@@ -464,7 +464,7 @@ Every preference lives in versioned config records in Supabase, edited in a sett
 **Versioning and safety**
 
 - Each save creates a new `config_version` row with a diff against the previous one; rollback is one click.
-- Invalid config is rejected at save time by the zod schema, never at run time.
+- Invalid config is rejected at save time by the backend's Pydantic schema (the frontend's generated types catch most errors before sending), never at run time.
 - **Replay preview:** before saving event or notification changes, the app re-runs the last 7 days of classified items against the draft config and shows which alerts would have fired. This uses stored results only, so it costs nothing.
 - Export and import as a JSON file, so config can also be kept in git.
 - Strategy and thesis changes never rewrite history: old verdicts stay tied to the version they were judged under.
@@ -509,7 +509,7 @@ Event triggers do the expensive work; timed jobs stay cheap. Outside earnings se
 | Trigger | Condition | Action |
 | --- | --- | --- |
 | Daily 07:00 CET | Weekday | News triage → escalations → daily digest |
-| Daily 22:30 CET | Weekday | Trading212 sync, FX, macro series; drift check |
+| Daily 22:30 CET | Every day by default; the Jobs config can limit it to weekdays | Trading212 sync, FX, macro series; drift check |
 | Weekly, Sunday | Always | Weekly digest; refresh `next_report_date` for holdings due in the next 14 days |
 | Quarterly | 1st day of Jan, Apr, Jul, Oct | Fetch IR financial calendars for non-US holdings |
 | Report date + 1 day | Holding reported | Earnings thesis check; retry at +2 and +4 days if no document found |
@@ -756,11 +756,55 @@ The biggest technical risk is extraction from European reports, which often arri
 
 Two tracks run in parallel over about 10 weeks: **backend** (Python: FastAPI + worker, Supabase schema, collectors, AI jobs, verification) and **frontend** (Next.js: config editor, dashboard, chat). A solo builder alternates tracks day to day or week to week; the plan works the same way if a second person takes one track. Each phase is done only when every task's acceptance criterion (AC) holds — not when the code merely runs.
 
+### Plan gap review (2026-09-25)
+
+A full pass of the spec against the phase tasks found features, config domains, triggers, defence layers and operational needs that the spec describes but no task delivered. Each gap is now a task with an acceptance criterion, in the phase where its dependencies exist. Phases 1b and 2 follow-ups are new; the other fixes extend existing phases. Together with phase 2b the plan grows from about 10 to about 13 weeks; the week numbers of later phases are left as originally written.
+
+| Gap | Where the spec asks for it | Fixed in |
+| --- | --- | --- |
+| No always-on host before phase 6, yet phase 1 requires 5 and 10 consecutive scheduled syncs | Phase 1 AC and sync point; Risks (restart policy, uptime check) | Phase 1b |
+| Strategy editor never scheduled | Configuration; Config section | Phase 1b |
+| Jobs (schedule) editor never scheduled | Configuration table | Phase 1b |
+| Config version history, diff view, one-click rollback, JSON export/import | Configuration: versioning and safety | Phase 1b |
+| Transactions and dividends are synced but never shown | What the app does, item 1 | Phase 1b |
+| Phase 1 ACs that need live data were never checked (Trading212 totals, Realtime within 2 s, consecutive runs) | Phase 1 | Phase 1b |
+| Thesis board (all holdings' status at a glance) | What the app does, item 2 | Phase 2 follow-ups |
+| Earnings-check trigger at report date + 1 with retries at + 2 and + 4; weekly refresh of `next_report_date` | Scheduling and triggers | Phase 2 follow-ups |
+| Cross-source reconciliation (press release vs 10-Q XBRL) and restatement handling | Defence, layer 3 | Phase 2 follow-ups |
+| Owner review queue for facts held by sanity bounds or quarantined; owner overrides | Defence, layers 3 and 6 | Phase 2 follow-ups |
+| Cost per Claude call is never computed, so `job_step.cost_usd` and the cost page have no data | Cost control; Phase 6 cost page | Phase 2 follow-ups |
+| Event escalation job (Sonnet impact note linked to the thesis) | AI pipelines table | Phase 3 |
+| Drift, hard-limit and strategy-rule breaches never reach the digest or an alert | Scheduling (drift); strategy `on_breach` | Phase 3 |
+| Price-move trigger (±8 %) | Scheduling and triggers | Phase 3 |
+| Weekly digest job (only the view was planned) | What the app does, item 4; Scheduling | Phase 3 |
+| Macro: FRED and ECB collectors, central-bank feeds, daily AI macro summary | Data sources; News layer 1; AI-substituted data | Phase 3 |
+| Time checks (freshness window, event vs publish date, recycled stories) | Defence, layer 5 | Phase 3 |
+| Unconfirmed re-check for 48 h, disputed side-by-side view, tier-3 "sentiment" handling | Defence, layer 2; News layer 3 | Phase 3 |
+| Per-ticker muting and repeat-event throttling | Notifications config | Phase 3 |
+| Alerts for failed jobs and missed runs (the Activity page only displays them) | Scheduling (missed run); Risks (Trading212 beta) | Phase 3 |
+| Thesis review dates and exit conditions never evaluated | Theses config | Phase 3 |
+| Source registry editor and event-rules editor (phase 4 previews a rules editor nobody builds) | Configuration; Phase 4 | Phase 3 |
+| Freshness label on the news feed and every report | Design and UI | Phase 3 |
+| Verification config domain has no schema, editor or consumer | Configuration table | Phase 4 |
+| Eval sets never grow from items flagged wrong | Defence, layer 7 | Phase 4 |
+| Snippet hover preview on citations; source sidebar on digests | Design and UI | Phase 4 |
+| Chat cannot trigger jobs | What the app does, item 7 | Phase 5 |
+| Reports section (searchable archive of digests, reviews, research) | Information architecture | Phase 5 |
+| "Research again" on the holding page | Design and UI | Phase 5 |
+| Budget editor (phase 6 has budget rules but no editor) | Configuration | Phase 6 |
+| Deployment packaging: restart policy, uptime monitor, Vercel production deploy | Tech stack; Risks | Phase 6 |
+| Accessibility and responsive pass | Design and UI: mobile and access | Phase 6 |
+
+Three contradictions inside the spec are corrected in place:
+- Config validation is Pydantic, not zod.
+- The portfolio sync runs daily by default, and the Jobs config can restrict it to weekdays.
+- The phase 0 pgmq check lists the `jobs` queue from phase 1 on.
+
 ### Phase 0 — Foundations (week 1)
 
 **Backend tasks**
 
-- [ ] Create the Supabase project (Free tier) and enable the `pgmq` extension. **AC:** `select * from pgmq.list_queues();` returns an empty result with no error.
+- [ ] Create the Supabase project (Free tier) and enable the `pgmq` extension. **AC:** `select * from pgmq.list_queues();` returns an empty result with no error (from phase 1 on it lists the `jobs` queue).
 - [ ] Write the initial Postgres migration: `config_version`, `instrument`, and the `app_backend` role with table grants and no RLS bypass beyond what's granted. **AC:** `supabase db push` applies cleanly to a fresh project; connecting as `app_backend` can read/write those tables and cannot read any table owned by `anon`-restricted policies it wasn't granted.
 - [ ] Scaffold the FastAPI app and the worker entrypoint from one `apps/backend` Python package (`uv` for dependencies). **AC:** `uv run uvicorn` serves `/health` returning 200; `uv run python -m worker` starts and logs "scheduler started" with zero registered jobs.
 - [ ] Define the strategy and thesis Pydantic models and export OpenAPI JSON. **AC:** `openapi.json` validates against the OpenAPI 3.1 spec and includes a `StrategyConfig` and `ThesisConfig` schema.
@@ -793,6 +837,24 @@ Two tracks run in parallel over about 10 weeks: **backend** (Python: FastAPI + w
 
 **Sync point:** the backend ships the portfolio read API and 10 consecutive clean daily syncs by end of week 2; the frontend builds Overview and Holdings against that live data, not fixtures, from week 3.
 
+### Phase 1b — Config foundation, hosting and phase 1 sign-off (next, about 1 week)
+
+Added by the gap review. Phase 1 is built; these are the pieces it assumed but nobody delivered, plus the owner-facing config the later phases need.
+
+**Backend tasks**
+
+- [ ] Always-on dev host for the API and worker (Docker Compose or systemd, restart always), an external uptime check on `/health`, and a Vercel preview deployment of the web app. **AC:** 10 consecutive scheduled syncs complete on the host with no error (this is phase 1's sync point); stopping the API raises an uptime alert within 5 minutes; killing either process brings it back within 1 minute.
+- [ ] Config history API: list versions per domain, diff between any two, roll back (the old body saved as a new active version), and export/import of all domains as one JSON file. **AC:** a rollback creates a new version whose body equals the chosen one; importing an exported file into an empty project recreates every active version; an invalid file is rejected with every error listed and nothing saved.
+- [ ] Phase 1 sign-off on live data. **AC:** with at least 3 positions in 3 currencies, the Overview total matches the Trading212 app within FX rounding; a sync started in a second tab updates the first tab's indicator within 2 seconds; 5 consecutive scheduled runs produce one snapshot row per position per day.
+
+**Frontend tasks**
+
+- [ ] Config section shell with the strategy editor: base currency, FX source, weight basis, categories and classifications, position, category and cash targets with bands and hard limits, and rules. Forms are generated from the backend's Pydantic-derived types. **AC:** changing a target and saving changes the Overview drift with no code change; targets summing above 100 % are rejected with a field-level error before saving; the editor round-trips every field of the active version without loss.
+- [ ] Jobs editor (schedule, enabled, time zone) and a version-history view with diff and rollback for every config domain. **AC:** a new schedule saved in the UI is used by the worker within 5 minutes with no restart; rolling back from the history view restores the previous drift figures.
+- [ ] Transactions and dividends view: orders, dividends and cash movements with filters by type, ticker and period. **AC:** every `transaction` row appears exactly once; the dividend total for a period equals a direct SQL sum.
+
+**Sync point:** the host and config history API land first (days 1–3); the editors build on them through the end of the week.
+
 ### Phase 2 — Extraction and earnings checks (weeks 3–5)
 
 **Backend tasks**
@@ -811,6 +873,22 @@ Two tracks run in parallel over about 10 weeks: **backend** (Python: FastAPI + w
 - [ ] Thesis and holding-profile config forms, generated from the backend's Pydantic-derived types. **AC:** editing a KPI threshold and saving is reflected in the next verdict run with no backend code change.
 
 **Sync point:** the backend ships the `fact`/`verdict` read API and the thesis config schema by week 4; the frontend builds the holding page and thesis editor against it through week 5.
+
+### Phase 2 follow-ups (with phase 2b, weeks 5–6)
+
+Phase 2 is built on its own branch; these gap-review tasks extend it.
+
+**Backend tasks**
+
+- [ ] Earnings-check triggers: enqueue the check at report date + 1, retry at + 2 and + 4 days when no document is found, and refresh `next_report_date` every Sunday for holdings reporting within 14 days. **AC:** a recorded report date produces exactly these attempts and stops after the first success; a date change found on Sunday moves the trigger.
+- [ ] Cross-source reconciliation and restatements: US press-release figures are checked against the later 10-Q/10-K XBRL value; a new value for an already stored period is kept beside the old one and flagged. **AC:** a seeded mismatch quarantines the fact and recomputes its verdicts; a seeded restatement keeps both values and never overwrites.
+- [ ] Owner review queue and overrides: facts held by sanity bounds or quarantined wait for the owner, who can accept, correct or reject; an override always wins and is logged with a reason. **AC:** a held fact is used in no verdict until accepted; a correction recomputes the affected verdicts within one worker cycle.
+- [ ] Cost accounting per Claude call: a model price table in the Budget config; every AI step records input and output tokens, searches and `cost_usd`. **AC:** the cost of every step equals tokens and searches times the configured prices, to the cent.
+
+**Frontend tasks**
+
+- [ ] Thesis board: every holding's thesis status (pass, breach, unknown per KPI) on one screen, with "unknown" styled distinctly and never omitted. **AC:** every holding with a thesis appears once; each status opens its verdict and evidence in one click.
+- [ ] Review queue screen for held and quarantined facts. **AC:** every held fact is listed with its snippet, source and the bound it broke; resolving one removes it and shows the recomputed verdict.
 
 ### Phase 2b — Identity, reference data and market history (weeks 5–6)
 
@@ -848,12 +926,27 @@ Added 2026-09-25 for the sources in "Additional data sources". It sits between p
 - [ ] SEC EDGAR full-text search: saved searches for each holding's names and watch topics. **AC:** a new filing that mentions a watched term becomes a `news_item` within one ingest cycle; a 10-K or 20-F naming a holding as customer or supplier is stored as a suggested relationship linked to the filing.
 - [ ] Eurostat macro series (HICP, unemployment, GDP, industrial production, confidence for CZ, DE and the euro area) and its release calendar. **AC:** each series matches the value on Eurostat's own site for its latest release; a macro surprise is evaluated only on a release day and cites the release date and source URL.
 
+- [ ] Event escalation job (Sonnet, 5 steps): for each confirmed severity-2+ cluster, an impact note linked to the affected thesis KPIs and exit conditions. **AC:** every escalation cites the cluster's sources and names the KPI or exit condition it touches, or states that none applies.
+- [ ] Drift, hard-limit and strategy-rule checks after each sync: out-of-band positions are flagged in the next digest; a hard-limit or rule breach alerts at its configured `on_breach` severity. **AC:** a seeded breach alerts once, not on every sync, and clears when back in band.
+- [ ] Price-move trigger: a daily close-to-close move beyond the configured threshold (default ±8 %) enqueues an escalation for that holding. **AC:** a seeded 9 % move produces one escalation; a 7 % move produces none; changing the threshold in config changes this with no deploy.
+- [ ] Weekly digest job (Sunday): the week's events by holding, thesis status changes, drift, and theses past their review date. **AC:** a week with no events still produces a digest saying so; a thesis past its `review_date` is listed until its review date moves.
+- [ ] Macro collectors and central-bank sources: FRED and ECB Data Portal series into `macro_series`; Fed, ECB and ČNB press pages or feeds as layer-1 sources; a daily AI macro and central-bank summary for the digest (qualitative only, numbers from the collectors). **AC:** every macro number in a digest comes from `macro_series` with its source and date; a rate decision appears in the next digest.
+- [ ] Time checks: drop items outside the freshness window, compare the event date with the publish date, and match new items against stored clusters so a known event never alerts twice. **AC:** a republished 2-year-old story and a second outlet's copy of a known event each produce no new alert.
+- [ ] Corroboration lifecycle: unconfirmed items are re-checked for 48 hours; contradicting sources mark the cluster disputed and freeze verdict changes until resolved; tier-3 items are labelled "sentiment", off by default, and never alert on their own. **AC:** a seeded single-outlet claim that gains a second independent source within 48 hours becomes confirmed; a disputed cluster changes no verdict.
+- [ ] Notification-rule completeness: per-ticker and per-event-type muting, repeat-event throttling, and holidays from the phase 2b calendar. **AC:** a muted ticker's severity-3 event goes to the digest, not to an alert; the same event repeated within the throttle window alerts once.
+- [ ] Alerts for failed jobs and missed runs through the notifier: a failed sync or collector, or a holding with no successful run in its window. **AC:** a forced Trading212 authentication failure alerts once with the job's error; a holding with no news run for 48 hours alerts once.
+
 **Frontend tasks**
 
 - [ ] News feed, filterable by holding, severity, confidence and source tier. **AC:** every filter combination returns a result set consistent with a direct SQL query using the same filters.
 - [ ] Notification-rules editor. **AC:** changing a severity's channel in the UI and saving changes where the next matching test alert is routed, with no backend restart.
 - [ ] Digest view (daily and weekly), with claim-level source links per item. **AC:** every factual sentence in a rendered digest links to a `news_item` or `fact` it was generated from.
 - [ ] Command palette (Cmd/Ctrl+K) for navigation and re-running a check. **AC:** every primary navigation destination and at least one action (re-run earnings check) is reachable from the palette with no mouse.
+
+- [ ] Source registry editor: name, tier, type, URL, enabled, per-holding scope, domain allow and block lists, freshness window, tier-3 handling. **AC:** disabling a source in the UI removes it from the next ingest run with no deploy.
+- [ ] Event-rules editor: severity per event type, per-holding overrides, price-move and macro-surprise thresholds (phase 4 adds the replay preview to it). **AC:** raising an event type to severity 3 in the UI makes the next matching test item alert.
+- [ ] Disputed-story view with both versions side by side and their sources. **AC:** every disputed cluster shows each conflicting claim with its source and tier.
+- [ ] Freshness label ("as of" or "synced … ago") on the news feed and every report view. **AC:** each of these screens shows the timestamp of the data it renders.
 
 **Sync point:** the backend ships the `news_item`/`story_cluster` read API and the notification-rules schema by week 6; the frontend builds the feed, rules editor and digest view against it through week 7.
 
@@ -868,11 +961,17 @@ Added 2026-09-25 for the sources in "Additional data sources". It sits between p
 
 - [ ] Trust tiers and corroboration for the new sources (tier 1: FIRDS, GLEIF, RNS, EQS, EDGAR, Eurostat; tier 2: Stooq, OpenFIGI; tier 3: Wikidata). **AC:** a Wikidata-only relationship is never shown as confirmed; a GLEIF parent contradicting Wikidata is shown as disputed with both sources.
 
+- [ ] Verification config domain: schema, and the corroboration, sanity-bound and claim-verifier jobs read their thresholds from it. **AC:** changing the sanity band in config changes which seeded facts are held, with no deploy.
+- [ ] Eval sets grow from feedback: an item marked wrong can be added to the golden or labelled set with its corrected value. **AC:** a flagged fact added this way is part of the next CI eval run.
+
 **Frontend tasks**
 
 - [ ] Wrong/irrelevant/useful controls on every fact, alert, verdict and report claim already shipped in phases 1–3. **AC:** every one of those surfaces has the controls, verified by a checklist pass over each screen, not just new ones.
 - [ ] Activity page: job log, per-holding coverage gaps, missed-run alerts. **AC:** stopping a scheduled job for one holding for 48 hours produces a visible gap on this page with no manual query.
 - [ ] Replay preview UI on the notification-rules and event-rules editors. **AC:** saving a rule change shows the preview's diff before the save is confirmed.
+
+- [ ] Verification config editor. **AC:** every field of the verification schema is editable and validated before saving.
+- [ ] Citation hover preview (snippet and source tier) on every claim-level citation, and a source sidebar on digests. **AC:** hovering any citation in a digest shows the exact snippet it links to.
 
 **Sync point:** the backend ships the feedback endpoint and the golden-set eval results by week 7; the frontend wires feedback into every existing surface and builds the Activity page through week 8.
 
@@ -887,12 +986,17 @@ Added 2026-09-25 for the sources in "Additional data sources". It sits between p
 - [ ] Form 13F institutional ownership from the SEC quarterly data sets, matched by CUSIP through OpenFIGI; optional tracked managers in config. **AC:** for 3 US test holdings, holder count and total shares per quarter equal an independent aggregation of the same SEC data set; tracked-manager new or exited positions appear in the next digest.
 - [ ] Research and monthly review use the new data: an ownership section (13F, voting-rights notices), a relationships section (GLEIF, confirmed Wikidata and EDGAR links), risk metrics (Stooq), liquidity (FITRS) and shared-ultimate-parent concentration. **AC:** every relationship, ownership or risk figure in a report cites its stored source record.
 
+- [ ] Chat can start jobs (re-run an earnings check, start research, run a sync) after an explicit confirmation in the chat. **AC:** each of these three actions can be started from chat and appears in the job log with its trigger.
+
 **Frontend tasks**
 
 - [ ] Research report view with a source-card sidebar. **AC:** every source used in a report appears in the sidebar with its tier, and every claim-level citation in the body links to one of those cards.
 - [ ] Research-profile editor (sections, depth, model, search budget, source tiers). **AC:** running research with two different profiles on the same ticker produces visibly different reports (section count or depth).
 - [ ] Monthly review view. **AC:** the compliance table renders every strategy rule with a pass/breach state, with no rule silently omitted.
 - [ ] Chat panel, reachable from the command palette. **AC:** a chat answer's source links open the same evidence pages as the rest of the app, not a separate broken path.
+
+- [ ] Reports section: an archive of digests, monthly reviews and research reports, with full-text search. **AC:** searching a ticker or phrase returns every report containing it, newest first.
+- [ ] "Research again" on the holding page, choosing a research profile. **AC:** the action starts a research job for that ticker and profile, and the result links back to the holding.
 
 **Sync point:** the backend ships the report and chat APIs by week 9; the frontend builds their views last, since they depend on every data shape from phases 1–4, through week 10.
 
@@ -904,10 +1008,15 @@ Added 2026-09-25 for the sources in "Additional data sources". It sits between p
 - [ ] Budget rules: step/search caps, Anthropic Console spend limit, behaviour at the cap. **AC:** artificially lowering the monthly cap in config and running jobs causes non-critical jobs to pause or downgrade model exactly as configured, verified in a test run.
 - [ ] Weekly error report job, summarising feedback-flagged items. **AC:** a week containing at least one flagged fact produces a non-empty report; a week with none says so explicitly.
 
+- [ ] Deployment packaging for the live host: container or systemd units with restart always, health checks, the uptime monitor from phase 1b, and the Vercel production deployment with its environment variables. **AC:** a fresh host runs the documented setup with no manual steps beyond secrets; both processes come back within 1 minute after being killed.
+
 **Frontend tasks**
 
 - [ ] Cost page: spend vs. budget, broken down by job type. **AC:** the total shown matches the sum of `job_step.cost_usd` for the period to the cent.
 - [ ] Empty, loading and error states across every screen built in phases 1–5. **AC:** a full pass with the backend stopped shows a clear error state on every screen, never a blank page or an unhandled exception.
+
+- [ ] Budget editor: monthly cap, per-job caps, behaviour at the cap, model price table. **AC:** lowering the cap in the UI triggers the configured downgrade or pause on the next job with no deploy.
+- [ ] Accessibility and responsive pass: contrast in both themes, keyboard reachability of every action, no meaning by colour alone, usable at phone width. **AC:** an automated audit (axe) reports no serious issues on every screen, and a keyboard-only walkthrough completes every primary action.
 
 **Sync point:** both tracks close out together against the acceptance checks above; nothing in phase 6 starts until every prior phase's ACs are met.
 
