@@ -5,6 +5,9 @@ import { connection } from "next/server";
 
 import { AppNav } from "@/components/app-nav";
 import { SignOutButton } from "@/components/sign-out-button";
+import { SyncErrorBanner } from "@/components/sync/sync-error-banner";
+import { SyncIndicator } from "@/components/sync/sync-indicator";
+import { SyncStatusProvider } from "@/components/sync/sync-status-provider";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { Button } from "@/components/ui/button";
 import { decideAccess, HOME_PATH, LOGIN_PATH } from "@/lib/auth/access";
@@ -32,6 +35,7 @@ export default async function AppLayout({ children }: LayoutProps<"/">) {
   if (decision.action === "redirect") redirect(decision.to);
 
   return (
+    <SyncStatusProvider>
     <div className="flex min-h-dvh flex-col">
       <a
         href="#main"
@@ -45,8 +49,9 @@ export default async function AppLayout({ children }: LayoutProps<"/">) {
             StewardAI
           </Link>
           <div className="ml-auto flex items-center gap-1">
+            <SyncIndicator />
             {state.user?.email ? (
-              <span className="hidden truncate text-sm text-text-muted sm:inline">
+              <span className="hidden truncate text-sm text-text-muted lg:inline">
                 {state.user.email}
               </span>
             ) : null}
@@ -65,8 +70,10 @@ export default async function AppLayout({ children }: LayoutProps<"/">) {
         </div>
       </header>
       <main id="main" tabIndex={-1} className="mx-auto w-full max-w-7xl flex-1 px-4 py-8 outline-none">
+        <SyncErrorBanner />
         {children}
       </main>
     </div>
+    </SyncStatusProvider>
   );
 }

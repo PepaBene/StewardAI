@@ -1,0 +1,80 @@
+"use client";
+
+import {
+  CircleAlertIcon,
+  CircleCheckIcon,
+  CircleDashedIcon,
+  LoaderCircleIcon,
+  RefreshCwIcon,
+} from "lucide-react";
+
+import { Button } from "@/components/ui/button";
+import { formatRelative, formatTime } from "@/lib/format";
+import { useNow } from "@/lib/hooks/use-now";
+import { cn } from "@/lib/utils";
+
+import { useSyncStatus } from "./sync-status-provider";
+
+const PHASE_LABELS = { queued: "Sync queued", waiting: "Waiting for previous sync", running: "Syncing" };
+
+/** Header indicator: the portfolio sync's live state, plus a "Sync now" button. */
+export function SyncIndicator() {
+  const { view, realtime, startSync, starting, startError } = useSyncStatus();
+  const now = useNow();
+
+  let icon = <CircleDashedIcon aria-hidden="true" className="size-4" />;
+  let text = "Checking sync…";
+  let title: string | undefined;
+  let tone = "text-text-muted";
+
+  if (view.kind === "never") {
+    text = "Never synced";
+  } else if (view.kind === "active") {
+    icon = <LoaderCircleIcon aria-hidden="true" className="size-4 animate-spin" />;
+    text = view.stepLabel && view.phase === "running" ? `Syncing: ${view.stepLabel}` : PHASE_LABELS[view.phase];
+    tone = "text-text";
+  } else if (view.kind === "idle") {
+    if (view.failure) {
+      icon = <CircleAlertIcon aria-hidden="true" className="size-4 text-warning-signal" />;
+      text = `Sync failed ${formatRelative(new Date(view.failure.at), now)}`;
+      title = view.failure.error ?? undefined;
+      tone = "text-text";
+    } else if (view.lastSuccessAt) {
+      const at = new Date(view.lastSuccessAt);
+      icon = <CircleCheckIcon aria-hidden="true" className="size-4" />;
+      text = `Synced ${formatTime(at)} · ${formatRelative(at, now)}`;
+      title = at.toLocaleString();
+    }
+  }
+
+  const busy = starting || view.kind === "active" || view.kind === "loading";
+  const liveNote =
+    realtime === "live" ? "live updates on" : realtime === "offline" ? "live updates off (polling)" : "connecting";
+
+  return (
+    <div className="flex items-center gap-2">
+      <p
+        role="status"
+        aria-live="polite"
+        title={title}
+        className={cn("flex items-center gap-1.5 text-sm", tone)}
+      >
+        {icon}
+        <span className="hidden md:inline num">{text}</span>
+        <span className="sr-only md:hidden">{text}</span>
+        <span className="sr-only">({liveNote})</span>
+      </p>
+      <Button
+        variant="outline"
+        size="sm"
+        onClick={() => void startSync()}
+        disabled={busy}
+        title={startError ?? undefined}
+      >
+        <RefreshCwIcon aria-hidden="true" className={cn(starting && "animate-spin")} />
+        <span className="hidden sm:inline">Sync now</span>
+        <span className="sr-only sm:hidden">Sync now</span>
+      </Button>
+    </div>
+  );
+}

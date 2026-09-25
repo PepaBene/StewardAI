@@ -12,7 +12,16 @@ import type { components, paths } from "./schema";
  */
 
 export type ApiClient = Client<paths>;
-export type HealthResponse = components["schemas"]["HealthResponse"];
+type Schemas = components["schemas"];
+export type HealthResponse = Schemas["HealthResponse"];
+export type PortfolioOverview = Schemas["PortfolioOverview"];
+export type HoldingsResponse = Schemas["HoldingsResponse"];
+export type Holding = Schemas["Holding"];
+export type JobSummary = Schemas["JobSummary"];
+export type DriftReport = Schemas["DriftReport"];
+export type PositionDrift = Schemas["PositionDrift"];
+export type DriftStatus = PositionDrift["status"];
+export type Freshness = Schemas["Freshness"];
 
 export type AccessTokenGetter = () => Promise<string | null | undefined>;
 

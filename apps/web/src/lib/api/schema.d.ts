@@ -66,10 +66,231 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/portfolio/overview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Portfolio Overview
+         * @description Totals, allocation, drift against the active strategy, and freshness, from the
+         *     latest snapshot. Returns empty sections (not an error) before the first sync.
+         */
+        get: operations["get_portfolio_overview"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/portfolio/holdings": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Portfolio Holdings
+         * @description Every open position of the latest snapshot, largest first.
+         */
+        get: operations["get_portfolio_holdings"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/jobs/portfolio-sync": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Run Portfolio Sync
+         * @description Queue a portfolio sync now. The worker runs it; a run already in progress finishes
+         *     first (the job waits for it), so two syncs never write at the same time.
+         */
+        post: operations["run_portfolio_sync"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/config/strategy": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Strategy Config */
+        get: operations["get_strategy_config"];
+        /**
+         * Save Strategy Config
+         * @description Validate and save as the new active strategy. Drift uses it immediately.
+         */
+        put: operations["save_strategy_config"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/config/theses": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Theses Config */
+        get: operations["get_theses_config"];
+        /** Save Theses Config */
+        put: operations["save_theses_config"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/config/jobs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Jobs Config
+         * @description The saved job schedules. 404 means the worker runs on the defaults.
+         */
+        get: operations["get_jobs_config"];
+        /**
+         * Save Jobs Config
+         * @description Save job schedules. The worker picks them up within a few minutes, no restart.
+         */
+        put: operations["save_jobs_config"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        /** AccountTotals */
+        AccountTotals: {
+            /** Account Currency */
+            account_currency: string;
+            /**
+             * Total Value
+             * @description Total value as Trading212 reports it.
+             */
+            total_value: number;
+            /** Cash */
+            cash: number;
+            /** Invested Value */
+            invested_value: number;
+            /** Invested Cost */
+            invested_cost: number;
+            /** Unrealized Ppl */
+            unrealized_ppl: number;
+            /** Realized Ppl */
+            realized_ppl: number;
+        };
+        /** AllocationSlice */
+        AllocationSlice: {
+            /**
+             * Key
+             * @description Ticker, or 'CASH'.
+             */
+            key: string;
+            /** Label */
+            label: string;
+            /** Value Base */
+            value_base: number;
+            /** Weight */
+            weight: number | null;
+        };
+        /** BaseTotals */
+        BaseTotals: {
+            /** Base Currency */
+            base_currency: string;
+            /**
+             * Fx Source
+             * @enum {string}
+             */
+            fx_source: "cnb" | "ecb";
+            /** Total */
+            total: number;
+            /** Cash */
+            cash: number;
+            /** Invested */
+            invested: number;
+        };
+        /** BucketDrift */
+        BucketDrift: {
+            /** Bucket */
+            bucket: string;
+            /** Value Base */
+            value_base: number;
+            /** Weight */
+            weight: number;
+            /** Target Weight */
+            target_weight: number | null;
+            /** Band */
+            band: number | null;
+            /** Lower */
+            lower: number | null;
+            /** Upper */
+            upper: number | null;
+            /** Drift */
+            drift: number | null;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "in_band" | "above_band" | "below_band" | "above_hard_limit" | "no_target";
+        };
+        /** CashDrift */
+        CashDrift: {
+            /** Value Base */
+            value_base: number;
+            /** Weight */
+            weight: number | null;
+            /** Target Weight */
+            target_weight: number | null;
+            /** Band */
+            band: number | null;
+            /** Lower */
+            lower: number | null;
+            /** Upper */
+            upper: number | null;
+            /** Drift */
+            drift: number | null;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "in_band" | "above_band" | "below_band" | "above_hard_limit" | "no_target";
+        };
         /** CashWeightRule */
         CashWeightRule: {
             /**
@@ -163,6 +384,58 @@ export interface components {
             /** Bucket */
             bucket?: string | null;
         };
+        /** DimensionAllocation */
+        DimensionAllocation: {
+            /** Dimension */
+            dimension: string;
+            /** Buckets */
+            buckets: components["schemas"]["BucketDrift"][];
+        };
+        /** DriftReport */
+        DriftReport: {
+            /**
+             * Weight Basis
+             * @enum {string}
+             */
+            weight_basis: "total" | "invested";
+            /** Basis Value Base */
+            basis_value_base: number;
+            /** Positions */
+            positions: components["schemas"]["PositionDrift"][];
+            /** Categories */
+            categories: components["schemas"]["DimensionAllocation"][];
+            cash: components["schemas"]["CashDrift"];
+            /** Out Of Band */
+            out_of_band: number;
+        };
+        /** Freshness */
+        Freshness: {
+            /**
+             * Snapshot Date
+             * Format: date
+             */
+            snapshot_date: string;
+            /**
+             * Synced At
+             * Format: date-time
+             * @description When the sync that wrote this snapshot finished its last step.
+             */
+            synced_at: string;
+            /** Job Id */
+            job_id: number;
+        };
+        /** FxRateUsed */
+        FxRateUsed: {
+            /** Currency */
+            currency: string;
+            /**
+             * Rate
+             * @description Base-currency units per one unit of `currency`.
+             */
+            rate: number;
+            /** Rate Date */
+            rate_date: string | null;
+        };
         /** HTTPValidationError */
         HTTPValidationError: {
             /** Detail */
@@ -177,6 +450,169 @@ export interface components {
             status: "ok";
             /** Version */
             version: string;
+        };
+        /** Holding */
+        Holding: {
+            /** Ticker */
+            ticker: string;
+            /** Name */
+            name: string | null;
+            /** Isin */
+            isin: string | null;
+            /** Quantity */
+            quantity: number;
+            /** Avg Price */
+            avg_price: number;
+            /** Current Price */
+            current_price: number;
+            /** Instrument Currency */
+            instrument_currency: string;
+            /**
+             * Value
+             * @description quantity x current_price, instrument currency.
+             */
+            value: number;
+            /** Account Currency */
+            account_currency: string;
+            /** Value Account */
+            value_account: number;
+            /** Cost Account */
+            cost_account: number;
+            /**
+             * Ppl
+             * @description Unrealised P/L in the account currency (Trading212).
+             */
+            ppl: number;
+            /**
+             * Ppl Pct
+             * @description ppl / cost_account.
+             */
+            ppl_pct: number | null;
+            /** Fx Rate */
+            fx_rate: number;
+            /** Fx Rate Date */
+            fx_rate_date: string | null;
+            /** Value Base */
+            value_base: number;
+            /** Weight */
+            weight: number | null;
+            /** Target Weight */
+            target_weight: number | null;
+            /** Drift */
+            drift: number | null;
+            /**
+             * Drift Status
+             * @enum {string}
+             */
+            drift_status: "in_band" | "above_band" | "below_band" | "above_hard_limit" | "no_target";
+        };
+        /** HoldingsResponse */
+        HoldingsResponse: {
+            freshness: components["schemas"]["Freshness"] | null;
+            /** Base Currency */
+            base_currency: string | null;
+            /** Account Currency */
+            account_currency: string | null;
+            /**
+             * Holdings
+             * @description Every open position once, by value descending.
+             */
+            holdings: components["schemas"]["Holding"][];
+        };
+        /** JobSchedule */
+        JobSchedule: {
+            /**
+             * Enabled
+             * @default true
+             */
+            enabled: boolean;
+            /**
+             * Cron
+             * @description Standard 5-field cron expression (minute hour day month weekday).
+             * @example 30 22 * * *
+             */
+            cron: string;
+            /**
+             * Timezone
+             * @default Europe/Prague
+             * @example Europe/Prague
+             */
+            timezone: string;
+        };
+        /** JobSummary */
+        JobSummary: {
+            /** Id */
+            id: number;
+            /** Job Type */
+            job_type: string;
+            /** Trigger */
+            trigger: string;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "queued" | "waiting" | "running" | "succeeded" | "failed";
+            /** Error */
+            error: string | null;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Started At */
+            started_at: string | null;
+            /** Finished At */
+            finished_at: string | null;
+        };
+        /**
+         * JobsConfig
+         * @description Schedules for the worker's timed jobs. Stored as `config_version` rows, domain `jobs`.
+         *
+         *     The worker re-reads this every few minutes, so a saved change applies without a restart.
+         */
+        JobsConfig: {
+            /**
+             * Schema Version
+             * @default 1
+             * @constant
+             */
+            schema_version: 1;
+            /** @description Trading212 sync, FX rates and drift. Default: daily at 22:30 Prague time. */
+            portfolio_sync?: components["schemas"]["JobSchedule"];
+        };
+        /** JobsConfigVersion */
+        JobsConfigVersion: {
+            /** Id */
+            id: number;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Note */
+            note: string | null;
+            body: components["schemas"]["JobsConfig"];
+        };
+        /** PortfolioOverview */
+        PortfolioOverview: {
+            /** @description Null until the first successful sync. */
+            freshness: components["schemas"]["Freshness"] | null;
+            /** @description The latest sync job, whatever its status. */
+            last_sync: components["schemas"]["JobSummary"] | null;
+            account: components["schemas"]["AccountTotals"] | null;
+            base: components["schemas"]["BaseTotals"] | null;
+            /** Strategy Config Version Id */
+            strategy_config_version_id: number | null;
+            /**
+             * Base Currency Mismatch
+             * @description The active strategy's base currency differs from the snapshot's; the next sync converts to the new one.
+             */
+            base_currency_mismatch: boolean;
+            /** Allocation */
+            allocation: components["schemas"]["AllocationSlice"][];
+            drift: components["schemas"]["DriftReport"] | null;
+            /** Fx Rates */
+            fx_rates: components["schemas"]["FxRateUsed"][];
         };
         /** PositionCountRule */
         PositionCountRule: {
@@ -208,6 +644,32 @@ export interface components {
             type: "position_count";
             /** Value */
             value: number;
+        };
+        /** PositionDrift */
+        PositionDrift: {
+            /** Ticker */
+            ticker: string;
+            /** Weight */
+            weight: number;
+            /** Target Weight */
+            target_weight: number | null;
+            /** Band */
+            band: number | null;
+            /** Lower */
+            lower: number | null;
+            /** Upper */
+            upper: number | null;
+            /** Hard Limit */
+            hard_limit: number | null;
+            /** Drift */
+            drift: number | null;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "in_band" | "above_band" | "below_band" | "above_hard_limit" | "no_target";
+            /** Held */
+            held: boolean;
         };
         /** PositionTarget */
         PositionTarget: {
@@ -332,6 +794,19 @@ export interface components {
             /** Rules */
             rules?: (components["schemas"]["PositionWeightRule"] | components["schemas"]["CategoryWeightRule"] | components["schemas"]["CashWeightRule"] | components["schemas"]["PositionCountRule"])[];
         };
+        /** StrategyConfigVersion */
+        StrategyConfigVersion: {
+            /** Id */
+            id: number;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Note */
+            note: string | null;
+            body: components["schemas"]["StrategyConfig"];
+        };
         /** TargetBand */
         TargetBand: {
             /** Target Weight */
@@ -356,6 +831,19 @@ export interface components {
             schema_version: 1;
             /** Theses */
             theses?: components["schemas"]["ThesisConfig"][];
+        };
+        /** ThesesConfigVersion */
+        ThesesConfigVersion: {
+            /** Id */
+            id: number;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Note */
+            note: string | null;
+            body: components["schemas"]["ThesesConfig"];
         };
         /** ThesisConfig */
         ThesisConfig: {
@@ -518,6 +1006,234 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ThesesConfig"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_portfolio_overview: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PortfolioOverview"];
+                };
+            };
+        };
+    };
+    get_portfolio_holdings: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HoldingsResponse"];
+                };
+            };
+        };
+    };
+    run_portfolio_sync: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["JobSummary"];
+                };
+            };
+        };
+    };
+    get_strategy_config: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StrategyConfigVersion"];
+                };
+            };
+        };
+    };
+    save_strategy_config: {
+        parameters: {
+            query?: {
+                /** @description Why this change was made. */
+                note?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["StrategyConfig"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StrategyConfigVersion"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_theses_config: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ThesesConfigVersion"];
+                };
+            };
+        };
+    };
+    save_theses_config: {
+        parameters: {
+            query?: {
+                /** @description Why this change was made. */
+                note?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ThesesConfig"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ThesesConfigVersion"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_jobs_config: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["JobsConfigVersion"];
+                };
+            };
+        };
+    };
+    save_jobs_config: {
+        parameters: {
+            query?: {
+                /** @description Why this change was made. */
+                note?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["JobsConfig"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["JobsConfigVersion"];
                 };
             };
             /** @description Validation Error */

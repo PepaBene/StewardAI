@@ -51,6 +51,9 @@
   --info-signal-subtle: oklch(0.955 0.02 240);
   --disputed: oklch(0.5 0.11 355);
   --disputed-subtle: oklch(0.96 0.02 355);
+
+  /* Charts: allocation bars (a lighter step of the accent hue; never gain/loss) */
+  --chart-bar: oklch(0.62 0.12 277);
 }
 
 .dark {
@@ -81,6 +84,8 @@
   --info-signal-subtle: oklch(0.27 0.04 240);
   --disputed: oklch(0.74 0.1 355);
   --disputed-subtle: oklch(0.27 0.045 355);
+
+  --chart-bar: oklch(0.64 0.11 277);
 }
 
 /* Drop Tailwind's default palette so only token colours exist. */
@@ -111,4 +116,5 @@
   --color-info-signal-subtle: var(--info-signal-subtle);
   --color-disputed: var(--disputed);
   --color-disputed-subtle: var(--disputed-subtle);
+  --color-chart-bar: var(--chart-bar);
 }

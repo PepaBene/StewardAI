@@ -12,7 +12,10 @@ export const SECTIONS = [
 
 export type Section = (typeof SECTIONS)[number];
 
-export const PLACEHOLDER_SECTIONS = SECTIONS.filter((s) => s.slug !== "");
+/** Sections with a real page of their own; the rest render the [section] placeholder. */
+export const BUILT_SLUGS: readonly string[] = ["", "holdings"];
+
+export const PLACEHOLDER_SECTIONS = SECTIONS.filter((s) => !BUILT_SLUGS.includes(s.slug));
 
 export function sectionHref(section: Pick<Section, "slug">) {
   return `/${section.slug}`;
