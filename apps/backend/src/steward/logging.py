@@ -35,14 +35,26 @@ class SecretScrubFilter(logging.Filter):
         self._secrets = sorted({s for s in secrets if s}, key=len, reverse=True)
 
     def filter(self, record: logging.LogRecord) -> bool:
-        message = record.getMessage()
+        # Scrub the template and each argument separately, keeping the args' shape:
+        # some formatters (uvicorn's access log) unpack record.args themselves.
+        if isinstance(record.msg, str):
+            record.msg = scrub(record.msg, self._secrets)
+        if isinstance(record.args, tuple):
+            record.args = tuple(self._scrub_arg(arg) for arg in record.args)
+        elif isinstance(record.args, dict):
+            record.args = {key: self._scrub_arg(arg) for key, arg in record.args.items()}
         if record.exc_info and not record.exc_text:
             record.exc_text = logging.Formatter().formatException(record.exc_info)
-        record.msg = scrub(message, self._secrets)
-        record.args = None
         if record.exc_text:
             record.exc_text = scrub(record.exc_text, self._secrets)
         return True
+
+    def _scrub_arg(self, arg: object) -> object:
+        # Only replace an argument whose text actually contained a secret, so numeric
+        # args still satisfy %d-style placeholders.
+        text = str(arg)
+        cleaned = scrub(text, self._secrets)
+        return arg if cleaned == text else cleaned
 
 
 def configure_logging(level: str = "INFO", secrets: Iterable[str] = ()) -> None:

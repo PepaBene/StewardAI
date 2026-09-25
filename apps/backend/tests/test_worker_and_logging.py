@@ -68,3 +68,23 @@ def test_log_filter_scrubs_formatted_args_and_tracebacks() -> None:
     SecretScrubFilter(["s3cr3t-value"]).filter(record)
     assert "s3cr3t-value" not in record.getMessage()
     assert record.exc_text is not None and "s3cr3t-value" not in record.exc_text
+
+
+def test_filter_keeps_uvicorn_access_log_args_intact() -> None:
+    """Regression: uvicorn's AccessFormatter unpacks record.args, so the filter must keep
+    them a 5-tuple (it once replaced them with None, breaking every access log line)."""
+    from uvicorn.logging import AccessFormatter
+
+    record = logging.LogRecord(
+        "uvicorn.access",
+        logging.INFO,
+        __file__,
+        1,
+        '%s - "%s %s HTTP/%s" %d',
+        ("127.0.0.1:5000", "GET", "/health?token=s3cr3t-value", "1.1", 200),
+        None,
+    )
+    SecretScrubFilter(["s3cr3t-value"]).filter(record)
+    line = AccessFormatter("%(client_addr)s %(request_line)s %(status_code)s").format(record)
+    assert "GET /health?token=[REDACTED] HTTP/1.1" in line
+    assert "200" in line and "s3cr3t-value" not in line

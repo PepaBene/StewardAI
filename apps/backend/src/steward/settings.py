@@ -1,4 +1,4 @@
-"""Process settings, read from environment variables (or a local .env file).
+"""Process settings, read from environment variables (or the repository-root .env file).
 
 Secrets are typed as SecretStr so they never show up in reprs or logs by accident.
 Preferences (strategy, schedules, models, budgets) do NOT belong here: they are
@@ -7,14 +7,25 @@ needs to start and to reach its dependencies.
 """
 
 from functools import lru_cache
+from pathlib import Path
 from typing import Annotated, Literal
 
 from pydantic import Field, SecretStr, field_validator
 from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
 
+# One .env at the repository root holds every setting for both apps (see /.env.example).
+# Real environment variables take precedence; on the live host there is no file at all.
+REPO_ROOT_ENV_FILE = Path(__file__).resolve().parents[4] / ".env"
+
 
 class Settings(BaseSettings):
-    model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
+    model_config = SettingsConfigDict(
+        env_file=REPO_ROOT_ENV_FILE,
+        env_file_encoding="utf-8",
+        extra="ignore",
+        # `KEY=` lines in .env mean "not set", not "empty string".
+        env_ignore_empty=True,
+    )
 
     log_level: str = "INFO"
 

@@ -45,8 +45,9 @@ side is stale.
    ```
 6. Check pgmq: `select * from pgmq.list_queues();` returns no rows and no error.
 
-Then configure `apps/backend/.env` (see `.env.example`: `DATABASE_URL` as `app_backend`,
-`SUPABASE_URL`, `OWNER_USER_ID`, Trading212 keys) and `apps/web/.env.local`.
+Then fill in the environment: `cp .env.example .env` in the repository root. That one file
+is read by both apps, and `.env.example` explains where to get every value (Supabase URL
+and keys, the `app_backend` connection string, the owner id, the Trading212 key).
 
 Supabase's direct database host is IPv6-only unless the project has the IPv4 add-on. A
 backend host without IPv6 must use the session pooler (user `app_backend.<project-ref>`).
@@ -54,6 +55,7 @@ backend host without IPv6 must use the session pooler (user `app_backend.<projec
 ## Running locally
 
 ```bash
+cp .env.example .env                                                 # once; fill in values
 cd apps/backend && uv sync && uv run uvicorn api.main:app --reload   # API on :8000
 cd apps/backend && uv run python -m worker                           # scheduler
 cd apps/web && npm install && npm run dev                            # web on :3000

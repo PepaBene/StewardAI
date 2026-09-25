@@ -15,8 +15,11 @@ from steward.trading212.client import Trading212Client, Trading212Error
 
 async def _print_positions(env: str) -> int:
     settings = get_settings()
-    if settings.t212_api_key is None or settings.t212_api_secret is None:
-        print("Set T212_API_KEY and T212_API_SECRET (see .env.example).", file=sys.stderr)
+    if not settings.t212_api_key or not settings.t212_api_secret:
+        print(
+            "Set T212_API_KEY and T212_API_SECRET (repository-root .env; see .env.example).",
+            file=sys.stderr,
+        )
         return 2
     async with Trading212Client(
         settings.t212_api_key.get_secret_value(),

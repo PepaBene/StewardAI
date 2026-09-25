@@ -27,8 +27,12 @@ openapi.json         committed API contract; the frontend generates its types fr
 
 ```bash
 uv sync                    # Python 3.12 + dependencies from uv.lock
-cp .env.example .env       # then fill in values
 ```
+
+Settings come from the environment, falling back to the **repository-root `.env`**, which
+the frontend shares (`cp .env.example .env` in the repo root; `/.env.example` says where to
+get every value). Empty `KEY=` lines count as unset. On the live host, use its secrets
+manager instead of a file.
 
 ## Everyday commands
 
