@@ -13,21 +13,31 @@ Both share `steward` (settings, logging, DB access, config schemas, source adapt
 src/
   steward/           shared library
     config/          Pydantic schemas per config domain (strategy, theses, jobs, holding
-                     profiles, verification) + versioned store
+                     profiles, verification, news sources, event rules, notifications,
+                     budget) + versioned store (history, diff, rollback, export/import)
     documents/       fetching source documents, HTML/PDF to text, snippet matching
     earnings/        earnings check: locate, extract (Claude), validate, verdicts, calendar,
-                     golden-set evaluation (`python -m steward.earnings.golden`)
+                     XBRL reconciliation, owner review queue, thesis board, golden-set
+                     evaluation (`python -m steward.earnings.golden`)
     news/            news pipeline: collectors, normalise, cluster, link, classify (Claude
-                     Haiku), corroborate, digest; classification eval (`python -m
+                     Haiku), corroborate, escalate (Sonnet impact notes), digest; RNS, EQS
+                     and EDGAR full-text collectors; classification eval (`python -m
                      steward.news.eval`)
     notify/          alert routing (rules, quiet hours, cap, throttle), Telegram and email,
                      the dispatcher
     fx/              ČNB and ECB reference-rate collectors, currency conversion
     jobs/            job runner (advisory lock, job/job_step log), pgmq queue, registry
-    portfolio/       sync job, day snapshots, drift, API read models
-    sources/         SEC EDGAR and Finnhub adapters
+    portfolio/       sync job, day snapshots, drift, rule breaches, transactions, read models
+    reference/       identity (OpenFIGI, FIRDS/FITRS, GLEIF), corporate structure, prices
+                     and risk metrics, exchange calendar, lifecycle events
+    macro/           Eurostat, ECB and FRED series into macro_series, surprise events
+    sources/         SEC EDGAR, Finnhub, OpenFIGI, ESMA, GLEIF, Wikidata, Stooq adapters
     trading212/      read-only Trading212 client (+ `python -m steward.trading212`)
-    ai.py            Anthropic client, per-step token and cost accounting
+    ai.py            Anthropic client, per-step token counts
+    costs.py         cost from the Budget config's price table
+    monitor.py       alerts for failed jobs, missed runs and news coverage gaps
+    heartbeat.py     worker heartbeat row + external ping (`python -m steward.heartbeat_check`)
+    signoff.py       Phase 1 live-data sign-off report (`python -m steward.signoff`)
     storage.py       evidence archive (Supabase Storage REST)
     db.py            asyncpg pool as app_backend
     logging.py       logging with secret scrubbing
@@ -89,23 +99,36 @@ extension; CI runs against a Postgres image that has it.
 
 | Route | What it does |
 | --- | --- |
+| `GET /health`, `GET /health/ready` | Liveness (public); readiness: database reachable and worker heartbeat fresh (public) |
 | `GET /portfolio/overview` | Totals, allocation, drift against the active strategy, freshness |
 | `GET /portfolio/holdings` | Every open position of the latest snapshot, largest first |
+| `GET /portfolio/transactions` | Orders, dividends and cash movements; filters `type`, `ticker`, `start`, `end`, with period totals |
 | `GET /holdings/{ticker}` | Position, thesis, profile, KPI verdicts with history, every fact |
+| `GET /holdings/{ticker}/identity` | Identifiers, listings, home market, legal entity, group structure, suggested relationships |
+| `GET /holdings/{ticker}/prices` | Daily bars with benchmark, risk metrics, plausibility check against Trading212 |
+| `POST /relationships/{id}/confirm`, `/reject` | Confirm a suggested relationship (writes a holding-profile version) or reject it for good |
+| `GET /reference/gaps` | Instruments that could not be resolved, symbols without prices |
+| `GET /calendar/exchanges`, `POST /calendar/exchanges/closures` | Public holidays and exchange closures; add closures to the Jobs config |
+| `GET /theses/board` | Every holding's KPI statuses on one screen |
 | `GET /facts/{id}/evidence` | Signed URL of the archived source, and the text around the snippet |
-| `POST /facts/{id}/review` | Accept or reject a fact the validator held; re-queues verdicts |
-| `POST /jobs/portfolio-sync` | Queue a sync now (202); the worker runs it |
-| `POST /jobs/earnings-check` | Queue an earnings check for `{ticker, report_date?, url?}` |
-| `POST /jobs/thesis-verdicts` | Re-judge KPIs from stored facts (`{ticker?}`), no model calls |
-| `POST /jobs/earnings-calendar` | Refresh next report dates now |
+| `POST /facts/{id}/review` | Accept, correct (with value) or reject a held or quarantined fact, with a reason; re-queues verdicts |
+| `GET /facts/review-queue` | Facts waiting for the owner, with snippet, source and the check they failed |
 | `GET /news` | News items, newest first, with their story's severity and confidence; filters `ticker`, `severity`, `confidence`, `tier`, `story` (repeat a parameter for "any of") |
+| `GET /news/event-types` | The event taxonomy |
+| `GET /stories/disputed`, `POST /stories/{id}/resolve` | Disputed stories with each conflicting source; resolve one (unfreezes verdicts) |
 | `GET /alerts` | Recent alert decisions: sent, held, suppressed (with why), failed |
 | `POST /alerts/test` | Route a test alert through the saved notification rules; the worker sends it |
 | `GET /reports`, `GET /reports/{id}` | Digests, each sentence with its cited news items and facts |
-| `POST /jobs/news-ingest`, `POST /jobs/digest` | Run the news pipeline / write a digest now |
-| `GET`/`PUT /config/{strategy,theses,jobs,holding-profiles,verification,news-sources,event-rules,notifications}` | Active config version / save a new one |
+| `GET /escalations`, `GET /escalations/{id}` | Event escalation reports (impact notes) |
+| `GET /jobs/{id}` | One job with its steps, details, tokens and cost |
+| `POST /jobs/{portfolio-sync,earnings-check,thesis-verdicts,fact-reconcile,earnings-calendar,news-ingest,digest,macro-collect,reference-data,price-history,holiday-refresh}` | Queue a run now (202); the worker runs it |
+| `GET`/`PUT /config/{strategy,theses,jobs,holding-profiles,verification,budget,news-sources,event-rules,notifications}` | Active config version / save a new one |
+| `POST /config/{domain}/validate` | Validate a body without saving |
+| `GET /config/{domain}/versions`, `/versions/{id}`, `/diff?from=&to=` | Version history and a field-level diff |
+| `POST /config/{domain}/versions/{id}/rollback` | Save the chosen version's body as a new active version |
+| `GET /config/export`, `POST /config/import` | Every active domain as one JSON file; import validates all domains first and saves nothing on any error |
 
-All but `/health` need the owner's MFA-verified Supabase JWT.
+All but the two health routes need the owner's MFA-verified Supabase JWT.
 
 ## Design notes
 
@@ -180,6 +203,52 @@ All but `/health` need the owner's MFA-verified Supabase JWT.
   (Batch API by default, falling back to a direct call after a timeout); every sentence must
   cite item or fact ids it was given, or it is removed. A period with nothing material still
   produces and sends a digest that says so.
+- **Reconciliation and review** (`fact_reconcile`, daily). A US press-release figure is
+  compared with the later 10-Q/10-K XBRL value for the same concept and period (Q4 derived
+  from the annual figure); a mismatch beyond tolerance quarantines the fact and re-queues
+  its verdicts. A new value for a stored period is kept beside the old one, never
+  overwriting it. Held and quarantined facts wait in the review queue; the owner's accept,
+  correction or rejection always wins and is logged with the reason.
+- **Costs.** Every AI step stores its raw token counts (input, output, cache read and write,
+  batch flag) and web searches, plus the Budget config's prices at the time and the
+  resulting `cost_usd`, so every cost can be recomputed.
+- **Reference data** (`reference_data`, weekly; `price_history`, weekdays;
+  `holiday_refresh`, January and July). OpenFIGI maps each ISIN to a share-class FIGI
+  and listings; ESMA FIRDS gives the home market and termination dates, FITRS liquidity; GLEIF gives the
+  issuer LEI, status, successor and parents; Wikidata adds industry, products and people,
+  and relationships it alone knows are stored as *suggested*. A lapsed LEI, a successor LEI
+  or a FIRDS termination raises one lifecycle event. Stooq bars feed returns, volatility,
+  drawdown, beta and correlation, computed in code. Frankfurter backfills FX history and is
+  the ECB fallback. Nager.Date holidays plus per-exchange closures in the Jobs config make
+  the calendar that silences expected gaps. Anything unresolved is listed, never skipped.
+- **Regulatory feeds.** RNS (via Investegate) and EQS pages are read for UK and German
+  holdings, chosen by the FIRDS home market; the announcement type maps to the event
+  taxonomy in the Event rules config, and results announcements start an earnings check.
+  Both are disabled by default: check each site's terms before enabling. EDGAR full-text
+  search runs saved searches for each holding's names and watch topics; a 10-K or 20-F that
+  names a holding as customer or supplier becomes a suggested relationship linked to it.
+- **Macro** (`macro_collect`, daily). Eurostat (HICP, unemployment, GDP, industrial
+  production, confidence for CZ, DE, EA), ECB Data Portal and FRED series (FRED needs
+  `FRED_API_KEY`) go into `macro_series`. A surprise beyond the Event rules band is
+  evaluated only when a value is first seen, and cites its release date and source URL.
+  Central-bank press feeds are news sources flagged `macro`. Digest macro numbers come
+  only from `macro_series`.
+- **Escalation** (`event_escalation`). A confirmed story at the configured severity, or a
+  close-to-close price move beyond the Event rules threshold, queues one Sonnet impact
+  note (at most `max_steps` calls and searches) that must cite the story's sources and
+  name the thesis KPI or exit condition it touches, or say none applies; the draft is
+  checked in code before it is stored.
+- **Time checks and lifecycle.** Items outside the freshness window are dropped; a story
+  whose event date is long before its publish date is marked recycled; a new story that
+  matches a stored one is linked as a duplicate and never alerts again. A disputed story
+  freezes verdict changes for its holding until the owner resolves it.
+- **Breaches** (sync step `breaches`). Drift out of band, hard limits and strategy rules are
+  evaluated after each sync; a breach alerts once at its `on_breach` severity, is listed
+  in the next digest, and clears when back in band.
+- **Monitoring** (`monitor`, every 15 min). A failed watched job, a scheduled run that did
+  not start (market holidays excepted), or a holding with no news coverage for the window
+  raises one `system` alert each (dedupe keys). The worker's heartbeat row and optional
+  `HEARTBEAT_PING_URL` cover the case where the worker itself is down.
 - **Config is validated here.** `steward.config` holds the Pydantic model per config domain.
   `POST /config/{domain}/validate` exposes them, which also puts `StrategyConfig`,
   `ThesesConfig` and `ThesisConfig` into `openapi.json` for the frontend's generated types.

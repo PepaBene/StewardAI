@@ -5,16 +5,28 @@ owner's strategy and per-holding theses, and uses Claude to monitor, explain and
 The full design is in
 [AI_Portfolio_Copilot_Technical_Product_Description.md](AI_Portfolio_Copilot_Technical_Product_Description.md).
 
-**Status: Phase 3 (News pipeline)** on top of Phase 1 (daily Trading212 sync, ČNB/ECB FX,
-drift, Overview and Holdings) and Phase 2 (earnings checks: each results release found,
-archived, read by Claude into figures with verbatim snippets, validated in code and judged
-against the thesis KPIs). Phase 3 adds the news pipeline: every two hours the configured
-feeds (RSS, IR pages, EDGAR filings, Finnhub, optionally Google News) are ingested,
-deduplicated, clustered by story, linked to holdings, classified by Claude Haiku and checked
-under the corroboration rules; confirmed severity-3 events reach Telegram or email under the
-notification rules, and daily and weekly digests cite every claim. The app gains a filterable
-news feed, digests, editors for sources, event rules and notifications, and a Cmd/Ctrl+K
-command palette.
+**Status: phases 0-3 built, including the gap-review tasks (phase 1b, phase 2 follow-ups,
+phase 2b).** Phase 1 syncs Trading212 daily with ČNB/ECB FX and shows drift, Overview and
+Holdings. Phase 1b adds the strategy and jobs editors, config version history with diff,
+rollback and JSON export/import, the transactions view, deployment packaging (`deploy/`)
+with a worker heartbeat, and a live-data sign-off report. Phase 2 checks each results
+release (archived, read by Claude into figures with verbatim snippets, validated in code,
+judged against the thesis KPIs); its follow-ups add report-date triggers with retries,
+XBRL reconciliation and restatements, the owner review queue, the thesis board and
+per-call cost accounting. Phase 2b resolves identity and structure (OpenFIGI, ESMA,
+GLEIF, Wikidata), stores price history and risk metrics, FX history and the exchange
+calendar, and raises lifecycle events. Phase 3 is the news pipeline: feeds, IR pages,
+EDGAR filings and full-text search, RNS/EQS (off by default), Finnhub and macro sources are
+ingested, clustered, linked, classified by Claude Haiku and corroborated; confirmed events
+alert through Telegram or email under the notification rules, get a Sonnet impact note
+when severe, and daily and weekly digests cite every claim. Rule breaches, price moves,
+macro surprises, failed jobs, missed runs and coverage gaps alert once each.
+
+Not yet verified: the acceptance criteria that need live data or time (consecutive
+scheduled runs on an always-on host, the Realtime 2-second update, the uptime alert,
+Overview totals against the Trading212 app, 48-hour ingest runs, source figures matched
+by hand). Run `uv run python -m steward.signoff` on the host for the phase 1 checks.
+Phases 4-6 are not started.
 
 ## Repository layout
 
@@ -23,6 +35,7 @@ apps/backend/          Python 3.12: FastAPI API + worker, one package (uv)
 apps/web/              Next.js App Router frontend (TypeScript, Tailwind, shadcn/ui)
 supabase/migrations/   the one database schema, plain SQL, applied with the Supabase CLI
 supabase/config.toml   local Supabase stack config (auth: sign-up off, TOTP MFA on)
+deploy/                Docker Compose and systemd units for the API and worker host
 .github/workflows/     CI: backend lint/types/tests (incl. pgmq), frontend types/lint/tests/build
 ```
 

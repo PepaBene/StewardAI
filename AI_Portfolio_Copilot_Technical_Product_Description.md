@@ -841,6 +841,8 @@ Three contradictions inside the spec are corrected in place:
 
 Added by the gap review. Phase 1 is built; these are the pieces it assumed but nobody delivered, plus the owner-facing config the later phases need.
 
+*Status (2026-09-25): built. The config-history, strategy-editor, jobs-editor and transactions ACs are covered by automated tests. Open until checked on live data: the always-on host (`deploy/`, heartbeat and `/health/ready` are in place; 10 consecutive syncs, the uptime alert and restart timing need the host), the Vercel preview, and the phase 1 sign-off (`python -m steward.signoff` prints the figures to compare with the Trading212 app; the Realtime check needs two browsers).*
+
 **Backend tasks**
 
 - [ ] Always-on dev host for the API and worker (Docker Compose or systemd, restart always), an external uptime check on `/health`, and a Vercel preview deployment of the web app. **AC:** 10 consecutive scheduled syncs complete on the host with no error (this is phase 1's sync point); stopping the API raises an uptime alert within 5 minutes; killing either process brings it back within 1 minute.
@@ -878,6 +880,8 @@ Added by the gap review. Phase 1 is built; these are the pieces it assumed but n
 
 Phase 2 is built on its own branch; these gap-review tasks extend it.
 
+*Status (2026-09-25): built; the trigger, reconciliation, review-queue and cost ACs are covered by automated tests with seeded data. The screens' one-click and recompute ACs still need a pass on live data.*
+
 **Backend tasks**
 
 - [ ] Earnings-check triggers: enqueue the check at report date + 1, retry at + 2 and + 4 days when no document is found, and refresh `next_report_date` every Sunday for holdings reporting within 14 days. **AC:** a recorded report date produces exactly these attempts and stops after the first success; a date change found on Sunday moves the trigger.
@@ -893,6 +897,8 @@ Phase 2 is built on its own branch; these gap-review tasks extend it.
 ### Phase 2b — Identity, reference data and market history (weeks 5–6)
 
 Added 2026-09-25 for the sources in "Additional data sources". It sits between phases 2 and 3 because the news pipeline matches on the identifiers, names and relationships it produces. It moves phases 3–6 back by about 1.5 weeks.
+
+*Status (2026-09-25): built and tested against recorded source responses. Open until checked on live data: the hand checks of identity and structure for the named test holdings, the 1 % Stooq-vs-Trading212 close check, and the 10 sampled ECB dates.*
 
 **Backend tasks**
 
@@ -911,6 +917,8 @@ Added 2026-09-25 for the sources in "Additional data sources". It sits between p
 **Sync point:** the backend ships identity, structure and price-history reads by the middle of week 5; the frontend builds the holding-page sections against them through week 6.
 
 ### Phase 3 — News pipeline (weeks 5–7)
+
+*Status (2026-09-25): built, including every gap-review task. Tested with recorded pages, feeds and seeded data; the 48-hour ingest ACs, Eurostat values against its site and Telegram delivery time need live runs. The RNS (Investegate) and EQS collectors ship disabled: enable them only after checking each site's terms. Eurostat releases are detected from each dataset's update date, not from a separate release calendar.*
 
 **Backend tasks**
 
