@@ -183,7 +183,7 @@ async def news_feed(pool: asyncpg.Pool, filters: FeedFilters) -> NewsFeed:
 
 class AlertOut(BaseModel):
     id: int
-    kind: Literal["news", "thesis_breach", "test"]
+    kind: Literal["news", "thesis_breach", "test", "portfolio", "system"]
     severity: int
     ticker: str | None
     event_type: str | None

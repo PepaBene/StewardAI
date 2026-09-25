@@ -45,7 +45,7 @@ from steward.news.escalation import (
 )
 from steward.news.feeds import HoldingFeedInfo
 from steward.news.pipeline import NewsDeps, run_news_pipeline
-from steward.news.read import disputed_stories, resolve_story
+from steward.news.read import disputed_stories, recent_alerts, resolve_story
 from steward.news.regulatory import (
     collect_regulatory,
     parse_efts,
@@ -806,6 +806,7 @@ async def test_a_breach_alerts_once_and_clears_when_back_in_band(
     await sync(0.48, 48)
     alerts = await backend_pool.fetch("select severity, message from alert order by id")
     assert [a["severity"] for a in alerts] == [3, 2]  # hard limit and rule, once each
+    assert {a.kind for a in await recent_alerts(backend_pool, 50)} == {"portfolio"}
     back = await sync(0.3, 72)
     assert set(back.cleared) == set(first.opened)
     reopened = await sync(0.5, 96)
@@ -920,3 +921,6 @@ async def test_monitoring_alerts_once_per_failure_missed_run_and_gap(
     assert any(k.startswith("coverage:news:AAPL_US_EQ") for k in keys)
     # The news run never ran in the last slots: a missed run, alerted once.
     assert sum(k.startswith("missed:news_ingest:") for k in keys) == 1
+    # GET /alerts reads system alerts (its response model once rejected the new kinds).
+    listed = await recent_alerts(backend_pool, 50)
+    assert {a.kind for a in listed} == {"system"}

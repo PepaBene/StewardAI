@@ -3623,7 +3623,9 @@
             "enum": [
               "news",
               "thesis_breach",
-              "test"
+              "test",
+              "portfolio",
+              "system"
             ],
             "title": "Kind"
           },
