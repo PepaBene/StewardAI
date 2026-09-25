@@ -42,3 +42,11 @@ async def close_pool() -> None:
 
 
 Pool = Annotated[asyncpg.Pool, Depends(get_pool)]
+
+
+async def get_pool_or_error() -> asyncpg.Pool | str:
+    """The pool, or why there is none (for the readiness check, which must answer anyway)."""
+    try:
+        return await get_pool()
+    except HTTPException as exc:
+        return str(exc.detail)

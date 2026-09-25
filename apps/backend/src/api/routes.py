@@ -12,6 +12,7 @@ from pydantic import BaseModel, Field
 from api.auth import Owner
 from api.db import Pool
 from steward.config import (
+    BudgetConfig,
     HoldingProfilesConfig,
     JobsConfig,
     StrategyConfig,
@@ -37,6 +38,13 @@ from steward.portfolio.read import (
     portfolio_holdings,
     portfolio_overview,
 )
+from steward.portfolio.transactions import (
+    TransactionFilters,
+    TransactionsPage,
+    TransactionType,
+    decode_cursor,
+    list_transactions,
+)
 from steward.settings import get_settings
 from steward.storage import EvidenceStore, StorageError, SupabaseStorage
 
@@ -59,6 +67,40 @@ async def get_portfolio_overview(pool: Pool, _owner: Owner) -> PortfolioOverview
 async def get_portfolio_holdings(pool: Pool, _owner: Owner) -> HoldingsResponse:
     """Every open position of the latest snapshot, largest first."""
     return await portfolio_holdings(pool)
+
+
+@router.get("/portfolio/transactions", tags=["portfolio"])
+async def get_portfolio_transactions(
+    pool: Pool,
+    _owner: Owner,
+    type: Annotated[list[TransactionType] | None, Query(description="Any of these.")] = None,
+    ticker: Annotated[str | None, Query(pattern=r"^[A-Za-z0-9._-]{1,32}$")] = None,
+    start: Annotated[dt.date | None, Query(alias="from", description="On or after.")] = None,
+    end: Annotated[dt.date | None, Query(alias="to", description="On or before.")] = None,
+    cursor: Annotated[str | None, Query(max_length=200)] = None,
+    limit: Annotated[int, Query(ge=1, le=500)] = 100,
+) -> TransactionsPage:
+    """Orders, dividends and cash movements, newest first, with totals per type and
+    currency over every row matching the filters (dates are UTC days, both inclusive)."""
+    try:
+        decoded = decode_cursor(cursor) if cursor else None
+    except ValueError as exc:
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, "Malformed cursor") from exc
+    return await list_transactions(
+        pool,
+        TransactionFilters(
+            types=list(type or []),
+            ticker=ticker,
+            start=dt.datetime.combine(start, dt.time(0), tzinfo=dt.UTC) if start else None,
+            end=(
+                dt.datetime.combine(end + dt.timedelta(days=1), dt.time(0), tzinfo=dt.UTC)
+                if end
+                else None
+            ),
+            cursor=decoded,
+            limit=limit,
+        ),
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -277,6 +319,13 @@ class HoldingProfilesConfigVersion(BaseModel):
     body: HoldingProfilesConfig
 
 
+class BudgetConfigVersion(BaseModel):
+    id: int
+    created_at: dt.datetime
+    note: str | None
+    body: BudgetConfig
+
+
 class VerificationConfigVersion(BaseModel):
     id: int
     created_at: dt.datetime
@@ -354,6 +403,12 @@ async def save_jobs_config(
     return JobsConfigVersion(**_as_dict(stored))
 
 
+@router.post("/config/jobs/validate", tags=["config"])
+async def validate_jobs(body: JobsConfig, _owner: Owner) -> JobsConfig:
+    """Validate job schedules without saving. 422 lists every error."""
+    return body
+
+
 @router.get("/config/holding-profiles", tags=["config"])
 async def get_holding_profiles_config(pool: Pool, _owner: Owner) -> HoldingProfilesConfigVersion:
     stored = await load_active(pool, "holding_profiles", HoldingProfilesConfig)
@@ -398,3 +453,32 @@ async def save_verification_config(
     async with pool.acquire() as conn:
         stored = await save_config(conn, "verification", body, created_by=owner.user_id, note=note)
     return VerificationConfigVersion(**_as_dict(stored))
+
+
+@router.post("/config/verification/validate", tags=["config"])
+async def validate_verification(body: VerificationConfig, _owner: Owner) -> VerificationConfig:
+    return body
+
+
+@router.get("/config/budget", tags=["config"])
+async def get_budget_config(pool: Pool, _owner: Owner) -> BudgetConfigVersion:
+    """The saved price table. 404 means the default prices apply."""
+    stored = await load_active(pool, "budget", BudgetConfig)
+    if stored is None:
+        raise _not_found("budget")
+    return BudgetConfigVersion(**_as_dict(stored))
+
+
+@router.put("/config/budget", tags=["config"])
+async def save_budget_config(
+    body: BudgetConfig, pool: Pool, owner: Owner, note: NoteParam = None
+) -> BudgetConfigVersion:
+    """Save the price table. Every AI step from the next job on is costed with it."""
+    async with pool.acquire() as conn:
+        stored = await save_config(conn, "budget", body, created_by=owner.user_id, note=note)
+    return BudgetConfigVersion(**_as_dict(stored))
+
+
+@router.post("/config/budget/validate", tags=["config"])
+async def validate_budget(body: BudgetConfig, _owner: Owner) -> BudgetConfig:
+    return body

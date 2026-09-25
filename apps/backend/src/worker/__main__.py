@@ -5,7 +5,9 @@ Runs until SIGINT or SIGTERM:
 - a config refresher that re-applies the Jobs config every few minutes;
 - the pgmq consumer for on-demand jobs the API enqueues;
 - the alert dispatcher, which sends due alerts (new ones, and ones held for quiet hours)
-  every few seconds.
+  every few seconds;
+- a heartbeat (a `sync_state` row the API's `/health/ready` reads, plus an optional ping to
+  an external dead-man's-switch monitor), so a stuck worker is noticed off the host.
 
 Without DATABASE_URL there is nothing to run: the scheduler starts with zero jobs and the
 worker says why.
@@ -13,6 +15,7 @@ worker says why.
 
 import asyncio
 import contextlib
+import datetime as dt
 import logging
 import signal
 
@@ -24,6 +27,7 @@ from steward import __version__
 from steward.config.jobs import JobsConfig
 from steward.config.store import load_active
 from steward.db import create_pool
+from steward.heartbeat import HEARTBEAT_SECONDS, beat
 from steward.jobs import queue
 from steward.jobs.registry import JOB_HANDLERS
 from steward.jobs.runner import JobTrigger, run_job
@@ -123,6 +127,19 @@ class Worker:
         if result.sent or result.failed:
             logger.info("alerts sent %s, failed %s", result.sent, result.failed)
 
+    async def heartbeat(self, http: httpx.AsyncClient) -> None:
+        try:
+            await beat(self.pool)
+        except (OSError, asyncpg.PostgresError, TimeoutError):
+            logger.exception("writing the heartbeat failed")
+            return
+        url = get_settings().heartbeat_ping_url
+        if url is not None:
+            try:
+                await http.get(url.get_secret_value(), timeout=10.0)
+            except httpx.HTTPError as exc:
+                logger.warning("heartbeat ping failed (%s)", type(exc).__name__)
+
     async def drain(self) -> None:
         if self._tasks:
             await asyncio.gather(*self._tasks, return_exceptions=True)
@@ -179,6 +196,15 @@ async def run() -> None:
             args=[http],
             id="internal:dispatch_alerts",
             name="dispatch_alerts",
+        )
+        scheduler.add_job(
+            worker.heartbeat,
+            "interval",
+            seconds=HEARTBEAT_SECONDS,
+            args=[http],
+            id="internal:heartbeat",
+            name="heartbeat",
+            next_run_time=dt.datetime.now(dt.UTC),
         )
         consumer = asyncio.create_task(worker.consume(stop))
 

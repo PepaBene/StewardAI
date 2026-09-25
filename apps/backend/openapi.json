@@ -27,6 +27,36 @@
         }
       }
     },
+    "/health/ready": {
+      "get": {
+        "tags": [
+          "system"
+        ],
+        "summary": "Ready",
+        "description": "Readiness for the uptime monitor: the database answers and the worker's heartbeat\nis recent. 503 otherwise, with what is wrong. No auth; reveals no data.",
+        "operationId": "ready",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "503": {
+            "description": "Not ready",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReadinessResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/config/strategy/validate": {
       "post": {
         "tags": [
@@ -121,6 +151,394 @@
         ]
       }
     },
+    "/config/{domain}/versions": {
+      "get": {
+        "tags": [
+          "config"
+        ],
+        "summary": "Get Config Versions",
+        "description": "Every saved version of a domain, newest first; the active one is flagged.",
+        "operationId": "get_config_versions",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "domain",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "enum": [
+                "strategy",
+                "theses",
+                "jobs",
+                "holding-profiles",
+                "verification",
+                "news-sources",
+                "event-rules",
+                "notifications",
+                "budget"
+              ],
+              "type": "string",
+              "description": "Config domain, as in /config/<domain>.",
+              "title": "Domain"
+            },
+            "description": "Config domain, as in /config/<domain>."
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 500,
+              "minimum": 1,
+              "default": 200,
+              "title": "Limit"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/ConfigVersionMeta"
+                  },
+                  "title": "Response Get Config Versions"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/config/{domain}/versions/{version_id}": {
+      "get": {
+        "tags": [
+          "config"
+        ],
+        "summary": "Get Config Version",
+        "operationId": "get_config_version",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "domain",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "enum": [
+                "strategy",
+                "theses",
+                "jobs",
+                "holding-profiles",
+                "verification",
+                "news-sources",
+                "event-rules",
+                "notifications",
+                "budget"
+              ],
+              "type": "string",
+              "description": "Config domain, as in /config/<domain>.",
+              "title": "Domain"
+            },
+            "description": "Config domain, as in /config/<domain>."
+          },
+          {
+            "name": "version_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Version Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConfigVersionBody"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/config/{domain}/diff": {
+      "get": {
+        "tags": [
+          "config"
+        ],
+        "summary": "Get Config Diff",
+        "description": "What changed from one version to another (any two versions of the domain).",
+        "operationId": "get_config_diff",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "domain",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "enum": [
+                "strategy",
+                "theses",
+                "jobs",
+                "holding-profiles",
+                "verification",
+                "news-sources",
+                "event-rules",
+                "notifications",
+                "budget"
+              ],
+              "type": "string",
+              "description": "Config domain, as in /config/<domain>.",
+              "title": "Domain"
+            },
+            "description": "Config domain, as in /config/<domain>."
+          },
+          {
+            "name": "from",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "From"
+            }
+          },
+          {
+            "name": "to",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "To"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConfigDiff"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/config/{domain}/versions/{version_id}/rollback": {
+      "post": {
+        "tags": [
+          "config"
+        ],
+        "summary": "Rollback Config",
+        "description": "Make an old version current again by saving its body as a new active version. The\nnext run of every job uses it. 409 if the old body no longer passes validation.",
+        "operationId": "rollback_config",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "domain",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "enum": [
+                "strategy",
+                "theses",
+                "jobs",
+                "holding-profiles",
+                "verification",
+                "news-sources",
+                "event-rules",
+                "notifications",
+                "budget"
+              ],
+              "type": "string",
+              "description": "Config domain, as in /config/<domain>.",
+              "title": "Domain"
+            },
+            "description": "Config domain, as in /config/<domain>."
+          },
+          {
+            "name": "version_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Version Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConfigVersionBody"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/config/export": {
+      "get": {
+        "tags": [
+          "config"
+        ],
+        "summary": "Export Config",
+        "description": "Every domain's active version in one file, to keep config in git or move it to\nanother project.",
+        "operationId": "export_config",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConfigExport"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/config/import": {
+      "post": {
+        "tags": [
+          "config"
+        ],
+        "summary": "Import Config",
+        "description": "Validate every domain of an exported file, then save them all as new active\nversions. Any invalid domain rejects the whole file with every error listed (422) and\nnothing saved.",
+        "operationId": "import_config",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "note",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "maxLength": 500
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Note"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ConfigExport"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ImportResult"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/portfolio/overview": {
       "get": {
         "tags": [
@@ -173,6 +591,155 @@
             "HTTPBearer": []
           }
         ]
+      }
+    },
+    "/portfolio/transactions": {
+      "get": {
+        "tags": [
+          "portfolio"
+        ],
+        "summary": "Get Portfolio Transactions",
+        "description": "Orders, dividends and cash movements, newest first, with totals per type and\ncurrency over every row matching the filters (dates are UTC days, both inclusive).",
+        "operationId": "get_portfolio_transactions",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "type",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "array",
+                  "items": {
+                    "enum": [
+                      "order",
+                      "dividend",
+                      "cash"
+                    ],
+                    "type": "string"
+                  }
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Any of these.",
+              "title": "Type"
+            },
+            "description": "Any of these."
+          },
+          {
+            "name": "ticker",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "pattern": "^[A-Za-z0-9._-]{1,32}$"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Ticker"
+            }
+          },
+          {
+            "name": "from",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "On or after.",
+              "title": "From"
+            },
+            "description": "On or after."
+          },
+          {
+            "name": "to",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "On or before.",
+              "title": "To"
+            },
+            "description": "On or before."
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "maxLength": 200
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Cursor"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 500,
+              "minimum": 1,
+              "default": 100,
+              "title": "Limit"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TransactionsPage"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
       }
     },
     "/jobs/portfolio-sync": {
@@ -754,6 +1321,53 @@
         }
       }
     },
+    "/config/jobs/validate": {
+      "post": {
+        "tags": [
+          "config"
+        ],
+        "summary": "Validate Jobs",
+        "description": "Validate job schedules without saving. 422 lists every error.",
+        "operationId": "validate_jobs",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/JobsConfig"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/JobsConfig"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
     "/config/holding-profiles": {
       "get": {
         "tags": [
@@ -983,6 +1597,191 @@
             }
           }
         }
+      }
+    },
+    "/config/verification/validate": {
+      "post": {
+        "tags": [
+          "config"
+        ],
+        "summary": "Validate Verification",
+        "operationId": "validate_verification",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/VerificationConfig"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VerificationConfig"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/config/budget": {
+      "get": {
+        "tags": [
+          "config"
+        ],
+        "summary": "Get Budget Config",
+        "description": "The saved price table. 404 means the default prices apply.",
+        "operationId": "get_budget_config",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BudgetConfigVersion"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "config"
+        ],
+        "summary": "Save Budget Config",
+        "description": "Save the price table. Every AI step from the next job on is costed with it.",
+        "operationId": "save_budget_config",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "note",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "maxLength": 500
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Why this change was made.",
+              "title": "Note"
+            },
+            "description": "Why this change was made."
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BudgetConfig"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BudgetConfigVersion"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/config/budget/validate": {
+      "post": {
+        "tags": [
+          "config"
+        ],
+        "summary": "Validate Budget",
+        "operationId": "validate_budget",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BudgetConfig"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BudgetConfig"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
       }
     },
     "/news": {
@@ -2280,6 +3079,91 @@
         ],
         "title": "BucketDrift"
       },
+      "BudgetConfig": {
+        "properties": {
+          "schema_version": {
+            "type": "integer",
+            "const": 1,
+            "title": "Schema Version",
+            "default": 1
+          },
+          "prices": {
+            "items": {
+              "$ref": "#/components/schemas/ModelPrice"
+            },
+            "type": "array",
+            "title": "Prices"
+          },
+          "web_search_per_1000": {
+            "type": "number",
+            "minimum": 0.0,
+            "title": "Web Search Per 1000",
+            "description": "USD per 1,000 web searches.",
+            "default": 10
+          },
+          "cache_write_multiplier": {
+            "type": "number",
+            "minimum": 0.0,
+            "title": "Cache Write Multiplier",
+            "description": "Cache-write tokens cost this times the input price.",
+            "default": 1.25
+          },
+          "cache_read_multiplier": {
+            "type": "number",
+            "minimum": 0.0,
+            "title": "Cache Read Multiplier",
+            "description": "Cache-read tokens cost this times the input price.",
+            "default": 0.1
+          },
+          "batch_multiplier": {
+            "type": "number",
+            "maximum": 1.0,
+            "minimum": 0.0,
+            "title": "Batch Multiplier",
+            "description": "Batch API requests cost this times the token price (searches excluded).",
+            "default": 0.5
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "BudgetConfig",
+        "description": "Stored as `config_version` rows, domain `budget`."
+      },
+      "BudgetConfigVersion": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note"
+          },
+          "body": {
+            "$ref": "#/components/schemas/BudgetConfig"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "created_at",
+          "note",
+          "body"
+        ],
+        "title": "BudgetConfigVersion"
+      },
       "CashDrift": {
         "properties": {
           "value_base": {
@@ -2563,6 +3447,291 @@
         ],
         "title": "CategoryWeightRule",
         "description": "Limit on a category's weight; with no bucket it applies to every bucket of the dimension."
+      },
+      "ConfigDiff": {
+        "properties": {
+          "domain": {
+            "type": "string",
+            "title": "Domain"
+          },
+          "from_id": {
+            "type": "integer",
+            "title": "From Id"
+          },
+          "to_id": {
+            "type": "integer",
+            "title": "To Id"
+          },
+          "changes": {
+            "items": {
+              "$ref": "#/components/schemas/DiffChange"
+            },
+            "type": "array",
+            "title": "Changes"
+          }
+        },
+        "type": "object",
+        "required": [
+          "domain",
+          "from_id",
+          "to_id",
+          "changes"
+        ],
+        "title": "ConfigDiff"
+      },
+      "ConfigExport": {
+        "properties": {
+          "format": {
+            "type": "string",
+            "const": "stewardai-config",
+            "title": "Format",
+            "default": "stewardai-config"
+          },
+          "format_version": {
+            "type": "integer",
+            "const": 1,
+            "title": "Format Version",
+            "default": 1
+          },
+          "exported_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Exported At"
+          },
+          "app_version": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "App Version"
+          },
+          "domains": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/ExportedDomain"
+            },
+            "type": "object",
+            "title": "Domains",
+            "description": "Active version per config domain (strategy, theses, jobs, ...)."
+          }
+        },
+        "type": "object",
+        "required": [
+          "domains"
+        ],
+        "title": "ConfigExport"
+      },
+      "ConfigVersionBody": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "domain": {
+            "type": "string",
+            "title": "Domain"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note"
+          },
+          "created_by": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Created By"
+          },
+          "active": {
+            "type": "boolean",
+            "title": "Active"
+          },
+          "parent_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Parent Id"
+          },
+          "schema_version": {
+            "type": "integer",
+            "title": "Schema Version"
+          },
+          "changes": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Changes",
+            "description": "Number of changed paths against the previous version; null for the first."
+          },
+          "body": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Body"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "domain",
+          "created_at",
+          "note",
+          "created_by",
+          "active",
+          "parent_id",
+          "schema_version",
+          "changes",
+          "body"
+        ],
+        "title": "ConfigVersionBody"
+      },
+      "ConfigVersionMeta": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "domain": {
+            "type": "string",
+            "title": "Domain"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note"
+          },
+          "created_by": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Created By"
+          },
+          "active": {
+            "type": "boolean",
+            "title": "Active"
+          },
+          "parent_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Parent Id"
+          },
+          "schema_version": {
+            "type": "integer",
+            "title": "Schema Version"
+          },
+          "changes": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Changes",
+            "description": "Number of changed paths against the previous version; null for the first."
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "domain",
+          "created_at",
+          "note",
+          "created_by",
+          "active",
+          "parent_id",
+          "schema_version",
+          "changes"
+        ],
+        "title": "ConfigVersionMeta"
+      },
+      "DiffChange": {
+        "properties": {
+          "path": {
+            "type": "string",
+            "title": "Path",
+            "description": "JSON pointer-style path, e.g. /target_positions/0/band."
+          },
+          "op": {
+            "type": "string",
+            "enum": [
+              "add",
+              "remove",
+              "replace"
+            ],
+            "title": "Op"
+          },
+          "old": {
+            "title": "Old"
+          },
+          "new": {
+            "title": "New"
+          }
+        },
+        "type": "object",
+        "required": [
+          "path",
+          "op"
+        ],
+        "title": "DiffChange"
       },
       "DigestBody": {
         "properties": {
@@ -3449,6 +4618,54 @@
           "context"
         ],
         "title": "EvidenceLink"
+      },
+      "ExportedDomain": {
+        "properties": {
+          "version_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Version Id"
+          },
+          "created_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Created At"
+          },
+          "note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note"
+          },
+          "body": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Body"
+          }
+        },
+        "type": "object",
+        "required": [
+          "body"
+        ],
+        "title": "ExportedDomain"
       },
       "Exposure": {
         "properties": {
@@ -4466,6 +5683,32 @@
         ],
         "title": "HoldingsResponse"
       },
+      "ImportResult": {
+        "properties": {
+          "saved": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "type": "object",
+            "title": "Saved",
+            "description": "Domain -> the version now active."
+          },
+          "unchanged": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Unchanged",
+            "description": "Domains whose body equalled the active version."
+          }
+        },
+        "type": "object",
+        "required": [
+          "saved",
+          "unchanged"
+        ],
+        "title": "ImportResult"
+      },
       "InstrumentInfo": {
         "properties": {
           "name": {
@@ -4823,6 +6066,38 @@
           "history"
         ],
         "title": "KpiStatus"
+      },
+      "ModelPrice": {
+        "properties": {
+          "model": {
+            "type": "string",
+            "pattern": "^claude-[a-z0-9.-]{1,64}$",
+            "title": "Model",
+            "examples": [
+              "claude-sonnet-5"
+            ]
+          },
+          "input_per_mtok": {
+            "type": "number",
+            "minimum": 0.0,
+            "title": "Input Per Mtok",
+            "description": "USD per million input tokens."
+          },
+          "output_per_mtok": {
+            "type": "number",
+            "minimum": 0.0,
+            "title": "Output Per Mtok",
+            "description": "USD per million output tokens."
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "model",
+          "input_per_mtok",
+          "output_per_mtok"
+        ],
+        "title": "ModelPrice"
       },
       "NewsFeed": {
         "properties": {
@@ -5857,6 +7132,62 @@
         "type": "object",
         "title": "QuietHours"
       },
+      "ReadinessResponse": {
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "ok",
+              "degraded"
+            ],
+            "title": "Status"
+          },
+          "version": {
+            "type": "string",
+            "title": "Version"
+          },
+          "database": {
+            "type": "boolean",
+            "title": "Database"
+          },
+          "worker_alive": {
+            "type": "boolean",
+            "title": "Worker Alive"
+          },
+          "worker_last_beat": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Worker Last Beat"
+          },
+          "detail": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Detail"
+          }
+        },
+        "type": "object",
+        "required": [
+          "status",
+          "version",
+          "database",
+          "worker_alive",
+          "worker_last_beat"
+        ],
+        "title": "ReadinessResponse"
+      },
       "ReportOut": {
         "properties": {
           "id": {
@@ -6854,6 +8185,219 @@
         },
         "type": "object",
         "title": "ThesisVerdictsRequest"
+      },
+      "TotalByCurrency": {
+        "properties": {
+          "type": {
+            "type": "string",
+            "enum": [
+              "order",
+              "dividend",
+              "cash"
+            ],
+            "title": "Type"
+          },
+          "subtype": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Subtype"
+          },
+          "currency": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Currency"
+          },
+          "count": {
+            "type": "integer",
+            "title": "Count"
+          },
+          "amount": {
+            "type": "number",
+            "title": "Amount",
+            "description": "Sum of `amount` over the filtered rows."
+          }
+        },
+        "type": "object",
+        "required": [
+          "type",
+          "subtype",
+          "currency",
+          "count",
+          "amount"
+        ],
+        "title": "TotalByCurrency"
+      },
+      "TransactionOut": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "order",
+              "dividend",
+              "cash"
+            ],
+            "title": "Type"
+          },
+          "subtype": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Subtype"
+          },
+          "ticker": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ticker"
+          },
+          "name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
+          },
+          "quantity": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Quantity"
+          },
+          "price": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Price"
+          },
+          "amount": {
+            "type": "number",
+            "title": "Amount",
+            "description": "In `currency`, as Trading212 reports it."
+          },
+          "currency": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Currency"
+          },
+          "occurred_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Occurred At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "type",
+          "subtype",
+          "ticker",
+          "name",
+          "quantity",
+          "price",
+          "amount",
+          "currency",
+          "occurred_at"
+        ],
+        "title": "TransactionOut"
+      },
+      "TransactionsPage": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/TransactionOut"
+            },
+            "type": "array",
+            "title": "Items"
+          },
+          "total_count": {
+            "type": "integer",
+            "title": "Total Count",
+            "description": "Rows matching the filters, across all pages."
+          },
+          "totals": {
+            "items": {
+              "$ref": "#/components/schemas/TotalByCurrency"
+            },
+            "type": "array",
+            "title": "Totals",
+            "description": "Sums per type, subtype and currency over every matching row."
+          },
+          "dividends": {
+            "items": {
+              "$ref": "#/components/schemas/TotalByCurrency"
+            },
+            "type": "array",
+            "title": "Dividends",
+            "description": "Dividend sums per currency over every matching row."
+          },
+          "next_cursor": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Cursor",
+            "description": "Pass as `cursor` for the next (older) page; null on the last page."
+          }
+        },
+        "type": "object",
+        "required": [
+          "items",
+          "total_count",
+          "totals",
+          "dividends",
+          "next_cursor"
+        ],
+        "title": "TransactionsPage"
       },
       "ValidationError": {
         "properties": {

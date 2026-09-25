@@ -10,7 +10,7 @@ from dataclasses import dataclass
 from typing import Any
 
 import asyncpg
-from pydantic import BaseModel
+from pydantic import BaseModel, ValidationError
 
 from steward.config import CONFIG_MODELS
 
@@ -24,9 +24,20 @@ class StoredConfig[M: BaseModel]:
 
 
 def json_diff(old: Any, new: Any, path: str = "") -> list[dict[str, Any]]:
-    """Changes from `old` to `new` as [{"path", "op", "old"?, "new"?}], objects walked by key."""
+    """Changes from `old` to `new` as [{"path", "op", "old"?, "new"?}]: objects walked by key,
+    lists by index (items past the shorter list are added or removed)."""
+    changes: list[dict[str, Any]] = []
+    if isinstance(old, list) and isinstance(new, list):
+        for i in range(max(len(old), len(new))):
+            child = f"{path}/{i}"
+            if i >= len(new):
+                changes.append({"path": child, "op": "remove", "old": old[i]})
+            elif i >= len(old):
+                changes.append({"path": child, "op": "add", "new": new[i]})
+            else:
+                changes.extend(json_diff(old[i], new[i], child))
+        return changes
     if isinstance(old, dict) and isinstance(new, dict):
-        changes: list[dict[str, Any]] = []
         for key in sorted(old.keys() | new.keys()):
             child = f"{path}/{key}"
             if key not in new:
@@ -102,3 +113,170 @@ async def save_config[M: BaseModel](
             created_by,
         )
     return StoredConfig(row["id"], row["created_at"], note, body)
+
+
+# ---------------------------------------------------------------------------
+# History: listing, reading, diffing, rolling back, export and import
+# ---------------------------------------------------------------------------
+
+
+@dataclass(frozen=True)
+class VersionMeta:
+    id: int
+    domain: str
+    created_at: dt.datetime
+    note: str | None
+    created_by: str | None
+    active: bool
+    parent_id: int | None
+    schema_version: int
+    changes: int | None
+
+
+_META_COLUMNS = (
+    "id, domain, created_at, note, created_by::text as created_by, active, parent_id,"
+    " schema_version, case when diff is null then null else jsonb_array_length(diff) end"
+    " as changes"
+)
+
+
+def _meta(row: asyncpg.Record) -> VersionMeta:
+    return VersionMeta(
+        id=row["id"],
+        domain=row["domain"],
+        created_at=row["created_at"],
+        note=row["note"],
+        created_by=row["created_by"],
+        active=row["active"],
+        parent_id=row["parent_id"],
+        schema_version=row["schema_version"],
+        changes=row["changes"],
+    )
+
+
+async def list_versions(
+    conn: asyncpg.Connection | asyncpg.Pool, domain: str, limit: int = 200
+) -> list[VersionMeta]:
+    """Every version of `domain`, newest first."""
+    rows = await conn.fetch(
+        f"select {_META_COLUMNS} from public.config_version where domain = $1"  # noqa: S608
+        " order by id desc limit $2",
+        domain,
+        limit,
+    )
+    return [_meta(r) for r in rows]
+
+
+async def get_version(
+    conn: asyncpg.Connection | asyncpg.Pool, domain: str, version_id: int
+) -> tuple[VersionMeta, dict[str, Any]] | None:
+    row = await conn.fetchrow(
+        f"select {_META_COLUMNS}, body from public.config_version"  # noqa: S608
+        " where domain = $1 and id = $2",
+        domain,
+        version_id,
+    )
+    if row is None:
+        return None
+    return _meta(row), json.loads(row["body"])
+
+
+def parse_body(domain: str, body: dict[str, Any]) -> BaseModel:
+    """Validate a stored or imported body with the domain's current model. Raises
+    ValidationError (every error listed) or KeyError for an unknown domain."""
+    return CONFIG_MODELS[domain].model_validate(body)
+
+
+class RollbackError(Exception):
+    """The chosen version no longer validates under the current schema."""
+
+    def __init__(self, errors: list[dict[str, Any]]) -> None:
+        super().__init__("the chosen version is not valid under the current schema")
+        self.errors = errors
+
+
+async def rollback(
+    conn: asyncpg.Connection, domain: str, version_id: int, *, created_by: str | None
+) -> StoredConfig[BaseModel] | None:
+    """Save version `version_id`'s body as the new active version (history is never
+    rewritten). None when no such version exists."""
+    found = await get_version(conn, domain, version_id)
+    if found is None:
+        return None
+    try:
+        body = parse_body(domain, found[1])
+    except ValidationError as exc:
+        raise RollbackError(json.loads(exc.json())) from exc
+    return await save_config(
+        conn, domain, body, created_by=created_by, note=f"Rolled back to version #{version_id}"
+    )
+
+
+async def export_active(conn: asyncpg.Connection | asyncpg.Pool) -> dict[str, dict[str, Any]]:
+    """The active version of every domain that has one: {domain: {version_id, created_at,
+    note, body}}."""
+    rows = await conn.fetch(
+        "select id, domain, created_at, note, body from public.config_version where active"
+        " order by domain"
+    )
+    return {
+        r["domain"]: {
+            "version_id": r["id"],
+            "created_at": r["created_at"],
+            "note": r["note"],
+            "body": json.loads(r["body"]),
+        }
+        for r in rows
+        if r["domain"] in CONFIG_MODELS
+    }
+
+
+class ConfigImportError(Exception):
+    """An import file with at least one invalid domain. Nothing was saved."""
+
+    def __init__(self, errors: list[dict[str, Any]]) -> None:
+        super().__init__(f"{len(errors)} problem(s) in the import file")
+        self.errors = errors
+
+
+def validate_import(bodies: dict[str, dict[str, Any]]) -> dict[str, BaseModel]:
+    """Every domain validated; every error from every domain listed, with `loc` prefixed by
+    ["domains", <domain>, "body"]. Raises ConfigImportError if any fails."""
+    parsed: dict[str, BaseModel] = {}
+    errors: list[dict[str, Any]] = []
+    for domain, body in bodies.items():
+        prefix: list[str | int] = ["domains", domain]
+        if domain not in CONFIG_MODELS:
+            errors.append(
+                {"loc": prefix, "msg": f"unknown config domain {domain!r}", "type": "value_error"}
+            )
+            continue
+        try:
+            parsed[domain] = parse_body(domain, body)
+        except ValidationError as exc:
+            for err in json.loads(exc.json()):
+                errors.append(
+                    {"loc": [*prefix, "body", *err["loc"]], "msg": err["msg"], "type": err["type"]}
+                )
+    if errors:
+        raise ConfigImportError(errors)
+    return parsed
+
+
+async def import_all(
+    conn: asyncpg.Connection,
+    bodies: dict[str, dict[str, Any]],
+    *,
+    created_by: str | None,
+    note: str | None = None,
+) -> dict[str, StoredConfig[BaseModel]]:
+    """Validate every domain first, then save them all in one transaction (all or nothing).
+    A body equal to the active version is not stored again."""
+    parsed = validate_import(bodies)
+    saved: dict[str, StoredConfig[BaseModel]] = {}
+    async with conn.transaction():
+        for domain, body in parsed.items():
+            saved[domain] = await save_config(
+                conn, domain, body, created_by=created_by, note=note or "Imported from file"
+            )
+    return saved

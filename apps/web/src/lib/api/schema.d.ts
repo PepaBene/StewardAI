@@ -24,6 +24,27 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/health/ready": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Ready
+         * @description Readiness for the uptime monitor: the database answers and the worker's heartbeat
+         *     is recent. 503 otherwise, with what is wrong. No auth; reveals no data.
+         */
+        get: operations["ready"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/config/strategy/validate": {
         parameters: {
             query?: never;
@@ -66,6 +87,127 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/config/{domain}/versions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Config Versions
+         * @description Every saved version of a domain, newest first; the active one is flagged.
+         */
+        get: operations["get_config_versions"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/config/{domain}/versions/{version_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Config Version */
+        get: operations["get_config_version"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/config/{domain}/diff": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Config Diff
+         * @description What changed from one version to another (any two versions of the domain).
+         */
+        get: operations["get_config_diff"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/config/{domain}/versions/{version_id}/rollback": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Rollback Config
+         * @description Make an old version current again by saving its body as a new active version. The
+         *     next run of every job uses it. 409 if the old body no longer passes validation.
+         */
+        post: operations["rollback_config"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/config/export": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Export Config
+         * @description Every domain's active version in one file, to keep config in git or move it to
+         *     another project.
+         */
+        get: operations["export_config"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/config/import": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Import Config
+         * @description Validate every domain of an exported file, then save them all as new active
+         *     versions. Any invalid domain rejects the whole file with every error listed (422) and
+         *     nothing saved.
+         */
+        post: operations["import_config"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/portfolio/overview": {
         parameters: {
             query?: never;
@@ -99,6 +241,27 @@ export interface paths {
          * @description Every open position of the latest snapshot, largest first.
          */
         get: operations["get_portfolio_holdings"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/portfolio/transactions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Portfolio Transactions
+         * @description Orders, dividends and cash movements, newest first, with totals per type and
+         *     currency over every row matching the filters (dates are UTC days, both inclusive).
+         */
+        get: operations["get_portfolio_transactions"];
         put?: never;
         post?: never;
         delete?: never;
@@ -316,6 +479,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/config/jobs/validate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Validate Jobs
+         * @description Validate job schedules without saving. 422 lists every error.
+         */
+        post: operations["validate_jobs"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/config/holding-profiles": {
         parameters: {
             query?: never;
@@ -372,6 +555,64 @@ export interface paths {
         /** Save Verification Config */
         put: operations["save_verification_config"];
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/config/verification/validate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Validate Verification */
+        post: operations["validate_verification"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/config/budget": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Budget Config
+         * @description The saved price table. 404 means the default prices apply.
+         */
+        get: operations["get_budget_config"];
+        /**
+         * Save Budget Config
+         * @description Save the price table. Every AI step from the next job on is costed with it.
+         */
+        put: operations["save_budget_config"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/config/budget/validate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Validate Budget */
+        post: operations["validate_budget"];
         delete?: never;
         options?: never;
         head?: never;
@@ -784,6 +1025,57 @@ export interface components {
              */
             status: "in_band" | "above_band" | "below_band" | "above_hard_limit" | "no_target";
         };
+        /**
+         * BudgetConfig
+         * @description Stored as `config_version` rows, domain `budget`.
+         */
+        BudgetConfig: {
+            /**
+             * Schema Version
+             * @default 1
+             * @constant
+             */
+            schema_version: 1;
+            /** Prices */
+            prices?: components["schemas"]["ModelPrice"][];
+            /**
+             * Web Search Per 1000
+             * @description USD per 1,000 web searches.
+             * @default 10
+             */
+            web_search_per_1000: number;
+            /**
+             * Cache Write Multiplier
+             * @description Cache-write tokens cost this times the input price.
+             * @default 1.25
+             */
+            cache_write_multiplier: number;
+            /**
+             * Cache Read Multiplier
+             * @description Cache-read tokens cost this times the input price.
+             * @default 0.1
+             */
+            cache_read_multiplier: number;
+            /**
+             * Batch Multiplier
+             * @description Batch API requests cost this times the token price (searches excluded).
+             * @default 0.5
+             */
+            batch_multiplier: number;
+        };
+        /** BudgetConfigVersion */
+        BudgetConfigVersion: {
+            /** Id */
+            id: number;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Note */
+            note: string | null;
+            body: components["schemas"]["BudgetConfig"];
+        };
         /** CashDrift */
         CashDrift: {
             /** Value Base */
@@ -898,6 +1190,118 @@ export interface components {
             dimension: string;
             /** Bucket */
             bucket?: string | null;
+        };
+        /** ConfigDiff */
+        ConfigDiff: {
+            /** Domain */
+            domain: string;
+            /** From Id */
+            from_id: number;
+            /** To Id */
+            to_id: number;
+            /** Changes */
+            changes: components["schemas"]["DiffChange"][];
+        };
+        /** ConfigExport */
+        ConfigExport: {
+            /**
+             * Format
+             * @default stewardai-config
+             * @constant
+             */
+            format: "stewardai-config";
+            /**
+             * Format Version
+             * @default 1
+             * @constant
+             */
+            format_version: 1;
+            /** Exported At */
+            exported_at?: string | null;
+            /** App Version */
+            app_version?: string | null;
+            /**
+             * Domains
+             * @description Active version per config domain (strategy, theses, jobs, ...).
+             */
+            domains: {
+                [key: string]: components["schemas"]["ExportedDomain"];
+            };
+        };
+        /** ConfigVersionBody */
+        ConfigVersionBody: {
+            /** Id */
+            id: number;
+            /** Domain */
+            domain: string;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Note */
+            note: string | null;
+            /** Created By */
+            created_by: string | null;
+            /** Active */
+            active: boolean;
+            /** Parent Id */
+            parent_id: number | null;
+            /** Schema Version */
+            schema_version: number;
+            /**
+             * Changes
+             * @description Number of changed paths against the previous version; null for the first.
+             */
+            changes: number | null;
+            /** Body */
+            body: {
+                [key: string]: unknown;
+            };
+        };
+        /** ConfigVersionMeta */
+        ConfigVersionMeta: {
+            /** Id */
+            id: number;
+            /** Domain */
+            domain: string;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Note */
+            note: string | null;
+            /** Created By */
+            created_by: string | null;
+            /** Active */
+            active: boolean;
+            /** Parent Id */
+            parent_id: number | null;
+            /** Schema Version */
+            schema_version: number;
+            /**
+             * Changes
+             * @description Number of changed paths against the previous version; null for the first.
+             */
+            changes: number | null;
+        };
+        /** DiffChange */
+        DiffChange: {
+            /**
+             * Path
+             * @description JSON pointer-style path, e.g. /target_positions/0/band.
+             */
+            path: string;
+            /**
+             * Op
+             * @enum {string}
+             */
+            op: "add" | "remove" | "replace";
+            /** Old */
+            old?: unknown;
+            /** New */
+            new?: unknown;
         };
         /** DigestBody */
         DigestBody: {
@@ -1294,6 +1698,19 @@ export interface components {
              */
             context: string | null;
         };
+        /** ExportedDomain */
+        ExportedDomain: {
+            /** Version Id */
+            version_id?: number | null;
+            /** Created At */
+            created_at?: string | null;
+            /** Note */
+            note?: string | null;
+            /** Body */
+            body: {
+                [key: string]: unknown;
+            };
+        };
         /** Exposure */
         Exposure: {
             /**
@@ -1655,6 +2072,21 @@ export interface components {
              */
             holdings: components["schemas"]["Holding"][];
         };
+        /** ImportResult */
+        ImportResult: {
+            /**
+             * Saved
+             * @description Domain -> the version now active.
+             */
+            saved: {
+                [key: string]: number;
+            };
+            /**
+             * Unchanged
+             * @description Domains whose body equalled the active version.
+             */
+            unchanged: string[];
+        };
         /** InstrumentInfo */
         InstrumentInfo: {
             /** Name */
@@ -1781,6 +2213,24 @@ export interface components {
              * @description Latest verdict per period, newest first.
              */
             history: components["schemas"]["VerdictOut"][];
+        };
+        /** ModelPrice */
+        ModelPrice: {
+            /**
+             * Model
+             * @example claude-sonnet-5
+             */
+            model: string;
+            /**
+             * Input Per Mtok
+             * @description USD per million input tokens.
+             */
+            input_per_mtok: number;
+            /**
+             * Output Per Mtok
+             * @description USD per million output tokens.
+             */
+            output_per_mtok: number;
         };
         /** NewsFeed */
         NewsFeed: {
@@ -2205,6 +2655,24 @@ export interface components {
              */
             timezone: string;
         };
+        /** ReadinessResponse */
+        ReadinessResponse: {
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "ok" | "degraded";
+            /** Version */
+            version: string;
+            /** Database */
+            database: boolean;
+            /** Worker Alive */
+            worker_alive: boolean;
+            /** Worker Last Beat */
+            worker_last_beat: string | null;
+            /** Detail */
+            detail?: string | null;
+        };
         /** ReportOut */
         ReportOut: {
             /** Id */
@@ -2583,6 +3051,82 @@ export interface components {
              */
             ticker?: string | null;
         };
+        /** TotalByCurrency */
+        TotalByCurrency: {
+            /**
+             * Type
+             * @enum {string}
+             */
+            type: "order" | "dividend" | "cash";
+            /** Subtype */
+            subtype: string | null;
+            /** Currency */
+            currency: string | null;
+            /** Count */
+            count: number;
+            /**
+             * Amount
+             * @description Sum of `amount` over the filtered rows.
+             */
+            amount: number;
+        };
+        /** TransactionOut */
+        TransactionOut: {
+            /** Id */
+            id: string;
+            /**
+             * Type
+             * @enum {string}
+             */
+            type: "order" | "dividend" | "cash";
+            /** Subtype */
+            subtype: string | null;
+            /** Ticker */
+            ticker: string | null;
+            /** Name */
+            name: string | null;
+            /** Quantity */
+            quantity: number | null;
+            /** Price */
+            price: number | null;
+            /**
+             * Amount
+             * @description In `currency`, as Trading212 reports it.
+             */
+            amount: number;
+            /** Currency */
+            currency: string | null;
+            /**
+             * Occurred At
+             * Format: date-time
+             */
+            occurred_at: string;
+        };
+        /** TransactionsPage */
+        TransactionsPage: {
+            /** Items */
+            items: components["schemas"]["TransactionOut"][];
+            /**
+             * Total Count
+             * @description Rows matching the filters, across all pages.
+             */
+            total_count: number;
+            /**
+             * Totals
+             * @description Sums per type, subtype and currency over every matching row.
+             */
+            totals: components["schemas"]["TotalByCurrency"][];
+            /**
+             * Dividends
+             * @description Dividend sums per currency over every matching row.
+             */
+            dividends: components["schemas"]["TotalByCurrency"][];
+            /**
+             * Next Cursor
+             * @description Pass as `cursor` for the next (older) page; null on the last page.
+             */
+            next_cursor: string | null;
+        };
         /** ValidationError */
         ValidationError: {
             /** Location */
@@ -2731,6 +3275,35 @@ export interface operations {
             };
         };
     };
+    ready: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Not ready */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReadinessResponse"];
+                };
+            };
+        };
+    };
     validate_strategy: {
         parameters: {
             query?: never;
@@ -2797,6 +3370,196 @@ export interface operations {
             };
         };
     };
+    get_config_versions: {
+        parameters: {
+            query?: {
+                limit?: number;
+            };
+            header?: never;
+            path: {
+                /** @description Config domain, as in /config/<domain>. */
+                domain: "strategy" | "theses" | "jobs" | "holding-profiles" | "verification" | "news-sources" | "event-rules" | "notifications" | "budget";
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ConfigVersionMeta"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_config_version: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Config domain, as in /config/<domain>. */
+                domain: "strategy" | "theses" | "jobs" | "holding-profiles" | "verification" | "news-sources" | "event-rules" | "notifications" | "budget";
+                version_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ConfigVersionBody"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_config_diff: {
+        parameters: {
+            query: {
+                from: number;
+                to: number;
+            };
+            header?: never;
+            path: {
+                /** @description Config domain, as in /config/<domain>. */
+                domain: "strategy" | "theses" | "jobs" | "holding-profiles" | "verification" | "news-sources" | "event-rules" | "notifications" | "budget";
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ConfigDiff"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    rollback_config: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Config domain, as in /config/<domain>. */
+                domain: "strategy" | "theses" | "jobs" | "holding-profiles" | "verification" | "news-sources" | "event-rules" | "notifications" | "budget";
+                version_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ConfigVersionBody"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    export_config: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ConfigExport"];
+                };
+            };
+        };
+    };
+    import_config: {
+        parameters: {
+            query?: {
+                note?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ConfigExport"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ImportResult"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     get_portfolio_overview: {
         parameters: {
             query?: never;
@@ -2833,6 +3596,45 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HoldingsResponse"];
+                };
+            };
+        };
+    };
+    get_portfolio_transactions: {
+        parameters: {
+            query?: {
+                /** @description Any of these. */
+                type?: ("order" | "dividend" | "cash")[] | null;
+                ticker?: string | null;
+                /** @description On or after. */
+                from?: string | null;
+                /** @description On or before. */
+                to?: string | null;
+                cursor?: string | null;
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TransactionsPage"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };
@@ -3208,6 +4010,39 @@ export interface operations {
             };
         };
     };
+    validate_jobs: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["JobsConfig"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["JobsConfig"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     get_holding_profiles_config: {
         parameters: {
             query?: never;
@@ -3340,6 +4175,128 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["VerificationConfigVersion"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    validate_verification: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["VerificationConfig"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["VerificationConfig"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_budget_config: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BudgetConfigVersion"];
+                };
+            };
+        };
+    };
+    save_budget_config: {
+        parameters: {
+            query?: {
+                /** @description Why this change was made. */
+                note?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["BudgetConfig"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BudgetConfigVersion"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    validate_budget: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["BudgetConfig"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BudgetConfig"];
                 };
             };
             /** @description Validation Error */

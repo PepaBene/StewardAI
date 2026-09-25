@@ -17,9 +17,14 @@ import logging
 from collections.abc import AsyncIterator, Awaitable, Callable
 from contextlib import asynccontextmanager
 from dataclasses import dataclass, field
+from decimal import Decimal
 from typing import Any, Literal
 
 import asyncpg
+
+from steward.config.budget import BudgetConfig
+from steward.config.store import load_active
+from steward.costs import PriceTable
 
 logger = logging.getLogger(__name__)
 
@@ -39,13 +44,16 @@ class JobFailed(Exception):
 
 @dataclass
 class StepUsage:
-    """Model usage of one step (AI steps only), stored on its `job_step` row."""
+    """Model usage of one step (AI steps only), stored on its `job_step` row. The runner
+    prices it with the Budget config when the step finishes."""
 
     model: str
     input_tokens: int = 0
     output_tokens: int = 0
+    cache_write_tokens: int = 0
+    cache_read_tokens: int = 0
     searches: int = 0
-    cost_usd: float | None = None
+    batch: bool = False
 
 
 @dataclass
@@ -63,6 +71,7 @@ class JobContext:
     params: dict[str, Any] = field(default_factory=dict)
     _next_step: int = 0
     config_version_ids: list[int] = field(default_factory=list)
+    _prices: PriceTable | None = None
 
     @asynccontextmanager
     async def step(self, name: str) -> AsyncIterator[StepHandle]:
@@ -87,14 +96,37 @@ class JobContext:
             raise
         await self._finish_step(step_id, "succeeded", handle, None)
 
+    async def price_table(self) -> PriceTable:
+        """The Budget config's prices, read once per run (its version is recorded)."""
+        if self._prices is None:
+            stored = await load_active(self.pool, "budget", BudgetConfig)
+            await self.record_config_version(stored.id if stored else None)
+            self._prices = PriceTable(stored.body if stored else BudgetConfig())
+        return self._prices
+
     async def _finish_step(
         self, step_id: int, status: str, handle: StepHandle, error: str | None
     ) -> None:
         usage = handle.usage
+        prices: dict[str, Any] | None = None
+        cost: Decimal | None = None
+        if usage is not None:
+            table = await self.price_table()
+            prices = table.prices_for(usage.model)
+            cost = table.cost(
+                usage.model,
+                input_tokens=usage.input_tokens,
+                output_tokens=usage.output_tokens,
+                cache_write_tokens=usage.cache_write_tokens,
+                cache_read_tokens=usage.cache_read_tokens,
+                searches=usage.searches,
+                batch=usage.batch,
+            )
         await self.pool.execute(
             "update public.job_step set status = $2, finished_at = clock_timestamp(),"
             " detail = $3::jsonb, error = $4, model = $5, input_tokens = $6,"
-            " output_tokens = $7, searches = $8, cost_usd = $9 where id = $1",
+            " output_tokens = $7, searches = $8, cost_usd = $9, cache_write_tokens = $10,"
+            " cache_read_tokens = $11, batch = $12, prices = $13::jsonb where id = $1",
             step_id,
             status,
             _json(handle.detail),
@@ -103,7 +135,11 @@ class JobContext:
             usage.input_tokens if usage else None,
             usage.output_tokens if usage else None,
             usage.searches if usage else None,
-            usage.cost_usd if usage else None,
+            cost,
+            usage.cache_write_tokens if usage else None,
+            usage.cache_read_tokens if usage else None,
+            usage.batch if usage else None,
+            json.dumps(prices) if prices else None,
         )
 
     async def record_config_version(self, version_id: int | None) -> None:

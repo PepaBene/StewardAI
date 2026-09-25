@@ -200,7 +200,7 @@ def test_json_diff_reports_adds_removes_and_nested_replacements() -> None:
     assert json_diff(old, new) == [
         {"path": "/b/c", "op": "replace", "old": 2, "new": 5},
         {"path": "/b/d", "op": "remove", "old": 3},
-        {"path": "/e", "op": "replace", "old": [1], "new": [1, 2]},
+        {"path": "/e/1", "op": "add", "new": 2},
         {"path": "/f", "op": "add", "new": True},
     ]
 
