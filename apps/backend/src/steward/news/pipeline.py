@@ -158,6 +158,15 @@ async def load_holdings(pool: asyncpg.Pool, config: NewsConfig) -> Holdings:
             tickers,
         )
     }
+    # Names from reference data: GLEIF legal and other names, subsidiaries, Wikidata
+    # aliases, and every listing's ticker.
+    known_aliases: dict[str, list[tuple[str, str]]] = defaultdict(list)
+    for row in await pool.fetch(
+        "select ticker, alias, kind from public.entity_alias where ticker = any($1::text[])"
+        " order by ticker, kind, alias",
+        tickers,
+    ):
+        known_aliases[row["ticker"]].append((row["alias"], row["kind"]))
     terms, feed_info, context = [], [], []
     ir_domains: set[str] = set()
     for ticker in tickers:
@@ -169,6 +178,10 @@ async def load_holdings(pool: asyncpg.Pool, config: NewsConfig) -> Holdings:
             instrument["name"] if instrument else None,
             instrument["isin"] if instrument else None,
         )
+        for alias, kind in known_aliases.get(ticker, []):
+            target = t.symbols if kind == "listing_ticker" else t.aliases
+            if alias not in target and alias not in t.names:
+                target.append(alias)
         terms.append(t)
         cik = (profile.sec_cik if profile else None) or (instrument["cik"] if instrument else None)
         names = tuple(dict.fromkeys([*t.names[1:2], *t.names[:1], *t.aliases]))

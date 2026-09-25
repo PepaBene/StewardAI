@@ -1,0 +1,56 @@
+{
+  "head" : {
+    "vars" : [ "alias" ]
+  },
+  "results" : {
+    "bindings" : [ {
+      "alias" : {
+        "xml:lang" : "de",
+        "type" : "literal",
+        "value" : "SAP SE"
+      }
+    }, {
+      "alias" : {
+        "xml:lang" : "de",
+        "type" : "literal",
+        "value" : "SAP AG"
+      }
+    }, {
+      "alias" : {
+        "xml:lang" : "en",
+        "type" : "literal",
+        "value" : "SAP SE"
+      }
+    }, {
+      "alias" : {
+        "xml:lang" : "en",
+        "type" : "literal",
+        "value" : "SAP SE     (Walldorf)"
+      }
+    }, {
+      "alias" : {
+        "xml:lang" : "en",
+        "type" : "literal",
+        "value" : "sap.com"
+      }
+    }, {
+      "alias" : {
+        "xml:lang" : "en",
+        "type" : "literal",
+        "value" : "SAP"
+      }
+    }, {
+      "alias" : {
+        "xml:lang" : "de",
+        "type" : "literal",
+        "value" : "SAP"
+      }
+    }, {
+      "alias" : {
+        "xml:lang" : "cs",
+        "type" : "literal",
+        "value" : "SAP SE"
+      }
+    } ]
+  }
+}

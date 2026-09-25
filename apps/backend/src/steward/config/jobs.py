@@ -1,5 +1,6 @@
 """Jobs config: when each scheduled job runs, and whether it runs at all."""
 
+import datetime as dt
 from typing import Annotated, Literal, Self
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
@@ -30,7 +31,53 @@ class JobSchedule(ConfigModel):
         return self
 
     def trigger(self) -> CronTrigger:
-        return CronTrigger.from_crontab(self.cron, timezone=ZoneInfo(self.timezone))
+        return cron_trigger(self.cron, ZoneInfo(self.timezone))
+
+
+_DAY_NAMES = ("sun", "mon", "tue", "wed", "thu", "fri", "sat")
+
+
+def crontab_weekdays(field: str) -> str:
+    """Standard crontab weekdays (0 or 7 = Sunday, 1 = Monday) as day names.
+
+    APScheduler 3 numbers weekdays from Monday = 0, so "1-5" would fire Tuesday to Saturday.
+    Numbers, ranges and steps are expanded to names here; names and "*" pass through."""
+    parts = []
+    for part in field.split(","):
+        body, _, step_text = part.partition("/")
+        if not any(ch.isdigit() for ch in body) and not (body == "*" and step_text):
+            parts.append(part)
+            continue
+        step = int(step_text) if step_text else 1
+        if body == "*":
+            start, end = 0, 6
+        elif "-" in body:
+            a, b = body.split("-", 1)
+            start, end = int(a), int(b)
+        else:
+            start = int(body)
+            end = 6 if step_text else start
+        if not (0 <= start <= 7 and 0 <= end <= 7 and step >= 1):
+            raise ValueError(f"weekday out of range in {field!r}")
+        if end < start:
+            raise ValueError(f"descending weekday range in {field!r}")
+        parts += [_DAY_NAMES[d % 7] for d in range(start, end + 1, step)]
+    return ",".join(dict.fromkeys(parts))
+
+
+def cron_trigger(expression: str, tz: ZoneInfo) -> CronTrigger:
+    fields = expression.split()
+    if len(fields) != 5:
+        raise ValueError(f"expected 5 fields, got {len(fields)}")
+    minute, hour, day, month, weekday = fields
+    return CronTrigger(
+        minute=minute,
+        hour=hour,
+        day=day,
+        month=month,
+        day_of_week=crontab_weekdays(weekday),
+        timezone=tz,
+    )
 
 
 ModelId = Annotated[str, Field(pattern=r"^claude-[a-z0-9.-]{1,64}$", examples=["claude-sonnet-5"])]
@@ -119,6 +166,72 @@ class DigestSettings(ConfigModel):
     )
 
 
+class ReferenceSettings(ConfigModel):
+    """Identity and reference data: OpenFIGI, ESMA FIRDS/FITRS, GLEIF, Wikidata."""
+
+    openfigi_refresh_days: int = Field(
+        default=30, ge=1, le=365, description="Re-map each ISIN through OpenFIGI this often."
+    )
+    wikidata_enabled: bool = Field(
+        default=True, description="Read aliases and suggested relationships from Wikidata."
+    )
+    wikidata_refresh_days: int = Field(default=30, ge=1, le=365)
+    max_subsidiary_aliases: int = Field(
+        default=50,
+        ge=0,
+        le=500,
+        description="Most GLEIF subsidiary names added to a holding's news aliases.",
+    )
+
+
+StooqSymbol = Annotated[str, Field(pattern=r"^\^?[a-z0-9._-]{1,24}$", examples=["^spx"])]
+
+
+class PriceSettings(ConfigModel):
+    """Daily price history (Stooq) and the risk figures computed from it."""
+
+    benchmark_symbols: list[StooqSymbol] = Field(
+        default_factory=lambda: ["^spx"],
+        description="Stooq symbols of the benchmarks (^spx S&P 500, ^dax DAX, ^ukx FTSE 100). "
+        "The first is used for beta and the holding charts.",
+    )
+    history_years: int = Field(default=2, ge=1, le=10)
+    plausibility_tolerance_pct: float = Field(
+        default=1.0,
+        gt=0,
+        le=20,
+        description="Largest gap between Stooq's close and Trading212's price on a sync day "
+        "before it is flagged.",
+    )
+
+
+CountryCode = Annotated[str, Field(pattern=r"^[A-Z]{2}$", examples=["CZ"])]
+Mic = Annotated[str, Field(pattern=r"^[A-Z0-9]{4}$", examples=["XNYS"])]
+
+
+class ExchangeClosure(ConfigModel):
+    mic: Mic
+    date: dt.date
+    name: str = Field(min_length=1, max_length=100)
+
+
+class CalendarSettings(ConfigModel):
+    """The expected-gap calendar: days when a source has nothing to publish or collect."""
+
+    holiday_countries: list[CountryCode] = Field(
+        default_factory=lambda: ["CZ", "US", "DE", "GB"],
+        description="Countries whose public holidays are loaded from Nager.Date.",
+    )
+    exchange_closures: list[ExchangeClosure] = Field(
+        default_factory=list,
+        description="Days an exchange is closed (public holidays are not exchange calendars; "
+        "confirm the suggestions on the calendar page). Used without a deploy.",
+    )
+
+    def closures(self, mic: str) -> set[dt.date]:
+        return {c.date for c in self.exchange_closures if c.mic == mic}
+
+
 class JobsConfig(ConfigModel):
     """Schedules for the worker's timed jobs. Stored as `config_version` rows, domain `jobs`.
 
@@ -150,6 +263,19 @@ class JobsConfig(ConfigModel):
         description="Check stored results figures against the issuers' 10-Q/10-K XBRL. "
         "Default: daily 09:00.",
     )
+    reference_data: JobSchedule = Field(
+        default_factory=lambda: JobSchedule(cron="30 4 * * 1"),
+        description="Identity, listings, legal entities and group structure. Default: Mondays "
+        "04:30.",
+    )
+    price_history: JobSchedule = Field(
+        default_factory=lambda: JobSchedule(cron="15 23 * * 1-5"),
+        description="Daily prices (Stooq) and FX history after the close. Default: weekdays 23:15.",
+    )
+    holiday_refresh: JobSchedule = Field(
+        default_factory=lambda: JobSchedule(cron="0 4 2 1,7 *"),
+        description="Public holidays for this and next year. Default: 2 January and 2 July.",
+    )
     news_ingest: JobSchedule = Field(
         default_factory=lambda: JobSchedule(cron="0 6-22/2 * * *"),
         description="Ingest, classify, corroborate and alert. Default: every 2 h, 06:00-22:00.",
@@ -168,6 +294,9 @@ class JobsConfig(ConfigModel):
     )
     news: NewsSettings = Field(default_factory=NewsSettings)
     digest: DigestSettings = Field(default_factory=DigestSettings)
+    reference: ReferenceSettings = Field(default_factory=ReferenceSettings)
+    prices: PriceSettings = Field(default_factory=PriceSettings)
+    calendar: CalendarSettings = Field(default_factory=CalendarSettings)
 
     def schedules(self) -> dict[str, JobSchedule]:
         return {
@@ -176,6 +305,9 @@ class JobsConfig(ConfigModel):
             "earnings_calendar_full": self.earnings_calendar_full,
             "earnings_due": self.earnings_due,
             "fact_reconcile": self.fact_reconcile,
+            "reference_data": self.reference_data,
+            "price_history": self.price_history,
+            "holiday_refresh": self.holiday_refresh,
             "news_ingest": self.news_ingest,
             "daily_digest": self.daily_digest,
             "weekly_digest": self.weekly_digest,

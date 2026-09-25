@@ -5,13 +5,15 @@ executing and one waiting, never two writing at once.
 """
 
 import asyncio
+import datetime as dt
 import json
 from typing import Any
+from zoneinfo import ZoneInfo
 
 import asyncpg
 import pytest
 
-from steward.config import JobsConfig, StrategyConfig
+from steward.config import JobSchedule, JobsConfig, StrategyConfig
 from steward.config.store import json_diff, load_active, save_config
 from steward.jobs import queue, registry
 from steward.jobs.runner import JobContext, JobFailed, create_job, run_job
@@ -217,8 +219,11 @@ async def test_schedule_follows_the_jobs_config() -> None:
         "earnings_calendar_full",
         "earnings_due",
         "fact_reconcile",
+        "holiday_refresh",
         "news_ingest",
         "portfolio_sync",
+        "price_history",
+        "reference_data",
         "weekly_digest",
     ]
     job = scheduler.get_job("config:portfolio_sync")
@@ -249,3 +254,27 @@ def test_jobs_config_rejects_bad_schedules(body: dict[str, Any]) -> None:
 
     with pytest.raises(ValidationError):
         JobsConfig.model_validate(body)
+
+
+@pytest.mark.parametrize(
+    ("cron", "days"),
+    [
+        ("0 7 * * 1-5", ["Mon", "Tue", "Wed", "Thu", "Fri"]),
+        ("0 6 * * 0", ["Sun"]),
+        ("0 6 * * 7", ["Sun"]),
+        ("0 6 * * 1,3,5", ["Mon", "Wed", "Fri"]),
+        ("0 6 * * */2", ["Sun", "Tue", "Thu", "Sat"]),
+        ("0 6 * * mon-fri", ["Mon", "Tue", "Wed", "Thu", "Fri"]),
+        ("0 6 * * *", ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"]),
+    ],
+)
+def test_cron_weekdays_follow_crontab_numbering(cron: str, days: list[str]) -> None:
+    # APScheduler 3 counts Monday as 0; the Jobs config uses standard crontab (0 = Sunday).
+    trigger = JobSchedule(cron=cron).trigger()
+    moment = dt.datetime(2026, 9, 27, 0, 0, tzinfo=ZoneInfo("Europe/Prague"))  # a Sunday
+    fired = set()
+    for _ in range(14):
+        moment = trigger.get_next_fire_time(None, moment)
+        fired.add(moment.strftime("%a"))
+        moment += dt.timedelta(minutes=1)
+    assert sorted(fired, key=["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].index) == days

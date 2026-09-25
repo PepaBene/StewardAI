@@ -95,6 +95,11 @@ class EdgarClient:
         data = (await self._get(SUBMISSIONS_URL.format(cik=pad_cik(cik)))).json()
         return parse_submissions(pad_cik(cik), data)
 
+    async def exchanges(self, cik: str) -> list[str]:
+        """Exchanges the issuer's securities trade on, as EDGAR lists them ("Nasdaq")."""
+        data = (await self._get(SUBMISSIONS_URL.format(cik=pad_cik(cik)))).json()
+        return [str(e) for e in data.get("exchanges") or [] if e]
+
     async def company_facts(self, cik: str) -> dict[str, Any]:
         """Every XBRL fact the issuer has filed (10-Q, 10-K, 20-F, ...), by taxonomy and
         concept. A 404 (no XBRL filings) is an empty result, not an error."""
@@ -190,3 +195,14 @@ def pick_press_release(documents: list[tuple[str, str]]) -> str | None:
     exhibits = [(t, n) for t, n in documents if t.startswith("EX-99")]
     exhibits.sort(key=lambda d: (d[0] != "EX-99.1", d[1].lower().endswith(".pdf"), d[0]))
     return exhibits[0][1] if exhibits else None
+
+
+# EDGAR's exchange names -> operating MIC.
+EXCHANGE_MIC: dict[str, str] = {
+    "Nasdaq": "XNAS",
+    "NYSE": "XNYS",
+    "NYSE American": "XASE",
+    "NYSE Arca": "ARCX",
+    "CBOE": "BATS",
+    "Cboe BZX": "BATS",
+}

@@ -12,6 +12,7 @@ from collections.abc import AsyncIterator, Callable
 from dataclasses import dataclass
 from decimal import Decimal
 from typing import Any
+from zoneinfo import ZoneInfo
 
 import asyncpg
 import httpx
@@ -25,6 +26,7 @@ from steward.fx.sources import FxSourceError, fetch_rates
 from steward.jobs.runner import JobContext, JobFailed
 from steward.portfolio.drift import HoldingValue, compute_drift
 from steward.portfolio.snapshot import Snapshot, build_snapshot, snapshot_date_for
+from steward.reference.calendar import fx_stale
 from steward.settings import get_settings
 from steward.trading212.client import Trading212Client
 from steward.trading212.models import HistoricalOrder, HistoryDividend, HistoryTransaction
@@ -33,6 +35,7 @@ JOB_TYPE = "portfolio_sync"
 
 # Stored rates older than this are not used when a source cannot be reached.
 FX_FALLBACK_MAX_AGE = dt.timedelta(days=10)
+PRAGUE = ZoneInfo("Europe/Prague")
 
 _ISIN = re.compile(r"^[A-Z]{2}[A-Z0-9]{9}[0-9]$")
 
@@ -100,6 +103,18 @@ async def portfolio_sync(ctx: JobContext, deps: SyncDeps) -> None:
             ) from exc
         step.detail["currencies"] = sorted(currencies)
         step.detail["base_currency"] = strategy.base_currency
+        newest = max((r.rate_date for r in rates), default=None)
+        # ČNB fixes by 14:30 and the ECB publishes around 16:00 CET: before 17:00 Prague
+        # time, today's rate is not expected yet.
+        published_by = (
+            snapshot_date
+            if captured_at.astimezone(PRAGUE).hour >= 17
+            else snapshot_date - dt.timedelta(days=1)
+        )
+        missing = await fx_stale(pool, fx_source, newest, published_by)
+        if missing:
+            # Publication days with no rate. Weekends and holidays are never on this list.
+            step.detail["fx_stale"] = {"newest_rate": newest, "missing_days": missing}
 
     async with ctx.step("snapshot") as step:
         await _write_snapshot(pool, ctx.job_id, stored.id if stored else None, snapshot)
@@ -153,13 +168,27 @@ async def _collect_rates(
         detail["used_stored_rates"] = len(rates)
         return rates
 
+    await store_rates(pool, rates)
+    detail["fetched"] = len(rates)
+    detail["rate_dates"] = sorted({r.rate_date for r in rates})
+    providers = sorted({r.provider for r in rates if r.provider})
+    if providers:
+        detail["provider"] = providers
+    return rates
+
+
+async def store_rates(pool: asyncpg.Pool, rates: list[FxRate], *, overwrite: bool = True) -> None:
+    conflict = (
+        "do update set rate = excluded.rate, published_amount = excluded.published_amount,"
+        " published_rate = excluded.published_rate, provider = excluded.provider,"
+        " fetched_at = now()"
+        if overwrite
+        else "do nothing"
+    )
     await pool.executemany(
-        "insert into public.fx_rate"
-        " (source, rate_date, currency, home_currency, rate, published_amount, published_rate)"
-        " values ($1, $2, $3, $4, $5, $6, $7)"
-        " on conflict (source, rate_date, currency) do update set rate = excluded.rate,"
-        " published_amount = excluded.published_amount,"
-        " published_rate = excluded.published_rate, fetched_at = now()",
+        "insert into public.fx_rate (source, rate_date, currency, home_currency, rate,"  # noqa: S608
+        " published_amount, published_rate, provider) values ($1, $2, $3, $4, $5, $6, $7, $8)"
+        f" on conflict (source, rate_date, currency) {conflict}",
         [
             (
                 r.source,
@@ -169,13 +198,11 @@ async def _collect_rates(
                 r.rate,
                 r.published_amount,
                 r.published_rate,
+                r.provider,
             )
             for r in rates
         ],
     )
-    detail["fetched"] = len(rates)
-    detail["rate_dates"] = sorted({r.rate_date for r in rates})
-    return rates
 
 
 async def _write_snapshot(

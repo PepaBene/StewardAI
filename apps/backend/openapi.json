@@ -2847,6 +2847,414 @@
           }
         ]
       }
+    },
+    "/holdings/{ticker}/identity": {
+      "get": {
+        "tags": [
+          "holdings"
+        ],
+        "summary": "Get Holding Identity",
+        "description": "Identifiers, listings, home market, legal entity, group structure and the\nrelationships waiting for confirmation.",
+        "operationId": "get_holding_identity",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "ticker",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9._-]{1,32}$",
+              "title": "Ticker"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HoldingIdentity"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/relationships/{relationship_id}/confirm": {
+      "post": {
+        "tags": [
+          "holdings"
+        ],
+        "summary": "Confirm Relationship",
+        "description": "Confirm a suggested relationship. A competitor, supplier or customer is added to the\nholding profile (a new config version), so the next news run matches on it.",
+        "operationId": "confirm_relationship",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "relationship_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Relationship Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RelationshipDecision"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/relationships/{relationship_id}/reject": {
+      "post": {
+        "tags": [
+          "holdings"
+        ],
+        "summary": "Reject Relationship",
+        "description": "Reject a suggested relationship; it is never suggested again.",
+        "operationId": "reject_relationship",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "relationship_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Relationship Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RelationshipDecision"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/holdings/{ticker}/prices": {
+      "get": {
+        "tags": [
+          "holdings"
+        ],
+        "summary": "Get Price History",
+        "description": "Daily closes with the benchmark, and the risk card computed from the stored bars.",
+        "operationId": "get_price_history",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "ticker",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9._-]{1,32}$",
+              "title": "Ticker"
+            }
+          },
+          {
+            "name": "days",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 3700,
+              "minimum": 7,
+              "default": 365,
+              "title": "Days"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PriceHistory"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/reference/gaps": {
+      "get": {
+        "tags": [
+          "reference"
+        ],
+        "summary": "Get Reference Gaps",
+        "description": "Instruments whose identity could not be resolved, and symbols with no price history.",
+        "operationId": "get_reference_gaps",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReferenceGaps"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/calendar/exchanges": {
+      "get": {
+        "tags": [
+          "reference"
+        ],
+        "summary": "Get Exchange Calendar",
+        "description": "Confirmed exchange closures and the public holidays suggested as closures.",
+        "operationId": "get_exchange_calendar",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExchangeCalendar"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/calendar/exchanges/closures": {
+      "post": {
+        "tags": [
+          "reference"
+        ],
+        "summary": "Add Exchange Closures",
+        "description": "Confirm closures into the Jobs config (a new version); used from the next run.",
+        "operationId": "add_exchange_closures",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ClosureConfirmation"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ClosureResult"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/jobs/reference-data": {
+      "post": {
+        "tags": [
+          "jobs"
+        ],
+        "summary": "Run Reference Data",
+        "description": "Resolve identity, reference data and structure now.",
+        "operationId": "run_reference_data",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReferenceRunRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "202": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/JobSummary"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/jobs/price-history": {
+      "post": {
+        "tags": [
+          "jobs"
+        ],
+        "summary": "Run Price History",
+        "description": "Collect price and FX history now.",
+        "operationId": "run_price_history",
+        "responses": {
+          "202": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/JobSummary"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/jobs/holiday-refresh": {
+      "post": {
+        "tags": [
+          "jobs"
+        ],
+        "summary": "Run Holiday Refresh",
+        "description": "Load public holidays for this and next year now.",
+        "operationId": "run_holiday_refresh",
+        "responses": {
+          "202": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/JobSummary"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
     }
   },
   "components": {
@@ -3044,6 +3452,29 @@
           "created_at"
         ],
         "title": "AlertOut"
+      },
+      "AliasOut": {
+        "properties": {
+          "alias": {
+            "type": "string",
+            "title": "Alias"
+          },
+          "kind": {
+            "type": "string",
+            "title": "Kind"
+          },
+          "source": {
+            "type": "string",
+            "title": "Source"
+          }
+        },
+        "type": "object",
+        "required": [
+          "alias",
+          "kind",
+          "source"
+        ],
+        "title": "AliasOut"
       },
       "AllocationSlice": {
         "properties": {
@@ -3433,6 +3864,34 @@
         ],
         "title": "BudgetConfigVersion"
       },
+      "CalendarSettings": {
+        "properties": {
+          "holiday_countries": {
+            "items": {
+              "type": "string",
+              "pattern": "^[A-Z]{2}$",
+              "examples": [
+                "CZ"
+              ]
+            },
+            "type": "array",
+            "title": "Holiday Countries",
+            "description": "Countries whose public holidays are loaded from Nager.Date."
+          },
+          "exchange_closures": {
+            "items": {
+              "$ref": "#/components/schemas/ExchangeClosure"
+            },
+            "type": "array",
+            "title": "Exchange Closures",
+            "description": "Days an exchange is closed (public holidays are not exchange calendars; confirm the suggestions on the calendar page). Used without a deploy."
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "CalendarSettings",
+        "description": "The expected-gap calendar: days when a source has nothing to publish or collect."
+      },
       "CashDrift": {
         "properties": {
           "value_base": {
@@ -3717,6 +4176,60 @@
         "title": "CategoryWeightRule",
         "description": "Limit on a category's weight; with no bucket it applies to every bucket of the dimension."
       },
+      "ClosureConfirmation": {
+        "properties": {
+          "closures": {
+            "items": {
+              "$ref": "#/components/schemas/ExchangeClosure"
+            },
+            "type": "array",
+            "minItems": 1,
+            "title": "Closures"
+          }
+        },
+        "type": "object",
+        "required": [
+          "closures"
+        ],
+        "title": "ClosureConfirmation"
+      },
+      "ClosureResult": {
+        "properties": {
+          "jobs_version_id": {
+            "type": "integer",
+            "title": "Jobs Version Id"
+          }
+        },
+        "type": "object",
+        "required": [
+          "jobs_version_id"
+        ],
+        "title": "ClosureResult"
+      },
+      "ClosureSuggestion": {
+        "properties": {
+          "mic": {
+            "type": "string",
+            "title": "Mic"
+          },
+          "date": {
+            "type": "string",
+            "format": "date",
+            "title": "Date"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          }
+        },
+        "type": "object",
+        "required": [
+          "mic",
+          "date",
+          "name"
+        ],
+        "title": "ClosureSuggestion"
+      },
       "ConfigDiff": {
         "properties": {
           "domain": {
@@ -3971,6 +4484,31 @@
           "changes"
         ],
         "title": "ConfigVersionMeta"
+      },
+      "Correlation": {
+        "properties": {
+          "ticker": {
+            "type": "string",
+            "title": "Ticker"
+          },
+          "correlation": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Correlation"
+          }
+        },
+        "type": "object",
+        "required": [
+          "ticker",
+          "correlation"
+        ],
+        "title": "Correlation"
       },
       "DiffChange": {
         "properties": {
@@ -4620,6 +5158,8 @@
                 "sector_competitor",
                 "index_change",
                 "analyst_rating",
+                "delisting",
+                "entity_status",
                 "other"
               ]
             },
@@ -4654,6 +5194,8 @@
                 "sector_competitor",
                 "index_change",
                 "analyst_rating",
+                "delisting",
+                "entity_status",
                 "other"
               ]
             },
@@ -4711,6 +5253,8 @@
                 "sector_competitor",
                 "index_change",
                 "analyst_rating",
+                "delisting",
+                "entity_status",
                 "other"
               ]
             },
@@ -4779,6 +5323,8 @@
               "sector_competitor",
               "index_change",
               "analyst_rating",
+              "delisting",
+              "entity_status",
               "other"
             ],
             "title": "Id"
@@ -4895,6 +5441,72 @@
           "context"
         ],
         "title": "EvidenceLink"
+      },
+      "ExchangeCalendar": {
+        "properties": {
+          "exchanges": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "type": "object",
+            "title": "Exchanges",
+            "description": "Home MIC of a holding -> its country."
+          },
+          "closures": {
+            "items": {
+              "$ref": "#/components/schemas/ExchangeClosure"
+            },
+            "type": "array",
+            "title": "Closures",
+            "description": "Confirmed (in the Jobs config)."
+          },
+          "suggestions": {
+            "items": {
+              "$ref": "#/components/schemas/ClosureSuggestion"
+            },
+            "type": "array",
+            "title": "Suggestions",
+            "description": "Public holidays in an exchange's country not yet confirmed as closures."
+          }
+        },
+        "type": "object",
+        "required": [
+          "exchanges",
+          "closures",
+          "suggestions"
+        ],
+        "title": "ExchangeCalendar"
+      },
+      "ExchangeClosure": {
+        "properties": {
+          "mic": {
+            "type": "string",
+            "pattern": "^[A-Z0-9]{4}$",
+            "title": "Mic",
+            "examples": [
+              "XNYS"
+            ]
+          },
+          "date": {
+            "type": "string",
+            "format": "date",
+            "title": "Date"
+          },
+          "name": {
+            "type": "string",
+            "maxLength": 100,
+            "minLength": 1,
+            "title": "Name"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "mic",
+          "date",
+          "name"
+        ],
+        "title": "ExchangeClosure"
       },
       "ExportedDomain": {
         "properties": {
@@ -5718,6 +6330,240 @@
         ],
         "title": "HoldingDetail"
       },
+      "HoldingIdentity": {
+        "properties": {
+          "ticker": {
+            "type": "string",
+            "title": "Ticker"
+          },
+          "isin": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Isin"
+          },
+          "share_class_figi": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Share Class Figi"
+          },
+          "security_type": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Security Type"
+          },
+          "home_mic": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Home Mic"
+          },
+          "home_country": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Home Country"
+          },
+          "price_symbol": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Price Symbol"
+          },
+          "identity_resolved_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Identity Resolved At"
+          },
+          "identity_error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Identity Error",
+            "description": "Why identity is incomplete; null when fine."
+          },
+          "identifiers": {
+            "items": {
+              "$ref": "#/components/schemas/IdentifierOut"
+            },
+            "type": "array",
+            "title": "Identifiers",
+            "description": "Composite (per-country) listings."
+          },
+          "identifier_count": {
+            "type": "integer",
+            "title": "Identifier Count",
+            "description": "All OpenFIGI listings of the share class."
+          },
+          "listings": {
+            "items": {
+              "$ref": "#/components/schemas/ListingOut"
+            },
+            "type": "array",
+            "title": "Listings"
+          },
+          "liquidity": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/LiquidityOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "legal_entity": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/LegalEntityOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "parents": {
+            "items": {
+              "$ref": "#/components/schemas/RelationshipOut"
+            },
+            "type": "array",
+            "title": "Parents",
+            "description": "Direct and ultimate consolidating parents."
+          },
+          "parent_exceptions": {
+            "items": {
+              "$ref": "#/components/schemas/ReportingExceptionOut"
+            },
+            "type": "array",
+            "title": "Parent Exceptions",
+            "description": "GLEIF's stated reasons that no parent is reported."
+          },
+          "subsidiaries": {
+            "items": {
+              "$ref": "#/components/schemas/RelationshipOut"
+            },
+            "type": "array",
+            "title": "Subsidiaries"
+          },
+          "subsidiary_count": {
+            "type": "integer",
+            "title": "Subsidiary Count"
+          },
+          "owners": {
+            "items": {
+              "$ref": "#/components/schemas/RelationshipOut"
+            },
+            "type": "array",
+            "title": "Owners"
+          },
+          "suggested": {
+            "items": {
+              "$ref": "#/components/schemas/RelationshipOut"
+            },
+            "type": "array",
+            "title": "Suggested",
+            "description": "Waiting for the owner to confirm."
+          },
+          "related": {
+            "items": {
+              "$ref": "#/components/schemas/RelationshipOut"
+            },
+            "type": "array",
+            "title": "Related",
+            "description": "Confirmed competitors, suppliers and customers."
+          },
+          "aliases": {
+            "items": {
+              "$ref": "#/components/schemas/AliasOut"
+            },
+            "type": "array",
+            "title": "Aliases"
+          },
+          "wikidata": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Wikidata"
+          }
+        },
+        "type": "object",
+        "required": [
+          "ticker",
+          "isin",
+          "share_class_figi",
+          "security_type",
+          "home_mic",
+          "home_country",
+          "price_symbol",
+          "identity_resolved_at",
+          "identity_error",
+          "identifiers",
+          "identifier_count",
+          "listings",
+          "liquidity",
+          "legal_entity",
+          "parents",
+          "parent_exceptions",
+          "subsidiaries",
+          "subsidiary_count",
+          "owners",
+          "suggested",
+          "related",
+          "aliases",
+          "wikidata"
+        ],
+        "title": "HoldingIdentity"
+      },
       "HoldingProfile": {
         "properties": {
           "ticker": {
@@ -5837,6 +6683,19 @@
             "title": "Fiscal Year End Month",
             "description": "Month the fiscal year ends in (Apple: 9, Microsoft: 6). Maps fiscal quarters to calendar periods.",
             "default": 12
+          },
+          "price_symbol": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^[a-z0-9._-]{1,24}$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Price Symbol",
+            "description": "Stooq symbol for price history when the one derived from OpenFIGI is wrong or missing (e.g. 'sap.de')."
           },
           "reporting_currency": {
             "anyOf": [
@@ -6012,6 +6871,109 @@
           "holdings"
         ],
         "title": "HoldingsResponse"
+      },
+      "IdentifierOut": {
+        "properties": {
+          "figi": {
+            "type": "string",
+            "title": "Figi"
+          },
+          "composite_figi": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Composite Figi"
+          },
+          "listing_ticker": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Listing Ticker"
+          },
+          "exch_code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Exch Code"
+          },
+          "security_type": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Security Type"
+          },
+          "name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
+          }
+        },
+        "type": "object",
+        "required": [
+          "figi",
+          "composite_figi",
+          "listing_ticker",
+          "exch_code",
+          "security_type",
+          "name"
+        ],
+        "title": "IdentifierOut"
+      },
+      "IdentityGap": {
+        "properties": {
+          "ticker": {
+            "type": "string",
+            "title": "Ticker"
+          },
+          "name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
+          },
+          "problem": {
+            "type": "string",
+            "title": "Problem"
+          }
+        },
+        "type": "object",
+        "required": [
+          "ticker",
+          "name",
+          "problem"
+        ],
+        "title": "IdentityGap"
       },
       "ImportResult": {
         "properties": {
@@ -6307,6 +7269,18 @@
             "$ref": "#/components/schemas/JobSchedule",
             "description": "Check stored results figures against the issuers' 10-Q/10-K XBRL. Default: daily 09:00."
           },
+          "reference_data": {
+            "$ref": "#/components/schemas/JobSchedule",
+            "description": "Identity, listings, legal entities and group structure. Default: Mondays 04:30."
+          },
+          "price_history": {
+            "$ref": "#/components/schemas/JobSchedule",
+            "description": "Daily prices (Stooq) and FX history after the close. Default: weekdays 23:15."
+          },
+          "holiday_refresh": {
+            "$ref": "#/components/schemas/JobSchedule",
+            "description": "Public holidays for this and next year. Default: 2 January and 2 July."
+          },
           "news_ingest": {
             "$ref": "#/components/schemas/JobSchedule",
             "description": "Ingest, classify, corroborate and alert. Default: every 2 h, 06:00-22:00."
@@ -6330,6 +7304,15 @@
           },
           "digest": {
             "$ref": "#/components/schemas/DigestSettings"
+          },
+          "reference": {
+            "$ref": "#/components/schemas/ReferenceSettings"
+          },
+          "prices": {
+            "$ref": "#/components/schemas/PriceSettings"
+          },
+          "calendar": {
+            "$ref": "#/components/schemas/CalendarSettings"
           }
         },
         "additionalProperties": false,
@@ -6404,6 +7387,296 @@
           "history"
         ],
         "title": "KpiStatus"
+      },
+      "LegalEntityOut": {
+        "properties": {
+          "lei": {
+            "type": "string",
+            "title": "Lei"
+          },
+          "legal_name": {
+            "type": "string",
+            "title": "Legal Name"
+          },
+          "other_names": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Other Names"
+          },
+          "jurisdiction": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Jurisdiction"
+          },
+          "legal_form": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Legal Form"
+          },
+          "hq_country": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Hq Country"
+          },
+          "status": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Status"
+          },
+          "registration_status": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Registration Status"
+          },
+          "next_renewal": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Renewal"
+          },
+          "successor_lei": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Successor Lei"
+          },
+          "fetched_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Fetched At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "lei",
+          "legal_name",
+          "other_names",
+          "jurisdiction",
+          "legal_form",
+          "hq_country",
+          "status",
+          "registration_status",
+          "next_renewal",
+          "successor_lei",
+          "fetched_at"
+        ],
+        "title": "LegalEntityOut"
+      },
+      "LiquidityOut": {
+        "properties": {
+          "liquid": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Liquid"
+          },
+          "avg_daily_turnover": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Avg Daily Turnover"
+          },
+          "turnover_currency": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Turnover Currency"
+          },
+          "avg_daily_trades": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Avg Daily Trades"
+          },
+          "most_relevant_market": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Most Relevant Market"
+          },
+          "period_to": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Period To"
+          }
+        },
+        "type": "object",
+        "required": [
+          "liquid",
+          "avg_daily_turnover",
+          "turnover_currency",
+          "avg_daily_trades",
+          "most_relevant_market",
+          "period_to"
+        ],
+        "title": "LiquidityOut"
+      },
+      "ListingOut": {
+        "properties": {
+          "mic": {
+            "type": "string",
+            "title": "Mic"
+          },
+          "full_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Full Name"
+          },
+          "cfi": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cfi"
+          },
+          "currency": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Currency"
+          },
+          "first_trade_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "First Trade At"
+          },
+          "terminated_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Terminated At"
+          },
+          "status": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Status"
+          },
+          "home": {
+            "type": "boolean",
+            "title": "Home"
+          }
+        },
+        "type": "object",
+        "required": [
+          "mic",
+          "full_name",
+          "cfi",
+          "currency",
+          "first_trade_at",
+          "terminated_at",
+          "status",
+          "home"
+        ],
+        "title": "ListingOut"
       },
       "ModelPrice": {
         "properties": {
@@ -6985,6 +8258,8 @@
                 "sector_competitor",
                 "index_change",
                 "analyst_rating",
+                "delisting",
+                "entity_status",
                 "other"
               ]
             },
@@ -7438,6 +8713,224 @@
         "title": "PositionWeightRule",
         "description": "Limit on a single position's weight; with no ticker it applies to every position."
       },
+      "PriceGap": {
+        "properties": {
+          "key": {
+            "type": "string",
+            "title": "Key",
+            "description": "Ticker, or the benchmark symbol."
+          },
+          "symbol": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Symbol"
+          },
+          "reason": {
+            "type": "string",
+            "title": "Reason"
+          }
+        },
+        "type": "object",
+        "required": [
+          "key",
+          "symbol",
+          "reason"
+        ],
+        "title": "PriceGap"
+      },
+      "PriceHistory": {
+        "properties": {
+          "ticker": {
+            "type": "string",
+            "title": "Ticker"
+          },
+          "symbol": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Symbol"
+          },
+          "source": {
+            "type": "string",
+            "const": "Stooq",
+            "title": "Source",
+            "default": "Stooq"
+          },
+          "as_of": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "As Of",
+            "description": "Date of the latest stored close."
+          },
+          "fetched_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fetched At"
+          },
+          "bars": {
+            "items": {
+              "$ref": "#/components/schemas/PricePoint"
+            },
+            "type": "array",
+            "title": "Bars"
+          },
+          "benchmark_symbol": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Benchmark Symbol"
+          },
+          "benchmark": {
+            "items": {
+              "$ref": "#/components/schemas/PricePoint"
+            },
+            "type": "array",
+            "title": "Benchmark"
+          },
+          "risk": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/RiskCard"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "correlations": {
+            "items": {
+              "$ref": "#/components/schemas/Correlation"
+            },
+            "type": "array",
+            "title": "Correlations",
+            "description": "With each other holding, last 252 days."
+          },
+          "gap": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Gap",
+            "description": "Why there is no price history, when there is none."
+          },
+          "plausibility": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Plausibility",
+            "description": "Latest Stooq close vs Trading212's price on a sync day."
+          }
+        },
+        "type": "object",
+        "required": [
+          "ticker",
+          "symbol",
+          "as_of",
+          "fetched_at",
+          "bars",
+          "benchmark_symbol",
+          "benchmark",
+          "risk",
+          "correlations",
+          "gap",
+          "plausibility"
+        ],
+        "title": "PriceHistory"
+      },
+      "PricePoint": {
+        "properties": {
+          "date": {
+            "type": "string",
+            "format": "date",
+            "title": "Date"
+          },
+          "close": {
+            "type": "number",
+            "title": "Close"
+          }
+        },
+        "type": "object",
+        "required": [
+          "date",
+          "close"
+        ],
+        "title": "PricePoint"
+      },
+      "PriceSettings": {
+        "properties": {
+          "benchmark_symbols": {
+            "items": {
+              "type": "string",
+              "pattern": "^\\^?[a-z0-9._-]{1,24}$",
+              "examples": [
+                "^spx"
+              ]
+            },
+            "type": "array",
+            "title": "Benchmark Symbols",
+            "description": "Stooq symbols of the benchmarks (^spx S&P 500, ^dax DAX, ^ukx FTSE 100). The first is used for beta and the holding charts."
+          },
+          "history_years": {
+            "type": "integer",
+            "maximum": 10.0,
+            "minimum": 1.0,
+            "title": "History Years",
+            "default": 2
+          },
+          "plausibility_tolerance_pct": {
+            "type": "number",
+            "maximum": 20.0,
+            "exclusiveMinimum": 0.0,
+            "title": "Plausibility Tolerance Pct",
+            "description": "Largest gap between Stooq's close and Trading212's price on a sync day before it is flagged.",
+            "default": 1.0
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "PriceSettings",
+        "description": "Daily price history (Stooq) and the risk figures computed from it."
+      },
       "QuietHours": {
         "properties": {
           "enabled": {
@@ -7669,6 +9162,231 @@
         ],
         "title": "ReconciliationOut"
       },
+      "ReferenceGaps": {
+        "properties": {
+          "identity": {
+            "items": {
+              "$ref": "#/components/schemas/IdentityGap"
+            },
+            "type": "array",
+            "title": "Identity"
+          },
+          "prices": {
+            "items": {
+              "$ref": "#/components/schemas/PriceGap"
+            },
+            "type": "array",
+            "title": "Prices"
+          },
+          "prices_checked_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Prices Checked At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "identity",
+          "prices",
+          "prices_checked_at"
+        ],
+        "title": "ReferenceGaps"
+      },
+      "ReferenceRunRequest": {
+        "properties": {
+          "ticker": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^[A-Za-z0-9._-]{1,32}$",
+                "examples": [
+                  "AAPL_US_EQ"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ticker",
+            "description": "One holding, or all when null."
+          },
+          "force": {
+            "type": "boolean",
+            "title": "Force",
+            "description": "Refresh OpenFIGI and Wikidata now.",
+            "default": false
+          }
+        },
+        "type": "object",
+        "title": "ReferenceRunRequest"
+      },
+      "ReferenceSettings": {
+        "properties": {
+          "openfigi_refresh_days": {
+            "type": "integer",
+            "maximum": 365.0,
+            "minimum": 1.0,
+            "title": "Openfigi Refresh Days",
+            "description": "Re-map each ISIN through OpenFIGI this often.",
+            "default": 30
+          },
+          "wikidata_enabled": {
+            "type": "boolean",
+            "title": "Wikidata Enabled",
+            "description": "Read aliases and suggested relationships from Wikidata.",
+            "default": true
+          },
+          "wikidata_refresh_days": {
+            "type": "integer",
+            "maximum": 365.0,
+            "minimum": 1.0,
+            "title": "Wikidata Refresh Days",
+            "default": 30
+          },
+          "max_subsidiary_aliases": {
+            "type": "integer",
+            "maximum": 500.0,
+            "minimum": 0.0,
+            "title": "Max Subsidiary Aliases",
+            "description": "Most GLEIF subsidiary names added to a holding's news aliases.",
+            "default": 50
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "ReferenceSettings",
+        "description": "Identity and reference data: OpenFIGI, ESMA FIRDS/FITRS, GLEIF, Wikidata."
+      },
+      "RelationshipDecision": {
+        "properties": {
+          "relationship": {
+            "$ref": "#/components/schemas/RelationshipOut"
+          },
+          "holding_profiles_version_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Holding Profiles Version Id",
+            "description": "The new holding-profiles version, when the confirmation changed it."
+          }
+        },
+        "type": "object",
+        "required": [
+          "relationship",
+          "holding_profiles_version_id"
+        ],
+        "title": "RelationshipDecision"
+      },
+      "RelationshipOut": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "parent",
+              "ultimate_parent",
+              "subsidiary",
+              "owner",
+              "competitor",
+              "supplier",
+              "customer"
+            ],
+            "title": "Type"
+          },
+          "object_name": {
+            "type": "string",
+            "title": "Object Name"
+          },
+          "object_lei": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Object Lei"
+          },
+          "source": {
+            "type": "string",
+            "title": "Source"
+          },
+          "sources": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Sources",
+            "description": "Every source that reported it."
+          },
+          "source_ref": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Ref"
+          },
+          "as_of": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "As Of"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "confirmed",
+              "suggested",
+              "rejected"
+            ],
+            "title": "Status"
+          },
+          "tier": {
+            "type": "integer",
+            "title": "Tier",
+            "description": "1 GLEIF or a filing, 3 Wikidata; owner decisions win."
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "type",
+          "object_name",
+          "object_lei",
+          "source",
+          "sources",
+          "source_ref",
+          "as_of",
+          "status",
+          "tier"
+        ],
+        "title": "RelationshipOut"
+      },
       "ReportOut": {
         "properties": {
           "id": {
@@ -7844,6 +9562,24 @@
         ],
         "title": "ReportSummary"
       },
+      "ReportingExceptionOut": {
+        "properties": {
+          "category": {
+            "type": "string",
+            "title": "Category"
+          },
+          "reason": {
+            "type": "string",
+            "title": "Reason"
+          }
+        },
+        "type": "object",
+        "required": [
+          "category",
+          "reason"
+        ],
+        "title": "ReportingExceptionOut"
+      },
       "ReviewItem": {
         "properties": {
           "ticker": {
@@ -7908,6 +9644,74 @@
         ],
         "title": "ReviewItem"
       },
+      "RiskCard": {
+        "properties": {
+          "returns": {
+            "additionalProperties": {
+              "anyOf": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "type": "object",
+            "title": "Returns",
+            "description": "1m, 3m, 6m, 1y, 2y (fractions)."
+          },
+          "volatility": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Volatility",
+            "description": "Annualised, last 252 trading days."
+          },
+          "max_drawdown": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Max Drawdown",
+            "description": "Worst fall from a peak, stored history."
+          },
+          "beta": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Beta",
+            "description": "Against the first benchmark, last 252 days."
+          },
+          "observations": {
+            "type": "integer",
+            "title": "Observations"
+          }
+        },
+        "type": "object",
+        "required": [
+          "returns",
+          "volatility",
+          "max_drawdown",
+          "beta",
+          "observations"
+        ],
+        "title": "RiskCard"
+      },
       "RuleMatch": {
         "properties": {
           "severities": {
@@ -7947,6 +9751,8 @@
                 "sector_competitor",
                 "index_change",
                 "analyst_rating",
+                "delisting",
+                "entity_status",
                 "other"
               ]
             },
@@ -8029,6 +9835,8 @@
               "sector_competitor",
               "index_change",
               "analyst_rating",
+              "delisting",
+              "entity_status",
               "other"
             ],
             "title": "Event Type"
@@ -8439,6 +10247,8 @@
               "sector_competitor",
               "index_change",
               "analyst_rating",
+              "delisting",
+              "entity_status",
               "other"
             ],
             "title": "Event Type",

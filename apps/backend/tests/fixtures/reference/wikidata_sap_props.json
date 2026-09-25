@@ -1,0 +1,373 @@
+{
+  "head" : {
+    "vars" : [ "p", "value", "valueLabel", "lei" ]
+  },
+  "results" : {
+    "bindings" : [ {
+      "value" : {
+        "type" : "uri",
+        "value" : "http://www.wikidata.org/entity/Q167533"
+      },
+      "p" : {
+        "type" : "literal",
+        "value" : "product"
+      },
+      "valueLabel" : {
+        "xml:lang" : "en",
+        "type" : "literal",
+        "value" : "SAP ERP"
+      }
+    }, {
+      "value" : {
+        "type" : "uri",
+        "value" : "http://www.wikidata.org/entity/Q1017587"
+      },
+      "p" : {
+        "type" : "literal",
+        "value" : "subsidiary"
+      },
+      "valueLabel" : {
+        "xml:lang" : "en",
+        "type" : "literal",
+        "value" : "Business Objects"
+      }
+    }, {
+      "value" : {
+        "type" : "uri",
+        "value" : "http://www.wikidata.org/entity/Q4790268"
+      },
+      "p" : {
+        "type" : "literal",
+        "value" : "subsidiary"
+      },
+      "valueLabel" : {
+        "xml:lang" : "en",
+        "type" : "literal",
+        "value" : "SAP Ariba"
+      }
+    }, {
+      "value" : {
+        "type" : "uri",
+        "value" : "http://www.wikidata.org/entity/Q5159089"
+      },
+      "p" : {
+        "type" : "literal",
+        "value" : "subsidiary"
+      },
+      "valueLabel" : {
+        "xml:lang" : "en",
+        "type" : "literal",
+        "value" : "SAP Concur"
+      },
+      "lei" : {
+        "type" : "literal",
+        "value" : "OO5F1NP112HF423F0445"
+      }
+    }, {
+      "value" : {
+        "type" : "uri",
+        "value" : "http://www.wikidata.org/entity/Q5447158"
+      },
+      "p" : {
+        "type" : "literal",
+        "value" : "subsidiary"
+      },
+      "valueLabel" : {
+        "xml:lang" : "en",
+        "type" : "literal",
+        "value" : "Fieldglass"
+      }
+    }, {
+      "value" : {
+        "type" : "uri",
+        "value" : "http://www.wikidata.org/entity/Q5560364"
+      },
+      "p" : {
+        "type" : "literal",
+        "value" : "subsidiary"
+      },
+      "valueLabel" : {
+        "xml:lang" : "en",
+        "type" : "literal",
+        "value" : "Gigya"
+      }
+    }, {
+      "value" : {
+        "type" : "uri",
+        "value" : "http://www.wikidata.org/entity/Q6341142"
+      },
+      "p" : {
+        "type" : "literal",
+        "value" : "subsidiary"
+      },
+      "valueLabel" : {
+        "xml:lang" : "en",
+        "type" : "literal",
+        "value" : "KXEN Inc."
+      }
+    }, {
+      "value" : {
+        "type" : "uri",
+        "value" : "http://www.wikidata.org/entity/Q7632539"
+      },
+      "p" : {
+        "type" : "literal",
+        "value" : "subsidiary"
+      },
+      "valueLabel" : {
+        "xml:lang" : "en",
+        "type" : "literal",
+        "value" : "SAP SuccessFactors"
+      }
+    }, {
+      "value" : {
+        "type" : "uri",
+        "value" : "http://www.wikidata.org/entity/Q28975953"
+      },
+      "p" : {
+        "type" : "literal",
+        "value" : "subsidiary"
+      },
+      "valueLabel" : {
+        "xml:lang" : "en",
+        "type" : "literal",
+        "value" : "Systems Applications and Products in Data Processing (United States)"
+      }
+    }, {
+      "value" : {
+        "type" : "uri",
+        "value" : "http://www.wikidata.org/entity/Q28975959"
+      },
+      "p" : {
+        "type" : "literal",
+        "value" : "subsidiary"
+      },
+      "valueLabel" : {
+        "xml:lang" : "en",
+        "type" : "literal",
+        "value" : "Systems Applications and Products in Data Processing (Australia)"
+      }
+    }, {
+      "value" : {
+        "type" : "uri",
+        "value" : "http://www.wikidata.org/entity/Q54968398"
+      },
+      "p" : {
+        "type" : "literal",
+        "value" : "subsidiary"
+      },
+      "valueLabel" : {
+        "xml:lang" : "en",
+        "type" : "literal",
+        "value" : "SAP ČR"
+      },
+      "lei" : {
+        "type" : "literal",
+        "value" : "5299009LZO78DYVDK330"
+      }
+    }, {
+      "value" : {
+        "type" : "uri",
+        "value" : "http://www.wikidata.org/entity/Q138042836"
+      },
+      "p" : {
+        "type" : "literal",
+        "value" : "subsidiary"
+      },
+      "valueLabel" : {
+        "xml:lang" : "en",
+        "type" : "literal",
+        "value" : "Delos Cloud"
+      }
+    }, {
+      "value" : {
+        "type" : "uri",
+        "value" : "http://www.wikidata.org/entity/Q638608"
+      },
+      "p" : {
+        "type" : "literal",
+        "value" : "industry"
+      },
+      "valueLabel" : {
+        "xml:lang" : "en",
+        "type" : "literal",
+        "value" : "software development"
+      }
+    }, {
+      "value" : {
+        "type" : "uri",
+        "value" : "http://www.wikidata.org/entity/Q880371"
+      },
+      "p" : {
+        "type" : "literal",
+        "value" : "industry"
+      },
+      "valueLabel" : {
+        "xml:lang" : "en",
+        "type" : "literal",
+        "value" : "software industry"
+      }
+    }, {
+      "value" : {
+        "type" : "uri",
+        "value" : "http://www.wikidata.org/entity/Q70623824"
+      },
+      "p" : {
+        "type" : "literal",
+        "value" : "ceo"
+      },
+      "valueLabel" : {
+        "xml:lang" : "en",
+        "type" : "literal",
+        "value" : "Christian Klein"
+      }
+    }, {
+      "value" : {
+        "type" : "uri",
+        "value" : "http://www.wikidata.org/entity/Q155718"
+      },
+      "p" : {
+        "type" : "literal",
+        "value" : "part_of"
+      },
+      "valueLabel" : {
+        "xml:lang" : "en",
+        "type" : "literal",
+        "value" : "DAX"
+      }
+    }, {
+      "value" : {
+        "type" : "uri",
+        "value" : "http://www.wikidata.org/entity/Q378967"
+      },
+      "p" : {
+        "type" : "literal",
+        "value" : "part_of"
+      },
+      "valueLabel" : {
+        "xml:lang" : "en",
+        "type" : "literal",
+        "value" : "TecDAX"
+      }
+    }, {
+      "value" : {
+        "type" : "uri",
+        "value" : "http://www.wikidata.org/entity/Q595622"
+      },
+      "p" : {
+        "type" : "literal",
+        "value" : "part_of"
+      },
+      "valueLabel" : {
+        "xml:lang" : "en",
+        "type" : "literal",
+        "value" : "MDAX"
+      }
+    }, {
+      "value" : {
+        "type" : "uri",
+        "value" : "http://www.wikidata.org/entity/Q874430"
+      },
+      "p" : {
+        "type" : "literal",
+        "value" : "part_of"
+      },
+      "valueLabel" : {
+        "xml:lang" : "en",
+        "type" : "literal",
+        "value" : "CDAX"
+      }
+    }, {
+      "value" : {
+        "type" : "uri",
+        "value" : "http://www.wikidata.org/entity/Q981010"
+      },
+      "p" : {
+        "type" : "literal",
+        "value" : "part_of"
+      },
+      "valueLabel" : {
+        "xml:lang" : "en",
+        "type" : "literal",
+        "value" : "EURO STOXX 50"
+      },
+      "lei" : {
+        "type" : "literal",
+        "value" : "529900G27B01O3PYWN37"
+      }
+    }, {
+      "value" : {
+        "type" : "uri",
+        "value" : "https://www.sap.com/"
+      },
+      "p" : {
+        "type" : "literal",
+        "value" : "website"
+      },
+      "valueLabel" : {
+        "type" : "literal",
+        "value" : "https://www.sap.com/"
+      }
+    }, {
+      "value" : {
+        "type" : "uri",
+        "value" : "http://www.wikidata.org/entity/Q62543"
+      },
+      "p" : {
+        "type" : "literal",
+        "value" : "owned_by"
+      },
+      "valueLabel" : {
+        "xml:lang" : "en",
+        "type" : "literal",
+        "value" : "Dietmar Hopp"
+      }
+    }, {
+      "value" : {
+        "type" : "uri",
+        "value" : "http://www.wikidata.org/entity/Q71074"
+      },
+      "p" : {
+        "type" : "literal",
+        "value" : "owned_by"
+      },
+      "valueLabel" : {
+        "xml:lang" : "en",
+        "type" : "literal",
+        "value" : "Hasso Plattner"
+      }
+    }, {
+      "value" : {
+        "type" : "uri",
+        "value" : "http://www.wikidata.org/entity/Q219635"
+      },
+      "p" : {
+        "type" : "literal",
+        "value" : "owned_by"
+      },
+      "valueLabel" : {
+        "xml:lang" : "en",
+        "type" : "literal",
+        "value" : "BlackRock"
+      },
+      "lei" : {
+        "type" : "literal",
+        "value" : "549300LRIF3NWCU26A80"
+      }
+    }, {
+      "value" : {
+        "type" : "uri",
+        "value" : "http://www.wikidata.org/entity/Q1196231"
+      },
+      "p" : {
+        "type" : "literal",
+        "value" : "owned_by"
+      },
+      "valueLabel" : {
+        "xml:lang" : "en",
+        "type" : "literal",
+        "value" : "Government Pension Fund Global"
+      }
+    } ]
+  }
+}

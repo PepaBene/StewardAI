@@ -17,6 +17,8 @@ from steward.jobs.runner import JobHandler
 from steward.news.digest import daily_digest_handler, weekly_digest_handler
 from steward.news.pipeline import news_ingest_handler
 from steward.portfolio.sync import portfolio_sync_handler
+from steward.reference.identity import reference_data_handler
+from steward.reference.prices import holiday_refresh_handler, price_history_handler
 
 JobType = Literal[
     "portfolio_sync",
@@ -26,6 +28,9 @@ JobType = Literal[
     "earnings_calendar_full",
     "earnings_due",
     "fact_reconcile",
+    "reference_data",
+    "price_history",
+    "holiday_refresh",
     "news_ingest",
     "daily_digest",
     "weekly_digest",
@@ -39,6 +44,9 @@ JOB_HANDLERS: dict[str, JobHandler] = {
     "earnings_calendar_full": earnings_calendar_full_handler,
     "earnings_due": earnings_due_handler,
     "fact_reconcile": fact_reconcile_handler,
+    "reference_data": reference_data_handler,
+    "price_history": price_history_handler,
+    "holiday_refresh": holiday_refresh_handler,
     "news_ingest": news_ingest_handler,
     "daily_digest": daily_digest_handler,
     "weekly_digest": weekly_digest_handler,
