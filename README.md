@@ -5,7 +5,8 @@ owner's strategy and per-holding theses, and uses Claude to monitor, explain and
 The full design is in
 [AI_Portfolio_Copilot_Technical_Product_Description.md](AI_Portfolio_Copilot_Technical_Product_Description.md).
 
-**Status: Phase 0 (Foundations).**
+**Status: Phase 1 (Portfolio core)**: daily Trading212 sync with ČNB/ECB FX conversion, drift
+against the strategy's targets, the Overview and Holdings screens, and a live sync indicator.
 
 ## Repository layout
 
@@ -43,7 +44,8 @@ side is stale.
    ```sql
    insert into private.app_owner (user_id) values ('<owner auth user id>');
    ```
-6. Check pgmq: `select * from pgmq.list_queues();` returns no rows and no error.
+6. Check pgmq: `select * from pgmq.list_queues();` runs with no error and lists the `jobs`
+   queue (created by the Phase 1 migration).
 
 Then fill in the environment: `cp .env.example .env` in the repository root. That one file
 is read by both apps, and `.env.example` explains where to get every value (Supabase URL
@@ -71,3 +73,5 @@ See [apps/backend/README.md](apps/backend/README.md) and [apps/web/README.md](ap
 - The backend connects directly as `app_backend`: explicit per-table grants plus a permissive
   policy, no superuser, no `BYPASSRLS`, no access to anything it was not granted.
 - `config_version` rows are immutable apart from `active`; one active version per domain.
+- `job` and `job_step` are in the `supabase_realtime` publication, so the web app's sync
+  indicator updates live. The migration adds them only where the publication exists.

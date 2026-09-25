@@ -105,7 +105,7 @@ function Overview({ data }: { data: PortfolioOverview }) {
           <Button
             className="mt-4"
             onClick={() => void startSync()}
-            disabled={view.kind === "active" || view.kind === "loading"}
+            disabled={view.kind === "active"}
           >
             <RefreshCwIcon aria-hidden="true" />
             Sync now
@@ -241,14 +241,14 @@ function DriftCard({ data }: { data: PortfolioOverview }) {
                       {p.ticker}
                       {p.held ? null : <span className="ml-1 font-sans text-text-muted">(not held)</span>}
                     </th>
-                    <td className="num py-2 px-3 text-right">{formatPercent(p.weight)}</td>
-                    <td className="num py-2 px-3 text-right text-text-muted">
+                    <td className="num whitespace-nowrap py-2 px-3 text-right">{formatPercent(p.weight)}</td>
+                    <td className="num whitespace-nowrap py-2 px-3 text-right text-text-muted">
                       {formatPercent(p.target_weight)}
                       <span className="block text-xs">
                         {formatPercent(p.lower)}–{formatPercent(p.upper)}
                       </span>
                     </td>
-                    <td className={cn("num py-2 px-3 text-right", isOutOfBand(p.status) && "font-semibold")}>
+                    <td className={cn("num whitespace-nowrap py-2 px-3 text-right", isOutOfBand(p.status) && "font-semibold")}>
                       {formatPp(p.drift)}
                     </td>
                     <td className="py-2 pl-3">
@@ -259,14 +259,14 @@ function DriftCard({ data }: { data: PortfolioOverview }) {
                 {cashRow ? (
                   <tr>
                     <th scope="row" className="py-2 pr-3 text-left font-normal">Cash</th>
-                    <td className="num py-2 px-3 text-right">{formatPercent(cashRow.weight)}</td>
-                    <td className="num py-2 px-3 text-right text-text-muted">
+                    <td className="num whitespace-nowrap py-2 px-3 text-right">{formatPercent(cashRow.weight)}</td>
+                    <td className="num whitespace-nowrap py-2 px-3 text-right text-text-muted">
                       {formatPercent(cashRow.target_weight)}
                       <span className="block text-xs">
                         {formatPercent(cashRow.lower)}–{formatPercent(cashRow.upper)}
                       </span>
                     </td>
-                    <td className="num py-2 px-3 text-right">{formatPp(cashRow.drift)}</td>
+                    <td className="num whitespace-nowrap py-2 px-3 text-right">{formatPp(cashRow.drift)}</td>
                     <td className="py-2 pl-3">
                       <DriftStatusBadge status={cashRow.status} />
                     </td>

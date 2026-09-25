@@ -5,20 +5,23 @@ One Python package, two processes:
 | Process | Command | Role |
 | --- | --- | --- |
 | API | `uv run uvicorn api.main:app` | FastAPI: the frontend's action calls. Verifies the Supabase JWT on every non-public route. |
-| Worker | `uv run python -m worker` | APScheduler for timed jobs (and, from Phase 1, the pgmq consumer). |
+| Worker | `uv run python -m worker` | APScheduler for timed jobs (schedules from the Jobs config) and the pgmq `jobs` queue consumer for on-demand runs. |
 
 Both share `steward` (settings, logging, DB access, config schemas, source adapters).
 
 ```
 src/
   steward/           shared library
-    config/          Pydantic schemas per config domain (strategy, theses, ...)
+    config/          Pydantic schemas per config domain (strategy, theses, jobs) + versioned store
+    fx/              ČNB and ECB reference-rate collectors, currency conversion
+    jobs/            job runner (advisory lock, job/job_step log), pgmq queue, registry
+    portfolio/       sync job, day snapshots, drift, API read models
     trading212/      read-only Trading212 client (+ `python -m steward.trading212`)
     db.py            asyncpg pool as app_backend
     logging.py       logging with secret scrubbing
     settings.py      environment settings
-  api/               FastAPI app, JWT verification, OpenAPI export
-  worker/            scheduler entrypoint
+  api/               FastAPI app, routes, JWT verification, OpenAPI export
+  worker/            scheduler + queue consumer entrypoint
 tests/               pytest (DB tests need STEWARD_TEST_DATABASE_URL)
 openapi.json         committed API contract; the frontend generates its types from it
 ```
@@ -54,7 +57,34 @@ in `supabase/migrations`, then check the access model as `app_backend`, `authent
 (owner and non-owner) and `anon`. The pgmq migration is skipped on servers without the
 extension; CI runs against a Postgres image that has it.
 
+## API (Phase 1)
+
+| Route | What it does |
+| --- | --- |
+| `GET /portfolio/overview` | Totals, allocation, drift against the active strategy, freshness |
+| `GET /portfolio/holdings` | Every open position of the latest snapshot, largest first |
+| `POST /jobs/portfolio-sync` | Queue a sync now (202); the worker runs it |
+| `GET`/`PUT /config/{strategy,theses,jobs}` | Active config version / save a new one |
+
+All but `/health` need the owner's MFA-verified Supabase JWT.
+
 ## Design notes
+
+- **Portfolio sync** (`portfolio_sync`, default daily 22:30 Prague, set in the Jobs config):
+  Trading212 account and positions, then the strategy's reference rates (ČNB or ECB; if the
+  source is down, stored rates up to 10 days old), then one `position_snapshot` row per
+  position per day plus an `account_snapshot` (a re-run replaces that day), then new
+  orders, dividends and cash movements (the first run backfills the full history, later
+  runs stop at the first known item), then drift. Every stage is a `job_step`. A position
+  whose currency has no reference rate fails the job before anything is written.
+- **One run per job type.** Each run takes a Postgres advisory lock for its job type; a
+  second run waits (`job.status = 'waiting'`) and never writes alongside the first, across
+  processes too.
+- **FX.** Rates are stored as home-currency units (CZK for ČNB, EUR for ECB) per one unit,
+  next to the figure exactly as published. Every base-currency value is quantity x price x
+  rate, recomputable by hand; GBX is converted as GBP/100.
+- **Drift** is computed on read from the latest snapshot and the *active* strategy, so a
+  saved target change shows up immediately.
 
 - **Config is validated here.** `steward.config` holds the Pydantic model per config domain.
   `POST /config/{domain}/validate` exposes them, which also puts `StrategyConfig`,

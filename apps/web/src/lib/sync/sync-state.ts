@@ -38,6 +38,8 @@ export const STEP_LABELS: Record<string, string> = {
 
 export type SyncView =
   | { kind: "loading" }
+  /** The status rows could not be read (e.g. Supabase unreachable); syncing still works. */
+  | { kind: "unavailable" }
   | { kind: "never" }
   | { kind: "active"; phase: "queued" | "waiting" | "running"; stepLabel: string | null; jobId: number }
   | {

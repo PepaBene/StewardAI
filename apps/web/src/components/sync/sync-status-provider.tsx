@@ -82,6 +82,7 @@ async function readSyncRows(supabase: SupabaseClient): Promise<Snapshot> {
 
 export function SyncStatusProvider({ children }: { children: ReactNode }) {
   const [rows, setRows] = useState<Snapshot | null>(null);
+  const [readFailed, setReadFailed] = useState(false);
   const [realtime, setRealtime] = useState<RealtimeState>(() =>
     getSupabaseConfig() ? "connecting" : "offline",
   );
@@ -101,18 +102,26 @@ export function SyncStatusProvider({ children }: { children: ReactNode }) {
       const mine = ++sequence;
       try {
         const next = await readSyncRows(supabase);
-        if (!cancelled && mine === sequence) setRows(next);
+        if (!cancelled && mine === sequence) {
+          setRows(next);
+          setReadFailed(false);
+        }
       } catch {
-        // Keep showing the last known state; the next event or poll retries.
+        // Keep the last known state if there is one; the next event or poll retries.
+        if (!cancelled && mine === sequence) setReadFailed(true);
       }
     };
     reloadRef.current = reload;
 
     (async () => {
       // Join the channel with the user's token, not the anon key: RLS would hide every row.
-      const { data } = await supabase.auth.getSession();
-      if (cancelled) return;
-      if (data.session) await supabase.realtime.setAuth(data.session.access_token);
+      try {
+        const { data } = await supabase.auth.getSession();
+        if (cancelled) return;
+        if (data.session) await supabase.realtime.setAuth(data.session.access_token);
+      } catch {
+        if (!cancelled) setReadFailed(true);
+      }
       await reload();
       if (cancelled) return;
       channel = supabase
@@ -175,14 +184,18 @@ export function SyncStatusProvider({ children }: { children: ReactNode }) {
 
   const value = useMemo<SyncStatusValue>(
     () => ({
-      view: rows ? describeSync(rows.latest, rows.lastSuccess, rows.step) : { kind: "loading" },
+      view: rows
+        ? describeSync(rows.latest, rows.lastSuccess, rows.step)
+        : readFailed || !getSupabaseConfig()
+          ? { kind: "unavailable" }
+          : { kind: "loading" },
       lastSuccessJobId: rows?.lastSuccess?.id ?? null,
       realtime,
       startSync,
       starting,
       startError,
     }),
-    [rows, realtime, startSync, starting, startError],
+    [rows, readFailed, realtime, startSync, starting, startError],
   );
 
   return <SyncStatusContext.Provider value={value}>{children}</SyncStatusContext.Provider>;

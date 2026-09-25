@@ -27,7 +27,11 @@ export function SyncIndicator() {
   let title: string | undefined;
   let tone = "text-text-muted";
 
-  if (view.kind === "never") {
+  if (view.kind === "unavailable") {
+    icon = <CircleAlertIcon aria-hidden="true" className="size-4 text-warning-signal" />;
+    text = "Sync status unavailable";
+    title = "Could not read the sync status from the database. Syncing still works.";
+  } else if (view.kind === "never") {
     text = "Never synced";
   } else if (view.kind === "active") {
     icon = <LoaderCircleIcon aria-hidden="true" className="size-4 animate-spin" />;
@@ -47,7 +51,9 @@ export function SyncIndicator() {
     }
   }
 
-  const busy = starting || view.kind === "active" || view.kind === "loading";
+  // Not disabled while the status is still loading: a duplicate request only queues a
+  // second run, which waits for the first (the backend serialises runs per job type).
+  const busy = starting || view.kind === "active";
   const liveNote =
     realtime === "live" ? "live updates on" : realtime === "offline" ? "live updates off (polling)" : "connecting";
 
