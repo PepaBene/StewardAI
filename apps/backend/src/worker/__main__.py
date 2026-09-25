@@ -3,7 +3,9 @@
 Runs until SIGINT or SIGTERM:
 - the in-process scheduler for timed jobs, registered from the Jobs config;
 - a config refresher that re-applies the Jobs config every few minutes;
-- the pgmq consumer for on-demand jobs the API enqueues.
+- the pgmq consumer for on-demand jobs the API enqueues;
+- the alert dispatcher, which sends due alerts (new ones, and ones held for quiet hours)
+  every few seconds.
 
 Without DATABASE_URL there is nothing to run: the scheduler starts with zero jobs and the
 worker says why.
@@ -15,6 +17,7 @@ import logging
 import signal
 
 import asyncpg
+import httpx
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 
 from steward import __version__
@@ -25,6 +28,8 @@ from steward.jobs import queue
 from steward.jobs.registry import JOB_HANDLERS
 from steward.jobs.runner import JobTrigger, run_job
 from steward.logging import configure_logging
+from steward.notify.alerts import dispatch_due
+from steward.notify.channels import channels_from_settings
 from steward.settings import get_settings
 from worker.scheduler import apply_jobs_config, build_scheduler
 
@@ -37,6 +42,7 @@ QUEUE_POLL_SECONDS = 1.0
 QUEUE_VISIBILITY_SECONDS = 3600
 QUEUE_MAX_READS = 3
 MAX_CONCURRENT_QUEUED_JOBS = 4
+DISPATCH_SECONDS = 15
 
 
 class Worker:
@@ -108,6 +114,15 @@ class Worker:
             finally:
                 await queue.archive(self.pool, message.msg_id)
 
+    async def dispatch_alerts(self, http: httpx.AsyncClient) -> None:
+        try:
+            result = await dispatch_due(self.pool, channels_from_settings(http, get_settings()))
+        except (OSError, asyncpg.PostgresError, TimeoutError):
+            logger.exception("dispatching alerts failed; retrying next round")
+            return
+        if result.sent or result.failed:
+            logger.info("alerts sent %s, failed %s", result.sent, result.failed)
+
     async def drain(self) -> None:
         if self._tasks:
             await asyncio.gather(*self._tasks, return_exceptions=True)
@@ -128,6 +143,7 @@ async def run() -> None:
     scheduler = build_scheduler()
     worker: Worker | None = None
     consumer: asyncio.Task[None] | None = None
+    http = httpx.AsyncClient(timeout=30.0)
 
     if settings.database_url is None:
         logger.warning("DATABASE_URL is not set: no jobs will run")
@@ -142,6 +158,14 @@ async def run() -> None:
             args=[scheduler],
             id="internal:refresh_schedule",
             name="refresh_schedule",
+        )
+        scheduler.add_job(
+            worker.dispatch_alerts,
+            "interval",
+            seconds=DISPATCH_SECONDS,
+            args=[http],
+            id="internal:dispatch_alerts",
+            name="dispatch_alerts",
         )
         consumer = asyncio.create_task(worker.consume(stop))
 
@@ -162,6 +186,7 @@ async def run() -> None:
         if worker is not None:
             await worker.drain()
             await worker.pool.close()
+        await http.aclose()
         logger.info("scheduler stopped")
 
 

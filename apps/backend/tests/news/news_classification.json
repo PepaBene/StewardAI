@@ -1,0 +1,1612 @@
+{
+  "description": "Fictional September 2026 news items for portfolio holdings, each labelled with the expected event type, affected ticker, rumour flag and relevance, used to evaluate the LLM event classifier.",
+  "items": [
+    {
+      "id": "cls-001",
+      "headline": "Nvidia raises third-quarter revenue outlook on data-center demand",
+      "summary": "Nvidia said it now expects fiscal third-quarter revenue of about $58 billion, up from its prior forecast of $54 billion, citing stronger-than-expected orders for its Blackwell data-center systems.",
+      "outlet": "nvidianews.nvidia.com",
+      "published_at": "2026-09-21T20:05:00Z",
+      "candidates": [
+        "NVDA_US_EQ"
+      ],
+      "expected": {
+        "event_type": "guidance_change",
+        "affected_ticker": "NVDA_US_EQ",
+        "rumour": false,
+        "relevant": true
+      }
+    },
+    {
+      "id": "cls-002",
+      "headline": "SAP cuts 2026 cloud revenue forecast as large deals slip",
+      "summary": "SAP lowered its full-year cloud revenue outlook to between 21.2 billion and 21.6 billion euros, saying several large transformation deals had been pushed out of the third quarter.",
+      "outlet": "reuters.com",
+      "published_at": "2026-09-18T06:40:00Z",
+      "candidates": [
+        "SAPd_EQ"
+      ],
+      "expected": {
+        "event_type": "guidance_change",
+        "affected_ticker": "SAPd_EQ",
+        "rumour": false,
+        "relevant": true
+      }
+    },
+    {
+      "id": "cls-003",
+      "headline": "Novo Nordisk issues profit warning, lowers full-year sales growth outlook",
+      "summary": "Novo Nordisk now expects 2026 sales growth of 4% to 8% at constant exchange rates, down from 8% to 14% previously, citing weaker US Wegovy prescriptions and pricing pressure.",
+      "outlet": "novonordisk.com",
+      "published_at": "2026-09-22T05:30:00Z",
+      "candidates": [
+        "NOVOb_EQ"
+      ],
+      "expected": {
+        "event_type": "guidance_change",
+        "affected_ticker": "NOVOb_EQ",
+        "rumour": false,
+        "relevant": true
+      }
+    },
+    {
+      "id": "cls-004",
+      "headline": "Microsoft lifts fiscal 2027 Azure growth outlook at investor briefing",
+      "summary": "Microsoft told investors it now expects Azure revenue to grow in the high-30s percent range in fiscal 2027, above the mid-30s growth it guided to in July, as new AI capacity comes online.",
+      "outlet": "cnbc.com",
+      "published_at": "2026-09-23T17:15:00Z",
+      "candidates": [
+        "MSFT_US_EQ"
+      ],
+      "expected": {
+        "event_type": "guidance_change",
+        "affected_ticker": "MSFT_US_EQ",
+        "rumour": false,
+        "relevant": true
+      }
+    },
+    {
+      "id": "cls-005",
+      "headline": "Apple warns quarterly revenue will fall short of its July forecast",
+      "summary": "Apple said fiscal fourth-quarter revenue will come in below the range it provided in July because a display component shortage has limited iPhone shipments during September.",
+      "outlet": "wsj.com",
+      "published_at": "2026-09-24T21:00:00Z",
+      "candidates": [
+        "AAPL_US_EQ"
+      ],
+      "expected": {
+        "event_type": "guidance_change",
+        "affected_ticker": "AAPL_US_EQ",
+        "rumour": false,
+        "relevant": true
+      }
+    },
+    {
+      "id": "cls-006",
+      "headline": "Apple to acquire AI search startup Lumora Labs for about $2 billion",
+      "summary": "Apple agreed to buy Lumora Labs, a San Francisco-based developer of on-device AI search tools, in a deal valued at about $2 billion, with closing expected by the end of the year.",
+      "outlet": "reuters.com",
+      "published_at": "2026-09-22T08:01:00Z",
+      "candidates": [
+        "AAPL_US_EQ"
+      ],
+      "expected": {
+        "event_type": "m_and_a",
+        "affected_ticker": "AAPL_US_EQ",
+        "rumour": false,
+        "relevant": true
+      }
+    },
+    {
+      "id": "cls-007",
+      "headline": "Microsoft agrees to buy cloud security firm Sentrova for $5.4 billion",
+      "summary": "Microsoft will acquire Sentrova, a cloud workload security company, for $5.4 billion in cash to strengthen its Defender product line. The transaction is subject to regulatory approvals.",
+      "outlet": "news.microsoft.com",
+      "published_at": "2026-09-19T13:00:00Z",
+      "candidates": [
+        "MSFT_US_EQ"
+      ],
+      "expected": {
+        "event_type": "m_and_a",
+        "affected_ticker": "MSFT_US_EQ",
+        "rumour": false,
+        "relevant": true
+      }
+    },
+    {
+      "id": "cls-008",
+      "headline": "SAP agrees to sell travel and expense unit to Harbor Crest Partners for 6.5 billion euros",
+      "summary": "SAP has agreed to divest its travel and expense management business to private equity firm Harbor Crest Partners for 6.5 billion euros, sharpening its focus on cloud ERP and business AI.",
+      "outlet": "news.sap.com",
+      "published_at": "2026-09-24T06:00:00Z",
+      "candidates": [
+        "SAPd_EQ"
+      ],
+      "expected": {
+        "event_type": "m_and_a",
+        "affected_ticker": "SAPd_EQ",
+        "rumour": false,
+        "relevant": true
+      }
+    },
+    {
+      "id": "cls-009",
+      "headline": "Nvidia in talks to acquire optical interconnect startup Photonyx",
+      "summary": "Nvidia is in advanced talks to buy Tel Aviv-based optical interconnect startup Photonyx for roughly $3 billion, according to people familiar with the matter. No agreement has been finalized.",
+      "outlet": "bloomberg.com",
+      "published_at": "2026-09-20T15:30:00Z",
+      "candidates": [
+        "NVDA_US_EQ"
+      ],
+      "expected": {
+        "event_type": "m_and_a",
+        "affected_ticker": "NVDA_US_EQ",
+        "rumour": true,
+        "relevant": true
+      }
+    },
+    {
+      "id": "cls-010",
+      "headline": "Novo Nordisk is said to be weighing bid for obesity biotech Kelvara",
+      "summary": "Novo Nordisk is said to be weighing an offer for US-listed Kelvara Therapeutics, which is developing an oral amylin drug, people familiar with the matter said. Deliberations are at an early stage.",
+      "outlet": "bloomberg.com",
+      "published_at": "2026-09-23T11:20:00Z",
+      "candidates": [
+        "NOVOb_EQ"
+      ],
+      "expected": {
+        "event_type": "m_and_a",
+        "affected_ticker": "NOVOb_EQ",
+        "rumour": true,
+        "relevant": true
+      }
+    },
+    {
+      "id": "cls-011",
+      "headline": "Apple reportedly in talks to buy satellite connectivity firm Orbitlink",
+      "summary": "Apple is reportedly in talks to acquire Orbitlink, a satellite operator that powers some iPhone emergency messaging features, according to people familiar with the matter. Talks could still collapse.",
+      "outlet": "ft.com",
+      "published_at": "2026-09-19T18:45:00Z",
+      "candidates": [
+        "AAPL_US_EQ"
+      ],
+      "expected": {
+        "event_type": "m_and_a",
+        "affected_ticker": "AAPL_US_EQ",
+        "rumour": true,
+        "relevant": true
+      }
+    },
+    {
+      "id": "cls-012",
+      "headline": "Novo Nordisk completes $1.1 billion acquisition of Aurelis Bio",
+      "summary": "Novo Nordisk said it has completed its acquisition of Aurelis Bio, a developer of gene therapies for heart failure, for $1.1 billion after receiving all required regulatory approvals.",
+      "outlet": "globenewswire.com",
+      "published_at": "2026-09-18T07:00:00Z",
+      "candidates": [
+        "NOVOb_EQ"
+      ],
+      "expected": {
+        "event_type": "m_and_a",
+        "affected_ticker": "NOVOb_EQ",
+        "rumour": false,
+        "relevant": true
+      }
+    },
+    {
+      "id": "cls-013",
+      "headline": "Novo Nordisk cuts interim dividend by 25%",
+      "summary": "Novo Nordisk's board approved an interim dividend of DKK 2.40 per share, down 25% from DKK 3.20 a year earlier, the company said in a company announcement.",
+      "outlet": "novonordisk.com",
+      "published_at": "2026-09-22T05:35:00Z",
+      "candidates": [
+        "NOVOb_EQ"
+      ],
+      "expected": {
+        "event_type": "dividend_cut",
+        "affected_ticker": "NOVOb_EQ",
+        "rumour": false,
+        "relevant": true
+      }
+    },
+    {
+      "id": "cls-014",
+      "headline": "SAP lowers dividend proposal to 1.80 euros per share",
+      "summary": "SAP said it will propose a dividend of 1.80 euros per share for fiscal 2026, below the 2.35 euros paid for 2025, to preserve cash during its restructuring programme.",
+      "outlet": "marketwatch.com",
+      "published_at": "2026-09-25T07:10:00Z",
+      "candidates": [
+        "SAPd_EQ"
+      ],
+      "expected": {
+        "event_type": "dividend_cut",
+        "affected_ticker": "SAPd_EQ",
+        "rumour": false,
+        "relevant": true
+      }
+    },
+    {
+      "id": "cls-015",
+      "headline": "Nvidia suspends quarterly cash dividend",
+      "summary": "Nvidia's board has suspended its quarterly cash dividend of $0.01 per share, beginning with the payment that would have been due in December, the company said in a regulatory filing.",
+      "outlet": "sec.gov",
+      "published_at": "2026-09-18T21:10:00Z",
+      "candidates": [
+        "NVDA_US_EQ"
+      ],
+      "expected": {
+        "event_type": "dividend_cut",
+        "affected_ticker": "NVDA_US_EQ",
+        "rumour": false,
+        "relevant": true
+      }
+    },
+    {
+      "id": "cls-016",
+      "headline": "Apple cuts quarterly dividend for the first time since 2012",
+      "summary": "Apple said it will pay a quarterly dividend of $0.20 per share, down from $0.26, the first reduction in its payout since the company reinstated dividends in 2012.",
+      "outlet": "apnews.com",
+      "published_at": "2026-09-24T21:30:00Z",
+      "candidates": [
+        "AAPL_US_EQ"
+      ],
+      "expected": {
+        "event_type": "dividend_cut",
+        "affected_ticker": "AAPL_US_EQ",
+        "rumour": false,
+        "relevant": true
+      }
+    },
+    {
+      "id": "cls-017",
+      "headline": "Nvidia reports record second-quarter revenue of $52.1 billion",
+      "summary": "Nvidia reported fiscal second-quarter revenue of $52.1 billion, up 49% from a year earlier, with data-center revenue of $46.3 billion and diluted earnings of $1.21 per share.",
+      "outlet": "nvidianews.nvidia.com",
+      "published_at": "2026-09-18T20:20:00Z",
+      "candidates": [
+        "NVDA_US_EQ"
+      ],
+      "expected": {
+        "event_type": "earnings_release",
+        "affected_ticker": "NVDA_US_EQ",
+        "rumour": false,
+        "relevant": true
+      }
+    },
+    {
+      "id": "cls-018",
+      "headline": "Microsoft fiscal fourth-quarter profit rises 18% on cloud strength",
+      "summary": "Microsoft reported fourth-quarter net income of $31.9 billion, up 18%, on revenue of $80.2 billion, as Microsoft Cloud revenue grew 27% from a year earlier.",
+      "outlet": "cnbc.com",
+      "published_at": "2026-09-19T20:40:00Z",
+      "candidates": [
+        "MSFT_US_EQ"
+      ],
+      "expected": {
+        "event_type": "earnings_release",
+        "affected_ticker": "MSFT_US_EQ",
+        "rumour": false,
+        "relevant": true
+      }
+    },
+    {
+      "id": "cls-019",
+      "headline": "Apple third-quarter revenue beats estimates on record services",
+      "summary": "Apple posted fiscal third-quarter revenue of $98.4 billion, up 8% year on year, and earnings of $1.62 per share, both above analyst estimates, driven by a record services result.",
+      "outlet": "marketwatch.com",
+      "published_at": "2026-09-20T20:35:00Z",
+      "candidates": [
+        "AAPL_US_EQ"
+      ],
+      "expected": {
+        "event_type": "earnings_release",
+        "affected_ticker": "AAPL_US_EQ",
+        "rumour": false,
+        "relevant": true
+      }
+    },
+    {
+      "id": "cls-020",
+      "headline": "SAP second-quarter operating profit rises 22% as cloud revenue climbs",
+      "summary": "SAP reported second-quarter non-IFRS operating profit of 2.4 billion euros, up 22%, as cloud revenue rose 26% to 5.3 billion euros.",
+      "outlet": "news.sap.com",
+      "published_at": "2026-09-21T05:05:00Z",
+      "candidates": [
+        "SAPd_EQ"
+      ],
+      "expected": {
+        "event_type": "earnings_release",
+        "affected_ticker": "SAPd_EQ",
+        "rumour": false,
+        "relevant": true
+      }
+    },
+    {
+      "id": "cls-021",
+      "headline": "Novo Nordisk half-year net profit falls 6%",
+      "summary": "Novo Nordisk reported first-half net profit of DKK 52.8 billion, down 6% from a year earlier, as higher sales were offset by increased marketing and restructuring costs.",
+      "outlet": "globenewswire.com",
+      "published_at": "2026-09-19T05:30:00Z",
+      "candidates": [
+        "NOVOb_EQ"
+      ],
+      "expected": {
+        "event_type": "earnings_release",
+        "affected_ticker": "NOVOb_EQ",
+        "rumour": false,
+        "relevant": true
+      }
+    },
+    {
+      "id": "cls-022",
+      "headline": "NVDA Q2 earnings are out: revenue $52.1B, EPS $1.21, beat on both",
+      "summary": "Nvidia just dropped Q2 numbers after the bell. Revenue $52.1B vs $50.8B expected, EPS $1.21 vs $1.17 expected, data center came in at $46.3B. Discuss.",
+      "outlet": "reddit.com",
+      "published_at": "2026-09-18T20:31:00Z",
+      "candidates": [
+        "NVDA_US_EQ"
+      ],
+      "expected": {
+        "event_type": "earnings_release",
+        "affected_ticker": "NVDA_US_EQ",
+        "rumour": false,
+        "relevant": true
+      }
+    },
+    {
+      "id": "cls-023",
+      "headline": "Microsoft files annual report showing fiscal 2026 revenue of $318 billion",
+      "summary": "Microsoft filed its annual Form 10-K for fiscal 2026, reporting full-year revenue of $318 billion, up 13%, and net income of $118 billion.",
+      "outlet": "sec.gov",
+      "published_at": "2026-09-22T21:05:00Z",
+      "candidates": [
+        "MSFT_US_EQ"
+      ],
+      "expected": {
+        "event_type": "earnings_release",
+        "affected_ticker": "MSFT_US_EQ",
+        "rumour": false,
+        "relevant": true
+      }
+    },
+    {
+      "id": "cls-024",
+      "headline": "Novo Nordisk Q2 results: sales up 11% at CER as Wegovy beats",
+      "summary": "Novo Nordisk reported second-quarter sales growth of 11% at constant exchange rates, with Wegovy sales of DKK 21.4 billion ahead of consensus, while operating profit rose 5%.",
+      "outlet": "seekingalpha.com",
+      "published_at": "2026-09-19T06:15:00Z",
+      "candidates": [
+        "NOVOb_EQ"
+      ],
+      "expected": {
+        "event_type": "earnings_release",
+        "affected_ticker": "NOVOb_EQ",
+        "rumour": false,
+        "relevant": true
+      }
+    },
+    {
+      "id": "cls-025",
+      "headline": "SAP names Katrin Vogel as chief financial officer",
+      "summary": "SAP appointed Katrin Vogel, currently head of finance for its cloud ERP business, as chief financial officer effective January 1, succeeding the current CFO, who will leave at year-end.",
+      "outlet": "news.sap.com",
+      "published_at": "2026-09-23T06:00:00Z",
+      "candidates": [
+        "SAPd_EQ"
+      ],
+      "expected": {
+        "event_type": "management_change",
+        "affected_ticker": "SAPd_EQ",
+        "rumour": false,
+        "relevant": true
+      }
+    },
+    {
+      "id": "cls-026",
+      "headline": "Novo Nordisk CEO to step down after less than two years in the role",
+      "summary": "Novo Nordisk said its chief executive will step down at the end of October. The board has started a search for a successor and named the chair as interim leader.",
+      "outlet": "reuters.com",
+      "published_at": "2026-09-24T12:10:00Z",
+      "candidates": [
+        "NOVOb_EQ"
+      ],
+      "expected": {
+        "event_type": "management_change",
+        "affected_ticker": "NOVOb_EQ",
+        "rumour": false,
+        "relevant": true
+      }
+    },
+    {
+      "id": "cls-027",
+      "headline": "Nvidia CFO to retire; company begins search for successor",
+      "summary": "Nvidia said its chief financial officer plans to retire next spring after more than a decade in the role and will stay on to help the company recruit and transition a successor.",
+      "outlet": "nvidianews.nvidia.com",
+      "published_at": "2026-09-22T20:10:00Z",
+      "candidates": [
+        "NVDA_US_EQ"
+      ],
+      "expected": {
+        "event_type": "management_change",
+        "affected_ticker": "NVDA_US_EQ",
+        "rumour": false,
+        "relevant": true
+      }
+    },
+    {
+      "id": "cls-028",
+      "headline": "Apple CFO to step down, finance vice president Laura Chen named successor",
+      "summary": "Apple said its chief financial officer will step down on December 31 and be succeeded by Laura Chen, vice president of financial planning and analysis, who joined the company in 2011.",
+      "outlet": "apple.com",
+      "published_at": "2026-09-21T13:30:00Z",
+      "candidates": [
+        "AAPL_US_EQ"
+      ],
+      "expected": {
+        "event_type": "management_change",
+        "affected_ticker": "AAPL_US_EQ",
+        "rumour": false,
+        "relevant": true
+      }
+    },
+    {
+      "id": "cls-029",
+      "headline": "Microsoft names Priya Natarajan chief financial officer",
+      "summary": "Microsoft named Priya Natarajan, corporate vice president of finance for its cloud business, as chief financial officer effective November 1. The outgoing CFO will remain as an adviser until June.",
+      "outlet": "news.microsoft.com",
+      "published_at": "2026-09-25T13:00:00Z",
+      "candidates": [
+        "MSFT_US_EQ"
+      ],
+      "expected": {
+        "event_type": "management_change",
+        "affected_ticker": "MSFT_US_EQ",
+        "rumour": false,
+        "relevant": true
+      }
+    },
+    {
+      "id": "cls-030",
+      "headline": "Apple is said to be preparing for CEO succession as early as next year",
+      "summary": "Apple is said to be stepping up planning for a handover of the chief executive role as soon as 2027, with its hardware engineering chief seen as the frontrunner, people familiar with the matter said.",
+      "outlet": "bloomberg.com",
+      "published_at": "2026-09-20T12:00:00Z",
+      "candidates": [
+        "AAPL_US_EQ"
+      ],
+      "expected": {
+        "event_type": "management_change",
+        "affected_ticker": "AAPL_US_EQ",
+        "rumour": true,
+        "relevant": true
+      }
+    },
+    {
+      "id": "cls-031",
+      "headline": "EU fines Apple 1.2 billion euros for breaching Digital Markets Act",
+      "summary": "The European Commission fined Apple 1.2 billion euros, ruling that its browser choice screen and default-app settings on iPhone breached obligations under the Digital Markets Act.",
+      "outlet": "ft.com",
+      "published_at": "2026-09-23T10:00:00Z",
+      "candidates": [
+        "AAPL_US_EQ"
+      ],
+      "expected": {
+        "event_type": "regulatory_legal",
+        "affected_ticker": "AAPL_US_EQ",
+        "rumour": false,
+        "relevant": true
+      }
+    },
+    {
+      "id": "cls-032",
+      "headline": "US Justice Department sues Nvidia over AI chip sales practices",
+      "summary": "The Justice Department filed an antitrust lawsuit accusing Nvidia of tying access to its GPUs to purchases of its networking equipment, and asked a court to block the practice.",
+      "outlet": "apnews.com",
+      "published_at": "2026-09-21T16:20:00Z",
+      "candidates": [
+        "NVDA_US_EQ"
+      ],
+      "expected": {
+        "event_type": "regulatory_legal",
+        "affected_ticker": "NVDA_US_EQ",
+        "rumour": false,
+        "relevant": true
+      }
+    },
+    {
+      "id": "cls-033",
+      "headline": "FTC opens formal investigation into Microsoft cloud licensing",
+      "summary": "The Federal Trade Commission has opened a formal investigation into whether Microsoft's software licensing terms unfairly penalize customers who run its products on rival cloud platforms.",
+      "outlet": "wsj.com",
+      "published_at": "2026-09-18T15:00:00Z",
+      "candidates": [
+        "MSFT_US_EQ"
+      ],
+      "expected": {
+        "event_type": "regulatory_legal",
+        "affected_ticker": "MSFT_US_EQ",
+        "rumour": false,
+        "relevant": true
+      }
+    },
+    {
+      "id": "cls-034",
+      "headline": "German court orders SAP to pay 310 million euros in licence dispute",
+      "summary": "A Munich regional court ordered SAP to pay 310 million euros in damages to a former reseller over terminated licence agreements. SAP said it would appeal the ruling.",
+      "outlet": "reuters.com",
+      "published_at": "2026-09-22T11:45:00Z",
+      "candidates": [
+        "SAPd_EQ"
+      ],
+      "expected": {
+        "event_type": "regulatory_legal",
+        "affected_ticker": "SAPd_EQ",
+        "rumour": false,
+        "relevant": true
+      }
+    },
+    {
+      "id": "cls-035",
+      "headline": "Novo Nordisk wins US patent ruling over semaglutide",
+      "summary": "A federal court in Delaware upheld Novo Nordisk's key semaglutide patent, blocking three generic drugmakers from launching copies of the diabetes and obesity drug before 2031.",
+      "outlet": "reuters.com",
+      "published_at": "2026-09-20T17:30:00Z",
+      "candidates": [
+        "NOVOb_EQ"
+      ],
+      "expected": {
+        "event_type": "regulatory_legal",
+        "affected_ticker": "NOVOb_EQ",
+        "rumour": false,
+        "relevant": true
+      }
+    },
+    {
+      "id": "cls-036",
+      "headline": "EU is said to be weighing antitrust probe into Microsoft's Copilot bundling",
+      "summary": "European Commission officials are weighing whether to open a formal antitrust investigation into Microsoft's bundling of its Copilot assistant with Teams and Office, according to people familiar with the matter.",
+      "outlet": "bloomberg.com",
+      "published_at": "2026-09-24T09:15:00Z",
+      "candidates": [
+        "MSFT_US_EQ"
+      ],
+      "expected": {
+        "event_type": "regulatory_legal",
+        "affected_ticker": "MSFT_US_EQ",
+        "rumour": true,
+        "relevant": true
+      }
+    },
+    {
+      "id": "cls-037",
+      "headline": "China fines Nvidia 1.8 billion yuan over Mellanox deal conditions",
+      "summary": "China's State Administration for Market Regulation fined Nvidia 1.8 billion yuan, saying the company violated supply commitments it made to win approval for its 2020 purchase of Mellanox.",
+      "outlet": "reuters.com",
+      "published_at": "2026-09-25T04:30:00Z",
+      "candidates": [
+        "NVDA_US_EQ"
+      ],
+      "expected": {
+        "event_type": "regulatory_legal",
+        "affected_ticker": "NVDA_US_EQ",
+        "rumour": false,
+        "relevant": true
+      }
+    },
+    {
+      "id": "cls-038",
+      "headline": "Apple hit with UK class action over Apple Watch battery claims",
+      "summary": "A consumer group filed a 1.4 billion pound class action at London's Competition Appeal Tribunal, alleging Apple failed to disclose battery degradation in older Apple Watch models.",
+      "outlet": "cnbc.com",
+      "published_at": "2026-09-19T09:40:00Z",
+      "candidates": [
+        "AAPL_US_EQ"
+      ],
+      "expected": {
+        "event_type": "regulatory_legal",
+        "affected_ticker": "AAPL_US_EQ",
+        "rumour": false,
+        "relevant": true
+      }
+    },
+    {
+      "id": "cls-039",
+      "headline": "Microsoft raises quarterly dividend 10% to $0.91 per share",
+      "summary": "Microsoft's board declared a quarterly dividend of $0.91 per share, a 10% increase over the previous $0.83, payable December 10 to shareholders of record on November 19.",
+      "outlet": "news.microsoft.com",
+      "published_at": "2026-09-18T20:15:00Z",
+      "candidates": [
+        "MSFT_US_EQ"
+      ],
+      "expected": {
+        "event_type": "capital_allocation",
+        "affected_ticker": "MSFT_US_EQ",
+        "rumour": false,
+        "relevant": true
+      }
+    },
+    {
+      "id": "cls-040",
+      "headline": "SAP launches new 5 billion euro share buyback programme",
+      "summary": "SAP's executive board approved a new share repurchase programme of up to 5 billion euros, to be executed through the end of 2027, following completion of its previous buyback.",
+      "outlet": "news.sap.com",
+      "published_at": "2026-09-19T15:30:00Z",
+      "candidates": [
+        "SAPd_EQ"
+      ],
+      "expected": {
+        "event_type": "capital_allocation",
+        "affected_ticker": "SAPd_EQ",
+        "rumour": false,
+        "relevant": true
+      }
+    },
+    {
+      "id": "cls-041",
+      "headline": "Nvidia prices $10 billion bond offering",
+      "summary": "Nvidia priced $10 billion of senior unsecured notes in four tranches maturing between 2029 and 2056, according to a prospectus filing. Proceeds will be used for general corporate purposes.",
+      "outlet": "sec.gov",
+      "published_at": "2026-09-23T21:20:00Z",
+      "candidates": [
+        "NVDA_US_EQ"
+      ],
+      "expected": {
+        "event_type": "capital_allocation",
+        "affected_ticker": "NVDA_US_EQ",
+        "rumour": false,
+        "relevant": true
+      }
+    },
+    {
+      "id": "cls-042",
+      "headline": "Apple authorizes additional $50 billion share repurchase",
+      "summary": "Apple's board authorized an additional $50 billion for share repurchases, adding to the program announced in May, the company said in a statement.",
+      "outlet": "apple.com",
+      "published_at": "2026-09-22T20:30:00Z",
+      "candidates": [
+        "AAPL_US_EQ"
+      ],
+      "expected": {
+        "event_type": "capital_allocation",
+        "affected_ticker": "AAPL_US_EQ",
+        "rumour": false,
+        "relevant": true
+      }
+    },
+    {
+      "id": "cls-043",
+      "headline": "Novo Nordisk raises 3 billion euros in bond sale",
+      "summary": "Novo Nordisk sold 3 billion euros of bonds across three maturities to refinance short-term debt, according to a term sheet seen by the newspaper. Orders exceeded 9 billion euros.",
+      "outlet": "ft.com",
+      "published_at": "2026-09-21T14:05:00Z",
+      "candidates": [
+        "NOVOb_EQ"
+      ],
+      "expected": {
+        "event_type": "capital_allocation",
+        "affected_ticker": "NOVOb_EQ",
+        "rumour": false,
+        "relevant": true
+      }
+    },
+    {
+      "id": "cls-044",
+      "headline": "SAP reportedly weighing first dollar bond sale in five years",
+      "summary": "SAP is reportedly considering a US dollar bond offering of at least $3 billion as soon as next month, according to people familiar with the matter. No final decision has been made.",
+      "outlet": "bloomberg.com",
+      "published_at": "2026-09-18T13:50:00Z",
+      "candidates": [
+        "SAPd_EQ"
+      ],
+      "expected": {
+        "event_type": "capital_allocation",
+        "affected_ticker": "SAPd_EQ",
+        "rumour": true,
+        "relevant": true
+      }
+    },
+    {
+      "id": "cls-045",
+      "headline": "Moody's upgrades Nvidia to Aa2, outlook stable",
+      "summary": "Moody's raised Nvidia's senior unsecured rating to Aa2 from Aa3, citing the company's dominant position in AI accelerators and its large net cash position.",
+      "outlet": "reuters.com",
+      "published_at": "2026-09-24T18:30:00Z",
+      "candidates": [
+        "NVDA_US_EQ"
+      ],
+      "expected": {
+        "event_type": "credit_rating",
+        "affected_ticker": "NVDA_US_EQ",
+        "rumour": false,
+        "relevant": true
+      }
+    },
+    {
+      "id": "cls-046",
+      "headline": "S&P downgrades Novo Nordisk to A from AA-",
+      "summary": "S&P Global Ratings lowered Novo Nordisk's long-term issuer credit rating to A from AA-, saying intensifying competition and US price cuts will weigh on margins over the next two years.",
+      "outlet": "marketwatch.com",
+      "published_at": "2026-09-23T19:00:00Z",
+      "candidates": [
+        "NOVOb_EQ"
+      ],
+      "expected": {
+        "event_type": "credit_rating",
+        "affected_ticker": "NOVOb_EQ",
+        "rumour": false,
+        "relevant": true
+      }
+    },
+    {
+      "id": "cls-047",
+      "headline": "Fitch upgrades SAP to A+ on cloud transition progress",
+      "summary": "Fitch Ratings upgraded SAP's long-term issuer default rating to A+ from A, citing higher recurring cloud revenue, stronger free cash flow and conservative leverage.",
+      "outlet": "wsj.com",
+      "published_at": "2026-09-20T09:10:00Z",
+      "candidates": [
+        "SAPd_EQ"
+      ],
+      "expected": {
+        "event_type": "credit_rating",
+        "affected_ticker": "SAPd_EQ",
+        "rumour": false,
+        "relevant": true
+      }
+    },
+    {
+      "id": "cls-048",
+      "headline": "S&P cuts Apple's credit rating to AA from AA+",
+      "summary": "S&P Global Ratings downgraded Apple one notch to AA, saying the company's increased debt-funded shareholder returns have reduced its financial headroom.",
+      "outlet": "bloomberg.com",
+      "published_at": "2026-09-25T15:40:00Z",
+      "candidates": [
+        "AAPL_US_EQ"
+      ],
+      "expected": {
+        "event_type": "credit_rating",
+        "affected_ticker": "AAPL_US_EQ",
+        "rumour": false,
+        "relevant": true
+      }
+    },
+    {
+      "id": "cls-049",
+      "headline": "Fed cuts rates by a quarter point, signals one more cut this year",
+      "summary": "The Federal Reserve lowered its benchmark rate by 25 basis points to a 3.25%-3.50% range, and policymakers' projections pointed to one additional cut before year-end.",
+      "outlet": "reuters.com",
+      "published_at": "2026-09-23T18:05:00Z",
+      "candidates": [
+        "AAPL_US_EQ",
+        "MSFT_US_EQ"
+      ],
+      "expected": {
+        "event_type": "central_bank",
+        "affected_ticker": null,
+        "rumour": false,
+        "relevant": true
+      }
+    },
+    {
+      "id": "cls-050",
+      "headline": "ECB holds rates steady, signals no rush to ease further",
+      "summary": "The European Central Bank kept its deposit rate at 2.00% for a fourth straight meeting, with the ECB president saying policy is well positioned and further easing is not imminent.",
+      "outlet": "ft.com",
+      "published_at": "2026-09-24T12:45:00Z",
+      "candidates": [
+        "SAPd_EQ"
+      ],
+      "expected": {
+        "event_type": "central_bank",
+        "affected_ticker": null,
+        "rumour": false,
+        "relevant": true
+      }
+    },
+    {
+      "id": "cls-051",
+      "headline": "Czech National Bank cuts key rate to 3.25%",
+      "summary": "The Czech National Bank's board cut its two-week repo rate by 25 basis points to 3.25%, saying inflation is expected to stay close to the 2% target next year.",
+      "outlet": "reuters.com",
+      "published_at": "2026-09-24T12:35:00Z",
+      "candidates": [
+        "SAPd_EQ",
+        "NOVOb_EQ"
+      ],
+      "expected": {
+        "event_type": "central_bank",
+        "affected_ticker": null,
+        "rumour": false,
+        "relevant": true
+      }
+    },
+    {
+      "id": "cls-052",
+      "headline": "Danish central bank keeps key rate unchanged after ECB decision",
+      "summary": "Danmarks Nationalbank left its current-account rate unchanged at 1.60%, mirroring the European Central Bank's decision to hold rates, in line with its fixed exchange-rate policy.",
+      "outlet": "reuters.com",
+      "published_at": "2026-09-24T14:10:00Z",
+      "candidates": [
+        "NOVOb_EQ"
+      ],
+      "expected": {
+        "event_type": "central_bank",
+        "affected_ticker": null,
+        "rumour": false,
+        "relevant": true
+      }
+    },
+    {
+      "id": "cls-053",
+      "headline": "Fed chair signals pause in rate cuts to assess labor market",
+      "summary": "In a speech on Thursday, the Federal Reserve chair said policymakers can afford to pause further rate cuts while they assess the labor market, a shift from guidance given last week.",
+      "outlet": "cnbc.com",
+      "published_at": "2026-09-25T16:30:00Z",
+      "candidates": [
+        "NVDA_US_EQ",
+        "MSFT_US_EQ"
+      ],
+      "expected": {
+        "event_type": "central_bank",
+        "affected_ticker": null,
+        "rumour": false,
+        "relevant": true
+      }
+    },
+    {
+      "id": "cls-054",
+      "headline": "US consumer prices rise more than expected in August",
+      "summary": "The US consumer price index rose 0.5% in August, above the 0.3% gain forecast by economists, lifting the annual inflation rate to 3.4% from 3.0%.",
+      "outlet": "apnews.com",
+      "published_at": "2026-09-18T12:35:00Z",
+      "candidates": [
+        "AAPL_US_EQ",
+        "NVDA_US_EQ"
+      ],
+      "expected": {
+        "event_type": "macro_surprise",
+        "affected_ticker": null,
+        "rumour": false,
+        "relevant": true
+      }
+    },
+    {
+      "id": "cls-055",
+      "headline": "US economy adds 245,000 jobs, far above expectations",
+      "summary": "US employers added 245,000 jobs last month, well above the 120,000 economists had forecast, and the unemployment rate fell to 4.1%, Labor Department data showed.",
+      "outlet": "cnbc.com",
+      "published_at": "2026-09-18T12:40:00Z",
+      "candidates": [
+        "MSFT_US_EQ"
+      ],
+      "expected": {
+        "event_type": "macro_surprise",
+        "affected_ticker": null,
+        "rumour": false,
+        "relevant": true
+      }
+    },
+    {
+      "id": "cls-056",
+      "headline": "US second-quarter GDP growth revised up to 4.1%",
+      "summary": "The US economy grew at a 4.1% annualized rate in the second quarter, the Commerce Department said in its third estimate, well above the previously reported 3.3% and the 3.4% economists expected.",
+      "outlet": "marketwatch.com",
+      "published_at": "2026-09-25T12:35:00Z",
+      "candidates": [
+        "AAPL_US_EQ",
+        "MSFT_US_EQ"
+      ],
+      "expected": {
+        "event_type": "macro_surprise",
+        "affected_ticker": null,
+        "rumour": false,
+        "relevant": true
+      }
+    },
+    {
+      "id": "cls-057",
+      "headline": "Euro zone inflation unexpectedly falls to 1.6%",
+      "summary": "Euro zone consumer price inflation slowed to 1.6% in September from 2.1% in August, well below the 2.0% expected by economists, according to a flash estimate from Eurostat.",
+      "outlet": "reuters.com",
+      "published_at": "2026-09-22T09:05:00Z",
+      "candidates": [
+        "SAPd_EQ"
+      ],
+      "expected": {
+        "event_type": "macro_surprise",
+        "affected_ticker": null,
+        "rumour": false,
+        "relevant": true
+      }
+    },
+    {
+      "id": "cls-058",
+      "headline": "Danish GDP contracts unexpectedly as pharma output drops",
+      "summary": "Denmark's economy shrank 0.9% in the second quarter, Statistics Denmark said, versus a consensus forecast for 0.3% growth, as pharmaceutical production fell sharply.",
+      "outlet": "bloomberg.com",
+      "published_at": "2026-09-19T06:10:00Z",
+      "candidates": [
+        "NOVOb_EQ"
+      ],
+      "expected": {
+        "event_type": "macro_surprise",
+        "affected_ticker": null,
+        "rumour": false,
+        "relevant": true
+      }
+    },
+    {
+      "id": "cls-059",
+      "headline": "Form 4: Nvidia CEO sells 225,000 shares under 10b5-1 trading plan",
+      "summary": "Nvidia's chief executive sold 225,000 shares between September 17 and September 19 at prices ranging from $182.10 to $186.40, under a pre-arranged Rule 10b5-1 trading plan, a Form 4 filing shows.",
+      "outlet": "sec.gov",
+      "published_at": "2026-09-21T22:00:00Z",
+      "candidates": [
+        "NVDA_US_EQ"
+      ],
+      "expected": {
+        "event_type": "insider_transaction",
+        "affected_ticker": "NVDA_US_EQ",
+        "rumour": false,
+        "relevant": true
+      }
+    },
+    {
+      "id": "cls-060",
+      "headline": "Form 4: Apple director buys $4 million of Apple stock",
+      "summary": "An Apple board member bought 16,500 shares at an average price of $242.30 on September 19, according to a Form 4 filing with the Securities and Exchange Commission.",
+      "outlet": "sec.gov",
+      "published_at": "2026-09-22T21:15:00Z",
+      "candidates": [
+        "AAPL_US_EQ"
+      ],
+      "expected": {
+        "event_type": "insider_transaction",
+        "affected_ticker": "AAPL_US_EQ",
+        "rumour": false,
+        "relevant": true
+      }
+    },
+    {
+      "id": "cls-061",
+      "headline": "SAP SE: Managers' transactions - Executive Board member purchases shares",
+      "summary": "SAP disclosed that a member of its Executive Board bought 4,000 SAP shares at 228.50 euros each on Xetra on September 22, as required under Article 19 of the Market Abuse Regulation.",
+      "outlet": "news.sap.com",
+      "published_at": "2026-09-23T15:00:00Z",
+      "candidates": [
+        "SAPd_EQ"
+      ],
+      "expected": {
+        "event_type": "insider_transaction",
+        "affected_ticker": "SAPd_EQ",
+        "rumour": false,
+        "relevant": true
+      }
+    },
+    {
+      "id": "cls-062",
+      "headline": "Novo Nordisk A/S - Managers' transactions: board member sells B shares",
+      "summary": "Novo Nordisk reported that a member of its board of directors sold 12,000 B shares at DKK 318.40 per share on Nasdaq Copenhagen, in a notification of managers' transactions.",
+      "outlet": "novonordisk.com",
+      "published_at": "2026-09-25T14:20:00Z",
+      "candidates": [
+        "NOVOb_EQ"
+      ],
+      "expected": {
+        "event_type": "insider_transaction",
+        "affected_ticker": "NOVOb_EQ",
+        "rumour": false,
+        "relevant": true
+      }
+    },
+    {
+      "id": "cls-063",
+      "headline": "Microsoft president sells $18 million of stock, filing shows",
+      "summary": "Microsoft's president and vice chair sold 36,000 shares worth about $18 million on September 22, according to a Form 4 filed with the SEC.",
+      "outlet": "marketwatch.com",
+      "published_at": "2026-09-24T22:10:00Z",
+      "candidates": [
+        "MSFT_US_EQ"
+      ],
+      "expected": {
+        "event_type": "insider_transaction",
+        "affected_ticker": "MSFT_US_EQ",
+        "rumour": false,
+        "relevant": true
+      }
+    },
+    {
+      "id": "cls-064",
+      "headline": "Microsoft Azure outage disrupts services across Europe for six hours",
+      "summary": "A networking fault in Microsoft's West Europe Azure region knocked Teams, Outlook and customer-hosted applications offline for about six hours on Monday before service was restored.",
+      "outlet": "cnbc.com",
+      "published_at": "2026-09-21T15:50:00Z",
+      "candidates": [
+        "MSFT_US_EQ"
+      ],
+      "expected": {
+        "event_type": "product_business",
+        "affected_ticker": "MSFT_US_EQ",
+        "rumour": false,
+        "relevant": true
+      }
+    },
+    {
+      "id": "cls-065",
+      "headline": "Nvidia wins $6 billion order to supply India's national AI compute programme",
+      "summary": "Nvidia will supply Blackwell-based systems worth about $6 billion to data centres being built under India's government-backed national AI compute programme, the companies said.",
+      "outlet": "reuters.com",
+      "published_at": "2026-09-20T07:45:00Z",
+      "candidates": [
+        "NVDA_US_EQ"
+      ],
+      "expected": {
+        "event_type": "product_business",
+        "affected_ticker": "NVDA_US_EQ",
+        "rumour": false,
+        "relevant": true
+      }
+    },
+    {
+      "id": "cls-066",
+      "headline": "SAP signs 1.5 billion euro cloud contract with German federal government",
+      "summary": "SAP signed a ten-year contract worth 1.5 billion euros to move Germany's federal administration finance and HR systems onto its sovereign cloud platform.",
+      "outlet": "news.sap.com",
+      "published_at": "2026-09-22T08:30:00Z",
+      "candidates": [
+        "SAPd_EQ"
+      ],
+      "expected": {
+        "event_type": "product_business",
+        "affected_ticker": "SAPd_EQ",
+        "rumour": false,
+        "relevant": true
+      }
+    },
+    {
+      "id": "cls-067",
+      "headline": "Novo Nordisk launches oral Wegovy in Japan",
+      "summary": "Novo Nordisk has launched its once-daily oral semaglutide tablet for chronic weight management in Japan, following approval by the country's health ministry in July.",
+      "outlet": "novonordisk.com",
+      "published_at": "2026-09-18T06:00:00Z",
+      "candidates": [
+        "NOVOb_EQ"
+      ],
+      "expected": {
+        "event_type": "product_business",
+        "affected_ticker": "NOVOb_EQ",
+        "rumour": false,
+        "relevant": true
+      }
+    },
+    {
+      "id": "cls-068",
+      "headline": "Apple recalls some USB-C chargers over overheating risk",
+      "summary": "Apple is recalling about 1.2 million 35W dual USB-C power adapters sold worldwide after reports that the chargers can overheat, posing a burn risk, the US product safety regulator said.",
+      "outlet": "apnews.com",
+      "published_at": "2026-09-23T14:25:00Z",
+      "candidates": [
+        "AAPL_US_EQ"
+      ],
+      "expected": {
+        "event_type": "product_business",
+        "affected_ticker": "AAPL_US_EQ",
+        "rumour": false,
+        "relevant": true
+      }
+    },
+    {
+      "id": "cls-069",
+      "headline": "Microsoft said to be close to winning $3 billion Pentagon cloud contract",
+      "summary": "Microsoft is said to be close to securing a $3 billion Defense Department contract for classified cloud services, according to people familiar with the matter. An award could come next month.",
+      "outlet": "bloomberg.com",
+      "published_at": "2026-09-22T17:00:00Z",
+      "candidates": [
+        "MSFT_US_EQ"
+      ],
+      "expected": {
+        "event_type": "product_business",
+        "affected_ticker": "MSFT_US_EQ",
+        "rumour": true,
+        "relevant": true
+      }
+    },
+    {
+      "id": "cls-070",
+      "headline": "Apple's first foldable iPhone goes on sale worldwide",
+      "summary": "Apple's iPhone Fold went on sale in more than 40 countries on Friday, priced from $1,999, with lines reported outside flagship stores in New York, London and Tokyo.",
+      "outlet": "cnbc.com",
+      "published_at": "2026-09-25T09:00:00Z",
+      "candidates": [
+        "AAPL_US_EQ"
+      ],
+      "expected": {
+        "event_type": "product_business",
+        "affected_ticker": "AAPL_US_EQ",
+        "rumour": false,
+        "relevant": true
+      }
+    },
+    {
+      "id": "cls-071",
+      "headline": "Novo Nordisk recalls batch of Ozempic pens in US over dosing defect",
+      "summary": "Novo Nordisk is voluntarily recalling one lot of Ozempic pre-filled pens in the United States after finding a defect that could cause patients to receive an incorrect dose.",
+      "outlet": "reuters.com",
+      "published_at": "2026-09-24T16:05:00Z",
+      "candidates": [
+        "NOVOb_EQ"
+      ],
+      "expected": {
+        "event_type": "product_business",
+        "affected_ticker": "NOVOb_EQ",
+        "rumour": false,
+        "relevant": true
+      }
+    },
+    {
+      "id": "cls-072",
+      "headline": "TSMC raises 2026 capital spending plan to $48 billion",
+      "summary": "Taiwan Semiconductor Manufacturing Co lifted its 2026 capital expenditure budget to $48 billion from $42 billion to expand advanced packaging capacity for AI chips.",
+      "outlet": "reuters.com",
+      "published_at": "2026-09-22T06:20:00Z",
+      "candidates": [
+        "NVDA_US_EQ"
+      ],
+      "expected": {
+        "event_type": "sector_competitor",
+        "affected_ticker": "NVDA_US_EQ",
+        "rumour": false,
+        "relevant": true
+      }
+    },
+    {
+      "id": "cls-073",
+      "headline": "Foxconn warns of weaker fourth-quarter consumer electronics revenue",
+      "summary": "Foxconn said revenue from its consumer electronics segment, which includes smartphone assembly, is expected to decline significantly in the fourth quarter from a year earlier.",
+      "outlet": "bloomberg.com",
+      "published_at": "2026-09-19T08:00:00Z",
+      "candidates": [
+        "AAPL_US_EQ"
+      ],
+      "expected": {
+        "event_type": "sector_competitor",
+        "affected_ticker": "AAPL_US_EQ",
+        "rumour": false,
+        "relevant": true
+      }
+    },
+    {
+      "id": "cls-074",
+      "headline": "Samsung unveils tri-fold smartphone priced at $2,400",
+      "summary": "Samsung Electronics introduced its first tri-fold smartphone, which opens into a 10-inch tablet, priced at $2,400 and going on sale in South Korea and the US in October.",
+      "outlet": "cnbc.com",
+      "published_at": "2026-09-23T02:00:00Z",
+      "candidates": [
+        "AAPL_US_EQ"
+      ],
+      "expected": {
+        "event_type": "sector_competitor",
+        "affected_ticker": "AAPL_US_EQ",
+        "rumour": false,
+        "relevant": true
+      }
+    },
+    {
+      "id": "cls-075",
+      "headline": "AMD unveils MI450 AI accelerator, claims performance lead",
+      "summary": "AMD introduced its Instinct MI450 data-center accelerator, claiming it delivers up to 30% higher inference performance than competing chips, with shipments to cloud customers starting in the fourth quarter.",
+      "outlet": "reuters.com",
+      "published_at": "2026-09-24T17:10:00Z",
+      "candidates": [
+        "NVDA_US_EQ"
+      ],
+      "expected": {
+        "event_type": "sector_competitor",
+        "affected_ticker": "NVDA_US_EQ",
+        "rumour": false,
+        "relevant": true
+      }
+    },
+    {
+      "id": "cls-076",
+      "headline": "OpenAI reportedly in talks to raise funding at $750 billion valuation",
+      "summary": "OpenAI is reportedly in talks with investors to raise about $30 billion in new funding at a valuation of roughly $750 billion, according to people familiar with the matter.",
+      "outlet": "wsj.com",
+      "published_at": "2026-09-21T19:30:00Z",
+      "candidates": [
+        "MSFT_US_EQ"
+      ],
+      "expected": {
+        "event_type": "sector_competitor",
+        "affected_ticker": "MSFT_US_EQ",
+        "rumour": true,
+        "relevant": true
+      }
+    },
+    {
+      "id": "cls-077",
+      "headline": "Amazon Web Services cuts prices on AI compute instances by up to 40%",
+      "summary": "Amazon Web Services reduced on-demand prices for its GPU and Trainium-based compute instances by as much as 40%, effective October 1, as competition for AI workloads intensifies.",
+      "outlet": "cnbc.com",
+      "published_at": "2026-09-18T17:30:00Z",
+      "candidates": [
+        "MSFT_US_EQ"
+      ],
+      "expected": {
+        "event_type": "sector_competitor",
+        "affected_ticker": "MSFT_US_EQ",
+        "rumour": false,
+        "relevant": true
+      }
+    },
+    {
+      "id": "cls-078",
+      "headline": "Workday cuts annual subscription revenue forecast",
+      "summary": "Workday lowered its fiscal 2027 subscription revenue forecast to $9.3 billion from $9.5 billion, citing longer sales cycles and weaker hiring among its enterprise customers.",
+      "outlet": "marketwatch.com",
+      "published_at": "2026-09-25T20:15:00Z",
+      "candidates": [
+        "SAPd_EQ"
+      ],
+      "expected": {
+        "event_type": "sector_competitor",
+        "affected_ticker": "SAPd_EQ",
+        "rumour": false,
+        "relevant": true
+      }
+    },
+    {
+      "id": "cls-079",
+      "headline": "Eli Lilly obesity pill shows 14% weight loss in late-stage trial",
+      "summary": "Eli Lilly said its once-daily obesity pill helped patients lose an average of 14% of their body weight over 72 weeks in a late-stage trial, outperforming expectations.",
+      "outlet": "reuters.com",
+      "published_at": "2026-09-20T11:00:00Z",
+      "candidates": [
+        "NOVOb_EQ"
+      ],
+      "expected": {
+        "event_type": "sector_competitor",
+        "affected_ticker": "NOVOb_EQ",
+        "rumour": false,
+        "relevant": true
+      }
+    },
+    {
+      "id": "cls-080",
+      "headline": "Intel cuts third-quarter revenue forecast on weak data-center sales",
+      "summary": "Intel lowered its third-quarter revenue forecast to between $12.2 billion and $12.8 billion, citing weaker-than-expected demand for its data-center processors.",
+      "outlet": "reuters.com",
+      "published_at": "2026-09-25T21:05:00Z",
+      "candidates": [
+        "NVDA_US_EQ"
+      ],
+      "expected": {
+        "event_type": "sector_competitor",
+        "affected_ticker": "NVDA_US_EQ",
+        "rumour": false,
+        "relevant": true
+      }
+    },
+    {
+      "id": "cls-081",
+      "headline": "Novo Nordisk to be removed from Stoxx Europe 50 index",
+      "summary": "Stoxx said Novo Nordisk will be deleted from the Stoxx Europe 50 index in its quarterly review, effective before the market open on September 28, after its market value fell.",
+      "outlet": "reuters.com",
+      "published_at": "2026-09-18T19:30:00Z",
+      "candidates": [
+        "NOVOb_EQ"
+      ],
+      "expected": {
+        "event_type": "index_change",
+        "affected_ticker": "NOVOb_EQ",
+        "rumour": false,
+        "relevant": true
+      }
+    },
+    {
+      "id": "cls-082",
+      "headline": "Apple to be removed from S&P 500 ESG Index in annual rebalance",
+      "summary": "S&P Dow Jones Indices said Apple will be dropped from the S&P 500 ESG Index as part of its annual rebalancing, effective prior to the open on October 1.",
+      "outlet": "prnewswire.com",
+      "published_at": "2026-09-19T21:15:00Z",
+      "candidates": [
+        "AAPL_US_EQ"
+      ],
+      "expected": {
+        "event_type": "index_change",
+        "affected_ticker": "AAPL_US_EQ",
+        "rumour": false,
+        "relevant": true
+      }
+    },
+    {
+      "id": "cls-083",
+      "headline": "SAP to be added to MSCI World ESG Leaders index",
+      "summary": "MSCI said SAP will join the MSCI World ESG Leaders index at the close of September 30, following an upgrade of the company's ESG rating.",
+      "outlet": "businesswire.com",
+      "published_at": "2026-09-21T22:30:00Z",
+      "candidates": [
+        "SAPd_EQ"
+      ],
+      "expected": {
+        "event_type": "index_change",
+        "affected_ticker": "SAPd_EQ",
+        "rumour": false,
+        "relevant": true
+      }
+    },
+    {
+      "id": "cls-084",
+      "headline": "Nvidia to be added to FTSE4Good Index Series",
+      "summary": "FTSE Russell said Nvidia will be included in the FTSE4Good Index Series in its semi-annual review, with the change taking effect after the close on September 18.",
+      "outlet": "globenewswire.com",
+      "published_at": "2026-09-18T14:00:00Z",
+      "candidates": [
+        "NVDA_US_EQ"
+      ],
+      "expected": {
+        "event_type": "index_change",
+        "affected_ticker": "NVDA_US_EQ",
+        "rumour": false,
+        "relevant": true
+      }
+    },
+    {
+      "id": "cls-085",
+      "headline": "Morgan Stanley raises Nvidia price target to $260",
+      "summary": "Morgan Stanley raised its price target on Nvidia to $260 from $235 and reiterated an overweight rating, citing sustained hyperscaler spending on AI infrastructure.",
+      "outlet": "marketwatch.com",
+      "published_at": "2026-09-22T11:30:00Z",
+      "candidates": [
+        "NVDA_US_EQ"
+      ],
+      "expected": {
+        "event_type": "analyst_rating",
+        "affected_ticker": "NVDA_US_EQ",
+        "rumour": false,
+        "relevant": true
+      }
+    },
+    {
+      "id": "cls-086",
+      "headline": "Jefferies downgrades SAP to hold from buy",
+      "summary": "Jefferies downgraded SAP to hold from buy and cut its price target to 230 euros from 285 euros, saying cloud backlog growth is likely to slow into 2027.",
+      "outlet": "reuters.com",
+      "published_at": "2026-09-19T06:50:00Z",
+      "candidates": [
+        "SAPd_EQ"
+      ],
+      "expected": {
+        "event_type": "analyst_rating",
+        "affected_ticker": "SAPd_EQ",
+        "rumour": false,
+        "relevant": true
+      }
+    },
+    {
+      "id": "cls-087",
+      "headline": "BofA upgrades Novo Nordisk to buy after sell-off",
+      "summary": "Bank of America upgraded Novo Nordisk to buy from neutral, saying the shares now price in too pessimistic a view of its obesity franchise; it set a DKK 420 price target.",
+      "outlet": "bloomberg.com",
+      "published_at": "2026-09-25T07:30:00Z",
+      "candidates": [
+        "NOVOb_EQ"
+      ],
+      "expected": {
+        "event_type": "analyst_rating",
+        "affected_ticker": "NOVOb_EQ",
+        "rumour": false,
+        "relevant": true
+      }
+    },
+    {
+      "id": "cls-088",
+      "headline": "Barclays cuts Apple price target to $210, keeps underweight",
+      "summary": "Barclays lowered its Apple price target to $210 from $225 and maintained an underweight rating, citing slower iPhone upgrade trends in China.",
+      "outlet": "marketwatch.com",
+      "published_at": "2026-09-18T11:15:00Z",
+      "candidates": [
+        "AAPL_US_EQ"
+      ],
+      "expected": {
+        "event_type": "analyst_rating",
+        "affected_ticker": "AAPL_US_EQ",
+        "rumour": false,
+        "relevant": true
+      }
+    },
+    {
+      "id": "cls-089",
+      "headline": "Goldman Sachs initiates Microsoft at buy with $620 target",
+      "summary": "Goldman Sachs began coverage of Microsoft with a buy rating and a $620 price target, arguing that Azure and Copilot monetization are still in early innings.",
+      "outlet": "cnbc.com",
+      "published_at": "2026-09-24T11:05:00Z",
+      "candidates": [
+        "MSFT_US_EQ"
+      ],
+      "expected": {
+        "event_type": "analyst_rating",
+        "affected_ticker": "MSFT_US_EQ",
+        "rumour": false,
+        "relevant": true
+      }
+    },
+    {
+      "id": "cls-090",
+      "headline": "Wedbush lifts Apple price target to $300 on foldable demand",
+      "summary": "Wedbush raised its price target on Apple to $300 from $275 and kept an outperform rating, saying early demand for the foldable iPhone is running ahead of its estimates.",
+      "outlet": "seekingalpha.com",
+      "published_at": "2026-09-25T12:10:00Z",
+      "candidates": [
+        "AAPL_US_EQ"
+      ],
+      "expected": {
+        "event_type": "analyst_rating",
+        "affected_ticker": "AAPL_US_EQ",
+        "rumour": false,
+        "relevant": true
+      }
+    },
+    {
+      "id": "cls-091",
+      "headline": "Stock market today: Dow and S&P 500 close higher as tech rebounds",
+      "summary": "US stocks ended higher on Tuesday, with the Nasdaq up 1.1%, as investors bought back into large technology shares after last week's pullback. Trading volume was below average.",
+      "outlet": "apnews.com",
+      "published_at": "2026-09-22T20:20:00Z",
+      "candidates": [
+        "AAPL_US_EQ",
+        "MSFT_US_EQ"
+      ],
+      "expected": {
+        "event_type": "other",
+        "affected_ticker": null,
+        "rumour": false,
+        "relevant": true
+      }
+    },
+    {
+      "id": "cls-092",
+      "headline": "5 stocks to watch this week: Apple, Nvidia and more",
+      "summary": "A look at the companies whose shares could move this week, from Apple and Nvidia to a handful of retailers, along with the economic calendar investors will be following.",
+      "outlet": "marketwatch.com",
+      "published_at": "2026-09-21T10:00:00Z",
+      "candidates": [
+        "AAPL_US_EQ",
+        "NVDA_US_EQ"
+      ],
+      "expected": {
+        "event_type": "other",
+        "affected_ticker": null,
+        "rumour": false,
+        "relevant": true
+      }
+    },
+    {
+      "id": "cls-093",
+      "headline": "Microsoft: Why I'm still holding after a decade",
+      "summary": "A long-term shareholder explains why Microsoft's diversified revenue base and steady cash generation keep it a core holding in the portfolio, despite a valuation premium to peers.",
+      "outlet": "seekingalpha.com",
+      "published_at": "2026-09-20T14:00:00Z",
+      "candidates": [
+        "MSFT_US_EQ"
+      ],
+      "expected": {
+        "event_type": "other",
+        "affected_ticker": "MSFT_US_EQ",
+        "rumour": false,
+        "relevant": true
+      }
+    },
+    {
+      "id": "cls-094",
+      "headline": "Is it too late to buy NVDA? Long-term holders share their thoughts",
+      "summary": "Discussion thread: long-time Nvidia holders weigh in on position sizing, valuation and whether it still makes sense to add to the stock at current levels.",
+      "outlet": "reddit.com",
+      "published_at": "2026-09-23T03:40:00Z",
+      "candidates": [
+        "NVDA_US_EQ"
+      ],
+      "expected": {
+        "event_type": "other",
+        "affected_ticker": "NVDA_US_EQ",
+        "rumour": false,
+        "relevant": true
+      }
+    },
+    {
+      "id": "cls-095",
+      "headline": "Washington apple harvest forecast rises 5% on favourable weather",
+      "summary": "The Washington State Tree Fruit Association expects the 2026 apple crop to reach 142 million boxes, 5% above last year, as mild spring weather helped fruit set in orchards.",
+      "outlet": "apnews.com",
+      "published_at": "2026-09-19T16:00:00Z",
+      "candidates": [
+        "AAPL_US_EQ"
+      ],
+      "expected": {
+        "event_type": "other",
+        "affected_ticker": null,
+        "rumour": false,
+        "relevant": false
+      }
+    },
+    {
+      "id": "cls-096",
+      "headline": "Apple Valley High School football clinches league title with late field goal",
+      "summary": "Apple Valley High School's football team secured the conference title on Friday night with a 42-yard field goal in the final seconds, finishing the regular season unbeaten.",
+      "outlet": "apnews.com",
+      "published_at": "2026-09-19T05:15:00Z",
+      "candidates": [
+        "AAPL_US_EQ"
+      ],
+      "expected": {
+        "event_type": "other",
+        "affected_ticker": null,
+        "rumour": false,
+        "relevant": false
+      }
+    },
+    {
+      "id": "cls-097",
+      "headline": "How to choose replacement windows for an older home",
+      "summary": "Energy-efficient windows can cut heating bills by up to 15%, but frame material, glazing type and installation quality matter more than brand when renovating an older house, contractors say.",
+      "outlet": "wsj.com",
+      "published_at": "2026-09-20T10:30:00Z",
+      "candidates": [
+        "MSFT_US_EQ"
+      ],
+      "expected": {
+        "event_type": "other",
+        "affected_ticker": null,
+        "rumour": false,
+        "relevant": false
+      }
+    },
+    {
+      "id": "cls-098",
+      "headline": "Maple producers warn warmer winters are shortening the sap season",
+      "summary": "Vermont sugarmakers say rising winter temperatures are compressing the weeks when sap flows from maple trees, threatening yields of the state's signature syrup.",
+      "outlet": "apnews.com",
+      "published_at": "2026-09-21T13:00:00Z",
+      "candidates": [
+        "SAPd_EQ"
+      ],
+      "expected": {
+        "event_type": "other",
+        "affected_ticker": null,
+        "rumour": false,
+        "relevant": false
+      }
+    },
+    {
+      "id": "cls-099",
+      "headline": "Novo Banco profit rises as Portuguese lender completes integration",
+      "summary": "Portugal's Novo Banco reported a 9% rise in half-year net profit to 410 million euros, helped by lower impairments as it completes its integration into its new French parent.",
+      "outlet": "reuters.com",
+      "published_at": "2026-09-23T08:40:00Z",
+      "candidates": [
+        "NOVOb_EQ"
+      ],
+      "expected": {
+        "event_type": "other",
+        "affected_ticker": null,
+        "rumour": false,
+        "relevant": false
+      }
+    },
+    {
+      "id": "cls-100",
+      "headline": "Sap-sucking spotted lanternfly spreads to new vineyards in New York",
+      "summary": "State agriculture officials confirmed spotted lanternfly infestations in three more Finger Lakes vineyards; the invasive insect feeds on plant sap and weakens grapevines.",
+      "outlet": "apnews.com",
+      "published_at": "2026-09-24T15:30:00Z",
+      "candidates": [
+        "SAPd_EQ"
+      ],
+      "expected": {
+        "event_type": "other",
+        "affected_ticker": null,
+        "rumour": false,
+        "relevant": false
+      }
+    }
+  ]
+}

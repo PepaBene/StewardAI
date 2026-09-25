@@ -11,6 +11,7 @@ from pydantic import BaseModel
 
 from api.auth import Owner
 from api.db import close_pool
+from api.news_routes import router as news_router
 from api.routes import router
 from steward import __version__
 from steward.config import StrategyConfig, ThesesConfig
@@ -72,6 +73,7 @@ def create_app() -> FastAPI:
         return body
 
     app.include_router(router)
+    app.include_router(news_router)
     return app
 
 

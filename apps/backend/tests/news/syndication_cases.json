@@ -1,0 +1,439 @@
+{
+  "description": "Fictional September 2026 syndication cases: each case lists copies of one wire story carried by different outlets that must cluster together; distractors are different stories on similar topics that must not join the case named in about_case.",
+  "cases": [
+    {
+      "id": "syn-01",
+      "note": "Reuters original, Nasdaq copy with 'Apple Inc', '$2 bln' and ' | Nasdaq' suffix, Yahoo copy with ' (Reuters)' suffix, Google News style copy with ' - Investing.com' title suffix whose summary is just the title plus source, as in Google News RSS.",
+      "copies": [
+        {
+          "url": "https://www.reuters.com/technology/apple-buy-ai-startup-lumora-labs-2-billion-2026-09-22/",
+          "outlet": "reuters.com",
+          "outlet_name": "Reuters",
+          "headline": "Apple to buy AI startup Lumora Labs for $2 billion",
+          "summary": "Apple Inc has agreed to acquire Lumora Labs, a San Francisco-based developer of on-device AI search tools, for about $2 billion, the company said on Tuesday, as it accelerates its push into generative AI.",
+          "published_at": "2026-09-22T08:01:00Z"
+        },
+        {
+          "url": "https://www.nasdaq.com/articles/apple-inc-to-buy-ai-startup-lumora-labs-for-2-bln",
+          "outlet": "nasdaq.com",
+          "outlet_name": "Nasdaq",
+          "headline": "Apple Inc to buy AI startup Lumora Labs for $2 bln | Nasdaq",
+          "summary": "Apple Inc has agreed to acquire Lumora Labs, a San Francisco-based developer of on-device AI search tools, for about $2 bln, the company said on Tuesday, as it accelerates its push into generative AI.",
+          "published_at": "2026-09-22T08:14:00Z"
+        },
+        {
+          "url": "https://finance.yahoo.com/news/apple-buy-ai-startup-lumora-080100123.html",
+          "outlet": "finance.yahoo.com",
+          "outlet_name": "Yahoo Finance",
+          "headline": "Apple to buy AI startup Lumora Labs for $2 billion (Reuters)",
+          "summary": "Apple Inc has agreed to acquire Lumora Labs, a San Francisco-based developer of on-device AI search tools, for about $2 billion, the company said on Tuesday, as it accelerates its push into generative AI.",
+          "published_at": "2026-09-22T08:32:00Z"
+        },
+        {
+          "url": "https://news.google.com/rss/articles/CBMiX2h0dHBzOi8vd3d3LmludmVzdGluZy5jb20vbmV3cy9hcHBsZS1sdW1vcmEtbGFicy0yYm4?oc=5",
+          "outlet": "investing.com",
+          "outlet_name": "Investing.com",
+          "headline": "Apple to buy AI startup Lumora Labs for $2 billion - Investing.com",
+          "summary": "Apple to buy AI startup Lumora Labs for $2 billion  Investing.com",
+          "published_at": "2026-09-22T09:05:00Z"
+        }
+      ]
+    },
+    {
+      "id": "syn-02",
+      "note": "'UPDATE 1-' wire prefix, 'Nvidia Corp' vs 'Nvidia', 'bln' vs 'billion' in summary, ' - Reuters' suffix.",
+      "copies": [
+        {
+          "url": "https://www.reuters.com/technology/nvidia-raises-quarterly-revenue-forecast-strong-ai-chip-demand-2026-09-21/",
+          "outlet": "reuters.com",
+          "outlet_name": "Reuters",
+          "headline": "Nvidia raises quarterly revenue forecast on strong AI chip demand",
+          "summary": "Nvidia on Monday raised its fiscal third-quarter revenue forecast to about $58 billion from $54 billion, citing stronger-than-expected orders for its Blackwell data-center systems from cloud providers.",
+          "published_at": "2026-09-21T20:12:00Z"
+        },
+        {
+          "url": "https://www.marketscreener.com/quote/stock/NVIDIA-CORPORATION-57355629/news/UPDATE-1-Nvidia-raises-quarterly-revenue-forecast-on-strong-AI-chip-demand-47281934/",
+          "outlet": "marketscreener.com",
+          "outlet_name": "MarketScreener",
+          "headline": "UPDATE 1-Nvidia raises quarterly revenue forecast on strong AI chip demand",
+          "summary": "Nvidia on Monday raised its fiscal third-quarter revenue forecast to about $58 bln from $54 bln, citing stronger-than-expected orders for its Blackwell data-center systems from cloud providers.",
+          "published_at": "2026-09-21T21:05:00Z"
+        },
+        {
+          "url": "https://www.investing.com/news/stock-market-news/nvidia-corp-raises-quarterly-revenue-forecast-on-strong-ai-chip-demand-4190562",
+          "outlet": "investing.com",
+          "outlet_name": "Investing.com",
+          "headline": "Nvidia Corp raises quarterly revenue forecast on strong AI chip demand",
+          "summary": "Nvidia on Monday raised its fiscal third-quarter revenue forecast to about $58 billion from $54 billion, citing stronger-than-expected orders for its Blackwell data-center systems from cloud providers.",
+          "published_at": "2026-09-21T20:40:00Z"
+        },
+        {
+          "url": "https://www.theglobeandmail.com/investing/markets/stocks/NVDA/pressreleases/34818823/nvidia-raises-quarterly-revenue-forecast/",
+          "outlet": "theglobeandmail.com",
+          "outlet_name": "The Globe and Mail",
+          "headline": "Nvidia raises quarterly revenue forecast on strong AI chip demand - Reuters",
+          "summary": "Nvidia on Monday raised its fiscal third-quarter revenue forecast to about $58 billion from $54 billion, citing stronger-than-expected orders for its Blackwell data-center systems from cloud providers.",
+          "published_at": "2026-09-21T22:18:00Z"
+        }
+      ]
+    },
+    {
+      "id": "syn-03",
+      "note": "'%' vs 'pct', 'SAP SE' vs 'SAP', 'million' vs 'mln' in summary.",
+      "copies": [
+        {
+          "url": "https://www.reuters.com/business/sap-cut-3000-jobs-restructuring-2026-09-23/",
+          "outlet": "reuters.com",
+          "outlet_name": "Reuters",
+          "headline": "SAP to cut 3,000 jobs, or 3% of workforce, in restructuring",
+          "summary": "German software maker SAP plans to cut about 3,000 jobs, or 3% of its workforce, and book restructuring charges of up to 800 million euros as it shifts investment toward business AI, the company said on Wednesday.",
+          "published_at": "2026-09-23T06:45:00Z"
+        },
+        {
+          "url": "https://www.marketscreener.com/quote/stock/SAP-SE-436555/news/SAP-to-cut-3-000-jobs-or-3-pct-of-workforce-in-restructuring-47290211/",
+          "outlet": "marketscreener.com",
+          "outlet_name": "MarketScreener",
+          "headline": "SAP to cut 3,000 jobs, or 3 pct of workforce, in restructuring",
+          "summary": "German software maker SAP plans to cut about 3,000 jobs, or 3 pct of its workforce, and book restructuring charges of up to 800 mln euros as it shifts investment toward business AI, the company said on Wednesday.",
+          "published_at": "2026-09-23T07:02:00Z"
+        },
+        {
+          "url": "https://www.usnews.com/news/technology/articles/2026-09-23/sap-se-to-cut-3-000-jobs-or-3-of-workforce-in-restructuring",
+          "outlet": "usnews.com",
+          "outlet_name": "U.S. News & World Report",
+          "headline": "SAP SE to cut 3,000 jobs, or 3% of workforce, in restructuring",
+          "summary": "German software maker SAP plans to cut about 3,000 jobs, or 3% of its workforce, and book restructuring charges of up to 800 million euros as it shifts investment toward business AI, the company said on Wednesday.",
+          "published_at": "2026-09-23T07:40:00Z"
+        }
+      ]
+    },
+    {
+      "id": "syn-04",
+      "note": "'Breaking:' prefix, one word ('2026') dropped from one headline, 'bn' vs 'billion' in summary.",
+      "copies": [
+        {
+          "url": "https://www.reuters.com/business/healthcare-pharmaceuticals/novo-nordisk-cuts-2026-sales-outlook-wegovy-demand-slows-2026-09-22/",
+          "outlet": "reuters.com",
+          "outlet_name": "Reuters",
+          "headline": "Novo Nordisk cuts 2026 sales outlook as Wegovy demand slows",
+          "summary": "Novo Nordisk on Tuesday cut its full-year sales growth forecast to 4%-8% from 8%-14%, a reduction of roughly DKK 12 billion in expected revenue, as US demand for its Wegovy obesity drug slowed.",
+          "published_at": "2026-09-22T05:48:00Z"
+        },
+        {
+          "url": "https://www.rttnews.com/story.aspx?Id=3561842",
+          "outlet": "rttnews.com",
+          "outlet_name": "RTTNews",
+          "headline": "Breaking: Novo Nordisk cuts 2026 sales outlook as Wegovy demand slows",
+          "summary": "Novo Nordisk on Tuesday cut its full-year sales growth forecast to 4%-8% from 8%-14%, a reduction of roughly DKK 12bn in expected revenue, as US demand for its Wegovy obesity drug slowed.",
+          "published_at": "2026-09-22T05:55:00Z"
+        },
+        {
+          "url": "https://www.nasdaq.com/articles/novo-nordisk-cuts-sales-outlook-as-wegovy-demand-slows",
+          "outlet": "nasdaq.com",
+          "outlet_name": "Nasdaq",
+          "headline": "Novo Nordisk cuts sales outlook as Wegovy demand slows",
+          "summary": "Novo Nordisk on Tuesday cut its full-year sales growth forecast to 4%-8% from 8%-14%, a reduction of roughly DKK 12 billion in expected revenue, as US demand for its Wegovy obesity drug slowed.",
+          "published_at": "2026-09-22T06:30:00Z"
+        }
+      ]
+    },
+    {
+      "id": "syn-05",
+      "note": "Amount written as '1.1 bln euros', '€1.1 billion' and '1.1 billion euros'; 'Microsoft Corp' vs 'Microsoft'; ' - Reuters' suffix.",
+      "copies": [
+        {
+          "url": "https://www.reuters.com/technology/eu-fines-microsoft-11-bln-euros-over-teams-bundling-2026-09-24/",
+          "outlet": "reuters.com",
+          "outlet_name": "Reuters",
+          "headline": "EU fines Microsoft 1.1 bln euros over Teams bundling",
+          "summary": "EU antitrust regulators fined Microsoft 1.1 bln euros on Thursday for illegally tying its Teams video-conferencing app to its Office suite, the European Commission said.",
+          "published_at": "2026-09-24T10:02:00Z"
+        },
+        {
+          "url": "https://www.euronews.com/business/2026/09/24/eu-fines-microsoft-11-billion-over-teams-bundling",
+          "outlet": "euronews.com",
+          "outlet_name": "Euronews",
+          "headline": "EU fines Microsoft €1.1 billion over Teams bundling",
+          "summary": "EU antitrust regulators fined Microsoft 1.1 billion euros on Thursday for illegally tying its Teams video-conferencing app to its Office suite, the European Commission said.",
+          "published_at": "2026-09-24T10:40:00Z"
+        },
+        {
+          "url": "https://www.devdiscourse.com/article/technology/3290417-eu-fines-microsoft-corp-11-billion-euros-over-teams-bundling",
+          "outlet": "devdiscourse.com",
+          "outlet_name": "Devdiscourse",
+          "headline": "EU fines Microsoft Corp 1.1 billion euros over Teams bundling - Reuters",
+          "summary": "EU antitrust regulators fined Microsoft 1.1 billion euros on Thursday for illegally tying its Teams video-conferencing app to its Office suite, the European Commission said.",
+          "published_at": "2026-09-24T11:25:00Z"
+        }
+      ]
+    },
+    {
+      "id": "syn-06",
+      "note": "Identical summaries; headlines lightly edited ('raises' vs 'lifts', 'Taiwan's' added, '$48 bln' vs '$48 billion').",
+      "copies": [
+        {
+          "url": "https://www.reuters.com/technology/tsmc-raises-2026-capex-48-bln-ai-demand-surges-2026-09-22/",
+          "outlet": "reuters.com",
+          "outlet_name": "Reuters",
+          "headline": "TSMC raises 2026 capex to $48 bln as AI demand surges",
+          "summary": "Taiwan Semiconductor Manufacturing Co raised its 2026 capital spending budget to $48 billion from $42 billion on Tuesday, as the chipmaker races to expand advanced packaging capacity for AI processors.",
+          "published_at": "2026-09-22T06:20:00Z"
+        },
+        {
+          "url": "https://www.channelnewsasia.com/business/taiwans-tsmc-raises-2026-capex-48-billion-ai-demand-surges-4720116",
+          "outlet": "channelnewsasia.com",
+          "outlet_name": "CNA",
+          "headline": "Taiwan's TSMC raises 2026 capex to $48 billion as AI demand surges",
+          "summary": "Taiwan Semiconductor Manufacturing Co raised its 2026 capital spending budget to $48 billion from $42 billion on Tuesday, as the chipmaker races to expand advanced packaging capacity for AI processors.",
+          "published_at": "2026-09-22T06:55:00Z"
+        },
+        {
+          "url": "https://www.theedgemalaysia.com/node/771502",
+          "outlet": "theedgemalaysia.com",
+          "outlet_name": "The Edge Malaysia",
+          "headline": "TSMC lifts 2026 capex to $48 billion as AI demand surges",
+          "summary": "Taiwan Semiconductor Manufacturing Co raised its 2026 capital spending budget to $48 billion from $42 billion on Tuesday, as the chipmaker races to expand advanced packaging capacity for AI processors.",
+          "published_at": "2026-09-22T08:10:00Z"
+        }
+      ]
+    },
+    {
+      "id": "syn-07",
+      "note": "AP story carried by several outlets: 'Breaking:' prefix, 'quarter point' vs 'quarter-point', 'and' vs comma.",
+      "copies": [
+        {
+          "url": "https://apnews.com/article/federal-reserve-interest-rates-cut-inflation-9c1e4a7b2d",
+          "outlet": "apnews.com",
+          "outlet_name": "AP News",
+          "headline": "Fed cuts key interest rate by a quarter point, signals one more cut this year",
+          "summary": "The Federal Reserve cut its key interest rate by a quarter point on Wednesday to a range of 3.25% to 3.5% and signaled that it expects to reduce rates once more before the end of the year.",
+          "published_at": "2026-09-23T18:04:00Z"
+        },
+        {
+          "url": "https://abcnews.go.com/Business/wireStory/fed-cuts-key-interest-rate-quarter-point-signals-126118452",
+          "outlet": "abcnews.go.com",
+          "outlet_name": "ABC News",
+          "headline": "Fed cuts key interest rate by a quarter-point and signals one more cut this year",
+          "summary": "The Federal Reserve cut its key interest rate by a quarter point on Wednesday to a range of 3.25% to 3.5% and signaled that it expects to reduce rates once more before the end of the year.",
+          "published_at": "2026-09-23T18:11:00Z"
+        },
+        {
+          "url": "https://www.startribune.com/fed-cuts-key-interest-rate-by-a-quarter-point/601284533",
+          "outlet": "startribune.com",
+          "outlet_name": "Star Tribune",
+          "headline": "Breaking: Fed cuts key interest rate by a quarter point, signals one more cut this year",
+          "summary": "The Federal Reserve cut its key interest rate by a quarter point on Wednesday to a range of 3.25% to 3.5% and signaled that it expects to reduce rates once more before the end of the year.",
+          "published_at": "2026-09-23T18:20:00Z"
+        },
+        {
+          "url": "https://www.usnews.com/news/business/articles/2026-09-23/fed-cuts-key-interest-rate-by-a-quarter-point-signals-one-more-cut-this-year",
+          "outlet": "usnews.com",
+          "outlet_name": "U.S. News & World Report",
+          "headline": "Fed cuts key interest rate by a quarter point, signals one more cut this year",
+          "summary": "The Federal Reserve cut its key interest rate by a quarter point on Wednesday to a range of 3.25% to 3.5% and signaled that it expects to reduce rates once more before the end of the year.",
+          "published_at": "2026-09-23T18:35:00Z"
+        },
+        {
+          "url": "https://www.pbs.org/newshour/economy/fed-cuts-key-interest-rate-by-a-quarter-point-signals-one-more-cut-this-year",
+          "outlet": "pbs.org",
+          "outlet_name": "PBS News",
+          "headline": "Fed cuts key interest rate by a quarter point, signals one more cut this year",
+          "summary": "The Federal Reserve cut its key interest rate by a quarter point on Wednesday to a range of 3.25% to 3.5% and signaled that it expects to reduce rates once more before the end of the year.",
+          "published_at": "2026-09-23T19:10:00Z"
+        }
+      ]
+    },
+    {
+      "id": "syn-08",
+      "note": "One copy's headline is a prefix of the original with the tail (', announces new $60 billion buyback') dropped; 'pct'/'bln' and 'Microsoft Corp' variants.",
+      "copies": [
+        {
+          "url": "https://www.reuters.com/business/microsoft-raises-quarterly-dividend-10-announces-new-60-billion-buyback-2026-09-22/",
+          "outlet": "reuters.com",
+          "outlet_name": "Reuters",
+          "headline": "Microsoft raises quarterly dividend 10%, announces new $60 billion buyback",
+          "summary": "Microsoft Corp on Tuesday raised its quarterly dividend by 10% to 91 cents per share and announced a new share repurchase program of up to $60 billion, with no expiration date.",
+          "published_at": "2026-09-22T20:35:00Z"
+        },
+        {
+          "url": "https://www.marketscreener.com/quote/stock/MICROSOFT-CORPORATION-4835/news/Microsoft-raises-quarterly-dividend-10-47288805/",
+          "outlet": "marketscreener.com",
+          "outlet_name": "MarketScreener",
+          "headline": "Microsoft raises quarterly dividend 10%",
+          "summary": "Microsoft Corp on Tuesday raised its quarterly dividend by 10% to 91 cents per share and announced a new share repurchase program of up to $60 billion, with no expiration date.",
+          "published_at": "2026-09-22T20:41:00Z"
+        },
+        {
+          "url": "https://www.investing.com/news/stock-market-news/microsoft-corp-raises-quarterly-dividend-10-pct-announces-new-60-bln-buyback-4191877",
+          "outlet": "investing.com",
+          "outlet_name": "Investing.com",
+          "headline": "Microsoft Corp raises quarterly dividend 10 pct, announces new $60 bln buyback",
+          "summary": "Microsoft Corp on Tuesday raised its quarterly dividend by 10 pct to 91 cents per share and announced a new share repurchase program of up to $60 bln, with no expiration date.",
+          "published_at": "2026-09-22T21:15:00Z"
+        }
+      ]
+    },
+    {
+      "id": "syn-09",
+      "note": "'Lilly' vs 'Eli Lilly' vs 'Eli Lilly and Co', '14%' vs '14 pct', ' | Nasdaq' suffix.",
+      "copies": [
+        {
+          "url": "https://www.reuters.com/business/healthcare-pharmaceuticals/lillys-obesity-pill-helps-patients-lose-14-weight-late-stage-trial-2026-09-20/",
+          "outlet": "reuters.com",
+          "outlet_name": "Reuters",
+          "headline": "Lilly's obesity pill helps patients lose 14% of weight in late-stage trial",
+          "summary": "Eli Lilly said on Sunday its experimental once-daily obesity pill helped patients lose an average of 14% of their body weight over 72 weeks in a late-stage trial, putting it on track for a US filing by year-end.",
+          "published_at": "2026-09-20T11:00:00Z"
+        },
+        {
+          "url": "https://www.nasdaq.com/articles/eli-lilly-and-co-obesity-pill-helps-patients-lose-14-pct-of-weight-in-late-stage-trial",
+          "outlet": "nasdaq.com",
+          "outlet_name": "Nasdaq",
+          "headline": "Eli Lilly and Co's obesity pill helps patients lose 14 pct of weight in late-stage trial | Nasdaq",
+          "summary": "Eli Lilly said on Sunday its experimental once-daily obesity pill helped patients lose an average of 14 pct of their body weight over 72 weeks in a late-stage trial, putting it on track for a US filing by year-end.",
+          "published_at": "2026-09-20T11:22:00Z"
+        }
+      ]
+    },
+    {
+      "id": "syn-10",
+      "note": "Identical summaries; 'EXCLUSIVE-' prefix on the wire copy, 'licence' vs 'license' spelling, ' (Reuters)' suffix.",
+      "copies": [
+        {
+          "url": "https://www.reuters.com/world/middle-east/exclusive-nvidia-wins-us-licence-ship-advanced-ai-chips-saudi-arabia-2026-09-24/",
+          "outlet": "reuters.com",
+          "outlet_name": "Reuters",
+          "headline": "EXCLUSIVE-Nvidia wins US licence to ship advanced AI chips to Saudi Arabia",
+          "summary": "The US Commerce Department has granted Nvidia a licence to ship tens of thousands of its most advanced AI chips to Saudi Arabia, according to documents seen by Reuters, clearing the way for large data-centre projects in the kingdom.",
+          "published_at": "2026-09-24T13:30:00Z"
+        },
+        {
+          "url": "https://www.zawya.com/en/business/technology-and-telecom/nvidia-wins-us-license-to-ship-advanced-ai-chips-to-saudi-arabia-q8w3k1zd",
+          "outlet": "zawya.com",
+          "outlet_name": "Zawya",
+          "headline": "Nvidia wins US license to ship advanced AI chips to Saudi Arabia",
+          "summary": "The US Commerce Department has granted Nvidia a licence to ship tens of thousands of its most advanced AI chips to Saudi Arabia, according to documents seen by Reuters, clearing the way for large data-centre projects in the kingdom.",
+          "published_at": "2026-09-24T14:05:00Z"
+        },
+        {
+          "url": "https://finance.yahoo.com/news/exclusive-nvidia-wins-us-licence-133000456.html",
+          "outlet": "finance.yahoo.com",
+          "outlet_name": "Yahoo Finance",
+          "headline": "Nvidia wins US licence to ship advanced AI chips to Saudi Arabia (Reuters)",
+          "summary": "The US Commerce Department has granted Nvidia a licence to ship tens of thousands of its most advanced AI chips to Saudi Arabia, according to documents seen by Reuters, clearing the way for large data-centre projects in the kingdom.",
+          "published_at": "2026-09-24T14:20:00Z"
+        }
+      ]
+    }
+  ],
+  "distractors": [
+    {
+      "url": "https://seekingalpha.com/article/4821937-what-apples-2-billion-lumora-deal-means-for-investors",
+      "outlet": "seekingalpha.com",
+      "outlet_name": "Seeking Alpha",
+      "headline": "What Apple's $2 billion Lumora deal means for investors",
+      "summary": "The Lumora acquisition is small relative to Apple's cash pile, but it signals a shift toward buying AI talent. We look at valuation impact, integration risk and what it means for the services margin.",
+      "published_at": "2026-09-22T15:40:00Z",
+      "about_case": "syn-01"
+    },
+    {
+      "url": "https://www.bloomberg.com/news/articles/2026-09-24/apple-to-buy-ai-chip-startup-voltera-for-400-million",
+      "outlet": "bloomberg.com",
+      "outlet_name": "Bloomberg",
+      "headline": "Apple to buy AI chip startup Voltera for $400 million",
+      "summary": "Apple agreed to acquire Voltera, a Toronto-based designer of low-power AI inference chips, for about $400 million, a second AI deal in the same week as it builds out in-house silicon.",
+      "published_at": "2026-09-24T16:10:00Z",
+      "about_case": "syn-01"
+    },
+    {
+      "url": "https://www.reuters.com/technology/amd-raises-quarterly-revenue-forecast-strong-ai-chip-demand-2026-09-21/",
+      "outlet": "reuters.com",
+      "outlet_name": "Reuters",
+      "headline": "AMD raises quarterly revenue forecast on strong AI chip demand",
+      "summary": "Advanced Micro Devices on Monday lifted its third-quarter revenue forecast to about $9.8 billion from $9.2 billion, saying demand for its Instinct accelerators had exceeded its expectations.",
+      "published_at": "2026-09-21T21:30:00Z",
+      "about_case": "syn-02"
+    },
+    {
+      "url": "https://www.reuters.com/business/workday-cut-1750-jobs-restructuring-2026-09-23/",
+      "outlet": "reuters.com",
+      "outlet_name": "Reuters",
+      "headline": "Workday to cut 1,750 jobs in restructuring",
+      "summary": "Workday plans to eliminate about 1,750 positions, or 8% of its workforce, and close some offices as the HR software maker reallocates spending toward AI products.",
+      "published_at": "2026-09-23T13:15:00Z",
+      "about_case": "syn-03"
+    },
+    {
+      "url": "https://www.cnbc.com/2026/09/22/novo-nordisk-cuts-wegovy-us-list-price.html",
+      "outlet": "cnbc.com",
+      "outlet_name": "CNBC",
+      "headline": "Novo Nordisk cuts Wegovy US list price by 20%",
+      "summary": "Novo Nordisk will lower the US list price of its Wegovy injection by 20% starting in January, the company said, as it tries to expand insurance coverage for the obesity drug.",
+      "published_at": "2026-09-22T14:00:00Z",
+      "about_case": "syn-04"
+    },
+    {
+      "url": "https://www.reuters.com/technology/eu-fines-amazon-900-mln-euros-over-marketplace-data-use-2026-09-24/",
+      "outlet": "reuters.com",
+      "outlet_name": "Reuters",
+      "headline": "EU fines Amazon 900 mln euros over marketplace data use",
+      "summary": "EU antitrust regulators fined Amazon 900 million euros on Thursday for using non-public data from independent sellers to favour its own retail business on its marketplace.",
+      "published_at": "2026-09-24T12:30:00Z",
+      "about_case": "syn-05"
+    },
+    {
+      "url": "https://www.reuters.com/technology/tsmc-august-revenue-rises-34-ai-chip-orders-2026-09-19/",
+      "outlet": "reuters.com",
+      "outlet_name": "Reuters",
+      "headline": "TSMC August revenue rises 34% on AI chip orders",
+      "summary": "Taiwan Semiconductor Manufacturing Co reported August revenue of T$342 billion, up 34% from a year earlier, driven by strong orders for advanced AI processors.",
+      "published_at": "2026-09-19T06:30:00Z",
+      "about_case": "syn-06"
+    },
+    {
+      "url": "https://www.cnbc.com/2026/09/24/fed-governor-more-rate-cuts-may-be-needed-this-year.html",
+      "outlet": "cnbc.com",
+      "outlet_name": "CNBC",
+      "headline": "Fed governor says more rate cuts may be needed this year",
+      "summary": "A Federal Reserve governor said a day after the central bank's decision that a softening labor market could justify additional easing beyond what officials projected.",
+      "published_at": "2026-09-24T14:45:00Z",
+      "about_case": "syn-07"
+    },
+    {
+      "url": "https://apnews.com/article/european-central-bank-interest-rates-hold-5b7d2e9f31",
+      "outlet": "apnews.com",
+      "outlet_name": "AP News",
+      "headline": "European Central Bank keeps key interest rate on hold, signals no rush to cut",
+      "summary": "The European Central Bank left its benchmark deposit rate unchanged at 2% on Thursday, saying inflation in the 20 countries that use the euro is close to its target.",
+      "published_at": "2026-09-24T12:40:00Z",
+      "about_case": "syn-07"
+    },
+    {
+      "url": "https://www.theverge.com/2026/9/22/microsoft-365-price-increase-business-customers",
+      "outlet": "theverge.com",
+      "outlet_name": "The Verge",
+      "headline": "Microsoft raises Microsoft 365 prices by 10% for business customers",
+      "summary": "Microsoft will increase prices for its Microsoft 365 business and enterprise plans by about 10% from January, citing the addition of Copilot features to the standard subscriptions.",
+      "published_at": "2026-09-22T16:00:00Z",
+      "about_case": "syn-08"
+    },
+    {
+      "url": "https://www.fiercepharma.com/pharma/eli-lilly-obesity-pill-analysts-see-20-billion-peak-sales",
+      "outlet": "fiercepharma.com",
+      "outlet_name": "Fierce Pharma",
+      "headline": "Eli Lilly's obesity pill: analysts see $20 billion peak sales",
+      "summary": "After Sunday's trial readout, analysts raised peak sales estimates for Lilly's oral obesity drug to as much as $20 billion, while flagging manufacturing scale and pricing as open questions.",
+      "published_at": "2026-09-21T15:20:00Z",
+      "about_case": "syn-09"
+    },
+    {
+      "url": "https://www.bloomberg.com/news/articles/2026-09-24/nvidia-wins-order-to-supply-ai-chips-to-saudi-data-center-operator",
+      "outlet": "bloomberg.com",
+      "outlet_name": "Bloomberg",
+      "headline": "Nvidia wins order to supply AI chips to Saudi data-center operator",
+      "summary": "A Saudi data-center developer said it has placed an order for 18,000 Nvidia Blackwell processors for a facility near Riyadh due to open in 2027, without disclosing the order's value.",
+      "published_at": "2026-09-24T16:50:00Z",
+      "about_case": "syn-10"
+    }
+  ]
+}

@@ -9,6 +9,7 @@ dependencies = [
     "apscheduler>=3.11,<4",
     "asyncpg>=0.31.0",
     "fastapi>=0.141.1",
+    "feedparser>=6.0.14",
     "httpx>=0.28.1",
     "pydantic>=2.13.5",
     "pydantic-settings>=2.15.0",
@@ -60,5 +61,5 @@ packages = ["steward", "api", "worker"]
 plugins = ["pydantic.mypy"]
 
 [[tool.mypy.overrides]]
-module = ["asyncpg", "asyncpg.*", "apscheduler", "apscheduler.*"]
+module = ["asyncpg", "asyncpg.*", "apscheduler", "apscheduler.*", "feedparser"]
 ignore_missing_imports = true

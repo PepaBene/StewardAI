@@ -66,6 +66,52 @@ class EarningsCalendarSettings(ConfigModel):
     lookahead_days: int = Field(default=120, ge=7, le=400)
 
 
+class NewsSettings(ConfigModel):
+    """The news pipeline after ingest: classification, corroboration."""
+
+    classification_model: ModelId = "claude-haiku-4-5"
+    classification_batch_size: int = Field(
+        default=50, ge=5, le=100, description="Items per classification call."
+    )
+    corroboration_model: ModelId = "claude-haiku-4-5"
+    corroboration_max_searches: int = Field(
+        default=3, ge=0, le=10, description="Web searches per corroboration call."
+    )
+    corroboration_rounds: int = Field(
+        default=2,
+        ge=0,
+        le=5,
+        description="Corroboration searches per story: one when it is first seen, the rest "
+        "spread over the re-check window.",
+    )
+    recheck_hours: int = Field(
+        default=48, ge=1, le=168, description="How long an unconfirmed story is re-checked."
+    )
+    max_items_per_run: int = Field(
+        default=500, ge=10, le=5000, description="Classification cap per run (cost guard)."
+    )
+
+
+class DigestSettings(ConfigModel):
+    model: ModelId = "claude-sonnet-5"
+    use_batch: bool = Field(
+        default=True, description="Write the summary through the Batch API (half price)."
+    )
+    batch_wait_minutes: int = Field(
+        default=60,
+        ge=1,
+        le=720,
+        description="How long to wait for the batch before writing the summary directly.",
+    )
+    min_severity_summarised: int = Field(
+        default=2,
+        ge=1,
+        le=3,
+        description="Stories at or above this severity get a written summary; the rest are "
+        "listed by headline.",
+    )
+
+
 class JobsConfig(ConfigModel):
     """Schedules for the worker's timed jobs. Stored as `config_version` rows, domain `jobs`.
 
@@ -86,14 +132,31 @@ class JobsConfig(ConfigModel):
         default_factory=lambda: JobSchedule(cron="0 8 * * *"),
         description="Queue earnings checks for holdings that reported. Default: daily 08:00.",
     )
+    news_ingest: JobSchedule = Field(
+        default_factory=lambda: JobSchedule(cron="0 6-22/2 * * *"),
+        description="Ingest, classify, corroborate and alert. Default: every 2 h, 06:00-22:00.",
+    )
+    daily_digest: JobSchedule = Field(
+        default_factory=lambda: JobSchedule(cron="0 7 * * 1-5"),
+        description="Daily digest of the last 24 h. Default: weekdays 07:00.",
+    )
+    weekly_digest: JobSchedule = Field(
+        default_factory=lambda: JobSchedule(cron="0 18 * * 0"),
+        description="Weekly digest of the last 7 days. Default: Sundays 18:00.",
+    )
     earnings_check: EarningsCheckSettings = Field(default_factory=EarningsCheckSettings)
     earnings_calendar_settings: EarningsCalendarSettings = Field(
         default_factory=EarningsCalendarSettings
     )
+    news: NewsSettings = Field(default_factory=NewsSettings)
+    digest: DigestSettings = Field(default_factory=DigestSettings)
 
     def schedules(self) -> dict[str, JobSchedule]:
         return {
             "portfolio_sync": self.portfolio_sync,
             "earnings_calendar": self.earnings_calendar,
             "earnings_due": self.earnings_due,
+            "news_ingest": self.news_ingest,
+            "daily_digest": self.daily_digest,
+            "weekly_digest": self.weekly_digest,
         }

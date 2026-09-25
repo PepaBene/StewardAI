@@ -39,6 +39,7 @@ class Filing:
     report_date: dt.date | None
     primary_document: str
     items: str
+    accepted_at: dt.datetime | None = None
 
     @property
     def folder(self) -> str:
@@ -126,6 +127,7 @@ def parse_submissions(cik: str, data: dict[str, Any]) -> list[Filing]:
     for i, form in enumerate(forms):
         try:
             report = recent.get("reportDate", [""] * len(forms))[i]
+            accepted = (recent.get("acceptanceDateTime") or [""] * len(forms))[i]
             filings.append(
                 Filing(
                     cik=cik,
@@ -135,11 +137,23 @@ def parse_submissions(cik: str, data: dict[str, Any]) -> list[Filing]:
                     report_date=dt.date.fromisoformat(report) if report else None,
                     primary_document=recent["primaryDocument"][i],
                     items=(recent.get("items") or [""] * len(forms))[i] or "",
+                    accepted_at=_accepted(accepted),
                 )
             )
         except (KeyError, IndexError, ValueError):
             continue
     return filings
+
+
+def _accepted(value: str) -> dt.datetime | None:
+    """EDGAR's acceptanceDateTime ("2026-07-31T16:30:21.000Z"), as an aware datetime."""
+    if not value:
+        return None
+    try:
+        parsed = dt.datetime.fromisoformat(value.replace("Z", "+00:00"))
+    except ValueError:
+        return None
+    return parsed if parsed.tzinfo else parsed.replace(tzinfo=dt.UTC)
 
 
 def parse_index(text: str) -> list[tuple[str, str]]:

@@ -25,6 +25,7 @@ PRICES: dict[str, tuple[Decimal, Decimal]] = {
 WEB_SEARCH_PER_1000 = Decimal("10")
 CACHE_WRITE_FACTOR = Decimal("1.25")
 CACHE_READ_FACTOR = Decimal("0.1")
+BATCH_FACTOR = Decimal("0.5")
 
 
 class AINotConfigured(Exception):
@@ -48,6 +49,8 @@ class Usage:
     cache_read_tokens: int = 0
     searches: int = 0
     fetches: int = 0
+    # Batch API requests are billed at half price.
+    batch: bool = False
 
     def add(self, usage: Any) -> None:
         """Add a response's `usage` block."""
@@ -71,6 +74,8 @@ class Usage:
             + Decimal(self.cache_read_tokens) * CACHE_READ_FACTOR
         )
         cost = tokens_in * per_input / 10**6 + Decimal(self.output_tokens) * per_output / 10**6
+        if self.batch:
+            cost *= BATCH_FACTOR
         cost += Decimal(self.searches) * WEB_SEARCH_PER_1000 / 1000
         return cost.quantize(Decimal("0.000001"))
 

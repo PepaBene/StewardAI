@@ -42,6 +42,7 @@ from steward.earnings.store import archive, load_known, store_facts
 from steward.earnings.validate import ValidationContext, validate
 from steward.earnings.verdicts import run_verdicts
 from steward.jobs.runner import JobContext, JobFailed
+from steward.notify.breach import alert_breaches
 from steward.settings import get_settings
 from steward.sources.edgar import EdgarClient, EdgarError
 from steward.storage import EvidenceStore, SupabaseStorage
@@ -335,6 +336,11 @@ async def earnings_check(ctx: JobContext, deps: EarningsDeps) -> None:
                 pool, config.theses, config.theses_version_id, ctx.job_id, [ticker]
             )
             step.detail.update(verdicts.as_detail())
+            breaches = await alert_breaches(
+                pool, ctx.job_id, dt.datetime.now(dt.UTC), get_settings().app_url
+            )
+            if breaches:
+                step.detail["alerts"] = breaches
         if instrument is not None:
             await pool.execute(
                 "update public.instrument set last_report_date = $2 where t212_ticker = $1"

@@ -212,9 +212,12 @@ async def test_schedule_follows_the_jobs_config() -> None:
         return None
 
     assert apply_jobs_config(scheduler, JobsConfig(), run) == [
+        "daily_digest",
         "earnings_calendar",
         "earnings_due",
+        "news_ingest",
         "portfolio_sync",
+        "weekly_digest",
     ]
     job = scheduler.get_job("config:portfolio_sync")
     assert job is not None and "hour='22'" in str(job.trigger) and "minute='30'" in str(job.trigger)
@@ -227,7 +230,7 @@ async def test_schedule_follows_the_jobs_config() -> None:
     disabled = JobsConfig.model_validate(
         {"portfolio_sync": {"cron": "15 6 * * *", "enabled": False}}
     )
-    assert apply_jobs_config(scheduler, disabled, run) == ["earnings_calendar", "earnings_due"]
+    assert "portfolio_sync" not in apply_jobs_config(scheduler, disabled, run)
     assert scheduler.get_job("config:portfolio_sync") is None
 
 
