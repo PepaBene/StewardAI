@@ -14,13 +14,28 @@ const DOMAINS = [
     title: "Holding profiles",
     body: "Where each company publishes results, its fiscal year end, and what news is relevant to it.",
   },
+  {
+    href: "/config/news-sources",
+    title: "News sources",
+    body: "The feeds the news check reads, and how far each outlet is trusted.",
+  },
+  {
+    href: "/config/event-rules",
+    title: "Event rules",
+    body: "The severity of each kind of event, per-holding overrides and adjustments.",
+  },
+  {
+    href: "/config/notifications",
+    title: "Notifications",
+    body: "Which confirmed events reach you, on which channel; quiet hours, caps, digests. Send a test alert.",
+  },
 ] as const;
 
 const LATER = [
   { title: "Strategy", note: "PUT /config/strategy (editor in a later phase)" },
   { title: "Jobs", note: "PUT /config/jobs: schedules, models, step caps" },
   { title: "Verification", note: "PUT /config/verification: sanity bounds, tolerances" },
-  { title: "News sources, notifications, research profiles, budget", note: "Phases 3 to 6" },
+  { title: "Research profiles, budget", note: "Phases 5 and 6" },
 ] as const;
 
 export default function ConfigPage() {

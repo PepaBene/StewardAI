@@ -19,6 +19,7 @@ import { ConfidenceBadge } from "@/components/evidence/confidence-badge";
 import { VerdictStatusBadge } from "@/components/evidence/verdict-status-badge";
 import { DriftStatusBadge } from "@/components/portfolio/drift-status-badge";
 import { FreshnessLabel } from "@/components/portfolio/freshness-label";
+import { HoldingNews } from "@/components/news/holding-news";
 import { StatCard } from "@/components/portfolio/stat-card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -179,6 +180,8 @@ export function HoldingContent({
       {thesis && thesis.kpis && thesis.kpis.length > 0 ? (
         <KpiTable kpis={detail.kpis} facts={facts} />
       ) : null}
+
+      <HoldingNews ticker={detail.ticker} />
 
       <FactsSection facts={detail.facts} reload={reload} onQueued={onQueued} />
     </>

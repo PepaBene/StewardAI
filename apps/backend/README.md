@@ -17,6 +17,11 @@ src/
     documents/       fetching source documents, HTML/PDF to text, snippet matching
     earnings/        earnings check: locate, extract (Claude), validate, verdicts, calendar,
                      golden-set evaluation (`python -m steward.earnings.golden`)
+    news/            news pipeline: collectors, normalise, cluster, link, classify (Claude
+                     Haiku), corroborate, digest; classification eval (`python -m
+                     steward.news.eval`)
+    notify/          alert routing (rules, quiet hours, cap, throttle), Telegram and email,
+                     the dispatcher
     fx/              ČNB and ECB reference-rate collectors, currency conversion
     jobs/            job runner (advisory lock, job/job_step log), pgmq queue, registry
     portfolio/       sync job, day snapshots, drift, API read models
@@ -31,6 +36,7 @@ src/
   worker/            scheduler + queue consumer entrypoint
 tests/               pytest (DB tests need STEWARD_TEST_DATABASE_URL)
 tests/golden/        golden set of real earnings releases with labelled figures
+tests/news/          100 labelled news items (classification) and 10 syndication cases
 openapi.json         committed API contract; the frontend generates its types from it
 ```
 
@@ -56,6 +62,8 @@ uv run python -m steward.trading212 --env live
 
 uv run python -m steward.earnings.golden      # golden set through validator + verdicts
 uv run python -m steward.earnings.golden --live --record runs/$(date +%F)   # measure Claude
+uv run python -m steward.news.eval             # labelled news set through the eval harness
+uv run python -m steward.news.eval --live      # measure classification (target >= 85 %)
 
 uv run pytest                                # unit tests; DB tests skip without a database
 STEWARD_TEST_DATABASE_URL=postgresql://postgres:postgres@localhost:5432/postgres uv run pytest
@@ -81,7 +89,12 @@ extension; CI runs against a Postgres image that has it.
 | `POST /jobs/earnings-check` | Queue an earnings check for `{ticker, report_date?, url?}` |
 | `POST /jobs/thesis-verdicts` | Re-judge KPIs from stored facts (`{ticker?}`), no model calls |
 | `POST /jobs/earnings-calendar` | Refresh next report dates now |
-| `GET`/`PUT /config/{strategy,theses,jobs,holding-profiles,verification}` | Active config version / save a new one |
+| `GET /news` | News items, newest first, with their story's severity and confidence; filters `ticker`, `severity`, `confidence`, `tier`, `story` (repeat a parameter for "any of") |
+| `GET /alerts` | Recent alert decisions: sent, held, suppressed (with why), failed |
+| `POST /alerts/test` | Route a test alert through the saved notification rules; the worker sends it |
+| `GET /reports`, `GET /reports/{id}` | Digests, each sentence with its cited news items and facts |
+| `POST /jobs/news-ingest`, `POST /jobs/digest` | Run the news pipeline / write a digest now |
+| `GET`/`PUT /config/{strategy,theses,jobs,holding-profiles,verification,news-sources,event-rules,notifications}` | Active config version / save a new one |
 
 All but `/health` need the owner's MFA-verified Supabase JWT.
 
@@ -127,6 +140,37 @@ All but `/health` need the owner's MFA-verified Supabase JWT.
   gets a verdict. `--live` measures Claude's extraction accuracy (Phase 2 target 95 %).
   The labels were read by Claude and US figures cross-checked against XBRL; hand-check them
   and add your own holdings.
+- **News pipeline** (`news_ingest`, every 2 h 06:00-22:00 Prague by default). Every enabled
+  source of the news_sources config is read (so a source added there is read on the next
+  run): RSS/Atom feeds, IR pages without a feed (new links since the last read; the first
+  read only records a baseline), each holding's EDGAR filings (labelled by rule from the
+  form and 8-K items, no model call), Finnhub company news, and optionally a Google News
+  query per holding. Items get a canonical URL (the unique key: a URL is stored once, ever),
+  the tier of their outlet (config, with every profile's IR domains as tier 1), and are
+  dropped when stale, blocked, tier 3 (unless enabled) or matching no holding. Linking uses
+  names, aliases, `$TICKER`/`(NASDAQ: TICKER)` forms, ISINs, and the profile's competitors,
+  suppliers, customers and watch topics. Copies of one wire story (prefixes like "UPDATE 1-",
+  outlet suffixes, "bln"/"billion" differences) join one `story_cluster`.
+- **Classification** labels event type, affected holding, relevance, thesis link and rumour
+  language, 50 items per Haiku call. Labels are checked in code: the affected holding must be
+  one the item was linked to, a KPI link must name that thesis's KPI, and a rumour pattern
+  match counts even if the model missed it. Severity comes only from the event_rules config.
+- **Corroboration is code** (`steward/news/corroborate.py`): a tier-1 item confirms with no
+  search; two independent tier-2 stories (different clusters and outlets) confirm; one
+  tier-2 story, or rumour language, stays unconfirmed; tier 3 alone is sentiment. For
+  unconfirmed stories at severity 2+, a Haiku web search (allowed domains only) looks for
+  more sources; a URL it cites counts only if it was among the search results, has tier 1
+  or 2 and is not an outlet the story already came from. Stories are re-checked for 48 h.
+- **Alerts.** A confirmed, non-rumour story that a notification rule matches (first match
+  wins) becomes one `alert` row per channel; mutes, the repeat throttle, the daily cap and
+  quiet hours are applied and recorded. The worker's dispatcher sends due alerts every 15 s
+  (Telegram Bot API, Resend), retrying failures. KPI breaches found by an earnings check
+  alert the same way. Messages are composed in code, never by a model.
+- **Digests** (`daily_digest`, `weekly_digest`). Assembled in code per holding: stories
+  with their sources, verdicts with their facts. Stories at severity 2+ get a Sonnet summary
+  (Batch API by default, falling back to a direct call after a timeout); every sentence must
+  cite item or fact ids it was given, or it is removed. A period with nothing material still
+  produces and sends a digest that says so.
 - **Config is validated here.** `steward.config` holds the Pydantic model per config domain.
   `POST /config/{domain}/validate` exposes them, which also puts `StrategyConfig`,
   `ThesesConfig` and `ThesisConfig` into `openapi.json` for the frontend's generated types.

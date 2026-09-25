@@ -5,11 +5,16 @@ owner's strategy and per-holding theses, and uses Claude to monitor, explain and
 The full design is in
 [AI_Portfolio_Copilot_Technical_Product_Description.md](AI_Portfolio_Copilot_Technical_Product_Description.md).
 
-**Status: Phase 2 (Extraction and earnings checks)** on top of Phase 1 (daily Trading212 sync,
-ČNB/ECB FX, drift, Overview and Holdings, live sync indicator): each holding's results
-release is found on EDGAR or the company's own site, archived, read by Claude into figures
-with verbatim snippets, validated in code, and judged against the thesis KPIs. The holding
-page shows every verdict with its evidence; theses and holding profiles are edited in the app.
+**Status: Phase 3 (News pipeline)** on top of Phase 1 (daily Trading212 sync, ČNB/ECB FX,
+drift, Overview and Holdings) and Phase 2 (earnings checks: each results release found,
+archived, read by Claude into figures with verbatim snippets, validated in code and judged
+against the thesis KPIs). Phase 3 adds the news pipeline: every two hours the configured
+feeds (RSS, IR pages, EDGAR filings, Finnhub, optionally Google News) are ingested,
+deduplicated, clustered by story, linked to holdings, classified by Claude Haiku and checked
+under the corroboration rules; confirmed severity-3 events reach Telegram or email under the
+notification rules, and daily and weekly digests cite every claim. The app gains a filterable
+news feed, digests, editors for sources, event rules and notifications, and a Cmd/Ctrl+K
+command palette.
 
 ## Repository layout
 
@@ -54,6 +59,9 @@ side is stale.
 7. Check Storage: the Phase 2 migration creates the private `evidence` bucket
    (`select id, public from storage.buckets;`). The backend writes to it with the project's
    secret key (`SUPABASE_SECRET_KEY`); the browser only ever gets short-lived signed URLs.
+8. Alerts: set up a Telegram bot and/or Resend (see `.env.example`), then send a test alert
+   from Config → Notifications. The worker sends it within about 15 seconds (or when quiet
+   hours end).
 
 Then fill in the environment: `cp .env.example .env` in the repository root. That one file
 is read by both apps, and `.env.example` explains where to get every value (Supabase URL

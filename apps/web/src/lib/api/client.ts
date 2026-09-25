@@ -35,6 +35,24 @@ export type ThesisKPI = Schemas["ThesisKPI"];
 export type HoldingProfilesConfig = Schemas["HoldingProfilesConfig"];
 export type HoldingProfile = Schemas["HoldingProfile"];
 export type Exposure = Schemas["Exposure"];
+export type NewsFeed = Schemas["NewsFeed"];
+export type NewsItemOut = Schemas["NewsItemOut"];
+export type StoryOut = Schemas["StoryOut"];
+export type AlertOut = Schemas["AlertOut"];
+export type ReportSummary = Schemas["ReportSummary"];
+export type ReportOut = Schemas["ReportOut"];
+export type DigestBody = Schemas["DigestBody"];
+export type DigestSection = Schemas["DigestSection"];
+export type DigestSentence = Schemas["Sentence"];
+export type DigestSource = Schemas["DigestSource"];
+export type TestAlertResult = Schemas["TestAlertResult"];
+export type EventTypeInfo = Schemas["EventTypeInfo"];
+export type EventType = EventTypeInfo["id"];
+export type NotificationsConfig = Schemas["NotificationsConfig"];
+export type NotificationRule = Schemas["NotificationRule"];
+export type NewsSourcesConfig = Schemas["NewsSourcesConfig"];
+export type NewsSource = Schemas["NewsSource"];
+export type EventRulesConfig = Schemas["EventRulesConfig"];
 
 export type AccessTokenGetter = () => Promise<string | null | undefined>;
 

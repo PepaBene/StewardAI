@@ -1,0 +1,78 @@
+"use client";
+
+import { ExternalLinkIcon } from "lucide-react";
+import Link from "next/link";
+import { useEffect, useState } from "react";
+
+import { ConfidenceBadge } from "@/components/evidence/confidence-badge";
+import { SeverityBadge, TierBadge } from "@/components/news/severity-badge";
+import { getBrowserApiClient, type NewsItemOut } from "@/lib/api/client";
+import { byLead, groupByStory } from "@/lib/news/feed-filters";
+import { eventLabel } from "@/lib/news/labels";
+import { formatDate } from "@/lib/format";
+
+/** The holding page's latest linked news, one row per story. */
+export function HoldingNews({ ticker }: { ticker: string }) {
+  const [items, setItems] = useState<NewsItemOut[] | null>(null);
+  const [failed, setFailed] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    getBrowserApiClient()
+      .GET("/news", { params: { query: { ticker, limit: 30 } } })
+      .then(({ data }) => {
+        if (cancelled) return;
+        if (data) setItems(data.items);
+        else setFailed(true);
+      })
+      .catch(() => !cancelled && setFailed(true));
+    return () => {
+      cancelled = true;
+    };
+  }, [ticker]);
+
+  const stories = items ? groupByStory(items).slice(0, 8) : [];
+  return (
+    <section aria-labelledby="news-heading" className="space-y-3">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <h2 id="news-heading" className="text-lg font-semibold">
+          News
+        </h2>
+        <Link href={`/news?ticker=${encodeURIComponent(ticker)}`} className="text-sm text-accent hover:underline">
+          All news for {ticker}
+        </Link>
+      </div>
+      {failed ? <p className="text-sm text-text-muted">News could not be loaded.</p> : null}
+      {items !== null && stories.length === 0 ? (
+        <p className="text-sm text-text-muted">No news linked to this holding in the feed window.</p>
+      ) : null}
+      {stories.length > 0 ? (
+        <ul className="divide-y divide-border rounded-lg border border-border bg-surface-raised">
+          {stories.map((group) => {
+            const [lead] = byLead(group);
+            return (
+              <li key={lead.story.id} className="flex flex-wrap items-start justify-between gap-2 p-3 text-sm">
+                <div className="min-w-0 flex-1">
+                  <a href={lead.url} target="_blank" rel="noreferrer" className="inline-flex items-start gap-1 font-medium hover:text-accent hover:underline">
+                    {lead.headline}
+                    <ExternalLinkIcon aria-hidden="true" className="mt-0.5 size-3 shrink-0 text-text-muted" />
+                  </a>
+                  <p className="flex flex-wrap items-center gap-x-2 text-text-muted">
+                    <span>{lead.outlet_name ?? lead.outlet}</span>
+                    <TierBadge tier={lead.tier} />
+                    <span className="num">{formatDate(new Date(lead.published_at))}</span>
+                    <span>{eventLabel(lead.story.event_type)}</span>
+                  </p>
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <SeverityBadge severity={lead.story.severity} />
+                  <ConfidenceBadge confidence={lead.story.confidence} />
+                </div>
+              </li>
+            );
+          })}
+        </ul>
+      ) : null}
+    </section>
+  );
+}

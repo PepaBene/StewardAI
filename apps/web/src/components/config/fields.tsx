@@ -155,3 +155,80 @@ export function SelectField<T extends string | number>({
     </div>
   );
 }
+
+/** A group of checkboxes for a list-valued field (severities, channels, event types). */
+export function CheckboxGroup<T extends string | number>({
+  label,
+  path,
+  errors,
+  hint,
+  className,
+  values,
+  options,
+  onChange,
+}: Common & {
+  values: readonly T[];
+  options: readonly { value: T; label: string }[];
+  onChange: (values: T[]) => void;
+}) {
+  const id = useId();
+  const messages = [
+    ...errorsAt(errors, path),
+    ...Object.entries(errors)
+      .filter(([p]) => p.startsWith(`${path}.`))
+      .flatMap(([, ms]) => ms),
+  ];
+  return (
+    <fieldset className={cn("space-y-1", className)} aria-describedby={messages.length > 0 ? `${id}-errors` : undefined}>
+      <legend className="mb-1 text-sm font-medium">{label}</legend>
+      <div className="flex flex-wrap gap-x-3 gap-y-1">
+        {options.map((o) => {
+          const checked = values.includes(o.value);
+          return (
+            <label key={String(o.value)} className="inline-flex items-center gap-1.5 text-sm">
+              <input
+                type="checkbox"
+                checked={checked}
+                onChange={() =>
+                  onChange(checked ? values.filter((v) => v !== o.value) : [...values, o.value])
+                }
+                className="size-4 accent-accent"
+              />
+              {o.label}
+            </label>
+          );
+        })}
+      </div>
+      <Messages id={`${id}-errors`} messages={messages} hint={hint} />
+    </fieldset>
+  );
+}
+
+export function CheckboxField({
+  label,
+  checked,
+  onChange,
+  hint,
+  className,
+}: {
+  label: string;
+  checked: boolean;
+  onChange: (checked: boolean) => void;
+  hint?: ReactNode;
+  className?: string;
+}) {
+  return (
+    <div className={cn("space-y-1", className)}>
+      <label className="inline-flex items-center gap-2 text-sm font-medium">
+        <input
+          type="checkbox"
+          checked={checked}
+          onChange={(e) => onChange(e.target.checked)}
+          className="size-4 accent-accent"
+        />
+        {label}
+      </label>
+      {hint ? <p className="text-xs text-text-muted">{hint}</p> : null}
+    </div>
+  );
+}
