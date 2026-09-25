@@ -1,0 +1,280 @@
+{
+  "id": "nvda-fy2027-q2",
+  "ticker": "NVDA_US_EQ",
+  "company": "NVIDIA Corporation",
+  "cik": "0001045810",
+  "form": "8-K",
+  "source_url": "https://www.sec.gov/Archives/edgar/data/1045810/000104581026000073/q2fy27pr.htm",
+  "filing_index_url": "https://www.sec.gov/Archives/edgar/data/1045810/000104581026000073/0001045810-26-000073-index.html",
+  "content_type": "text/html",
+  "document": "document.html.gz",
+  "report_date": "2026-08-26",
+  "fiscal_year_end_month": 1,
+  "reporting_currency": "USD",
+  "period": {
+    "fiscal_year": 2027,
+    "fiscal_period": "Q2",
+    "period_end": "2026-07-26"
+  },
+  "figures": [
+    {
+      "metric": "revenue",
+      "basis": "reported",
+      "fiscal_year": 2027,
+      "fiscal_period": "Q2",
+      "value_as_written": "96,221",
+      "value": 96221,
+      "scale": "millions",
+      "unit": "currency",
+      "currency": "USD",
+      "snippet": "Revenue | $96,221 | $46,743 | $177,837 | $90,805",
+      "crosscheck": {
+        "source": "xbrl",
+        "tag": "Revenues",
+        "value": 96221000000,
+        "matches": true,
+        "period_end": "2026-07-26"
+      },
+      "unit_snippet": "(In millions, except per share data)"
+    },
+    {
+      "metric": "revenue",
+      "basis": "reported",
+      "fiscal_year": 2026,
+      "fiscal_period": "Q2",
+      "value_as_written": "46,743",
+      "value": 46743,
+      "scale": "millions",
+      "unit": "currency",
+      "currency": "USD",
+      "snippet": "Revenue | $96,221 | $46,743 | $177,837 | $90,805",
+      "crosscheck": {
+        "source": "xbrl",
+        "tag": "Revenues",
+        "value": 46743000000,
+        "matches": true,
+        "period_end": "2025-07-27"
+      },
+      "unit_snippet": "(In millions, except per share data)"
+    },
+    {
+      "metric": "gross_profit",
+      "basis": "reported",
+      "fiscal_year": 2027,
+      "fiscal_period": "Q2",
+      "value_as_written": "72,142",
+      "value": 72142,
+      "scale": "millions",
+      "unit": "currency",
+      "currency": "USD",
+      "snippet": "Gross profit | 72,142 | 33,853 | 133,299 | 60,521",
+      "crosscheck": {
+        "source": "xbrl",
+        "tag": "GrossProfit",
+        "value": 72142000000,
+        "matches": true,
+        "period_end": "2026-07-26"
+      },
+      "unit_snippet": "(In millions, except per share data)"
+    },
+    {
+      "metric": "gross_profit",
+      "basis": "reported",
+      "fiscal_year": 2026,
+      "fiscal_period": "Q2",
+      "value_as_written": "33,853",
+      "value": 33853,
+      "scale": "millions",
+      "unit": "currency",
+      "currency": "USD",
+      "snippet": "Gross profit | 72,142 | 33,853 | 133,299 | 60,521",
+      "crosscheck": {
+        "source": "xbrl",
+        "tag": "GrossProfit",
+        "value": 33853000000,
+        "matches": true,
+        "period_end": "2025-07-27"
+      },
+      "unit_snippet": "(In millions, except per share data)"
+    },
+    {
+      "metric": "operating_income",
+      "basis": "reported",
+      "fiscal_year": 2027,
+      "fiscal_period": "Q2",
+      "value_as_written": "63,734",
+      "value": 63734,
+      "scale": "millions",
+      "unit": "currency",
+      "currency": "USD",
+      "snippet": "Operating income | 63,734 | 28,440 | 117,270 | 50,078",
+      "crosscheck": {
+        "source": "xbrl",
+        "tag": "OperatingIncomeLoss",
+        "value": 63734000000,
+        "matches": true,
+        "period_end": "2026-07-26"
+      },
+      "unit_snippet": "(In millions, except per share data)"
+    },
+    {
+      "metric": "operating_income",
+      "basis": "reported",
+      "fiscal_year": 2026,
+      "fiscal_period": "Q2",
+      "value_as_written": "28,440",
+      "value": 28440,
+      "scale": "millions",
+      "unit": "currency",
+      "currency": "USD",
+      "snippet": "Operating income | 63,734 | 28,440 | 117,270 | 50,078",
+      "crosscheck": {
+        "source": "xbrl",
+        "tag": "OperatingIncomeLoss",
+        "value": 28440000000,
+        "matches": true,
+        "period_end": "2025-07-27"
+      },
+      "unit_snippet": "(In millions, except per share data)"
+    },
+    {
+      "metric": "operating_income",
+      "basis": "adjusted",
+      "fiscal_year": 2027,
+      "fiscal_period": "Q2",
+      "value_as_written": "63,956",
+      "value": 63956,
+      "scale": "millions",
+      "unit": "currency",
+      "currency": "USD",
+      "snippet": "Non-GAAP operating income* | $63,956 | $53,783 | $28,541 | $117,739 | $50,341",
+      "crosscheck": null,
+      "unit_snippet": "($ In millions, except per share data)"
+    },
+    {
+      "metric": "operating_income",
+      "basis": "adjusted",
+      "fiscal_year": 2026,
+      "fiscal_period": "Q2",
+      "value_as_written": "28,541",
+      "value": 28541,
+      "scale": "millions",
+      "unit": "currency",
+      "currency": "USD",
+      "snippet": "Non-GAAP operating income* | $63,956 | $53,783 | $28,541 | $117,739 | $50,341",
+      "crosscheck": null,
+      "unit_snippet": "($ In millions, except per share data)"
+    },
+    {
+      "metric": "net_income",
+      "basis": "reported",
+      "fiscal_year": 2027,
+      "fiscal_period": "Q2",
+      "value_as_written": "59,688",
+      "value": 59688,
+      "scale": "millions",
+      "unit": "currency",
+      "currency": "USD",
+      "snippet": "Net income | $59,688 | $26,422 | $118,010 | $45,197",
+      "crosscheck": {
+        "source": "xbrl",
+        "tag": "NetIncomeLoss",
+        "value": 59688000000,
+        "matches": true,
+        "period_end": "2026-07-26"
+      },
+      "unit_snippet": "(In millions, except per share data)"
+    },
+    {
+      "metric": "net_income",
+      "basis": "reported",
+      "fiscal_year": 2026,
+      "fiscal_period": "Q2",
+      "value_as_written": "26,422",
+      "value": 26422,
+      "scale": "millions",
+      "unit": "currency",
+      "currency": "USD",
+      "snippet": "Net income | $59,688 | $26,422 | $118,010 | $45,197",
+      "crosscheck": {
+        "source": "xbrl",
+        "tag": "NetIncomeLoss",
+        "value": 26422000000,
+        "matches": true,
+        "period_end": "2025-07-27"
+      },
+      "unit_snippet": "(In millions, except per share data)"
+    },
+    {
+      "metric": "eps_diluted",
+      "basis": "reported",
+      "fiscal_year": 2027,
+      "fiscal_period": "Q2",
+      "value_as_written": "2.46",
+      "value": 2.46,
+      "scale": "units",
+      "unit": "per_share",
+      "currency": "USD",
+      "snippet": "Diluted | $2.46 | $1.08 | $4.85 | $1.84",
+      "crosscheck": {
+        "source": "xbrl",
+        "tag": "EarningsPerShareDiluted",
+        "value": 2.46,
+        "matches": true,
+        "period_end": "2026-07-26"
+      },
+      "unit_snippet": null
+    },
+    {
+      "metric": "eps_diluted",
+      "basis": "reported",
+      "fiscal_year": 2026,
+      "fiscal_period": "Q2",
+      "value_as_written": "1.08",
+      "value": 1.08,
+      "scale": "units",
+      "unit": "per_share",
+      "currency": "USD",
+      "snippet": "Diluted | $2.46 | $1.08 | $4.85 | $1.84",
+      "crosscheck": {
+        "source": "xbrl",
+        "tag": "EarningsPerShareDiluted",
+        "value": 1.08,
+        "matches": true,
+        "period_end": "2025-07-27"
+      },
+      "unit_snippet": null
+    },
+    {
+      "metric": "eps_diluted",
+      "basis": "adjusted",
+      "fiscal_year": 2027,
+      "fiscal_period": "Q2",
+      "value_as_written": "2.22",
+      "value": 2.22,
+      "scale": "units",
+      "unit": "per_share",
+      "currency": "USD",
+      "snippet": "Non-GAAP* | $2.22 | $1.87 | $1.01 | $4.09 | $1.78",
+      "crosscheck": null,
+      "unit_snippet": null
+    },
+    {
+      "metric": "eps_diluted",
+      "basis": "adjusted",
+      "fiscal_year": 2026,
+      "fiscal_period": "Q2",
+      "value_as_written": "1.01",
+      "value": 1.01,
+      "scale": "units",
+      "unit": "per_share",
+      "currency": "USD",
+      "snippet": "Non-GAAP* | $2.22 | $1.87 | $1.01 | $4.09 | $1.78",
+      "crosscheck": null,
+      "unit_snippet": null
+    }
+  ],
+  "absent_metrics": [],
+  "labelled_by": "claude (AI-read from the document; owner has not hand-checked)",
+  "notes": "Reported figures are taken from the condensed consolidated statement of income; adjusted figures from the GAAP to non-GAAP reconciliation (columns: this quarter, prior quarter, same quarter last year). XBRL crosscheck of reported figures: 10 match, 0 mismatch, 0 not checkable."
+}

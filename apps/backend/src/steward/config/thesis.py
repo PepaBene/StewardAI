@@ -3,9 +3,10 @@
 import datetime as dt
 from typing import Literal, Self
 
-from pydantic import Field, model_validator
+from pydantic import Field, field_validator, model_validator
 
 from steward.config.common import ComparisonOperator, ConfigModel, Slug, Ticker, require_unique
+from steward.earnings.units import parse_kpi_unit
 
 
 class ThesisKPI(ConfigModel):
@@ -19,10 +20,22 @@ class ThesisKPI(ConfigModel):
     )
     operator: ComparisonOperator
     threshold: float
-    unit: str = Field(min_length=1, max_length=32, examples=["%", "EUR bn"])
+    unit: str = Field(
+        min_length=1,
+        max_length=32,
+        examples=["%", "EUR bn"],
+        description="What the threshold is in: '%', 'x', 'count', or a currency with an "
+        "optional scale ('EUR bn', 'USD m', 'USD' for per-share amounts).",
+    )
     basis: Literal["reported", "adjusted"] = "reported"
     period: Literal["quarter", "annual", "ttm"] = "quarter"
     description: str = ""
+
+    @field_validator("unit")
+    @classmethod
+    def _known_unit(cls, value: str) -> str:
+        parse_kpi_unit(value)
+        return value
 
 
 class ThesisConfig(ConfigModel):

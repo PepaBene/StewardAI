@@ -202,6 +202,282 @@
         ]
       }
     },
+    "/jobs/earnings-check": {
+      "post": {
+        "tags": [
+          "jobs"
+        ],
+        "summary": "Run Earnings Check",
+        "description": "Queue an earnings thesis check for one holding: find the release, extract and\nvalidate its figures, then judge the thesis KPIs.",
+        "operationId": "run_earnings_check",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EarningsCheckRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "202": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/JobSummary"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/jobs/thesis-verdicts": {
+      "post": {
+        "tags": [
+          "jobs"
+        ],
+        "summary": "Run Thesis Verdicts",
+        "description": "Re-judge thesis KPIs from the stored facts with the active theses config. No\nfetching, no model calls: use it after editing a threshold.",
+        "operationId": "run_thesis_verdicts",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ThesisVerdictsRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "202": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/JobSummary"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/jobs/earnings-calendar": {
+      "post": {
+        "tags": [
+          "jobs"
+        ],
+        "summary": "Run Earnings Calendar",
+        "description": "Refresh every holding's next report date now.",
+        "operationId": "run_earnings_calendar",
+        "responses": {
+          "202": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/JobSummary"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/holdings/{ticker}": {
+      "get": {
+        "tags": [
+          "holdings"
+        ],
+        "summary": "Get Holding",
+        "description": "One holding: position, thesis, KPI verdicts with their history, and every extracted\nfact with its source.",
+        "operationId": "get_holding",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "ticker",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9._-]{1,32}$",
+              "title": "Ticker"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HoldingDetail"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/facts/{fact_id}/evidence": {
+      "get": {
+        "tags": [
+          "holdings"
+        ],
+        "summary": "Get Fact Evidence",
+        "description": "The archived copy of the page a fact was read from: a short-lived signed URL and\nthe text around the fact's snippet.",
+        "operationId": "get_fact_evidence",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "fact_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Fact Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EvidenceLink"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/facts/{fact_id}/review": {
+      "post": {
+        "tags": [
+          "holdings"
+        ],
+        "summary": "Review Fact",
+        "description": "Release or reject a fact the validator held for review (sanity bound, restatement,\ncurrency). Verdicts for the holding are re-run afterwards.",
+        "operationId": "review_fact",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "fact_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Fact Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/FactReview"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FactReviewResult"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/config/strategy": {
       "get": {
         "tags": [
@@ -461,6 +737,237 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/JobsConfigVersion"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/config/holding-profiles": {
+      "get": {
+        "tags": [
+          "config"
+        ],
+        "summary": "Get Holding Profiles Config",
+        "operationId": "get_holding_profiles_config",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HoldingProfilesConfigVersion"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "config"
+        ],
+        "summary": "Save Holding Profiles Config",
+        "description": "Save holding profiles. The next earnings check and calendar refresh use them.",
+        "operationId": "save_holding_profiles_config",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "note",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "maxLength": 500
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Why this change was made.",
+              "title": "Note"
+            },
+            "description": "Why this change was made."
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/HoldingProfilesConfig"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HoldingProfilesConfigVersion"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/config/holding-profiles/validate": {
+      "post": {
+        "tags": [
+          "config"
+        ],
+        "summary": "Validate Holding Profiles",
+        "description": "Validate holding profiles without saving. 422 lists every error.",
+        "operationId": "validate_holding_profiles",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/HoldingProfilesConfig"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HoldingProfilesConfig"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/config/verification": {
+      "get": {
+        "tags": [
+          "config"
+        ],
+        "summary": "Get Verification Config",
+        "description": "The saved validator thresholds. 404 means the defaults apply.",
+        "operationId": "get_verification_config",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VerificationConfigVersion"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "config"
+        ],
+        "summary": "Save Verification Config",
+        "operationId": "save_verification_config",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "note",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "maxLength": 500
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Why this change was made.",
+              "title": "Note"
+            },
+            "description": "Why this change was made."
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/VerificationConfig"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VerificationConfigVersion"
                 }
               }
             }
@@ -1045,6 +1552,531 @@
         ],
         "title": "DriftReport"
       },
+      "EarningsCalendarSettings": {
+        "properties": {
+          "model": {
+            "type": "string",
+            "pattern": "^claude-[a-z0-9.-]{1,64}$",
+            "title": "Model",
+            "description": "Reads report dates off IR calendar pages.",
+            "default": "claude-haiku-4-5",
+            "examples": [
+              "claude-sonnet-5"
+            ]
+          },
+          "lookahead_days": {
+            "type": "integer",
+            "maximum": 400.0,
+            "minimum": 7.0,
+            "title": "Lookahead Days",
+            "default": 120
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "EarningsCalendarSettings",
+        "description": "Next report dates: Finnhub for US issuers, the IR calendar page otherwise."
+      },
+      "EarningsCheckRequest": {
+        "properties": {
+          "ticker": {
+            "type": "string",
+            "pattern": "^[A-Za-z0-9._-]{1,32}$",
+            "title": "Ticker",
+            "examples": [
+              "AAPL_US_EQ"
+            ]
+          },
+          "report_date": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Report Date",
+            "description": "Report date to look for. Default: the instrument's report date if it has passed, else today."
+          },
+          "url": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 2000,
+                "pattern": "^https?://"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Url",
+            "description": "Use this document instead of searching (a press release or report)."
+          }
+        },
+        "type": "object",
+        "required": [
+          "ticker"
+        ],
+        "title": "EarningsCheckRequest"
+      },
+      "EarningsCheckSettings": {
+        "properties": {
+          "extraction_model": {
+            "type": "string",
+            "pattern": "^claude-[a-z0-9.-]{1,64}$",
+            "title": "Extraction Model",
+            "default": "claude-sonnet-5",
+            "examples": [
+              "claude-sonnet-5"
+            ]
+          },
+          "locate_model": {
+            "type": "string",
+            "pattern": "^claude-[a-z0-9.-]{1,64}$",
+            "title": "Locate Model",
+            "description": "Searches for the release when EDGAR has none (non-US issuers).",
+            "default": "claude-sonnet-5",
+            "examples": [
+              "claude-sonnet-5"
+            ]
+          },
+          "effort": {
+            "type": "string",
+            "enum": [
+              "low",
+              "medium",
+              "high",
+              "xhigh",
+              "max"
+            ],
+            "title": "Effort",
+            "default": "high"
+          },
+          "max_steps": {
+            "type": "integer",
+            "maximum": 50.0,
+            "minimum": 2.0,
+            "title": "Max Steps",
+            "description": "Claude calls plus document fetches per run.",
+            "default": 8
+          },
+          "max_searches": {
+            "type": "integer",
+            "maximum": 20.0,
+            "minimum": 0.0,
+            "title": "Max Searches",
+            "description": "Web searches per run.",
+            "default": 3
+          },
+          "check_days_after_report": {
+            "items": {
+              "type": "integer",
+              "maximum": 30.0,
+              "minimum": 0.0
+            },
+            "type": "array",
+            "title": "Check Days After Report",
+            "description": "Days after the report date on which the check runs until it finds the release (the spec's +1, retry at +2 and +4)."
+          },
+          "max_document_mb": {
+            "type": "integer",
+            "maximum": 32.0,
+            "minimum": 1.0,
+            "title": "Max Document Mb",
+            "default": 20
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "EarningsCheckSettings",
+        "description": "The earnings thesis check: find the release, extract figures, validate, judge KPIs."
+      },
+      "EvidenceLink": {
+        "properties": {
+          "fact_id": {
+            "type": "integer",
+            "title": "Fact Id"
+          },
+          "source_url": {
+            "type": "string",
+            "title": "Source Url"
+          },
+          "evidence_url": {
+            "type": "string",
+            "title": "Evidence Url",
+            "description": "Signed URL of the archived copy, valid 10 minutes."
+          },
+          "content_type": {
+            "type": "string",
+            "title": "Content Type"
+          },
+          "fetched_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Fetched At"
+          },
+          "sha256": {
+            "type": "string",
+            "title": "Sha256"
+          },
+          "context": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Context",
+            "description": "The archived text around the snippet."
+          }
+        },
+        "type": "object",
+        "required": [
+          "fact_id",
+          "source_url",
+          "evidence_url",
+          "content_type",
+          "fetched_at",
+          "sha256",
+          "context"
+        ],
+        "title": "EvidenceLink"
+      },
+      "Exposure": {
+        "properties": {
+          "kind": {
+            "type": "string",
+            "enum": [
+              "revenue_currency",
+              "revenue_region",
+              "commodity_input",
+              "other"
+            ],
+            "title": "Kind"
+          },
+          "name": {
+            "type": "string",
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Name",
+            "examples": [
+              "USD",
+              "Greater China",
+              "Copper"
+            ]
+          },
+          "share": {
+            "anyOf": [
+              {
+                "type": "number",
+                "maximum": 1.0,
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Share",
+            "description": "Share of revenue or cost, 0..1."
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "kind",
+          "name"
+        ],
+        "title": "Exposure"
+      },
+      "FactCheck": {
+        "properties": {
+          "check": {
+            "type": "string",
+            "title": "Check"
+          },
+          "ok": {
+            "type": "boolean",
+            "title": "Ok"
+          },
+          "detail": {
+            "type": "string",
+            "title": "Detail",
+            "default": ""
+          }
+        },
+        "type": "object",
+        "required": [
+          "check",
+          "ok"
+        ],
+        "title": "FactCheck"
+      },
+      "FactOut": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "metric": {
+            "type": "string",
+            "title": "Metric"
+          },
+          "basis": {
+            "type": "string",
+            "enum": [
+              "reported",
+              "adjusted"
+            ],
+            "title": "Basis"
+          },
+          "period": {
+            "type": "string",
+            "title": "Period"
+          },
+          "fiscal_year": {
+            "type": "integer",
+            "title": "Fiscal Year"
+          },
+          "fiscal_period": {
+            "type": "string",
+            "title": "Fiscal Period"
+          },
+          "period_end": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Period End"
+          },
+          "value": {
+            "type": "number",
+            "title": "Value",
+            "description": "As printed, in `scale`."
+          },
+          "value_as_written": {
+            "type": "string",
+            "title": "Value As Written"
+          },
+          "value_units": {
+            "type": "number",
+            "title": "Value Units",
+            "description": "With the scale applied."
+          },
+          "scale": {
+            "type": "string",
+            "enum": [
+              "units",
+              "thousands",
+              "millions",
+              "billions"
+            ],
+            "title": "Scale"
+          },
+          "unit": {
+            "type": "string",
+            "enum": [
+              "currency",
+              "per_share",
+              "percent",
+              "count",
+              "ratio"
+            ],
+            "title": "Unit"
+          },
+          "currency": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Currency"
+          },
+          "source_url": {
+            "type": "string",
+            "title": "Source Url"
+          },
+          "snippet": {
+            "type": "string",
+            "title": "Snippet"
+          },
+          "unit_snippet": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Unit Snippet"
+          },
+          "evidence_sha256": {
+            "type": "string",
+            "title": "Evidence Sha256"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "verified",
+              "unverified",
+              "rejected",
+              "quarantined"
+            ],
+            "title": "Status"
+          },
+          "status_reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Status Reason"
+          },
+          "checks": {
+            "items": {
+              "$ref": "#/components/schemas/FactCheck"
+            },
+            "type": "array",
+            "title": "Checks"
+          },
+          "restates_fact_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Restates Fact Id"
+          },
+          "extracted_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Extracted At"
+          },
+          "reviewed_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reviewed At"
+          },
+          "confidence": {
+            "type": "string",
+            "enum": [
+              "verified",
+              "corroborated",
+              "unconfirmed",
+              "disputed"
+            ],
+            "title": "Confidence"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "metric",
+          "basis",
+          "period",
+          "fiscal_year",
+          "fiscal_period",
+          "period_end",
+          "value",
+          "value_as_written",
+          "value_units",
+          "scale",
+          "unit",
+          "currency",
+          "source_url",
+          "snippet",
+          "unit_snippet",
+          "evidence_sha256",
+          "status",
+          "status_reason",
+          "checks",
+          "restates_fact_id",
+          "extracted_at",
+          "reviewed_at",
+          "confidence"
+        ],
+        "title": "FactOut"
+      },
+      "FactReview": {
+        "properties": {
+          "action": {
+            "type": "string",
+            "enum": [
+              "verify",
+              "reject"
+            ],
+            "title": "Action"
+          },
+          "note": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 500
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note"
+          }
+        },
+        "type": "object",
+        "required": [
+          "action"
+        ],
+        "title": "FactReview"
+      },
+      "FactReviewResult": {
+        "properties": {
+          "fact_id": {
+            "type": "integer",
+            "title": "Fact Id"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "verified",
+              "rejected"
+            ],
+            "title": "Status"
+          },
+          "verdict_job": {
+            "$ref": "#/components/schemas/JobSummary"
+          }
+        },
+        "type": "object",
+        "required": [
+          "fact_id",
+          "status",
+          "verdict_job"
+        ],
+        "title": "FactReviewResult"
+      },
       "Freshness": {
         "properties": {
           "snapshot_date": {
@@ -1303,6 +2335,381 @@
         ],
         "title": "Holding"
       },
+      "HoldingDetail": {
+        "properties": {
+          "ticker": {
+            "type": "string",
+            "title": "Ticker"
+          },
+          "instrument": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/InstrumentInfo"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "position": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Holding"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Null when the latest sync has no position."
+          },
+          "base_currency": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Base Currency"
+          },
+          "freshness": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Freshness"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "thesis": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ThesisConfig"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "theses_config_version_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Theses Config Version Id"
+          },
+          "profile": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/HoldingProfile"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "kpis": {
+            "items": {
+              "$ref": "#/components/schemas/KpiStatus"
+            },
+            "type": "array",
+            "title": "Kpis"
+          },
+          "facts": {
+            "items": {
+              "$ref": "#/components/schemas/FactOut"
+            },
+            "type": "array",
+            "title": "Facts",
+            "description": "Every fact, newest period first."
+          },
+          "last_earnings_check": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/JobSummary"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "last_verdict_run": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/JobSummary"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "ticker",
+          "instrument",
+          "position",
+          "base_currency",
+          "freshness",
+          "thesis",
+          "theses_config_version_id",
+          "profile",
+          "kpis",
+          "facts",
+          "last_earnings_check",
+          "last_verdict_run"
+        ],
+        "title": "HoldingDetail"
+      },
+      "HoldingProfile": {
+        "properties": {
+          "ticker": {
+            "type": "string",
+            "pattern": "^[A-Za-z0-9._-]{1,32}$",
+            "title": "Ticker",
+            "examples": [
+              "AAPL_US_EQ"
+            ]
+          },
+          "company_name": {
+            "type": "string",
+            "maxLength": 200,
+            "title": "Company Name",
+            "default": ""
+          },
+          "aliases": {
+            "items": {
+              "type": "string",
+              "maxLength": 200,
+              "minLength": 1
+            },
+            "type": "array",
+            "title": "Aliases",
+            "description": "Other and former names, used to match news."
+          },
+          "ir_url": {
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 1,
+                "format": "uri"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ir Url",
+            "description": "Investor relations home page."
+          },
+          "results_urls": {
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "format": "uri"
+            },
+            "type": "array",
+            "title": "Results Urls",
+            "description": "Pages where results press releases or reports are published."
+          },
+          "financial_calendar_url": {
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 1,
+                "format": "uri"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Financial Calendar Url",
+            "description": "IR financial calendar page with upcoming report dates."
+          },
+          "regulatory_news_urls": {
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "format": "uri"
+            },
+            "type": "array",
+            "title": "Regulatory News Urls"
+          },
+          "extra_domains": {
+            "items": {
+              "type": "string",
+              "maxLength": 253,
+              "pattern": "^([a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?\\.)+[a-z]{2,63}$",
+              "examples": [
+                "investor.apple.com"
+              ]
+            },
+            "type": "array",
+            "title": "Extra Domains",
+            "description": "Further domains the earnings check may search and fetch from (the IR and results URLs' domains are always allowed)."
+          },
+          "sec_cik": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^[0-9]{1,10}$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sec Cik",
+            "description": "SEC Central Index Key. US issuers (8-K) and foreign issuers that furnish results on 6-K. Looked up from the ticker when empty."
+          },
+          "sec_ticker": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^[A-Z0-9.\\-]{1,10}$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sec Ticker",
+            "description": "Ticker as EDGAR and Finnhub list it, when it differs from the Trading212 ticker's prefix."
+          },
+          "fiscal_year_end_month": {
+            "type": "integer",
+            "maximum": 12.0,
+            "minimum": 1.0,
+            "title": "Fiscal Year End Month",
+            "description": "Month the fiscal year ends in (Apple: 9, Microsoft: 6). Maps fiscal quarters to calendar periods.",
+            "default": 12
+          },
+          "reporting_currency": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^[A-Z]{3}$",
+                "examples": [
+                  "CZK"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reporting Currency",
+            "description": "Currency the company reports in; figures in another are held."
+          },
+          "competitors": {
+            "items": {
+              "type": "string",
+              "maxLength": 200,
+              "minLength": 1
+            },
+            "type": "array",
+            "title": "Competitors"
+          },
+          "suppliers": {
+            "items": {
+              "type": "string",
+              "maxLength": 200,
+              "minLength": 1
+            },
+            "type": "array",
+            "title": "Suppliers"
+          },
+          "customers": {
+            "items": {
+              "type": "string",
+              "maxLength": 200,
+              "minLength": 1
+            },
+            "type": "array",
+            "title": "Customers"
+          },
+          "watch_topics": {
+            "items": {
+              "type": "string",
+              "maxLength": 200,
+              "minLength": 1
+            },
+            "type": "array",
+            "title": "Watch Topics"
+          },
+          "exposures": {
+            "items": {
+              "$ref": "#/components/schemas/Exposure"
+            },
+            "type": "array",
+            "title": "Exposures"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "ticker"
+        ],
+        "title": "HoldingProfile"
+      },
+      "HoldingProfilesConfig": {
+        "properties": {
+          "schema_version": {
+            "type": "integer",
+            "const": 1,
+            "title": "Schema Version",
+            "default": 1
+          },
+          "profiles": {
+            "items": {
+              "$ref": "#/components/schemas/HoldingProfile"
+            },
+            "type": "array",
+            "title": "Profiles"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "HoldingProfilesConfig",
+        "description": "All holding profiles. Stored as `config_version` rows, domain `holding_profiles`."
+      },
+      "HoldingProfilesConfigVersion": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note"
+          },
+          "body": {
+            "$ref": "#/components/schemas/HoldingProfilesConfig"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "created_at",
+          "note",
+          "body"
+        ],
+        "title": "HoldingProfilesConfigVersion"
+      },
       "HoldingsResponse": {
         "properties": {
           "freshness": {
@@ -1354,6 +2761,113 @@
           "holdings"
         ],
         "title": "HoldingsResponse"
+      },
+      "InstrumentInfo": {
+        "properties": {
+          "name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
+          },
+          "isin": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Isin"
+          },
+          "currency": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Currency"
+          },
+          "cik": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cik"
+          },
+          "next_report_date": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Report Date"
+          },
+          "report_date_source": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Report Date Source"
+          },
+          "last_report_date": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Report Date"
+          },
+          "report_date_checked_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Report Date Checked At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "name",
+          "isin",
+          "currency",
+          "cik",
+          "next_report_date",
+          "report_date_source",
+          "last_report_date",
+          "report_date_checked_at"
+        ],
+        "title": "InstrumentInfo"
       },
       "JobSchedule": {
         "properties": {
@@ -1476,6 +2990,20 @@
           "portfolio_sync": {
             "$ref": "#/components/schemas/JobSchedule",
             "description": "Trading212 sync, FX rates and drift. Default: daily at 22:30 Prague time."
+          },
+          "earnings_calendar": {
+            "$ref": "#/components/schemas/JobSchedule",
+            "description": "Refresh every holding's next report date. Default: Sundays 06:00."
+          },
+          "earnings_due": {
+            "$ref": "#/components/schemas/JobSchedule",
+            "description": "Queue earnings checks for holdings that reported. Default: daily 08:00."
+          },
+          "earnings_check": {
+            "$ref": "#/components/schemas/EarningsCheckSettings"
+          },
+          "earnings_calendar_settings": {
+            "$ref": "#/components/schemas/EarningsCalendarSettings"
           }
         },
         "additionalProperties": false,
@@ -1517,6 +3045,39 @@
           "body"
         ],
         "title": "JobsConfigVersion"
+      },
+      "KpiStatus": {
+        "properties": {
+          "kpi": {
+            "$ref": "#/components/schemas/ThesisKPI"
+          },
+          "current": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/VerdictOut"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Latest period's verdict."
+          },
+          "history": {
+            "items": {
+              "$ref": "#/components/schemas/VerdictOut"
+            },
+            "type": "array",
+            "title": "History",
+            "description": "Latest verdict per period, newest first."
+          }
+        },
+        "type": "object",
+        "required": [
+          "kpi",
+          "current",
+          "history"
+        ],
+        "title": "KpiStatus"
       },
       "PortfolioOverview": {
         "properties": {
@@ -2281,6 +3842,7 @@
             "maxLength": 32,
             "minLength": 1,
             "title": "Unit",
+            "description": "What the threshold is in: '%', 'x', 'count', or a currency with an optional scale ('EUR bn', 'USD m', 'USD' for per-share amounts).",
             "examples": [
               "%",
               "EUR bn"
@@ -2323,6 +3885,28 @@
         "title": "ThesisKPI",
         "description": "An absolute threshold the owner sets. v1 has no consensus-estimate comparisons."
       },
+      "ThesisVerdictsRequest": {
+        "properties": {
+          "ticker": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^[A-Za-z0-9._-]{1,32}$",
+                "examples": [
+                  "AAPL_US_EQ"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ticker",
+            "description": "One holding, or all when null."
+          }
+        },
+        "type": "object",
+        "title": "ThesisVerdictsRequest"
+      },
       "ValidationError": {
         "properties": {
           "loc": {
@@ -2362,6 +3946,242 @@
           "type"
         ],
         "title": "ValidationError"
+      },
+      "VerdictOut": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "kpi_id": {
+            "type": "string",
+            "title": "Kpi Id"
+          },
+          "period": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Period"
+          },
+          "fiscal_year": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fiscal Year"
+          },
+          "fiscal_period": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fiscal Period"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "pass",
+              "breach",
+              "unknown"
+            ],
+            "title": "Status"
+          },
+          "observed_value": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Observed Value",
+            "description": "In the KPI's unit (e.g. 9.63 for '%')."
+          },
+          "operator": {
+            "type": "string",
+            "title": "Operator"
+          },
+          "threshold": {
+            "type": "number",
+            "title": "Threshold"
+          },
+          "threshold_unit": {
+            "type": "string",
+            "title": "Threshold Unit"
+          },
+          "rationale": {
+            "type": "string",
+            "title": "Rationale"
+          },
+          "fact_ids": {
+            "items": {
+              "type": "integer"
+            },
+            "type": "array",
+            "title": "Fact Ids"
+          },
+          "config_version_id": {
+            "type": "integer",
+            "title": "Config Version Id"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "confidence": {
+            "type": "string",
+            "enum": [
+              "verified",
+              "corroborated",
+              "unconfirmed",
+              "disputed"
+            ],
+            "title": "Confidence"
+          },
+          "stale": {
+            "type": "boolean",
+            "title": "Stale",
+            "description": "Judged under an older theses config than the active one; re-run verdicts."
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "kpi_id",
+          "period",
+          "fiscal_year",
+          "fiscal_period",
+          "status",
+          "observed_value",
+          "operator",
+          "threshold",
+          "threshold_unit",
+          "rationale",
+          "fact_ids",
+          "config_version_id",
+          "created_at",
+          "confidence",
+          "stale"
+        ],
+        "title": "VerdictOut"
+      },
+      "VerificationConfig": {
+        "properties": {
+          "schema_version": {
+            "type": "integer",
+            "const": 1,
+            "title": "Schema Version",
+            "default": 1
+          },
+          "sanity_max_change_qoq": {
+            "anyOf": [
+              {
+                "type": "number",
+                "exclusiveMinimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sanity Max Change Qoq",
+            "description": "A figure that moves more than this fraction against the previous quarter's verified figure is held for review (0.5 = ±50 %). Null disables.",
+            "default": 0.5
+          },
+          "sanity_overrides": {
+            "patternProperties": {
+              "^[a-z][a-z0-9_]{0,63}$": {
+                "anyOf": [
+                  {
+                    "type": "number"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              }
+            },
+            "type": "object",
+            "title": "Sanity Overrides",
+            "description": "Per-metric band replacing the default; null disables the bound for that metric (e.g. seasonal or often sign-changing figures)."
+          },
+          "stated_ratio_tolerance_pp": {
+            "type": "number",
+            "minimum": 0.0,
+            "title": "Stated Ratio Tolerance Pp",
+            "description": "How far (in percentage points) a ratio the document states may differ from the one recomputed from its raw figures before the stated one is rejected.",
+            "default": 0.15
+          },
+          "period_end_tolerance_days": {
+            "type": "integer",
+            "maximum": 31.0,
+            "minimum": 0.0,
+            "title": "Period End Tolerance Days",
+            "description": "Slack between a stated period end and the calendar month end expected from the fiscal year end (52/53-week fiscal years end on a weekday, not month end).",
+            "default": 10
+          },
+          "max_report_lag_days": {
+            "type": "integer",
+            "maximum": 400.0,
+            "minimum": 30.0,
+            "title": "Max Report Lag Days",
+            "description": "Latest a release may come out after the end of the period it reports.",
+            "default": 150
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "VerificationConfig",
+        "description": "Stored as `config_version` rows, domain `verification`."
+      },
+      "VerificationConfigVersion": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note"
+          },
+          "body": {
+            "$ref": "#/components/schemas/VerificationConfig"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "created_at",
+          "note",
+          "body"
+        ],
+        "title": "VerificationConfigVersion"
       }
     },
     "securitySchemes": {

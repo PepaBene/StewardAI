@@ -1,0 +1,224 @@
+{
+  "id": "aapl-fy2026-q3",
+  "ticker": "AAPL_US_EQ",
+  "company": "Apple Inc.",
+  "cik": "0000320193",
+  "form": "8-K",
+  "source_url": "https://www.sec.gov/Archives/edgar/data/320193/000032019326000018/a8-kex991q3202606272026.htm",
+  "filing_index_url": "https://www.sec.gov/Archives/edgar/data/320193/000032019326000018/0000320193-26-000018-index.html",
+  "content_type": "text/html",
+  "document": "document.html.gz",
+  "report_date": "2026-07-30",
+  "fiscal_year_end_month": 9,
+  "reporting_currency": "USD",
+  "period": {
+    "fiscal_year": 2026,
+    "fiscal_period": "Q3",
+    "period_end": "2026-06-27"
+  },
+  "figures": [
+    {
+      "metric": "revenue",
+      "basis": "reported",
+      "fiscal_year": 2026,
+      "fiscal_period": "Q3",
+      "value_as_written": "109,417",
+      "value": 109417,
+      "scale": "millions",
+      "unit": "currency",
+      "currency": "USD",
+      "snippet": "Total net sales (1) | 109,417 | 94,036 | 364,357 | 313,695",
+      "crosscheck": {
+        "source": "xbrl",
+        "tag": "RevenueFromContractWithCustomerExcludingAssessedTax",
+        "value": 109417000000,
+        "matches": true,
+        "period_end": "2026-06-27"
+      },
+      "unit_snippet": "(In millions, except number of shares, which are reflected in thousands, and per-share amounts)"
+    },
+    {
+      "metric": "revenue",
+      "basis": "reported",
+      "fiscal_year": 2025,
+      "fiscal_period": "Q3",
+      "value_as_written": "94,036",
+      "value": 94036,
+      "scale": "millions",
+      "unit": "currency",
+      "currency": "USD",
+      "snippet": "Total net sales (1) | 109,417 | 94,036 | 364,357 | 313,695",
+      "crosscheck": {
+        "source": "xbrl",
+        "tag": "RevenueFromContractWithCustomerExcludingAssessedTax",
+        "value": 94036000000,
+        "matches": true,
+        "period_end": "2025-06-28"
+      },
+      "unit_snippet": "(In millions, except number of shares, which are reflected in thousands, and per-share amounts)"
+    },
+    {
+      "metric": "gross_profit",
+      "basis": "reported",
+      "fiscal_year": 2026,
+      "fiscal_period": "Q3",
+      "value_as_written": "54,770",
+      "value": 54770,
+      "scale": "millions",
+      "unit": "currency",
+      "currency": "USD",
+      "snippet": "Gross margin | 54,770 | 43,718 | 178,782 | 146,860",
+      "crosscheck": {
+        "source": "xbrl",
+        "tag": "GrossProfit",
+        "value": 54770000000,
+        "matches": true,
+        "period_end": "2026-06-27"
+      },
+      "unit_snippet": "(In millions, except number of shares, which are reflected in thousands, and per-share amounts)"
+    },
+    {
+      "metric": "gross_profit",
+      "basis": "reported",
+      "fiscal_year": 2025,
+      "fiscal_period": "Q3",
+      "value_as_written": "43,718",
+      "value": 43718,
+      "scale": "millions",
+      "unit": "currency",
+      "currency": "USD",
+      "snippet": "Gross margin | 54,770 | 43,718 | 178,782 | 146,860",
+      "crosscheck": {
+        "source": "xbrl",
+        "tag": "GrossProfit",
+        "value": 43718000000,
+        "matches": true,
+        "period_end": "2025-06-28"
+      },
+      "unit_snippet": "(In millions, except number of shares, which are reflected in thousands, and per-share amounts)"
+    },
+    {
+      "metric": "operating_income",
+      "basis": "reported",
+      "fiscal_year": 2026,
+      "fiscal_period": "Q3",
+      "value_as_written": "35,695",
+      "value": 35695,
+      "scale": "millions",
+      "unit": "currency",
+      "currency": "USD",
+      "snippet": "Operating income | 35,695 | 28,202 | 122,432 | 100,623",
+      "crosscheck": {
+        "source": "xbrl",
+        "tag": "OperatingIncomeLoss",
+        "value": 35695000000,
+        "matches": true,
+        "period_end": "2026-06-27"
+      },
+      "unit_snippet": "(In millions, except number of shares, which are reflected in thousands, and per-share amounts)"
+    },
+    {
+      "metric": "operating_income",
+      "basis": "reported",
+      "fiscal_year": 2025,
+      "fiscal_period": "Q3",
+      "value_as_written": "28,202",
+      "value": 28202,
+      "scale": "millions",
+      "unit": "currency",
+      "currency": "USD",
+      "snippet": "Operating income | 35,695 | 28,202 | 122,432 | 100,623",
+      "crosscheck": {
+        "source": "xbrl",
+        "tag": "OperatingIncomeLoss",
+        "value": 28202000000,
+        "matches": true,
+        "period_end": "2025-06-28"
+      },
+      "unit_snippet": "(In millions, except number of shares, which are reflected in thousands, and per-share amounts)"
+    },
+    {
+      "metric": "net_income",
+      "basis": "reported",
+      "fiscal_year": 2026,
+      "fiscal_period": "Q3",
+      "value_as_written": "29,789",
+      "value": 29789,
+      "scale": "millions",
+      "unit": "currency",
+      "currency": "USD",
+      "snippet": "Net income | $29,789 | $23,434 | $101,464 | $84,544",
+      "crosscheck": {
+        "source": "xbrl",
+        "tag": "NetIncomeLoss",
+        "value": 29789000000,
+        "matches": true,
+        "period_end": "2026-06-27"
+      },
+      "unit_snippet": "(In millions, except number of shares, which are reflected in thousands, and per-share amounts)"
+    },
+    {
+      "metric": "net_income",
+      "basis": "reported",
+      "fiscal_year": 2025,
+      "fiscal_period": "Q3",
+      "value_as_written": "23,434",
+      "value": 23434,
+      "scale": "millions",
+      "unit": "currency",
+      "currency": "USD",
+      "snippet": "Net income | $29,789 | $23,434 | $101,464 | $84,544",
+      "crosscheck": {
+        "source": "xbrl",
+        "tag": "NetIncomeLoss",
+        "value": 23434000000,
+        "matches": true,
+        "period_end": "2025-06-28"
+      },
+      "unit_snippet": "(In millions, except number of shares, which are reflected in thousands, and per-share amounts)"
+    },
+    {
+      "metric": "eps_diluted",
+      "basis": "reported",
+      "fiscal_year": 2026,
+      "fiscal_period": "Q3",
+      "value_as_written": "2.02",
+      "value": 2.02,
+      "scale": "units",
+      "unit": "per_share",
+      "currency": "USD",
+      "snippet": "Diluted | $2.02 | $1.57 | $6.88 | $5.62",
+      "crosscheck": {
+        "source": "xbrl",
+        "tag": "EarningsPerShareDiluted",
+        "value": 2.02,
+        "matches": true,
+        "period_end": "2026-06-27"
+      },
+      "unit_snippet": null
+    },
+    {
+      "metric": "eps_diluted",
+      "basis": "reported",
+      "fiscal_year": 2025,
+      "fiscal_period": "Q3",
+      "value_as_written": "1.57",
+      "value": 1.57,
+      "scale": "units",
+      "unit": "per_share",
+      "currency": "USD",
+      "snippet": "Diluted | $2.02 | $1.57 | $6.88 | $5.62",
+      "crosscheck": {
+        "source": "xbrl",
+        "tag": "EarningsPerShareDiluted",
+        "value": 1.57,
+        "matches": true,
+        "period_end": "2025-06-28"
+      },
+      "unit_snippet": null
+    }
+  ],
+  "absent_metrics": [],
+  "labelled_by": "claude (AI-read from the document; owner has not hand-checked)",
+  "notes": "Apple labels gross profit as 'Gross margin' in its condensed consolidated statement of operations; that line is used for gross_profit. XBRL crosscheck of reported figures: 10 match, 0 mismatch, 0 not checkable."
+}

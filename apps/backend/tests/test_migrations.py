@@ -16,6 +16,7 @@ pytestmark = pytest.mark.db
 
 OWNER = uuid.UUID("00000000-0000-0000-0000-00000000000a")
 STRANGER = uuid.UUID("00000000-0000-0000-0000-00000000000b")
+SHA = "a" * 64
 
 
 async def test_all_migrations_apply(migrated_db: MigratedDatabase) -> None:
@@ -233,3 +234,56 @@ async def test_seeded_placeholder_strategy_is_a_valid_config(migrated_db: Migrat
         await conn.close()
     strategy = StrategyConfig.model_validate(json.loads(body))
     assert strategy.base_currency == "CZK" and strategy.target_positions
+
+
+async def test_phase2_tables_follow_the_access_model(migrated_db: MigratedDatabase) -> None:
+    """evidence, fact and verdict: owner-only reads, no anon, and a backend that appends
+    evidence and verdicts, changes only the review state of facts, and deletes nothing."""
+    conn = await asyncpg.connect(migrated_db.admin_url)
+    try:
+        await conn.execute("insert into private.app_owner (user_id) values ($1)", OWNER)
+        await conn.execute(
+            "insert into evidence (sha256, storage_path, source_url, content_type, byte_size)"
+            " values ($1, 'aa/x.html', 'https://x.test', 'text/html', 10)",
+            SHA,
+        )
+        await conn.execute(
+            "insert into fact (ticker, metric, basis, fiscal_year, fiscal_period, period, value,"
+            " value_as_written, scale, unit, currency, source_url, snippet, evidence_sha256,"
+            " evidence_path, status) values ('X_EQ', 'revenue', 'reported', 2025, 'Q3',"
+            " 'FY2025 Q3', 7.52, '7.52', 'billions', 'currency', 'EUR', 'https://x.test',"
+            " 'Revenue 7.52', $1, 'aa/x.html', 'verified')",
+            SHA,
+        )
+        assert await conn.fetchval("select value_units from fact") == 7520000000
+        for table in ("evidence", "fact", "verdict"):
+            await _as_frontend(conn, "authenticated", STRANGER)
+            assert await conn.fetchval(f"select count(*) from {table}") == 0  # noqa: S608
+            await conn.execute("reset role")
+            await _as_frontend(conn, "anon", None)
+            with pytest.raises(asyncpg.InsufficientPrivilegeError):
+                await conn.execute(f"select * from {table}")  # noqa: S608
+            await conn.execute("reset role")
+        await _as_frontend(conn, "authenticated", OWNER)
+        assert await conn.fetchval("select count(*) from fact") == 1
+        with pytest.raises(asyncpg.InsufficientPrivilegeError):
+            await conn.execute("update fact set status = 'rejected'")
+        await conn.execute("reset role")
+    finally:
+        await conn.close()
+
+    backend = await asyncpg.connect(migrated_db.backend_url)
+    try:
+        await backend.execute("update fact set status = 'unverified', status_reason = 'x'")
+        with pytest.raises(asyncpg.RaiseError, match="immutable"):
+            await backend.execute("update fact set snippet = 'changed'")
+        with pytest.raises(asyncpg.InsufficientPrivilegeError):
+            await backend.execute("delete from evidence")
+        with pytest.raises(asyncpg.InsufficientPrivilegeError):
+            await backend.execute("delete from verdict")
+        with pytest.raises(asyncpg.CheckViolationError):
+            await backend.execute(
+                "insert into job (job_type, trigger, params) values ('x', 'manual', '[]')"
+            )
+    finally:
+        await backend.close()
