@@ -40,7 +40,9 @@ side is stale.
    - Authentication → Sign In / Providers: turn **off** "Allow new users to sign up".
    - Authentication → Multi-Factor: enable **TOTP** (enroll and verify).
    - Authentication → Users → Add user: create the owner account.
-5. Register the owner, so RLS lets that user (and only that user) read app data:
+5. Register the owner, so RLS lets that user (and only that user) read app data. The
+   `register_owner` migration does this automatically when the project has exactly one
+   auth user at `db push` time; otherwise run:
    ```sql
    insert into private.app_owner (user_id) values ('<owner auth user id>');
    ```
