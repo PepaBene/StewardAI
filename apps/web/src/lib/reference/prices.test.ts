@@ -102,6 +102,7 @@ describe("plausibility check", () => {
 
   it("ignores incomplete records", () => {
     expect(parsePlausibility(null)).toBeNull();
-    expect(parsePlausibility({ date: "2026-09-24", stooq_close: 1 })).toBeNull();
+    // A record written before the check stored the Trading212 side.
+    expect(parsePlausibility({ date: "2026-09-24", stooq_close: 1 } as never)).toBeNull();
   });
 });

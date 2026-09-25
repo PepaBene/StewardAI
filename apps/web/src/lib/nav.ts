@@ -24,6 +24,9 @@ export function sectionHref(section: Pick<Section, "slug">) {
 /** Pages outside a section's own path that belong to it (highlighted as that section). */
 export const SECTION_ALIASES: Record<string, readonly string[]> = {
   "/holdings": ["/transactions", "/theses", "/review"],
+  "/reports": ["/escalations"],
+  // A job run's page belongs to the job log.
+  "/activity": ["/jobs"],
 };
 
 export function isSectionActive(href: string, pathname: string): boolean {

@@ -291,6 +291,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/jobs/{job_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Job
+         * @description One job run with its steps, to follow an on-demand run to completion.
+         */
+        get: operations["get_job"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/jobs/earnings-check": {
         parameters: {
             query?: never;
@@ -703,6 +723,48 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/stories/disputed": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Disputed Stories
+         * @description Stories whose sources contradict each other: the claim with its sources beside the
+         *     contradicting ones, each with its tier. The holding's verdicts are frozen until the owner
+         *     resolves the story.
+         */
+        get: operations["get_disputed_stories"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/stories/{story_id}/resolve": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Resolve Disputed Story
+         * @description Resolve a disputed story; returns the updated list (resolved ones included).
+         */
+        post: operations["resolve_disputed_story"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/news/event-types": {
         parameters: {
             query?: never;
@@ -796,6 +858,65 @@ export interface paths {
         get: operations["get_report_by_id"];
         put?: never;
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/escalations": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Escalations
+         * @description Impact notes on confirmed severity-2+ stories and large price moves, newest first:
+         *     each cites its sources and names the thesis KPIs or exit conditions it touches, or
+         *     states that none applies.
+         */
+        get: operations["get_escalations"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/escalations/{report_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Escalation */
+        get: operations["get_escalation"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/jobs/macro-collect": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Run Macro Collect
+         * @description Collect macro series now and raise any macro surprise.
+         */
+        post: operations["run_macro_collect"];
         delete?: never;
         options?: never;
         head?: never;
@@ -1196,7 +1317,7 @@ export interface components {
              * Kind
              * @enum {string}
              */
-            kind: "news" | "thesis_breach" | "test";
+            kind: "news" | "thesis_breach" | "test" | "portfolio" | "system";
             /** Severity */
             severity: number;
             /** Ticker */
@@ -1258,6 +1379,26 @@ export interface components {
             value_base: number;
             /** Weight */
             weight: number | null;
+        };
+        /**
+         * AnnouncementRule
+         * @description Maps a regulatory announcement's type (the RNS headline or the EQS category) to an
+         *     event type. First match wins; `classify` leaves the item to the classifier.
+         */
+        AnnouncementRule: {
+            /**
+             * Service
+             * @default any
+             * @enum {string}
+             */
+            service: "rns" | "eqs" | "any";
+            /**
+             * Pattern
+             * @description Case-insensitive regular expression matched against the announcement type (RNS: the headline, e.g. 'Final Results'; EQS: the category, e.g. 'Ad-hoc').
+             */
+            pattern: string;
+            /** Event Type */
+            event_type: ("guidance_change" | "m_and_a" | "dividend_cut" | "earnings_release" | "management_change" | "regulatory_legal" | "capital_allocation" | "credit_rating" | "central_bank" | "macro_surprise" | "insider_transaction" | "product_business" | "sector_competitor" | "index_change" | "analyst_rating" | "delisting" | "entity_status" | "other") | "classify";
         };
         /** BaseTotals */
         BaseTotals: {
@@ -1530,6 +1671,21 @@ export interface components {
             /** Bucket */
             bucket?: string | null;
         };
+        /** ClaimSource */
+        ClaimSource: {
+            /** Url */
+            url: string;
+            /** Outlet */
+            outlet: string | null;
+            /** Tier */
+            tier: number;
+            /** Headline */
+            headline?: string | null;
+            /** Published At */
+            published_at?: string | null;
+            /** News Item Id */
+            news_item_id?: number | null;
+        };
         /** ClosureConfirmation */
         ClosureConfirmation: {
             /** Closures */
@@ -1704,6 +1860,28 @@ export interface components {
              */
             alerts_sent: number;
             /**
+             * Portfolio
+             * @description Out-of-band weights and breaches open in the period.
+             */
+            portfolio?: components["schemas"]["PortfolioFlag"][];
+            /** Thesis Changes */
+            thesis_changes?: components["schemas"]["ThesisChange"][];
+            /**
+             * Reviews Due
+             * @description Theses past their review date.
+             */
+            reviews_due?: components["schemas"]["ReviewDue"][];
+            /**
+             * Macro
+             * @description Latest macro figures, each with its release and URL.
+             */
+            macro?: components["schemas"]["MacroFigure"][];
+            /**
+             * Holidays
+             * @description Public holidays in the period and the next 7 days.
+             */
+            holidays?: components["schemas"]["MarketHoliday"][];
+            /**
              * Dropped Sentences
              * @description Written sentences removed because they cited nothing given.
              * @default 0
@@ -1830,6 +2008,62 @@ export interface components {
             /** Buckets */
             buckets: components["schemas"]["BucketDrift"][];
         };
+        /** DisputedStory */
+        DisputedStory: {
+            /** Id */
+            id: number;
+            /** Ticker */
+            ticker: string | null;
+            /** Event Type */
+            event_type: string | null;
+            /** Severity */
+            severity: number | null;
+            /** Headline */
+            headline: string;
+            /** Status Reason */
+            status_reason: string | null;
+            /**
+             * First Seen
+             * Format: date-time
+             */
+            first_seen: string;
+            /**
+             * Last Seen
+             * Format: date-time
+             */
+            last_seen: string;
+            /**
+             * Claim
+             * @description The story's own sources (the claim).
+             */
+            claim: components["schemas"]["ClaimSource"][];
+            /**
+             * Contradicting
+             * @description Verified sources that dispute it.
+             */
+            contradicting: components["schemas"]["ClaimSource"][];
+            /**
+             * Supporting
+             * @description Verified sources found to support it.
+             */
+            supporting: components["schemas"]["ClaimSource"][];
+            /**
+             * Note
+             * @description What the corroboration search found, in a sentence.
+             */
+            note: string | null;
+            /** Resolution */
+            resolution: ("confirmed" | "false") | null;
+            /** Resolution Note */
+            resolution_note: string | null;
+            /** Resolved At */
+            resolved_at: string | null;
+            /**
+             * Verdicts Frozen
+             * @description The holding's verdicts do not change until this story is resolved.
+             */
+            verdicts_frozen: boolean;
+        };
         /** DomainTier */
         DomainTier: {
             /**
@@ -1949,6 +2183,167 @@ export interface components {
              */
             max_document_mb: number;
         };
+        /** EcbSeries */
+        EcbSeries: {
+            /** Key */
+            key: string;
+            /** Label */
+            label: string;
+            /**
+             * Flow Key
+             * @description Data Portal flow/key, e.g. FM/D.U2.EUR.4F.KR.DFR.LEV.
+             */
+            flow_key: string;
+            /**
+             * Unit
+             * @default %
+             */
+            unit: string;
+            /**
+             * Policy Rate
+             * @default false
+             */
+            policy_rate: boolean;
+        };
+        /** EscalationBody */
+        EscalationBody: {
+            /** Ticker */
+            ticker: string;
+            /**
+             * Trigger
+             * @enum {string}
+             */
+            trigger: "story" | "price_move";
+            /** Cluster Id */
+            cluster_id: number | null;
+            /** Event Type */
+            event_type: string | null;
+            /** Severity */
+            severity: number | null;
+            /** Headline */
+            headline: string;
+            /** Sentences */
+            sentences: components["schemas"]["NoteSentence"][];
+            /**
+             * Kpis
+             * @description [{id, description}] the event bears on.
+             */
+            kpis: {
+                [key: string]: string;
+            }[];
+            /** Exit Conditions */
+            exit_conditions: string[];
+            /** None Applies */
+            none_applies: boolean;
+            /**
+             * Thesis Link
+             * @description The thesis KPIs/exit conditions touched, or 'none'.
+             */
+            thesis_link: string;
+            /** Rationale */
+            rationale: string;
+            /** Sources */
+            sources: components["schemas"]["EscalationSource"][];
+            /**
+             * Dropped Sentences
+             * @default 0
+             */
+            dropped_sentences: number;
+            /** Writer */
+            writer?: string | null;
+            /** Price Move */
+            price_move?: {
+                [key: string]: unknown;
+            } | null;
+        };
+        /** EscalationOut */
+        EscalationOut: {
+            /** Id */
+            id: number;
+            /** Ticker */
+            ticker: string | null;
+            /** Title */
+            title: string;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            body: components["schemas"]["EscalationBody"];
+            /** Body Md */
+            body_md: string;
+        };
+        /**
+         * EscalationSettings
+         * @description Event escalation: an impact note on a confirmed severity-2+ story or a price move.
+         */
+        EscalationSettings: {
+            /**
+             * Enabled
+             * @default true
+             */
+            enabled: boolean;
+            /**
+             * Model
+             * @default claude-sonnet-5
+             * @example claude-sonnet-5
+             */
+            model: string;
+            /**
+             * Max Steps
+             * @description Claude calls plus web searches per escalation.
+             * @default 5
+             */
+            max_steps: number;
+            /**
+             * Max Searches
+             * @default 3
+             */
+            max_searches: number;
+            /**
+             * Min Severity
+             * @default 2
+             */
+            min_severity: number;
+        };
+        /** EscalationSource */
+        EscalationSource: {
+            /** Url */
+            url: string;
+            /** Outlet */
+            outlet?: string | null;
+            /** Tier */
+            tier?: number | null;
+            /** Headline */
+            headline?: string | null;
+            /**
+             * Kind
+             * @default story
+             * @enum {string}
+             */
+            kind: "story" | "search" | "price";
+        };
+        /** EurostatSeries */
+        EurostatSeries: {
+            /** Key */
+            key: string;
+            /** Label */
+            label: string;
+            /** Dataset */
+            dataset: string;
+            /**
+             * Filters
+             * @description Dimension filters, e.g. {'unit': 'RCH_A'}.
+             */
+            filters?: {
+                [key: string]: string;
+            };
+            /**
+             * Unit
+             * @default %
+             */
+            unit: string;
+        };
         /**
          * EventRulesConfig
          * @description Stored as `config_version` rows, domain `event_rules`.
@@ -2000,6 +2395,24 @@ export interface components {
              * @default 3
              */
             thesis_breach_severity: number;
+            /**
+             * Price Move Threshold Pct
+             * @description A daily close-to-close move beyond +-this percentage queues an event escalation for the holding.
+             * @default 8
+             */
+            price_move_threshold_pct: number;
+            /**
+             * Macro Surprise Bands
+             * @description Per macro series key: a new release that moves more than this against the previous one is a macro surprise (in the series' own unit; 0: any change, e.g. a policy rate). Evaluated only on release days.
+             */
+            macro_surprise_bands?: {
+                [key: string]: number;
+            };
+            /**
+             * Announcement Types
+             * @description How RNS and EQS announcement types map to event types.
+             */
+            announcement_types?: components["schemas"]["AnnouncementRule"][];
             /**
              * Earnings Check On
              * @description Confirmed stories of these types queue an earnings thesis check for the holding, unless one ran in the last 10 days.
@@ -2271,6 +2684,31 @@ export interface components {
             /** Detail */
             detail: string;
         };
+        /** FredSeries */
+        FredSeries: {
+            /** Key */
+            key: string;
+            /** Label */
+            label: string;
+            /** Series Id */
+            series_id: string;
+            /**
+             * Units
+             * @default lin
+             * @enum {string}
+             */
+            units: "lin" | "pch" | "pc1" | "chg";
+            /**
+             * Unit
+             * @default %
+             */
+            unit: string;
+            /**
+             * Policy Rate
+             * @default false
+             */
+            policy_rate: boolean;
+        };
         /** Freshness */
         Freshness: {
             /**
@@ -2458,10 +2896,8 @@ export interface components {
             related: components["schemas"]["RelationshipOut"][];
             /** Aliases */
             aliases: components["schemas"]["AliasOut"][];
-            /** Wikidata */
-            wikidata: {
-                [key: string]: unknown;
-            } | null;
+            /** @description Tier 3: community-edited. */
+            wikidata: components["schemas"]["WikidataSummary"] | null;
         };
         /** HoldingProfile */
         HoldingProfile: {
@@ -2646,6 +3082,37 @@ export interface components {
             /** Term */
             term: string;
         };
+        /** JobDetail */
+        JobDetail: {
+            /** Id */
+            id: number;
+            /** Job Type */
+            job_type: string;
+            /** Trigger */
+            trigger: string;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "queued" | "waiting" | "running" | "succeeded" | "failed";
+            /** Error */
+            error: string | null;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Started At */
+            started_at: string | null;
+            /** Finished At */
+            finished_at: string | null;
+            /** Params */
+            params: {
+                [key: string]: unknown;
+            };
+            /** Steps */
+            steps: components["schemas"]["JobStepOut"][];
+        };
         /** JobSchedule */
         JobSchedule: {
             /**
@@ -2665,6 +3132,35 @@ export interface components {
              * @example Europe/Prague
              */
             timezone: string;
+        };
+        /** JobStepOut */
+        JobStepOut: {
+            /** Step Index */
+            step_index: number;
+            /** Name */
+            name: string;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "running" | "succeeded" | "failed";
+            /**
+             * Started At
+             * Format: date-time
+             */
+            started_at: string;
+            /** Finished At */
+            finished_at: string | null;
+            /** Error */
+            error: string | null;
+            /** Detail */
+            detail: {
+                [key: string]: unknown;
+            } | null;
+            /** Model */
+            model: string | null;
+            /** Cost Usd */
+            cost_usd: number | null;
         };
         /** JobSummary */
         JobSummary: {
@@ -2720,6 +3216,10 @@ export interface components {
             price_history?: components["schemas"]["JobSchedule"];
             /** @description Public holidays for this and next year. Default: 2 January and 2 July. */
             holiday_refresh?: components["schemas"]["JobSchedule"];
+            /** @description FRED, ECB and Eurostat macro series; macro surprises on release days. Default: daily 11:30 (after Eurostat's 11:00 releases). */
+            macro_collect?: components["schemas"]["JobSchedule"];
+            /** @description Alert on failed jobs, missed runs and coverage gaps. Default: every 15 minutes. */
+            monitor?: components["schemas"]["JobSchedule"];
             /** @description Ingest, classify, corroborate and alert. Default: every 2 h, 06:00-22:00. */
             news_ingest?: components["schemas"]["JobSchedule"];
             /** @description Daily digest of the last 24 h. Default: weekdays 07:00. */
@@ -2730,6 +3230,9 @@ export interface components {
             earnings_calendar_settings?: components["schemas"]["EarningsCalendarSettings"];
             news?: components["schemas"]["NewsSettings"];
             digest?: components["schemas"]["DigestSettings"];
+            escalation?: components["schemas"]["EscalationSettings"];
+            macro?: components["schemas"]["MacroSettings"];
+            monitoring?: components["schemas"]["MonitorSettings"];
             reference?: components["schemas"]["ReferenceSettings"];
             prices?: components["schemas"]["PriceSettings"];
             calendar?: components["schemas"]["CalendarSettings"];
@@ -2820,6 +3323,60 @@ export interface components {
             /** Home */
             home: boolean;
         };
+        /** MacroFigure */
+        MacroFigure: {
+            /** Series Id */
+            series_id: string;
+            /** Label */
+            label: string;
+            /** Value */
+            value: number;
+            /** Unit */
+            unit: string | null;
+            /**
+             * Period
+             * Format: date
+             */
+            period: string;
+            /** Release Date */
+            release_date: string | null;
+            /** Url */
+            url: string;
+            /**
+             * New
+             * @description Released within the digest's window.
+             */
+            new: boolean;
+        };
+        /**
+         * MacroSettings
+         * @description Macro series collected into `macro_series` (numbers in digests come only from here).
+         */
+        MacroSettings: {
+            /**
+             * Geos
+             * @description Eurostat areas: countries and the euro area (EA21 from 2026).
+             */
+            geos?: string[];
+            /** Eurostat */
+            eurostat?: components["schemas"]["EurostatSeries"][];
+            /** Fred */
+            fred?: components["schemas"]["FredSeries"][];
+            /** Ecb */
+            ecb?: components["schemas"]["EcbSeries"][];
+        };
+        /** MarketHoliday */
+        MarketHoliday: {
+            /** Calendar */
+            calendar: string;
+            /**
+             * Date
+             * Format: date
+             */
+            date: string;
+            /** Name */
+            name: string;
+        };
         /** ModelPrice */
         ModelPrice: {
             /**
@@ -2837,6 +3394,29 @@ export interface components {
              * @description USD per million output tokens.
              */
             output_per_mtok: number;
+        };
+        /**
+         * MonitorSettings
+         * @description Monitoring: failed jobs, missed scheduled runs and per-holding coverage gaps alert.
+         */
+        MonitorSettings: {
+            /**
+             * Alert Failed Jobs
+             * @description Job types whose failed runs alert (once per run).
+             */
+            alert_failed_jobs?: string[];
+            /**
+             * Missed Run Grace Minutes
+             * @description A scheduled run that has not succeeded this long after its slot is missed.
+             * @default 90
+             */
+            missed_run_grace_minutes: number;
+            /**
+             * News Coverage Hours
+             * @description A holding with no successful news run this long raises a coverage alert.
+             * @default 48
+             */
+            news_coverage_hours: number;
         };
         /** NewsFeed */
         NewsFeed: {
@@ -2951,10 +3531,10 @@ export interface components {
             tier: 1 | 2 | 3;
             /**
              * Type
-             * @description rss: an RSS or Atom feed. page: a news page read daily; new links on it become items. edgar: every holding's SEC filings. finnhub: US company news. google_news: a Google News query per holding (unofficial endpoint).
+             * @description rss: an RSS or Atom feed. page: a news page read daily; new links on it become items. edgar: every holding's SEC filings. finnhub: US company news. google_news: a Google News query per holding (unofficial endpoint). rns: UK regulatory announcements per holding (Investegate company page). eqs: German regulatory announcements (EQS News company page from the holding profile's regulatory_news_urls). edgar_fts: SEC full-text search for each holding's watch topics and for other filers naming it.
              * @enum {string}
              */
-            type: "rss" | "page" | "edgar" | "finnhub" | "google_news";
+            type: "rss" | "page" | "edgar" | "finnhub" | "google_news" | "rns" | "eqs" | "edgar_fts";
             /**
              * Url
              * @description Feed or page URL (rss, page).
@@ -2970,6 +3550,12 @@ export interface components {
              * @description Holdings this source is about (e.g. a company's own IR feed): its items link to them without a name match. Empty: items are matched by name.
              */
             tickers?: string[];
+            /**
+             * Macro
+             * @description A macro or central-bank source: its items are kept without matching a holding and appear under Markets and macro.
+             * @default false
+             */
+            macro: boolean;
         };
         /**
          * NewsSourcesConfig
@@ -2994,6 +3580,11 @@ export interface components {
              * @description Items from these outlets are dropped.
              */
             blocked_domains?: string[];
+            /**
+             * Allowed Domains
+             * @description When set, aggregator items (Finnhub, Google News) are kept only from these outlets (and the tiered ones above).
+             */
+            allowed_domains?: string[];
             /**
              * Unknown Outlet Tier
              * @description Tier for an aggregator's item from an outlet not listed above.
@@ -3026,6 +3617,13 @@ export interface components {
             /** Note */
             note: string | null;
             body: components["schemas"]["NewsSourcesConfig"];
+        };
+        /** NoteSentence */
+        NoteSentence: {
+            /** Text */
+            text: string;
+            /** Source Urls */
+            source_urls?: string[];
         };
         /** NotificationRule */
         NotificationRule: {
@@ -3084,6 +3682,22 @@ export interface components {
              */
             repeat_throttle_hours: number;
             /**
+             * Quiet All Day On
+             * @description Days treated as quiet from start to end: alerts are held (or go to the digest) as during quiet hours. Holidays are the public holidays of holiday_country.
+             */
+            quiet_all_day_on?: ("weekends" | "holidays")[];
+            /**
+             * Holiday Country
+             * @default CZ
+             */
+            holiday_country: string;
+            /**
+             * System Alert Severity
+             * @description Severity of monitoring alerts (a failed job, a missed run, a holding with no news coverage); routed by the rules like any event. 0: never alert.
+             * @default 3
+             */
+            system_alert_severity: number;
+            /**
              * Digest Channels
              * @description Where the daily and weekly digests go.
              */
@@ -3101,6 +3715,48 @@ export interface components {
             /** Note */
             note: string | null;
             body: components["schemas"]["NotificationsConfig"];
+        };
+        /** PlausibilityCheck */
+        PlausibilityCheck: {
+            /**
+             * Date
+             * Format: date
+             */
+            date: string;
+            /** Stooq Close */
+            stooq_close: number;
+            /** Trading212 Price */
+            trading212_price: number;
+            /** Difference Pct */
+            difference_pct: number;
+            /**
+             * Flagged
+             * @description Beyond the configured tolerance.
+             */
+            flagged: boolean;
+        };
+        /** PortfolioFlag */
+        PortfolioFlag: {
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "band" | "hard_limit" | "rule";
+            /** Key */
+            key: string;
+            /** Ticker */
+            ticker: string | null;
+            /** Severity */
+            severity: number;
+            /** Detail */
+            detail: string;
+            /**
+             * First Seen
+             * Format: date-time
+             */
+            first_seen: string;
+            /** Cleared At */
+            cleared_at: string | null;
         };
         /** PortfolioOverview */
         PortfolioOverview: {
@@ -3244,6 +3900,11 @@ export interface components {
              * @description Ticker, or the benchmark symbol.
              */
             key: string;
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "holding" | "benchmark";
             /** Symbol */
             symbol: string | null;
             /** Reason */
@@ -3285,13 +3946,8 @@ export interface components {
              * @description Why there is no price history, when there is none.
              */
             gap: string | null;
-            /**
-             * Plausibility
-             * @description Latest Stooq close vs Trading212's price on a sync day.
-             */
-            plausibility: {
-                [key: string]: unknown;
-            } | null;
+            /** @description Latest Stooq close vs Trading212's price on a sync day. */
+            plausibility: components["schemas"]["PlausibilityCheck"] | null;
         };
         /** PricePoint */
         PricePoint: {
@@ -3568,6 +4224,16 @@ export interface components {
             /** Reason */
             reason: string;
         };
+        /** ReviewDue */
+        ReviewDue: {
+            /** Ticker */
+            ticker: string;
+            /**
+             * Review Date
+             * Format: date
+             */
+            review_date: string;
+        };
         /** ReviewItem */
         ReviewItem: {
             /** Ticker */
@@ -3705,6 +4371,16 @@ export interface components {
             corroborating_urls?: string[];
             /** Contradicting Urls */
             contradicting_urls?: string[];
+        };
+        /** StoryResolution */
+        StoryResolution: {
+            /**
+             * Resolution
+             * @enum {string}
+             */
+            resolution: "confirmed" | "false";
+            /** Note */
+            note?: string | null;
         };
         /**
          * StrategyConfig
@@ -3870,6 +4546,26 @@ export interface components {
             as_of: string | null;
             /** Rows */
             rows: components["schemas"]["BoardRow"][];
+        };
+        /** ThesisChange */
+        ThesisChange: {
+            /** Ticker */
+            ticker: string;
+            /** Kpi Id */
+            kpi_id: string;
+            /** Period */
+            period: string | null;
+            /** From Status */
+            from_status: ("pass" | "breach" | "unknown") | null;
+            /**
+             * To Status
+             * @enum {string}
+             */
+            to_status: "pass" | "breach" | "unknown";
+            /** Verdict Id */
+            verdict_id: number;
+            /** Fact Ids */
+            fact_ids: number[];
         };
         /** ThesisConfig */
         ThesisConfig: {
@@ -4140,6 +4836,31 @@ export interface components {
             /** Note */
             note: string | null;
             body: components["schemas"]["VerificationConfig"];
+        };
+        /** WikidataSummary */
+        WikidataSummary: {
+            /** Qid */
+            qid: string;
+            /** Industry */
+            industry?: string[];
+            /** Products */
+            products?: string[];
+            /** Ceo */
+            ceo?: string[];
+            /** Chair */
+            chair?: string[];
+            /** Website */
+            website?: string | null;
+            /**
+             * Part Of
+             * @description Indexes and groups.
+             */
+            part_of?: string[];
+            /**
+             * Fetched At
+             * Format: date-time
+             */
+            fetched_at: string;
         };
     };
     responses: never;
@@ -4550,6 +5271,37 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["JobSummary"];
+                };
+            };
+        };
+    };
+    get_job: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                job_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["JobDetail"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };
@@ -5329,6 +6081,72 @@ export interface operations {
             };
         };
     };
+    get_disputed_stories: {
+        parameters: {
+            query?: {
+                include_resolved?: boolean;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DisputedStory"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    resolve_disputed_story: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                story_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["StoryResolution"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DisputedStory"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     get_event_types: {
         parameters: {
             query?: never;
@@ -5473,6 +6291,89 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_escalations: {
+        parameters: {
+            query?: {
+                ticker?: string | null;
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EscalationOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_escalation: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                report_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EscalationOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    run_macro_collect: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["JobSummary"];
                 };
             };
         };

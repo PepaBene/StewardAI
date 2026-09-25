@@ -116,7 +116,7 @@ export type Plausibility = {
 
 const num = (v: unknown) => (typeof v === "number" && Number.isFinite(v) ? v : null);
 
-/** The API types `plausibility` as a free-form object; read the fields the backend writes. */
+/** The plausibility check (`PlausibilityCheck`), read defensively: a record stored by an older backend may lack fields. */
 export function parsePlausibility(raw: PriceHistory["plausibility"]): Plausibility | null {
   if (!raw || typeof raw !== "object") return null;
   const stooqClose = num(raw.stooq_close);

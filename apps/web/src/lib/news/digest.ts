@@ -1,4 +1,12 @@
-import type { DigestBody, DigestSentence, DigestSource } from "@/lib/api/client";
+import type {
+  DigestBody,
+  DigestSentence,
+  DigestSource,
+  MacroFigure,
+  MarketHoliday,
+  PortfolioFlag,
+  ThesisChange,
+} from "@/lib/api/client";
 
 /*
  * Claim-level citations for a digest: each sentence links to the news items and facts it
@@ -58,4 +66,62 @@ export function citationLinks(
 /** Every sentence of the digest (overview and per-holding summaries). */
 export function allSentences(body: DigestBody): DigestSentence[] {
   return [...(body.overview ?? []), ...(body.sections ?? []).flatMap((s) => s.summary ?? [])];
+}
+
+// ---------------------------------------------------------------------------
+// Portfolio, thesis, review, macro and holiday sections
+// ---------------------------------------------------------------------------
+
+export const PORTFOLIO_FLAG_LABELS: Record<PortfolioFlag["kind"], string> = {
+  band: "Outside its band",
+  hard_limit: "Hard limit breached",
+  rule: "Strategy rule breached",
+};
+
+/** Flags still open first, then by severity (highest first), then by key. */
+export function sortFlags(flags: PortfolioFlag[]): PortfolioFlag[] {
+  return [...flags].sort((a, b) => {
+    const open = Number(a.cleared_at !== null) - Number(b.cleared_at !== null);
+    if (open !== 0) return open;
+    if (a.severity !== b.severity) return b.severity - a.severity;
+    return a.key.localeCompare(b.key);
+  });
+}
+
+export const VERDICT_WORDS: Record<ThesisChange["to_status"], string> = {
+  pass: "pass",
+  breach: "breach",
+  unknown: "unknown",
+};
+
+/** "never judged → breach", "pass → breach". */
+export function thesisChangeText(change: Pick<ThesisChange, "from_status" | "to_status">): string {
+  const from = change.from_status ? VERDICT_WORDS[change.from_status] : "never judged";
+  return `${from} → ${VERDICT_WORDS[change.to_status]}`;
+}
+
+/** A macro figure in its own unit: "2.4 %", "101.3 index", "4.33 %". */
+export function formatMacroValue(value: number, unit: string | null, locale?: string): string {
+  if (!Number.isFinite(value)) return "—";
+  const text = new Intl.NumberFormat(locale, { maximumFractionDigits: 2 }).format(value);
+  return unit ? `${text} ${unit}` : text;
+}
+
+/** Newly released figures first, then by label. */
+export function sortMacro(figures: MacroFigure[]): MacroFigure[] {
+  return [...figures].sort((a, b) => Number(b.new) - Number(a.new) || a.label.localeCompare(b.label));
+}
+
+/** Holidays grouped by date (ascending), each listing the calendars closed that day. */
+export function groupHolidays(holidays: MarketHoliday[]): { date: string; entries: MarketHoliday[] }[] {
+  const byDate = new Map<string, MarketHoliday[]>();
+  for (const h of [...holidays].sort((a, b) => a.date.localeCompare(b.date) || a.calendar.localeCompare(b.calendar))) {
+    byDate.set(h.date, [...(byDate.get(h.date) ?? []), h]);
+  }
+  return [...byDate].map(([date, entries]) => ({ date, entries }));
+}
+
+/** Whether any of the digest's portfolio, thesis, review, macro or holiday lists has entries. */
+export function hasStatusSections(body: DigestBody): boolean {
+  return [body.portfolio, body.thesis_changes, body.reviews_due, body.macro, body.holidays].some((l) => (l ?? []).length > 0);
 }

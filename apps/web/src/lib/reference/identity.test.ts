@@ -120,13 +120,13 @@ describe("sources and links", () => {
     expect(safeHref(null)).toBeNull();
   });
 
-  it("reads the free-form Wikidata summary defensively", () => {
+  it("reads the Wikidata summary defensively (a row written by an older backend may lack fields)", () => {
     expect(parseWikidata(null)).toBeNull();
-    expect(parseWikidata({ industry: ["x"] })).toBeNull();
+    expect(parseWikidata({ industry: ["x"] } as never)).toBeNull();
     expect(
       parseWikidata({
         qid: "Q552581",
-        industry: ["software industry", 3],
+        industry: ["software industry", 3 as unknown as string],
         products: ["SAP ERP"],
         ceo: ["Christian Klein"],
         chair: [],

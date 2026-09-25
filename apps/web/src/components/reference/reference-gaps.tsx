@@ -92,6 +92,7 @@ export function ReferenceGapsPanel() {
             <thead>
               <tr className="border-b border-border text-text-muted">
                 <th scope="col" className="px-3 py-2 text-left font-medium">Holding or benchmark</th>
+                <th scope="col" className="px-3 py-2 text-left font-medium">Kind</th>
                 <th scope="col" className="px-3 py-2 text-left font-medium">Stooq symbol</th>
                 <th scope="col" className="px-3 py-2 text-left font-medium">Reason</th>
               </tr>
@@ -100,7 +101,7 @@ export function ReferenceGapsPanel() {
               {data.prices.map((g) => (
                 <tr key={g.key} className="border-b border-border align-top last:border-0">
                   <th scope="row" className="px-3 py-1.5 text-left font-mono font-normal">
-                    {g.key.startsWith("^") ? (
+                    {g.kind === "benchmark" ? (
                       g.key
                     ) : (
                       <Link href={`/holdings/${encodeURIComponent(g.key)}#prices-heading`} className={LINK}>
@@ -108,6 +109,7 @@ export function ReferenceGapsPanel() {
                       </Link>
                     )}
                   </th>
+                  <td className="px-3 py-1.5">{g.kind === "benchmark" ? "Benchmark" : "Holding"}</td>
                   <td className="px-3 py-1.5 font-mono">{g.symbol ?? "—"}</td>
                   <td className="px-3 py-1.5">{g.reason}</td>
                 </tr>

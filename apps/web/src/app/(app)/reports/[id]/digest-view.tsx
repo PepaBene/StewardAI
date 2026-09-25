@@ -1,22 +1,45 @@
 "use client";
 
-import { CheckCircle2Icon, ExternalLinkIcon, LoaderCircleIcon } from "lucide-react";
+import {
+  CalendarOffIcon,
+  CheckCircle2Icon,
+  ClipboardCheckIcon,
+  ExternalLinkIcon,
+  LandmarkIcon,
+  LoaderCircleIcon,
+  ScaleIcon,
+  TriangleAlertIcon,
+} from "lucide-react";
 import Link from "next/link";
 import { useCallback, useMemo } from "react";
 
 import { AlertMessage } from "@/components/alert-message";
 import { ConfidenceBadge } from "@/components/evidence/confidence-badge";
+import { AsOfLabel } from "@/components/freshness/as-of-label";
 import { VerdictStatusBadge } from "@/components/evidence/verdict-status-badge";
 import { SeverityBadge, TierBadge } from "@/components/news/severity-badge";
 import {
   getBrowserApiClient,
+  type DigestBody,
   type DigestSentence,
   type DigestSource,
   type ReportOut,
 } from "@/lib/api/client";
-import { formatDate, formatTime } from "@/lib/format";
+import { formatDate, formatDateTime, formatTime } from "@/lib/format";
+import { digestFreshnessKind } from "@/lib/freshness";
 import { useApiResource } from "@/lib/hooks/use-api-resource";
-import { citationLinks, sourceAnchor, sourceNumbers } from "@/lib/news/digest";
+import {
+  citationLinks,
+  formatMacroValue,
+  groupHolidays,
+  hasStatusSections,
+  PORTFOLIO_FLAG_LABELS,
+  sortFlags,
+  sortMacro,
+  sourceAnchor,
+  sourceNumbers,
+  thesisChangeText,
+} from "@/lib/news/digest";
 import { eventLabel, TIERS } from "@/lib/news/labels";
 
 export function DigestView({ id }: { id: number }) {
@@ -101,11 +124,13 @@ function Digest({ report }: { report: ReportOut }) {
           / {body.kind} digest
         </p>
         <h1 className="text-2xl font-semibold tracking-tight">{report.title}</h1>
+        <AsOfLabel className="mt-1" at={body.window_end} kind={digestFreshnessKind(body.kind)} prefix="News as of" />
         <p className="num mt-1 text-sm text-text-muted">
           Covers {formatWindow(body.window_start)} to {formatWindow(body.window_end)} · {body.alerts_sent} alert
           {body.alerts_sent === 1 ? "" : "s"} sent
           {body.writer ? ` · summary by ${body.writer}` : ""}
           {body.dropped_sentences ? ` · ${body.dropped_sentences} uncited sentence${body.dropped_sentences === 1 ? "" : "s"} removed` : ""}
+          {" · "}written <time dateTime={report.created_at}>{formatDateTime(report.created_at)}</time>
         </p>
       </div>
 
@@ -196,6 +221,8 @@ function Digest({ report }: { report: ReportOut }) {
               ) : null}
             </section>
           ))}
+
+          {hasStatusSections(body) ? <StatusSections body={body} /> : null}
         </article>
 
         <aside aria-label="Sources" className="space-y-2">
@@ -223,6 +250,163 @@ function Digest({ report }: { report: ReportOut }) {
           </ol>
         </aside>
       </div>
+    </div>
+  );
+}
+
+const SECTION = "space-y-2 rounded-lg border border-border bg-surface-raised p-4";
+const LINK = "text-accent underline-offset-4 hover:underline";
+
+/** Portfolio flags, thesis status changes, reviews due, macro figures and market holidays. */
+function StatusSections({ body }: { body: DigestBody }) {
+  const flags = sortFlags(body.portfolio ?? []);
+  const changes = body.thesis_changes ?? [];
+  const reviews = body.reviews_due ?? [];
+  const macro = sortMacro(body.macro ?? []);
+  const holidays = groupHolidays(body.holidays ?? []);
+  return (
+    <div className="space-y-4">
+      {flags.length > 0 ? (
+        <section aria-labelledby="digest-portfolio" className={SECTION}>
+          <h2 id="digest-portfolio" className="flex items-center gap-1.5 text-lg font-semibold">
+            <TriangleAlertIcon aria-hidden="true" className="size-4 text-warning-signal" />
+            Portfolio flags
+          </h2>
+          <p className="text-xs text-text-muted">Out-of-band weights and hard-limit or rule breaches open during the period.</p>
+          <ul className="space-y-1.5 text-sm">
+            {flags.map((f) => (
+              <li key={`${f.kind}:${f.key}`} className="flex flex-wrap items-center gap-2">
+                <SeverityBadge severity={f.severity} />
+                <span className="font-medium">{PORTFOLIO_FLAG_LABELS[f.kind] ?? f.kind}</span>
+                {f.ticker ? (
+                  <Link href={`/holdings/${encodeURIComponent(f.ticker)}`} className="font-mono text-xs text-accent hover:underline">
+                    {f.ticker}
+                  </Link>
+                ) : null}
+                <span>{f.detail}</span>
+                <span className="num text-xs text-text-muted">
+                  {f.cleared_at ? `cleared ${formatDateTime(f.cleared_at)}` : `open since ${formatDateTime(f.first_seen)}`}
+                </span>
+              </li>
+            ))}
+          </ul>
+          <p className="text-xs">
+            <Link href="/config/strategy" className={LINK}>
+              Bands and rules in Config: Strategy
+            </Link>
+          </p>
+        </section>
+      ) : null}
+
+      {changes.length > 0 ? (
+        <section aria-labelledby="digest-thesis" className={SECTION}>
+          <h2 id="digest-thesis" className="flex items-center gap-1.5 text-lg font-semibold">
+            <ScaleIcon aria-hidden="true" className="size-4 text-text-muted" />
+            Thesis status changes
+          </h2>
+          <ul className="space-y-1.5 text-sm">
+            {changes.map((c) => (
+              <li key={c.verdict_id} className="flex flex-wrap items-center gap-2">
+                <VerdictStatusBadge status={c.to_status} />
+                <Link href={`/holdings/${encodeURIComponent(c.ticker)}`} className="font-mono text-xs text-accent hover:underline">
+                  {c.ticker}
+                </Link>
+                <span>
+                  KPI <span className="font-mono">{c.kpi_id}</span>
+                  {c.period ? ` (${c.period})` : ""}: {thesisChangeText(c)}
+                </span>
+                {c.fact_ids.map((f) => (
+                  <Link key={f} href={`/evidence/${f}`} className="text-xs text-accent hover:underline">
+                    fact {f}
+                  </Link>
+                ))}
+              </li>
+            ))}
+          </ul>
+        </section>
+      ) : null}
+
+      {reviews.length > 0 ? (
+        <section aria-labelledby="digest-reviews" className={SECTION}>
+          <h2 id="digest-reviews" className="flex items-center gap-1.5 text-lg font-semibold">
+            <ClipboardCheckIcon aria-hidden="true" className="size-4 text-text-muted" />
+            Theses due for review
+          </h2>
+          <ul className="space-y-1 text-sm">
+            {reviews.map((r) => (
+              <li key={r.ticker}>
+                <Link href={`/config/theses#${encodeURIComponent(r.ticker)}`} className={LINK}>
+                  {r.ticker}
+                </Link>{" "}
+                <span className="num text-text-muted">review date {formatDate(r.review_date)}</span>
+              </li>
+            ))}
+          </ul>
+        </section>
+      ) : null}
+
+      {macro.length > 0 ? (
+        <section aria-labelledby="digest-macro" className={SECTION}>
+          <h2 id="digest-macro" className="flex items-center gap-1.5 text-lg font-semibold">
+            <LandmarkIcon aria-hidden="true" className="size-4 text-text-muted" />
+            Macro figures
+          </h2>
+          <p className="text-xs text-text-muted">The latest value of each collected series, with its period, release date and source.</p>
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[32rem] text-sm">
+              <thead>
+                <tr className="border-b border-border text-text-muted">
+                  <th scope="col" className="py-1.5 pr-3 text-left font-medium">Series</th>
+                  <th scope="col" className="py-1.5 pr-3 text-right font-medium">Value</th>
+                  <th scope="col" className="py-1.5 pr-3 text-left font-medium">Period</th>
+                  <th scope="col" className="py-1.5 text-left font-medium">Released</th>
+                </tr>
+              </thead>
+              <tbody>
+                {macro.map((m) => (
+                  <tr key={m.series_id} className="border-b border-border last:border-0">
+                    <th scope="row" className="py-1.5 pr-3 text-left font-normal">
+                      <a href={m.url} target="_blank" rel="noreferrer" className="inline-flex items-start gap-1 hover:text-accent hover:underline">
+                        {m.label}
+                        <ExternalLinkIcon aria-hidden="true" className="mt-0.5 size-3 shrink-0 text-text-muted" />
+                      </a>
+                      {m.new ? (
+                        <span className="ml-1.5 rounded-sm border border-info-signal/40 bg-info-signal-subtle px-1 text-xs">new</span>
+                      ) : null}
+                    </th>
+                    <td className="num py-1.5 pr-3 text-right">{formatMacroValue(m.value, m.unit)}</td>
+                    <td className="num py-1.5 pr-3">{formatDate(m.period)}</td>
+                    <td className="num py-1.5">{m.release_date ? formatDate(m.release_date) : "—"}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </section>
+      ) : null}
+
+      {holidays.length > 0 ? (
+        <section aria-labelledby="digest-holidays" className={SECTION}>
+          <h2 id="digest-holidays" className="flex items-center gap-1.5 text-lg font-semibold">
+            <CalendarOffIcon aria-hidden="true" className="size-4 text-text-muted" />
+            Market holidays
+          </h2>
+          <p className="text-xs text-text-muted">Public holidays and confirmed exchange closures in the period and the next 7 days.</p>
+          <ul className="space-y-1 text-sm">
+            {holidays.map((g) => (
+              <li key={g.date} className="flex flex-wrap gap-x-2">
+                <span className="num font-medium">{formatDate(g.date)}</span>
+                <span>{g.entries.map((h) => `${h.name} (${h.calendar})`).join(" · ")}</span>
+              </li>
+            ))}
+          </ul>
+          <p className="text-xs">
+            <Link href="/config/calendar" className={LINK}>
+              Exchange calendar
+            </Link>
+          </p>
+        </section>
+      ) : null}
     </div>
   );
 }

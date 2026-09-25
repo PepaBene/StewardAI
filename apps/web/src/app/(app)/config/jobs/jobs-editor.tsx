@@ -14,16 +14,21 @@ import type { FieldErrors } from "@/lib/api/validation-errors";
 import { describeCron } from "@/lib/config/cron";
 import {
   EFFORTS,
+  FRED_UNITS,
   jobsFromBody,
   jobsToBody,
+  MACRO_SOURCES,
   MODEL_SUGGESTIONS,
   newClosure,
+  newMacroSeries,
   SCHEDULES,
   scheduleLabel,
   SETTINGS,
   SETTINGS_KEYS,
   type ClosureForm,
   type JobsForm,
+  type MacroSeriesForm,
+  type MacroSource,
   type ScheduleForm,
   type ScheduleKey,
   type SettingField,
@@ -124,6 +129,15 @@ export function JobsEditor() {
                   closures={form.closures}
                   errors={editor.errors}
                   onChange={(closures) => setForm((f) => (f ? { ...f, closures } : f))}
+                />
+              ) : null}
+              {section === "macro" ? (
+                <MacroSeriesEditor
+                  series={form.macroSeries}
+                  errors={editor.errors}
+                  onChange={(source, rows) =>
+                    setForm((f) => (f ? { ...f, macroSeries: { ...f.macroSeries, [source]: rows } } : f))
+                  }
                 />
               ) : null}
             </SettingsCard>
@@ -360,5 +374,93 @@ function ClosuresEditor({
         </Button>
       </div>
     </fieldset>
+  );
+}
+
+function MacroSeriesEditor({
+  series,
+  errors,
+  onChange,
+}: {
+  series: Record<MacroSource, MacroSeriesForm[]>;
+  errors: FieldErrors;
+  onChange: (source: MacroSource, rows: MacroSeriesForm[]) => void;
+}) {
+  return (
+    <div className="space-y-4">
+      <p className="text-xs text-text-muted">
+        Each series&rsquo; key names it in digests and in the macro surprise bands of{" "}
+        <Link href="/config/event-rules#triggers-heading" className="text-accent underline-offset-4 hover:underline">
+          Config: Event rules
+        </Link>
+        .
+      </p>
+      {MACRO_SOURCES.map(({ value: source, label, ref, refHint }) => {
+        const rows = series[source];
+        const set = (rowKey: string, change: Partial<MacroSeriesForm>) =>
+          onChange(source, rows.map((r) => (r.rowKey === rowKey ? { ...r, ...change } : r)));
+        const listPath = `macro.${source}`;
+        const own = errors[listPath] ?? [];
+        return (
+          <fieldset key={source} className="space-y-2">
+            <legend className="text-sm font-medium">
+              {label} series <span className="num text-text-muted">({rows.length})</span>
+            </legend>
+            {rows.length === 0 ? <p className="text-sm text-text-muted">No {label} series.</p> : null}
+            {rows.map((r, i) => {
+              const path = `${listPath}.${i}`;
+              const refPath = `${path}.${source === "eurostat" ? "dataset" : source === "fred" ? "series_id" : "flow_key"}`;
+              return (
+                <div key={r.rowKey} role="group" aria-label={`${label} series ${r.key || i + 1}`} className="space-y-2 rounded-md border border-border p-3">
+                  <div className="grid items-start gap-2 sm:grid-cols-2 lg:grid-cols-[1fr_2fr_1.5fr_0.7fr_auto]">
+                    <TextField label="Key" path={`${path}.key`} errors={errors} value={r.key} spellCheck={false} placeholder="hicp" onChange={(v) => set(r.rowKey, { key: v })} />
+                    <TextField label="Label" path={`${path}.label`} errors={errors} value={r.label} maxLength={100} onChange={(v) => set(r.rowKey, { label: v })} />
+                    <TextField label={ref} path={refPath} errors={errors} value={r.ref} spellCheck={false} onChange={(v) => set(r.rowKey, { ref: v })} hint={i === 0 ? refHint : undefined} />
+                    <TextField label="Unit" path={`${path}.unit`} errors={errors} value={r.unit} maxLength={20} onChange={(v) => set(r.rowKey, { unit: v })} />
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="lg:mt-6"
+                      aria-label={`Remove ${label} series ${r.key || i + 1}`}
+                      onClick={() => onChange(source, rows.filter((x) => x.rowKey !== r.rowKey))}
+                    >
+                      <Trash2Icon aria-hidden="true" />
+                    </Button>
+                  </div>
+                  {source === "eurostat" ? (
+                    <TextAreaField
+                      label="Dimension filters"
+                      path={`${path}.filters`}
+                      errors={errors}
+                      value={r.filters}
+                      rows={2}
+                      onChange={(v) => set(r.rowKey, { filters: v })}
+                      hint='One "dimension=value" per line, e.g. "unit=RCH_A". The areas above are added per country.'
+                    />
+                  ) : (
+                    <div className="flex flex-wrap items-end gap-4">
+                      {source === "fred" ? (
+                        <SelectField className="w-60" label="Units" path={`${path}.units`} errors={errors} value={r.units} options={FRED_UNITS} onChange={(v) => set(r.rowKey, { units: v })} />
+                      ) : null}
+                      <CheckboxField
+                        label="Policy rate"
+                        checked={r.policy_rate}
+                        onChange={(v) => set(r.rowKey, { policy_rate: v })}
+                        hint="A rate decision: listed as a central-bank figure."
+                      />
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+            {own.length > 0 ? <p className="text-xs text-text">{own.join(" ")}</p> : null}
+            <Button variant="outline" size="sm" onClick={() => onChange(source, [...rows, newMacroSeries(source)])}>
+              <PlusIcon aria-hidden="true" />
+              Add {label} series
+            </Button>
+          </fieldset>
+        );
+      })}
+    </div>
   );
 }

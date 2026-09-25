@@ -19,6 +19,9 @@ export type SettingsKey =
   | "earnings_calendar_settings"
   | "news"
   | "digest"
+  | "escalation"
+  | "macro"
+  | "monitoring"
   | "reference"
   | "prices"
   | "calendar";
@@ -66,6 +69,16 @@ export const SCHEDULES: Record<ScheduleKey, { label: string; description: string
     description: "Public holidays for this and next year (Nager.Date).",
     cron: "0 4 2 1,7 *",
   },
+  macro_collect: {
+    label: "Macro data",
+    description: "FRED, ECB and Eurostat macro series; macro surprises on release days.",
+    cron: "30 11 * * *",
+  },
+  monitor: {
+    label: "Monitoring",
+    description: "Alert on failed jobs, missed runs and holdings with no news coverage.",
+    cron: "*/15 * * * *",
+  },
   news_ingest: {
     label: "News check",
     description: "Ingest, classify, corroborate and alert.",
@@ -111,6 +124,45 @@ export const DEFAULT_JOBS: JobsConfig = {
     max_items_per_run: 500,
   },
   digest: { model: "claude-sonnet-5", use_batch: true, batch_wait_minutes: 60, min_severity_summarised: 2 },
+  escalation: { enabled: true, model: "claude-sonnet-5", max_steps: 5, max_searches: 3, min_severity: 2 },
+  macro: {
+    geos: ["CZ", "DE", "EA21"],
+    eurostat: [
+      { key: "hicp", label: "HICP inflation, annual rate", dataset: "prc_hicp_minr", filters: { unit: "RCH_A", coicop18: "TOTAL" }, unit: "%" },
+      { key: "unemployment", label: "Unemployment rate", dataset: "une_rt_m", filters: { s_adj: "SA", age: "TOTAL", sex: "T", unit: "PC_ACT" }, unit: "%" },
+      { key: "gdp", label: "GDP, change on previous quarter", dataset: "namq_10_gdp", filters: { unit: "CLV_PCH_PRE", s_adj: "SCA", na_item: "B1GQ" }, unit: "%" },
+      {
+        key: "industrial_production",
+        label: "Industrial production, change on previous month",
+        dataset: "sts_inpr_m",
+        filters: { indic_bt: "PRD", nace_r2: "B-D", s_adj: "SCA", unit: "PCH_PRE" },
+        unit: "%",
+      },
+      { key: "sentiment", label: "Economic sentiment indicator", dataset: "ei_bssi_m_r2", filters: { indic: "BS-ESI-I", s_adj: "SA" }, unit: "index" },
+    ],
+    fred: [
+      { key: "us_cpi", label: "US CPI inflation, annual rate", series_id: "CPIAUCSL", units: "pc1", unit: "%", policy_rate: false },
+      { key: "us_unemployment", label: "US unemployment rate", series_id: "UNRATE", units: "lin", unit: "%", policy_rate: false },
+      { key: "fed_funds", label: "Fed funds effective rate", series_id: "DFF", units: "lin", unit: "%", policy_rate: true },
+    ],
+    ecb: [
+      { key: "ecb_deposit_rate", label: "ECB deposit facility rate", flow_key: "FM/D.U2.EUR.4F.KR.DFR.LEV", unit: "%", policy_rate: true },
+    ],
+  },
+  monitoring: {
+    alert_failed_jobs: [
+      "portfolio_sync",
+      "news_ingest",
+      "earnings_check",
+      "daily_digest",
+      "weekly_digest",
+      "reference_data",
+      "price_history",
+      "macro_collect",
+    ],
+    missed_run_grace_minutes: 90,
+    news_coverage_hours: 48,
+  },
   reference: { openfigi_refresh_days: 30, wikidata_enabled: true, wikidata_refresh_days: 30, max_subsidiary_aliases: 50 },
   prices: { benchmark_symbols: ["^spx"], history_years: 2, plausibility_tolerance_pct: 1 },
   calendar: { holiday_countries: ["CZ", "US", "DE", "GB"], exchange_closures: [] },
@@ -125,9 +177,10 @@ export type SettingField<S extends SettingsKey> = {
   label: string;
   /**
    * `lines`: a string list, one per line. `codes`: a list of upper-case codes, separated by
-   * commas or spaces. `number`: a decimal.
+   * commas or spaces. `words`: a list of identifiers as typed, separated by commas or spaces.
+   * `number`: a decimal.
    */
-  kind: "model" | "int" | "number" | "bool" | "effort" | "int-list" | "severity" | "lines" | "codes";
+  kind: "model" | "int" | "number" | "bool" | "effort" | "int-list" | "severity" | "lines" | "codes" | "words";
   hint?: string;
   min?: number;
   max?: number;
@@ -179,6 +232,33 @@ export const SETTINGS: { [S in SettingsKey]: { title: string; description: strin
       { key: "min_severity_summarised", label: "Summarise stories from severity", kind: "severity", hint: "Lower-severity stories are listed by headline." },
     ],
   },
+  escalation: {
+    title: "Event escalation",
+    description: "An impact note linked to the thesis for each confirmed story at or above the severity below, and for each large price move (threshold in Config: Event rules).",
+    fields: [
+      { key: "enabled", label: "Write impact notes", kind: "bool", hint: "Off: no escalation is queued." },
+      { key: "model", label: "Model", kind: "model" },
+      { key: "max_steps", label: "Step cap per note", kind: "int", min: 1, max: 20, hint: "Claude calls plus web searches." },
+      { key: "max_searches", label: "Web searches per note", kind: "int", min: 0, max: 10, hint: "Restricted to tier-1 and tier-2 outlets." },
+      { key: "min_severity", label: "Escalate stories from severity", kind: "severity" },
+    ],
+  },
+  macro: {
+    title: "Macro",
+    description: "Macro series collected into the macro store: every macro number in a digest comes from here, with its release date and source.",
+    fields: [
+      { key: "geos", label: "Eurostat areas", kind: "codes", hint: "Countries and the euro area, e.g. CZ, DE, EA21 (the euro area from 2026)." },
+    ],
+  },
+  monitoring: {
+    title: "Monitoring",
+    description: "Failed jobs, missed scheduled runs and holdings without news coverage raise a system alert (its severity is set in Config: Notifications).",
+    fields: [
+      { key: "alert_failed_jobs", label: "Alert when these jobs fail", kind: "words", hint: "Job types separated by commas, e.g. portfolio_sync, news_ingest, earnings_check, macro_collect. One alert per failed run." },
+      { key: "missed_run_grace_minutes", label: "A scheduled run is missed after (minutes)", kind: "int", min: 5, max: 1440 },
+      { key: "news_coverage_hours", label: "Coverage alert after no news run for (hours)", kind: "int", min: 6, max: 336 },
+    ],
+  },
   reference: {
     title: "Reference data",
     description: "Identity and group structure: OpenFIGI, ESMA FIRDS/FITRS, GLEIF and Wikidata.",
@@ -208,6 +288,39 @@ export const SETTINGS: { [S in SettingsKey]: { title: string; description: strin
 };
 export const SETTINGS_KEYS = Object.keys(SETTINGS) as SettingsKey[];
 
+/** The macro series lists (`macro.eurostat`, `macro.fred`, `macro.ecb`), edited as rows. */
+export type MacroSource = "eurostat" | "fred" | "ecb";
+export const MACRO_SOURCES: readonly { value: MacroSource; label: string; ref: string; refHint: string }[] = [
+  { value: "eurostat", label: "Eurostat", ref: "Dataset", refHint: "Dataset code, e.g. prc_hicp_minr." },
+  { value: "fred", label: "FRED (US)", ref: "Series id", refHint: "FRED series id, e.g. CPIAUCSL." },
+  { value: "ecb", label: "ECB Data Portal", ref: "Flow/key", refHint: "Flow and key, e.g. FM/D.U2.EUR.4F.KR.DFR.LEV." },
+];
+export type FredUnits = "lin" | "pch" | "pc1" | "chg";
+export const FRED_UNITS: readonly { value: FredUnits; label: string }[] = [
+  { value: "lin", label: "Level" },
+  { value: "chg", label: "Change" },
+  { value: "pch", label: "% change" },
+  { value: "pc1", label: "% change from a year ago" },
+];
+export type MacroSeriesForm = {
+  rowKey: string;
+  source: MacroSource;
+  /** The series key used in digests and surprise bands (e.g. "hicp"). */
+  key: string;
+  label: string;
+  /** Eurostat dataset, FRED series id or ECB flow/key. */
+  ref: string;
+  /** Eurostat only: "dimension=value" per line. */
+  filters: string;
+  /** FRED only. */
+  units: FredUnits;
+  unit: string;
+  /** FRED and ECB: a policy rate (any change is a surprise). */
+  policy_rate: boolean;
+  rest: Record<string, unknown>;
+};
+const MACRO_REF: Record<MacroSource, string> = { eurostat: "dataset", fred: "series_id", ecb: "flow_key" };
+
 export type ScheduleForm = { name: string; enabled: boolean; cron: string; timezone: string; rest: Record<string, unknown> };
 export type SettingsForm = { values: Record<string, string | boolean>; rest: Record<string, unknown> };
 /** One confirmed exchange closure (`calendar.exchange_closures`), edited as a row. */
@@ -216,6 +329,7 @@ export type JobsForm = {
   schedules: ScheduleForm[];
   settings: Record<SettingsKey, SettingsForm>;
   closures: ClosureForm[];
+  macroSeries: Record<MacroSource, MacroSeriesForm[]>;
   /** Top-level properties this form does not know (kept as loaded). */
   rest: Record<string, unknown>;
 };
@@ -224,6 +338,75 @@ let closureCounter = 0;
 
 export function newClosure(): ClosureForm {
   return { key: `c${++closureCounter}`, mic: "", date: "", name: "", rest: {} };
+}
+
+export function newMacroSeries(source: MacroSource): MacroSeriesForm {
+  return {
+    rowKey: `m${++closureCounter}`,
+    source,
+    key: "",
+    label: "",
+    ref: "",
+    filters: "",
+    units: "lin",
+    unit: "%",
+    policy_rate: false,
+    rest: {},
+  };
+}
+
+/** Eurostat dimension filters: "unit=RCH_A" per line <-> {unit: "RCH_A"}. */
+export function parseFilters(text: string): Record<string, string> {
+  return Object.fromEntries(
+    text
+      .split("\n")
+      .map((line) => line.trim())
+      .filter(Boolean)
+      .map((line) => {
+        const at = line.indexOf("=");
+        return at < 0 ? [line, ""] : [line.slice(0, at).trim(), line.slice(at + 1).trim()];
+      }),
+  );
+}
+
+export function formatFilters(filters: Record<string, string>): string {
+  return Object.entries(filters)
+    .map(([k, v]) => `${k}=${v}`)
+    .join("\n");
+}
+
+function macroSeriesFromBody(source: MacroSource, raw: unknown): MacroSeriesForm[] {
+  return (Array.isArray(raw) ? raw : []).map((row: Record<string, unknown>) => {
+    const { key, label, filters, units, unit, policy_rate, ...extra } = row;
+    const refField = MACRO_REF[source];
+    const ref = extra[refField];
+    delete extra[refField];
+    return {
+      ...newMacroSeries(source),
+      key: String(key ?? ""),
+      label: String(label ?? ""),
+      ref: String(ref ?? ""),
+      filters: filters && typeof filters === "object" ? formatFilters(filters as Record<string, string>) : "",
+      units: (units as FredUnits | undefined) ?? "lin",
+      unit: unit == null ? "%" : String(unit),
+      policy_rate: Boolean(policy_rate),
+      rest: extra,
+    };
+  });
+}
+
+function macroSeriesToBody(row: MacroSeriesForm): Record<string, unknown> {
+  const out: Record<string, unknown> = {
+    ...row.rest,
+    key: row.key.trim(),
+    label: row.label.trim(),
+    [MACRO_REF[row.source]]: row.ref.trim(),
+    unit: row.unit.trim(),
+  };
+  if (row.source === "eurostat") out.filters = parseFilters(row.filters);
+  if (row.source === "fred") out.units = row.units;
+  if (row.source !== "eurostat") out.policy_rate = row.policy_rate;
+  return out;
 }
 
 function isSchedule(value: unknown): value is JobSchedule {
@@ -277,9 +460,17 @@ export function jobsFromBody(body: JobsConfig | null): JobsForm {
     const { mic, date, name, ...extra } = c;
     return { ...newClosure(), mic: String(mic ?? ""), date: String(date ?? ""), name: String(name ?? ""), rest: extra };
   });
+  // Macro series are edited as rows per source.
+  const macroSeries = Object.fromEntries(
+    MACRO_SOURCES.map(({ value }) => {
+      const rows = macroSeriesFromBody(value, settings.macro.rest[value]);
+      delete settings.macro.rest[value];
+      return [value, rows];
+    }),
+  ) as Record<MacroSource, MacroSeriesForm[]>;
   const known = new Set<string>(["schema_version", ...names, ...SETTINGS_KEYS]);
   const rest = Object.fromEntries(Object.entries(b).filter(([k]) => !known.has(k)));
-  return { schedules, settings, closures, rest };
+  return { schedules, settings, closures, macroSeries, rest };
 }
 
 function list(text: string, separator: RegExp): string[] {
@@ -304,6 +495,7 @@ export function jobsToBody(form: JobsForm): JobsConfig {
       else if (field.kind === "number") out[field.key] = numberOrText(String(v).replace(",", "."));
       else if (field.kind === "lines") out[field.key] = list(String(v), /\n/);
       else if (field.kind === "codes") out[field.key] = list(String(v), /[\s,;]+/).map((c) => c.toUpperCase());
+      else if (field.kind === "words") out[field.key] = list(String(v), /[\s,;]+/);
       else if (field.kind === "int-list")
         out[field.key] = String(v)
           .split(/[\s,;]+/)
@@ -318,6 +510,9 @@ export function jobsToBody(form: JobsForm): JobsConfig {
         date: c.date.trim(),
         name: c.name.trim(),
       }));
+    }
+    if (key === "macro") {
+      for (const { value } of MACRO_SOURCES) out[value] = form.macroSeries[value].map(macroSeriesToBody);
     }
     body[key] = out;
   }

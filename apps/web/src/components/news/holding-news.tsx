@@ -6,15 +6,22 @@ import { useEffect, useState } from "react";
 
 import { ConfidenceBadge } from "@/components/evidence/confidence-badge";
 import { SeverityBadge, TierBadge } from "@/components/news/severity-badge";
-import { getBrowserApiClient, type NewsItemOut } from "@/lib/api/client";
+import { FreshnessText } from "@/components/freshness/as-of-label";
+import { getBrowserApiClient, type JobSummary, type NewsItemOut } from "@/lib/api/client";
 import { byLead, groupByStory } from "@/lib/news/feed-filters";
+import { escalationsForTicker } from "@/lib/news/escalation";
 import { eventLabel } from "@/lib/news/labels";
 import { formatDate } from "@/lib/format";
+import { ingestFreshness, ingestPrefix } from "@/lib/freshness";
+import { useNow } from "@/lib/hooks/use-now";
 
 /** The holding page's latest linked news, one row per story. */
 export function HoldingNews({ ticker }: { ticker: string }) {
   const [items, setItems] = useState<NewsItemOut[] | null>(null);
   const [failed, setFailed] = useState(false);
+  const [lastIngest, setLastIngest] = useState<JobSummary | null>(null);
+  const now = useNow();
+  const freshness = ingestFreshness(lastIngest, now);
 
   useEffect(() => {
     let cancelled = false;
@@ -22,8 +29,10 @@ export function HoldingNews({ ticker }: { ticker: string }) {
       .GET("/news", { params: { query: { ticker, limit: 30 } } })
       .then(({ data }) => {
         if (cancelled) return;
-        if (data) setItems(data.items);
-        else setFailed(true);
+        if (data) {
+          setItems(data.items);
+          setLastIngest(data.last_ingest);
+        } else setFailed(true);
       })
       .catch(() => !cancelled && setFailed(true));
     return () => {
@@ -38,10 +47,22 @@ export function HoldingNews({ ticker }: { ticker: string }) {
         <h2 id="news-heading" className="text-lg font-semibold">
           News
         </h2>
-        <Link href={`/news?ticker=${encodeURIComponent(ticker)}`} className="text-sm text-accent hover:underline">
-          All news for {ticker}
-        </Link>
+        <span className="flex flex-wrap gap-3">
+          <Link href={escalationsForTicker(ticker)} className="text-sm text-accent hover:underline">
+            Impact notes
+          </Link>
+          <Link href={`/news?ticker=${encodeURIComponent(ticker)}`} className="text-sm text-accent hover:underline">
+            All news for {ticker}
+          </Link>
+        </span>
       </div>
+      {freshness && lastIngest ? (
+        <FreshnessText
+          value={freshness}
+          prefix={ingestPrefix(lastIngest.status)}
+          className="text-xs"
+        />
+      ) : null}
       {failed ? <p className="text-sm text-text-muted">News could not be loaded.</p> : null}
       {items !== null && stories.length === 0 ? (
         <p className="text-sm text-text-muted">No news linked to this holding in the feed window.</p>

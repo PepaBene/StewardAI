@@ -1,15 +1,18 @@
 "use client";
 
 import { ArrowRightIcon, CommandIcon, LoaderCircleIcon, PlayIcon, SearchIcon } from "lucide-react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
 
 import { Button } from "@/components/ui/button";
 import { getBrowserApiClient, type Holding } from "@/lib/api/client";
+import { jobHref } from "@/lib/jobs/job-detail";
 import {
   baseCommands,
   filterCommands,
   holdingCommands,
+  jobCommands,
   type PaletteAction,
   type PaletteCommand,
 } from "@/lib/palette";
@@ -37,13 +40,15 @@ function queue(action: PaletteAction) {
       return api.POST("/jobs/price-history");
     case "holiday-refresh":
       return api.POST("/jobs/holiday-refresh");
+    case "macro-collect":
+      return api.POST("/jobs/macro-collect");
   }
 }
 
-async function runAction(action: PaletteAction): Promise<string> {
+async function runAction(action: PaletteAction): Promise<{ text: string; jobId: number | null }> {
   const result = await queue(action);
-  if (!result.data) return `Could not queue it: the API answered HTTP ${result.response.status}.`;
-  return `Queued as job #${result.data.id}.`;
+  if (!result.data) return { text: `Could not queue it: the API answered HTTP ${result.response.status}.`, jobId: null };
+  return { text: `Queued as job #${result.data.id}.`, jobId: result.data.id };
 }
 
 /**
@@ -58,10 +63,10 @@ export function CommandPalette() {
   const [query, setQuery] = useState("");
   const [active, setActive] = useState(0);
   const [holdings, setHoldings] = useState<Holding[]>([]);
-  const [status, setStatus] = useState<{ busy: boolean; text: string } | null>(null);
+  const [status, setStatus] = useState<{ busy: boolean; text: string; jobId?: number | null } | null>(null);
 
   const commands = useMemo(() => [...baseCommands(), ...holdingCommands(holdings)], [holdings]);
-  const results = useMemo(() => filterCommands(commands, query), [commands, query]);
+  const results = useMemo(() => [...jobCommands(query), ...filterCommands(commands, query)], [commands, query]);
   const selected = Math.min(active, Math.max(0, results.length - 1));
 
   const open = useCallback(() => {
@@ -98,7 +103,8 @@ export function CommandPalette() {
     if (command.action) {
       setStatus({ busy: true, text: `${command.label}…` });
       try {
-        setStatus({ busy: false, text: `${command.label}: ${await runAction(command.action)}` });
+        const outcome = await runAction(command.action);
+        setStatus({ busy: false, text: `${command.label}: ${outcome.text}`, jobId: outcome.jobId });
       } catch (err) {
         setStatus({ busy: false, text: err instanceof Error ? err.message : String(err) });
       }
@@ -180,6 +186,15 @@ export function CommandPalette() {
             <span className="flex items-center gap-1.5 text-text">
               {status.busy ? <LoaderCircleIcon aria-hidden="true" className="size-3.5 animate-spin" /> : null}
               {status.text}
+              {status.jobId ? (
+                <Link
+                  href={jobHref(status.jobId)}
+                  onClick={() => dialog.current?.close()}
+                  className="text-accent hover:underline"
+                >
+                  Follow it
+                </Link>
+              ) : null}
             </span>
           ) : (
             <span>↑↓ to move · Enter to open or run · Esc to close</span>

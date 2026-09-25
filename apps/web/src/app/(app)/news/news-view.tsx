@@ -1,12 +1,13 @@
 "use client";
 
-import { ExternalLinkIcon, LoaderCircleIcon, PlayIcon, RefreshCwIcon, XIcon } from "lucide-react";
+import { ExternalLinkIcon, LoaderCircleIcon, PlayIcon, RefreshCwIcon, ScaleIcon, XIcon } from "lucide-react";
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
 import { AlertMessage } from "@/components/alert-message";
 import { EmptyState } from "@/components/empty-state";
+import { FreshnessText } from "@/components/freshness/as-of-label";
 import { ConfidenceBadge } from "@/components/evidence/confidence-badge";
 import { SeverityBadge, TierBadge } from "@/components/news/severity-badge";
 import { Button } from "@/components/ui/button";
@@ -30,6 +31,9 @@ import {
 } from "@/lib/news/feed-filters";
 import { CONFIDENCES, eventLabel, SEVERITY, STATUS_LABELS, TIERS } from "@/lib/news/labels";
 import { formatRelative } from "@/lib/format";
+import { ingestFreshness, ingestPrefix } from "@/lib/freshness";
+import { jobHref } from "@/lib/jobs/job-detail";
+import { disputedStoryHref } from "@/lib/news/disputed";
 import { useNow } from "@/lib/hooks/use-now";
 import { cn } from "@/lib/utils";
 
@@ -67,7 +71,7 @@ export function NewsView() {
   const filters = useMemo(() => parseFilters(new URLSearchParams(params.toString())), [params]);
   const [load, setLoad] = useState<Load>({ kind: "loading" });
   const [holdings, setHoldings] = useState<Holding[]>([]);
-  const [queued, setQueued] = useState<string | null>(null);
+  const [queued, setQueued] = useState<{ text: string; jobId: number | null } | null>(null);
   const [reloadKey, setReloadKey] = useState(0);
 
   const setFilters = useCallback(
@@ -107,7 +111,11 @@ export function NewsView() {
   async function runNow() {
     setQueued(null);
     const { data, response } = await getBrowserApiClient().POST("/jobs/news-ingest");
-    setQueued(data ? `News check queued (job #${data.id}). Reload in a minute to see new items.` : `Could not queue: HTTP ${response.status}.`);
+    setQueued(
+      data
+        ? { text: `News check queued (job #${data.id}). Reload in a minute to see new items.`, jobId: data.id }
+        : { text: `Could not queue: HTTP ${response.status}.`, jobId: null },
+    );
   }
 
   const groups = load.kind === "ok" ? groupByStory(load.items) : [];
@@ -124,7 +132,13 @@ export function NewsView() {
         </div>
         <div className="flex flex-col items-end gap-2">
           {load.kind === "ok" ? <IngestFreshness job={load.lastIngest} /> : null}
-          <div className="flex gap-2">
+          <div className="flex flex-wrap justify-end gap-2">
+            <Button asChild variant="ghost" size="sm">
+              <Link href="/news/disputed">
+                <ScaleIcon aria-hidden="true" />
+                Disputed stories
+              </Link>
+            </Button>
             <Button variant="ghost" size="sm" onClick={() => setReloadKey((k) => k + 1)}>
               <RefreshCwIcon aria-hidden="true" />
               Reload
@@ -136,7 +150,16 @@ export function NewsView() {
           </div>
         </div>
       </div>
-      {queued ? <AlertMessage tone="info" title="Queued">{queued}</AlertMessage> : null}
+      {queued ? (
+        <AlertMessage tone="info" title="Queued">
+          {queued.text}{" "}
+          {queued.jobId !== null ? (
+            <Link href={jobHref(queued.jobId)} className="text-accent hover:underline">
+              Follow the job
+            </Link>
+          ) : null}
+        </AlertMessage>
+      ) : null}
 
       <Filters filters={filters} holdings={holdings} onChange={setFilters} />
 
@@ -173,15 +196,15 @@ export function NewsView() {
 
 function IngestFreshness({ job }: { job: JobSummary | null }) {
   const now = useNow();
-  if (!job) return <p className="text-sm text-text-muted">No news check has run yet.</p>;
-  const at = new Date(job.finished_at ?? job.started_at ?? job.created_at);
+  const value = ingestFreshness(job, now);
+  if (!job || !value) return <p className="text-sm text-text-muted">No news check has run yet.</p>;
   return (
-    <p className="text-sm text-text-muted">
-      Last news check {job.status === "succeeded" ? "" : `(${job.status}) `}
-      <time dateTime={at.toISOString()} className="num">
-        {formatRelative(at, now)}
-      </time>
-    </p>
+    <div className="flex flex-col items-end gap-0.5">
+      <FreshnessText value={value} prefix={ingestPrefix(job.status)} />
+      <Link href={jobHref(job.id)} className="text-xs text-accent hover:underline">
+        Last check: job #{job.id}
+      </Link>
+    </div>
   );
 }
 
@@ -340,6 +363,11 @@ function StoryRow({ items: group, onStory }: { items: NewsItemOut[]; onStory: (i
           {STATUS_LABELS[story.status] ?? story.status}
           {story.status_reason ? `: ${story.status_reason}` : ""}
         </span>
+        {story.status === "disputed" ? (
+          <Link href={disputedStoryHref(story.id)} className="text-accent hover:underline">
+            Compare the versions
+          </Link>
+        ) : null}
         {story.source_count > items.length || copies.length > 0 ? (
           <button type="button" onClick={() => onStory(story.id)} className="text-accent hover:underline">
             {story.source_count} {story.source_count === 1 ? "outlet" : "outlets"}

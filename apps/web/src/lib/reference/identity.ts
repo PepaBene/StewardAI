@@ -134,7 +134,7 @@ function strings(value: unknown): string[] {
   return Array.isArray(value) ? value.filter((v): v is string => typeof v === "string" && v.trim() !== "") : [];
 }
 
-/** The API types `wikidata` as a free-form object; read only the fields we show. */
+/** The Wikidata summary (`WikidataSummary`), read defensively: a row stored by an older backend may lack fields. */
 export function parseWikidata(raw: HoldingIdentity["wikidata"]): WikidataSummary | null {
   if (!raw || typeof raw !== "object" || typeof raw.qid !== "string" || !raw.qid) return null;
   return {

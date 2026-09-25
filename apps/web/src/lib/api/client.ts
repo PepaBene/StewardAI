@@ -96,6 +96,23 @@ export type ReferenceGaps = Schemas["ReferenceGaps"];
 export type ExchangeCalendar = Schemas["ExchangeCalendar"];
 export type ExchangeClosure = Schemas["ExchangeClosure"];
 export type ClosureSuggestion = Schemas["ClosureSuggestion"];
+export type PriceGap = Schemas["PriceGap"];
+export type JobDetail = Schemas["JobDetail"];
+export type JobStepOut = Schemas["JobStepOut"];
+export type JobStatus = JobSummary["status"];
+export type DisputedStory = Schemas["DisputedStory"];
+export type ClaimSource = Schemas["ClaimSource"];
+export type StoryResolution = Schemas["StoryResolution"];
+export type EscalationOut = Schemas["EscalationOut"];
+export type EscalationBody = Schemas["EscalationBody"];
+export type EscalationSource = Schemas["EscalationSource"];
+export type NoteSentence = Schemas["NoteSentence"];
+export type PortfolioFlag = Schemas["PortfolioFlag"];
+export type ThesisChange = Schemas["ThesisChange"];
+export type ReviewDue = Schemas["ReviewDue"];
+export type MacroFigure = Schemas["MacroFigure"];
+export type MarketHoliday = Schemas["MarketHoliday"];
+export type AnnouncementRule = Schemas["AnnouncementRule"];
 
 export type AccessTokenGetter = () => Promise<string | null | undefined>;
 

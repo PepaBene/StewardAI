@@ -21,6 +21,7 @@ import {
   newRule,
   notificationsFromBody,
   notificationsToBody,
+  QUIET_DAYS,
   QUIET_MODES,
   type NotificationsForm,
   type RuleForm,
@@ -33,6 +34,10 @@ const api = () => getBrowserApiClient();
 const EVENT_OPTIONS = EVENT_TYPES.map((t) => ({ value: t, label: EVENT_LABELS[t] }));
 const SEVERITY_OPTIONS = ([3, 2, 1] as const).map((s) => ({ value: s, label: `${s} · ${SEVERITY[s].label}` }));
 const CHANNEL_OPTIONS = CHANNELS.map((c) => ({ value: c, label: CHANNEL_LABELS[c] }));
+const SYSTEM_LEVELS = ([3, 2, 1, 0] as const).map((s) => ({
+  value: s,
+  label: s === 0 ? "0 · Never alert" : `${s} · ${SEVERITY[s].label}`,
+}));
 
 export function NotificationsEditor() {
   const [form, setForm] = useState<NotificationsForm | null>(null);
@@ -127,6 +132,27 @@ export function NotificationsEditor() {
               <TextField label="Time zone" path="quiet_hours.timezone" errors={editor.errors} value={form.quiet_timezone} onChange={(v) => set({ quiet_timezone: v })} />
             </div>
             <div className="grid gap-3 sm:grid-cols-2">
+              <CheckboxGroup
+                label="Quiet all day on"
+                path="quiet_all_day_on"
+                errors={editor.errors}
+                values={form.quiet_all_day_on}
+                options={QUIET_DAYS}
+                onChange={(v) => set({ quiet_all_day_on: v })}
+                hint="These days are quiet from start to end: alerts are held (or go to the digest) as during quiet hours."
+              />
+              <TextField
+                label="Public holidays of (country)"
+                path="holiday_country"
+                errors={editor.errors}
+                value={form.holiday_country}
+                maxLength={2}
+                spellCheck={false}
+                onChange={(v) => set({ holiday_country: v.toUpperCase() })}
+                hint="Two-letter code, e.g. CZ. Used when public holidays are quiet; the holidays come from the Nager.Date calendar."
+              />
+            </div>
+            <div className="grid gap-3 sm:grid-cols-2">
               <TextField
                 label="Daily alert cap"
                 inputMode="numeric"
@@ -157,6 +183,16 @@ export function NotificationsEditor() {
                 onChange={(v) => set({ muted_event_types: v as EventType[] })}
               />
             </div>
+            <SelectField
+              className="max-w-sm"
+              label="Monitoring alert severity"
+              path="system_alert_severity"
+              errors={editor.errors}
+              value={form.system_alert_severity}
+              options={SYSTEM_LEVELS}
+              onChange={(v) => set({ system_alert_severity: v })}
+              hint="Severity of system alerts (a failed job, a missed run, a holding with no news coverage). They are routed by the rules above like any event."
+            />
             <CheckboxGroup
               label="Digest channels"
               path="digest_channels"

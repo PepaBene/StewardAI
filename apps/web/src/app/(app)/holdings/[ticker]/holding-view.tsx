@@ -47,6 +47,7 @@ import {
 import { allowedReviewActions, isHeld, REVIEW_ACTIONS, reviewQueueHref } from "@/lib/evidence/review";
 import { formatDate, formatMoney, formatPercent, formatRelative, gainLossTone } from "@/lib/format";
 import { useApiResource } from "@/lib/hooks/use-api-resource";
+import { jobHref } from "@/lib/jobs/job-detail";
 
 const POLL_MS = 3000;
 const POLL_LIMIT_MS = 10 * 60 * 1000;
@@ -267,6 +268,10 @@ function JobLine({ label, job }: { label: string; job: JobSummary | null | undef
       {label}: <span className="font-medium text-text">{job.status}</span>
       {" · "}
       <time dateTime={at}>{formatRelative(new Date(at))}</time>
+      {" · "}
+      <Link href={jobHref(job.id)} className="text-accent hover:underline">
+        job #{job.id}
+      </Link>
       {job.status === "failed" && job.error ? <span className="block text-text">{job.error}</span> : null}
     </p>
   );

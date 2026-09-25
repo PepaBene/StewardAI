@@ -16,7 +16,8 @@ export type PaletteAction =
   | { kind: "thesis-verdicts" }
   | { kind: "reference-data"; ticker?: string }
   | { kind: "price-history" }
-  | { kind: "holiday-refresh" };
+  | { kind: "holiday-refresh" }
+  | { kind: "macro-collect" };
 
 export type PaletteCommand = {
   id: string;
@@ -29,13 +30,13 @@ export type PaletteCommand = {
 
 export const CONFIG_PAGES = [
   { href: "/config/strategy", label: "Strategy", keywords: "targets allocation bands rules categories classifications currency drift" },
-  { href: "/config/jobs", label: "Jobs", keywords: "schedules cron timezone models step caps worker benchmarks prices reference wikidata holidays" },
+  { href: "/config/jobs", label: "Jobs", keywords: "schedules cron timezone models step caps worker benchmarks prices reference wikidata holidays escalation macro eurostat fred ecb monitoring" },
   { href: "/config/theses", label: "Theses", keywords: "kpi thresholds exit" },
   { href: "/config/holding-profiles", label: "Holding profiles", keywords: "ir aliases competitors fiscal stooq price symbol" },
   { href: "/config/calendar", label: "Exchange calendar", keywords: "holidays closures exchanges mic market closed nager public holiday" },
-  { href: "/config/news-sources", label: "News sources", keywords: "feeds rss tiers outlets" },
-  { href: "/config/event-rules", label: "Event rules", keywords: "severity taxonomy" },
-  { href: "/config/notifications", label: "Notifications", keywords: "alerts telegram email quiet hours channels" },
+  { href: "/config/news-sources", label: "News sources", keywords: "feeds rss tiers outlets rns eqs edgar full-text central bank macro allow list" },
+  { href: "/config/event-rules", label: "Event rules", keywords: "severity taxonomy price move threshold macro surprise bands announcement types rns eqs" },
+  { href: "/config/notifications", label: "Notifications", keywords: "alerts telegram email quiet hours channels weekends holidays monitoring system alerts" },
 ] as const;
 
 /** Pages that are not a section or a config editor. */
@@ -45,7 +46,18 @@ export const OTHER_PAGES = [
   { href: "/transactions", label: "Transactions and dividends", keywords: "orders dividends cash deposits withdrawals history holdings" },
   { href: "/config", label: "Config: Export or import", keywords: "backup json file git" },
   { href: "/status#reference-gaps", label: "Reference data gaps", keywords: "identity unresolved figi isin lei stooq prices missing symbol coverage" },
+  { href: "/news/disputed", label: "Disputed stories", keywords: "news contradicted conflicting sources resolve confirm false side by side" },
+  { href: "/escalations", label: "Impact notes (escalations)", keywords: "escalations reports thesis kpi exit price move confirmed stories" },
 ] as const;
+
+/** A job number, with or without a leading "#" or "job": open that job run (there is no job list yet). */
+export function jobCommands(query: string): PaletteCommand[] {
+  const match = /^(?:job\s*)?#?(\d{1,12})$/i.exec(query.trim());
+  if (!match) return [];
+  const id = Number(match[1]);
+  if (!Number.isSafeInteger(id) || id <= 0) return [];
+  return [{ id: `job:${id}`, label: `Job #${id}`, group: "Go to", keywords: "job run steps", href: `/jobs/${id}` }];
+}
 
 export function baseCommands(): PaletteCommand[] {
   return [
@@ -85,6 +97,7 @@ export function baseCommands(): PaletteCommand[] {
     { id: "act:reference", label: "Refresh reference data now", group: "Actions", keywords: "identity openfigi esma firds gleif wikidata structure all holdings", action: { kind: "reference-data" } },
     { id: "act:prices", label: "Collect price history now", group: "Actions", keywords: "stooq prices fx risk benchmark", action: { kind: "price-history" } },
     { id: "act:holidays", label: "Refresh public holidays now", group: "Actions", keywords: "calendar nager exchange closures", action: { kind: "holiday-refresh" } },
+    { id: "act:macro", label: "Collect macro data now", group: "Actions", keywords: "eurostat fred ecb inflation rates surprise", action: { kind: "macro-collect" } },
   ];
 }
 

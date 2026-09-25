@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import { DOMAIN_SLUGS, historyHref } from "@/lib/config/domains";
 import { SECTIONS } from "@/lib/nav";
 
-import { baseCommands, CONFIG_PAGES, filterCommands, holdingCommands, OTHER_PAGES } from "./palette";
+import { baseCommands, CONFIG_PAGES, filterCommands, holdingCommands, jobCommands, OTHER_PAGES } from "./palette";
 
 const commands = [...baseCommands(), ...holdingCommands([{ ticker: "AAPL_US_EQ", name: "Apple" }])];
 
@@ -62,5 +62,27 @@ describe("command palette", () => {
     expect(actions).toContainEqual({ kind: "price-history" });
     expect(actions).toContainEqual({ kind: "holiday-refresh" });
     expect(filterCommands(commands, "reference apple")[0].action).toEqual({ kind: "reference-data", ticker: "AAPL_US_EQ" });
+  });
+});
+
+describe("command palette: phase 3", () => {
+  it("reaches the disputed stories and the impact notes", () => {
+    expect(filterCommands(commands, "disputed")[0].href).toBe("/news/disputed");
+    expect(filterCommands(commands, "contradicted").map((c) => c.href)).toContain("/news/disputed");
+    expect(filterCommands(commands, "escalations").map((c) => c.href)).toContain("/escalations");
+    expect(filterCommands(commands, "impact notes")[0].href).toBe("/escalations");
+    expect(filterCommands(commands, "macro surprise").map((c) => c.href)).toContain("/config/event-rules");
+  });
+
+  it("runs the macro collection", () => {
+    expect(filterCommands(commands, "macro now")[0].action).toEqual({ kind: "macro-collect" });
+  });
+
+  it("opens a job run by number", () => {
+    expect(jobCommands("42")).toEqual([expect.objectContaining({ href: "/jobs/42", label: "Job #42" })]);
+    expect(jobCommands(" job 42 ")[0].href).toBe("/jobs/42");
+    expect(jobCommands("#7")[0].href).toBe("/jobs/7");
+    expect(jobCommands("0")).toEqual([]);
+    expect(jobCommands("news")).toEqual([]);
   });
 });
