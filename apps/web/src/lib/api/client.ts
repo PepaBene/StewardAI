@@ -78,6 +78,24 @@ export type TransactionOut = Schemas["TransactionOut"];
 export type TransactionType = TransactionOut["type"];
 export type TransactionsPage = Schemas["TransactionsPage"];
 export type TotalByCurrency = Schemas["TotalByCurrency"];
+export type HoldingIdentity = Schemas["HoldingIdentity"];
+export type IdentifierOut = Schemas["IdentifierOut"];
+export type ListingOut = Schemas["ListingOut"];
+export type LiquidityOut = Schemas["LiquidityOut"];
+export type LegalEntityOut = Schemas["LegalEntityOut"];
+export type RelationshipOut = Schemas["RelationshipOut"];
+export type RelationshipType = RelationshipOut["type"];
+export type RelationshipDecision = Schemas["RelationshipDecision"];
+export type ReportingExceptionOut = Schemas["ReportingExceptionOut"];
+export type AliasOut = Schemas["AliasOut"];
+export type PriceHistory = Schemas["PriceHistory"];
+export type PricePoint = Schemas["PricePoint"];
+export type RiskCard = Schemas["RiskCard"];
+export type Correlation = Schemas["Correlation"];
+export type ReferenceGaps = Schemas["ReferenceGaps"];
+export type ExchangeCalendar = Schemas["ExchangeCalendar"];
+export type ExchangeClosure = Schemas["ExchangeClosure"];
+export type ClosureSuggestion = Schemas["ClosureSuggestion"];
 
 export type AccessTokenGetter = () => Promise<string | null | undefined>;
 

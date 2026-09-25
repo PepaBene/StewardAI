@@ -1,4 +1,4 @@
-import { HistoryIcon } from "lucide-react";
+import { CalendarDaysIcon, HistoryIcon } from "lucide-react";
 import type { Metadata } from "next";
 import Link from "next/link";
 
@@ -20,7 +20,7 @@ const DOMAINS: { slug: ConfigDomainSlug; href: string; title: string; body: stri
     slug: "jobs",
     href: "/config/jobs",
     title: "Jobs",
-    body: "When each scheduled job runs, whether it runs, its time zone, and the models and caps of the jobs that call Claude.",
+    body: "When each scheduled job runs, whether it runs, its time zone, the models and caps of the jobs that call Claude, reference data, price benchmarks and the holiday calendar.",
   },
   {
     slug: "theses",
@@ -32,7 +32,7 @@ const DOMAINS: { slug: ConfigDomainSlug; href: string; title: string; body: stri
     slug: "holding-profiles",
     href: "/config/holding-profiles",
     title: "Holding profiles",
-    body: "Where each company publishes results, its fiscal year end, and what news is relevant to it.",
+    body: "Where each company publishes results, its fiscal year end, its Stooq price symbol, and what news is relevant to it.",
   },
   {
     slug: "news-sources",
@@ -94,6 +94,19 @@ export default function ConfigPage() {
           </li>
         ))}
       </ul>
+      <Link
+        href="/config/calendar"
+        className="flex items-start gap-3 rounded-lg border border-border bg-surface-raised p-4 transition-colors hover:border-accent"
+      >
+        <CalendarDaysIcon aria-hidden="true" className="mt-0.5 size-5 shrink-0 text-text-muted" />
+        <span>
+          <span className="font-medium text-text">Exchange calendar</span>
+          <span className="mt-1 block text-sm text-text-muted">
+            Confirm which public holidays close each holding&rsquo;s exchange. Confirmed closures are saved to the Jobs
+            config.
+          </span>
+        </span>
+      </Link>
       <div>
         <h2 className="text-sm font-medium text-text-muted">Not in the editor yet</h2>
         <ul className="mt-2 space-y-1 text-sm">

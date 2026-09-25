@@ -13,7 +13,10 @@ export type PaletteAction =
   | { kind: "portfolio-sync" }
   | { kind: "news-ingest" }
   | { kind: "digest"; period: "daily" | "weekly" }
-  | { kind: "thesis-verdicts" };
+  | { kind: "thesis-verdicts" }
+  | { kind: "reference-data"; ticker?: string }
+  | { kind: "price-history" }
+  | { kind: "holiday-refresh" };
 
 export type PaletteCommand = {
   id: string;
@@ -26,9 +29,10 @@ export type PaletteCommand = {
 
 export const CONFIG_PAGES = [
   { href: "/config/strategy", label: "Strategy", keywords: "targets allocation bands rules categories classifications currency drift" },
-  { href: "/config/jobs", label: "Jobs", keywords: "schedules cron timezone models step caps worker" },
+  { href: "/config/jobs", label: "Jobs", keywords: "schedules cron timezone models step caps worker benchmarks prices reference wikidata holidays" },
   { href: "/config/theses", label: "Theses", keywords: "kpi thresholds exit" },
-  { href: "/config/holding-profiles", label: "Holding profiles", keywords: "ir aliases competitors fiscal" },
+  { href: "/config/holding-profiles", label: "Holding profiles", keywords: "ir aliases competitors fiscal stooq price symbol" },
+  { href: "/config/calendar", label: "Exchange calendar", keywords: "holidays closures exchanges mic market closed nager public holiday" },
   { href: "/config/news-sources", label: "News sources", keywords: "feeds rss tiers outlets" },
   { href: "/config/event-rules", label: "Event rules", keywords: "severity taxonomy" },
   { href: "/config/notifications", label: "Notifications", keywords: "alerts telegram email quiet hours channels" },
@@ -40,6 +44,7 @@ export const OTHER_PAGES = [
   { href: "/review", label: "Review queue", keywords: "held quarantined figures facts accept correct reject override validator reconciliation" },
   { href: "/transactions", label: "Transactions and dividends", keywords: "orders dividends cash deposits withdrawals history holdings" },
   { href: "/config", label: "Config: Export or import", keywords: "backup json file git" },
+  { href: "/status#reference-gaps", label: "Reference data gaps", keywords: "identity unresolved figi isin lei stooq prices missing symbol coverage" },
 ] as const;
 
 export function baseCommands(): PaletteCommand[] {
@@ -77,6 +82,9 @@ export function baseCommands(): PaletteCommand[] {
     { id: "act:verdicts", label: "Re-run thesis verdicts", group: "Actions", keywords: "kpi judge", action: { kind: "thesis-verdicts" } },
     { id: "act:daily", label: "Write daily digest now", group: "Actions", keywords: "report send", action: { kind: "digest", period: "daily" } },
     { id: "act:weekly", label: "Write weekly digest now", group: "Actions", keywords: "report send", action: { kind: "digest", period: "weekly" } },
+    { id: "act:reference", label: "Refresh reference data now", group: "Actions", keywords: "identity openfigi esma firds gleif wikidata structure all holdings", action: { kind: "reference-data" } },
+    { id: "act:prices", label: "Collect price history now", group: "Actions", keywords: "stooq prices fx risk benchmark", action: { kind: "price-history" } },
+    { id: "act:holidays", label: "Refresh public holidays now", group: "Actions", keywords: "calendar nager exchange closures", action: { kind: "holiday-refresh" } },
   ];
 }
 
@@ -99,6 +107,13 @@ export function holdingCommands(holdings: { ticker: string; name?: string | null
         href: reviewQueueHref(h.ticker),
       },
       {
+        id: `reference:${h.ticker}`,
+        label: `Refresh reference data: ${name}`,
+        group: "Actions" as const,
+        keywords: `${h.ticker} identity figi lei gleif wikidata structure`,
+        action: { kind: "reference-data" as const, ticker: h.ticker },
+      },
+      {
         id: `earnings:${h.ticker}`,
         label: `Re-run earnings check: ${name}`,
         group: "Actions" as const,
@@ -109,10 +124,13 @@ export function holdingCommands(holdings: { ticker: string; name?: string | null
   });
 }
 
+/** Per-holding entries, shown only once something is typed. */
+const PER_HOLDING = ["earnings:", "review:", "reference:"];
+
 export function filterCommands(commands: PaletteCommand[], query: string, limit = 12): PaletteCommand[] {
   const words = query.toLowerCase().split(/\s+/).filter(Boolean);
   if (words.length === 0) {
-    return commands.filter((c) => c.action?.kind !== "earnings-check" && !c.id.startsWith("review:")).slice(0, limit);
+    return commands.filter((c) => !PER_HOLDING.some((prefix) => c.id.startsWith(prefix))).slice(0, limit);
   }
   const scored = commands
     .map((c) => {

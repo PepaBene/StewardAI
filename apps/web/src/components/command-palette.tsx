@@ -15,18 +15,33 @@ import {
 } from "@/lib/palette";
 import { cn } from "@/lib/utils";
 
-async function runAction(action: PaletteAction): Promise<string> {
+function queue(action: PaletteAction) {
   const api = getBrowserApiClient();
-  const result =
-    action.kind === "earnings-check"
-      ? await api.POST("/jobs/earnings-check", { body: { ticker: action.ticker } })
-      : action.kind === "portfolio-sync"
-        ? await api.POST("/jobs/portfolio-sync")
-        : action.kind === "news-ingest"
-          ? await api.POST("/jobs/news-ingest")
-          : action.kind === "digest"
-            ? await api.POST("/jobs/digest", { body: { kind: action.period } })
-            : await api.POST("/jobs/thesis-verdicts", { body: {} });
+  switch (action.kind) {
+    case "earnings-check":
+      return api.POST("/jobs/earnings-check", { body: { ticker: action.ticker } });
+    case "portfolio-sync":
+      return api.POST("/jobs/portfolio-sync");
+    case "news-ingest":
+      return api.POST("/jobs/news-ingest");
+    case "digest":
+      return api.POST("/jobs/digest", { body: { kind: action.period } });
+    case "thesis-verdicts":
+      return api.POST("/jobs/thesis-verdicts", { body: {} });
+    case "reference-data":
+      return api.POST("/jobs/reference-data", {
+        // One holding: re-read OpenFIGI and Wikidata now. All: the weekly job's normal refresh.
+        body: { ticker: action.ticker ?? null, force: Boolean(action.ticker) },
+      });
+    case "price-history":
+      return api.POST("/jobs/price-history");
+    case "holiday-refresh":
+      return api.POST("/jobs/holiday-refresh");
+  }
+}
+
+async function runAction(action: PaletteAction): Promise<string> {
+  const result = await queue(action);
   if (!result.data) return `Could not queue it: the API answered HTTP ${result.response.status}.`;
   return `Queued as job #${result.data.id}.`;
 }

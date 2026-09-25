@@ -14,7 +14,14 @@ export type ScheduleKey = {
   [K in keyof JobsConfig]-?: NonNullable<JobsConfig[K]> extends JobSchedule ? K : never;
 }[keyof JobsConfig];
 
-export type SettingsKey = "earnings_check" | "earnings_calendar_settings" | "news" | "digest";
+export type SettingsKey =
+  | "earnings_check"
+  | "earnings_calendar_settings"
+  | "news"
+  | "digest"
+  | "reference"
+  | "prices"
+  | "calendar";
 type Settings<S extends SettingsKey> = NonNullable<JobsConfig[S]>;
 
 /** Labels and the backend's default cron per known schedule (apps/backend/src/steward/config/jobs.py). */
@@ -104,6 +111,9 @@ export const DEFAULT_JOBS: JobsConfig = {
     max_items_per_run: 500,
   },
   digest: { model: "claude-sonnet-5", use_batch: true, batch_wait_minutes: 60, min_severity_summarised: 2 },
+  reference: { openfigi_refresh_days: 30, wikidata_enabled: true, wikidata_refresh_days: 30, max_subsidiary_aliases: 50 },
+  prices: { benchmark_symbols: ["^spx"], history_years: 2, plausibility_tolerance_pct: 1 },
+  calendar: { holiday_countries: ["CZ", "US", "DE", "GB"], exchange_closures: [] },
 };
 
 /** Model ids offered as suggestions; any `claude-…` id is accepted. */
@@ -113,7 +123,11 @@ export const EFFORTS = ["low", "medium", "high", "xhigh", "max"] as const;
 export type SettingField<S extends SettingsKey> = {
   key: keyof Settings<S> & string;
   label: string;
-  kind: "model" | "int" | "bool" | "effort" | "int-list" | "severity";
+  /**
+   * `lines`: a string list, one per line. `codes`: a list of upper-case codes, separated by
+   * commas or spaces. `number`: a decimal.
+   */
+  kind: "model" | "int" | "number" | "bool" | "effort" | "int-list" | "severity" | "lines" | "codes";
   hint?: string;
   min?: number;
   max?: number;
@@ -165,17 +179,52 @@ export const SETTINGS: { [S in SettingsKey]: { title: string; description: strin
       { key: "min_severity_summarised", label: "Summarise stories from severity", kind: "severity", hint: "Lower-severity stories are listed by headline." },
     ],
   },
+  reference: {
+    title: "Reference data",
+    description: "Identity and group structure: OpenFIGI, ESMA FIRDS/FITRS, GLEIF and Wikidata.",
+    fields: [
+      { key: "openfigi_refresh_days", label: "Re-map each ISIN through OpenFIGI every (days)", kind: "int", min: 1, max: 365 },
+      { key: "wikidata_enabled", label: "Read aliases and suggested relationships from Wikidata", kind: "bool", hint: "Tier 3: its relationships stay suggestions until you confirm them." },
+      { key: "wikidata_refresh_days", label: "Refresh Wikidata every (days)", kind: "int", min: 1, max: 365 },
+      { key: "max_subsidiary_aliases", label: "Most subsidiary names added to news aliases", kind: "int", min: 0, max: 500, hint: "From GLEIF Level 2." },
+    ],
+  },
+  prices: {
+    title: "Prices",
+    description: "Daily closes from Stooq, and the risk figures computed from them.",
+    fields: [
+      { key: "benchmark_symbols", label: "Benchmark symbols", kind: "lines", hint: "Stooq symbols, one per line: ^spx S&P 500, ^dax DAX, ^ukx FTSE 100. The first is used for beta and the holding charts." },
+      { key: "history_years", label: "Years of history", kind: "int", min: 1, max: 10 },
+      { key: "plausibility_tolerance_pct", label: "Plausibility tolerance (%)", kind: "number", hint: "Largest gap between Stooq's close and Trading212's price on a sync day before it is flagged. Above 0, up to 20." },
+    ],
+  },
+  calendar: {
+    title: "Holiday calendar",
+    description: "Days a source has nothing to publish: public holidays (Nager.Date) and confirmed exchange closures.",
+    fields: [
+      { key: "holiday_countries", label: "Public-holiday countries", kind: "codes", hint: "Two-letter codes, e.g. CZ, US, DE, GB." },
+    ],
+  },
 };
 export const SETTINGS_KEYS = Object.keys(SETTINGS) as SettingsKey[];
 
 export type ScheduleForm = { name: string; enabled: boolean; cron: string; timezone: string; rest: Record<string, unknown> };
 export type SettingsForm = { values: Record<string, string | boolean>; rest: Record<string, unknown> };
+/** One confirmed exchange closure (`calendar.exchange_closures`), edited as a row. */
+export type ClosureForm = { key: string; mic: string; date: string; name: string; rest: Record<string, unknown> };
 export type JobsForm = {
   schedules: ScheduleForm[];
   settings: Record<SettingsKey, SettingsForm>;
+  closures: ClosureForm[];
   /** Top-level properties this form does not know (kept as loaded). */
   rest: Record<string, unknown>;
 };
+
+let closureCounter = 0;
+
+export function newClosure(): ClosureForm {
+  return { key: `c${++closureCounter}`, mic: "", date: "", name: "", rest: {} };
+}
 
 function isSchedule(value: unknown): value is JobSchedule {
   return typeof value === "object" && value !== null && typeof (value as { cron?: unknown }).cron === "string";
@@ -210,14 +259,34 @@ export function jobsFromBody(body: JobsConfig | null): JobsForm {
         const v = loaded[field.key];
         delete rest[field.key];
         values[field.key] =
-          field.kind === "bool" ? Boolean(v) : Array.isArray(v) ? v.join(", ") : v == null ? "" : String(v);
+          field.kind === "bool"
+            ? Boolean(v)
+            : Array.isArray(v)
+              ? v.join(field.kind === "lines" ? "\n" : ", ")
+              : v == null
+                ? ""
+                : String(v);
       }
       return [s, { values, rest }];
     }),
   ) as Record<SettingsKey, SettingsForm>;
+  // Closures are edited as rows, not as a settings field.
+  const loadedClosures = settings.calendar.rest.exchange_closures;
+  delete settings.calendar.rest.exchange_closures;
+  const closures = (Array.isArray(loadedClosures) ? loadedClosures : []).map((c: Record<string, unknown>) => {
+    const { mic, date, name, ...extra } = c;
+    return { ...newClosure(), mic: String(mic ?? ""), date: String(date ?? ""), name: String(name ?? ""), rest: extra };
+  });
   const known = new Set<string>(["schema_version", ...names, ...SETTINGS_KEYS]);
   const rest = Object.fromEntries(Object.entries(b).filter(([k]) => !known.has(k)));
-  return { schedules, settings, rest };
+  return { schedules, settings, closures, rest };
+}
+
+function list(text: string, separator: RegExp): string[] {
+  return text
+    .split(separator)
+    .map((v) => v.trim())
+    .filter(Boolean);
 }
 
 export function jobsToBody(form: JobsForm): JobsConfig {
@@ -232,12 +301,23 @@ export function jobsToBody(form: JobsForm): JobsConfig {
       const v = values[field.key];
       if (field.kind === "bool") out[field.key] = Boolean(v);
       else if (field.kind === "int" || field.kind === "severity") out[field.key] = numberOrText(String(v));
+      else if (field.kind === "number") out[field.key] = numberOrText(String(v).replace(",", "."));
+      else if (field.kind === "lines") out[field.key] = list(String(v), /\n/);
+      else if (field.kind === "codes") out[field.key] = list(String(v), /[\s,;]+/).map((c) => c.toUpperCase());
       else if (field.kind === "int-list")
         out[field.key] = String(v)
           .split(/[\s,;]+/)
           .filter(Boolean)
           .map(numberOrText);
       else out[field.key] = String(v).trim();
+    }
+    if (key === "calendar") {
+      out.exchange_closures = form.closures.map((c) => ({
+        ...c.rest,
+        mic: c.mic.trim().toUpperCase(),
+        date: c.date.trim(),
+        name: c.name.trim(),
+      }));
     }
     body[key] = out;
   }

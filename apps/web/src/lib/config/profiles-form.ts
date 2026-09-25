@@ -27,6 +27,8 @@ export type ProfileForm = {
   sec_cik: string;
   sec_ticker: string;
   fiscal_year_end_month: number;
+  /** Stooq symbol override (e.g. "sap.de"); empty = derived from OpenFIGI. */
+  price_symbol: string;
   reporting_currency: string;
   competitors: string;
   suppliers: string;
@@ -56,6 +58,7 @@ export function newProfile(ticker = ""): ProfileForm {
     sec_cik: "",
     sec_ticker: "",
     fiscal_year_end_month: 12,
+    price_symbol: "",
     reporting_currency: "",
     competitors: "",
     suppliers: "",
@@ -81,6 +84,7 @@ export function profilesFromBody(body: HoldingProfilesConfig | null): ProfileFor
     sec_cik: p.sec_cik ?? "",
     sec_ticker: p.sec_ticker ?? "",
     fiscal_year_end_month: p.fiscal_year_end_month,
+    price_symbol: p.price_symbol ?? "",
     reporting_currency: p.reporting_currency ?? "",
     competitors: joined(p.competitors),
     suppliers: joined(p.suppliers),
@@ -113,6 +117,7 @@ export function profilesToBody(forms: ProfileForm[]): HoldingProfilesConfig {
         sec_cik: orNull(f.sec_cik),
         sec_ticker: orNull(f.sec_ticker)?.toUpperCase() ?? null,
         fiscal_year_end_month: f.fiscal_year_end_month,
+        price_symbol: orNull(f.price_symbol)?.toLowerCase() ?? null,
         reporting_currency: orNull(f.reporting_currency)?.toUpperCase() ?? null,
         competitors: lines(f.competitors),
         suppliers: lines(f.suppliers),

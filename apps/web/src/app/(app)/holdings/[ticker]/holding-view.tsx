@@ -24,6 +24,8 @@ import { DriftStatusBadge } from "@/components/portfolio/drift-status-badge";
 import { FreshnessLabel } from "@/components/portfolio/freshness-label";
 import { HoldingNews } from "@/components/news/holding-news";
 import { StatCard } from "@/components/portfolio/stat-card";
+import { IdentitySection } from "@/components/reference/identity-section";
+import { PriceRiskSection } from "@/components/reference/price-risk-section";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -193,9 +195,13 @@ export function HoldingContent({
         <KpiTable kpis={detail.kpis} facts={facts} />
       ) : null}
 
+      <PriceRiskSection ticker={detail.ticker} currency={detail.position?.instrument_currency} />
+
       <HoldingNews ticker={detail.ticker} />
 
       <FactsSection ticker={detail.ticker} facts={detail.facts} reload={reload} onQueued={onQueued} />
+
+      <IdentitySection ticker={detail.ticker} />
     </>
   );
 }

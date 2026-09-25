@@ -196,7 +196,7 @@ function ProfileCard({
       </div>
 
       <fieldset className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-        <legend className="mb-2 text-sm font-medium">Filings and fiscal calendar</legend>
+        <legend className="mb-2 text-sm font-medium">Filings, fiscal calendar and prices</legend>
         <SelectField
           label="Fiscal year ends in"
           path={`${path}.fiscal_year_end_month`}
@@ -209,6 +209,13 @@ function ProfileCard({
         <TextField label="Reporting currency" placeholder="USD" maxLength={3} {...text("reporting_currency")} />
         <TextField label="SEC CIK" placeholder="looked up from the ticker" inputMode="numeric" {...text("sec_cik")} />
         <TextField label="EDGAR / Finnhub symbol" placeholder="if not the ticker prefix" {...text("sec_ticker")} />
+        <TextField
+          label="Stooq price symbol"
+          placeholder="derived from OpenFIGI"
+          spellCheck={false}
+          hint="Only when the derived symbol is wrong or has no data, e.g. sap.de, aapl.us, vod.uk. Lower case."
+          {...text("price_symbol")}
+        />
       </fieldset>
 
       <fieldset className="grid gap-3 lg:grid-cols-2">

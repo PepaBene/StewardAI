@@ -1,12 +1,14 @@
 "use client";
 
-import { ClockIcon, InfoIcon, LoaderCircleIcon } from "lucide-react";
-import { useId, useMemo, useState } from "react";
+import { CalendarDaysIcon, ClockIcon, InfoIcon, LoaderCircleIcon, PlusIcon, Trash2Icon } from "lucide-react";
+import Link from "next/link";
+import { useId, useMemo, useState, type ReactNode } from "react";
 
 import { AlertMessage } from "@/components/alert-message";
 import { ConfigHeader } from "@/components/config/config-header";
-import { CheckboxField, SelectField, TextField } from "@/components/config/fields";
+import { CheckboxField, SelectField, TextAreaField, TextField } from "@/components/config/fields";
 import { SaveBar } from "@/components/config/save-bar";
+import { Button } from "@/components/ui/button";
 import { getBrowserApiClient, type JobsConfig } from "@/lib/api/client";
 import type { FieldErrors } from "@/lib/api/validation-errors";
 import { describeCron } from "@/lib/config/cron";
@@ -15,10 +17,12 @@ import {
   jobsFromBody,
   jobsToBody,
   MODEL_SUGGESTIONS,
+  newClosure,
   SCHEDULES,
   scheduleLabel,
   SETTINGS,
   SETTINGS_KEYS,
+  type ClosureForm,
   type JobsForm,
   type ScheduleForm,
   type ScheduleKey,
@@ -114,7 +118,15 @@ export function JobsEditor() {
               values={form.settings[section].values}
               errors={editor.errors}
               onChange={(key, value) => setSetting(section, key, value)}
-            />
+            >
+              {section === "calendar" ? (
+                <ClosuresEditor
+                  closures={form.closures}
+                  errors={editor.errors}
+                  onChange={(closures) => setForm((f) => (f ? { ...f, closures } : f))}
+                />
+              ) : null}
+            </SettingsCard>
           ))}
 
           <SaveBar
@@ -198,11 +210,13 @@ function SettingsCard({
   values,
   errors,
   onChange,
+  children,
 }: {
   section: SettingsKey;
   values: Record<string, string | boolean>;
   errors: FieldErrors;
   onChange: (key: string, value: string | boolean) => void;
+  children?: ReactNode;
 }) {
   const info = SETTINGS[section];
   const listId = useId();
@@ -232,6 +246,9 @@ function SettingsCard({
           if (field.kind === "effort") {
             return <SelectField key={field.key} label={field.label} path={path} errors={errors} value={String(value)} options={EFFORT_OPTIONS} onChange={(v) => onChange(field.key, v)} hint={field.hint} />;
           }
+          if (field.kind === "lines") {
+            return <TextAreaField key={field.key} label={field.label} path={path} errors={errors} value={String(value)} rows={3} onChange={(v) => onChange(field.key, v)} hint={hint} />;
+          }
           if (field.kind === "severity") {
             return <SelectField key={field.key} label={field.label} path={path} errors={errors} value={String(value) as "1" | "2" | "3"} options={SEVERITY_OPTIONS} onChange={(v) => onChange(field.key, v)} hint={field.hint} />;
           }
@@ -249,7 +266,7 @@ function SettingsCard({
               }}
               value={String(value)}
               list={field.kind === "model" ? listId : undefined}
-              inputMode={field.kind === "int" ? "numeric" : undefined}
+              inputMode={field.kind === "int" ? "numeric" : field.kind === "number" ? "decimal" : undefined}
               spellCheck={false}
               onChange={(v) => onChange(field.key, v)}
               hint={hint}
@@ -257,6 +274,91 @@ function SettingsCard({
           );
         })}
       </div>
+      {children}
     </section>
+  );
+}
+
+function ClosuresEditor({
+  closures,
+  errors,
+  onChange,
+}: {
+  closures: ClosureForm[];
+  errors: FieldErrors;
+  onChange: (closures: ClosureForm[]) => void;
+}) {
+  const path = "calendar.exchange_closures";
+  const set = (key: string, change: Partial<ClosureForm>) =>
+    onChange(closures.map((c) => (c.key === key ? { ...c, ...change } : c)));
+  const own = errors[path] ?? [];
+  return (
+    <fieldset className="space-y-2">
+      <legend className="text-sm font-medium">Exchange closures</legend>
+      <p className="text-xs text-text-muted">
+        Days an exchange is closed, used without a deploy. Public holidays are not exchange calendars; review the suggested
+        days on the{" "}
+        <Link href="/config/calendar" className="text-accent underline-offset-4 hover:underline">
+          exchange calendar
+        </Link>{" "}
+        page.
+      </p>
+      {closures.length === 0 ? <p className="text-sm text-text-muted">No closures confirmed.</p> : null}
+      {closures.map((c, i) => (
+        <div key={c.key} role="group" aria-label={`Closure ${i + 1}`} className="grid grid-cols-[0.8fr_1fr_2fr_auto] items-end gap-2">
+          <TextField
+            label="MIC"
+            path={`${path}.${i}.mic`}
+            errors={errors}
+            value={c.mic}
+            maxLength={4}
+            placeholder="XNYS"
+            spellCheck={false}
+            hideLabel={i > 0}
+            onChange={(v) => set(c.key, { mic: v })}
+          />
+          <TextField
+            label="Date"
+            type="date"
+            path={`${path}.${i}.date`}
+            errors={errors}
+            value={c.date}
+            hideLabel={i > 0}
+            onChange={(v) => set(c.key, { date: v })}
+          />
+          <TextField
+            label="Name"
+            path={`${path}.${i}.name`}
+            errors={errors}
+            value={c.name}
+            maxLength={100}
+            placeholder="Good Friday"
+            hideLabel={i > 0}
+            onChange={(v) => set(c.key, { name: v })}
+          />
+          <Button
+            variant="ghost"
+            size="icon"
+            aria-label={`Remove closure ${c.mic || i + 1} ${c.date}`}
+            onClick={() => onChange(closures.filter((x) => x.key !== c.key))}
+          >
+            <Trash2Icon aria-hidden="true" />
+          </Button>
+        </div>
+      ))}
+      {own.length > 0 ? <p className="text-xs text-text">{own.join(" ")}</p> : null}
+      <div className="flex flex-wrap gap-2">
+        <Button variant="outline" size="sm" onClick={() => onChange([...closures, newClosure()])}>
+          <PlusIcon aria-hidden="true" />
+          Add closure
+        </Button>
+        <Button asChild variant="ghost" size="sm">
+          <Link href="/config/calendar">
+            <CalendarDaysIcon aria-hidden="true" />
+            Suggested closures
+          </Link>
+        </Button>
+      </div>
+    </fieldset>
   );
 }

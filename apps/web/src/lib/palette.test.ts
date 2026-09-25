@@ -46,6 +46,21 @@ describe("command palette", () => {
 
   it("hides per-holding actions and queues until something is typed", () => {
     const shown = filterCommands(commands, "", 100);
-    expect(shown.some((c) => c.id.startsWith("earnings:") || c.id.startsWith("review:"))).toBe(false);
+    expect(
+      shown.some((c) => c.id.startsWith("earnings:") || c.id.startsWith("review:") || c.id.startsWith("reference:")),
+    ).toBe(false);
+  });
+
+  it("reaches the phase 2b pages and actions", () => {
+    expect(filterCommands(commands, "exchange calendar")[0].href).toBe("/config/calendar");
+    expect(filterCommands(commands, "holidays").map((c) => c.href)).toContain("/config/calendar");
+    expect(filterCommands(commands, "reference gaps")[0].href).toBe("/status#reference-gaps");
+    expect(filterCommands(commands, "stooq symbol").map((c) => c.href)).toContain("/config/holding-profiles");
+    expect(filterCommands(commands, "benchmarks").map((c) => c.href)).toContain("/config/jobs");
+    const actions = filterCommands(commands, "now", 50).map((c) => c.action);
+    expect(actions).toContainEqual({ kind: "reference-data" });
+    expect(actions).toContainEqual({ kind: "price-history" });
+    expect(actions).toContainEqual({ kind: "holiday-refresh" });
+    expect(filterCommands(commands, "reference apple")[0].action).toEqual({ kind: "reference-data", ticker: "AAPL_US_EQ" });
   });
 });

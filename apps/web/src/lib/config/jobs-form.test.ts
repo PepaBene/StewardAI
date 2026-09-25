@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import type { JobsConfig } from "@/lib/api/client";
 
 import { describeCron } from "./cron";
-import { DEFAULT_JOBS, jobsFromBody, jobsToBody, SCHEDULE_KEYS, scheduleLabel } from "./jobs-form";
+import { DEFAULT_JOBS, jobsFromBody, jobsToBody, newClosure, SCHEDULE_KEYS, scheduleLabel } from "./jobs-form";
 
 const FULL: JobsConfig = {
   schema_version: 1,
@@ -38,6 +38,15 @@ const FULL: JobsConfig = {
     max_items_per_run: 1000,
   },
   digest: { model: "claude-sonnet-5", use_batch: false, batch_wait_minutes: 30, min_severity_summarised: 3 },
+  reference: { openfigi_refresh_days: 14, wikidata_enabled: false, wikidata_refresh_days: 60, max_subsidiary_aliases: 120 },
+  prices: { benchmark_symbols: ["^spx", "^dax", "^ukx"], history_years: 5, plausibility_tolerance_pct: 1.5 },
+  calendar: {
+    holiday_countries: ["CZ", "US", "DE"],
+    exchange_closures: [
+      { mic: "XNYS", date: "2026-04-03", name: "Good Friday" },
+      { mic: "XETR", date: "2026-12-24", name: "Christmas Eve" },
+    ],
+  },
 };
 
 describe("jobs form", () => {
@@ -69,6 +78,42 @@ describe("jobs form", () => {
     expect(body.earnings_check!.check_days_after_report).toEqual([1, 2, 5]);
     expect(body.news!.recheck_hours).toBe("4x");
     expect(body.portfolio_sync!.cron).toBe("0 22 * * *");
+  });
+});
+
+describe("jobs form: reference, prices and calendar", () => {
+  it("edits benchmarks one per line and holiday countries as codes", () => {
+    const form = jobsFromBody(FULL);
+    expect(form.settings.prices.values.benchmark_symbols).toBe("^spx\n^dax\n^ukx");
+    expect(form.settings.calendar.values.holiday_countries).toBe("CZ, US, DE");
+    form.settings.prices.values.benchmark_symbols = " ^spx \n\n^ndx\n";
+    form.settings.prices.values.plausibility_tolerance_pct = "2,5";
+    form.settings.calendar.values.holiday_countries = "cz gb;at";
+    const body = jobsToBody(form);
+    expect(body.prices!.benchmark_symbols).toEqual(["^spx", "^ndx"]);
+    expect(body.prices!.plausibility_tolerance_pct).toBe(2.5);
+    expect(body.calendar!.holiday_countries).toEqual(["CZ", "GB", "AT"]);
+  });
+
+  it("edits exchange closures as rows", () => {
+    const form = jobsFromBody(FULL);
+    expect(form.closures.map((c) => [c.mic, c.date, c.name])).toEqual([
+      ["XNYS", "2026-04-03", "Good Friday"],
+      ["XETR", "2026-12-24", "Christmas Eve"],
+    ]);
+    form.closures = [
+      form.closures[1],
+      { ...newClosure(), mic: " xlon ", date: "2026-12-28", name: " Boxing Day (substitute) " },
+    ];
+    expect(jobsToBody(form).calendar!.exchange_closures).toEqual([
+      { mic: "XETR", date: "2026-12-24", name: "Christmas Eve" },
+      { mic: "XLON", date: "2026-12-28", name: "Boxing Day (substitute)" },
+    ]);
+  });
+
+  it("defaults to no closures", () => {
+    expect(jobsFromBody(null).closures).toEqual([]);
+    expect(jobsToBody(jobsFromBody(null)).calendar).toEqual({ holiday_countries: ["CZ", "US", "DE", "GB"], exchange_closures: [] });
   });
 });
 
