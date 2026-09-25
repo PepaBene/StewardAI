@@ -116,6 +116,13 @@ class HoldingDetail(BaseModel):
 
 class EvidenceLink(BaseModel):
     fact_id: int
+    ticker: str
+    metric: str
+    period: str
+    value_as_written: str
+    snippet: str
+    unit_snippet: str | None
+    confidence: Confidence
     source_url: str
     evidence_url: str = Field(description="Signed URL of the archived copy, valid 10 minutes.")
     content_type: str

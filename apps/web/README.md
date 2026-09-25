@@ -41,6 +41,20 @@ route redirects to `/login`, which says which variables are missing.
 The API must allow this app's origin through CORS. The backend's `CORS_ORIGINS` defaults
 to `http://localhost:3000`.
 
+## Pages
+
+| Route | What it shows |
+| --- | --- |
+| `/` | Overview: value, allocation, drift, freshness |
+| `/holdings` | Every open position; each row opens its holding page |
+| `/holdings/[ticker]` | Position, thesis, KPI verdicts (open a row for the rationale, the facts behind it, their snippets and evidence links, and the KPI's history), every extracted figure with its confidence badge, and Accept / Reject for figures the validator held. Runs an earnings check or re-runs verdicts. |
+| `/evidence/[factId]` | One fact: the quoted snippet, the archived text around it, the original URL and a signed link to the archived copy |
+| `/config/theses`, `/config/holding-profiles` | Editors for those config domains. Form state converts to the generated `ThesesConfig` / `HoldingProfilesConfig` types; the backend's Pydantic model validates, and its 422 errors are shown next to each field. Saving theses queues a verdict run, so a changed threshold shows up at once. |
+
+Confidence badges (`components/evidence/confidence-badge.tsx`) use the four labels of the
+spec, Verified / Corroborated / Unconfirmed / Disputed, in the muted grey / blue / amber / red
+palette. Pass and breach use gain and loss; unknown is dashed and neutral.
+
 ## Scripts
 
 | Script | What it does |

@@ -13,7 +13,7 @@ export const SECTIONS = [
 export type Section = (typeof SECTIONS)[number];
 
 /** Sections with a real page of their own; the rest render the [section] placeholder. */
-export const BUILT_SLUGS: readonly string[] = ["", "holdings"];
+export const BUILT_SLUGS: readonly string[] = ["", "holdings", "config"];
 
 export const PLACEHOLDER_SECTIONS = SECTIONS.filter((s) => !BUILT_SLUGS.includes(s.slug));
 

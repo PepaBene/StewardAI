@@ -5,8 +5,11 @@ owner's strategy and per-holding theses, and uses Claude to monitor, explain and
 The full design is in
 [AI_Portfolio_Copilot_Technical_Product_Description.md](AI_Portfolio_Copilot_Technical_Product_Description.md).
 
-**Status: Phase 1 (Portfolio core)**: daily Trading212 sync with ČNB/ECB FX conversion, drift
-against the strategy's targets, the Overview and Holdings screens, and a live sync indicator.
+**Status: Phase 2 (Extraction and earnings checks)** on top of Phase 1 (daily Trading212 sync,
+ČNB/ECB FX, drift, Overview and Holdings, live sync indicator): each holding's results
+release is found on EDGAR or the company's own site, archived, read by Claude into figures
+with verbatim snippets, validated in code, and judged against the thesis KPIs. The holding
+page shows every verdict with its evidence; theses and holding profiles are edited in the app.
 
 ## Repository layout
 
@@ -48,6 +51,9 @@ side is stale.
    ```
 6. Check pgmq: `select * from pgmq.list_queues();` runs with no error and lists the `jobs`
    queue (created by the Phase 1 migration).
+7. Check Storage: the Phase 2 migration creates the private `evidence` bucket
+   (`select id, public from storage.buckets;`). The backend writes to it with the project's
+   secret key (`SUPABASE_SECRET_KEY`); the browser only ever gets short-lived signed URLs.
 
 Then fill in the environment: `cp .env.example .env` in the repository root. That one file
 is read by both apps, and `.env.example` explains where to get every value (Supabase URL
@@ -75,5 +81,8 @@ See [apps/backend/README.md](apps/backend/README.md) and [apps/web/README.md](ap
 - The backend connects directly as `app_backend`: explicit per-table grants plus a permissive
   policy, no superuser, no `BYPASSRLS`, no access to anything it was not granted.
 - `config_version` rows are immutable apart from `active`; one active version per domain.
+- `fact` rows never change their figure or source (a trigger enforces it); only the review
+  state moves. A restated value is a new row pointing at the one it restates. `evidence` and
+  `verdict` are append-only, and the backend has no delete grant on any of the three.
 - `job` and `job_step` are in the `supabase_realtime` publication, so the web app's sync
   indicator updates live. The migration adds them only where the publication exists.

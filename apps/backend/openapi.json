@@ -1699,6 +1699,47 @@
             "type": "integer",
             "title": "Fact Id"
           },
+          "ticker": {
+            "type": "string",
+            "title": "Ticker"
+          },
+          "metric": {
+            "type": "string",
+            "title": "Metric"
+          },
+          "period": {
+            "type": "string",
+            "title": "Period"
+          },
+          "value_as_written": {
+            "type": "string",
+            "title": "Value As Written"
+          },
+          "snippet": {
+            "type": "string",
+            "title": "Snippet"
+          },
+          "unit_snippet": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Unit Snippet"
+          },
+          "confidence": {
+            "type": "string",
+            "enum": [
+              "verified",
+              "corroborated",
+              "unconfirmed",
+              "disputed"
+            ],
+            "title": "Confidence"
+          },
           "source_url": {
             "type": "string",
             "title": "Source Url"
@@ -1737,6 +1778,13 @@
         "type": "object",
         "required": [
           "fact_id",
+          "ticker",
+          "metric",
+          "period",
+          "value_as_written",
+          "snippet",
+          "unit_snippet",
+          "confidence",
           "source_url",
           "evidence_url",
           "content_type",

@@ -128,6 +128,131 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/jobs/earnings-check": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Run Earnings Check
+         * @description Queue an earnings thesis check for one holding: find the release, extract and
+         *     validate its figures, then judge the thesis KPIs.
+         */
+        post: operations["run_earnings_check"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/jobs/thesis-verdicts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Run Thesis Verdicts
+         * @description Re-judge thesis KPIs from the stored facts with the active theses config. No
+         *     fetching, no model calls: use it after editing a threshold.
+         */
+        post: operations["run_thesis_verdicts"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/jobs/earnings-calendar": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Run Earnings Calendar
+         * @description Refresh every holding's next report date now.
+         */
+        post: operations["run_earnings_calendar"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/holdings/{ticker}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Holding
+         * @description One holding: position, thesis, KPI verdicts with their history, and every extracted
+         *     fact with its source.
+         */
+        get: operations["get_holding"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/facts/{fact_id}/evidence": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Fact Evidence
+         * @description The archived copy of the page a fact was read from: a short-lived signed URL and
+         *     the text around the fact's snippet.
+         */
+        get: operations["get_fact_evidence"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/facts/{fact_id}/review": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Review Fact
+         * @description Release or reject a fact the validator held for review (sanity bound, restatement,
+         *     currency). Verdicts for the holding are re-run afterwards.
+         */
+        post: operations["review_fact"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/config/strategy": {
         parameters: {
             query?: never;
@@ -184,6 +309,68 @@ export interface paths {
          * @description Save job schedules. The worker picks them up within a few minutes, no restart.
          */
         put: operations["save_jobs_config"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/config/holding-profiles": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Holding Profiles Config */
+        get: operations["get_holding_profiles_config"];
+        /**
+         * Save Holding Profiles Config
+         * @description Save holding profiles. The next earnings check and calendar refresh use them.
+         */
+        put: operations["save_holding_profiles_config"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/config/holding-profiles/validate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Validate Holding Profiles
+         * @description Validate holding profiles without saving. 422 lists every error.
+         */
+        post: operations["validate_holding_profiles"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/config/verification": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Verification Config
+         * @description The saved validator thresholds. 404 means the defaults apply.
+         */
+        get: operations["get_verification_config"];
+        /** Save Verification Config */
+        put: operations["save_verification_config"];
         post?: never;
         delete?: never;
         options?: never;
@@ -408,6 +595,260 @@ export interface components {
             /** Out Of Band */
             out_of_band: number;
         };
+        /**
+         * EarningsCalendarSettings
+         * @description Next report dates: Finnhub for US issuers, the IR calendar page otherwise.
+         */
+        EarningsCalendarSettings: {
+            /**
+             * Model
+             * @description Reads report dates off IR calendar pages.
+             * @default claude-haiku-4-5
+             * @example claude-sonnet-5
+             */
+            model: string;
+            /**
+             * Lookahead Days
+             * @default 120
+             */
+            lookahead_days: number;
+        };
+        /** EarningsCheckRequest */
+        EarningsCheckRequest: {
+            /**
+             * Ticker
+             * @example AAPL_US_EQ
+             */
+            ticker: string;
+            /**
+             * Report Date
+             * @description Report date to look for. Default: the instrument's report date if it has passed, else today.
+             */
+            report_date?: string | null;
+            /**
+             * Url
+             * @description Use this document instead of searching (a press release or report).
+             */
+            url?: string | null;
+        };
+        /**
+         * EarningsCheckSettings
+         * @description The earnings thesis check: find the release, extract figures, validate, judge KPIs.
+         */
+        EarningsCheckSettings: {
+            /**
+             * Extraction Model
+             * @default claude-sonnet-5
+             * @example claude-sonnet-5
+             */
+            extraction_model: string;
+            /**
+             * Locate Model
+             * @description Searches for the release when EDGAR has none (non-US issuers).
+             * @default claude-sonnet-5
+             * @example claude-sonnet-5
+             */
+            locate_model: string;
+            /**
+             * Effort
+             * @default high
+             * @enum {string}
+             */
+            effort: "low" | "medium" | "high" | "xhigh" | "max";
+            /**
+             * Max Steps
+             * @description Claude calls plus document fetches per run.
+             * @default 8
+             */
+            max_steps: number;
+            /**
+             * Max Searches
+             * @description Web searches per run.
+             * @default 3
+             */
+            max_searches: number;
+            /**
+             * Check Days After Report
+             * @description Days after the report date on which the check runs until it finds the release (the spec's +1, retry at +2 and +4).
+             */
+            check_days_after_report?: number[];
+            /**
+             * Max Document Mb
+             * @default 20
+             */
+            max_document_mb: number;
+        };
+        /** EvidenceLink */
+        EvidenceLink: {
+            /** Fact Id */
+            fact_id: number;
+            /** Ticker */
+            ticker: string;
+            /** Metric */
+            metric: string;
+            /** Period */
+            period: string;
+            /** Value As Written */
+            value_as_written: string;
+            /** Snippet */
+            snippet: string;
+            /** Unit Snippet */
+            unit_snippet: string | null;
+            /**
+             * Confidence
+             * @enum {string}
+             */
+            confidence: "verified" | "corroborated" | "unconfirmed" | "disputed";
+            /** Source Url */
+            source_url: string;
+            /**
+             * Evidence Url
+             * @description Signed URL of the archived copy, valid 10 minutes.
+             */
+            evidence_url: string;
+            /** Content Type */
+            content_type: string;
+            /**
+             * Fetched At
+             * Format: date-time
+             */
+            fetched_at: string;
+            /** Sha256 */
+            sha256: string;
+            /**
+             * Context
+             * @description The archived text around the snippet.
+             */
+            context: string | null;
+        };
+        /** Exposure */
+        Exposure: {
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "revenue_currency" | "revenue_region" | "commodity_input" | "other";
+            /**
+             * Name
+             * @example USD
+             * @example Greater China
+             * @example Copper
+             */
+            name: string;
+            /**
+             * Share
+             * @description Share of revenue or cost, 0..1.
+             */
+            share?: number | null;
+        };
+        /** FactCheck */
+        FactCheck: {
+            /** Check */
+            check: string;
+            /** Ok */
+            ok: boolean;
+            /**
+             * Detail
+             * @default
+             */
+            detail: string;
+        };
+        /** FactOut */
+        FactOut: {
+            /** Id */
+            id: number;
+            /** Metric */
+            metric: string;
+            /**
+             * Basis
+             * @enum {string}
+             */
+            basis: "reported" | "adjusted";
+            /** Period */
+            period: string;
+            /** Fiscal Year */
+            fiscal_year: number;
+            /** Fiscal Period */
+            fiscal_period: string;
+            /** Period End */
+            period_end: string | null;
+            /**
+             * Value
+             * @description As printed, in `scale`.
+             */
+            value: number;
+            /** Value As Written */
+            value_as_written: string;
+            /**
+             * Value Units
+             * @description With the scale applied.
+             */
+            value_units: number;
+            /**
+             * Scale
+             * @enum {string}
+             */
+            scale: "units" | "thousands" | "millions" | "billions";
+            /**
+             * Unit
+             * @enum {string}
+             */
+            unit: "currency" | "per_share" | "percent" | "count" | "ratio";
+            /** Currency */
+            currency: string | null;
+            /** Source Url */
+            source_url: string;
+            /** Snippet */
+            snippet: string;
+            /** Unit Snippet */
+            unit_snippet: string | null;
+            /** Evidence Sha256 */
+            evidence_sha256: string;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "verified" | "unverified" | "rejected" | "quarantined";
+            /** Status Reason */
+            status_reason: string | null;
+            /** Checks */
+            checks: components["schemas"]["FactCheck"][];
+            /** Restates Fact Id */
+            restates_fact_id: number | null;
+            /**
+             * Extracted At
+             * Format: date-time
+             */
+            extracted_at: string;
+            /** Reviewed At */
+            reviewed_at: string | null;
+            /**
+             * Confidence
+             * @enum {string}
+             */
+            confidence: "verified" | "corroborated" | "unconfirmed" | "disputed";
+        };
+        /** FactReview */
+        FactReview: {
+            /**
+             * Action
+             * @enum {string}
+             */
+            action: "verify" | "reject";
+            /** Note */
+            note?: string | null;
+        };
+        /** FactReviewResult */
+        FactReviewResult: {
+            /** Fact Id */
+            fact_id: number;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "verified" | "rejected";
+            verdict_job: components["schemas"]["JobSummary"];
+        };
         /** Freshness */
         Freshness: {
             /**
@@ -506,6 +947,128 @@ export interface components {
              */
             drift_status: "in_band" | "above_band" | "below_band" | "above_hard_limit" | "no_target";
         };
+        /** HoldingDetail */
+        HoldingDetail: {
+            /** Ticker */
+            ticker: string;
+            instrument: components["schemas"]["InstrumentInfo"] | null;
+            /** @description Null when the latest sync has no position. */
+            position: components["schemas"]["Holding"] | null;
+            /** Base Currency */
+            base_currency: string | null;
+            freshness: components["schemas"]["Freshness"] | null;
+            thesis: components["schemas"]["ThesisConfig"] | null;
+            /** Theses Config Version Id */
+            theses_config_version_id: number | null;
+            profile: components["schemas"]["HoldingProfile"] | null;
+            /** Kpis */
+            kpis: components["schemas"]["KpiStatus"][];
+            /**
+             * Facts
+             * @description Every fact, newest period first.
+             */
+            facts: components["schemas"]["FactOut"][];
+            last_earnings_check: components["schemas"]["JobSummary"] | null;
+            last_verdict_run: components["schemas"]["JobSummary"] | null;
+        };
+        /** HoldingProfile */
+        HoldingProfile: {
+            /**
+             * Ticker
+             * @example AAPL_US_EQ
+             */
+            ticker: string;
+            /**
+             * Company Name
+             * @default
+             */
+            company_name: string;
+            /**
+             * Aliases
+             * @description Other and former names, used to match news.
+             */
+            aliases?: string[];
+            /**
+             * Ir Url
+             * @description Investor relations home page.
+             */
+            ir_url?: string | null;
+            /**
+             * Results Urls
+             * @description Pages where results press releases or reports are published.
+             */
+            results_urls?: string[];
+            /**
+             * Financial Calendar Url
+             * @description IR financial calendar page with upcoming report dates.
+             */
+            financial_calendar_url?: string | null;
+            /** Regulatory News Urls */
+            regulatory_news_urls?: string[];
+            /**
+             * Extra Domains
+             * @description Further domains the earnings check may search and fetch from (the IR and results URLs' domains are always allowed).
+             */
+            extra_domains?: string[];
+            /**
+             * Sec Cik
+             * @description SEC Central Index Key. US issuers (8-K) and foreign issuers that furnish results on 6-K. Looked up from the ticker when empty.
+             */
+            sec_cik?: string | null;
+            /**
+             * Sec Ticker
+             * @description Ticker as EDGAR and Finnhub list it, when it differs from the Trading212 ticker's prefix.
+             */
+            sec_ticker?: string | null;
+            /**
+             * Fiscal Year End Month
+             * @description Month the fiscal year ends in (Apple: 9, Microsoft: 6). Maps fiscal quarters to calendar periods.
+             * @default 12
+             */
+            fiscal_year_end_month: number;
+            /**
+             * Reporting Currency
+             * @description Currency the company reports in; figures in another are held.
+             */
+            reporting_currency?: string | null;
+            /** Competitors */
+            competitors?: string[];
+            /** Suppliers */
+            suppliers?: string[];
+            /** Customers */
+            customers?: string[];
+            /** Watch Topics */
+            watch_topics?: string[];
+            /** Exposures */
+            exposures?: components["schemas"]["Exposure"][];
+        };
+        /**
+         * HoldingProfilesConfig
+         * @description All holding profiles. Stored as `config_version` rows, domain `holding_profiles`.
+         */
+        HoldingProfilesConfig: {
+            /**
+             * Schema Version
+             * @default 1
+             * @constant
+             */
+            schema_version: 1;
+            /** Profiles */
+            profiles?: components["schemas"]["HoldingProfile"][];
+        };
+        /** HoldingProfilesConfigVersion */
+        HoldingProfilesConfigVersion: {
+            /** Id */
+            id: number;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Note */
+            note: string | null;
+            body: components["schemas"]["HoldingProfilesConfig"];
+        };
         /** HoldingsResponse */
         HoldingsResponse: {
             freshness: components["schemas"]["Freshness"] | null;
@@ -518,6 +1081,25 @@ export interface components {
              * @description Every open position once, by value descending.
              */
             holdings: components["schemas"]["Holding"][];
+        };
+        /** InstrumentInfo */
+        InstrumentInfo: {
+            /** Name */
+            name: string | null;
+            /** Isin */
+            isin: string | null;
+            /** Currency */
+            currency: string | null;
+            /** Cik */
+            cik: string | null;
+            /** Next Report Date */
+            next_report_date: string | null;
+            /** Report Date Source */
+            report_date_source: string | null;
+            /** Last Report Date */
+            last_report_date: string | null;
+            /** Report Date Checked At */
+            report_date_checked_at: string | null;
         };
         /** JobSchedule */
         JobSchedule: {
@@ -579,6 +1161,12 @@ export interface components {
             schema_version: 1;
             /** @description Trading212 sync, FX rates and drift. Default: daily at 22:30 Prague time. */
             portfolio_sync?: components["schemas"]["JobSchedule"];
+            /** @description Refresh every holding's next report date. Default: Sundays 06:00. */
+            earnings_calendar?: components["schemas"]["JobSchedule"];
+            /** @description Queue earnings checks for holdings that reported. Default: daily 08:00. */
+            earnings_due?: components["schemas"]["JobSchedule"];
+            earnings_check?: components["schemas"]["EarningsCheckSettings"];
+            earnings_calendar_settings?: components["schemas"]["EarningsCalendarSettings"];
         };
         /** JobsConfigVersion */
         JobsConfigVersion: {
@@ -592,6 +1180,17 @@ export interface components {
             /** Note */
             note: string | null;
             body: components["schemas"]["JobsConfig"];
+        };
+        /** KpiStatus */
+        KpiStatus: {
+            kpi: components["schemas"]["ThesisKPI"];
+            /** @description Latest period's verdict. */
+            current: components["schemas"]["VerdictOut"] | null;
+            /**
+             * History
+             * @description Latest verdict per period, newest first.
+             */
+            history: components["schemas"]["VerdictOut"][];
         };
         /** PortfolioOverview */
         PortfolioOverview: {
@@ -889,6 +1488,7 @@ export interface components {
             threshold: number;
             /**
              * Unit
+             * @description What the threshold is in: '%', 'x', 'count', or a currency with an optional scale ('EUR bn', 'USD m', 'USD' for per-share amounts).
              * @example %
              * @example EUR bn
              */
@@ -911,6 +1511,14 @@ export interface components {
              */
             description: string;
         };
+        /** ThesisVerdictsRequest */
+        ThesisVerdictsRequest: {
+            /**
+             * Ticker
+             * @description One holding, or all when null.
+             */
+            ticker?: string | null;
+        };
         /** ValidationError */
         ValidationError: {
             /** Location */
@@ -923,6 +1531,112 @@ export interface components {
             input?: unknown;
             /** Context */
             ctx?: Record<string, never>;
+        };
+        /** VerdictOut */
+        VerdictOut: {
+            /** Id */
+            id: number;
+            /** Kpi Id */
+            kpi_id: string;
+            /** Period */
+            period: string | null;
+            /** Fiscal Year */
+            fiscal_year: number | null;
+            /** Fiscal Period */
+            fiscal_period: string | null;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "pass" | "breach" | "unknown";
+            /**
+             * Observed Value
+             * @description In the KPI's unit (e.g. 9.63 for '%').
+             */
+            observed_value: number | null;
+            /** Operator */
+            operator: string;
+            /** Threshold */
+            threshold: number;
+            /** Threshold Unit */
+            threshold_unit: string;
+            /** Rationale */
+            rationale: string;
+            /** Fact Ids */
+            fact_ids: number[];
+            /** Config Version Id */
+            config_version_id: number;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /**
+             * Confidence
+             * @enum {string}
+             */
+            confidence: "verified" | "corroborated" | "unconfirmed" | "disputed";
+            /**
+             * Stale
+             * @description Judged under an older theses config than the active one; re-run verdicts.
+             */
+            stale: boolean;
+        };
+        /**
+         * VerificationConfig
+         * @description Stored as `config_version` rows, domain `verification`.
+         */
+        VerificationConfig: {
+            /**
+             * Schema Version
+             * @default 1
+             * @constant
+             */
+            schema_version: 1;
+            /**
+             * Sanity Max Change Qoq
+             * @description A figure that moves more than this fraction against the previous quarter's verified figure is held for review (0.5 = ±50 %). Null disables.
+             * @default 0.5
+             */
+            sanity_max_change_qoq: number | null;
+            /**
+             * Sanity Overrides
+             * @description Per-metric band replacing the default; null disables the bound for that metric (e.g. seasonal or often sign-changing figures).
+             */
+            sanity_overrides?: {
+                [key: string]: number | null;
+            };
+            /**
+             * Stated Ratio Tolerance Pp
+             * @description How far (in percentage points) a ratio the document states may differ from the one recomputed from its raw figures before the stated one is rejected.
+             * @default 0.15
+             */
+            stated_ratio_tolerance_pp: number;
+            /**
+             * Period End Tolerance Days
+             * @description Slack between a stated period end and the calendar month end expected from the fiscal year end (52/53-week fiscal years end on a weekday, not month end).
+             * @default 10
+             */
+            period_end_tolerance_days: number;
+            /**
+             * Max Report Lag Days
+             * @description Latest a release may come out after the end of the period it reports.
+             * @default 150
+             */
+            max_report_lag_days: number;
+        };
+        /** VerificationConfigVersion */
+        VerificationConfigVersion: {
+            /** Id */
+            id: number;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Note */
+            note: string | null;
+            body: components["schemas"]["VerificationConfig"];
         };
     };
     responses: never;
@@ -1075,6 +1789,189 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["JobSummary"];
+                };
+            };
+        };
+    };
+    run_earnings_check: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["EarningsCheckRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["JobSummary"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    run_thesis_verdicts: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ThesisVerdictsRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["JobSummary"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    run_earnings_calendar: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["JobSummary"];
+                };
+            };
+        };
+    };
+    get_holding: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                ticker: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HoldingDetail"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_fact_evidence: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                fact_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EvidenceLink"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    review_fact: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                fact_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["FactReview"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FactReviewResult"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };
@@ -1234,6 +2131,151 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["JobsConfigVersion"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_holding_profiles_config: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HoldingProfilesConfigVersion"];
+                };
+            };
+        };
+    };
+    save_holding_profiles_config: {
+        parameters: {
+            query?: {
+                /** @description Why this change was made. */
+                note?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["HoldingProfilesConfig"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HoldingProfilesConfigVersion"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    validate_holding_profiles: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["HoldingProfilesConfig"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HoldingProfilesConfig"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_verification_config: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["VerificationConfigVersion"];
+                };
+            };
+        };
+    };
+    save_verification_config: {
+        parameters: {
+            query?: {
+                /** @description Why this change was made. */
+                note?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["VerificationConfig"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["VerificationConfigVersion"];
                 };
             };
             /** @description Validation Error */

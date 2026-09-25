@@ -12,17 +12,25 @@ Both share `steward` (settings, logging, DB access, config schemas, source adapt
 ```
 src/
   steward/           shared library
-    config/          Pydantic schemas per config domain (strategy, theses, jobs) + versioned store
+    config/          Pydantic schemas per config domain (strategy, theses, jobs, holding
+                     profiles, verification) + versioned store
+    documents/       fetching source documents, HTML/PDF to text, snippet matching
+    earnings/        earnings check: locate, extract (Claude), validate, verdicts, calendar,
+                     golden-set evaluation (`python -m steward.earnings.golden`)
     fx/              ČNB and ECB reference-rate collectors, currency conversion
     jobs/            job runner (advisory lock, job/job_step log), pgmq queue, registry
     portfolio/       sync job, day snapshots, drift, API read models
+    sources/         SEC EDGAR and Finnhub adapters
     trading212/      read-only Trading212 client (+ `python -m steward.trading212`)
+    ai.py            Anthropic client, per-step token and cost accounting
+    storage.py       evidence archive (Supabase Storage REST)
     db.py            asyncpg pool as app_backend
     logging.py       logging with secret scrubbing
     settings.py      environment settings
   api/               FastAPI app, routes, JWT verification, OpenAPI export
   worker/            scheduler + queue consumer entrypoint
 tests/               pytest (DB tests need STEWARD_TEST_DATABASE_URL)
+tests/golden/        golden set of real earnings releases with labelled figures
 openapi.json         committed API contract; the frontend generates its types from it
 ```
 
@@ -46,6 +54,9 @@ uv run python -m api.export_openapi          # regenerate openapi.json after API
 uv run python -m steward.trading212          # print positions from the Trading212 demo account
 uv run python -m steward.trading212 --env live
 
+uv run python -m steward.earnings.golden      # golden set through validator + verdicts
+uv run python -m steward.earnings.golden --live --record runs/$(date +%F)   # measure Claude
+
 uv run pytest                                # unit tests; DB tests skip without a database
 STEWARD_TEST_DATABASE_URL=postgresql://postgres:postgres@localhost:5432/postgres uv run pytest
 uv run ruff check . && uv run ruff format --check . && uv run mypy
@@ -57,14 +68,20 @@ in `supabase/migrations`, then check the access model as `app_backend`, `authent
 (owner and non-owner) and `anon`. The pgmq migration is skipped on servers without the
 extension; CI runs against a Postgres image that has it.
 
-## API (Phase 1)
+## API
 
 | Route | What it does |
 | --- | --- |
 | `GET /portfolio/overview` | Totals, allocation, drift against the active strategy, freshness |
 | `GET /portfolio/holdings` | Every open position of the latest snapshot, largest first |
+| `GET /holdings/{ticker}` | Position, thesis, profile, KPI verdicts with history, every fact |
+| `GET /facts/{id}/evidence` | Signed URL of the archived source, and the text around the snippet |
+| `POST /facts/{id}/review` | Accept or reject a fact the validator held; re-queues verdicts |
 | `POST /jobs/portfolio-sync` | Queue a sync now (202); the worker runs it |
-| `GET`/`PUT /config/{strategy,theses,jobs}` | Active config version / save a new one |
+| `POST /jobs/earnings-check` | Queue an earnings check for `{ticker, report_date?, url?}` |
+| `POST /jobs/thesis-verdicts` | Re-judge KPIs from stored facts (`{ticker?}`), no model calls |
+| `POST /jobs/earnings-calendar` | Refresh next report dates now |
+| `GET`/`PUT /config/{strategy,theses,jobs,holding-profiles,verification}` | Active config version / save a new one |
 
 All but `/health` need the owner's MFA-verified Supabase JWT.
 
@@ -86,6 +103,30 @@ All but `/health` need the owner's MFA-verified Supabase JWT.
 - **Drift** is computed on read from the latest snapshot and the *active* strategy, so a
   saved target change shows up immediately.
 
+- **Earnings check** (`earnings_check`, queued by `earnings_due` at report date +1, +2 and
+  +4 days, or on demand). Locate: EDGAR 8-K item 2.02 or 6-K exhibit 99.1 near the report
+  date; else one Claude web search restricted to the holding profile's domains, whose answer
+  is used only if it was among the search results. The code fetches the document (size-capped),
+  archives the exact bytes in Storage keyed by SHA-256, and converts it to text. One Claude
+  call (Sonnet 5 by default, set in the Jobs config) gets only that document and returns
+  figures as JSON with the number as written and a verbatim snippet; it has no tools. The
+  validator then checks every figure in code (see `steward/earnings/validate.py`: snippet
+  containment, value reading, scale, currency, fiscal-period alignment, consistency,
+  recomputation of stated ratios, sanity bounds, restatements). Only `verified` facts reach
+  verdicts; `unverified` ones wait for the owner's review; `rejected` ones are kept for the
+  record. Every step logs tokens and cost on `job_step`.
+- **Verdicts are arithmetic, in code.** A KPI is an absolute threshold, so pass / breach is
+  computed from verified facts: margins and growth rates are recomputed from raw figures,
+  converted to the KPI's unit (`%`, `x`, `EUR bn`, `USD per share`) and compared. No
+  verified figure, a currency mismatch, or a missing prior period gives `unknown` with the
+  reason. The spec's separate "verdict call" is deliberately not a model call: it would add
+  a way to be wrong and no information, since the judgement needs no language.
+- **Golden set.** `tests/golden/earnings`: 23 real releases (Apple, Microsoft, NVIDIA, SAP,
+  Novo Nordisk) from EDGAR with 272 labelled figures. CI runs them with the labels as the
+  extraction, which proves every correct real-world figure passes validation and every KPI
+  gets a verdict. `--live` measures Claude's extraction accuracy (Phase 2 target 95 %).
+  The labels were read by Claude and US figures cross-checked against XBRL; hand-check them
+  and add your own holdings.
 - **Config is validated here.** `steward.config` holds the Pydantic model per config domain.
   `POST /config/{domain}/validate` exposes them, which also puts `StrategyConfig`,
   `ThesesConfig` and `ThesisConfig` into `openapi.json` for the frontend's generated types.

@@ -21,6 +21,7 @@ from steward.config import (
 from steward.config.common import Ticker
 from steward.config.store import StoredConfig, load_active, save_config
 from steward.earnings.read import (
+    FACT_CONFIDENCE,
     EvidenceLink,
     HoldingDetail,
     document_text,
@@ -171,9 +172,10 @@ async def get_fact_evidence(
     """The archived copy of the page a fact was read from: a short-lived signed URL and
     the text around the fact's snippet."""
     row = await pool.fetchrow(
-        "select f.id, f.snippet, e.source_url, e.storage_path, e.content_type, e.fetched_at,"
-        " e.sha256 from public.fact f join public.evidence e on e.sha256 = f.evidence_sha256"
-        " where f.id = $1",
+        "select f.id, f.ticker, f.metric, f.period, f.value_as_written, f.snippet,"
+        " f.unit_snippet, f.status, e.source_url, e.storage_path, e.content_type,"
+        " e.fetched_at, e.sha256 from public.fact f"
+        " join public.evidence e on e.sha256 = f.evidence_sha256 where f.id = $1",
         fact_id,
     )
     if row is None:
@@ -188,6 +190,13 @@ async def get_fact_evidence(
     )
     return EvidenceLink(
         fact_id=row["id"],
+        ticker=row["ticker"],
+        metric=row["metric"],
+        period=row["period"],
+        value_as_written=row["value_as_written"],
+        snippet=row["snippet"],
+        unit_snippet=row["unit_snippet"],
+        confidence=FACT_CONFIDENCE[row["status"]],
         source_url=row["source_url"],
         evidence_url=url,
         content_type=row["content_type"],

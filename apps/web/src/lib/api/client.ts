@@ -22,6 +22,19 @@ export type DriftReport = Schemas["DriftReport"];
 export type PositionDrift = Schemas["PositionDrift"];
 export type DriftStatus = PositionDrift["status"];
 export type Freshness = Schemas["Freshness"];
+export type HoldingDetail = Schemas["HoldingDetail"];
+export type KpiStatus = Schemas["KpiStatus"];
+export type VerdictOut = Schemas["VerdictOut"];
+export type FactOut = Schemas["FactOut"];
+export type EvidenceLink = Schemas["EvidenceLink"];
+export type Confidence = FactOut["confidence"];
+export type VerdictStatus = VerdictOut["status"];
+export type ThesesConfig = Schemas["ThesesConfig"];
+export type ThesisConfig = Schemas["ThesisConfig"];
+export type ThesisKPI = Schemas["ThesisKPI"];
+export type HoldingProfilesConfig = Schemas["HoldingProfilesConfig"];
+export type HoldingProfile = Schemas["HoldingProfile"];
+export type Exposure = Schemas["Exposure"];
 
 export type AccessTokenGetter = () => Promise<string | null | undefined>;
 
