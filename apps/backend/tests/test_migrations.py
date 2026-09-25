@@ -27,6 +27,10 @@ async def test_backend_reads_and_writes_foundation_tables(migrated_db: MigratedD
     conn = await asyncpg.connect(migrated_db.backend_url)
     try:
         assert await conn.fetchval("select current_user") == "app_backend"
+        # The seed migration left a placeholder strategy active; retire it first.
+        await conn.execute(
+            "update config_version set active = false where domain = 'strategy' and active"
+        )
         first = await conn.fetchval(
             "insert into config_version (domain, body, schema_version, active)"
             " values ('strategy', $1::jsonb, 1, true) returning id",
@@ -152,13 +156,15 @@ async def test_frontend_reads_only_as_owner(migrated_db: MigratedDatabase) -> No
         )
         await conn.execute("insert into private.app_owner (user_id) values ($1)", OWNER)
 
+        versions = await conn.fetchval("select count(*) from config_version")  # incl. the seed
+
         await _as_frontend(conn, "authenticated", STRANGER)
         assert await conn.fetchval("select count(*) from instrument") == 0
         assert await conn.fetchval("select count(*) from config_version") == 0
 
         await _as_frontend(conn, "authenticated", OWNER)
         assert await conn.fetchval("select count(*) from instrument") == 1
-        assert await conn.fetchval("select count(*) from config_version") == 1
+        assert await conn.fetchval("select count(*) from config_version") == versions
         # Writes go through the API, never directly from the browser.
         with pytest.raises(asyncpg.InsufficientPrivilegeError):
             await conn.execute("insert into instrument (t212_ticker) values ('X_EQ')")
@@ -213,3 +219,17 @@ async def test_pgmq_enabled_and_usable_by_backend(migrated_db: MigratedDatabase)
     finally:
         await backend.close()
         await admin.close()
+
+
+async def test_seeded_placeholder_strategy_is_a_valid_config(migrated_db: MigratedDatabase) -> None:
+    from steward.config import StrategyConfig
+
+    conn = await asyncpg.connect(migrated_db.admin_url)
+    try:
+        body = await conn.fetchval(
+            "select body from config_version where domain = 'strategy' and active"
+        )
+    finally:
+        await conn.close()
+    strategy = StrategyConfig.model_validate(json.loads(body))
+    assert strategy.base_currency == "CZK" and strategy.target_positions
