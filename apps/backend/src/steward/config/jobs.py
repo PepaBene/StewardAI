@@ -232,6 +232,132 @@ class CalendarSettings(ConfigModel):
         return {c.date for c in self.exchange_closures if c.mic == mic}
 
 
+class EscalationSettings(ConfigModel):
+    """Event escalation: an impact note on a confirmed severity-2+ story or a price move."""
+
+    enabled: bool = True
+    model: ModelId = "claude-sonnet-5"
+    max_steps: int = Field(
+        default=5, ge=1, le=20, description="Claude calls plus web searches per escalation."
+    )
+    max_searches: int = Field(default=3, ge=0, le=10)
+    min_severity: int = Field(default=2, ge=1, le=3)
+
+
+class EurostatSeries(ConfigModel):
+    key: Annotated[str, Field(pattern=r"^[a-z0-9_]{1,40}$")]
+    label: str = Field(min_length=1, max_length=100)
+    dataset: str = Field(pattern=r"^[a-z0-9_]{3,40}$")
+    filters: dict[str, str] = Field(
+        default_factory=dict, description="Dimension filters, e.g. {'unit': 'RCH_A'}."
+    )
+    unit: str = Field(default="%", max_length=20)
+
+
+class FredSeries(ConfigModel):
+    key: Annotated[str, Field(pattern=r"^[a-z0-9_]{1,40}$")]
+    label: str = Field(min_length=1, max_length=100)
+    series_id: str = Field(pattern=r"^[A-Z0-9_]{1,30}$")
+    units: Literal["lin", "pch", "pc1", "chg"] = "lin"
+    unit: str = Field(default="%", max_length=20)
+    policy_rate: bool = False
+
+
+class EcbSeries(ConfigModel):
+    key: Annotated[str, Field(pattern=r"^[a-z0-9_]{1,40}$")]
+    label: str = Field(min_length=1, max_length=100)
+    flow_key: str = Field(
+        pattern=r"^[A-Z0-9_]+/[A-Za-z0-9._+]+$",
+        description="Data Portal flow/key, e.g. FM/D.U2.EUR.4F.KR.DFR.LEV.",
+    )
+    unit: str = Field(default="%", max_length=20)
+    policy_rate: bool = False
+
+
+def _eurostat_defaults() -> list[EurostatSeries]:
+    rows = [
+        ("hicp", "HICP inflation, annual rate", "prc_hicp_minr",
+         {"unit": "RCH_A", "coicop18": "TOTAL"}, "%"),
+        ("unemployment", "Unemployment rate", "une_rt_m",
+         {"s_adj": "SA", "age": "TOTAL", "sex": "T", "unit": "PC_ACT"}, "%"),
+        ("gdp", "GDP, change on previous quarter", "namq_10_gdp",
+         {"unit": "CLV_PCH_PRE", "s_adj": "SCA", "na_item": "B1GQ"}, "%"),
+        ("industrial_production", "Industrial production, change on previous month",
+         "sts_inpr_m", {"indic_bt": "PRD", "nace_r2": "B-D", "s_adj": "SCA", "unit": "PCH_PRE"},
+         "%"),
+        ("sentiment", "Economic sentiment indicator", "ei_bssi_m_r2",
+         {"indic": "BS-ESI-I", "s_adj": "SA"}, "index"),
+    ]  # fmt: skip
+    return [
+        EurostatSeries(key=k, label=label, dataset=d, filters=f, unit=u)
+        for k, label, d, f, u in rows
+    ]
+
+
+class MacroSettings(ConfigModel):
+    """Macro series collected into `macro_series` (numbers in digests come only from here)."""
+
+    geos: list[Annotated[str, Field(pattern=r"^[A-Z0-9]{2,5}$")]] = Field(
+        default_factory=lambda: ["CZ", "DE", "EA21"],
+        description="Eurostat areas: countries and the euro area (EA21 from 2026).",
+    )
+    eurostat: list[EurostatSeries] = Field(default_factory=_eurostat_defaults)
+    fred: list[FredSeries] = Field(
+        default_factory=lambda: [
+            FredSeries(
+                key="us_cpi",
+                label="US CPI inflation, annual rate",
+                series_id="CPIAUCSL",
+                units="pc1",
+            ),
+            FredSeries(key="us_unemployment", label="US unemployment rate", series_id="UNRATE"),
+            FredSeries(
+                key="fed_funds", label="Fed funds effective rate", series_id="DFF", policy_rate=True
+            ),
+        ]
+    )
+    ecb: list[EcbSeries] = Field(
+        default_factory=lambda: [
+            EcbSeries(
+                key="ecb_deposit_rate",
+                label="ECB deposit facility rate",
+                flow_key="FM/D.U2.EUR.4F.KR.DFR.LEV",
+                policy_rate=True,
+            ),
+        ]
+    )
+
+
+class MonitorSettings(ConfigModel):
+    """Monitoring: failed jobs, missed scheduled runs and per-holding coverage gaps alert."""
+
+    alert_failed_jobs: list[str] = Field(
+        default_factory=lambda: [
+            "portfolio_sync",
+            "news_ingest",
+            "earnings_check",
+            "daily_digest",
+            "weekly_digest",
+            "reference_data",
+            "price_history",
+            "macro_collect",
+        ],
+        description="Job types whose failed runs alert (once per run).",
+    )
+    missed_run_grace_minutes: int = Field(
+        default=90,
+        ge=5,
+        le=1440,
+        description="A scheduled run that has not succeeded this long after its slot is missed.",
+    )
+    news_coverage_hours: int = Field(
+        default=48,
+        ge=6,
+        le=336,
+        description="A holding with no successful news run this long raises a coverage alert.",
+    )
+
+
 class JobsConfig(ConfigModel):
     """Schedules for the worker's timed jobs. Stored as `config_version` rows, domain `jobs`.
 
@@ -276,6 +402,16 @@ class JobsConfig(ConfigModel):
         default_factory=lambda: JobSchedule(cron="0 4 2 1,7 *"),
         description="Public holidays for this and next year. Default: 2 January and 2 July.",
     )
+    macro_collect: JobSchedule = Field(
+        default_factory=lambda: JobSchedule(cron="30 11 * * *"),
+        description="FRED, ECB and Eurostat macro series; macro surprises on release days. "
+        "Default: daily 11:30 (after Eurostat's 11:00 releases).",
+    )
+    monitor: JobSchedule = Field(
+        default_factory=lambda: JobSchedule(cron="*/15 * * * *"),
+        description="Alert on failed jobs, missed runs and coverage gaps. Default: every 15 "
+        "minutes.",
+    )
     news_ingest: JobSchedule = Field(
         default_factory=lambda: JobSchedule(cron="0 6-22/2 * * *"),
         description="Ingest, classify, corroborate and alert. Default: every 2 h, 06:00-22:00.",
@@ -294,6 +430,9 @@ class JobsConfig(ConfigModel):
     )
     news: NewsSettings = Field(default_factory=NewsSettings)
     digest: DigestSettings = Field(default_factory=DigestSettings)
+    escalation: EscalationSettings = Field(default_factory=EscalationSettings)
+    macro: MacroSettings = Field(default_factory=MacroSettings)
+    monitoring: MonitorSettings = Field(default_factory=MonitorSettings)
     reference: ReferenceSettings = Field(default_factory=ReferenceSettings)
     prices: PriceSettings = Field(default_factory=PriceSettings)
     calendar: CalendarSettings = Field(default_factory=CalendarSettings)
@@ -308,6 +447,8 @@ class JobsConfig(ConfigModel):
             "reference_data": self.reference_data,
             "price_history": self.price_history,
             "holiday_refresh": self.holiday_refresh,
+            "macro_collect": self.macro_collect,
+            "monitor": self.monitor,
             "news_ingest": self.news_ingest,
             "daily_digest": self.daily_digest,
             "weekly_digest": self.weekly_digest,

@@ -10,6 +10,10 @@
 - FX history: the ECB's rates for `history_years` from Frankfurter in one request (once), and
   a daily consistency check of the Data Portal's latest rates against Frankfurter's.
 
+- Price-move trigger: when a holding's latest close moved beyond the event rules' threshold
+  (default +-8 %) against the previous close, an event escalation is queued once for that
+  holding and day. Without Stooq data, Trading212's prices on consecutive sync days are used.
+
 `holiday_refresh` (twice a year, and on demand): public holidays of the configured
 countries for this and next year from Nager.Date.
 """
@@ -24,11 +28,13 @@ import asyncpg
 import httpx
 
 from steward import __version__
+from steward.config.event_rules import EventRulesConfig
 from steward.config.holding_profiles import HoldingProfilesConfig
 from steward.config.jobs import JobsConfig
 from steward.config.store import load_active
 from steward.fx.convert import FxRate
 from steward.jobs.runner import JobContext
+from steward.news.escalation import queue_escalation
 from steward.portfolio.sync import store_rates
 from steward.reference.identity import holding_tickers
 from steward.sources.market import (
@@ -185,6 +191,34 @@ def _frankfurter(rate: FxRate) -> FxRate:
     return replace(rate, provider="frankfurter")
 
 
+async def latest_move(
+    pool: asyncpg.Pool, ticker: str, symbol: str | None, today: dt.date
+) -> tuple[dt.date, float, str] | None:
+    """(date, close-to-close % move, price source) of the latest close, if recent."""
+    rows = []
+    source = symbol or "trading212"
+    if symbol:
+        rows = await pool.fetch(
+            "select date, close from public.price_bar where symbol = $1 and source = 'stooq'"
+            " order by date desc limit 2",
+            symbol,
+        )
+    if len(rows) < 2:
+        source = "trading212"
+        rows = await pool.fetch(
+            "select snapshot_date as date, current_price as close from public.position_snapshot"
+            " where ticker = $1 order by snapshot_date desc limit 2",
+            ticker,
+        )
+    if len(rows) < 2 or not rows[1]["close"]:
+        return None
+    day = rows[0]["date"]
+    if day < today - dt.timedelta(days=4):
+        return None  # history backfill, not today's move
+    pct = float((Decimal(rows[0]["close"]) / Decimal(rows[1]["close"]) - 1) * 100)
+    return day, pct, source
+
+
 async def run_price_history(ctx: JobContext, deps: PriceDeps) -> None:
     pool = ctx.pool
     async with ctx.step("load_config") as step:
@@ -227,6 +261,32 @@ async def run_price_history(ctx: JobContext, deps: PriceDeps) -> None:
         now = dt.datetime.now(dt.UTC).isoformat()
         await _save_state(pool, GAPS_KEY, {"at": now, "gaps": gaps})
         await _save_state(pool, CHECKS_KEY, {"at": now, "checks": checks})
+
+    async with ctx.step("price_moves") as step:
+        rules = await load_active(pool, "event_rules", EventRulesConfig)
+        await ctx.record_config_version(rules.id if rules else None)
+        threshold = (rules.body if rules else EventRulesConfig()).price_move_threshold_pct
+        moves = []
+        for ticker, symbol in symbols.items():
+            move = await latest_move(pool, ticker, symbol, deps.today)
+            if move is None:
+                continue
+            day, pct, used = move
+            if abs(pct) <= threshold:
+                continue
+            job = await queue_escalation(
+                pool,
+                {
+                    "trigger": "price_move",
+                    "ticker": ticker,
+                    "date": day.isoformat(),
+                    "move_pct": round(pct, 4),
+                    "symbol": used,
+                },
+                ("date", day.isoformat()),
+            )
+            moves.append(f"{ticker} {pct:+.2f}% on {day} (job {job or 'already queued'})")
+        step.detail.update(threshold_pct=threshold, moves=moves)
 
     async with ctx.step("fx_history") as step:
         await fx_history(pool, deps, settings.history_years, step.detail)

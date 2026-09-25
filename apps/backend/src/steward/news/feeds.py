@@ -52,6 +52,13 @@ class HoldingFeedInfo:
     names: tuple[str, ...]
     cik: str | None
     symbol: str | None
+    isin: str | None = None
+    # Home market country (FIRDS/FITRS): decides RNS (GB) or EQS (DE).
+    home_country: str | None = None
+    # London ticker (TIDM) for the Investegate company page.
+    tidm: str | None = None
+    regulatory_urls: tuple[str, ...] = ()
+    topics: tuple[str, ...] = ()
 
 
 @dataclass

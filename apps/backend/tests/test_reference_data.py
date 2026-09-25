@@ -504,7 +504,7 @@ async def test_prices_risk_and_visible_gaps(
     assert history.risk.volatility == pytest.approx(risk.volatility(closes))
     assert history.risk.max_drawdown == pytest.approx(risk.max_drawdown(closes))
     assert history.risk.beta == pytest.approx(1.0)  # the same series as its benchmark
-    assert history.plausibility is not None and history.plausibility["flagged"] is True
+    assert history.plausibility is not None and history.plausibility.flagged is True
 
     gap = await price_history(backend_pool, "ZZZ_EQ", 365)
     assert gap.bars == [] and gap.gap == "Stooq has no data for zzz.de"

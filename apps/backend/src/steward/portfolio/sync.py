@@ -24,6 +24,7 @@ from steward.config.strategy import StrategyConfig
 from steward.fx.convert import FxRate, FxSourceName, FxTable, MissingRateError
 from steward.fx.sources import FxSourceError, fetch_rates
 from steward.jobs.runner import JobContext, JobFailed
+from steward.portfolio.breaches import evaluate, record_breaches
 from steward.portfolio.drift import HoldingValue, compute_drift
 from steward.portfolio.snapshot import Snapshot, build_snapshot, snapshot_date_for
 from steward.reference.calendar import fx_stale
@@ -142,6 +143,22 @@ async def portfolio_sync(ctx: JobContext, deps: SyncDeps) -> None:
             flagged=[
                 p.ticker for p in report.positions if p.status not in ("in_band", "no_target")
             ],
+        )
+
+    async with ctx.step("breaches") as step:
+        breaches = await record_breaches(
+            pool,
+            evaluate(report, strategy),
+            job_id=ctx.job_id,
+            config_version_id=stored.id if stored else None,
+            now=deps.now(),
+            app_url=get_settings().app_url,
+        )
+        step.detail.update(
+            opened=breaches.opened,
+            still_open=breaches.still_open,
+            cleared=breaches.cleared,
+            alerts=breaches.alerts,
         )
 
 

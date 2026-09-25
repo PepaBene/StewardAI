@@ -29,8 +29,13 @@ from steward import __version__
 from steward.ai import AINotConfigured, create_client
 from steward.config.event_rules import EVENT_DESCRIPTIONS, EventRulesConfig
 from steward.config.holding_profiles import HoldingProfilesConfig
-from steward.config.jobs import JobsConfig, NewsSettings
-from steward.config.news_sources import AGGREGATOR_TYPES, NewsSource, NewsSourcesConfig
+from steward.config.jobs import EscalationSettings, JobsConfig, NewsSettings
+from steward.config.news_sources import (
+    AGGREGATOR_TYPES,
+    REGULATORY_COUNTRY,
+    NewsSource,
+    NewsSourcesConfig,
+)
 from steward.config.notifications import NotificationsConfig
 from steward.config.store import load_active
 from steward.config.thesis import ThesesConfig
@@ -55,6 +60,7 @@ from steward.news.corroborate import (
     SearchRequest,
     decide,
 )
+from steward.news.escalation import escalation_due, queue_escalation
 from steward.news.feeds import (
     HoldingFeedInfo,
     RawItem,
@@ -66,9 +72,11 @@ from steward.news.feeds import (
 )
 from steward.news.link import HoldingTerms, Linker, holding_terms
 from steward.news.normalize import canonical_url, host_of
+from steward.news.regulatory import FtsResult, collect_edgar_fts, collect_regulatory
 from steward.notify.alerts import create_alerts, dispatch_due
 from steward.notify.channels import Channel, channels_from_settings
 from steward.notify.route import AlertRequest
+from steward.reference.identity import object_key, upsert_relationship
 from steward.settings import get_settings
 from steward.sources.edgar import EdgarClient
 
@@ -99,6 +107,7 @@ class NewsConfig:
     theses: ThesesConfig
     news: NewsSettings
     version_ids: tuple[int, ...]
+    escalation: EscalationSettings = field(default_factory=EscalationSettings)
 
 
 async def load_news_config(ctx: JobContext) -> NewsConfig:
@@ -120,6 +129,7 @@ async def load_news_config(ctx: JobContext) -> NewsConfig:
         profiles=profiles.body if profiles else HoldingProfilesConfig(),
         theses=theses.body if theses else ThesesConfig(),
         news=(jobs.body if jobs else JobsConfig()).news,
+        escalation=(jobs.body if jobs else JobsConfig()).escalation,
         version_ids=tuple(s.id for s in stored if s is not None),
     )
 
@@ -153,8 +163,11 @@ async def load_holdings(pool: asyncpg.Pool, config: NewsConfig) -> Holdings:
     instruments = {
         r["t212_ticker"]: r
         for r in await pool.fetch(
-            "select t212_ticker, name, isin, cik from public.instrument"
-            " where t212_ticker = any($1::text[])",
+            "select i.t212_ticker, i.name, i.isin, i.cik, i.home_country,"
+            " (select listing_ticker from public.instrument_identifier x"
+            "   where x.ticker = i.t212_ticker and x.exch_code = 'LN'"
+            "   order by (x.figi = x.composite_figi) desc limit 1) as tidm"
+            " from public.instrument i where i.t212_ticker = any($1::text[])",
             tickers,
         )
     }
@@ -185,7 +198,21 @@ async def load_holdings(pool: asyncpg.Pool, config: NewsConfig) -> Holdings:
         terms.append(t)
         cik = (profile.sec_cik if profile else None) or (instrument["cik"] if instrument else None)
         names = tuple(dict.fromkeys([*t.names[1:2], *t.names[:1], *t.aliases]))
-        feed_info.append(HoldingFeedInfo(ticker, names, cik, t.symbols[0] if t.symbols else None))
+        feed_info.append(
+            HoldingFeedInfo(
+                ticker,
+                names,
+                cik,
+                t.symbols[0] if t.symbols else None,
+                isin=instrument["isin"] if instrument else None,
+                home_country=instrument["home_country"] if instrument else None,
+                tidm=instrument["tidm"] if instrument else None,
+                regulatory_urls=tuple(str(u) for u in profile.regulatory_news_urls)
+                if profile
+                else (),
+                topics=tuple(profile.watch_topics) if profile else (),
+            )
+        )
         thesis = next((th for th in config.theses.theses if th.ticker == ticker), None)
         context.append(
             HoldingContext(
@@ -239,7 +266,9 @@ async def collect_source(
     since: dt.datetime,
     pool: asyncpg.Pool,
     freshness_days: int,
+    rules: EventRulesConfig | None = None,
 ) -> tuple[list[RawItem], list[str]]:
+    rules = rules or EventRulesConfig()
     scoped = tuple(source.tickers)
     feeds = [h for h in holdings.feed_info if not scoped or h.ticker in scoped]
     if source.type == "rss":
@@ -270,8 +299,85 @@ async def collect_source(
             deps.http, deps.finnhub_key, source.id, feeds, since, deps.now().date()
         )
         return result.items, result.errors
+    if source.type in REGULATORY_COUNTRY:
+        result = await collect_regulatory(
+            deps.http,
+            source.type,
+            source.id,
+            feeds,
+            rules,
+            REGULATORY_COUNTRY[source.type],
+        )
+        return result.items, result.errors
+    if source.type == "edgar_fts":
+        if deps.edgar is None:
+            return [], ["SEC_USER_AGENT is not set"]
+        fts = await collect_edgar_fts(
+            deps.http, deps.edgar.headers, source.id, feeds, since.date(), deps.now().date()
+        )
+        await record_filing_hits(pool, fts)
+        return fts.items, fts.errors
     result = await collect_google_news(deps.http, source.id, feeds, freshness_days)
     return result.items, result.errors
+
+
+async def record_filing_hits(pool: asyncpg.Pool, fts: FtsResult) -> None:
+    """Topic hits (linked to their news item once stored) and other filers naming a holding,
+    stored as suggested relationships linked to the filing."""
+    for ticker, topic, hit in fts.topic_hits:
+        await pool.execute(
+            "insert into public.filing_hit (ticker, kind, query, matched_term, accession, cik,"
+            " filer_name, form, filed_at, file, url) values ($1, 'topic', $2, $2, $3, $4, $5,"
+            " $6, $7, $8, $9) on conflict do nothing",
+            ticker,
+            topic,
+            hit.accession,
+            hit.cik,
+            hit.filer_name,
+            hit.form,
+            hit.filed_at,
+            hit.file,
+            hit.url,
+        )
+    for ticker, relation, keyword, hit in fts.relations:
+        async with pool.acquire() as conn, conn.transaction():
+            await upsert_relationship(
+                conn,
+                ticker=ticker,
+                subject=ticker,
+                subject_name=None,
+                type=relation,
+                object_name=hit.filer_name,
+                source="edgar",
+                confirmed=False,
+                source_ref=hit.url,
+                as_of=hit.filed_at,
+                detail={"keyword": keyword, "form": hit.form, "accession": hit.accession},
+            )
+            rel_id = await conn.fetchval(
+                "select id from public.entity_relationship where ticker = $1 and type = $2"
+                " and object_key = $3",
+                ticker,
+                relation,
+                object_key(None, None, hit.filer_name),
+            )
+            await conn.execute(
+                "insert into public.filing_hit (ticker, kind, query, matched_term, accession,"
+                " cik, filer_name, form, filed_at, file, url, relationship_id) values ($1, $2,"
+                " $3, $4, $5, $6, $7, $8, $9, $10, $11, $12) on conflict do nothing",
+                ticker,
+                relation,
+                f"name + {keyword}",
+                keyword,
+                hit.accession,
+                hit.cik,
+                hit.filer_name,
+                hit.form,
+                hit.filed_at,
+                hit.file,
+                hit.url,
+                rel_id,
+            )
 
 
 def item_tier(
@@ -363,12 +469,17 @@ async def store_items(
         if config.sources.blocked(item.outlet_host) or config.sources.blocked(host_of(url)):
             stats.blocked += 1
             continue
+        if source.type in AGGREGATOR_TYPES and not config.sources.allowed_aggregated(
+            item.outlet_host
+        ):
+            stats.blocked += 1
+            continue
         tier = item_tier(item, source, config.sources, holdings.ir_domains)
         if tier == 3 and not config.sources.include_tier3:
             stats.tier3_dropped += 1
             continue
         links = linker.link(f"{item.headline}\n{item.summary or ''}", item.tickers)
-        if not links:
+        if not links and not source.macro:
             stats.unlinked += 1
             continue
         fingerprint = Fingerprint.of(item.headline, item.summary, (item.outlet_name or "",))
@@ -408,7 +519,7 @@ async def store_items(
                 [link.ticker for link in links],
                 json.dumps([link.as_json() for link in links]),
                 item.event_type,
-                links[0].ticker if item.event_type else None,
+                links[0].ticker if item.event_type and links else None,
                 False if item.event_type else None,
                 True if item.event_type else None,
                 now if item.event_type else None,
@@ -546,6 +657,8 @@ class StoryState:
     finding: SearchFinding | None
     url: str
     classified: bool
+    resolution: str | None = None
+    duplicate_of: int | None = None
 
 
 def _finding_from_json(data: Any) -> SearchFinding | None:
@@ -563,8 +676,8 @@ async def load_story(
     pool: asyncpg.Pool, cluster_id: int, rules: EventRulesConfig
 ) -> StoryState | None:
     cluster = await pool.fetchrow(
-        "select id, status, search_rounds, last_searched_at, corroboration, first_seen"
-        " from public.story_cluster where id = $1",
+        "select id, status, search_rounds, last_searched_at, corroboration, first_seen,"
+        " resolution, duplicate_of from public.story_cluster where id = $1",
         cluster_id,
     )
     items = await pool.fetch(
@@ -604,6 +717,8 @@ async def load_story(
         finding=_finding_from_json(cluster["corroboration"]),
         url=lead["url"],
         classified=bool(labelled),
+        resolution=cluster["resolution"],
+        duplicate_of=cluster["duplicate_of"],
     )
 
 
@@ -672,6 +787,11 @@ async def assess(
             finding=story.finding,
         )
         status, confidence, reason = decision.status, decision.confidence, decision.reason
+    if story.resolution == "confirmed":
+        # The owner resolved a disputed story; that decision wins over the rules.
+        status, confidence, reason = "confirmed", "corroborated", "resolved by the owner"
+    elif story.resolution == "false":
+        status, confidence, reason = "disputed", "disputed", "marked false by the owner"
     story.status = status
     recheck = story.first_seen + window if status in ("unconfirmed", "sentiment") else None
     await pool.execute(
@@ -811,6 +931,19 @@ async def route_story(
 ) -> str | None:
     if story.status != "confirmed" or story.rumour or story.recycled or story.severity < 1:
         return None
+    if story.duplicate_of is not None:
+        return None
+    known = await known_event(ctx.pool, story)
+    if known is not None:
+        await ctx.pool.execute(
+            "update public.story_cluster set duplicate_of = $2, status_reason ="
+            " concat_ws('; ', status_reason, $3::text) where id = $1",
+            story.id,
+            known,
+            f"a known event (story #{known}), not alerted again",
+        )
+        story.duplicate_of = known
+        return f"story {story.id}: known event (story #{known}), not alerted again"
     exists = await ctx.pool.fetchval(
         "select exists (select 1 from public.alert where cluster_id = $1 and kind = 'news')",
         story.id,
@@ -828,6 +961,30 @@ async def route_story(
         job_id=ctx.job_id,
     )
     return f"story {story.id}: {created.explanation}" if created.ids else None
+
+
+async def known_event(pool: asyncpg.Pool, story: StoryState) -> int | None:
+    """An earlier confirmed story about the same holding and event: the same event date
+    (+-1 day) when both are known, else first seen within 72 hours. Another outlet's copy
+    of a known event that did not cluster with it therefore never alerts twice."""
+    if story.ticker is None or story.event_type is None:
+        return None
+    found: int | None = await pool.fetchval(
+        "select id from public.story_cluster where id <> $1 and ticker = $2"
+        " and event_type = $3 and status = 'confirmed' and duplicate_of is null"
+        " and first_seen <= $4 and ("
+        "   ($5::date is not null and event_date is not null"
+        "    and abs(event_date - $5::date) <= 1)"
+        "   or (($5::date is null or event_date is null)"
+        "    and first_seen >= $4 - interval '72 hours'))"
+        " order by first_seen, id limit 1",
+        story.id,
+        story.ticker,
+        story.event_type,
+        story.first_seen,
+        story.event_date,
+    )
+    return found
 
 
 async def queue_earnings_check(
@@ -885,7 +1042,7 @@ async def run_news_pipeline(ctx: JobContext, deps: NewsDeps) -> None:
             error: str | None = None
             try:
                 items, notes = await collect_source(
-                    source, deps, holdings, since, pool, freshness_days
+                    source, deps, holdings, since, pool, freshness_days, config.event_rules
                 )
             except (FetchError, httpx.HTTPError, ValueError) as exc:
                 items, notes, error = [], [], str(exc)[:500]
@@ -907,6 +1064,10 @@ async def run_news_pipeline(ctx: JobContext, deps: NewsDeps) -> None:
     async with ctx.step("normalise_dedupe_link") as step:
         stats = await store_items(pool, collected, config, holdings, now, ctx.job_id)
         step.detail.update(stats.detail())
+        await pool.execute(
+            "update public.filing_hit h set news_item_id = n.id from public.news_item n"
+            " where h.news_item_id is null and h.kind = 'topic' and n.url = h.url"
+        )
     touched = set(stats.touched_clusters)
 
     if deps.classifier is not None:
@@ -949,6 +1110,7 @@ async def run_news_pipeline(ctx: JobContext, deps: NewsDeps) -> None:
     async with ctx.step("route") as step:
         routed: list[str] = []
         checks: list[str] = []
+        escalations: list[str] = []
         for story in stories:
             outcome = await route_story(ctx, story, config, holdings, now, deps.app_url)
             if outcome:
@@ -956,7 +1118,23 @@ async def run_news_pipeline(ctx: JobContext, deps: NewsDeps) -> None:
             check = await queue_earnings_check(ctx, story, config, now)
             if check:
                 checks.append(check)
-        step.detail.update(alerts=routed, earnings_checks=checks)
+            if escalation_due(
+                story.status,
+                story.severity,
+                story.rumour,
+                story.recycled,
+                story.duplicate_of is not None,
+                story.ticker,
+                config.escalation,
+            ):
+                job = await queue_escalation(
+                    pool,
+                    {"cluster_id": story.id, "ticker": story.ticker},
+                    ("cluster_id", str(story.id)),
+                )
+                if job is not None:
+                    escalations.append(f"story {story.id} (job {job})")
+        step.detail.update(alerts=routed, earnings_checks=checks, escalations=escalations)
 
     async with ctx.step("dispatch") as step:
         result = await dispatch_due(pool, deps.channels)

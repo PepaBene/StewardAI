@@ -11,10 +11,12 @@ routes it by the event rules and notification rules like any other event.
 """
 
 import datetime as dt
-import json
 from dataclasses import dataclass
 
 import asyncpg
+
+from steward.news.synthetic import SyntheticEvent, SyntheticSource
+from steward.news.synthetic import raise_events as raise_synthetic
 
 SOURCE_ID = "reference-data"
 
@@ -129,62 +131,29 @@ def entity_events(
     return events
 
 
-async def ensure_source(pool: asyncpg.Pool | asyncpg.Connection) -> None:
-    await pool.execute(
-        "insert into public.source (id, name, tier, type, enabled) values ($1,"
-        " 'Reference data (ESMA FIRDS, GLEIF)', 1, 'reference', true)"
-        " on conflict (id) do nothing",
-        SOURCE_ID,
-    )
+REFERENCE_SOURCE = SyntheticSource(SOURCE_ID, "Reference data (ESMA FIRDS, GLEIF)", "reference")
 
 
 async def raise_events(
     pool: asyncpg.Pool, events: list[LifecycleEvent], now: dt.datetime, job_id: int | None
 ) -> list[int]:
     """Store each event once (by URL). Returns the new news item ids."""
-    created: list[int] = []
-    if not events:
-        return created
-    await ensure_source(pool)
-    for event in events:
-        async with pool.acquire() as conn, conn.transaction():
-            exists = await conn.fetchval(
-                "select id from public.news_item where url = $1", event.url
+    return await raise_synthetic(
+        pool,
+        REFERENCE_SOURCE,
+        [
+            SyntheticEvent(
+                ticker=e.ticker,
+                event_type=e.event_type,
+                headline=e.headline,
+                summary=e.summary,
+                url=e.url,
+                event_date=e.event_date,
+                outlet="gleif.org" if "gleif" in e.url else "esma.europa.eu",
+                outlet_name="GLEIF" if "gleif" in e.url else "ESMA FIRDS",
             )
-            if exists:
-                continue
-            cluster = await conn.fetchval(
-                "insert into public.story_cluster (ticker, event_type, headline, headline_key,"
-                " best_tier, first_seen, last_seen, event_date) values ($1, $2, $3, $4, 1, $5,"
-                " $5, $6) returning id",
-                event.ticker,
-                event.event_type,
-                event.headline,
-                event.url,
-                now,
-                event.event_date,
-            )
-            item = await conn.fetchval(
-                "insert into public.news_item (url, source_id, outlet, outlet_name, tier,"
-                " published_at, first_seen_at, headline, summary, language, cluster_id, tickers,"
-                " links, event_type, affected_ticker, rumour, relevant, event_date,"
-                " classified_at, classified_by, job_id) values ($1, $2, $3, $4, 1, $5, $5, $6,"
-                " $7, 'en', $8, $9, $10::jsonb, $11, $12, false, true, $13, $5,"
-                " 'rules:reference', $14) returning id",
-                event.url,
-                SOURCE_ID,
-                "gleif.org" if "gleif" in event.url else "esma.europa.eu",
-                "GLEIF" if "gleif" in event.url else "ESMA FIRDS",
-                now,
-                event.headline,
-                event.summary,
-                cluster,
-                [event.ticker],
-                json.dumps([{"ticker": event.ticker, "via": "source", "term": event.ticker}]),
-                event.event_type,
-                event.ticker,
-                event.event_date,
-                job_id,
-            )
-            created.append(item)
-    return created
+            for e in events
+        ],
+        now,
+        job_id,
+    )

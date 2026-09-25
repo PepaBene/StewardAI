@@ -414,6 +414,7 @@ class VerdictRunSummary:
     verdicts: int
     written: int
     by_status: dict[str, int]
+    frozen: list[str] = field(default_factory=list)
 
     def as_detail(self) -> dict[str, object]:
         return asdict(self)
@@ -429,8 +430,13 @@ async def run_verdicts(
     counts: dict[str, int] = {"pass": 0, "breach": 0, "unknown": 0}
     total = written = 0
     judged = []
+    frozen = await frozen_tickers(pool)
+    held_back: list[str] = []
     for thesis in theses.theses:
         if tickers is not None and thesis.ticker not in tickers:
+            continue
+        if thesis.ticker in frozen:
+            held_back.append(f"{thesis.ticker}: disputed story #{frozen[thesis.ticker]}")
             continue
         facts = await load_verified_facts(pool, thesis.ticker)
         drafts = judge_thesis(thesis, facts)
@@ -439,4 +445,15 @@ async def run_verdicts(
         for d in drafts:
             counts[d.status] += 1
         judged.append(thesis.ticker)
-    return VerdictRunSummary(judged, total, written, counts)
+    return VerdictRunSummary(judged, total, written, counts, held_back)
+
+
+async def frozen_tickers(pool: asyncpg.Pool) -> dict[str, int]:
+    """Holdings with an unresolved disputed story (severity 2+, seen in the last 30 days):
+    no verdict changes until the owner resolves it."""
+    rows = await pool.fetch(
+        "select ticker, min(id) as id from public.story_cluster where status = 'disputed'"
+        " and resolved_at is null and ticker is not null and coalesce(severity, 0) >= 2"
+        " and last_seen >= now() - interval '30 days' group by ticker"
+    )
+    return {r["ticker"]: r["id"] for r in rows}

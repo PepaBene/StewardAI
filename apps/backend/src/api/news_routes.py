@@ -17,14 +17,19 @@ from steward.config.store import load_active, save_config
 from steward.news.read import (
     AlertOut,
     Confidence,
+    DisputedStory,
+    EscalationOut,
     FeedFilters,
     NewsFeed,
     ReportOut,
     ReportSummary,
+    disputed_stories,
     get_report,
+    list_escalations,
     list_reports,
     news_feed,
     recent_alerts,
+    resolve_story,
 )
 from steward.notify.alerts import create_alerts
 from steward.notify.route import AlertRequest
@@ -62,6 +67,31 @@ async def get_news(
         limit=limit,
     )
     return await news_feed(pool, filters)
+
+
+@router.get("/stories/disputed", tags=["news"])
+async def get_disputed_stories(
+    pool: Pool, _owner: Owner, include_resolved: Annotated[bool, Query()] = False
+) -> list[DisputedStory]:
+    """Stories whose sources contradict each other: the claim with its sources beside the
+    contradicting ones, each with its tier. The holding's verdicts are frozen until the owner
+    resolves the story."""
+    return await disputed_stories(pool, include_resolved)
+
+
+class StoryResolution(BaseModel):
+    resolution: Literal["confirmed", "false"]
+    note: str | None = Field(default=None, max_length=500)
+
+
+@router.post("/stories/{story_id}/resolve", tags=["news"])
+async def resolve_disputed_story(
+    story_id: int, body: StoryResolution, pool: Pool, _owner: Owner
+) -> list[DisputedStory]:
+    """Resolve a disputed story; returns the updated list (resolved ones included)."""
+    if not await resolve_story(pool, story_id, body.resolution, body.note):
+        raise HTTPException(status.HTTP_404_NOT_FOUND, f"No disputed story {story_id}")
+    return [s for s in await disputed_stories(pool, True) if s.id == story_id]
 
 
 class EventTypeInfo(BaseModel):
@@ -160,9 +190,36 @@ async def get_report_by_id(report_id: int, pool: Pool, _owner: Owner) -> ReportO
     return report
 
 
+@router.get("/escalations", tags=["reports"])
+async def get_escalations(
+    pool: Pool,
+    _owner: Owner,
+    ticker: Annotated[str | None, Query(pattern=r"^[A-Za-z0-9._-]{1,32}$")] = None,
+    limit: Annotated[int, Query(ge=1, le=200)] = 50,
+) -> list[EscalationOut]:
+    """Impact notes on confirmed severity-2+ stories and large price moves, newest first:
+    each cites its sources and names the thesis KPIs or exit conditions it touches, or
+    states that none applies."""
+    return await list_escalations(pool, ticker, limit)
+
+
+@router.get("/escalations/{report_id}", tags=["reports"])
+async def get_escalation(report_id: int, pool: Pool, _owner: Owner) -> EscalationOut:
+    found = [e for e in await list_escalations(pool, None, 500) if e.id == report_id]
+    if not found:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, f"No escalation {report_id}")
+    return found[0]
+
+
 # ---------------------------------------------------------------------------
 # On-demand runs
 # ---------------------------------------------------------------------------
+
+
+@router.post("/jobs/macro-collect", tags=["jobs"], status_code=status.HTTP_202_ACCEPTED)
+async def run_macro_collect(pool: Pool, owner: Owner) -> JobSummary:
+    """Collect macro series now and raise any macro surprise."""
+    return await _enqueue(pool, "macro_collect", owner.user_id)
 
 
 @router.post("/jobs/news-ingest", tags=["jobs"], status_code=status.HTTP_202_ACCEPTED)

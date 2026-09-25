@@ -15,7 +15,7 @@ import asyncpg
 
 from steward.config.notifications import NotificationsConfig
 from steward.notify.channels import MISSING_CHANNEL_HELP, Channel, ChannelError
-from steward.notify.route import AlertRequest, RouteContext, day_start, route
+from steward.notify.route import AlertRequest, RouteContext, day_start, quiet_day_end, route
 
 logger = logging.getLogger(__name__)
 
@@ -42,6 +42,8 @@ async def create_alerts(
     cluster_id: int | None = None,
     verdict_id: int | None = None,
     job_id: int | None = None,
+    dedupe_key: str | None = None,
+    breach_id: int | None = None,
 ) -> CreatedAlerts:
     alerts_today = await conn.fetchval(
         "select count(*) from public.alert where kind <> 'test'"
@@ -61,16 +63,35 @@ async def create_alerts(
             now - dt.timedelta(hours=config.repeat_throttle_hours),
             cluster_id,
         )
+    holidays: set[dt.date] = set()
+    if "holidays" in config.quiet_all_day_on:
+        holidays = {
+            r["date"]
+            for r in await conn.fetch(
+                "select date from public.holiday where calendar = $1 and scope = 'national'"
+                " and date between $2 and $3",
+                config.holiday_country,
+                now.date() - dt.timedelta(days=1),
+                now.date() + dt.timedelta(days=14),
+            )
+        }
     rows, explanation = route(
-        request, config, RouteContext(now=now, alerts_today=alerts_today, recent_alert_id=recent)
+        request,
+        config,
+        RouteContext(
+            now=now,
+            alerts_today=alerts_today,
+            recent_alert_id=recent,
+            quiet_until=quiet_day_end(config, now, holidays),
+        ),
     )
     created = CreatedAlerts(explanation=explanation)
     for row in rows:
         alert_id = await conn.fetchval(
             "insert into public.alert (kind, severity, ticker, event_type, cluster_id,"
             " verdict_id, channel, message, status, send_after, suppressed_reason,"
-            " config_version_id, job_id, created_at)"
-            " values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)"
+            " config_version_id, job_id, created_at, dedupe_key, breach_id)"
+            " values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)"
             " on conflict do nothing returning id",
             request.kind,
             request.severity,
@@ -86,6 +107,8 @@ async def create_alerts(
             config_version_id,
             job_id,
             now,
+            dedupe_key,
+            breach_id,
         )
         if alert_id is None:
             continue

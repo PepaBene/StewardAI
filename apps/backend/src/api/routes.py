@@ -2,6 +2,7 @@
 versioned config."""
 
 import datetime as dt
+import json
 from collections.abc import AsyncIterator
 from decimal import Decimal
 from typing import Annotated, Any, Literal
@@ -135,6 +136,53 @@ async def run_portfolio_sync(pool: Pool, owner: Owner) -> JobSummary:
     """Queue a portfolio sync now. The worker runs it; a run already in progress finishes
     first (the job waits for it), so two syncs never write at the same time."""
     return await _enqueue(pool, "portfolio_sync", owner.user_id)
+
+
+class JobStepOut(BaseModel):
+    step_index: int
+    name: str
+    status: Literal["running", "succeeded", "failed"]
+    started_at: dt.datetime
+    finished_at: dt.datetime | None
+    error: str | None
+    detail: dict[str, Any] | None
+    model: str | None
+    cost_usd: float | None
+
+
+class JobDetail(JobSummary):
+    params: dict[str, Any]
+    steps: list[JobStepOut]
+
+
+@router.get("/jobs/{job_id}", tags=["jobs"])
+async def get_job(job_id: int, pool: Pool, _owner: Owner) -> JobDetail:
+    """One job run with its steps, to follow an on-demand run to completion."""
+    row = await pool.fetchrow(
+        "select id, job_type, trigger, status, error, created_at, started_at, finished_at,"
+        " params from public.job where id = $1",
+        job_id,
+    )
+    if row is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, f"No job {job_id}")
+    steps = await pool.fetch(
+        "select step_index, name, status, started_at, finished_at, error, detail, model,"
+        " cost_usd from public.job_step where job_id = $1 order by step_index",
+        job_id,
+    )
+    return JobDetail(
+        **{**dict(row), "params": json.loads(row["params"])},
+        steps=[
+            JobStepOut(
+                **{
+                    **dict(s),
+                    "detail": json.loads(s["detail"]) if s["detail"] else None,
+                    "cost_usd": float(s["cost_usd"]) if s["cost_usd"] is not None else None,
+                }
+            )
+            for s in steps
+        ],
+    )
 
 
 class EarningsCheckRequest(BaseModel):

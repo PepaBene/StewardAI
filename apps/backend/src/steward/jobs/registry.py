@@ -14,7 +14,10 @@ from steward.earnings.calendar import (
 from steward.earnings.check import earnings_check_handler, thesis_verdicts_handler
 from steward.earnings.reconcile import fact_reconcile_handler
 from steward.jobs.runner import JobHandler
+from steward.macro.collect import macro_collect_handler
+from steward.monitor import monitor_handler
 from steward.news.digest import daily_digest_handler, weekly_digest_handler
+from steward.news.escalation import event_escalation_handler
 from steward.news.pipeline import news_ingest_handler
 from steward.portfolio.sync import portfolio_sync_handler
 from steward.reference.identity import reference_data_handler
@@ -31,6 +34,9 @@ JobType = Literal[
     "reference_data",
     "price_history",
     "holiday_refresh",
+    "macro_collect",
+    "event_escalation",
+    "monitor",
     "news_ingest",
     "daily_digest",
     "weekly_digest",
@@ -47,6 +53,9 @@ JOB_HANDLERS: dict[str, JobHandler] = {
     "reference_data": reference_data_handler,
     "price_history": price_history_handler,
     "holiday_refresh": holiday_refresh_handler,
+    "macro_collect": macro_collect_handler,
+    "event_escalation": event_escalation_handler,
+    "monitor": monitor_handler,
     "news_ingest": news_ingest_handler,
     "daily_digest": daily_digest_handler,
     "weekly_digest": weekly_digest_handler,

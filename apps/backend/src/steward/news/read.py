@@ -8,6 +8,8 @@ import asyncpg
 from pydantic import BaseModel, Field
 
 from steward.news.digest import DigestBody
+from steward.news.escalation import EscalationBody
+from steward.news.normalize import host_of
 from steward.portfolio.read import JobSummary
 
 Confidence = Literal["verified", "corroborated", "unconfirmed", "disputed"]
@@ -264,3 +266,146 @@ async def get_report(pool: asyncpg.Pool, report_id: int) -> ReportOut | None:
             "delivery": _json(row["delivery"]),
         }
     )
+
+
+# ---------------------------------------------------------------------------
+# Disputed stories: both versions side by side
+# ---------------------------------------------------------------------------
+
+
+class ClaimSource(BaseModel):
+    url: str
+    outlet: str | None
+    tier: int
+    headline: str | None = None
+    published_at: dt.datetime | None = None
+    news_item_id: int | None = None
+
+
+class DisputedStory(BaseModel):
+    id: int
+    ticker: str | None
+    event_type: str | None
+    severity: int | None
+    headline: str
+    status_reason: str | None
+    first_seen: dt.datetime
+    last_seen: dt.datetime
+    claim: list[ClaimSource] = Field(description="The story's own sources (the claim).")
+    contradicting: list[ClaimSource] = Field(description="Verified sources that dispute it.")
+    supporting: list[ClaimSource] = Field(description="Verified sources found to support it.")
+    note: str | None = Field(description="What the corroboration search found, in a sentence.")
+    resolution: Literal["confirmed", "false"] | None
+    resolution_note: str | None
+    resolved_at: dt.datetime | None
+    verdicts_frozen: bool = Field(
+        description="The holding's verdicts do not change until this story is resolved."
+    )
+
+
+def _sources(doc: Any, key: str) -> list[ClaimSource]:
+    if not doc:
+        return []
+    data = json.loads(doc) if isinstance(doc, str) else doc
+    return [ClaimSource(url=u, outlet=host_of(u), tier=int(t)) for u, t in data.get(key, [])]
+
+
+async def disputed_stories(pool: asyncpg.Pool, include_resolved: bool) -> list[DisputedStory]:
+    rows = await pool.fetch(
+        "select id, ticker, event_type, severity, headline, status_reason, first_seen,"
+        " last_seen, corroboration, resolution, resolution_note, resolved_at"
+        " from public.story_cluster where (status = 'disputed' or resolution is not null)"
+        " and ($1 or resolved_at is null) order by last_seen desc limit 100",
+        include_resolved,
+    )
+    out = []
+    for r in rows:
+        items = await pool.fetch(
+            "select id, url, outlet, tier, headline, published_at from public.news_item"
+            " where cluster_id = $1 order by tier, published_at, id",
+            r["id"],
+        )
+        doc = json.loads(r["corroboration"]) if r["corroboration"] else {}
+        out.append(
+            DisputedStory(
+                id=r["id"],
+                ticker=r["ticker"],
+                event_type=r["event_type"],
+                severity=r["severity"],
+                headline=r["headline"],
+                status_reason=r["status_reason"],
+                first_seen=r["first_seen"],
+                last_seen=r["last_seen"],
+                claim=[
+                    ClaimSource(
+                        url=i["url"],
+                        outlet=i["outlet"],
+                        tier=i["tier"],
+                        headline=i["headline"],
+                        published_at=i["published_at"],
+                        news_item_id=i["id"],
+                    )
+                    for i in items
+                ],
+                contradicting=_sources(doc, "contradicting"),
+                supporting=_sources(doc, "supporting"),
+                note=doc.get("note"),
+                resolution=r["resolution"],
+                resolution_note=r["resolution_note"],
+                resolved_at=r["resolved_at"],
+                verdicts_frozen=r["resolved_at"] is None
+                and r["ticker"] is not None
+                and (r["severity"] or 0) >= 2,
+            )
+        )
+    return out
+
+
+async def resolve_story(
+    pool: asyncpg.Pool, story_id: int, resolution: str, note: str | None
+) -> bool:
+    """The owner's resolution of a disputed story: confirmed (it happened) or false. The
+    story's verdict freeze lifts; a confirmed story is routed on the next news run."""
+    updated = await pool.fetchval(
+        "update public.story_cluster set resolution = $2, resolution_note = $3,"
+        " resolved_at = now(), status = case when $2 = 'confirmed' then 'confirmed'"
+        " else status end, confidence = case when $2 = 'confirmed' then 'corroborated'"
+        " else confidence end, status_reason = case when $2 = 'confirmed' then"
+        " 'resolved by the owner' else 'marked false by the owner' end,"
+        " last_seen = greatest(last_seen, now())"
+        " where id = $1 and (status = 'disputed' or resolution is not null) returning id",
+        story_id,
+        resolution,
+        note,
+    )
+    return updated is not None
+
+
+# ---------------------------------------------------------------------------
+# Escalations
+# ---------------------------------------------------------------------------
+
+
+class EscalationOut(BaseModel):
+    id: int
+    ticker: str | None
+    title: str
+    created_at: dt.datetime
+    body: EscalationBody
+    body_md: str
+
+
+async def list_escalations(
+    pool: asyncpg.Pool, ticker: str | None, limit: int
+) -> list[EscalationOut]:
+    rows = await pool.fetch(
+        "select id, ticker, title, created_at, body, body_md from public.report"
+        " where type = 'escalation' and ($1::text is null or ticker = $1)"
+        " order by id desc limit $2",
+        ticker,
+        limit,
+    )
+    return [
+        EscalationOut(**{**dict(r), "body": EscalationBody.model_validate(_json(r["body"]))})
+        for r in rows
+    ]

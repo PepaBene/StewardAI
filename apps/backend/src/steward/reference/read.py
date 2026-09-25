@@ -88,6 +88,17 @@ class AliasOut(BaseModel):
     source: str
 
 
+class WikidataSummary(BaseModel):
+    qid: str
+    industry: list[str] = Field(default_factory=list)
+    products: list[str] = Field(default_factory=list)
+    ceo: list[str] = Field(default_factory=list)
+    chair: list[str] = Field(default_factory=list)
+    website: str | None = None
+    part_of: list[str] = Field(default_factory=list, description="Indexes and groups.")
+    fetched_at: dt.datetime
+
+
 class HoldingIdentity(BaseModel):
     ticker: str
     isin: str | None
@@ -115,7 +126,7 @@ class HoldingIdentity(BaseModel):
         description="Confirmed competitors, suppliers and customers."
     )
     aliases: list[AliasOut]
-    wikidata: dict[str, Any] | None
+    wikidata: WikidataSummary | None = Field(description="Tier 3: community-edited.")
 
 
 SOURCE_TIER = {"gleif": 1, "edgar": 1, "owner": 1, "wikidata": 3}
@@ -216,7 +227,9 @@ async def holding_identity(pool: asyncpg.Pool, ticker: str) -> HoldingIdentity |
         suggested=[r for r in rels if r.status == "suggested"],
         related=[r for r in confirmed if r.type in ("competitor", "supplier", "customer")],
         aliases=[AliasOut(**dict(a)) for a in aliases],
-        wikidata=json.loads(inst["wikidata"]) if inst["wikidata"] else None,
+        wikidata=WikidataSummary.model_validate(json.loads(inst["wikidata"]))
+        if inst["wikidata"]
+        else None,
     )
 
 
@@ -319,6 +332,14 @@ class Correlation(BaseModel):
     correlation: float | None
 
 
+class PlausibilityCheck(BaseModel):
+    date: dt.date
+    stooq_close: float
+    trading212_price: float
+    difference_pct: float
+    flagged: bool = Field(description="Beyond the configured tolerance.")
+
+
 class PriceHistory(BaseModel):
     ticker: str
     symbol: str | None
@@ -331,7 +352,7 @@ class PriceHistory(BaseModel):
     risk: RiskCard | None
     correlations: list[Correlation] = Field(description="With each other holding, last 252 days.")
     gap: str | None = Field(description="Why there is no price history, when there is none.")
-    plausibility: dict[str, Any] | None = Field(
+    plausibility: PlausibilityCheck | None = Field(
         description="Latest Stooq close vs Trading212's price on a sync day."
     )
 
@@ -410,7 +431,7 @@ async def price_history(pool: asyncpg.Pool, ticker: str, days: int) -> PriceHist
         risk=RiskCard(**figures.__dict__) if figures else None,
         correlations=correlations,
         gap=gap,
-        plausibility=checks.get(ticker),
+        plausibility=PlausibilityCheck.model_validate(checks[ticker]) if ticker in checks else None,
     )
 
 
@@ -427,6 +448,7 @@ class IdentityGap(BaseModel):
 
 class PriceGap(BaseModel):
     key: str = Field(description="Ticker, or the benchmark symbol.")
+    kind: Literal["holding", "benchmark"]
     symbol: str | None
     reason: str
 
@@ -449,7 +471,12 @@ async def reference_gaps(pool: asyncpg.Pool) -> ReferenceGaps:
             for r in rows
         ],
         prices=[
-            PriceGap(key=k, symbol=v.get("symbol"), reason=v.get("reason", ""))
+            PriceGap(
+                key=k,
+                kind="benchmark" if k == v.get("symbol") else "holding",
+                symbol=v.get("symbol"),
+                reason=v.get("reason", ""),
+            )
             for k, v in sorted(state.get("gaps", {}).items())
         ],
         prices_checked_at=state.get("at"),

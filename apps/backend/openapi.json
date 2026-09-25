@@ -769,6 +769,54 @@
         ]
       }
     },
+    "/jobs/{job_id}": {
+      "get": {
+        "tags": [
+          "jobs"
+        ],
+        "summary": "Get Job",
+        "description": "One job run with its steps, to follow an on-demand run to completion.",
+        "operationId": "get_job",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "job_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Job Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/JobDetail"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/jobs/earnings-check": {
       "post": {
         "tags": [
@@ -2087,6 +2135,121 @@
         }
       }
     },
+    "/stories/disputed": {
+      "get": {
+        "tags": [
+          "news"
+        ],
+        "summary": "Get Disputed Stories",
+        "description": "Stories whose sources contradict each other: the claim with its sources beside the\ncontradicting ones, each with its tier. The holding's verdicts are frozen until the owner\nresolves the story.",
+        "operationId": "get_disputed_stories",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "include_resolved",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "default": false,
+              "title": "Include Resolved"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/DisputedStory"
+                  },
+                  "title": "Response Get Disputed Stories"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/stories/{story_id}/resolve": {
+      "post": {
+        "tags": [
+          "news"
+        ],
+        "summary": "Resolve Disputed Story",
+        "description": "Resolve a disputed story; returns the updated list (resolved ones included).",
+        "operationId": "resolve_disputed_story",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "story_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Story Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/StoryResolution"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/DisputedStory"
+                  },
+                  "title": "Response Resolve Disputed Story"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/news/event-types": {
       "get": {
         "tags": [
@@ -2356,6 +2519,152 @@
             }
           }
         }
+      }
+    },
+    "/escalations": {
+      "get": {
+        "tags": [
+          "reports"
+        ],
+        "summary": "Get Escalations",
+        "description": "Impact notes on confirmed severity-2+ stories and large price moves, newest first:\neach cites its sources and names the thesis KPIs or exit conditions it touches, or\nstates that none applies.",
+        "operationId": "get_escalations",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "ticker",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "pattern": "^[A-Za-z0-9._-]{1,32}$"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Ticker"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 200,
+              "minimum": 1,
+              "default": 50,
+              "title": "Limit"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/EscalationOut"
+                  },
+                  "title": "Response Get Escalations"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/escalations/{report_id}": {
+      "get": {
+        "tags": [
+          "reports"
+        ],
+        "summary": "Get Escalation",
+        "operationId": "get_escalation",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "report_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Report Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EscalationOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/jobs/macro-collect": {
+      "post": {
+        "tags": [
+          "jobs"
+        ],
+        "summary": "Run Macro Collect",
+        "description": "Collect macro series now and raise any macro surprise.",
+        "operationId": "run_macro_collect",
+        "responses": {
+          "202": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/JobSummary"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
       }
     },
     "/jobs/news-ingest": {
@@ -3512,6 +3821,67 @@
         ],
         "title": "AllocationSlice"
       },
+      "AnnouncementRule": {
+        "properties": {
+          "service": {
+            "type": "string",
+            "enum": [
+              "rns",
+              "eqs",
+              "any"
+            ],
+            "title": "Service",
+            "default": "any"
+          },
+          "pattern": {
+            "type": "string",
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Pattern",
+            "description": "Case-insensitive regular expression matched against the announcement type (RNS: the headline, e.g. 'Final Results'; EQS: the category, e.g. 'Ad-hoc')."
+          },
+          "event_type": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "guidance_change",
+                  "m_and_a",
+                  "dividend_cut",
+                  "earnings_release",
+                  "management_change",
+                  "regulatory_legal",
+                  "capital_allocation",
+                  "credit_rating",
+                  "central_bank",
+                  "macro_surprise",
+                  "insider_transaction",
+                  "product_business",
+                  "sector_competitor",
+                  "index_change",
+                  "analyst_rating",
+                  "delisting",
+                  "entity_status",
+                  "other"
+                ]
+              },
+              {
+                "type": "string",
+                "const": "classify"
+              }
+            ],
+            "title": "Event Type"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "pattern",
+          "event_type"
+        ],
+        "title": "AnnouncementRule",
+        "description": "Maps a regulatory announcement's type (the RNS headline or the EQS category) to an\nevent type. First match wins; `classify` leaves the item to the classifier."
+      },
       "BaseTotals": {
         "properties": {
           "base_currency": {
@@ -4176,6 +4546,70 @@
         "title": "CategoryWeightRule",
         "description": "Limit on a category's weight; with no bucket it applies to every bucket of the dimension."
       },
+      "ClaimSource": {
+        "properties": {
+          "url": {
+            "type": "string",
+            "title": "Url"
+          },
+          "outlet": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Outlet"
+          },
+          "tier": {
+            "type": "integer",
+            "title": "Tier"
+          },
+          "headline": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Headline"
+          },
+          "published_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Published At"
+          },
+          "news_item_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "News Item Id"
+          }
+        },
+        "type": "object",
+        "required": [
+          "url",
+          "outlet",
+          "tier"
+        ],
+        "title": "ClaimSource"
+      },
       "ClosureConfirmation": {
         "properties": {
           "closures": {
@@ -4594,6 +5028,45 @@
             "title": "Alerts Sent",
             "default": 0
           },
+          "portfolio": {
+            "items": {
+              "$ref": "#/components/schemas/PortfolioFlag"
+            },
+            "type": "array",
+            "title": "Portfolio",
+            "description": "Out-of-band weights and breaches open in the period."
+          },
+          "thesis_changes": {
+            "items": {
+              "$ref": "#/components/schemas/ThesisChange"
+            },
+            "type": "array",
+            "title": "Thesis Changes"
+          },
+          "reviews_due": {
+            "items": {
+              "$ref": "#/components/schemas/ReviewDue"
+            },
+            "type": "array",
+            "title": "Reviews Due",
+            "description": "Theses past their review date."
+          },
+          "macro": {
+            "items": {
+              "$ref": "#/components/schemas/MacroFigure"
+            },
+            "type": "array",
+            "title": "Macro",
+            "description": "Latest macro figures, each with its release and URL."
+          },
+          "holidays": {
+            "items": {
+              "$ref": "#/components/schemas/MarketHoliday"
+            },
+            "type": "array",
+            "title": "Holidays",
+            "description": "Public holidays in the period and the next 7 days."
+          },
           "dropped_sentences": {
             "type": "integer",
             "title": "Dropped Sentences",
@@ -4902,6 +5375,171 @@
         ],
         "title": "DimensionAllocation"
       },
+      "DisputedStory": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "ticker": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ticker"
+          },
+          "event_type": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Event Type"
+          },
+          "severity": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Severity"
+          },
+          "headline": {
+            "type": "string",
+            "title": "Headline"
+          },
+          "status_reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Status Reason"
+          },
+          "first_seen": {
+            "type": "string",
+            "format": "date-time",
+            "title": "First Seen"
+          },
+          "last_seen": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Last Seen"
+          },
+          "claim": {
+            "items": {
+              "$ref": "#/components/schemas/ClaimSource"
+            },
+            "type": "array",
+            "title": "Claim",
+            "description": "The story's own sources (the claim)."
+          },
+          "contradicting": {
+            "items": {
+              "$ref": "#/components/schemas/ClaimSource"
+            },
+            "type": "array",
+            "title": "Contradicting",
+            "description": "Verified sources that dispute it."
+          },
+          "supporting": {
+            "items": {
+              "$ref": "#/components/schemas/ClaimSource"
+            },
+            "type": "array",
+            "title": "Supporting",
+            "description": "Verified sources found to support it."
+          },
+          "note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note",
+            "description": "What the corroboration search found, in a sentence."
+          },
+          "resolution": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "confirmed",
+                  "false"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Resolution"
+          },
+          "resolution_note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Resolution Note"
+          },
+          "resolved_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Resolved At"
+          },
+          "verdicts_frozen": {
+            "type": "boolean",
+            "title": "Verdicts Frozen",
+            "description": "The holding's verdicts do not change until this story is resolved."
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "ticker",
+          "event_type",
+          "severity",
+          "headline",
+          "status_reason",
+          "first_seen",
+          "last_seen",
+          "claim",
+          "contradicting",
+          "supporting",
+          "note",
+          "resolution",
+          "resolution_note",
+          "resolved_at",
+          "verdicts_frozen"
+        ],
+        "title": "DisputedStory"
+      },
       "DomainTier": {
         "properties": {
           "domain": {
@@ -5127,6 +5765,376 @@
         "title": "EarningsCheckSettings",
         "description": "The earnings thesis check: find the release, extract figures, validate, judge KPIs."
       },
+      "EcbSeries": {
+        "properties": {
+          "key": {
+            "type": "string",
+            "pattern": "^[a-z0-9_]{1,40}$",
+            "title": "Key"
+          },
+          "label": {
+            "type": "string",
+            "maxLength": 100,
+            "minLength": 1,
+            "title": "Label"
+          },
+          "flow_key": {
+            "type": "string",
+            "pattern": "^[A-Z0-9_]+/[A-Za-z0-9._+]+$",
+            "title": "Flow Key",
+            "description": "Data Portal flow/key, e.g. FM/D.U2.EUR.4F.KR.DFR.LEV."
+          },
+          "unit": {
+            "type": "string",
+            "maxLength": 20,
+            "title": "Unit",
+            "default": "%"
+          },
+          "policy_rate": {
+            "type": "boolean",
+            "title": "Policy Rate",
+            "default": false
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "key",
+          "label",
+          "flow_key"
+        ],
+        "title": "EcbSeries"
+      },
+      "EscalationBody": {
+        "properties": {
+          "ticker": {
+            "type": "string",
+            "title": "Ticker"
+          },
+          "trigger": {
+            "type": "string",
+            "enum": [
+              "story",
+              "price_move"
+            ],
+            "title": "Trigger"
+          },
+          "cluster_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cluster Id"
+          },
+          "event_type": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Event Type"
+          },
+          "severity": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Severity"
+          },
+          "headline": {
+            "type": "string",
+            "title": "Headline"
+          },
+          "sentences": {
+            "items": {
+              "$ref": "#/components/schemas/NoteSentence"
+            },
+            "type": "array",
+            "title": "Sentences"
+          },
+          "kpis": {
+            "items": {
+              "additionalProperties": {
+                "type": "string"
+              },
+              "type": "object"
+            },
+            "type": "array",
+            "title": "Kpis",
+            "description": "[{id, description}] the event bears on."
+          },
+          "exit_conditions": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Exit Conditions"
+          },
+          "none_applies": {
+            "type": "boolean",
+            "title": "None Applies"
+          },
+          "thesis_link": {
+            "type": "string",
+            "title": "Thesis Link",
+            "description": "The thesis KPIs/exit conditions touched, or 'none'."
+          },
+          "rationale": {
+            "type": "string",
+            "title": "Rationale"
+          },
+          "sources": {
+            "items": {
+              "$ref": "#/components/schemas/EscalationSource"
+            },
+            "type": "array",
+            "title": "Sources"
+          },
+          "dropped_sentences": {
+            "type": "integer",
+            "title": "Dropped Sentences",
+            "default": 0
+          },
+          "writer": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Writer"
+          },
+          "price_move": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Price Move"
+          }
+        },
+        "type": "object",
+        "required": [
+          "ticker",
+          "trigger",
+          "cluster_id",
+          "event_type",
+          "severity",
+          "headline",
+          "sentences",
+          "kpis",
+          "exit_conditions",
+          "none_applies",
+          "thesis_link",
+          "rationale",
+          "sources"
+        ],
+        "title": "EscalationBody"
+      },
+      "EscalationOut": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "ticker": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ticker"
+          },
+          "title": {
+            "type": "string",
+            "title": "Title"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "body": {
+            "$ref": "#/components/schemas/EscalationBody"
+          },
+          "body_md": {
+            "type": "string",
+            "title": "Body Md"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "ticker",
+          "title",
+          "created_at",
+          "body",
+          "body_md"
+        ],
+        "title": "EscalationOut"
+      },
+      "EscalationSettings": {
+        "properties": {
+          "enabled": {
+            "type": "boolean",
+            "title": "Enabled",
+            "default": true
+          },
+          "model": {
+            "type": "string",
+            "pattern": "^claude-[a-z0-9.-]{1,64}$",
+            "title": "Model",
+            "default": "claude-sonnet-5",
+            "examples": [
+              "claude-sonnet-5"
+            ]
+          },
+          "max_steps": {
+            "type": "integer",
+            "maximum": 20.0,
+            "minimum": 1.0,
+            "title": "Max Steps",
+            "description": "Claude calls plus web searches per escalation.",
+            "default": 5
+          },
+          "max_searches": {
+            "type": "integer",
+            "maximum": 10.0,
+            "minimum": 0.0,
+            "title": "Max Searches",
+            "default": 3
+          },
+          "min_severity": {
+            "type": "integer",
+            "maximum": 3.0,
+            "minimum": 1.0,
+            "title": "Min Severity",
+            "default": 2
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "EscalationSettings",
+        "description": "Event escalation: an impact note on a confirmed severity-2+ story or a price move."
+      },
+      "EscalationSource": {
+        "properties": {
+          "url": {
+            "type": "string",
+            "title": "Url"
+          },
+          "outlet": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Outlet"
+          },
+          "tier": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tier"
+          },
+          "headline": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Headline"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "story",
+              "search",
+              "price"
+            ],
+            "title": "Kind",
+            "default": "story"
+          }
+        },
+        "type": "object",
+        "required": [
+          "url"
+        ],
+        "title": "EscalationSource"
+      },
+      "EurostatSeries": {
+        "properties": {
+          "key": {
+            "type": "string",
+            "pattern": "^[a-z0-9_]{1,40}$",
+            "title": "Key"
+          },
+          "label": {
+            "type": "string",
+            "maxLength": 100,
+            "minLength": 1,
+            "title": "Label"
+          },
+          "dataset": {
+            "type": "string",
+            "pattern": "^[a-z0-9_]{3,40}$",
+            "title": "Dataset"
+          },
+          "filters": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "type": "object",
+            "title": "Filters",
+            "description": "Dimension filters, e.g. {'unit': 'RCH_A'}."
+          },
+          "unit": {
+            "type": "string",
+            "maxLength": 20,
+            "title": "Unit",
+            "default": "%"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "key",
+          "label",
+          "dataset"
+        ],
+        "title": "EurostatSeries"
+      },
       "EventRulesConfig": {
         "properties": {
           "schema_version": {
@@ -5233,6 +6241,33 @@
             "title": "Thesis Breach Severity",
             "description": "Severity of an alert for a KPI breach found by an earnings check (0: never alert, the digest still lists it).",
             "default": 3
+          },
+          "price_move_threshold_pct": {
+            "type": "number",
+            "maximum": 100.0,
+            "exclusiveMinimum": 0.0,
+            "title": "Price Move Threshold Pct",
+            "description": "A daily close-to-close move beyond +-this percentage queues an event escalation for the holding.",
+            "default": 8.0
+          },
+          "macro_surprise_bands": {
+            "patternProperties": {
+              "^[a-z0-9_]{1,40}$": {
+                "type": "number",
+                "minimum": 0.0
+              }
+            },
+            "type": "object",
+            "title": "Macro Surprise Bands",
+            "description": "Per macro series key: a new release that moves more than this against the previous one is a macro surprise (in the series' own unit; 0: any change, e.g. a policy rate). Evaluated only on release days."
+          },
+          "announcement_types": {
+            "items": {
+              "$ref": "#/components/schemas/AnnouncementRule"
+            },
+            "type": "array",
+            "title": "Announcement Types",
+            "description": "How RNS and EQS announcement types map to event types."
           },
           "earnings_check_on": {
             "items": {
@@ -5940,6 +6975,56 @@
         ],
         "title": "FailedCheck"
       },
+      "FredSeries": {
+        "properties": {
+          "key": {
+            "type": "string",
+            "pattern": "^[a-z0-9_]{1,40}$",
+            "title": "Key"
+          },
+          "label": {
+            "type": "string",
+            "maxLength": 100,
+            "minLength": 1,
+            "title": "Label"
+          },
+          "series_id": {
+            "type": "string",
+            "pattern": "^[A-Z0-9_]{1,30}$",
+            "title": "Series Id"
+          },
+          "units": {
+            "type": "string",
+            "enum": [
+              "lin",
+              "pch",
+              "pc1",
+              "chg"
+            ],
+            "title": "Units",
+            "default": "lin"
+          },
+          "unit": {
+            "type": "string",
+            "maxLength": 20,
+            "title": "Unit",
+            "default": "%"
+          },
+          "policy_rate": {
+            "type": "boolean",
+            "title": "Policy Rate",
+            "default": false
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "key",
+          "label",
+          "series_id"
+        ],
+        "title": "FredSeries"
+      },
       "Freshness": {
         "properties": {
           "snapshot_date": {
@@ -6526,14 +7611,13 @@
           "wikidata": {
             "anyOf": [
               {
-                "additionalProperties": true,
-                "type": "object"
+                "$ref": "#/components/schemas/WikidataSummary"
               },
               {
                 "type": "null"
               }
             ],
-            "title": "Wikidata"
+            "description": "Tier 3: community-edited."
           }
         },
         "type": "object",
@@ -7131,6 +8215,99 @@
         ],
         "title": "ItemLink"
       },
+      "JobDetail": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "job_type": {
+            "type": "string",
+            "title": "Job Type"
+          },
+          "trigger": {
+            "type": "string",
+            "title": "Trigger"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "queued",
+              "waiting",
+              "running",
+              "succeeded",
+              "failed"
+            ],
+            "title": "Status"
+          },
+          "error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "started_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Started At"
+          },
+          "finished_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Finished At"
+          },
+          "params": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Params"
+          },
+          "steps": {
+            "items": {
+              "$ref": "#/components/schemas/JobStepOut"
+            },
+            "type": "array",
+            "title": "Steps"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "job_type",
+          "trigger",
+          "status",
+          "error",
+          "created_at",
+          "started_at",
+          "finished_at",
+          "params",
+          "steps"
+        ],
+        "title": "JobDetail"
+      },
       "JobSchedule": {
         "properties": {
           "enabled": {
@@ -7161,6 +8338,102 @@
           "cron"
         ],
         "title": "JobSchedule"
+      },
+      "JobStepOut": {
+        "properties": {
+          "step_index": {
+            "type": "integer",
+            "title": "Step Index"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "running",
+              "succeeded",
+              "failed"
+            ],
+            "title": "Status"
+          },
+          "started_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Started At"
+          },
+          "finished_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Finished At"
+          },
+          "error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error"
+          },
+          "detail": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Detail"
+          },
+          "model": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Model"
+          },
+          "cost_usd": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cost Usd"
+          }
+        },
+        "type": "object",
+        "required": [
+          "step_index",
+          "name",
+          "status",
+          "started_at",
+          "finished_at",
+          "error",
+          "detail",
+          "model",
+          "cost_usd"
+        ],
+        "title": "JobStepOut"
       },
       "JobSummary": {
         "properties": {
@@ -7281,6 +8554,14 @@
             "$ref": "#/components/schemas/JobSchedule",
             "description": "Public holidays for this and next year. Default: 2 January and 2 July."
           },
+          "macro_collect": {
+            "$ref": "#/components/schemas/JobSchedule",
+            "description": "FRED, ECB and Eurostat macro series; macro surprises on release days. Default: daily 11:30 (after Eurostat's 11:00 releases)."
+          },
+          "monitor": {
+            "$ref": "#/components/schemas/JobSchedule",
+            "description": "Alert on failed jobs, missed runs and coverage gaps. Default: every 15 minutes."
+          },
           "news_ingest": {
             "$ref": "#/components/schemas/JobSchedule",
             "description": "Ingest, classify, corroborate and alert. Default: every 2 h, 06:00-22:00."
@@ -7304,6 +8585,15 @@
           },
           "digest": {
             "$ref": "#/components/schemas/DigestSettings"
+          },
+          "escalation": {
+            "$ref": "#/components/schemas/EscalationSettings"
+          },
+          "macro": {
+            "$ref": "#/components/schemas/MacroSettings"
+          },
+          "monitoring": {
+            "$ref": "#/components/schemas/MonitorSettings"
           },
           "reference": {
             "$ref": "#/components/schemas/ReferenceSettings"
@@ -7678,6 +8968,133 @@
         ],
         "title": "ListingOut"
       },
+      "MacroFigure": {
+        "properties": {
+          "series_id": {
+            "type": "string",
+            "title": "Series Id"
+          },
+          "label": {
+            "type": "string",
+            "title": "Label"
+          },
+          "value": {
+            "type": "number",
+            "title": "Value"
+          },
+          "unit": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Unit"
+          },
+          "period": {
+            "type": "string",
+            "format": "date",
+            "title": "Period"
+          },
+          "release_date": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Release Date"
+          },
+          "url": {
+            "type": "string",
+            "title": "Url"
+          },
+          "new": {
+            "type": "boolean",
+            "title": "New",
+            "description": "Released within the digest's window."
+          }
+        },
+        "type": "object",
+        "required": [
+          "series_id",
+          "label",
+          "value",
+          "unit",
+          "period",
+          "release_date",
+          "url",
+          "new"
+        ],
+        "title": "MacroFigure"
+      },
+      "MacroSettings": {
+        "properties": {
+          "geos": {
+            "items": {
+              "type": "string",
+              "pattern": "^[A-Z0-9]{2,5}$"
+            },
+            "type": "array",
+            "title": "Geos",
+            "description": "Eurostat areas: countries and the euro area (EA21 from 2026)."
+          },
+          "eurostat": {
+            "items": {
+              "$ref": "#/components/schemas/EurostatSeries"
+            },
+            "type": "array",
+            "title": "Eurostat"
+          },
+          "fred": {
+            "items": {
+              "$ref": "#/components/schemas/FredSeries"
+            },
+            "type": "array",
+            "title": "Fred"
+          },
+          "ecb": {
+            "items": {
+              "$ref": "#/components/schemas/EcbSeries"
+            },
+            "type": "array",
+            "title": "Ecb"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "MacroSettings",
+        "description": "Macro series collected into `macro_series` (numbers in digests come only from here)."
+      },
+      "MarketHoliday": {
+        "properties": {
+          "calendar": {
+            "type": "string",
+            "title": "Calendar"
+          },
+          "date": {
+            "type": "string",
+            "format": "date",
+            "title": "Date"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          }
+        },
+        "type": "object",
+        "required": [
+          "calendar",
+          "date",
+          "name"
+        ],
+        "title": "MarketHoliday"
+      },
       "ModelPrice": {
         "properties": {
           "model": {
@@ -7709,6 +9126,38 @@
           "output_per_mtok"
         ],
         "title": "ModelPrice"
+      },
+      "MonitorSettings": {
+        "properties": {
+          "alert_failed_jobs": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Alert Failed Jobs",
+            "description": "Job types whose failed runs alert (once per run)."
+          },
+          "missed_run_grace_minutes": {
+            "type": "integer",
+            "maximum": 1440.0,
+            "minimum": 5.0,
+            "title": "Missed Run Grace Minutes",
+            "description": "A scheduled run that has not succeeded this long after its slot is missed.",
+            "default": 90
+          },
+          "news_coverage_hours": {
+            "type": "integer",
+            "maximum": 336.0,
+            "minimum": 6.0,
+            "title": "News Coverage Hours",
+            "description": "A holding with no successful news run this long raises a coverage alert.",
+            "default": 48
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "MonitorSettings",
+        "description": "Monitoring: failed jobs, missed scheduled runs and per-holding coverage gaps alert."
       },
       "NewsFeed": {
         "properties": {
@@ -7993,10 +9442,13 @@
               "page",
               "edgar",
               "finnhub",
-              "google_news"
+              "google_news",
+              "rns",
+              "eqs",
+              "edgar_fts"
             ],
             "title": "Type",
-            "description": "rss: an RSS or Atom feed. page: a news page read daily; new links on it become items. edgar: every holding's SEC filings. finnhub: US company news. google_news: a Google News query per holding (unofficial endpoint)."
+            "description": "rss: an RSS or Atom feed. page: a news page read daily; new links on it become items. edgar: every holding's SEC filings. finnhub: US company news. google_news: a Google News query per holding (unofficial endpoint). rns: UK regulatory announcements per holding (Investegate company page). eqs: German regulatory announcements (EQS News company page from the holding profile's regulatory_news_urls). edgar_fts: SEC full-text search for each holding's watch topics and for other filers naming it."
           },
           "url": {
             "anyOf": [
@@ -8028,6 +9480,12 @@
             "type": "array",
             "title": "Tickers",
             "description": "Holdings this source is about (e.g. a company's own IR feed): its items link to them without a name match. Empty: items are matched by name."
+          },
+          "macro": {
+            "type": "boolean",
+            "title": "Macro",
+            "description": "A macro or central-bank source: its items are kept without matching a holding and appear under Markets and macro.",
+            "default": false
           }
         },
         "additionalProperties": false,
@@ -8075,6 +9533,19 @@
             "type": "array",
             "title": "Blocked Domains",
             "description": "Items from these outlets are dropped."
+          },
+          "allowed_domains": {
+            "items": {
+              "type": "string",
+              "maxLength": 253,
+              "pattern": "^([a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?\\.)+[a-z]{2,63}$",
+              "examples": [
+                "reuters.com"
+              ]
+            },
+            "type": "array",
+            "title": "Allowed Domains",
+            "description": "When set, aggregator items (Finnhub, Google News) are kept only from these outlets (and the tiered ones above)."
           },
           "unknown_outlet_tier": {
             "type": "integer",
@@ -8141,6 +9612,26 @@
           "body"
         ],
         "title": "NewsSourcesConfigVersion"
+      },
+      "NoteSentence": {
+        "properties": {
+          "text": {
+            "type": "string",
+            "title": "Text"
+          },
+          "source_urls": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Source Urls"
+          }
+        },
+        "type": "object",
+        "required": [
+          "text"
+        ],
+        "title": "NoteSentence"
       },
       "NotificationRule": {
         "properties": {
@@ -8274,6 +9765,32 @@
             "description": "Another story with the same holding and event type within this many hours of an alert is not alerted again.",
             "default": 24
           },
+          "quiet_all_day_on": {
+            "items": {
+              "type": "string",
+              "enum": [
+                "weekends",
+                "holidays"
+              ]
+            },
+            "type": "array",
+            "title": "Quiet All Day On",
+            "description": "Days treated as quiet from start to end: alerts are held (or go to the digest) as during quiet hours. Holidays are the public holidays of holiday_country."
+          },
+          "holiday_country": {
+            "type": "string",
+            "pattern": "^[A-Z]{2}$",
+            "title": "Holiday Country",
+            "default": "CZ"
+          },
+          "system_alert_severity": {
+            "type": "integer",
+            "maximum": 3.0,
+            "minimum": 0.0,
+            "title": "System Alert Severity",
+            "description": "Severity of monitoring alerts (a failed job, a missed run, a holding with no news coverage); routed by the rules like any event. 0: never alert.",
+            "default": 3
+          },
           "digest_channels": {
             "items": {
               "type": "string",
@@ -8326,6 +9843,105 @@
           "body"
         ],
         "title": "NotificationsConfigVersion"
+      },
+      "PlausibilityCheck": {
+        "properties": {
+          "date": {
+            "type": "string",
+            "format": "date",
+            "title": "Date"
+          },
+          "stooq_close": {
+            "type": "number",
+            "title": "Stooq Close"
+          },
+          "trading212_price": {
+            "type": "number",
+            "title": "Trading212 Price"
+          },
+          "difference_pct": {
+            "type": "number",
+            "title": "Difference Pct"
+          },
+          "flagged": {
+            "type": "boolean",
+            "title": "Flagged",
+            "description": "Beyond the configured tolerance."
+          }
+        },
+        "type": "object",
+        "required": [
+          "date",
+          "stooq_close",
+          "trading212_price",
+          "difference_pct",
+          "flagged"
+        ],
+        "title": "PlausibilityCheck"
+      },
+      "PortfolioFlag": {
+        "properties": {
+          "kind": {
+            "type": "string",
+            "enum": [
+              "band",
+              "hard_limit",
+              "rule"
+            ],
+            "title": "Kind"
+          },
+          "key": {
+            "type": "string",
+            "title": "Key"
+          },
+          "ticker": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ticker"
+          },
+          "severity": {
+            "type": "integer",
+            "title": "Severity"
+          },
+          "detail": {
+            "type": "string",
+            "title": "Detail"
+          },
+          "first_seen": {
+            "type": "string",
+            "format": "date-time",
+            "title": "First Seen"
+          },
+          "cleared_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cleared At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "kind",
+          "key",
+          "ticker",
+          "severity",
+          "detail",
+          "first_seen",
+          "cleared_at"
+        ],
+        "title": "PortfolioFlag"
       },
       "PortfolioOverview": {
         "properties": {
@@ -8720,6 +10336,14 @@
             "title": "Key",
             "description": "Ticker, or the benchmark symbol."
           },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "holding",
+              "benchmark"
+            ],
+            "title": "Kind"
+          },
           "symbol": {
             "anyOf": [
               {
@@ -8739,6 +10363,7 @@
         "type": "object",
         "required": [
           "key",
+          "kind",
           "symbol",
           "reason"
         ],
@@ -8850,14 +10475,12 @@
           "plausibility": {
             "anyOf": [
               {
-                "additionalProperties": true,
-                "type": "object"
+                "$ref": "#/components/schemas/PlausibilityCheck"
               },
               {
                 "type": "null"
               }
             ],
-            "title": "Plausibility",
             "description": "Latest Stooq close vs Trading212's price on a sync day."
           }
         },
@@ -9580,6 +11203,25 @@
         ],
         "title": "ReportingExceptionOut"
       },
+      "ReviewDue": {
+        "properties": {
+          "ticker": {
+            "type": "string",
+            "title": "Ticker"
+          },
+          "review_date": {
+            "type": "string",
+            "format": "date",
+            "title": "Review Date"
+          }
+        },
+        "type": "object",
+        "required": [
+          "ticker",
+          "review_date"
+        ],
+        "title": "ReviewDue"
+      },
       "ReviewItem": {
         "properties": {
           "ticker": {
@@ -9986,6 +11628,35 @@
           "last_seen"
         ],
         "title": "StoryOut"
+      },
+      "StoryResolution": {
+        "properties": {
+          "resolution": {
+            "type": "string",
+            "enum": [
+              "confirmed",
+              "false"
+            ],
+            "title": "Resolution"
+          },
+          "note": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 500
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note"
+          }
+        },
+        "type": "object",
+        "required": [
+          "resolution"
+        ],
+        "title": "StoryResolution"
       },
       "StrategyConfig": {
         "properties": {
@@ -10426,6 +12097,76 @@
           "rows"
         ],
         "title": "ThesisBoard"
+      },
+      "ThesisChange": {
+        "properties": {
+          "ticker": {
+            "type": "string",
+            "title": "Ticker"
+          },
+          "kpi_id": {
+            "type": "string",
+            "title": "Kpi Id"
+          },
+          "period": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Period"
+          },
+          "from_status": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "pass",
+                  "breach",
+                  "unknown"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "From Status"
+          },
+          "to_status": {
+            "type": "string",
+            "enum": [
+              "pass",
+              "breach",
+              "unknown"
+            ],
+            "title": "To Status"
+          },
+          "verdict_id": {
+            "type": "integer",
+            "title": "Verdict Id"
+          },
+          "fact_ids": {
+            "items": {
+              "type": "integer"
+            },
+            "type": "array",
+            "title": "Fact Ids"
+          }
+        },
+        "type": "object",
+        "required": [
+          "ticker",
+          "kpi_id",
+          "period",
+          "from_status",
+          "to_status",
+          "verdict_id",
+          "fact_ids"
+        ],
+        "title": "ThesisChange"
       },
       "ThesisConfig": {
         "properties": {
@@ -11071,6 +12812,72 @@
           "body"
         ],
         "title": "VerificationConfigVersion"
+      },
+      "WikidataSummary": {
+        "properties": {
+          "qid": {
+            "type": "string",
+            "title": "Qid"
+          },
+          "industry": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Industry"
+          },
+          "products": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Products"
+          },
+          "ceo": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Ceo"
+          },
+          "chair": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Chair"
+          },
+          "website": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Website"
+          },
+          "part_of": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Part Of",
+            "description": "Indexes and groups."
+          },
+          "fetched_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Fetched At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "qid",
+          "fetched_at"
+        ],
+        "title": "WikidataSummary"
       }
     },
     "securitySchemes": {

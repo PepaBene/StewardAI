@@ -33,6 +33,7 @@ from steward.config.holding_profiles import HoldingProfilesConfig
 from steward.config.jobs import DigestSettings, JobsConfig
 from steward.config.notifications import NotificationsConfig
 from steward.config.store import load_active
+from steward.config.thesis import ThesesConfig
 from steward.jobs.runner import JobContext, JobHandler
 from steward.news.link import short_name
 from steward.notify.channels import (
@@ -96,6 +97,48 @@ class DigestSection(BaseModel):
     verdicts: list[DigestVerdict] = Field(default_factory=list)
 
 
+class PortfolioFlag(BaseModel):
+    kind: Literal["band", "hard_limit", "rule"]
+    key: str
+    ticker: str | None
+    severity: int
+    detail: str
+    first_seen: dt.datetime
+    cleared_at: dt.datetime | None
+
+
+class ThesisChange(BaseModel):
+    ticker: str
+    kpi_id: str
+    period: str | None
+    from_status: Literal["pass", "breach", "unknown"] | None
+    to_status: Literal["pass", "breach", "unknown"]
+    verdict_id: int
+    fact_ids: list[int]
+
+
+class ReviewDue(BaseModel):
+    ticker: str
+    review_date: dt.date
+
+
+class MacroFigure(BaseModel):
+    series_id: str
+    label: str
+    value: float
+    unit: str | None
+    period: dt.date
+    release_date: dt.date | None
+    url: str
+    new: bool = Field(description="Released within the digest's window.")
+
+
+class MarketHoliday(BaseModel):
+    calendar: str
+    date: dt.date
+    name: str
+
+
 class DigestBody(BaseModel):
     kind: DigestKind
     window_start: dt.datetime
@@ -106,6 +149,19 @@ class DigestBody(BaseModel):
     sections: list[DigestSection] = Field(default_factory=list)
     sources: list[DigestSource] = Field(default_factory=list)
     alerts_sent: int = 0
+    portfolio: list[PortfolioFlag] = Field(
+        default_factory=list, description="Out-of-band weights and breaches open in the period."
+    )
+    thesis_changes: list[ThesisChange] = Field(default_factory=list)
+    reviews_due: list[ReviewDue] = Field(
+        default_factory=list, description="Theses past their review date."
+    )
+    macro: list[MacroFigure] = Field(
+        default_factory=list, description="Latest macro figures, each with its release and URL."
+    )
+    holidays: list[MarketHoliday] = Field(
+        default_factory=list, description="Public holidays in the period and the next 7 days."
+    )
     dropped_sentences: int = Field(
         default=0, description="Written sentences removed because they cited nothing given."
     )
@@ -376,6 +432,87 @@ async def gather(
     return material
 
 
+async def portfolio_flags(
+    pool: asyncpg.Pool, start: dt.datetime, end: dt.datetime
+) -> list[PortfolioFlag]:
+    rows = await pool.fetch(
+        "select kind, key, ticker, severity, detail, first_seen, cleared_at"
+        " from public.portfolio_breach where first_seen < $2"
+        " and (cleared_at is null or cleared_at >= $1) order by severity desc, key",
+        start,
+        end,
+    )
+    return [PortfolioFlag(**dict(r)) for r in rows]
+
+
+async def thesis_changes(
+    pool: asyncpg.Pool, start: dt.datetime, end: dt.datetime
+) -> list[ThesisChange]:
+    """Each KPI whose latest verdict in the window differs from its latest one before."""
+    rows = await pool.fetch(
+        "select distinct on (v.ticker, v.kpi_id) v.id, v.ticker, v.kpi_id, v.period, v.status,"
+        " v.fact_ids, (select p.status from public.verdict p where p.ticker = v.ticker"
+        "   and p.kpi_id = v.kpi_id and p.created_at < $1 order by p.id desc limit 1) as before"
+        " from public.verdict v where v.created_at >= $1 and v.created_at < $2"
+        " order by v.ticker, v.kpi_id, v.id desc",
+        start,
+        end,
+    )
+    return [
+        ThesisChange(
+            ticker=r["ticker"],
+            kpi_id=r["kpi_id"],
+            period=r["period"],
+            from_status=r["before"],
+            to_status=r["status"],
+            verdict_id=r["id"],
+            fact_ids=list(r["fact_ids"]),
+        )
+        for r in rows
+        if r["before"] != r["status"]
+    ]
+
+
+async def macro_figures(pool: asyncpg.Pool, start: dt.datetime) -> list[MacroFigure]:
+    rows = await pool.fetch(
+        "select distinct on (series_id) series_id, label, value, unit, period, release_date, url"
+        " from public.macro_series order by series_id, period desc"
+    )
+    return [
+        MacroFigure(
+            series_id=r["series_id"],
+            label=r["label"] or r["series_id"],
+            value=float(r["value"]),
+            unit=r["unit"],
+            period=r["period"],
+            release_date=r["release_date"],
+            url=r["url"],
+            new=r["release_date"] is not None and r["release_date"] >= start.date(),
+        )
+        for r in rows
+    ]
+
+
+async def market_holidays(
+    pool: asyncpg.Pool, start: dt.datetime, end: dt.datetime
+) -> list[MarketHoliday]:
+    rows = await pool.fetch(
+        "select calendar, date, name from public.holiday where scope in ('national', 'exchange')"
+        " and date between $1 and $2 order by date, calendar",
+        start.date(),
+        (end + dt.timedelta(days=7)).date(),
+    )
+    return [MarketHoliday(**dict(r)) for r in rows]
+
+
+def reviews_due(theses: ThesesConfig, today: dt.date) -> list[ReviewDue]:
+    return [
+        ReviewDue(ticker=t.ticker, review_date=t.review_date)
+        for t in theses.theses
+        if t.review_date is not None and t.review_date <= today
+    ]
+
+
 def material_prompt(material: Material) -> str:
     groups = []
     for section in material.sections.values():
@@ -491,6 +628,38 @@ def render_text(body: DigestBody, app_url: str | None, markdown: bool) -> str:
         for v in section.verdicts:
             refs = ", ".join(fact_link(f) for f in v.fact_ids) or "no fact"
             lines.append(f"- {v.text} ({refs})")
+    if body.portfolio:
+        lines += ["", "## Portfolio" if markdown else "PORTFOLIO"]
+        for flag in body.portfolio:
+            state = " (cleared)" if flag.cleared_at else ""
+            kind = {"band": "out of band", "hard_limit": "hard limit", "rule": "rule breach"}
+            lines.append(f"- [{kind[flag.kind]}] {flag.detail}{state}")
+    if body.thesis_changes:
+        lines += ["", "## Thesis status changes" if markdown else "THESIS STATUS CHANGES"]
+        for c in body.thesis_changes:
+            refs = ", ".join(fact_link(f) for f in c.fact_ids) or "no fact"
+            lines.append(
+                f"- {c.ticker} KPI {c.kpi_id} ({c.period or 'no period'}): "
+                f"{c.from_status or 'new'} -> {c.to_status} ({refs})"
+            )
+    if body.reviews_due:
+        lines += ["", "## Theses to review" if markdown else "THESES TO REVIEW"]
+        lines += [
+            f"- {r.ticker}: review date {r.review_date.isoformat()}" for r in body.reviews_due
+        ]
+    if body.macro:
+        lines += ["", "## Macro figures" if markdown else "MACRO FIGURES"]
+        for m in body.macro:
+            unit = "%" if m.unit == "%" else f" {m.unit or ''}"
+            released = m.release_date.isoformat() if m.release_date else "release date unknown"
+            new = " (new)" if m.new else ""
+            lines.append(
+                f"- {m.label}: {m.value:g}{unit} for {m.period.isoformat()}{new}, "
+                f"released {released} ({link('source', m.url)})"
+            )
+    if body.holidays:
+        lines += ["", "## Market holidays" if markdown else "MARKET HOLIDAYS"]
+        lines += [f"- {h.date.isoformat()} {h.calendar}: {h.name}" for h in body.holidays]
     if app_url:
         lines += ["", f"Open in StewardAI: {app_url.rstrip('/')}/reports"]
     return "\n".join(lines)
@@ -503,10 +672,22 @@ async def build_digest(
     profiles: HoldingProfilesConfig,
     settings: DigestSettings,
     writer: DigestWriter | None,
+    theses: ThesesConfig | None = None,
 ) -> tuple[DigestBody, Usage | None, str | None]:
     start = end - WINDOWS[kind]
     material = await gather(pool, start, end, profiles, settings.min_severity_summarised)
     headline, nothing = headline_for(kind, material)
+    flags = await portfolio_flags(pool, start, end)
+    breaches = [f for f in flags if f.kind != "band" and f.first_seen >= start]
+    if breaches:
+        count = len(breaches)
+        extra = f"{count} portfolio {'breach' if count == 1 else 'breaches'}"
+        headline = (
+            f"{extra} in the last {'24 hours' if kind == 'daily' else '7 days'}."
+            if nothing
+            else f"{headline.rstrip('.')}; {extra}."
+        )
+        nothing = False
     alerts = await pool.fetchval(
         "select count(*) from public.alert where status = 'sent' and kind <> 'test'"
         " and sent_at >= $1 and sent_at < $2",
@@ -529,6 +710,11 @@ async def build_digest(
         ),
         sources=list(material.sources.values()),
         alerts_sent=int(alerts or 0),
+        portfolio=flags,
+        thesis_changes=await thesis_changes(pool, start, end),
+        reviews_due=reviews_due(theses or ThesesConfig(), end.date()),
+        macro=await macro_figures(pool, start),
+        holidays=await market_holidays(pool, start, end),
     )
     usage: Usage | None = None
     note: str | None = None
@@ -591,7 +777,8 @@ async def run_digest(
         notifications = await load_active(pool, "notifications", NotificationsConfig)
         profiles = await load_active(pool, "holding_profiles", HoldingProfilesConfig)
         jobs = await load_active(pool, "jobs", JobsConfig)
-        for stored in (notifications, profiles, jobs):
+        theses = await load_active(pool, "theses", ThesesConfig)
+        for stored in (notifications, profiles, jobs, theses):
             await ctx.record_config_version(stored.id if stored else None)
         notify = notifications.body if notifications else NotificationsConfig()
         settings = (jobs.body if jobs else JobsConfig()).digest
@@ -605,6 +792,7 @@ async def run_digest(
             profiles.body if profiles else HoldingProfilesConfig(),
             settings,
             writer,
+            theses.body if theses else None,
         )
         if usage is not None:
             step.usage = usage.step_usage()
