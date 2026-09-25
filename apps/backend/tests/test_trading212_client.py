@@ -206,4 +206,7 @@ def test_client_source_contains_no_write_calls() -> None:
     write_like = {"post", "put", "patch", "delete", "request", "send", "stream"}
     assert called & write_like == set(), f"write-capable calls in client: {called & write_like}"
     public = [name for name in vars(Trading212Client) if not name.startswith("_")]
-    assert all(name.startswith("get_") or name in {"aclose", "env"} for name in public), public
+    # Public API: single reads (get_*) and paginated reads (iter_*) only.
+    assert all(
+        name.startswith(("get_", "iter_")) or name in {"aclose", "env"} for name in public
+    ), public

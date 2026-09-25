@@ -16,14 +16,21 @@ import base64
 import json
 import logging
 import time
-from collections.abc import Awaitable, Callable
+from collections.abc import AsyncIterator, Awaitable, Callable
 from decimal import Decimal
 from typing import Any, Literal, Self
 
 import httpx
 from pydantic import BaseModel, TypeAdapter, ValidationError
 
-from steward.trading212.models import AccountSummary, Instrument, Position
+from steward.trading212.models import (
+    AccountSummary,
+    HistoricalOrder,
+    HistoryDividend,
+    HistoryTransaction,
+    Instrument,
+    Position,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -98,12 +105,40 @@ class Trading212Client:
     async def get_instruments(self) -> list[Instrument]:
         return _parse_list(Instrument, await self._get("/equity/metadata/instruments"))
 
+    # History endpoints are paginated (newest first) and rate-limited to 6 requests a
+    # minute each; iterate page by page so the caller can stop once it reaches known items.
+
+    def iter_order_history(self) -> AsyncIterator[list[HistoricalOrder]]:
+        return self._pages("/equity/history/orders", HistoricalOrder)
+
+    def iter_dividend_history(self) -> AsyncIterator[list[HistoryDividend]]:
+        return self._pages("/equity/history/dividends", HistoryDividend)
+
+    def iter_cash_history(self) -> AsyncIterator[list[HistoryTransaction]]:
+        return self._pages("/equity/history/transactions", HistoryTransaction)
+
+    async def _pages[M: BaseModel](self, path: str, model: type[M]) -> AsyncIterator[list[M]]:
+        next_path: str | None = f"{path}?limit={HISTORY_PAGE_SIZE}"
+        seen: set[str] = set()
+        while next_path:
+            if next_path in seen:
+                raise Trading212Error(f"GET {path} pagination repeated {next_path}")
+            seen.add(next_path)
+            payload = await self._get(next_path)
+            if not isinstance(payload, dict) or not isinstance(payload.get("items"), list):
+                raise Trading212Error(f"Unexpected {path} page shape")
+            yield _parse_list(model, payload["items"])
+            next_path = _relative_page_path(payload.get("nextPagePath"))
+
     async def _get(self, path: str, params: dict[str, str] | None = None) -> Any:
+        # Rate limits are per endpoint: key them by path without the query string.
+        path, _, query = path.partition("?")
+        url = f"{path}?{query}" if query else path
         attempt = 0
         while True:
             await self._wait_for_window(path)
             try:
-                response = await self._http.get(path, params=params)
+                response = await self._http.get(url, params=params)
             except httpx.TransportError as exc:
                 if attempt >= self._max_retries:
                     raise Trading212Error(f"GET {path} failed: {exc!r}") from exc
@@ -162,6 +197,22 @@ class Trading212Client:
             self._not_before[path] = time.time() + int(retry_after)
         elif (remaining == "0" or response.status_code == 429) and reset and reset.isdigit():
             self._not_before[path] = float(reset)
+
+
+HISTORY_PAGE_SIZE = 50
+_API_PREFIX = "/api/v0"
+
+
+def _relative_page_path(next_page_path: object) -> str | None:
+    """nextPagePath comes back as '/api/v0/equity/...?cursor=..'; the client's base URL
+    already ends in /api/v0."""
+    if not next_page_path or not isinstance(next_page_path, str):
+        return None
+    if next_page_path.startswith(_API_PREFIX + "/"):
+        return next_page_path[len(_API_PREFIX) :]
+    if next_page_path.startswith("/"):
+        return next_page_path
+    raise Trading212Error(f"Unexpected nextPagePath {next_page_path!r}")
 
 
 def _backoff(attempt: int) -> float:

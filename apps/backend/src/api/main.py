@@ -1,5 +1,7 @@
 """FastAPI app: serves the frontend's action calls. Run with `uv run uvicorn api.main:app`."""
 
+from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager
 from typing import Literal
 
 from fastapi import FastAPI
@@ -8,6 +10,8 @@ from fastapi.routing import APIRoute
 from pydantic import BaseModel
 
 from api.auth import Owner
+from api.db import close_pool
+from api.routes import router
 from steward import __version__
 from steward.config import StrategyConfig, ThesesConfig
 from steward.logging import configure_logging
@@ -24,6 +28,12 @@ def _operation_id(route: APIRoute) -> str:
     return route.name
 
 
+@asynccontextmanager
+async def _lifespan(_app: FastAPI) -> AsyncIterator[None]:
+    yield
+    await close_pool()
+
+
 def create_app() -> FastAPI:
     settings = get_settings()
     configure_logging(settings.log_level, settings.secret_values())
@@ -35,6 +45,7 @@ def create_app() -> FastAPI:
         # One schema per model (no "-Input"/"-Output" split) so the frontend gets
         # exactly one StrategyConfig type.
         separate_input_output_schemas=False,
+        lifespan=_lifespan,
     )
     app.add_middleware(
         CORSMiddleware,
@@ -60,6 +71,7 @@ def create_app() -> FastAPI:
         an invalid body gets a 422 listing every error."""
         return body
 
+    app.include_router(router)
     return app
 
 

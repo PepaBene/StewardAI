@@ -7,6 +7,7 @@ frontend's TypeScript types.
 
 from pydantic import BaseModel
 
+from steward.config.jobs import JobSchedule, JobsConfig
 from steward.config.strategy import StrategyConfig
 from steward.config.thesis import ThesesConfig, ThesisConfig, ThesisKPI
 
@@ -15,6 +16,15 @@ from steward.config.thesis import ThesesConfig, ThesisConfig, ThesisKPI
 CONFIG_MODELS: dict[str, type[BaseModel]] = {
     "strategy": StrategyConfig,
     "theses": ThesesConfig,
+    "jobs": JobsConfig,
 }
 
-__all__ = ["CONFIG_MODELS", "StrategyConfig", "ThesesConfig", "ThesisConfig", "ThesisKPI"]
+__all__ = [
+    "CONFIG_MODELS",
+    "JobSchedule",
+    "JobsConfig",
+    "StrategyConfig",
+    "ThesesConfig",
+    "ThesisConfig",
+    "ThesisKPI",
+]

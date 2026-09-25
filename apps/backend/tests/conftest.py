@@ -80,3 +80,13 @@ async def migrated_db() -> AsyncIterator[MigratedDatabase]:
         admin = await asyncpg.connect(base_url)
         await admin.execute(f'drop database "{name}" with (force)')
         await admin.close()
+
+
+@pytest.fixture
+async def backend_pool(migrated_db: MigratedDatabase) -> AsyncIterator[asyncpg.Pool]:
+    """A pool connected as app_backend, the way the API and worker connect."""
+    pool = await asyncpg.create_pool(migrated_db.backend_url, min_size=1, max_size=8)
+    try:
+        yield pool
+    finally:
+        await pool.close()

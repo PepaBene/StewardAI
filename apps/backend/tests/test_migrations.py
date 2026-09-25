@@ -191,7 +191,8 @@ async def test_only_one_owner(migrated_db: MigratedDatabase) -> None:
 
 
 async def test_pgmq_enabled_and_usable_by_backend(migrated_db: MigratedDatabase) -> None:
-    """Phase 0 AC: `select * from pgmq.list_queues();` returns empty with no error.
+    """Phase 0 AC: `select * from pgmq.list_queues();` runs with no error (it was empty in
+    Phase 0; since Phase 1 it lists exactly the `jobs` queue).
 
     Runs where pgmq is installed (CI uses a pgmq Postgres image; Supabase ships it)."""
     if "20260925141614_enable_pgmq.sql" not in migrated_db.applied:
@@ -199,7 +200,8 @@ async def test_pgmq_enabled_and_usable_by_backend(migrated_db: MigratedDatabase)
     backend = await asyncpg.connect(migrated_db.backend_url)
     admin = await asyncpg.connect(migrated_db.admin_url)
     try:
-        assert await backend.fetch("select * from pgmq.list_queues()") == []
+        queues = await backend.fetch("select queue_name from pgmq.list_queues()")
+        assert [q["queue_name"] for q in queues] == ["jobs"]
         # Queues are created by migrations (as the owner); the backend then uses them.
         await admin.execute("select pgmq.create('phase0_check')")
         msg_id = await backend.fetchval(

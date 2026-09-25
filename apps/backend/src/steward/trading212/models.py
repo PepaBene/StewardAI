@@ -80,3 +80,71 @@ class Instrument(T212Model):
     type: str | None = None
     currency_code: str | None = None
     working_schedule_id: int | None = None
+
+
+# ---------------------------------------------------------------------------
+# History (GET /equity/history/...): paginated, newest first.
+# ---------------------------------------------------------------------------
+
+
+class HistoryInstrument(T212Model):
+    ticker: str
+    name: str | None = None
+    isin: str | None = None
+    currency: str | None = None
+
+
+class HistoryOrder(T212Model):
+    id: int
+    ticker: str | None = None
+    side: str | None = None
+    type: str | None = None
+    status: str | None = None
+    currency: str | None = None
+    created_at: dt.datetime | None = None
+    instrument: HistoryInstrument | None = None
+
+
+class FillWalletImpact(T212Model):
+    currency: str | None = None
+    net_value: Decimal | None = None
+    realised_profit_loss: Decimal | None = None
+    fx_rate: Decimal | None = None
+
+
+class Fill(T212Model):
+    id: int
+    filled_at: dt.datetime
+    quantity: Decimal | None = None
+    price: Decimal | None = None
+    type: str | None = None
+    wallet_impact: FillWalletImpact | None = None
+
+
+class HistoricalOrder(T212Model):
+    """An order and, once executed, its fill. Cancelled or rejected orders have no fill."""
+
+    order: HistoryOrder
+    fill: Fill | None = None
+
+
+class HistoryDividend(T212Model):
+    reference: str
+    ticker: str | None = None
+    type: str | None = None
+    quantity: Decimal | None = None
+    amount: Decimal
+    currency: str | None = None
+    gross_amount_per_share: Decimal | None = None
+    paid_on: dt.datetime
+    instrument: HistoryInstrument | None = None
+
+
+class HistoryTransaction(T212Model):
+    """A cash movement: deposit, withdrawal, fee, transfer or interest."""
+
+    reference: str
+    type: str
+    amount: Decimal
+    currency: str | None = None
+    date_time: dt.datetime

@@ -120,10 +120,676 @@
           }
         ]
       }
+    },
+    "/portfolio/overview": {
+      "get": {
+        "tags": [
+          "portfolio"
+        ],
+        "summary": "Get Portfolio Overview",
+        "description": "Totals, allocation, drift against the active strategy, and freshness, from the\nlatest snapshot. Returns empty sections (not an error) before the first sync.",
+        "operationId": "get_portfolio_overview",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PortfolioOverview"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/portfolio/holdings": {
+      "get": {
+        "tags": [
+          "portfolio"
+        ],
+        "summary": "Get Portfolio Holdings",
+        "description": "Every open position of the latest snapshot, largest first.",
+        "operationId": "get_portfolio_holdings",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HoldingsResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/jobs/portfolio-sync": {
+      "post": {
+        "tags": [
+          "jobs"
+        ],
+        "summary": "Run Portfolio Sync",
+        "description": "Queue a portfolio sync now. The worker runs it; a run already in progress finishes\nfirst (the job waits for it), so two syncs never write at the same time.",
+        "operationId": "run_portfolio_sync",
+        "responses": {
+          "202": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/JobSummary"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/config/strategy": {
+      "get": {
+        "tags": [
+          "config"
+        ],
+        "summary": "Get Strategy Config",
+        "operationId": "get_strategy_config",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StrategyConfigVersion"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "config"
+        ],
+        "summary": "Save Strategy Config",
+        "description": "Validate and save as the new active strategy. Drift uses it immediately.",
+        "operationId": "save_strategy_config",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "note",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "maxLength": 500
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Why this change was made.",
+              "title": "Note"
+            },
+            "description": "Why this change was made."
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/StrategyConfig"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StrategyConfigVersion"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/config/theses": {
+      "get": {
+        "tags": [
+          "config"
+        ],
+        "summary": "Get Theses Config",
+        "operationId": "get_theses_config",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ThesesConfigVersion"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "config"
+        ],
+        "summary": "Save Theses Config",
+        "operationId": "save_theses_config",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "note",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "maxLength": 500
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Why this change was made.",
+              "title": "Note"
+            },
+            "description": "Why this change was made."
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ThesesConfig"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ThesesConfigVersion"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/config/jobs": {
+      "get": {
+        "tags": [
+          "config"
+        ],
+        "summary": "Get Jobs Config",
+        "description": "The saved job schedules. 404 means the worker runs on the defaults.",
+        "operationId": "get_jobs_config",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/JobsConfigVersion"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "config"
+        ],
+        "summary": "Save Jobs Config",
+        "description": "Save job schedules. The worker picks them up within a few minutes, no restart.",
+        "operationId": "save_jobs_config",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "note",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "maxLength": 500
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Why this change was made.",
+              "title": "Note"
+            },
+            "description": "Why this change was made."
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/JobsConfig"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/JobsConfigVersion"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
     "schemas": {
+      "AccountTotals": {
+        "properties": {
+          "account_currency": {
+            "type": "string",
+            "title": "Account Currency"
+          },
+          "total_value": {
+            "type": "number",
+            "title": "Total Value",
+            "description": "Total value as Trading212 reports it."
+          },
+          "cash": {
+            "type": "number",
+            "title": "Cash"
+          },
+          "invested_value": {
+            "type": "number",
+            "title": "Invested Value"
+          },
+          "invested_cost": {
+            "type": "number",
+            "title": "Invested Cost"
+          },
+          "unrealized_ppl": {
+            "type": "number",
+            "title": "Unrealized Ppl"
+          },
+          "realized_ppl": {
+            "type": "number",
+            "title": "Realized Ppl"
+          }
+        },
+        "type": "object",
+        "required": [
+          "account_currency",
+          "total_value",
+          "cash",
+          "invested_value",
+          "invested_cost",
+          "unrealized_ppl",
+          "realized_ppl"
+        ],
+        "title": "AccountTotals"
+      },
+      "AllocationSlice": {
+        "properties": {
+          "key": {
+            "type": "string",
+            "title": "Key",
+            "description": "Ticker, or 'CASH'."
+          },
+          "label": {
+            "type": "string",
+            "title": "Label"
+          },
+          "value_base": {
+            "type": "number",
+            "title": "Value Base"
+          },
+          "weight": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Weight"
+          }
+        },
+        "type": "object",
+        "required": [
+          "key",
+          "label",
+          "value_base",
+          "weight"
+        ],
+        "title": "AllocationSlice"
+      },
+      "BaseTotals": {
+        "properties": {
+          "base_currency": {
+            "type": "string",
+            "title": "Base Currency"
+          },
+          "fx_source": {
+            "type": "string",
+            "enum": [
+              "cnb",
+              "ecb"
+            ],
+            "title": "Fx Source"
+          },
+          "total": {
+            "type": "number",
+            "title": "Total"
+          },
+          "cash": {
+            "type": "number",
+            "title": "Cash"
+          },
+          "invested": {
+            "type": "number",
+            "title": "Invested"
+          }
+        },
+        "type": "object",
+        "required": [
+          "base_currency",
+          "fx_source",
+          "total",
+          "cash",
+          "invested"
+        ],
+        "title": "BaseTotals"
+      },
+      "BucketDrift": {
+        "properties": {
+          "bucket": {
+            "type": "string",
+            "title": "Bucket"
+          },
+          "value_base": {
+            "type": "number",
+            "title": "Value Base"
+          },
+          "weight": {
+            "type": "number",
+            "title": "Weight"
+          },
+          "target_weight": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Target Weight"
+          },
+          "band": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Band"
+          },
+          "lower": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Lower"
+          },
+          "upper": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Upper"
+          },
+          "drift": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Drift"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "in_band",
+              "above_band",
+              "below_band",
+              "above_hard_limit",
+              "no_target"
+            ],
+            "title": "Status"
+          }
+        },
+        "type": "object",
+        "required": [
+          "bucket",
+          "value_base",
+          "weight",
+          "target_weight",
+          "band",
+          "lower",
+          "upper",
+          "drift",
+          "status"
+        ],
+        "title": "BucketDrift"
+      },
+      "CashDrift": {
+        "properties": {
+          "value_base": {
+            "type": "number",
+            "title": "Value Base"
+          },
+          "weight": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Weight"
+          },
+          "target_weight": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Target Weight"
+          },
+          "band": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Band"
+          },
+          "lower": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Lower"
+          },
+          "upper": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Upper"
+          },
+          "drift": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Drift"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "in_band",
+              "above_band",
+              "below_band",
+              "above_hard_limit",
+              "no_target"
+            ],
+            "title": "Status"
+          }
+        },
+        "type": "object",
+        "required": [
+          "value_base",
+          "weight",
+          "target_weight",
+          "band",
+          "lower",
+          "upper",
+          "drift",
+          "status"
+        ],
+        "title": "CashDrift"
+      },
       "CashWeightRule": {
         "properties": {
           "id": {
@@ -311,6 +977,132 @@
         "title": "CategoryWeightRule",
         "description": "Limit on a category's weight; with no bucket it applies to every bucket of the dimension."
       },
+      "DimensionAllocation": {
+        "properties": {
+          "dimension": {
+            "type": "string",
+            "title": "Dimension"
+          },
+          "buckets": {
+            "items": {
+              "$ref": "#/components/schemas/BucketDrift"
+            },
+            "type": "array",
+            "title": "Buckets"
+          }
+        },
+        "type": "object",
+        "required": [
+          "dimension",
+          "buckets"
+        ],
+        "title": "DimensionAllocation"
+      },
+      "DriftReport": {
+        "properties": {
+          "weight_basis": {
+            "type": "string",
+            "enum": [
+              "total",
+              "invested"
+            ],
+            "title": "Weight Basis"
+          },
+          "basis_value_base": {
+            "type": "number",
+            "title": "Basis Value Base"
+          },
+          "positions": {
+            "items": {
+              "$ref": "#/components/schemas/PositionDrift"
+            },
+            "type": "array",
+            "title": "Positions"
+          },
+          "categories": {
+            "items": {
+              "$ref": "#/components/schemas/DimensionAllocation"
+            },
+            "type": "array",
+            "title": "Categories"
+          },
+          "cash": {
+            "$ref": "#/components/schemas/CashDrift"
+          },
+          "out_of_band": {
+            "type": "integer",
+            "title": "Out Of Band"
+          }
+        },
+        "type": "object",
+        "required": [
+          "weight_basis",
+          "basis_value_base",
+          "positions",
+          "categories",
+          "cash",
+          "out_of_band"
+        ],
+        "title": "DriftReport"
+      },
+      "Freshness": {
+        "properties": {
+          "snapshot_date": {
+            "type": "string",
+            "format": "date",
+            "title": "Snapshot Date"
+          },
+          "synced_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Synced At",
+            "description": "When the sync that wrote this snapshot finished its last step."
+          },
+          "job_id": {
+            "type": "integer",
+            "title": "Job Id"
+          }
+        },
+        "type": "object",
+        "required": [
+          "snapshot_date",
+          "synced_at",
+          "job_id"
+        ],
+        "title": "Freshness"
+      },
+      "FxRateUsed": {
+        "properties": {
+          "currency": {
+            "type": "string",
+            "title": "Currency"
+          },
+          "rate": {
+            "type": "number",
+            "title": "Rate",
+            "description": "Base-currency units per one unit of `currency`."
+          },
+          "rate_date": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Rate Date"
+          }
+        },
+        "type": "object",
+        "required": [
+          "currency",
+          "rate",
+          "rate_date"
+        ],
+        "title": "FxRateUsed"
+      },
       "HTTPValidationError": {
         "properties": {
           "detail": {
@@ -342,6 +1134,488 @@
           "version"
         ],
         "title": "HealthResponse"
+      },
+      "Holding": {
+        "properties": {
+          "ticker": {
+            "type": "string",
+            "title": "Ticker"
+          },
+          "name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
+          },
+          "isin": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Isin"
+          },
+          "quantity": {
+            "type": "number",
+            "title": "Quantity"
+          },
+          "avg_price": {
+            "type": "number",
+            "title": "Avg Price"
+          },
+          "current_price": {
+            "type": "number",
+            "title": "Current Price"
+          },
+          "instrument_currency": {
+            "type": "string",
+            "title": "Instrument Currency"
+          },
+          "value": {
+            "type": "number",
+            "title": "Value",
+            "description": "quantity x current_price, instrument currency."
+          },
+          "account_currency": {
+            "type": "string",
+            "title": "Account Currency"
+          },
+          "value_account": {
+            "type": "number",
+            "title": "Value Account"
+          },
+          "cost_account": {
+            "type": "number",
+            "title": "Cost Account"
+          },
+          "ppl": {
+            "type": "number",
+            "title": "Ppl",
+            "description": "Unrealised P/L in the account currency (Trading212)."
+          },
+          "ppl_pct": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ppl Pct",
+            "description": "ppl / cost_account."
+          },
+          "fx_rate": {
+            "type": "number",
+            "title": "Fx Rate"
+          },
+          "fx_rate_date": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fx Rate Date"
+          },
+          "value_base": {
+            "type": "number",
+            "title": "Value Base"
+          },
+          "weight": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Weight"
+          },
+          "target_weight": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Target Weight"
+          },
+          "drift": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Drift"
+          },
+          "drift_status": {
+            "type": "string",
+            "enum": [
+              "in_band",
+              "above_band",
+              "below_band",
+              "above_hard_limit",
+              "no_target"
+            ],
+            "title": "Drift Status"
+          }
+        },
+        "type": "object",
+        "required": [
+          "ticker",
+          "name",
+          "isin",
+          "quantity",
+          "avg_price",
+          "current_price",
+          "instrument_currency",
+          "value",
+          "account_currency",
+          "value_account",
+          "cost_account",
+          "ppl",
+          "ppl_pct",
+          "fx_rate",
+          "fx_rate_date",
+          "value_base",
+          "weight",
+          "target_weight",
+          "drift",
+          "drift_status"
+        ],
+        "title": "Holding"
+      },
+      "HoldingsResponse": {
+        "properties": {
+          "freshness": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Freshness"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "base_currency": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Base Currency"
+          },
+          "account_currency": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Account Currency"
+          },
+          "holdings": {
+            "items": {
+              "$ref": "#/components/schemas/Holding"
+            },
+            "type": "array",
+            "title": "Holdings",
+            "description": "Every open position once, by value descending."
+          }
+        },
+        "type": "object",
+        "required": [
+          "freshness",
+          "base_currency",
+          "account_currency",
+          "holdings"
+        ],
+        "title": "HoldingsResponse"
+      },
+      "JobSchedule": {
+        "properties": {
+          "enabled": {
+            "type": "boolean",
+            "title": "Enabled",
+            "default": true
+          },
+          "cron": {
+            "type": "string",
+            "title": "Cron",
+            "description": "Standard 5-field cron expression (minute hour day month weekday).",
+            "examples": [
+              "30 22 * * *"
+            ]
+          },
+          "timezone": {
+            "type": "string",
+            "title": "Timezone",
+            "default": "Europe/Prague",
+            "examples": [
+              "Europe/Prague"
+            ]
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "cron"
+        ],
+        "title": "JobSchedule"
+      },
+      "JobSummary": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "job_type": {
+            "type": "string",
+            "title": "Job Type"
+          },
+          "trigger": {
+            "type": "string",
+            "title": "Trigger"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "queued",
+              "waiting",
+              "running",
+              "succeeded",
+              "failed"
+            ],
+            "title": "Status"
+          },
+          "error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "started_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Started At"
+          },
+          "finished_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Finished At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "job_type",
+          "trigger",
+          "status",
+          "error",
+          "created_at",
+          "started_at",
+          "finished_at"
+        ],
+        "title": "JobSummary"
+      },
+      "JobsConfig": {
+        "properties": {
+          "schema_version": {
+            "type": "integer",
+            "const": 1,
+            "title": "Schema Version",
+            "default": 1
+          },
+          "portfolio_sync": {
+            "$ref": "#/components/schemas/JobSchedule",
+            "description": "Trading212 sync, FX rates and drift. Default: daily at 22:30 Prague time."
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "JobsConfig",
+        "description": "Schedules for the worker's timed jobs. Stored as `config_version` rows, domain `jobs`.\n\nThe worker re-reads this every few minutes, so a saved change applies without a restart."
+      },
+      "JobsConfigVersion": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note"
+          },
+          "body": {
+            "$ref": "#/components/schemas/JobsConfig"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "created_at",
+          "note",
+          "body"
+        ],
+        "title": "JobsConfigVersion"
+      },
+      "PortfolioOverview": {
+        "properties": {
+          "freshness": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Freshness"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Null until the first successful sync."
+          },
+          "last_sync": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/JobSummary"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The latest sync job, whatever its status."
+          },
+          "account": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AccountTotals"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "base": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/BaseTotals"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "strategy_config_version_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Strategy Config Version Id"
+          },
+          "base_currency_mismatch": {
+            "type": "boolean",
+            "title": "Base Currency Mismatch",
+            "description": "The active strategy's base currency differs from the snapshot's; the next sync converts to the new one."
+          },
+          "allocation": {
+            "items": {
+              "$ref": "#/components/schemas/AllocationSlice"
+            },
+            "type": "array",
+            "title": "Allocation"
+          },
+          "drift": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/DriftReport"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "fx_rates": {
+            "items": {
+              "$ref": "#/components/schemas/FxRateUsed"
+            },
+            "type": "array",
+            "title": "Fx Rates"
+          }
+        },
+        "type": "object",
+        "required": [
+          "freshness",
+          "last_sync",
+          "account",
+          "base",
+          "strategy_config_version_id",
+          "base_currency_mismatch",
+          "allocation",
+          "drift",
+          "fx_rates"
+        ],
+        "title": "PortfolioOverview"
       },
       "PositionCountRule": {
         "properties": {
@@ -400,6 +1674,113 @@
           "value"
         ],
         "title": "PositionCountRule"
+      },
+      "PositionDrift": {
+        "properties": {
+          "ticker": {
+            "type": "string",
+            "title": "Ticker"
+          },
+          "weight": {
+            "type": "number",
+            "title": "Weight"
+          },
+          "target_weight": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Target Weight"
+          },
+          "band": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Band"
+          },
+          "lower": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Lower"
+          },
+          "upper": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Upper"
+          },
+          "hard_limit": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Hard Limit"
+          },
+          "drift": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Drift"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "in_band",
+              "above_band",
+              "below_band",
+              "above_hard_limit",
+              "no_target"
+            ],
+            "title": "Status"
+          },
+          "held": {
+            "type": "boolean",
+            "title": "Held"
+          }
+        },
+        "type": "object",
+        "required": [
+          "ticker",
+          "weight",
+          "target_weight",
+          "band",
+          "lower",
+          "upper",
+          "hard_limit",
+          "drift",
+          "status",
+          "held"
+        ],
+        "title": "PositionDrift"
       },
       "PositionTarget": {
         "properties": {
@@ -694,6 +2075,41 @@
         "title": "StrategyConfig",
         "description": "The owner's investment strategy.\n\nStored as the body of `config_version` rows with domain `strategy`."
       },
+      "StrategyConfigVersion": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note"
+          },
+          "body": {
+            "$ref": "#/components/schemas/StrategyConfig"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "created_at",
+          "note",
+          "body"
+        ],
+        "title": "StrategyConfigVersion"
+      },
       "TargetBand": {
         "properties": {
           "target_weight": {
@@ -738,6 +2154,41 @@
         "type": "object",
         "title": "ThesesConfig",
         "description": "All theses. Stored as the body of `config_version` rows, domain `theses`."
+      },
+      "ThesesConfigVersion": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note"
+          },
+          "body": {
+            "$ref": "#/components/schemas/ThesesConfig"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "created_at",
+          "note",
+          "body"
+        ],
+        "title": "ThesesConfigVersion"
       },
       "ThesisConfig": {
         "properties": {
