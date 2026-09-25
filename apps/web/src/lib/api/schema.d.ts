@@ -128,6 +128,131 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/jobs/earnings-check": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Run Earnings Check
+         * @description Queue an earnings thesis check for one holding: find the release, extract and
+         *     validate its figures, then judge the thesis KPIs.
+         */
+        post: operations["run_earnings_check"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/jobs/thesis-verdicts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Run Thesis Verdicts
+         * @description Re-judge thesis KPIs from the stored facts with the active theses config. No
+         *     fetching, no model calls: use it after editing a threshold.
+         */
+        post: operations["run_thesis_verdicts"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/jobs/earnings-calendar": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Run Earnings Calendar
+         * @description Refresh every holding's next report date now.
+         */
+        post: operations["run_earnings_calendar"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/holdings/{ticker}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Holding
+         * @description One holding: position, thesis, KPI verdicts with their history, and every extracted
+         *     fact with its source.
+         */
+        get: operations["get_holding"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/facts/{fact_id}/evidence": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Fact Evidence
+         * @description The archived copy of the page a fact was read from: a short-lived signed URL and
+         *     the text around the fact's snippet.
+         */
+        get: operations["get_fact_evidence"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/facts/{fact_id}/review": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Review Fact
+         * @description Release or reject a fact the validator held for review (sanity bound, restatement,
+         *     currency). Verdicts for the holding are re-run afterwards.
+         */
+        post: operations["review_fact"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/config/strategy": {
         parameters: {
             query?: never;
@@ -191,6 +316,348 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/config/holding-profiles": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Holding Profiles Config */
+        get: operations["get_holding_profiles_config"];
+        /**
+         * Save Holding Profiles Config
+         * @description Save holding profiles. The next earnings check and calendar refresh use them.
+         */
+        put: operations["save_holding_profiles_config"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/config/holding-profiles/validate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Validate Holding Profiles
+         * @description Validate holding profiles without saving. 422 lists every error.
+         */
+        post: operations["validate_holding_profiles"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/config/verification": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Verification Config
+         * @description The saved validator thresholds. 404 means the defaults apply.
+         */
+        get: operations["get_verification_config"];
+        /** Save Verification Config */
+        put: operations["save_verification_config"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/news": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get News
+         * @description News items, newest first, each with its story's severity and confidence. Filters
+         *     combine (AND); a repeated parameter matches any of its values.
+         */
+        get: operations["get_news"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/news/event-types": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Event Types
+         * @description The fixed event taxonomy, for labels and filters.
+         */
+        get: operations["get_event_types"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/alerts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Alerts
+         * @description Recent alert decisions: sent, held for quiet hours, suppressed (with why) or failed.
+         */
+        get: operations["get_alerts"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/alerts/test": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Send Test Alert
+         * @description Route a test alert through the active notification rules exactly as a real event
+         *     would be (quiet hours included; the daily cap and repeat throttle do not apply). The
+         *     worker sends it within seconds, or when quiet hours end.
+         */
+        post: operations["send_test_alert"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/reports": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Reports */
+        get: operations["get_reports"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/reports/{report_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Report By Id
+         * @description A digest with every sentence's citations and the source list.
+         */
+        get: operations["get_report_by_id"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/jobs/news-ingest": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Run News Ingest
+         * @description Run the news pipeline now: ingest, classify, corroborate, alert.
+         */
+        post: operations["run_news_ingest"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/jobs/digest": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Run Digest Now
+         * @description Write and send a digest now.
+         */
+        post: operations["run_digest_now"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/config/news-sources": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get News Sources Config
+         * @description The saved source registry. 404 means the defaults apply.
+         */
+        get: operations["get_news_sources_config"];
+        /**
+         * Save News Sources Config
+         * @description Save the source registry. The next ingest run reads it; no deploy or restart.
+         */
+        put: operations["save_news_sources_config"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/config/news-sources/validate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Validate News Sources */
+        post: operations["validate_news_sources"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/config/event-rules": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Event Rules Config
+         * @description The saved event severities. 404 means the defaults apply.
+         */
+        get: operations["get_event_rules_config"];
+        /** Save Event Rules Config */
+        put: operations["save_event_rules_config"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/config/event-rules/validate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Validate Event Rules */
+        post: operations["validate_event_rules"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/config/notifications": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Notifications Config
+         * @description The saved notification rules. 404 means the defaults apply.
+         */
+        get: operations["get_notifications_config"];
+        /**
+         * Save Notifications Config
+         * @description Save notification rules. The next alert is routed with them; no restart.
+         */
+        put: operations["save_notifications_config"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/config/notifications/validate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Validate Notifications */
+        post: operations["validate_notifications"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -214,6 +681,54 @@ export interface components {
             unrealized_ppl: number;
             /** Realized Ppl */
             realized_ppl: number;
+        };
+        /** AlertOut */
+        AlertOut: {
+            /** Id */
+            id: number;
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "news" | "thesis_breach" | "test";
+            /** Severity */
+            severity: number;
+            /** Ticker */
+            ticker: string | null;
+            /** Event Type */
+            event_type: string | null;
+            /** Cluster Id */
+            cluster_id: number | null;
+            /** Verdict Id */
+            verdict_id: number | null;
+            /**
+             * Channel
+             * @enum {string}
+             */
+            channel: "telegram" | "email";
+            /** Message */
+            message: string;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "pending" | "sent" | "suppressed" | "failed";
+            /**
+             * Send After
+             * Format: date-time
+             */
+            send_after: string;
+            /** Sent At */
+            sent_at: string | null;
+            /** Suppressed Reason */
+            suppressed_reason: string | null;
+            /** Error */
+            error: string | null;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
         };
         /** AllocationSlice */
         AllocationSlice: {
@@ -384,12 +899,177 @@ export interface components {
             /** Bucket */
             bucket?: string | null;
         };
+        /** DigestBody */
+        DigestBody: {
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "daily" | "weekly";
+            /**
+             * Window Start
+             * Format: date-time
+             */
+            window_start: string;
+            /**
+             * Window End
+             * Format: date-time
+             */
+            window_end: string;
+            /** Nothing Material */
+            nothing_material: boolean;
+            /** Headline */
+            headline: string;
+            /** Overview */
+            overview?: components["schemas"]["Sentence"][];
+            /** Sections */
+            sections?: components["schemas"]["DigestSection"][];
+            /** Sources */
+            sources?: components["schemas"]["DigestSource"][];
+            /**
+             * Alerts Sent
+             * @default 0
+             */
+            alerts_sent: number;
+            /**
+             * Dropped Sentences
+             * @description Written sentences removed because they cited nothing given.
+             * @default 0
+             */
+            dropped_sentences: number;
+            /** Writer */
+            writer?: string | null;
+        };
+        /** DigestRequest */
+        DigestRequest: {
+            /**
+             * Kind
+             * @default daily
+             * @enum {string}
+             */
+            kind: "daily" | "weekly";
+        };
+        /** DigestSection */
+        DigestSection: {
+            /**
+             * Ticker
+             * @description Null: markets and macro.
+             */
+            ticker: string | null;
+            /** Name */
+            name: string;
+            /** Summary */
+            summary?: components["schemas"]["Sentence"][];
+            /** Stories */
+            stories?: components["schemas"]["DigestStory"][];
+            /** Verdicts */
+            verdicts?: components["schemas"]["DigestVerdict"][];
+        };
+        /** DigestSettings */
+        DigestSettings: {
+            /**
+             * Model
+             * @default claude-sonnet-5
+             * @example claude-sonnet-5
+             */
+            model: string;
+            /**
+             * Use Batch
+             * @description Write the summary through the Batch API (half price).
+             * @default true
+             */
+            use_batch: boolean;
+            /**
+             * Batch Wait Minutes
+             * @description How long to wait for the batch before writing the summary directly.
+             * @default 60
+             */
+            batch_wait_minutes: number;
+            /**
+             * Min Severity Summarised
+             * @description Stories at or above this severity get a written summary; the rest are listed by headline.
+             * @default 2
+             */
+            min_severity_summarised: number;
+        };
+        /** DigestSource */
+        DigestSource: {
+            /** News Item Id */
+            news_item_id: number;
+            /** Url */
+            url: string;
+            /** Outlet */
+            outlet: string | null;
+            /** Tier */
+            tier: number;
+            /** Headline */
+            headline: string;
+            /**
+             * Published At
+             * Format: date-time
+             */
+            published_at: string;
+        };
+        /** DigestStory */
+        DigestStory: {
+            /** Cluster Id */
+            cluster_id: number;
+            /** Headline */
+            headline: string;
+            /** Event Type */
+            event_type: string | null;
+            /** Severity */
+            severity: number;
+            /** Status */
+            status: string;
+            /**
+             * Confidence
+             * @enum {string}
+             */
+            confidence: "verified" | "corroborated" | "unconfirmed" | "disputed";
+            /**
+             * News Item Ids
+             * @description The story's items, lead item first.
+             */
+            news_item_ids: number[];
+        };
+        /** DigestVerdict */
+        DigestVerdict: {
+            /** Verdict Id */
+            verdict_id: number;
+            /** Kpi Id */
+            kpi_id: string;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "pass" | "breach" | "unknown";
+            /** Period */
+            period: string | null;
+            /** Text */
+            text: string;
+            /** Fact Ids */
+            fact_ids: number[];
+        };
         /** DimensionAllocation */
         DimensionAllocation: {
             /** Dimension */
             dimension: string;
             /** Buckets */
             buckets: components["schemas"]["BucketDrift"][];
+        };
+        /** DomainTier */
+        DomainTier: {
+            /**
+             * Domain
+             * @example reuters.com
+             */
+            domain: string;
+            /**
+             * Tier
+             * @enum {integer}
+             */
+            tier: 1 | 2 | 3;
         };
         /** DriftReport */
         DriftReport: {
@@ -407,6 +1087,340 @@ export interface components {
             cash: components["schemas"]["CashDrift"];
             /** Out Of Band */
             out_of_band: number;
+        };
+        /**
+         * EarningsCalendarSettings
+         * @description Next report dates: Finnhub for US issuers, the IR calendar page otherwise.
+         */
+        EarningsCalendarSettings: {
+            /**
+             * Model
+             * @description Reads report dates off IR calendar pages.
+             * @default claude-haiku-4-5
+             * @example claude-sonnet-5
+             */
+            model: string;
+            /**
+             * Lookahead Days
+             * @default 120
+             */
+            lookahead_days: number;
+        };
+        /** EarningsCheckRequest */
+        EarningsCheckRequest: {
+            /**
+             * Ticker
+             * @example AAPL_US_EQ
+             */
+            ticker: string;
+            /**
+             * Report Date
+             * @description Report date to look for. Default: the instrument's report date if it has passed, else today.
+             */
+            report_date?: string | null;
+            /**
+             * Url
+             * @description Use this document instead of searching (a press release or report).
+             */
+            url?: string | null;
+        };
+        /**
+         * EarningsCheckSettings
+         * @description The earnings thesis check: find the release, extract figures, validate, judge KPIs.
+         */
+        EarningsCheckSettings: {
+            /**
+             * Extraction Model
+             * @default claude-sonnet-5
+             * @example claude-sonnet-5
+             */
+            extraction_model: string;
+            /**
+             * Locate Model
+             * @description Searches for the release when EDGAR has none (non-US issuers).
+             * @default claude-sonnet-5
+             * @example claude-sonnet-5
+             */
+            locate_model: string;
+            /**
+             * Effort
+             * @default high
+             * @enum {string}
+             */
+            effort: "low" | "medium" | "high" | "xhigh" | "max";
+            /**
+             * Max Steps
+             * @description Claude calls plus document fetches per run.
+             * @default 8
+             */
+            max_steps: number;
+            /**
+             * Max Searches
+             * @description Web searches per run.
+             * @default 3
+             */
+            max_searches: number;
+            /**
+             * Check Days After Report
+             * @description Days after the report date on which the check runs until it finds the release (the spec's +1, retry at +2 and +4).
+             */
+            check_days_after_report?: number[];
+            /**
+             * Max Document Mb
+             * @default 20
+             */
+            max_document_mb: number;
+        };
+        /**
+         * EventRulesConfig
+         * @description Stored as `config_version` rows, domain `event_rules`.
+         */
+        EventRulesConfig: {
+            /**
+             * Schema Version
+             * @default 1
+             * @constant
+             */
+            schema_version: 1;
+            /**
+             * Severities
+             * @description Severity per event type; a type left out keeps its default.
+             */
+            severities?: {
+                [key: string]: number;
+            };
+            /**
+             * Overrides
+             * @description Per-holding severity for one event type.
+             */
+            overrides?: components["schemas"]["SeverityOverride"][];
+            /**
+             * Escalate When Thesis Linked
+             * @description Event types raised one level (max 3) when the item touches a thesis KPI or exit condition.
+             */
+            escalate_when_thesis_linked?: ("guidance_change" | "m_and_a" | "dividend_cut" | "earnings_release" | "management_change" | "regulatory_legal" | "capital_allocation" | "credit_rating" | "central_bank" | "macro_surprise" | "insider_transaction" | "product_business" | "sector_competitor" | "index_change" | "analyst_rating" | "other")[];
+            /**
+             * Insider Cluster Count
+             * @description Insider transactions for one holding within the window that count as cluster buying or selling (raised to severity 2).
+             * @default 3
+             */
+            insider_cluster_count: number;
+            /**
+             * Insider Cluster Days
+             * @default 14
+             */
+            insider_cluster_days: number;
+            /**
+             * Recycled After Days
+             * @description An item whose event happened this long before it was published is a recycled story: shown, never alerted.
+             * @default 7
+             */
+            recycled_after_days: number;
+            /**
+             * Thesis Breach Severity
+             * @description Severity of an alert for a KPI breach found by an earnings check (0: never alert, the digest still lists it).
+             * @default 3
+             */
+            thesis_breach_severity: number;
+            /**
+             * Earnings Check On
+             * @description Confirmed stories of these types queue an earnings thesis check for the holding, unless one ran in the last 10 days.
+             */
+            earnings_check_on?: ("guidance_change" | "m_and_a" | "dividend_cut" | "earnings_release" | "management_change" | "regulatory_legal" | "capital_allocation" | "credit_rating" | "central_bank" | "macro_surprise" | "insider_transaction" | "product_business" | "sector_competitor" | "index_change" | "analyst_rating" | "other")[];
+        };
+        /** EventRulesConfigVersion */
+        EventRulesConfigVersion: {
+            /** Id */
+            id: number;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Note */
+            note: string | null;
+            body: components["schemas"]["EventRulesConfig"];
+        };
+        /** EventTypeInfo */
+        EventTypeInfo: {
+            /**
+             * Id
+             * @enum {string}
+             */
+            id: "guidance_change" | "m_and_a" | "dividend_cut" | "earnings_release" | "management_change" | "regulatory_legal" | "capital_allocation" | "credit_rating" | "central_bank" | "macro_surprise" | "insider_transaction" | "product_business" | "sector_competitor" | "index_change" | "analyst_rating" | "other";
+            /** Description */
+            description: string;
+        };
+        /** EvidenceLink */
+        EvidenceLink: {
+            /** Fact Id */
+            fact_id: number;
+            /** Ticker */
+            ticker: string;
+            /** Metric */
+            metric: string;
+            /** Period */
+            period: string;
+            /** Value As Written */
+            value_as_written: string;
+            /** Snippet */
+            snippet: string;
+            /** Unit Snippet */
+            unit_snippet: string | null;
+            /**
+             * Confidence
+             * @enum {string}
+             */
+            confidence: "verified" | "corroborated" | "unconfirmed" | "disputed";
+            /** Source Url */
+            source_url: string;
+            /**
+             * Evidence Url
+             * @description Signed URL of the archived copy, valid 10 minutes.
+             */
+            evidence_url: string;
+            /** Content Type */
+            content_type: string;
+            /**
+             * Fetched At
+             * Format: date-time
+             */
+            fetched_at: string;
+            /** Sha256 */
+            sha256: string;
+            /**
+             * Context
+             * @description The archived text around the snippet.
+             */
+            context: string | null;
+        };
+        /** Exposure */
+        Exposure: {
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "revenue_currency" | "revenue_region" | "commodity_input" | "other";
+            /**
+             * Name
+             * @example USD
+             * @example Greater China
+             * @example Copper
+             */
+            name: string;
+            /**
+             * Share
+             * @description Share of revenue or cost, 0..1.
+             */
+            share?: number | null;
+        };
+        /** FactCheck */
+        FactCheck: {
+            /** Check */
+            check: string;
+            /** Ok */
+            ok: boolean;
+            /**
+             * Detail
+             * @default
+             */
+            detail: string;
+        };
+        /** FactOut */
+        FactOut: {
+            /** Id */
+            id: number;
+            /** Metric */
+            metric: string;
+            /**
+             * Basis
+             * @enum {string}
+             */
+            basis: "reported" | "adjusted";
+            /** Period */
+            period: string;
+            /** Fiscal Year */
+            fiscal_year: number;
+            /** Fiscal Period */
+            fiscal_period: string;
+            /** Period End */
+            period_end: string | null;
+            /**
+             * Value
+             * @description As printed, in `scale`.
+             */
+            value: number;
+            /** Value As Written */
+            value_as_written: string;
+            /**
+             * Value Units
+             * @description With the scale applied.
+             */
+            value_units: number;
+            /**
+             * Scale
+             * @enum {string}
+             */
+            scale: "units" | "thousands" | "millions" | "billions";
+            /**
+             * Unit
+             * @enum {string}
+             */
+            unit: "currency" | "per_share" | "percent" | "count" | "ratio";
+            /** Currency */
+            currency: string | null;
+            /** Source Url */
+            source_url: string;
+            /** Snippet */
+            snippet: string;
+            /** Unit Snippet */
+            unit_snippet: string | null;
+            /** Evidence Sha256 */
+            evidence_sha256: string;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "verified" | "unverified" | "rejected" | "quarantined";
+            /** Status Reason */
+            status_reason: string | null;
+            /** Checks */
+            checks: components["schemas"]["FactCheck"][];
+            /** Restates Fact Id */
+            restates_fact_id: number | null;
+            /**
+             * Extracted At
+             * Format: date-time
+             */
+            extracted_at: string;
+            /** Reviewed At */
+            reviewed_at: string | null;
+            /**
+             * Confidence
+             * @enum {string}
+             */
+            confidence: "verified" | "corroborated" | "unconfirmed" | "disputed";
+        };
+        /** FactReview */
+        FactReview: {
+            /**
+             * Action
+             * @enum {string}
+             */
+            action: "verify" | "reject";
+            /** Note */
+            note?: string | null;
+        };
+        /** FactReviewResult */
+        FactReviewResult: {
+            /** Fact Id */
+            fact_id: number;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "verified" | "rejected";
+            verdict_job: components["schemas"]["JobSummary"];
         };
         /** Freshness */
         Freshness: {
@@ -506,6 +1520,128 @@ export interface components {
              */
             drift_status: "in_band" | "above_band" | "below_band" | "above_hard_limit" | "no_target";
         };
+        /** HoldingDetail */
+        HoldingDetail: {
+            /** Ticker */
+            ticker: string;
+            instrument: components["schemas"]["InstrumentInfo"] | null;
+            /** @description Null when the latest sync has no position. */
+            position: components["schemas"]["Holding"] | null;
+            /** Base Currency */
+            base_currency: string | null;
+            freshness: components["schemas"]["Freshness"] | null;
+            thesis: components["schemas"]["ThesisConfig"] | null;
+            /** Theses Config Version Id */
+            theses_config_version_id: number | null;
+            profile: components["schemas"]["HoldingProfile"] | null;
+            /** Kpis */
+            kpis: components["schemas"]["KpiStatus"][];
+            /**
+             * Facts
+             * @description Every fact, newest period first.
+             */
+            facts: components["schemas"]["FactOut"][];
+            last_earnings_check: components["schemas"]["JobSummary"] | null;
+            last_verdict_run: components["schemas"]["JobSummary"] | null;
+        };
+        /** HoldingProfile */
+        HoldingProfile: {
+            /**
+             * Ticker
+             * @example AAPL_US_EQ
+             */
+            ticker: string;
+            /**
+             * Company Name
+             * @default
+             */
+            company_name: string;
+            /**
+             * Aliases
+             * @description Other and former names, used to match news.
+             */
+            aliases?: string[];
+            /**
+             * Ir Url
+             * @description Investor relations home page.
+             */
+            ir_url?: string | null;
+            /**
+             * Results Urls
+             * @description Pages where results press releases or reports are published.
+             */
+            results_urls?: string[];
+            /**
+             * Financial Calendar Url
+             * @description IR financial calendar page with upcoming report dates.
+             */
+            financial_calendar_url?: string | null;
+            /** Regulatory News Urls */
+            regulatory_news_urls?: string[];
+            /**
+             * Extra Domains
+             * @description Further domains the earnings check may search and fetch from (the IR and results URLs' domains are always allowed).
+             */
+            extra_domains?: string[];
+            /**
+             * Sec Cik
+             * @description SEC Central Index Key. US issuers (8-K) and foreign issuers that furnish results on 6-K. Looked up from the ticker when empty.
+             */
+            sec_cik?: string | null;
+            /**
+             * Sec Ticker
+             * @description Ticker as EDGAR and Finnhub list it, when it differs from the Trading212 ticker's prefix.
+             */
+            sec_ticker?: string | null;
+            /**
+             * Fiscal Year End Month
+             * @description Month the fiscal year ends in (Apple: 9, Microsoft: 6). Maps fiscal quarters to calendar periods.
+             * @default 12
+             */
+            fiscal_year_end_month: number;
+            /**
+             * Reporting Currency
+             * @description Currency the company reports in; figures in another are held.
+             */
+            reporting_currency?: string | null;
+            /** Competitors */
+            competitors?: string[];
+            /** Suppliers */
+            suppliers?: string[];
+            /** Customers */
+            customers?: string[];
+            /** Watch Topics */
+            watch_topics?: string[];
+            /** Exposures */
+            exposures?: components["schemas"]["Exposure"][];
+        };
+        /**
+         * HoldingProfilesConfig
+         * @description All holding profiles. Stored as `config_version` rows, domain `holding_profiles`.
+         */
+        HoldingProfilesConfig: {
+            /**
+             * Schema Version
+             * @default 1
+             * @constant
+             */
+            schema_version: 1;
+            /** Profiles */
+            profiles?: components["schemas"]["HoldingProfile"][];
+        };
+        /** HoldingProfilesConfigVersion */
+        HoldingProfilesConfigVersion: {
+            /** Id */
+            id: number;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Note */
+            note: string | null;
+            body: components["schemas"]["HoldingProfilesConfig"];
+        };
         /** HoldingsResponse */
         HoldingsResponse: {
             freshness: components["schemas"]["Freshness"] | null;
@@ -518,6 +1654,34 @@ export interface components {
              * @description Every open position once, by value descending.
              */
             holdings: components["schemas"]["Holding"][];
+        };
+        /** InstrumentInfo */
+        InstrumentInfo: {
+            /** Name */
+            name: string | null;
+            /** Isin */
+            isin: string | null;
+            /** Currency */
+            currency: string | null;
+            /** Cik */
+            cik: string | null;
+            /** Next Report Date */
+            next_report_date: string | null;
+            /** Report Date Source */
+            report_date_source: string | null;
+            /** Last Report Date */
+            last_report_date: string | null;
+            /** Report Date Checked At */
+            report_date_checked_at: string | null;
+        };
+        /** ItemLink */
+        ItemLink: {
+            /** Ticker */
+            ticker: string;
+            /** Via */
+            via: string;
+            /** Term */
+            term: string;
         };
         /** JobSchedule */
         JobSchedule: {
@@ -579,6 +1743,20 @@ export interface components {
             schema_version: 1;
             /** @description Trading212 sync, FX rates and drift. Default: daily at 22:30 Prague time. */
             portfolio_sync?: components["schemas"]["JobSchedule"];
+            /** @description Refresh every holding's next report date. Default: Sundays 06:00. */
+            earnings_calendar?: components["schemas"]["JobSchedule"];
+            /** @description Queue earnings checks for holdings that reported. Default: daily 08:00. */
+            earnings_due?: components["schemas"]["JobSchedule"];
+            /** @description Ingest, classify, corroborate and alert. Default: every 2 h, 06:00-22:00. */
+            news_ingest?: components["schemas"]["JobSchedule"];
+            /** @description Daily digest of the last 24 h. Default: weekdays 07:00. */
+            daily_digest?: components["schemas"]["JobSchedule"];
+            /** @description Weekly digest of the last 7 days. Default: Sundays 18:00. */
+            weekly_digest?: components["schemas"]["JobSchedule"];
+            earnings_check?: components["schemas"]["EarningsCheckSettings"];
+            earnings_calendar_settings?: components["schemas"]["EarningsCalendarSettings"];
+            news?: components["schemas"]["NewsSettings"];
+            digest?: components["schemas"]["DigestSettings"];
         };
         /** JobsConfigVersion */
         JobsConfigVersion: {
@@ -592,6 +1770,281 @@ export interface components {
             /** Note */
             note: string | null;
             body: components["schemas"]["JobsConfig"];
+        };
+        /** KpiStatus */
+        KpiStatus: {
+            kpi: components["schemas"]["ThesisKPI"];
+            /** @description Latest period's verdict. */
+            current: components["schemas"]["VerdictOut"] | null;
+            /**
+             * History
+             * @description Latest verdict per period, newest first.
+             */
+            history: components["schemas"]["VerdictOut"][];
+        };
+        /** NewsFeed */
+        NewsFeed: {
+            /** Items */
+            items: components["schemas"]["NewsItemOut"][];
+            /**
+             * Next Before Id
+             * @description Pass as before_id for the next page.
+             */
+            next_before_id: number | null;
+            last_ingest: components["schemas"]["JobSummary"] | null;
+        };
+        /** NewsItemOut */
+        NewsItemOut: {
+            /** Id */
+            id: number;
+            /** Url */
+            url: string;
+            /** Headline */
+            headline: string;
+            /** Summary */
+            summary: string | null;
+            /** Outlet */
+            outlet: string | null;
+            /** Outlet Name */
+            outlet_name: string | null;
+            /** Tier */
+            tier: number;
+            /** Source Id */
+            source_id: string;
+            /**
+             * Published At
+             * Format: date-time
+             */
+            published_at: string;
+            /** Tickers */
+            tickers: string[];
+            /** Links */
+            links: components["schemas"]["ItemLink"][];
+            /** Event Type */
+            event_type: string | null;
+            /** Affected Ticker */
+            affected_ticker: string | null;
+            /** Rumour */
+            rumour: boolean | null;
+            /** Relevant */
+            relevant: boolean | null;
+            story: components["schemas"]["StoryOut"];
+        };
+        /**
+         * NewsSettings
+         * @description The news pipeline after ingest: classification, corroboration.
+         */
+        NewsSettings: {
+            /**
+             * Classification Model
+             * @default claude-haiku-4-5
+             * @example claude-sonnet-5
+             */
+            classification_model: string;
+            /**
+             * Classification Batch Size
+             * @description Items per classification call.
+             * @default 50
+             */
+            classification_batch_size: number;
+            /**
+             * Corroboration Model
+             * @default claude-haiku-4-5
+             * @example claude-sonnet-5
+             */
+            corroboration_model: string;
+            /**
+             * Corroboration Max Searches
+             * @description Web searches per corroboration call.
+             * @default 3
+             */
+            corroboration_max_searches: number;
+            /**
+             * Corroboration Rounds
+             * @description Corroboration searches per story: one when it is first seen, the rest spread over the re-check window.
+             * @default 2
+             */
+            corroboration_rounds: number;
+            /**
+             * Recheck Hours
+             * @description How long an unconfirmed story is re-checked.
+             * @default 48
+             */
+            recheck_hours: number;
+            /**
+             * Max Items Per Run
+             * @description Classification cap per run (cost guard).
+             * @default 500
+             */
+            max_items_per_run: number;
+        };
+        /** NewsSource */
+        NewsSource: {
+            /**
+             * Id
+             * @example max-single-position
+             */
+            id: string;
+            /** Name */
+            name: string;
+            /**
+             * Tier
+             * @description 1: the company, regulators, central banks, official newswires. 2: curated outlets. 3: blogs and social (labelled sentiment, never alert alone).
+             * @enum {integer}
+             */
+            tier: 1 | 2 | 3;
+            /**
+             * Type
+             * @description rss: an RSS or Atom feed. page: a news page read daily; new links on it become items. edgar: every holding's SEC filings. finnhub: US company news. google_news: a Google News query per holding (unofficial endpoint).
+             * @enum {string}
+             */
+            type: "rss" | "page" | "edgar" | "finnhub" | "google_news";
+            /**
+             * Url
+             * @description Feed or page URL (rss, page).
+             */
+            url?: string | null;
+            /**
+             * Enabled
+             * @default true
+             */
+            enabled: boolean;
+            /**
+             * Tickers
+             * @description Holdings this source is about (e.g. a company's own IR feed): its items link to them without a name match. Empty: items are matched by name.
+             */
+            tickers?: string[];
+        };
+        /**
+         * NewsSourcesConfig
+         * @description Stored as `config_version` rows, domain `news_sources`.
+         */
+        NewsSourcesConfig: {
+            /**
+             * Schema Version
+             * @default 1
+             * @constant
+             */
+            schema_version: 1;
+            /** Sources */
+            sources?: components["schemas"]["NewsSource"][];
+            /**
+             * Domain Tiers
+             * @description Trust tier per outlet domain (subdomains included). Every holding's IR and results domains count as tier 1.
+             */
+            domain_tiers?: components["schemas"]["DomainTier"][];
+            /**
+             * Blocked Domains
+             * @description Items from these outlets are dropped.
+             */
+            blocked_domains?: string[];
+            /**
+             * Unknown Outlet Tier
+             * @description Tier for an aggregator's item from an outlet not listed above.
+             * @default 3
+             * @enum {integer}
+             */
+            unknown_outlet_tier: 1 | 2 | 3;
+            /**
+             * Freshness Hours
+             * @description Items published earlier are dropped.
+             * @default 72
+             */
+            freshness_hours: number;
+            /**
+             * Include Tier3
+             * @description Keep tier-3 items (labelled sentiment; they never alert on their own).
+             * @default false
+             */
+            include_tier3: boolean;
+        };
+        /** NewsSourcesConfigVersion */
+        NewsSourcesConfigVersion: {
+            /** Id */
+            id: number;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Note */
+            note: string | null;
+            body: components["schemas"]["NewsSourcesConfig"];
+        };
+        /** NotificationRule */
+        NotificationRule: {
+            /**
+             * Id
+             * @example max-single-position
+             */
+            id: string;
+            /**
+             * Enabled
+             * @default true
+             */
+            enabled: boolean;
+            match: components["schemas"]["RuleMatch"];
+            /**
+             * Channels
+             * @description Where a matching event is sent immediately.
+             */
+            channels: ("telegram" | "email")[];
+            /**
+             * During Quiet Hours
+             * @description hold_until_end: send when quiet hours end. send: send anyway. digest_only: do not send; it appears in the next digest.
+             * @default hold_until_end
+             * @enum {string}
+             */
+            during_quiet_hours: "hold_until_end" | "send" | "digest_only";
+        };
+        /**
+         * NotificationsConfig
+         * @description Stored as `config_version` rows, domain `notifications`.
+         */
+        NotificationsConfig: {
+            /**
+             * Schema Version
+             * @default 1
+             * @constant
+             */
+            schema_version: 1;
+            /** Rules */
+            rules?: components["schemas"]["NotificationRule"][];
+            quiet_hours?: components["schemas"]["QuietHours"];
+            /**
+             * Daily Alert Cap
+             * @description Most alerts sent per day (in the quiet-hours timezone); the rest wait for the digest. Null: no cap.
+             * @default 5
+             */
+            daily_alert_cap: number | null;
+            /** Muted Tickers */
+            muted_tickers?: string[];
+            /** Muted Event Types */
+            muted_event_types?: ("guidance_change" | "m_and_a" | "dividend_cut" | "earnings_release" | "management_change" | "regulatory_legal" | "capital_allocation" | "credit_rating" | "central_bank" | "macro_surprise" | "insider_transaction" | "product_business" | "sector_competitor" | "index_change" | "analyst_rating" | "other")[];
+            /**
+             * Repeat Throttle Hours
+             * @description Another story with the same holding and event type within this many hours of an alert is not alerted again.
+             * @default 24
+             */
+            repeat_throttle_hours: number;
+            /**
+             * Digest Channels
+             * @description Where the daily and weekly digests go.
+             */
+            digest_channels?: ("telegram" | "email")[];
+        };
+        /** NotificationsConfigVersion */
+        NotificationsConfigVersion: {
+            /** Id */
+            id: number;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Note */
+            note: string | null;
+            body: components["schemas"]["NotificationsConfig"];
         };
         /** PortfolioOverview */
         PortfolioOverview: {
@@ -728,6 +2181,180 @@ export interface components {
             /** Ticker */
             ticker?: string | null;
         };
+        /** QuietHours */
+        QuietHours: {
+            /**
+             * Enabled
+             * @default true
+             */
+            enabled: boolean;
+            /**
+             * Start
+             * @default 22:00
+             */
+            start: string;
+            /**
+             * End
+             * @default 07:00
+             */
+            end: string;
+            /**
+             * Timezone
+             * @default Europe/Prague
+             * @example Europe/Prague
+             */
+            timezone: string;
+        };
+        /** ReportOut */
+        ReportOut: {
+            /** Id */
+            id: number;
+            /**
+             * Type
+             * @enum {string}
+             */
+            type: "digest" | "research" | "review" | "escalation";
+            /** Period */
+            period: string | null;
+            /** Title */
+            title: string;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Period Start */
+            period_start: string | null;
+            /** Period End */
+            period_end: string | null;
+            body: components["schemas"]["DigestBody"];
+            /** Body Md */
+            body_md: string;
+            /** Delivery */
+            delivery: {
+                [key: string]: {
+                    [key: string]: string;
+                };
+            };
+        };
+        /** ReportSummary */
+        ReportSummary: {
+            /** Id */
+            id: number;
+            /**
+             * Type
+             * @enum {string}
+             */
+            type: "digest" | "research" | "review" | "escalation";
+            /** Period */
+            period: string | null;
+            /** Title */
+            title: string;
+            /** Headline */
+            headline: string | null;
+            /** Nothing Material */
+            nothing_material: boolean | null;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Delivery */
+            delivery: {
+                [key: string]: {
+                    [key: string]: string;
+                };
+            };
+        };
+        /** RuleMatch */
+        RuleMatch: {
+            /**
+             * Severities
+             * @example [
+             *       3
+             *     ]
+             */
+            severities: (1 | 2 | 3)[];
+            /**
+             * Event Types
+             * @description Empty: any type.
+             */
+            event_types?: ("guidance_change" | "m_and_a" | "dividend_cut" | "earnings_release" | "management_change" | "regulatory_legal" | "capital_allocation" | "credit_rating" | "central_bank" | "macro_surprise" | "insider_transaction" | "product_business" | "sector_competitor" | "index_change" | "analyst_rating" | "other")[];
+            /**
+             * Tickers
+             * @description Empty: any holding.
+             */
+            tickers?: string[];
+        };
+        /** Sentence */
+        Sentence: {
+            /** Text */
+            text: string;
+            /** News Item Ids */
+            news_item_ids?: number[];
+            /** Fact Ids */
+            fact_ids?: number[];
+        };
+        /** SeverityOverride */
+        SeverityOverride: {
+            /**
+             * Ticker
+             * @example AAPL_US_EQ
+             */
+            ticker: string;
+            /**
+             * Event Type
+             * @enum {string}
+             */
+            event_type: "guidance_change" | "m_and_a" | "dividend_cut" | "earnings_release" | "management_change" | "regulatory_legal" | "capital_allocation" | "credit_rating" | "central_bank" | "macro_surprise" | "insider_transaction" | "product_business" | "sector_competitor" | "index_change" | "analyst_rating" | "other";
+            /** Severity */
+            severity: number;
+        };
+        /** StoryOut */
+        StoryOut: {
+            /** Id */
+            id: number;
+            /** Ticker */
+            ticker: string | null;
+            /** Event Type */
+            event_type: string | null;
+            /** Severity */
+            severity: number | null;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "pending" | "confirmed" | "unconfirmed" | "disputed" | "sentiment";
+            /**
+             * Confidence
+             * @enum {string}
+             */
+            confidence: "verified" | "corroborated" | "unconfirmed" | "disputed";
+            /** Status Reason */
+            status_reason: string | null;
+            /** Rumour */
+            rumour: boolean;
+            /** Recycled */
+            recycled: boolean;
+            /** Best Tier */
+            best_tier: number;
+            /** Source Count */
+            source_count: number;
+            /**
+             * First Seen
+             * Format: date-time
+             */
+            first_seen: string;
+            /**
+             * Last Seen
+             * Format: date-time
+             */
+            last_seen: string;
+            /** Corroborating Urls */
+            corroborating_urls?: string[];
+            /** Contradicting Urls */
+            contradicting_urls?: string[];
+        };
         /**
          * StrategyConfig
          * @description The owner's investment strategy.
@@ -818,6 +2445,42 @@ export interface components {
              */
             band: number;
         };
+        /** TestAlertRequest */
+        TestAlertRequest: {
+            /**
+             * Severity
+             * @default 3
+             * @enum {integer}
+             */
+            severity: 1 | 2 | 3;
+            /**
+             * Event Type
+             * @default guidance_change
+             * @enum {string}
+             */
+            event_type: "guidance_change" | "m_and_a" | "dividend_cut" | "earnings_release" | "management_change" | "regulatory_legal" | "capital_allocation" | "credit_rating" | "central_bank" | "macro_surprise" | "insider_transaction" | "product_business" | "sector_competitor" | "index_change" | "analyst_rating" | "other";
+            /** Ticker */
+            ticker?: string | null;
+        };
+        /** TestAlertResult */
+        TestAlertResult: {
+            /**
+             * Explanation
+             * @description Which rule matched and what happens.
+             */
+            explanation: string;
+            /**
+             * Channels
+             * @description Channels the alert is queued for.
+             */
+            channels: string[];
+            /** Held Until */
+            held_until: string | null;
+            /** Suppressed Reason */
+            suppressed_reason: string | null;
+            /** Alerts */
+            alerts: components["schemas"]["AlertOut"][];
+        };
         /**
          * ThesesConfig
          * @description All theses. Stored as the body of `config_version` rows, domain `theses`.
@@ -889,6 +2552,7 @@ export interface components {
             threshold: number;
             /**
              * Unit
+             * @description What the threshold is in: '%', 'x', 'count', or a currency with an optional scale ('EUR bn', 'USD m', 'USD' for per-share amounts).
              * @example %
              * @example EUR bn
              */
@@ -911,6 +2575,14 @@ export interface components {
              */
             description: string;
         };
+        /** ThesisVerdictsRequest */
+        ThesisVerdictsRequest: {
+            /**
+             * Ticker
+             * @description One holding, or all when null.
+             */
+            ticker?: string | null;
+        };
         /** ValidationError */
         ValidationError: {
             /** Location */
@@ -923,6 +2595,112 @@ export interface components {
             input?: unknown;
             /** Context */
             ctx?: Record<string, never>;
+        };
+        /** VerdictOut */
+        VerdictOut: {
+            /** Id */
+            id: number;
+            /** Kpi Id */
+            kpi_id: string;
+            /** Period */
+            period: string | null;
+            /** Fiscal Year */
+            fiscal_year: number | null;
+            /** Fiscal Period */
+            fiscal_period: string | null;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "pass" | "breach" | "unknown";
+            /**
+             * Observed Value
+             * @description In the KPI's unit (e.g. 9.63 for '%').
+             */
+            observed_value: number | null;
+            /** Operator */
+            operator: string;
+            /** Threshold */
+            threshold: number;
+            /** Threshold Unit */
+            threshold_unit: string;
+            /** Rationale */
+            rationale: string;
+            /** Fact Ids */
+            fact_ids: number[];
+            /** Config Version Id */
+            config_version_id: number;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /**
+             * Confidence
+             * @enum {string}
+             */
+            confidence: "verified" | "corroborated" | "unconfirmed" | "disputed";
+            /**
+             * Stale
+             * @description Judged under an older theses config than the active one; re-run verdicts.
+             */
+            stale: boolean;
+        };
+        /**
+         * VerificationConfig
+         * @description Stored as `config_version` rows, domain `verification`.
+         */
+        VerificationConfig: {
+            /**
+             * Schema Version
+             * @default 1
+             * @constant
+             */
+            schema_version: 1;
+            /**
+             * Sanity Max Change Qoq
+             * @description A figure that moves more than this fraction against the previous quarter's verified figure is held for review (0.5 = ±50 %). Null disables.
+             * @default 0.5
+             */
+            sanity_max_change_qoq: number | null;
+            /**
+             * Sanity Overrides
+             * @description Per-metric band replacing the default; null disables the bound for that metric (e.g. seasonal or often sign-changing figures).
+             */
+            sanity_overrides?: {
+                [key: string]: number | null;
+            };
+            /**
+             * Stated Ratio Tolerance Pp
+             * @description How far (in percentage points) a ratio the document states may differ from the one recomputed from its raw figures before the stated one is rejected.
+             * @default 0.15
+             */
+            stated_ratio_tolerance_pp: number;
+            /**
+             * Period End Tolerance Days
+             * @description Slack between a stated period end and the calendar month end expected from the fiscal year end (52/53-week fiscal years end on a weekday, not month end).
+             * @default 10
+             */
+            period_end_tolerance_days: number;
+            /**
+             * Max Report Lag Days
+             * @description Latest a release may come out after the end of the period it reports.
+             * @default 150
+             */
+            max_report_lag_days: number;
+        };
+        /** VerificationConfigVersion */
+        VerificationConfigVersion: {
+            /** Id */
+            id: number;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Note */
+            note: string | null;
+            body: components["schemas"]["VerificationConfig"];
         };
     };
     responses: never;
@@ -1075,6 +2853,189 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["JobSummary"];
+                };
+            };
+        };
+    };
+    run_earnings_check: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["EarningsCheckRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["JobSummary"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    run_thesis_verdicts: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ThesisVerdictsRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["JobSummary"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    run_earnings_calendar: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["JobSummary"];
+                };
+            };
+        };
+    };
+    get_holding: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                ticker: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HoldingDetail"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_fact_evidence: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                fact_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EvidenceLink"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    review_fact: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                fact_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["FactReview"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FactReviewResult"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };
@@ -1234,6 +3195,659 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["JobsConfigVersion"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_holding_profiles_config: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HoldingProfilesConfigVersion"];
+                };
+            };
+        };
+    };
+    save_holding_profiles_config: {
+        parameters: {
+            query?: {
+                /** @description Why this change was made. */
+                note?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["HoldingProfilesConfig"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HoldingProfilesConfigVersion"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    validate_holding_profiles: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["HoldingProfilesConfig"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HoldingProfilesConfig"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_verification_config: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["VerificationConfigVersion"];
+                };
+            };
+        };
+    };
+    save_verification_config: {
+        parameters: {
+            query?: {
+                /** @description Why this change was made. */
+                note?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["VerificationConfig"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["VerificationConfigVersion"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_news: {
+        parameters: {
+            query?: {
+                ticker?: string | null;
+                /** @description Story severity 0-3. */
+                severity?: number[] | null;
+                confidence?: ("verified" | "corroborated" | "unconfirmed" | "disputed")[] | null;
+                /** @description Source tier 1-3. */
+                tier?: number[] | null;
+                /** @description Only this story's items. */
+                story?: number | null;
+                before_id?: number | null;
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NewsFeed"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_event_types: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EventTypeInfo"][];
+                };
+            };
+        };
+    };
+    get_alerts: {
+        parameters: {
+            query?: {
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AlertOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    send_test_alert: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TestAlertRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TestAlertResult"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_reports: {
+        parameters: {
+            query?: {
+                type?: "digest" | "research" | "review" | "escalation";
+                period?: ("daily" | "weekly") | null;
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReportSummary"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_report_by_id: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                report_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReportOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    run_news_ingest: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["JobSummary"];
+                };
+            };
+        };
+    };
+    run_digest_now: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DigestRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["JobSummary"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_news_sources_config: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NewsSourcesConfigVersion"];
+                };
+            };
+        };
+    };
+    save_news_sources_config: {
+        parameters: {
+            query?: {
+                /** @description Why this change was made. */
+                note?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["NewsSourcesConfig"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NewsSourcesConfigVersion"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    validate_news_sources: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["NewsSourcesConfig"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NewsSourcesConfig"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_event_rules_config: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EventRulesConfigVersion"];
+                };
+            };
+        };
+    };
+    save_event_rules_config: {
+        parameters: {
+            query?: {
+                /** @description Why this change was made. */
+                note?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["EventRulesConfig"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EventRulesConfigVersion"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    validate_event_rules: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["EventRulesConfig"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EventRulesConfig"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_notifications_config: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NotificationsConfigVersion"];
+                };
+            };
+        };
+    };
+    save_notifications_config: {
+        parameters: {
+            query?: {
+                /** @description Why this change was made. */
+                note?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["NotificationsConfig"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NotificationsConfigVersion"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    validate_notifications: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["NotificationsConfig"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NotificationsConfig"];
                 };
             };
             /** @description Validation Error */

@@ -202,6 +202,282 @@
         ]
       }
     },
+    "/jobs/earnings-check": {
+      "post": {
+        "tags": [
+          "jobs"
+        ],
+        "summary": "Run Earnings Check",
+        "description": "Queue an earnings thesis check for one holding: find the release, extract and\nvalidate its figures, then judge the thesis KPIs.",
+        "operationId": "run_earnings_check",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EarningsCheckRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "202": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/JobSummary"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/jobs/thesis-verdicts": {
+      "post": {
+        "tags": [
+          "jobs"
+        ],
+        "summary": "Run Thesis Verdicts",
+        "description": "Re-judge thesis KPIs from the stored facts with the active theses config. No\nfetching, no model calls: use it after editing a threshold.",
+        "operationId": "run_thesis_verdicts",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ThesisVerdictsRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "202": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/JobSummary"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/jobs/earnings-calendar": {
+      "post": {
+        "tags": [
+          "jobs"
+        ],
+        "summary": "Run Earnings Calendar",
+        "description": "Refresh every holding's next report date now.",
+        "operationId": "run_earnings_calendar",
+        "responses": {
+          "202": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/JobSummary"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/holdings/{ticker}": {
+      "get": {
+        "tags": [
+          "holdings"
+        ],
+        "summary": "Get Holding",
+        "description": "One holding: position, thesis, KPI verdicts with their history, and every extracted\nfact with its source.",
+        "operationId": "get_holding",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "ticker",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9._-]{1,32}$",
+              "title": "Ticker"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HoldingDetail"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/facts/{fact_id}/evidence": {
+      "get": {
+        "tags": [
+          "holdings"
+        ],
+        "summary": "Get Fact Evidence",
+        "description": "The archived copy of the page a fact was read from: a short-lived signed URL and\nthe text around the fact's snippet.",
+        "operationId": "get_fact_evidence",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "fact_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Fact Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EvidenceLink"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/facts/{fact_id}/review": {
+      "post": {
+        "tags": [
+          "holdings"
+        ],
+        "summary": "Review Fact",
+        "description": "Release or reject a fact the validator held for review (sanity bound, restatement,\ncurrency). Verdicts for the holding are re-run afterwards.",
+        "operationId": "review_fact",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "fact_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Fact Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/FactReview"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FactReviewResult"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/config/strategy": {
       "get": {
         "tags": [
@@ -477,6 +753,1167 @@
           }
         }
       }
+    },
+    "/config/holding-profiles": {
+      "get": {
+        "tags": [
+          "config"
+        ],
+        "summary": "Get Holding Profiles Config",
+        "operationId": "get_holding_profiles_config",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HoldingProfilesConfigVersion"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "config"
+        ],
+        "summary": "Save Holding Profiles Config",
+        "description": "Save holding profiles. The next earnings check and calendar refresh use them.",
+        "operationId": "save_holding_profiles_config",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "note",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "maxLength": 500
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Why this change was made.",
+              "title": "Note"
+            },
+            "description": "Why this change was made."
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/HoldingProfilesConfig"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HoldingProfilesConfigVersion"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/config/holding-profiles/validate": {
+      "post": {
+        "tags": [
+          "config"
+        ],
+        "summary": "Validate Holding Profiles",
+        "description": "Validate holding profiles without saving. 422 lists every error.",
+        "operationId": "validate_holding_profiles",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/HoldingProfilesConfig"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HoldingProfilesConfig"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/config/verification": {
+      "get": {
+        "tags": [
+          "config"
+        ],
+        "summary": "Get Verification Config",
+        "description": "The saved validator thresholds. 404 means the defaults apply.",
+        "operationId": "get_verification_config",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VerificationConfigVersion"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "config"
+        ],
+        "summary": "Save Verification Config",
+        "operationId": "save_verification_config",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "note",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "maxLength": 500
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Why this change was made.",
+              "title": "Note"
+            },
+            "description": "Why this change was made."
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/VerificationConfig"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VerificationConfigVersion"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/news": {
+      "get": {
+        "tags": [
+          "news"
+        ],
+        "summary": "Get News",
+        "description": "News items, newest first, each with its story's severity and confidence. Filters\ncombine (AND); a repeated parameter matches any of its values.",
+        "operationId": "get_news",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "ticker",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "pattern": "^[A-Za-z0-9._-]{1,32}$"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Ticker"
+            }
+          },
+          {
+            "name": "severity",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "array",
+                  "items": {
+                    "type": "integer"
+                  }
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Story severity 0-3.",
+              "title": "Severity"
+            },
+            "description": "Story severity 0-3."
+          },
+          {
+            "name": "confidence",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "array",
+                  "items": {
+                    "enum": [
+                      "verified",
+                      "corroborated",
+                      "unconfirmed",
+                      "disputed"
+                    ],
+                    "type": "string"
+                  }
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Confidence"
+            }
+          },
+          {
+            "name": "tier",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "array",
+                  "items": {
+                    "type": "integer"
+                  }
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Source tier 1-3.",
+              "title": "Tier"
+            },
+            "description": "Source tier 1-3."
+          },
+          {
+            "name": "story",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Only this story's items.",
+              "title": "Story"
+            },
+            "description": "Only this story's items."
+          },
+          {
+            "name": "before_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Before Id"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 200,
+              "minimum": 1,
+              "default": 50,
+              "title": "Limit"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NewsFeed"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/news/event-types": {
+      "get": {
+        "tags": [
+          "news"
+        ],
+        "summary": "Get Event Types",
+        "description": "The fixed event taxonomy, for labels and filters.",
+        "operationId": "get_event_types",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/EventTypeInfo"
+                  },
+                  "type": "array",
+                  "title": "Response Get Event Types"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/alerts": {
+      "get": {
+        "tags": [
+          "alerts"
+        ],
+        "summary": "Get Alerts",
+        "description": "Recent alert decisions: sent, held for quiet hours, suppressed (with why) or failed.",
+        "operationId": "get_alerts",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 200,
+              "minimum": 1,
+              "default": 50,
+              "title": "Limit"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/AlertOut"
+                  },
+                  "title": "Response Get Alerts"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/alerts/test": {
+      "post": {
+        "tags": [
+          "alerts"
+        ],
+        "summary": "Send Test Alert",
+        "description": "Route a test alert through the active notification rules exactly as a real event\nwould be (quiet hours included; the daily cap and repeat throttle do not apply). The\nworker sends it within seconds, or when quiet hours end.",
+        "operationId": "send_test_alert",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TestAlertRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "202": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TestAlertResult"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/reports": {
+      "get": {
+        "tags": [
+          "reports"
+        ],
+        "summary": "Get Reports",
+        "operationId": "get_reports",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "type",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "enum": [
+                "digest",
+                "research",
+                "review",
+                "escalation"
+              ],
+              "type": "string",
+              "default": "digest",
+              "title": "Type"
+            }
+          },
+          {
+            "name": "period",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "enum": [
+                    "daily",
+                    "weekly"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Period"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 200,
+              "minimum": 1,
+              "default": 60,
+              "title": "Limit"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/ReportSummary"
+                  },
+                  "title": "Response Get Reports"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/reports/{report_id}": {
+      "get": {
+        "tags": [
+          "reports"
+        ],
+        "summary": "Get Report By Id",
+        "description": "A digest with every sentence's citations and the source list.",
+        "operationId": "get_report_by_id",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "report_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Report Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReportOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/jobs/news-ingest": {
+      "post": {
+        "tags": [
+          "jobs"
+        ],
+        "summary": "Run News Ingest",
+        "description": "Run the news pipeline now: ingest, classify, corroborate, alert.",
+        "operationId": "run_news_ingest",
+        "responses": {
+          "202": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/JobSummary"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/jobs/digest": {
+      "post": {
+        "tags": [
+          "jobs"
+        ],
+        "summary": "Run Digest Now",
+        "description": "Write and send a digest now.",
+        "operationId": "run_digest_now",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DigestRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "202": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/JobSummary"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/config/news-sources": {
+      "get": {
+        "tags": [
+          "config"
+        ],
+        "summary": "Get News Sources Config",
+        "description": "The saved source registry. 404 means the defaults apply.",
+        "operationId": "get_news_sources_config",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NewsSourcesConfigVersion"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "config"
+        ],
+        "summary": "Save News Sources Config",
+        "description": "Save the source registry. The next ingest run reads it; no deploy or restart.",
+        "operationId": "save_news_sources_config",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "note",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "maxLength": 500
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Why this change was made.",
+              "title": "Note"
+            },
+            "description": "Why this change was made."
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NewsSourcesConfig"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NewsSourcesConfigVersion"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/config/news-sources/validate": {
+      "post": {
+        "tags": [
+          "config"
+        ],
+        "summary": "Validate News Sources",
+        "operationId": "validate_news_sources",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NewsSourcesConfig"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NewsSourcesConfig"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/config/event-rules": {
+      "get": {
+        "tags": [
+          "config"
+        ],
+        "summary": "Get Event Rules Config",
+        "description": "The saved event severities. 404 means the defaults apply.",
+        "operationId": "get_event_rules_config",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EventRulesConfigVersion"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "config"
+        ],
+        "summary": "Save Event Rules Config",
+        "operationId": "save_event_rules_config",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "note",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "maxLength": 500
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Why this change was made.",
+              "title": "Note"
+            },
+            "description": "Why this change was made."
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EventRulesConfig"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EventRulesConfigVersion"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/config/event-rules/validate": {
+      "post": {
+        "tags": [
+          "config"
+        ],
+        "summary": "Validate Event Rules",
+        "operationId": "validate_event_rules",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EventRulesConfig"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EventRulesConfig"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/config/notifications": {
+      "get": {
+        "tags": [
+          "config"
+        ],
+        "summary": "Get Notifications Config",
+        "description": "The saved notification rules. 404 means the defaults apply.",
+        "operationId": "get_notifications_config",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NotificationsConfigVersion"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "config"
+        ],
+        "summary": "Save Notifications Config",
+        "description": "Save notification rules. The next alert is routed with them; no restart.",
+        "operationId": "save_notifications_config",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "note",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "maxLength": 500
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Why this change was made.",
+              "title": "Note"
+            },
+            "description": "Why this change was made."
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NotificationsConfig"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NotificationsConfigVersion"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/config/notifications/validate": {
+      "post": {
+        "tags": [
+          "config"
+        ],
+        "summary": "Validate Notifications",
+        "operationId": "validate_notifications",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NotificationsConfig"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NotificationsConfig"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
     }
   },
   "components": {
@@ -524,6 +1961,156 @@
           "realized_ppl"
         ],
         "title": "AccountTotals"
+      },
+      "AlertOut": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "news",
+              "thesis_breach",
+              "test"
+            ],
+            "title": "Kind"
+          },
+          "severity": {
+            "type": "integer",
+            "title": "Severity"
+          },
+          "ticker": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ticker"
+          },
+          "event_type": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Event Type"
+          },
+          "cluster_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cluster Id"
+          },
+          "verdict_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Verdict Id"
+          },
+          "channel": {
+            "type": "string",
+            "enum": [
+              "telegram",
+              "email"
+            ],
+            "title": "Channel"
+          },
+          "message": {
+            "type": "string",
+            "title": "Message"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "pending",
+              "sent",
+              "suppressed",
+              "failed"
+            ],
+            "title": "Status"
+          },
+          "send_after": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Send After"
+          },
+          "sent_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sent At"
+          },
+          "suppressed_reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Suppressed Reason"
+          },
+          "error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "kind",
+          "severity",
+          "ticker",
+          "event_type",
+          "cluster_id",
+          "verdict_id",
+          "channel",
+          "message",
+          "status",
+          "send_after",
+          "sent_at",
+          "suppressed_reason",
+          "error",
+          "created_at"
+        ],
+        "title": "AlertOut"
       },
       "AllocationSlice": {
         "properties": {
@@ -977,6 +2564,347 @@
         "title": "CategoryWeightRule",
         "description": "Limit on a category's weight; with no bucket it applies to every bucket of the dimension."
       },
+      "DigestBody": {
+        "properties": {
+          "kind": {
+            "type": "string",
+            "enum": [
+              "daily",
+              "weekly"
+            ],
+            "title": "Kind"
+          },
+          "window_start": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Window Start"
+          },
+          "window_end": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Window End"
+          },
+          "nothing_material": {
+            "type": "boolean",
+            "title": "Nothing Material"
+          },
+          "headline": {
+            "type": "string",
+            "title": "Headline"
+          },
+          "overview": {
+            "items": {
+              "$ref": "#/components/schemas/Sentence"
+            },
+            "type": "array",
+            "title": "Overview"
+          },
+          "sections": {
+            "items": {
+              "$ref": "#/components/schemas/DigestSection"
+            },
+            "type": "array",
+            "title": "Sections"
+          },
+          "sources": {
+            "items": {
+              "$ref": "#/components/schemas/DigestSource"
+            },
+            "type": "array",
+            "title": "Sources"
+          },
+          "alerts_sent": {
+            "type": "integer",
+            "title": "Alerts Sent",
+            "default": 0
+          },
+          "dropped_sentences": {
+            "type": "integer",
+            "title": "Dropped Sentences",
+            "description": "Written sentences removed because they cited nothing given.",
+            "default": 0
+          },
+          "writer": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Writer"
+          }
+        },
+        "type": "object",
+        "required": [
+          "kind",
+          "window_start",
+          "window_end",
+          "nothing_material",
+          "headline"
+        ],
+        "title": "DigestBody"
+      },
+      "DigestRequest": {
+        "properties": {
+          "kind": {
+            "type": "string",
+            "enum": [
+              "daily",
+              "weekly"
+            ],
+            "title": "Kind",
+            "default": "daily"
+          }
+        },
+        "type": "object",
+        "title": "DigestRequest"
+      },
+      "DigestSection": {
+        "properties": {
+          "ticker": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ticker",
+            "description": "Null: markets and macro."
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "summary": {
+            "items": {
+              "$ref": "#/components/schemas/Sentence"
+            },
+            "type": "array",
+            "title": "Summary"
+          },
+          "stories": {
+            "items": {
+              "$ref": "#/components/schemas/DigestStory"
+            },
+            "type": "array",
+            "title": "Stories"
+          },
+          "verdicts": {
+            "items": {
+              "$ref": "#/components/schemas/DigestVerdict"
+            },
+            "type": "array",
+            "title": "Verdicts"
+          }
+        },
+        "type": "object",
+        "required": [
+          "ticker",
+          "name"
+        ],
+        "title": "DigestSection"
+      },
+      "DigestSettings": {
+        "properties": {
+          "model": {
+            "type": "string",
+            "pattern": "^claude-[a-z0-9.-]{1,64}$",
+            "title": "Model",
+            "default": "claude-sonnet-5",
+            "examples": [
+              "claude-sonnet-5"
+            ]
+          },
+          "use_batch": {
+            "type": "boolean",
+            "title": "Use Batch",
+            "description": "Write the summary through the Batch API (half price).",
+            "default": true
+          },
+          "batch_wait_minutes": {
+            "type": "integer",
+            "maximum": 720.0,
+            "minimum": 1.0,
+            "title": "Batch Wait Minutes",
+            "description": "How long to wait for the batch before writing the summary directly.",
+            "default": 60
+          },
+          "min_severity_summarised": {
+            "type": "integer",
+            "maximum": 3.0,
+            "minimum": 1.0,
+            "title": "Min Severity Summarised",
+            "description": "Stories at or above this severity get a written summary; the rest are listed by headline.",
+            "default": 2
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "DigestSettings"
+      },
+      "DigestSource": {
+        "properties": {
+          "news_item_id": {
+            "type": "integer",
+            "title": "News Item Id"
+          },
+          "url": {
+            "type": "string",
+            "title": "Url"
+          },
+          "outlet": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Outlet"
+          },
+          "tier": {
+            "type": "integer",
+            "title": "Tier"
+          },
+          "headline": {
+            "type": "string",
+            "title": "Headline"
+          },
+          "published_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Published At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "news_item_id",
+          "url",
+          "outlet",
+          "tier",
+          "headline",
+          "published_at"
+        ],
+        "title": "DigestSource"
+      },
+      "DigestStory": {
+        "properties": {
+          "cluster_id": {
+            "type": "integer",
+            "title": "Cluster Id"
+          },
+          "headline": {
+            "type": "string",
+            "title": "Headline"
+          },
+          "event_type": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Event Type"
+          },
+          "severity": {
+            "type": "integer",
+            "title": "Severity"
+          },
+          "status": {
+            "type": "string",
+            "title": "Status"
+          },
+          "confidence": {
+            "type": "string",
+            "enum": [
+              "verified",
+              "corroborated",
+              "unconfirmed",
+              "disputed"
+            ],
+            "title": "Confidence"
+          },
+          "news_item_ids": {
+            "items": {
+              "type": "integer"
+            },
+            "type": "array",
+            "title": "News Item Ids",
+            "description": "The story's items, lead item first."
+          }
+        },
+        "type": "object",
+        "required": [
+          "cluster_id",
+          "headline",
+          "event_type",
+          "severity",
+          "status",
+          "confidence",
+          "news_item_ids"
+        ],
+        "title": "DigestStory"
+      },
+      "DigestVerdict": {
+        "properties": {
+          "verdict_id": {
+            "type": "integer",
+            "title": "Verdict Id"
+          },
+          "kpi_id": {
+            "type": "string",
+            "title": "Kpi Id"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "pass",
+              "breach",
+              "unknown"
+            ],
+            "title": "Status"
+          },
+          "period": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Period"
+          },
+          "text": {
+            "type": "string",
+            "title": "Text"
+          },
+          "fact_ids": {
+            "items": {
+              "type": "integer"
+            },
+            "type": "array",
+            "title": "Fact Ids"
+          }
+        },
+        "type": "object",
+        "required": [
+          "verdict_id",
+          "kpi_id",
+          "status",
+          "period",
+          "text",
+          "fact_ids"
+        ],
+        "title": "DigestVerdict"
+      },
       "DimensionAllocation": {
         "properties": {
           "dimension": {
@@ -997,6 +2925,35 @@
           "buckets"
         ],
         "title": "DimensionAllocation"
+      },
+      "DomainTier": {
+        "properties": {
+          "domain": {
+            "type": "string",
+            "maxLength": 253,
+            "pattern": "^([a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?\\.)+[a-z]{2,63}$",
+            "title": "Domain",
+            "examples": [
+              "reuters.com"
+            ]
+          },
+          "tier": {
+            "type": "integer",
+            "enum": [
+              1,
+              2,
+              3
+            ],
+            "title": "Tier"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "domain",
+          "tier"
+        ],
+        "title": "DomainTier"
       },
       "DriftReport": {
         "properties": {
@@ -1044,6 +3001,785 @@
           "out_of_band"
         ],
         "title": "DriftReport"
+      },
+      "EarningsCalendarSettings": {
+        "properties": {
+          "model": {
+            "type": "string",
+            "pattern": "^claude-[a-z0-9.-]{1,64}$",
+            "title": "Model",
+            "description": "Reads report dates off IR calendar pages.",
+            "default": "claude-haiku-4-5",
+            "examples": [
+              "claude-sonnet-5"
+            ]
+          },
+          "lookahead_days": {
+            "type": "integer",
+            "maximum": 400.0,
+            "minimum": 7.0,
+            "title": "Lookahead Days",
+            "default": 120
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "EarningsCalendarSettings",
+        "description": "Next report dates: Finnhub for US issuers, the IR calendar page otherwise."
+      },
+      "EarningsCheckRequest": {
+        "properties": {
+          "ticker": {
+            "type": "string",
+            "pattern": "^[A-Za-z0-9._-]{1,32}$",
+            "title": "Ticker",
+            "examples": [
+              "AAPL_US_EQ"
+            ]
+          },
+          "report_date": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Report Date",
+            "description": "Report date to look for. Default: the instrument's report date if it has passed, else today."
+          },
+          "url": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 2000,
+                "pattern": "^https?://"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Url",
+            "description": "Use this document instead of searching (a press release or report)."
+          }
+        },
+        "type": "object",
+        "required": [
+          "ticker"
+        ],
+        "title": "EarningsCheckRequest"
+      },
+      "EarningsCheckSettings": {
+        "properties": {
+          "extraction_model": {
+            "type": "string",
+            "pattern": "^claude-[a-z0-9.-]{1,64}$",
+            "title": "Extraction Model",
+            "default": "claude-sonnet-5",
+            "examples": [
+              "claude-sonnet-5"
+            ]
+          },
+          "locate_model": {
+            "type": "string",
+            "pattern": "^claude-[a-z0-9.-]{1,64}$",
+            "title": "Locate Model",
+            "description": "Searches for the release when EDGAR has none (non-US issuers).",
+            "default": "claude-sonnet-5",
+            "examples": [
+              "claude-sonnet-5"
+            ]
+          },
+          "effort": {
+            "type": "string",
+            "enum": [
+              "low",
+              "medium",
+              "high",
+              "xhigh",
+              "max"
+            ],
+            "title": "Effort",
+            "default": "high"
+          },
+          "max_steps": {
+            "type": "integer",
+            "maximum": 50.0,
+            "minimum": 2.0,
+            "title": "Max Steps",
+            "description": "Claude calls plus document fetches per run.",
+            "default": 8
+          },
+          "max_searches": {
+            "type": "integer",
+            "maximum": 20.0,
+            "minimum": 0.0,
+            "title": "Max Searches",
+            "description": "Web searches per run.",
+            "default": 3
+          },
+          "check_days_after_report": {
+            "items": {
+              "type": "integer",
+              "maximum": 30.0,
+              "minimum": 0.0
+            },
+            "type": "array",
+            "title": "Check Days After Report",
+            "description": "Days after the report date on which the check runs until it finds the release (the spec's +1, retry at +2 and +4)."
+          },
+          "max_document_mb": {
+            "type": "integer",
+            "maximum": 32.0,
+            "minimum": 1.0,
+            "title": "Max Document Mb",
+            "default": 20
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "EarningsCheckSettings",
+        "description": "The earnings thesis check: find the release, extract figures, validate, judge KPIs."
+      },
+      "EventRulesConfig": {
+        "properties": {
+          "schema_version": {
+            "type": "integer",
+            "const": 1,
+            "title": "Schema Version",
+            "default": 1
+          },
+          "severities": {
+            "additionalProperties": {
+              "type": "integer",
+              "maximum": 3.0,
+              "minimum": 0.0
+            },
+            "propertyNames": {
+              "enum": [
+                "guidance_change",
+                "m_and_a",
+                "dividend_cut",
+                "earnings_release",
+                "management_change",
+                "regulatory_legal",
+                "capital_allocation",
+                "credit_rating",
+                "central_bank",
+                "macro_surprise",
+                "insider_transaction",
+                "product_business",
+                "sector_competitor",
+                "index_change",
+                "analyst_rating",
+                "other"
+              ]
+            },
+            "type": "object",
+            "title": "Severities",
+            "description": "Severity per event type; a type left out keeps its default."
+          },
+          "overrides": {
+            "items": {
+              "$ref": "#/components/schemas/SeverityOverride"
+            },
+            "type": "array",
+            "title": "Overrides",
+            "description": "Per-holding severity for one event type."
+          },
+          "escalate_when_thesis_linked": {
+            "items": {
+              "type": "string",
+              "enum": [
+                "guidance_change",
+                "m_and_a",
+                "dividend_cut",
+                "earnings_release",
+                "management_change",
+                "regulatory_legal",
+                "capital_allocation",
+                "credit_rating",
+                "central_bank",
+                "macro_surprise",
+                "insider_transaction",
+                "product_business",
+                "sector_competitor",
+                "index_change",
+                "analyst_rating",
+                "other"
+              ]
+            },
+            "type": "array",
+            "title": "Escalate When Thesis Linked",
+            "description": "Event types raised one level (max 3) when the item touches a thesis KPI or exit condition."
+          },
+          "insider_cluster_count": {
+            "type": "integer",
+            "maximum": 50.0,
+            "minimum": 2.0,
+            "title": "Insider Cluster Count",
+            "description": "Insider transactions for one holding within the window that count as cluster buying or selling (raised to severity 2).",
+            "default": 3
+          },
+          "insider_cluster_days": {
+            "type": "integer",
+            "maximum": 90.0,
+            "minimum": 1.0,
+            "title": "Insider Cluster Days",
+            "default": 14
+          },
+          "recycled_after_days": {
+            "type": "integer",
+            "maximum": 365.0,
+            "minimum": 1.0,
+            "title": "Recycled After Days",
+            "description": "An item whose event happened this long before it was published is a recycled story: shown, never alerted.",
+            "default": 7
+          },
+          "thesis_breach_severity": {
+            "type": "integer",
+            "maximum": 3.0,
+            "minimum": 0.0,
+            "title": "Thesis Breach Severity",
+            "description": "Severity of an alert for a KPI breach found by an earnings check (0: never alert, the digest still lists it).",
+            "default": 3
+          },
+          "earnings_check_on": {
+            "items": {
+              "type": "string",
+              "enum": [
+                "guidance_change",
+                "m_and_a",
+                "dividend_cut",
+                "earnings_release",
+                "management_change",
+                "regulatory_legal",
+                "capital_allocation",
+                "credit_rating",
+                "central_bank",
+                "macro_surprise",
+                "insider_transaction",
+                "product_business",
+                "sector_competitor",
+                "index_change",
+                "analyst_rating",
+                "other"
+              ]
+            },
+            "type": "array",
+            "title": "Earnings Check On",
+            "description": "Confirmed stories of these types queue an earnings thesis check for the holding, unless one ran in the last 10 days."
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "EventRulesConfig",
+        "description": "Stored as `config_version` rows, domain `event_rules`."
+      },
+      "EventRulesConfigVersion": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note"
+          },
+          "body": {
+            "$ref": "#/components/schemas/EventRulesConfig"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "created_at",
+          "note",
+          "body"
+        ],
+        "title": "EventRulesConfigVersion"
+      },
+      "EventTypeInfo": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "enum": [
+              "guidance_change",
+              "m_and_a",
+              "dividend_cut",
+              "earnings_release",
+              "management_change",
+              "regulatory_legal",
+              "capital_allocation",
+              "credit_rating",
+              "central_bank",
+              "macro_surprise",
+              "insider_transaction",
+              "product_business",
+              "sector_competitor",
+              "index_change",
+              "analyst_rating",
+              "other"
+            ],
+            "title": "Id"
+          },
+          "description": {
+            "type": "string",
+            "title": "Description"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "description"
+        ],
+        "title": "EventTypeInfo"
+      },
+      "EvidenceLink": {
+        "properties": {
+          "fact_id": {
+            "type": "integer",
+            "title": "Fact Id"
+          },
+          "ticker": {
+            "type": "string",
+            "title": "Ticker"
+          },
+          "metric": {
+            "type": "string",
+            "title": "Metric"
+          },
+          "period": {
+            "type": "string",
+            "title": "Period"
+          },
+          "value_as_written": {
+            "type": "string",
+            "title": "Value As Written"
+          },
+          "snippet": {
+            "type": "string",
+            "title": "Snippet"
+          },
+          "unit_snippet": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Unit Snippet"
+          },
+          "confidence": {
+            "type": "string",
+            "enum": [
+              "verified",
+              "corroborated",
+              "unconfirmed",
+              "disputed"
+            ],
+            "title": "Confidence"
+          },
+          "source_url": {
+            "type": "string",
+            "title": "Source Url"
+          },
+          "evidence_url": {
+            "type": "string",
+            "title": "Evidence Url",
+            "description": "Signed URL of the archived copy, valid 10 minutes."
+          },
+          "content_type": {
+            "type": "string",
+            "title": "Content Type"
+          },
+          "fetched_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Fetched At"
+          },
+          "sha256": {
+            "type": "string",
+            "title": "Sha256"
+          },
+          "context": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Context",
+            "description": "The archived text around the snippet."
+          }
+        },
+        "type": "object",
+        "required": [
+          "fact_id",
+          "ticker",
+          "metric",
+          "period",
+          "value_as_written",
+          "snippet",
+          "unit_snippet",
+          "confidence",
+          "source_url",
+          "evidence_url",
+          "content_type",
+          "fetched_at",
+          "sha256",
+          "context"
+        ],
+        "title": "EvidenceLink"
+      },
+      "Exposure": {
+        "properties": {
+          "kind": {
+            "type": "string",
+            "enum": [
+              "revenue_currency",
+              "revenue_region",
+              "commodity_input",
+              "other"
+            ],
+            "title": "Kind"
+          },
+          "name": {
+            "type": "string",
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Name",
+            "examples": [
+              "USD",
+              "Greater China",
+              "Copper"
+            ]
+          },
+          "share": {
+            "anyOf": [
+              {
+                "type": "number",
+                "maximum": 1.0,
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Share",
+            "description": "Share of revenue or cost, 0..1."
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "kind",
+          "name"
+        ],
+        "title": "Exposure"
+      },
+      "FactCheck": {
+        "properties": {
+          "check": {
+            "type": "string",
+            "title": "Check"
+          },
+          "ok": {
+            "type": "boolean",
+            "title": "Ok"
+          },
+          "detail": {
+            "type": "string",
+            "title": "Detail",
+            "default": ""
+          }
+        },
+        "type": "object",
+        "required": [
+          "check",
+          "ok"
+        ],
+        "title": "FactCheck"
+      },
+      "FactOut": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "metric": {
+            "type": "string",
+            "title": "Metric"
+          },
+          "basis": {
+            "type": "string",
+            "enum": [
+              "reported",
+              "adjusted"
+            ],
+            "title": "Basis"
+          },
+          "period": {
+            "type": "string",
+            "title": "Period"
+          },
+          "fiscal_year": {
+            "type": "integer",
+            "title": "Fiscal Year"
+          },
+          "fiscal_period": {
+            "type": "string",
+            "title": "Fiscal Period"
+          },
+          "period_end": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Period End"
+          },
+          "value": {
+            "type": "number",
+            "title": "Value",
+            "description": "As printed, in `scale`."
+          },
+          "value_as_written": {
+            "type": "string",
+            "title": "Value As Written"
+          },
+          "value_units": {
+            "type": "number",
+            "title": "Value Units",
+            "description": "With the scale applied."
+          },
+          "scale": {
+            "type": "string",
+            "enum": [
+              "units",
+              "thousands",
+              "millions",
+              "billions"
+            ],
+            "title": "Scale"
+          },
+          "unit": {
+            "type": "string",
+            "enum": [
+              "currency",
+              "per_share",
+              "percent",
+              "count",
+              "ratio"
+            ],
+            "title": "Unit"
+          },
+          "currency": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Currency"
+          },
+          "source_url": {
+            "type": "string",
+            "title": "Source Url"
+          },
+          "snippet": {
+            "type": "string",
+            "title": "Snippet"
+          },
+          "unit_snippet": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Unit Snippet"
+          },
+          "evidence_sha256": {
+            "type": "string",
+            "title": "Evidence Sha256"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "verified",
+              "unverified",
+              "rejected",
+              "quarantined"
+            ],
+            "title": "Status"
+          },
+          "status_reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Status Reason"
+          },
+          "checks": {
+            "items": {
+              "$ref": "#/components/schemas/FactCheck"
+            },
+            "type": "array",
+            "title": "Checks"
+          },
+          "restates_fact_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Restates Fact Id"
+          },
+          "extracted_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Extracted At"
+          },
+          "reviewed_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reviewed At"
+          },
+          "confidence": {
+            "type": "string",
+            "enum": [
+              "verified",
+              "corroborated",
+              "unconfirmed",
+              "disputed"
+            ],
+            "title": "Confidence"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "metric",
+          "basis",
+          "period",
+          "fiscal_year",
+          "fiscal_period",
+          "period_end",
+          "value",
+          "value_as_written",
+          "value_units",
+          "scale",
+          "unit",
+          "currency",
+          "source_url",
+          "snippet",
+          "unit_snippet",
+          "evidence_sha256",
+          "status",
+          "status_reason",
+          "checks",
+          "restates_fact_id",
+          "extracted_at",
+          "reviewed_at",
+          "confidence"
+        ],
+        "title": "FactOut"
+      },
+      "FactReview": {
+        "properties": {
+          "action": {
+            "type": "string",
+            "enum": [
+              "verify",
+              "reject"
+            ],
+            "title": "Action"
+          },
+          "note": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 500
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note"
+          }
+        },
+        "type": "object",
+        "required": [
+          "action"
+        ],
+        "title": "FactReview"
+      },
+      "FactReviewResult": {
+        "properties": {
+          "fact_id": {
+            "type": "integer",
+            "title": "Fact Id"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "verified",
+              "rejected"
+            ],
+            "title": "Status"
+          },
+          "verdict_job": {
+            "$ref": "#/components/schemas/JobSummary"
+          }
+        },
+        "type": "object",
+        "required": [
+          "fact_id",
+          "status",
+          "verdict_job"
+        ],
+        "title": "FactReviewResult"
       },
       "Freshness": {
         "properties": {
@@ -1303,6 +4039,381 @@
         ],
         "title": "Holding"
       },
+      "HoldingDetail": {
+        "properties": {
+          "ticker": {
+            "type": "string",
+            "title": "Ticker"
+          },
+          "instrument": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/InstrumentInfo"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "position": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Holding"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Null when the latest sync has no position."
+          },
+          "base_currency": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Base Currency"
+          },
+          "freshness": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Freshness"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "thesis": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ThesisConfig"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "theses_config_version_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Theses Config Version Id"
+          },
+          "profile": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/HoldingProfile"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "kpis": {
+            "items": {
+              "$ref": "#/components/schemas/KpiStatus"
+            },
+            "type": "array",
+            "title": "Kpis"
+          },
+          "facts": {
+            "items": {
+              "$ref": "#/components/schemas/FactOut"
+            },
+            "type": "array",
+            "title": "Facts",
+            "description": "Every fact, newest period first."
+          },
+          "last_earnings_check": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/JobSummary"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "last_verdict_run": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/JobSummary"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "ticker",
+          "instrument",
+          "position",
+          "base_currency",
+          "freshness",
+          "thesis",
+          "theses_config_version_id",
+          "profile",
+          "kpis",
+          "facts",
+          "last_earnings_check",
+          "last_verdict_run"
+        ],
+        "title": "HoldingDetail"
+      },
+      "HoldingProfile": {
+        "properties": {
+          "ticker": {
+            "type": "string",
+            "pattern": "^[A-Za-z0-9._-]{1,32}$",
+            "title": "Ticker",
+            "examples": [
+              "AAPL_US_EQ"
+            ]
+          },
+          "company_name": {
+            "type": "string",
+            "maxLength": 200,
+            "title": "Company Name",
+            "default": ""
+          },
+          "aliases": {
+            "items": {
+              "type": "string",
+              "maxLength": 200,
+              "minLength": 1
+            },
+            "type": "array",
+            "title": "Aliases",
+            "description": "Other and former names, used to match news."
+          },
+          "ir_url": {
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 1,
+                "format": "uri"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ir Url",
+            "description": "Investor relations home page."
+          },
+          "results_urls": {
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "format": "uri"
+            },
+            "type": "array",
+            "title": "Results Urls",
+            "description": "Pages where results press releases or reports are published."
+          },
+          "financial_calendar_url": {
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 1,
+                "format": "uri"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Financial Calendar Url",
+            "description": "IR financial calendar page with upcoming report dates."
+          },
+          "regulatory_news_urls": {
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "format": "uri"
+            },
+            "type": "array",
+            "title": "Regulatory News Urls"
+          },
+          "extra_domains": {
+            "items": {
+              "type": "string",
+              "maxLength": 253,
+              "pattern": "^([a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?\\.)+[a-z]{2,63}$",
+              "examples": [
+                "investor.apple.com"
+              ]
+            },
+            "type": "array",
+            "title": "Extra Domains",
+            "description": "Further domains the earnings check may search and fetch from (the IR and results URLs' domains are always allowed)."
+          },
+          "sec_cik": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^[0-9]{1,10}$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sec Cik",
+            "description": "SEC Central Index Key. US issuers (8-K) and foreign issuers that furnish results on 6-K. Looked up from the ticker when empty."
+          },
+          "sec_ticker": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^[A-Z0-9.\\-]{1,10}$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sec Ticker",
+            "description": "Ticker as EDGAR and Finnhub list it, when it differs from the Trading212 ticker's prefix."
+          },
+          "fiscal_year_end_month": {
+            "type": "integer",
+            "maximum": 12.0,
+            "minimum": 1.0,
+            "title": "Fiscal Year End Month",
+            "description": "Month the fiscal year ends in (Apple: 9, Microsoft: 6). Maps fiscal quarters to calendar periods.",
+            "default": 12
+          },
+          "reporting_currency": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^[A-Z]{3}$",
+                "examples": [
+                  "CZK"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reporting Currency",
+            "description": "Currency the company reports in; figures in another are held."
+          },
+          "competitors": {
+            "items": {
+              "type": "string",
+              "maxLength": 200,
+              "minLength": 1
+            },
+            "type": "array",
+            "title": "Competitors"
+          },
+          "suppliers": {
+            "items": {
+              "type": "string",
+              "maxLength": 200,
+              "minLength": 1
+            },
+            "type": "array",
+            "title": "Suppliers"
+          },
+          "customers": {
+            "items": {
+              "type": "string",
+              "maxLength": 200,
+              "minLength": 1
+            },
+            "type": "array",
+            "title": "Customers"
+          },
+          "watch_topics": {
+            "items": {
+              "type": "string",
+              "maxLength": 200,
+              "minLength": 1
+            },
+            "type": "array",
+            "title": "Watch Topics"
+          },
+          "exposures": {
+            "items": {
+              "$ref": "#/components/schemas/Exposure"
+            },
+            "type": "array",
+            "title": "Exposures"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "ticker"
+        ],
+        "title": "HoldingProfile"
+      },
+      "HoldingProfilesConfig": {
+        "properties": {
+          "schema_version": {
+            "type": "integer",
+            "const": 1,
+            "title": "Schema Version",
+            "default": 1
+          },
+          "profiles": {
+            "items": {
+              "$ref": "#/components/schemas/HoldingProfile"
+            },
+            "type": "array",
+            "title": "Profiles"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "HoldingProfilesConfig",
+        "description": "All holding profiles. Stored as `config_version` rows, domain `holding_profiles`."
+      },
+      "HoldingProfilesConfigVersion": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note"
+          },
+          "body": {
+            "$ref": "#/components/schemas/HoldingProfilesConfig"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "created_at",
+          "note",
+          "body"
+        ],
+        "title": "HoldingProfilesConfigVersion"
+      },
       "HoldingsResponse": {
         "properties": {
           "freshness": {
@@ -1354,6 +4465,136 @@
           "holdings"
         ],
         "title": "HoldingsResponse"
+      },
+      "InstrumentInfo": {
+        "properties": {
+          "name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
+          },
+          "isin": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Isin"
+          },
+          "currency": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Currency"
+          },
+          "cik": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cik"
+          },
+          "next_report_date": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Report Date"
+          },
+          "report_date_source": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Report Date Source"
+          },
+          "last_report_date": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Report Date"
+          },
+          "report_date_checked_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Report Date Checked At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "name",
+          "isin",
+          "currency",
+          "cik",
+          "next_report_date",
+          "report_date_source",
+          "last_report_date",
+          "report_date_checked_at"
+        ],
+        "title": "InstrumentInfo"
+      },
+      "ItemLink": {
+        "properties": {
+          "ticker": {
+            "type": "string",
+            "title": "Ticker"
+          },
+          "via": {
+            "type": "string",
+            "title": "Via"
+          },
+          "term": {
+            "type": "string",
+            "title": "Term"
+          }
+        },
+        "type": "object",
+        "required": [
+          "ticker",
+          "via",
+          "term"
+        ],
+        "title": "ItemLink"
       },
       "JobSchedule": {
         "properties": {
@@ -1476,6 +4717,38 @@
           "portfolio_sync": {
             "$ref": "#/components/schemas/JobSchedule",
             "description": "Trading212 sync, FX rates and drift. Default: daily at 22:30 Prague time."
+          },
+          "earnings_calendar": {
+            "$ref": "#/components/schemas/JobSchedule",
+            "description": "Refresh every holding's next report date. Default: Sundays 06:00."
+          },
+          "earnings_due": {
+            "$ref": "#/components/schemas/JobSchedule",
+            "description": "Queue earnings checks for holdings that reported. Default: daily 08:00."
+          },
+          "news_ingest": {
+            "$ref": "#/components/schemas/JobSchedule",
+            "description": "Ingest, classify, corroborate and alert. Default: every 2 h, 06:00-22:00."
+          },
+          "daily_digest": {
+            "$ref": "#/components/schemas/JobSchedule",
+            "description": "Daily digest of the last 24 h. Default: weekdays 07:00."
+          },
+          "weekly_digest": {
+            "$ref": "#/components/schemas/JobSchedule",
+            "description": "Weekly digest of the last 7 days. Default: Sundays 18:00."
+          },
+          "earnings_check": {
+            "$ref": "#/components/schemas/EarningsCheckSettings"
+          },
+          "earnings_calendar_settings": {
+            "$ref": "#/components/schemas/EarningsCalendarSettings"
+          },
+          "news": {
+            "$ref": "#/components/schemas/NewsSettings"
+          },
+          "digest": {
+            "$ref": "#/components/schemas/DigestSettings"
           }
         },
         "additionalProperties": false,
@@ -1517,6 +4790,654 @@
           "body"
         ],
         "title": "JobsConfigVersion"
+      },
+      "KpiStatus": {
+        "properties": {
+          "kpi": {
+            "$ref": "#/components/schemas/ThesisKPI"
+          },
+          "current": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/VerdictOut"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Latest period's verdict."
+          },
+          "history": {
+            "items": {
+              "$ref": "#/components/schemas/VerdictOut"
+            },
+            "type": "array",
+            "title": "History",
+            "description": "Latest verdict per period, newest first."
+          }
+        },
+        "type": "object",
+        "required": [
+          "kpi",
+          "current",
+          "history"
+        ],
+        "title": "KpiStatus"
+      },
+      "NewsFeed": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/NewsItemOut"
+            },
+            "type": "array",
+            "title": "Items"
+          },
+          "next_before_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Before Id",
+            "description": "Pass as before_id for the next page."
+          },
+          "last_ingest": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/JobSummary"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "items",
+          "next_before_id",
+          "last_ingest"
+        ],
+        "title": "NewsFeed"
+      },
+      "NewsItemOut": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "url": {
+            "type": "string",
+            "title": "Url"
+          },
+          "headline": {
+            "type": "string",
+            "title": "Headline"
+          },
+          "summary": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Summary"
+          },
+          "outlet": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Outlet"
+          },
+          "outlet_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Outlet Name"
+          },
+          "tier": {
+            "type": "integer",
+            "title": "Tier"
+          },
+          "source_id": {
+            "type": "string",
+            "title": "Source Id"
+          },
+          "published_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Published At"
+          },
+          "tickers": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Tickers"
+          },
+          "links": {
+            "items": {
+              "$ref": "#/components/schemas/ItemLink"
+            },
+            "type": "array",
+            "title": "Links"
+          },
+          "event_type": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Event Type"
+          },
+          "affected_ticker": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Affected Ticker"
+          },
+          "rumour": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Rumour"
+          },
+          "relevant": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Relevant"
+          },
+          "story": {
+            "$ref": "#/components/schemas/StoryOut"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "url",
+          "headline",
+          "summary",
+          "outlet",
+          "outlet_name",
+          "tier",
+          "source_id",
+          "published_at",
+          "tickers",
+          "links",
+          "event_type",
+          "affected_ticker",
+          "rumour",
+          "relevant",
+          "story"
+        ],
+        "title": "NewsItemOut"
+      },
+      "NewsSettings": {
+        "properties": {
+          "classification_model": {
+            "type": "string",
+            "pattern": "^claude-[a-z0-9.-]{1,64}$",
+            "title": "Classification Model",
+            "default": "claude-haiku-4-5",
+            "examples": [
+              "claude-sonnet-5"
+            ]
+          },
+          "classification_batch_size": {
+            "type": "integer",
+            "maximum": 100.0,
+            "minimum": 5.0,
+            "title": "Classification Batch Size",
+            "description": "Items per classification call.",
+            "default": 50
+          },
+          "corroboration_model": {
+            "type": "string",
+            "pattern": "^claude-[a-z0-9.-]{1,64}$",
+            "title": "Corroboration Model",
+            "default": "claude-haiku-4-5",
+            "examples": [
+              "claude-sonnet-5"
+            ]
+          },
+          "corroboration_max_searches": {
+            "type": "integer",
+            "maximum": 10.0,
+            "minimum": 0.0,
+            "title": "Corroboration Max Searches",
+            "description": "Web searches per corroboration call.",
+            "default": 3
+          },
+          "corroboration_rounds": {
+            "type": "integer",
+            "maximum": 5.0,
+            "minimum": 0.0,
+            "title": "Corroboration Rounds",
+            "description": "Corroboration searches per story: one when it is first seen, the rest spread over the re-check window.",
+            "default": 2
+          },
+          "recheck_hours": {
+            "type": "integer",
+            "maximum": 168.0,
+            "minimum": 1.0,
+            "title": "Recheck Hours",
+            "description": "How long an unconfirmed story is re-checked.",
+            "default": 48
+          },
+          "max_items_per_run": {
+            "type": "integer",
+            "maximum": 5000.0,
+            "minimum": 10.0,
+            "title": "Max Items Per Run",
+            "description": "Classification cap per run (cost guard).",
+            "default": 500
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "NewsSettings",
+        "description": "The news pipeline after ingest: classification, corroboration."
+      },
+      "NewsSource": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "maxLength": 64,
+            "pattern": "^[a-z0-9]+(-[a-z0-9]+)*$",
+            "title": "Id",
+            "examples": [
+              "max-single-position"
+            ]
+          },
+          "name": {
+            "type": "string",
+            "maxLength": 100,
+            "minLength": 1,
+            "title": "Name"
+          },
+          "tier": {
+            "type": "integer",
+            "enum": [
+              1,
+              2,
+              3
+            ],
+            "title": "Tier",
+            "description": "1: the company, regulators, central banks, official newswires. 2: curated outlets. 3: blogs and social (labelled sentiment, never alert alone)."
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "rss",
+              "page",
+              "edgar",
+              "finnhub",
+              "google_news"
+            ],
+            "title": "Type",
+            "description": "rss: an RSS or Atom feed. page: a news page read daily; new links on it become items. edgar: every holding's SEC filings. finnhub: US company news. google_news: a Google News query per holding (unofficial endpoint)."
+          },
+          "url": {
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 1,
+                "format": "uri"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Url",
+            "description": "Feed or page URL (rss, page)."
+          },
+          "enabled": {
+            "type": "boolean",
+            "title": "Enabled",
+            "default": true
+          },
+          "tickers": {
+            "items": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9._-]{1,32}$",
+              "examples": [
+                "AAPL_US_EQ"
+              ]
+            },
+            "type": "array",
+            "title": "Tickers",
+            "description": "Holdings this source is about (e.g. a company's own IR feed): its items link to them without a name match. Empty: items are matched by name."
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "id",
+          "name",
+          "tier",
+          "type"
+        ],
+        "title": "NewsSource"
+      },
+      "NewsSourcesConfig": {
+        "properties": {
+          "schema_version": {
+            "type": "integer",
+            "const": 1,
+            "title": "Schema Version",
+            "default": 1
+          },
+          "sources": {
+            "items": {
+              "$ref": "#/components/schemas/NewsSource"
+            },
+            "type": "array",
+            "title": "Sources"
+          },
+          "domain_tiers": {
+            "items": {
+              "$ref": "#/components/schemas/DomainTier"
+            },
+            "type": "array",
+            "title": "Domain Tiers",
+            "description": "Trust tier per outlet domain (subdomains included). Every holding's IR and results domains count as tier 1."
+          },
+          "blocked_domains": {
+            "items": {
+              "type": "string",
+              "maxLength": 253,
+              "pattern": "^([a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?\\.)+[a-z]{2,63}$",
+              "examples": [
+                "reuters.com"
+              ]
+            },
+            "type": "array",
+            "title": "Blocked Domains",
+            "description": "Items from these outlets are dropped."
+          },
+          "unknown_outlet_tier": {
+            "type": "integer",
+            "enum": [
+              1,
+              2,
+              3
+            ],
+            "title": "Unknown Outlet Tier",
+            "description": "Tier for an aggregator's item from an outlet not listed above.",
+            "default": 3
+          },
+          "freshness_hours": {
+            "type": "integer",
+            "maximum": 720.0,
+            "minimum": 1.0,
+            "title": "Freshness Hours",
+            "description": "Items published earlier are dropped.",
+            "default": 72
+          },
+          "include_tier3": {
+            "type": "boolean",
+            "title": "Include Tier3",
+            "description": "Keep tier-3 items (labelled sentiment; they never alert on their own).",
+            "default": false
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "NewsSourcesConfig",
+        "description": "Stored as `config_version` rows, domain `news_sources`."
+      },
+      "NewsSourcesConfigVersion": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note"
+          },
+          "body": {
+            "$ref": "#/components/schemas/NewsSourcesConfig"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "created_at",
+          "note",
+          "body"
+        ],
+        "title": "NewsSourcesConfigVersion"
+      },
+      "NotificationRule": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "maxLength": 64,
+            "pattern": "^[a-z0-9]+(-[a-z0-9]+)*$",
+            "title": "Id",
+            "examples": [
+              "max-single-position"
+            ]
+          },
+          "enabled": {
+            "type": "boolean",
+            "title": "Enabled",
+            "default": true
+          },
+          "match": {
+            "$ref": "#/components/schemas/RuleMatch"
+          },
+          "channels": {
+            "items": {
+              "type": "string",
+              "enum": [
+                "telegram",
+                "email"
+              ]
+            },
+            "type": "array",
+            "minItems": 1,
+            "title": "Channels",
+            "description": "Where a matching event is sent immediately."
+          },
+          "during_quiet_hours": {
+            "type": "string",
+            "enum": [
+              "hold_until_end",
+              "send",
+              "digest_only"
+            ],
+            "title": "During Quiet Hours",
+            "description": "hold_until_end: send when quiet hours end. send: send anyway. digest_only: do not send; it appears in the next digest.",
+            "default": "hold_until_end"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "id",
+          "match",
+          "channels"
+        ],
+        "title": "NotificationRule"
+      },
+      "NotificationsConfig": {
+        "properties": {
+          "schema_version": {
+            "type": "integer",
+            "const": 1,
+            "title": "Schema Version",
+            "default": 1
+          },
+          "rules": {
+            "items": {
+              "$ref": "#/components/schemas/NotificationRule"
+            },
+            "type": "array",
+            "title": "Rules"
+          },
+          "quiet_hours": {
+            "$ref": "#/components/schemas/QuietHours"
+          },
+          "daily_alert_cap": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "maximum": 100.0,
+                "minimum": 1.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Daily Alert Cap",
+            "description": "Most alerts sent per day (in the quiet-hours timezone); the rest wait for the digest. Null: no cap.",
+            "default": 5
+          },
+          "muted_tickers": {
+            "items": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9._-]{1,32}$",
+              "examples": [
+                "AAPL_US_EQ"
+              ]
+            },
+            "type": "array",
+            "title": "Muted Tickers"
+          },
+          "muted_event_types": {
+            "items": {
+              "type": "string",
+              "enum": [
+                "guidance_change",
+                "m_and_a",
+                "dividend_cut",
+                "earnings_release",
+                "management_change",
+                "regulatory_legal",
+                "capital_allocation",
+                "credit_rating",
+                "central_bank",
+                "macro_surprise",
+                "insider_transaction",
+                "product_business",
+                "sector_competitor",
+                "index_change",
+                "analyst_rating",
+                "other"
+              ]
+            },
+            "type": "array",
+            "title": "Muted Event Types"
+          },
+          "repeat_throttle_hours": {
+            "type": "integer",
+            "maximum": 168.0,
+            "minimum": 0.0,
+            "title": "Repeat Throttle Hours",
+            "description": "Another story with the same holding and event type within this many hours of an alert is not alerted again.",
+            "default": 24
+          },
+          "digest_channels": {
+            "items": {
+              "type": "string",
+              "enum": [
+                "telegram",
+                "email"
+              ]
+            },
+            "type": "array",
+            "title": "Digest Channels",
+            "description": "Where the daily and weekly digests go."
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "NotificationsConfig",
+        "description": "Stored as `config_version` rows, domain `notifications`."
+      },
+      "NotificationsConfigVersion": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note"
+          },
+          "body": {
+            "$ref": "#/components/schemas/NotificationsConfig"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "created_at",
+          "note",
+          "body"
+        ],
+        "title": "NotificationsConfigVersion"
       },
       "PortfolioOverview": {
         "properties": {
@@ -1904,6 +5825,484 @@
         "title": "PositionWeightRule",
         "description": "Limit on a single position's weight; with no ticker it applies to every position."
       },
+      "QuietHours": {
+        "properties": {
+          "enabled": {
+            "type": "boolean",
+            "title": "Enabled",
+            "default": true
+          },
+          "start": {
+            "type": "string",
+            "pattern": "^([01][0-9]|2[0-3]):[0-5][0-9]$",
+            "title": "Start",
+            "default": "22:00"
+          },
+          "end": {
+            "type": "string",
+            "pattern": "^([01][0-9]|2[0-3]):[0-5][0-9]$",
+            "title": "End",
+            "default": "07:00"
+          },
+          "timezone": {
+            "type": "string",
+            "title": "Timezone",
+            "default": "Europe/Prague",
+            "examples": [
+              "Europe/Prague"
+            ]
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "QuietHours"
+      },
+      "ReportOut": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "digest",
+              "research",
+              "review",
+              "escalation"
+            ],
+            "title": "Type"
+          },
+          "period": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Period"
+          },
+          "title": {
+            "type": "string",
+            "title": "Title"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "period_start": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Period Start"
+          },
+          "period_end": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Period End"
+          },
+          "body": {
+            "$ref": "#/components/schemas/DigestBody"
+          },
+          "body_md": {
+            "type": "string",
+            "title": "Body Md"
+          },
+          "delivery": {
+            "additionalProperties": {
+              "additionalProperties": {
+                "type": "string"
+              },
+              "type": "object"
+            },
+            "type": "object",
+            "title": "Delivery"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "type",
+          "period",
+          "title",
+          "created_at",
+          "period_start",
+          "period_end",
+          "body",
+          "body_md",
+          "delivery"
+        ],
+        "title": "ReportOut"
+      },
+      "ReportSummary": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "digest",
+              "research",
+              "review",
+              "escalation"
+            ],
+            "title": "Type"
+          },
+          "period": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Period"
+          },
+          "title": {
+            "type": "string",
+            "title": "Title"
+          },
+          "headline": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Headline"
+          },
+          "nothing_material": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Nothing Material"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "delivery": {
+            "additionalProperties": {
+              "additionalProperties": {
+                "type": "string"
+              },
+              "type": "object"
+            },
+            "type": "object",
+            "title": "Delivery"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "type",
+          "period",
+          "title",
+          "headline",
+          "nothing_material",
+          "created_at",
+          "delivery"
+        ],
+        "title": "ReportSummary"
+      },
+      "RuleMatch": {
+        "properties": {
+          "severities": {
+            "items": {
+              "type": "integer",
+              "enum": [
+                1,
+                2,
+                3
+              ]
+            },
+            "type": "array",
+            "minItems": 1,
+            "title": "Severities",
+            "examples": [
+              [
+                3
+              ]
+            ]
+          },
+          "event_types": {
+            "items": {
+              "type": "string",
+              "enum": [
+                "guidance_change",
+                "m_and_a",
+                "dividend_cut",
+                "earnings_release",
+                "management_change",
+                "regulatory_legal",
+                "capital_allocation",
+                "credit_rating",
+                "central_bank",
+                "macro_surprise",
+                "insider_transaction",
+                "product_business",
+                "sector_competitor",
+                "index_change",
+                "analyst_rating",
+                "other"
+              ]
+            },
+            "type": "array",
+            "title": "Event Types",
+            "description": "Empty: any type."
+          },
+          "tickers": {
+            "items": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9._-]{1,32}$",
+              "examples": [
+                "AAPL_US_EQ"
+              ]
+            },
+            "type": "array",
+            "title": "Tickers",
+            "description": "Empty: any holding."
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "severities"
+        ],
+        "title": "RuleMatch"
+      },
+      "Sentence": {
+        "properties": {
+          "text": {
+            "type": "string",
+            "title": "Text"
+          },
+          "news_item_ids": {
+            "items": {
+              "type": "integer"
+            },
+            "type": "array",
+            "title": "News Item Ids"
+          },
+          "fact_ids": {
+            "items": {
+              "type": "integer"
+            },
+            "type": "array",
+            "title": "Fact Ids"
+          }
+        },
+        "type": "object",
+        "required": [
+          "text"
+        ],
+        "title": "Sentence"
+      },
+      "SeverityOverride": {
+        "properties": {
+          "ticker": {
+            "type": "string",
+            "pattern": "^[A-Za-z0-9._-]{1,32}$",
+            "title": "Ticker",
+            "examples": [
+              "AAPL_US_EQ"
+            ]
+          },
+          "event_type": {
+            "type": "string",
+            "enum": [
+              "guidance_change",
+              "m_and_a",
+              "dividend_cut",
+              "earnings_release",
+              "management_change",
+              "regulatory_legal",
+              "capital_allocation",
+              "credit_rating",
+              "central_bank",
+              "macro_surprise",
+              "insider_transaction",
+              "product_business",
+              "sector_competitor",
+              "index_change",
+              "analyst_rating",
+              "other"
+            ],
+            "title": "Event Type"
+          },
+          "severity": {
+            "type": "integer",
+            "maximum": 3.0,
+            "minimum": 0.0,
+            "title": "Severity"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "ticker",
+          "event_type",
+          "severity"
+        ],
+        "title": "SeverityOverride"
+      },
+      "StoryOut": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "ticker": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ticker"
+          },
+          "event_type": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Event Type"
+          },
+          "severity": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Severity"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "pending",
+              "confirmed",
+              "unconfirmed",
+              "disputed",
+              "sentiment"
+            ],
+            "title": "Status"
+          },
+          "confidence": {
+            "type": "string",
+            "enum": [
+              "verified",
+              "corroborated",
+              "unconfirmed",
+              "disputed"
+            ],
+            "title": "Confidence"
+          },
+          "status_reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Status Reason"
+          },
+          "rumour": {
+            "type": "boolean",
+            "title": "Rumour"
+          },
+          "recycled": {
+            "type": "boolean",
+            "title": "Recycled"
+          },
+          "best_tier": {
+            "type": "integer",
+            "title": "Best Tier"
+          },
+          "source_count": {
+            "type": "integer",
+            "title": "Source Count"
+          },
+          "first_seen": {
+            "type": "string",
+            "format": "date-time",
+            "title": "First Seen"
+          },
+          "last_seen": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Last Seen"
+          },
+          "corroborating_urls": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Corroborating Urls"
+          },
+          "contradicting_urls": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Contradicting Urls"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "ticker",
+          "event_type",
+          "severity",
+          "status",
+          "confidence",
+          "status_reason",
+          "rumour",
+          "recycled",
+          "best_tier",
+          "source_count",
+          "first_seen",
+          "last_seen"
+        ],
+        "title": "StoryOut"
+      },
       "StrategyConfig": {
         "properties": {
           "schema_version": {
@@ -2134,6 +6533,116 @@
         ],
         "title": "TargetBand"
       },
+      "TestAlertRequest": {
+        "properties": {
+          "severity": {
+            "type": "integer",
+            "enum": [
+              1,
+              2,
+              3
+            ],
+            "title": "Severity",
+            "default": 3
+          },
+          "event_type": {
+            "type": "string",
+            "enum": [
+              "guidance_change",
+              "m_and_a",
+              "dividend_cut",
+              "earnings_release",
+              "management_change",
+              "regulatory_legal",
+              "capital_allocation",
+              "credit_rating",
+              "central_bank",
+              "macro_surprise",
+              "insider_transaction",
+              "product_business",
+              "sector_competitor",
+              "index_change",
+              "analyst_rating",
+              "other"
+            ],
+            "title": "Event Type",
+            "default": "guidance_change"
+          },
+          "ticker": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^[A-Za-z0-9._-]{1,32}$",
+                "examples": [
+                  "AAPL_US_EQ"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ticker"
+          }
+        },
+        "type": "object",
+        "title": "TestAlertRequest"
+      },
+      "TestAlertResult": {
+        "properties": {
+          "explanation": {
+            "type": "string",
+            "title": "Explanation",
+            "description": "Which rule matched and what happens."
+          },
+          "channels": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Channels",
+            "description": "Channels the alert is queued for."
+          },
+          "held_until": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Held Until"
+          },
+          "suppressed_reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Suppressed Reason"
+          },
+          "alerts": {
+            "items": {
+              "$ref": "#/components/schemas/AlertOut"
+            },
+            "type": "array",
+            "title": "Alerts"
+          }
+        },
+        "type": "object",
+        "required": [
+          "explanation",
+          "channels",
+          "held_until",
+          "suppressed_reason",
+          "alerts"
+        ],
+        "title": "TestAlertResult"
+      },
       "ThesesConfig": {
         "properties": {
           "schema_version": {
@@ -2281,6 +6790,7 @@
             "maxLength": 32,
             "minLength": 1,
             "title": "Unit",
+            "description": "What the threshold is in: '%', 'x', 'count', or a currency with an optional scale ('EUR bn', 'USD m', 'USD' for per-share amounts).",
             "examples": [
               "%",
               "EUR bn"
@@ -2323,6 +6833,28 @@
         "title": "ThesisKPI",
         "description": "An absolute threshold the owner sets. v1 has no consensus-estimate comparisons."
       },
+      "ThesisVerdictsRequest": {
+        "properties": {
+          "ticker": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^[A-Za-z0-9._-]{1,32}$",
+                "examples": [
+                  "AAPL_US_EQ"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ticker",
+            "description": "One holding, or all when null."
+          }
+        },
+        "type": "object",
+        "title": "ThesisVerdictsRequest"
+      },
       "ValidationError": {
         "properties": {
           "loc": {
@@ -2362,6 +6894,242 @@
           "type"
         ],
         "title": "ValidationError"
+      },
+      "VerdictOut": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "kpi_id": {
+            "type": "string",
+            "title": "Kpi Id"
+          },
+          "period": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Period"
+          },
+          "fiscal_year": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fiscal Year"
+          },
+          "fiscal_period": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fiscal Period"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "pass",
+              "breach",
+              "unknown"
+            ],
+            "title": "Status"
+          },
+          "observed_value": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Observed Value",
+            "description": "In the KPI's unit (e.g. 9.63 for '%')."
+          },
+          "operator": {
+            "type": "string",
+            "title": "Operator"
+          },
+          "threshold": {
+            "type": "number",
+            "title": "Threshold"
+          },
+          "threshold_unit": {
+            "type": "string",
+            "title": "Threshold Unit"
+          },
+          "rationale": {
+            "type": "string",
+            "title": "Rationale"
+          },
+          "fact_ids": {
+            "items": {
+              "type": "integer"
+            },
+            "type": "array",
+            "title": "Fact Ids"
+          },
+          "config_version_id": {
+            "type": "integer",
+            "title": "Config Version Id"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "confidence": {
+            "type": "string",
+            "enum": [
+              "verified",
+              "corroborated",
+              "unconfirmed",
+              "disputed"
+            ],
+            "title": "Confidence"
+          },
+          "stale": {
+            "type": "boolean",
+            "title": "Stale",
+            "description": "Judged under an older theses config than the active one; re-run verdicts."
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "kpi_id",
+          "period",
+          "fiscal_year",
+          "fiscal_period",
+          "status",
+          "observed_value",
+          "operator",
+          "threshold",
+          "threshold_unit",
+          "rationale",
+          "fact_ids",
+          "config_version_id",
+          "created_at",
+          "confidence",
+          "stale"
+        ],
+        "title": "VerdictOut"
+      },
+      "VerificationConfig": {
+        "properties": {
+          "schema_version": {
+            "type": "integer",
+            "const": 1,
+            "title": "Schema Version",
+            "default": 1
+          },
+          "sanity_max_change_qoq": {
+            "anyOf": [
+              {
+                "type": "number",
+                "exclusiveMinimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sanity Max Change Qoq",
+            "description": "A figure that moves more than this fraction against the previous quarter's verified figure is held for review (0.5 = ±50 %). Null disables.",
+            "default": 0.5
+          },
+          "sanity_overrides": {
+            "patternProperties": {
+              "^[a-z][a-z0-9_]{0,63}$": {
+                "anyOf": [
+                  {
+                    "type": "number"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              }
+            },
+            "type": "object",
+            "title": "Sanity Overrides",
+            "description": "Per-metric band replacing the default; null disables the bound for that metric (e.g. seasonal or often sign-changing figures)."
+          },
+          "stated_ratio_tolerance_pp": {
+            "type": "number",
+            "minimum": 0.0,
+            "title": "Stated Ratio Tolerance Pp",
+            "description": "How far (in percentage points) a ratio the document states may differ from the one recomputed from its raw figures before the stated one is rejected.",
+            "default": 0.15
+          },
+          "period_end_tolerance_days": {
+            "type": "integer",
+            "maximum": 31.0,
+            "minimum": 0.0,
+            "title": "Period End Tolerance Days",
+            "description": "Slack between a stated period end and the calendar month end expected from the fiscal year end (52/53-week fiscal years end on a weekday, not month end).",
+            "default": 10
+          },
+          "max_report_lag_days": {
+            "type": "integer",
+            "maximum": 400.0,
+            "minimum": 30.0,
+            "title": "Max Report Lag Days",
+            "description": "Latest a release may come out after the end of the period it reports.",
+            "default": 150
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "VerificationConfig",
+        "description": "Stored as `config_version` rows, domain `verification`."
+      },
+      "VerificationConfigVersion": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note"
+          },
+          "body": {
+            "$ref": "#/components/schemas/VerificationConfig"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "created_at",
+          "note",
+          "body"
+        ],
+        "title": "VerificationConfigVersion"
       }
     },
     "securitySchemes": {

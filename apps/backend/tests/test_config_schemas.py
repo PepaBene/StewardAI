@@ -179,3 +179,68 @@ def test_valid_theses() -> None:
 def test_invalid_theses_are_rejected(body: dict[str, object], message: str) -> None:
     with pytest.raises(ValidationError, match=message):
         ThesesConfig.model_validate(body)
+
+
+# ---------------------------------------------------------------------------
+# Phase 2 domains
+# ---------------------------------------------------------------------------
+
+
+def test_every_scheduled_job_type_has_a_handler() -> None:
+    from steward.config import JobsConfig
+    from steward.jobs.registry import JOB_HANDLERS
+
+    assert set(JobsConfig().schedules()) <= set(JOB_HANDLERS)
+
+
+def test_jobs_config_saved_before_phase_2_still_loads() -> None:
+    from steward.config import JobsConfig
+
+    old = JobsConfig.model_validate({"schema_version": 1, "portfolio_sync": {"cron": "0 23 * * *"}})
+    assert old.earnings_check.extraction_model == "claude-sonnet-5"
+    assert old.earnings_check.check_days_after_report == [1, 2, 4]
+    with pytest.raises(ValidationError):
+        JobsConfig.model_validate({"earnings_check": {"extraction_model": "gpt-5"}})
+
+
+def test_holding_profiles_validate_and_expose_allowed_domains() -> None:
+    from steward.config import HoldingProfilesConfig
+
+    config = HoldingProfilesConfig.model_validate(
+        {
+            "profiles": [
+                {
+                    "ticker": "ASMLa_EQ",
+                    "ir_url": "https://www.asml.com/en/investors",
+                    "results_urls": ["https://www.asml.com/en/investors/financial-results"],
+                    "extra_domains": ["globenewswire.com"],
+                    "fiscal_year_end_month": 12,
+                    "reporting_currency": "EUR",
+                    "exposures": [{"kind": "revenue_region", "name": "China", "share": 0.3}],
+                }
+            ]
+        }
+    )
+    profile = config.for_ticker("ASMLa_EQ")
+    assert profile is not None and profile.edgar_ticker() == "ASML"
+    assert profile.allowed_domains() == ["globenewswire.com", "www.asml.com"]
+    for bad in (
+        {"profiles": [{"ticker": "X_EQ"}, {"ticker": "X_EQ"}]},
+        {"profiles": [{"ticker": "X_EQ", "fiscal_year_end_month": 0}]},
+        {"profiles": [{"ticker": "X_EQ", "ir_url": "not a url"}]},
+        {"profiles": [{"ticker": "X_EQ", "extra_domains": ["https://x.com"]}]},
+        {"profiles": [{"ticker": "X_EQ", "sec_cik": "12ab"}]},
+    ):
+        with pytest.raises(ValidationError):
+            HoldingProfilesConfig.model_validate(bad)
+
+
+def test_verification_config_bands() -> None:
+    from steward.config import VerificationConfig
+
+    config = VerificationConfig(sanity_overrides={"net_income": None, "revenue": 0.8})
+    assert config.sanity_band("net_income") is None
+    assert config.sanity_band("revenue") == 0.8
+    assert config.sanity_band("gross_profit") == 0.5
+    with pytest.raises(ValidationError):
+        VerificationConfig(sanity_max_change_qoq=0)

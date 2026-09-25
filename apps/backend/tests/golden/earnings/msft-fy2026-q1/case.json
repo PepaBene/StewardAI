@@ -1,0 +1,252 @@
+{
+  "id": "msft-fy2026-q1",
+  "ticker": "MSFT_US_EQ",
+  "company": "Microsoft Corporation",
+  "cik": "0000789019",
+  "form": "8-K",
+  "source_url": "https://www.sec.gov/Archives/edgar/data/789019/000119312525256310/msft-ex99_1.htm",
+  "filing_index_url": "https://www.sec.gov/Archives/edgar/data/789019/000119312525256310/0001193125-25-256310-index.html",
+  "content_type": "text/html",
+  "document": "document.html.gz",
+  "report_date": "2025-10-29",
+  "fiscal_year_end_month": 6,
+  "reporting_currency": "USD",
+  "period": {
+    "fiscal_year": 2026,
+    "fiscal_period": "Q1",
+    "period_end": "2025-09-30"
+  },
+  "figures": [
+    {
+      "metric": "revenue",
+      "basis": "reported",
+      "fiscal_year": 2026,
+      "fiscal_period": "Q1",
+      "value_as_written": "77,673",
+      "value": 77673,
+      "scale": "millions",
+      "unit": "currency",
+      "currency": "USD",
+      "snippet": "Total revenue | 77,673 | 65,585",
+      "crosscheck": {
+        "source": "xbrl",
+        "tag": "RevenueFromContractWithCustomerExcludingAssessedTax",
+        "value": 77673000000,
+        "matches": true,
+        "period_end": "2025-09-30"
+      },
+      "unit_snippet": "(In millions, except per share amounts) (Unaudited)"
+    },
+    {
+      "metric": "revenue",
+      "basis": "reported",
+      "fiscal_year": 2025,
+      "fiscal_period": "Q1",
+      "value_as_written": "65,585",
+      "value": 65585,
+      "scale": "millions",
+      "unit": "currency",
+      "currency": "USD",
+      "snippet": "Total revenue | 77,673 | 65,585",
+      "crosscheck": {
+        "source": "xbrl",
+        "tag": "RevenueFromContractWithCustomerExcludingAssessedTax",
+        "value": 65585000000,
+        "matches": true,
+        "period_end": "2024-09-30"
+      },
+      "unit_snippet": "(In millions, except per share amounts) (Unaudited)"
+    },
+    {
+      "metric": "gross_profit",
+      "basis": "reported",
+      "fiscal_year": 2026,
+      "fiscal_period": "Q1",
+      "value_as_written": "53,630",
+      "value": 53630,
+      "scale": "millions",
+      "unit": "currency",
+      "currency": "USD",
+      "snippet": "Gross margin | 53,630 | 45,486",
+      "crosscheck": {
+        "source": "xbrl",
+        "tag": "GrossProfit",
+        "value": 53630000000,
+        "matches": true,
+        "period_end": "2025-09-30"
+      },
+      "unit_snippet": "(In millions, except per share amounts) (Unaudited)"
+    },
+    {
+      "metric": "gross_profit",
+      "basis": "reported",
+      "fiscal_year": 2025,
+      "fiscal_period": "Q1",
+      "value_as_written": "45,486",
+      "value": 45486,
+      "scale": "millions",
+      "unit": "currency",
+      "currency": "USD",
+      "snippet": "Gross margin | 53,630 | 45,486",
+      "crosscheck": {
+        "source": "xbrl",
+        "tag": "GrossProfit",
+        "value": 45486000000,
+        "matches": true,
+        "period_end": "2024-09-30"
+      },
+      "unit_snippet": "(In millions, except per share amounts) (Unaudited)"
+    },
+    {
+      "metric": "operating_income",
+      "basis": "reported",
+      "fiscal_year": 2026,
+      "fiscal_period": "Q1",
+      "value_as_written": "37,961",
+      "value": 37961,
+      "scale": "millions",
+      "unit": "currency",
+      "currency": "USD",
+      "snippet": "Operating income | 37,961 | 30,552",
+      "crosscheck": {
+        "source": "xbrl",
+        "tag": "OperatingIncomeLoss",
+        "value": 37961000000,
+        "matches": true,
+        "period_end": "2025-09-30"
+      },
+      "unit_snippet": "(In millions, except per share amounts) (Unaudited)"
+    },
+    {
+      "metric": "operating_income",
+      "basis": "reported",
+      "fiscal_year": 2025,
+      "fiscal_period": "Q1",
+      "value_as_written": "30,552",
+      "value": 30552,
+      "scale": "millions",
+      "unit": "currency",
+      "currency": "USD",
+      "snippet": "Operating income | 37,961 | 30,552",
+      "crosscheck": {
+        "source": "xbrl",
+        "tag": "OperatingIncomeLoss",
+        "value": 30552000000,
+        "matches": true,
+        "period_end": "2024-09-30"
+      },
+      "unit_snippet": "(In millions, except per share amounts) (Unaudited)"
+    },
+    {
+      "metric": "net_income",
+      "basis": "reported",
+      "fiscal_year": 2026,
+      "fiscal_period": "Q1",
+      "value_as_written": "27,747",
+      "value": 27747,
+      "scale": "millions",
+      "unit": "currency",
+      "currency": "USD",
+      "snippet": "Net income | $27,747 | $24,667",
+      "crosscheck": {
+        "source": "xbrl",
+        "tag": "NetIncomeLoss",
+        "value": 27747000000,
+        "matches": true,
+        "period_end": "2025-09-30"
+      },
+      "unit_snippet": "(In millions, except per share amounts) (Unaudited)"
+    },
+    {
+      "metric": "net_income",
+      "basis": "reported",
+      "fiscal_year": 2025,
+      "fiscal_period": "Q1",
+      "value_as_written": "24,667",
+      "value": 24667,
+      "scale": "millions",
+      "unit": "currency",
+      "currency": "USD",
+      "snippet": "Net income | $27,747 | $24,667",
+      "crosscheck": {
+        "source": "xbrl",
+        "tag": "NetIncomeLoss",
+        "value": 24667000000,
+        "matches": true,
+        "period_end": "2024-09-30"
+      },
+      "unit_snippet": "(In millions, except per share amounts) (Unaudited)"
+    },
+    {
+      "metric": "eps_diluted",
+      "basis": "reported",
+      "fiscal_year": 2026,
+      "fiscal_period": "Q1",
+      "value_as_written": "3.72",
+      "value": 3.72,
+      "scale": "units",
+      "unit": "per_share",
+      "currency": "USD",
+      "snippet": "Diluted | $3.72 | $3.30",
+      "crosscheck": {
+        "source": "xbrl",
+        "tag": "EarningsPerShareDiluted",
+        "value": 3.72,
+        "matches": true,
+        "period_end": "2025-09-30"
+      },
+      "unit_snippet": null
+    },
+    {
+      "metric": "eps_diluted",
+      "basis": "reported",
+      "fiscal_year": 2025,
+      "fiscal_period": "Q1",
+      "value_as_written": "3.30",
+      "value": 3.3,
+      "scale": "units",
+      "unit": "per_share",
+      "currency": "USD",
+      "snippet": "Diluted | $3.72 | $3.30",
+      "crosscheck": {
+        "source": "xbrl",
+        "tag": "EarningsPerShareDiluted",
+        "value": 3.3,
+        "matches": true,
+        "period_end": "2024-09-30"
+      },
+      "unit_snippet": null
+    },
+    {
+      "metric": "eps_diluted",
+      "basis": "adjusted",
+      "fiscal_year": 2026,
+      "fiscal_period": "Q1",
+      "value_as_written": "4.13",
+      "value": 4.13,
+      "scale": "units",
+      "unit": "per_share",
+      "currency": "USD",
+      "snippet": "2025 As Adjusted (non-GAAP) | $30,833 | $4.13",
+      "crosscheck": null,
+      "unit_snippet": null
+    },
+    {
+      "metric": "eps_diluted",
+      "basis": "adjusted",
+      "fiscal_year": 2025,
+      "fiscal_period": "Q1",
+      "value_as_written": "3.37",
+      "value": 3.37,
+      "scale": "units",
+      "unit": "per_share",
+      "currency": "USD",
+      "snippet": "2024 As Adjusted (non-GAAP) | $25,190 | $3.37",
+      "crosscheck": null,
+      "unit_snippet": null
+    }
+  ],
+  "absent_metrics": [],
+  "labelled_by": "claude (AI-read from the document; owner has not hand-checked)",
+  "notes": "Microsoft labels gross profit as 'Gross margin' in its income statement; that line is used for gross_profit. Adjusted EPS = Microsoft's non-GAAP EPS excluding the impact from investments in OpenAI (release's GAAP to non-GAAP table). XBRL crosscheck of reported figures: 10 match, 0 mismatch, 0 not checkable."
+}

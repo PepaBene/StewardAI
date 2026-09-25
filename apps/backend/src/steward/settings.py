@@ -51,6 +51,24 @@ class Settings(BaseSettings):
     t212_api_key: SecretStr | None = None
     t212_api_secret: SecretStr | None = None
 
+    # Claude API (extraction, report-date extraction). Read by the Anthropic SDK client.
+    anthropic_api_key: SecretStr | None = None
+    # Supabase Storage writes to the `evidence` bucket (secret or legacy service_role key).
+    supabase_secret_key: SecretStr | None = None
+    # SEC EDGAR asks for a descriptive User-Agent with a contact address.
+    sec_user_agent: str | None = None
+    # Finnhub free tier: US earnings calendar.
+    finnhub_api_key: SecretStr | None = None
+
+    # Notifications: Telegram Bot API and email through Resend (HTTP API).
+    telegram_bot_token: SecretStr | None = None
+    telegram_chat_id: str | None = None
+    resend_api_key: SecretStr | None = None
+    alert_email_from: str | None = None
+    alert_email_to: str | None = None
+    # Public URL of the web app, for links in alerts and digests.
+    app_url: str | None = None
+
     @field_validator("cors_origins", mode="before")
     @classmethod
     def _split_origins(cls, value: object) -> object:
@@ -79,6 +97,11 @@ class Settings(BaseSettings):
             self.supabase_jwt_secret,
             self.t212_api_key,
             self.t212_api_secret,
+            self.anthropic_api_key,
+            self.supabase_secret_key,
+            self.finnhub_api_key,
+            self.telegram_bot_token,
+            self.resend_api_key,
         ]
         return [s.get_secret_value() for s in secrets if s is not None and s.get_secret_value()]
 

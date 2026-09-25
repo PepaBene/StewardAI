@@ -5,13 +5,16 @@ description = "StewardAI backend: FastAPI API and worker (scheduler + queue cons
 readme = "README.md"
 requires-python = ">=3.12,<3.13"
 dependencies = [
+    "anthropic>=1.8.0",
     "apscheduler>=3.11,<4",
     "asyncpg>=0.31.0",
     "fastapi>=0.141.1",
+    "feedparser>=6.0.14",
     "httpx>=0.28.1",
     "pydantic>=2.13.5",
     "pydantic-settings>=2.15.0",
     "pyjwt[crypto]>=2.15.0",
+    "pypdf>=6.19.0",
     "uvicorn[standard]>=0.54.0",
 ]
 
@@ -58,5 +61,5 @@ packages = ["steward", "api", "worker"]
 plugins = ["pydantic.mypy"]
 
 [[tool.mypy.overrides]]
-module = ["asyncpg", "asyncpg.*", "apscheduler", "apscheduler.*"]
+module = ["asyncpg", "asyncpg.*", "apscheduler", "apscheduler.*", "feedparser"]
 ignore_missing_imports = true

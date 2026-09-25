@@ -1,9 +1,11 @@
 """Running a job: one `job` row, a `job_step` row per step, one run per job type at a time.
 
-Serialisation uses a Postgres advisory lock keyed by job type, held on a dedicated
-connection for the whole run. A second run of the same type waits (status `waiting`)
-until the first releases it; it never runs alongside it. The lock lives in Postgres, so
-this holds across processes too (worker and a second worker, scheduler and queue).
+Serialisation uses a Postgres advisory lock keyed by job type (and by ticker for runs
+about one holding, so an earnings check of one company never waits for another's), held
+on a dedicated connection for the whole run. A second run with the same key waits
+(status `waiting`) until the first releases it; it never runs alongside it. The lock lives
+in Postgres, so this holds across processes too (worker and a second worker, scheduler and
+queue).
 
 Steps are written through the pool, autocommitted, so the frontend sees each step start
 and finish through Realtime while the job is still running.
@@ -36,8 +38,20 @@ class JobFailed(Exception):
 
 
 @dataclass
+class StepUsage:
+    """Model usage of one step (AI steps only), stored on its `job_step` row."""
+
+    model: str
+    input_tokens: int = 0
+    output_tokens: int = 0
+    searches: int = 0
+    cost_usd: float | None = None
+
+
+@dataclass
 class StepHandle:
     detail: dict[str, Any] = field(default_factory=dict)
+    usage: StepUsage | None = None
 
 
 @dataclass
@@ -46,6 +60,7 @@ class JobContext:
     job_id: int
     job_type: str
     trigger: JobTrigger
+    params: dict[str, Any] = field(default_factory=dict)
     _next_step: int = 0
     config_version_ids: list[int] = field(default_factory=list)
 
@@ -68,19 +83,27 @@ class JobContext:
         try:
             yield handle
         except BaseException as exc:
-            await self.pool.execute(
-                "update public.job_step set status = 'failed', finished_at = clock_timestamp(),"
-                " detail = $2::jsonb, error = $3 where id = $1",
-                step_id,
-                _json(handle.detail),
-                _error_text(exc),
-            )
+            await self._finish_step(step_id, "failed", handle, _error_text(exc))
             raise
+        await self._finish_step(step_id, "succeeded", handle, None)
+
+    async def _finish_step(
+        self, step_id: int, status: str, handle: StepHandle, error: str | None
+    ) -> None:
+        usage = handle.usage
         await self.pool.execute(
-            "update public.job_step set status = 'succeeded', finished_at = clock_timestamp(),"
-            " detail = $2::jsonb where id = $1",
+            "update public.job_step set status = $2, finished_at = clock_timestamp(),"
+            " detail = $3::jsonb, error = $4, model = $5, input_tokens = $6,"
+            " output_tokens = $7, searches = $8, cost_usd = $9 where id = $1",
             step_id,
+            status,
             _json(handle.detail),
+            error,
+            usage.model if usage else None,
+            usage.input_tokens if usage else None,
+            usage.output_tokens if usage else None,
+            usage.searches if usage else None,
+            usage.cost_usd if usage else None,
         )
 
     async def record_config_version(self, version_id: int | None) -> None:
@@ -102,15 +125,23 @@ async def create_job(
     job_type: str,
     trigger: JobTrigger,
     requested_by: str | None = None,
+    params: dict[str, Any] | None = None,
 ) -> int:
     job_id: int = await conn.fetchval(
-        "insert into public.job (job_type, trigger, requested_by) values ($1, $2, $3::uuid)"
-        " returning id",
+        "insert into public.job (job_type, trigger, requested_by, params)"
+        " values ($1, $2, $3::uuid, $4::jsonb) returning id",
         job_type,
         trigger,
         requested_by,
+        json.dumps(params or {}, default=str),
     )
     return job_id
+
+
+def lock_key(job_type: str, params: dict[str, Any]) -> str:
+    """Runs of one job type about one ticker exclude each other; different tickers don't."""
+    ticker = params.get("ticker")
+    return f"{job_type}:{ticker}" if isinstance(ticker, str) and ticker else job_type
 
 
 async def run_job(
@@ -120,13 +151,21 @@ async def run_job(
     *,
     trigger: JobTrigger,
     job_id: int | None = None,
+    params: dict[str, Any] | None = None,
     lock_timeout: dt.timedelta = DEFAULT_LOCK_TIMEOUT,
 ) -> Literal["succeeded", "failed"]:
-    """Run `handler` as job `job_id` (created here if None). Never raises for a job failure:
-    the failure is recorded on the job and its step, and "failed" is returned."""
+    """Run `handler` as job `job_id` (created here with `params` if None; an existing job's
+    params are read from its row). Never raises for a job failure: the failure is recorded
+    on the job and its step, and "failed" is returned."""
     if job_id is None:
-        job_id = await create_job(pool, job_type, trigger)
-    ctx = JobContext(pool=pool, job_id=job_id, job_type=job_type, trigger=trigger)
+        job_id = await create_job(pool, job_type, trigger, params=params)
+    else:
+        stored = await pool.fetchval("select params from public.job where id = $1", job_id)
+        params = json.loads(stored) if stored else {}
+    ctx = JobContext(
+        pool=pool, job_id=job_id, job_type=job_type, trigger=trigger, params=params or {}
+    )
+    key = lock_key(job_type, ctx.params)
 
     async with pool.acquire() as lock_conn:
         await pool.execute("update public.job set status = 'waiting' where id = $1", job_id)
@@ -134,7 +173,7 @@ async def run_job(
             await lock_conn.execute(
                 "select pg_advisory_lock($1, hashtext($2))",
                 LOCK_NAMESPACE,
-                job_type,
+                key,
                 timeout=lock_timeout.total_seconds(),
             )
         except TimeoutError:
@@ -161,7 +200,7 @@ async def run_job(
             return "succeeded"
         finally:
             await lock_conn.execute(
-                "select pg_advisory_unlock($1, hashtext($2))", LOCK_NAMESPACE, job_type
+                "select pg_advisory_unlock($1, hashtext($2))", LOCK_NAMESPACE, key
             )
 
 

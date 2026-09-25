@@ -1,6 +1,7 @@
 "use client";
 
 import { ArrowDownIcon, ArrowUpDownIcon, ArrowUpIcon, LoaderCircleIcon, RefreshCwIcon } from "lucide-react";
+import Link from "next/link";
 import { useMemo, useState } from "react";
 
 import { AlertMessage } from "@/components/alert-message";
@@ -39,7 +40,9 @@ export function HoldingsView() {
       <div className="flex flex-wrap items-end justify-between gap-2">
         <div>
           <h1 className="text-2xl font-semibold tracking-tight">Holdings</h1>
-          <p className="mt-1 text-sm text-text-muted">Every open Trading212 position.</p>
+          <p className="mt-1 text-sm text-text-muted">
+            Every open Trading212 position. Open one for its thesis, verdicts and evidence.
+          </p>
         </div>
         {state.kind === "ok" && state.data.freshness ? (
           <FreshnessLabel
@@ -153,8 +156,15 @@ function HoldingsTable({ data }: { data: HoldingsResponse }) {
             return (
               <tr key={h.ticker} className="border-b border-border last:border-0">
                 <th scope="row" className="px-3 py-2 text-left font-normal">
-                  <span className="block font-medium text-text">{h.name ?? h.ticker}</span>
-                  <span className="block font-mono text-xs text-text-muted">{h.ticker}</span>
+                  <Link
+                    href={`/holdings/${encodeURIComponent(h.ticker)}`}
+                    className="group block rounded-sm"
+                  >
+                    <span className="block font-medium text-text group-hover:text-accent group-hover:underline">
+                      {h.name ?? h.ticker}
+                    </span>
+                    <span className="block font-mono text-xs text-text-muted">{h.ticker}</span>
+                  </Link>
                 </th>
                 <td className="num px-3 py-2 text-right">{formatQuantity(h.quantity)}</td>
                 <td className="num px-3 py-2 text-right text-text-muted">
