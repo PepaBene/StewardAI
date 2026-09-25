@@ -1,10 +1,10 @@
 "use client";
 
 import { LoaderCircleIcon, PlusIcon, Trash2Icon } from "lucide-react";
-import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 
 import { AlertMessage } from "@/components/alert-message";
+import { ConfigHeader } from "@/components/config/config-header";
 import { SaveBar } from "@/components/config/save-bar";
 import { SelectField, TextAreaField, TextField } from "@/components/config/fields";
 import { EmptyState } from "@/components/empty-state";
@@ -80,21 +80,14 @@ export function ProfilesEditor() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <p className="text-sm text-text-muted">
-          <Link href="/config" className="hover:text-text hover:underline">
-            Config
-          </Link>{" "}
-          / Holding profiles
-        </p>
-        <h1 className="text-2xl font-semibold tracking-tight">Holding profiles</h1>
-        <p className="mt-1 max-w-prose text-sm text-text-muted">
+      <ConfigHeader title="Holding profiles" domain="holding-profiles">
+        <p>
           Where each company publishes and how its fiscal year runs. The earnings check looks for
           releases on EDGAR (US 8-K, foreign 6-K) and otherwise searches only the domains listed
           here; the fiscal year end maps &ldquo;Q3&rdquo; to calendar months. Names, competitors and
           topics feed the news pipeline.
         </p>
-      </div>
+      </ConfigHeader>
 
       {editor.status.kind === "loading" ? (
         <p className="flex items-center gap-2 text-sm text-text-muted" role="status">

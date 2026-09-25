@@ -1,3 +1,4 @@
+import { CONFIG_DOMAINS, DOMAIN_SLUGS, historyHref } from "@/lib/config/domains";
 import { SECTIONS, sectionHref } from "@/lib/nav";
 
 /*
@@ -23,11 +24,19 @@ export type PaletteCommand = {
 };
 
 export const CONFIG_PAGES = [
+  { href: "/config/strategy", label: "Strategy", keywords: "targets allocation bands rules categories classifications currency drift" },
+  { href: "/config/jobs", label: "Jobs", keywords: "schedules cron timezone models step caps worker" },
   { href: "/config/theses", label: "Theses", keywords: "kpi thresholds exit" },
   { href: "/config/holding-profiles", label: "Holding profiles", keywords: "ir aliases competitors fiscal" },
   { href: "/config/news-sources", label: "News sources", keywords: "feeds rss tiers outlets" },
   { href: "/config/event-rules", label: "Event rules", keywords: "severity taxonomy" },
   { href: "/config/notifications", label: "Notifications", keywords: "alerts telegram email quiet hours channels" },
+] as const;
+
+/** Pages that are not a section or a config editor. */
+export const OTHER_PAGES = [
+  { href: "/transactions", label: "Transactions and dividends", keywords: "orders dividends cash deposits withdrawals history holdings" },
+  { href: "/config", label: "Config: Export or import", keywords: "backup json file git" },
 ] as const;
 
 export function baseCommands(): PaletteCommand[] {
@@ -45,6 +54,20 @@ export function baseCommands(): PaletteCommand[] {
       group: "Go to" as const,
       keywords: p.keywords,
       href: p.href,
+    })),
+    ...OTHER_PAGES.map((p) => ({
+      id: `nav:${p.href}`,
+      label: p.label,
+      group: "Go to" as const,
+      keywords: p.keywords,
+      href: p.href,
+    })),
+    ...DOMAIN_SLUGS.map((slug) => ({
+      id: `nav:${historyHref(slug)}`,
+      label: `History: ${CONFIG_DOMAINS[slug].label}`,
+      group: "Go to" as const,
+      keywords: "config versions diff rollback undo",
+      href: historyHref(slug),
     })),
     { id: "act:sync", label: "Sync portfolio now", group: "Actions", keywords: "trading212 refresh", action: { kind: "portfolio-sync" } },
     { id: "act:news", label: "Check news now", group: "Actions", keywords: "ingest feeds run", action: { kind: "news-ingest" } },

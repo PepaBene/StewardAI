@@ -1,10 +1,10 @@
 "use client";
 
 import { ArrowDownIcon, ArrowUpIcon, BellRingIcon, LoaderCircleIcon, PlusIcon, Trash2Icon } from "lucide-react";
-import Link from "next/link";
 import { useMemo, useState } from "react";
 
 import { AlertMessage } from "@/components/alert-message";
+import { ConfigHeader } from "@/components/config/config-header";
 import { CheckboxField, CheckboxGroup, SelectField, TextAreaField, TextField } from "@/components/config/fields";
 import { SaveBar } from "@/components/config/save-bar";
 import { Button } from "@/components/ui/button";
@@ -69,20 +69,13 @@ export function NotificationsEditor() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <p className="text-sm text-text-muted">
-          <Link href="/config" className="hover:text-text hover:underline">
-            Config
-          </Link>{" "}
-          / Notifications
-        </p>
-        <h1 className="text-2xl font-semibold tracking-tight">Notifications</h1>
-        <p className="mt-1 max-w-prose text-sm text-text-muted">
+      <ConfigHeader title="Notifications" domain="notifications">
+        <p>
           Which confirmed events reach you right away, on which channel. Rules are checked top to
           bottom and the first match decides; anything no rule matches waits for the digest. Rumours
           and unconfirmed stories never alert. Changes apply to the next alert, no restart.
         </p>
-      </div>
+      </ConfigHeader>
 
       {editor.status.kind === "loading" ? (
         <p className="flex items-center gap-2 text-sm text-text-muted" role="status">

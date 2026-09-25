@@ -84,6 +84,23 @@ export function formatDate(date: Date | string, locale?: Locale) {
   return d.toLocaleDateString(locale, { day: "numeric", month: "short", year: "numeric" });
 }
 
+/** "25 Sep 2026, 14:05". */
+export function formatDateTime(
+  date: Date | string,
+  { locale, timeZone }: { locale?: Locale; timeZone?: string } = {},
+) {
+  const d = typeof date === "string" ? new Date(date) : date;
+  if (Number.isNaN(d.getTime())) return EM_DASH;
+  return d.toLocaleString(locale, {
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+    timeZone,
+  });
+}
+
 /** "just now", "4 min ago", "3 h ago", "2 days ago". */
 export function formatRelative(date: Date, now: Date = new Date()) {
   const seconds = Math.round((now.getTime() - date.getTime()) / 1000);

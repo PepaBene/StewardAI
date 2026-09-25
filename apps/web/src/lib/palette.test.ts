@@ -1,8 +1,9 @@
 import { describe, expect, it } from "vitest";
 
+import { DOMAIN_SLUGS, historyHref } from "@/lib/config/domains";
 import { SECTIONS } from "@/lib/nav";
 
-import { baseCommands, CONFIG_PAGES, filterCommands, holdingCommands } from "./palette";
+import { baseCommands, CONFIG_PAGES, filterCommands, holdingCommands, OTHER_PAGES } from "./palette";
 
 const commands = [...baseCommands(), ...holdingCommands([{ ticker: "AAPL_US_EQ", name: "Apple" }])];
 
@@ -11,6 +12,15 @@ describe("command palette", () => {
     const hrefs = new Set(commands.map((c) => c.href).filter(Boolean));
     for (const s of SECTIONS) expect(hrefs).toContain(`/${s.slug}`);
     for (const p of CONFIG_PAGES) expect(hrefs).toContain(p.href);
+    for (const p of OTHER_PAGES) expect(hrefs).toContain(p.href);
+    for (const slug of DOMAIN_SLUGS) expect(hrefs).toContain(historyHref(slug));
+    for (const href of ["/config/strategy", "/config/jobs", "/transactions"]) expect(hrefs).toContain(href);
+  });
+
+  it("finds the new pages by typing", () => {
+    expect(filterCommands(commands, "dividends")[0].href).toBe("/transactions");
+    expect(filterCommands(commands, "history strategy")[0].href).toBe("/config/history/strategy");
+    expect(filterCommands(commands, "cron").map((c) => c.href)).toContain("/config/jobs");
   });
 
   it("finds the re-run earnings check action by typing", () => {

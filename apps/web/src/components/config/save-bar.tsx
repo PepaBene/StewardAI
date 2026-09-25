@@ -17,8 +17,11 @@ export function SaveBar({
   message,
   onValidate,
   onSave,
+  blocked = false,
 }: {
   dirty: boolean;
+  /** Problems found before sending (shown in `errors`): Save stays disabled. */
+  blocked?: boolean;
   busy: "saving" | "validating" | null;
   errors: FieldErrors;
   message: string | null;
@@ -55,7 +58,7 @@ export function SaveBar({
             onSave(note.trim() || null);
             setNote("");
           }}
-          disabled={busy !== null || !dirty}
+          disabled={busy !== null || !dirty || blocked}
         >
           {busy === "saving" ? <LoaderCircleIcon aria-hidden="true" className="animate-spin" /> : <SaveIcon aria-hidden="true" />}
           Save new version

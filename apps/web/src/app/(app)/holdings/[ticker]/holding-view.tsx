@@ -621,11 +621,21 @@ function ReviewButtons({
 }) {
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  async function review(action: "verify" | "reject") {
+  const [reason, setReason] = useState("");
+  const reasonId = `review-reason-${fact.id}`;
+  async function review(action: "accept" | "reject") {
+    // The API logs every decision with the owner's reason; it is required.
+    if (!reason.trim()) {
+      setError("Give a reason first.");
+      return;
+    }
     setPending(true);
     setError(null);
     const result = await getBrowserApiClient()
-      .POST("/facts/{fact_id}/review", { params: { path: { fact_id: fact.id } }, body: { action } })
+      .POST("/facts/{fact_id}/review", {
+        params: { path: { fact_id: fact.id } },
+        body: { action, reason: reason.trim() },
+      })
       .catch((err: unknown) => ({ data: undefined, error: err, response: { status: 0 } as Response }));
     setPending(false);
     if (result.data) onQueued(result.data.verdict_job);
@@ -634,7 +644,18 @@ function ReviewButtons({
   }
   return (
     <div className="mt-1 flex flex-wrap items-center gap-1">
-      <Button size="sm" variant="outline" disabled={pending} onClick={() => void review("verify")}>
+      <Label htmlFor={reasonId} className="sr-only">
+        Reason for the decision
+      </Label>
+      <Input
+        id={reasonId}
+        value={reason}
+        maxLength={500}
+        placeholder="Reason"
+        onChange={(e) => setReason(e.target.value)}
+        className="h-8 w-40"
+      />
+      <Button size="sm" variant="outline" disabled={pending} onClick={() => void review("accept")}>
         Accept
       </Button>
       <Button size="sm" variant="ghost" disabled={pending} onClick={() => void review("reject")}>

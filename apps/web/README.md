@@ -46,16 +46,21 @@ to `http://localhost:3000`.
 | Route | What it shows |
 | --- | --- |
 | `/` | Overview: value, allocation, drift, freshness |
-| `/holdings` | Every open position; each row opens its holding page |
+| `/holdings` | Every open position; each row opens its holding page. A tab switches to the transactions view. |
+| `/transactions` | Orders, dividends and cash movements, filterable by type, ticker and period (filters live in the URL), with **Load more** paging that never repeats a row. The dividend total per currency and the totals per type, subtype and currency are computed by the API over every matching row, not the loaded page. Part of the Holdings section. |
 | `/holdings/[ticker]` | Position, thesis, KPI verdicts (open a row for the rationale, the facts behind it, their snippets and evidence links, and the KPI's history), every extracted figure with its confidence badge, and Accept / Reject for figures the validator held. Runs an earnings check or re-runs verdicts. |
 | `/evidence/[factId]` | One fact: the quoted snippet, the archived text around it, the original URL and a signed link to the archived copy |
 | `/news` | News feed grouped by story, filterable by holding, severity, confidence and source tier (filters live in the URL); each story shows its copies, why it is (un)confirmed and its corroborating links |
 | `/reports`, `/reports/[id]` | Daily and weekly digests; each sentence carries numbered citations linking to its news items (with a source-card sidebar showing tier) or to `/evidence/[factId]` |
 | `/config/news-sources`, `/config/event-rules`, `/config/notifications` | Source registry and outlet tiers; severity per event type and overrides; notification rules, quiet hours, cap and a **Send test alert** panel |
+| `/config` | Every config domain with its editor and history, and **Export** (every domain's active version as one JSON file) / **Import** (validated domain by domain; any error rejects the whole file, and every error is listed by domain and field) |
+| `/config/strategy` | Base currency, FX source, weight basis, goals, horizon, notes, categories and a ticker × dimension classification table, cash / position / category targets with bands and hard limits, and rules (position weight, category weight, cash weight, position count). Weights are typed as percentages and stored as exact fractions. Position + cash targets, and each dimension's category targets, above 100 % are flagged on the fields and block Save. Drift on the Overview uses the saved version at once. |
+| `/config/jobs` | Every schedule the backend's `JobsConfig` has (enabled, 5-field cron with a plain-English reading, time zone) and the models and caps of the earnings check, earnings calendar, news pipeline and digests. The worker picks up a saved schedule within 5 minutes. |
+| `/config/history`, `/config/history/[domain]` | Version history for every config domain (strategy, theses, jobs, holding-profiles, verification, news-sources, event-rules, notifications, budget): diff any two versions (default: the selected one against its parent), read a version's JSON, and roll back after a confirm step (a new active version with the old body; a body the current schema rejects is refused with its errors). Every editor links here from its header. |
 | `/config/theses`, `/config/holding-profiles` | Editors for those config domains. Form state converts to the generated `ThesesConfig` / `HoldingProfilesConfig` types; the backend's Pydantic model validates, and its 422 errors are shown next to each field. Saving theses queues a verdict run, so a changed threshold shows up at once. |
 
 The **command palette** (Cmd/Ctrl+K, or Search in the header) reaches every section, config
-editor and holding, and runs checks (sync, news check, digests, verdicts, an earnings check per
+editor, config history, the transactions view and every holding, and runs checks (sync, news check, digests, verdicts, an earnings check per
 holding) from the keyboard.
 
 Confidence badges (`components/evidence/confidence-badge.tsx`) use the four labels of the
@@ -71,7 +76,7 @@ palette. Pass and breach use gain and loss; unknown is dashed and neutral.
 | `npm run lint` | ESLint (flat config, `eslint-config-next`), then `lint:colors`. |
 | `npm run lint:colors` | Fails on any colour literal or Tailwind palette class in `src/` outside `src/app/tokens.css`. |
 | `npm run typecheck` | `next typegen` (route types for `PageProps`/`LayoutProps`), then `tsc --noEmit`. |
-| `npm test` | Vitest. Covers the auth/MFA decision logic, the typed API client and the colour rule. |
+| `npm test` | Vitest. Covers the auth/MFA decision logic, the typed API client, the colour rule, the pure form <-> body conversions of the config editors (the strategy and jobs forms round-trip a fully populated body without loss), cron readings, history and import helpers, and the transaction filters. |
 | `npm run gen:api` | Regenerates `src/lib/api/schema.d.ts` from `../backend/openapi.json`. |
 
 ## Auth and MFA enforcement

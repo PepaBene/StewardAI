@@ -20,3 +20,13 @@ export const PLACEHOLDER_SECTIONS = SECTIONS.filter((s) => !BUILT_SLUGS.includes
 export function sectionHref(section: Pick<Section, "slug">) {
   return `/${section.slug}`;
 }
+
+/** Pages outside a section's own path that belong to it (highlighted as that section). */
+export const SECTION_ALIASES: Record<string, readonly string[]> = {
+  "/holdings": ["/transactions"],
+};
+
+export function isSectionActive(href: string, pathname: string): boolean {
+  if (href === "/") return pathname === "/";
+  return [href, ...(SECTION_ALIASES[href] ?? [])].some((p) => pathname === p || pathname.startsWith(`${p}/`));
+}

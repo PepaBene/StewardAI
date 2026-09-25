@@ -1,10 +1,10 @@
 "use client";
 
 import { LoaderCircleIcon, PlusIcon, Trash2Icon } from "lucide-react";
-import Link from "next/link";
 import { useMemo, useState } from "react";
 
 import { AlertMessage } from "@/components/alert-message";
+import { ConfigHeader } from "@/components/config/config-header";
 import { CheckboxGroup, SelectField, TextField } from "@/components/config/fields";
 import { SaveBar } from "@/components/config/save-bar";
 import { Button } from "@/components/ui/button";
@@ -49,20 +49,13 @@ export function EventRulesEditor() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <p className="text-sm text-text-muted">
-          <Link href="/config" className="hover:text-text hover:underline">
-            Config
-          </Link>{" "}
-          / Event rules
-        </p>
-        <h1 className="text-2xl font-semibold tracking-tight">Event rules</h1>
-        <p className="mt-1 max-w-prose text-sm text-text-muted">
+      <ConfigHeader title="Event rules" domain="event-rules">
+        <p>
           How much each kind of event matters. 0 is ignored, 1 goes in the digest, 2 is a digest
           highlight linked to the thesis, 3 is an instant alert once confirmed. The classifier only
           labels the event type; the severity always comes from here.
         </p>
-      </div>
+      </ConfigHeader>
       {editor.status.kind === "loading" ? (
         <p className="flex items-center gap-2 text-sm text-text-muted" role="status">
           <LoaderCircleIcon aria-hidden="true" className="size-4 animate-spin" />

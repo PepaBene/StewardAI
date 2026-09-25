@@ -53,6 +53,21 @@ export type NotificationRule = Schemas["NotificationRule"];
 export type NewsSourcesConfig = Schemas["NewsSourcesConfig"];
 export type NewsSource = Schemas["NewsSource"];
 export type EventRulesConfig = Schemas["EventRulesConfig"];
+export type StrategyConfig = Schemas["StrategyConfig"];
+export type StrategyRule = NonNullable<StrategyConfig["rules"]>[number];
+export type JobsConfig = Schemas["JobsConfig"];
+export type JobSchedule = Schemas["JobSchedule"];
+export type ConfigDomainSlug = paths["/config/{domain}/versions"]["get"]["parameters"]["path"]["domain"];
+export type ConfigVersionMeta = Schemas["ConfigVersionMeta"];
+export type ConfigVersionBody = Schemas["ConfigVersionBody"];
+export type ConfigDiff = Schemas["ConfigDiff"];
+export type DiffChange = Schemas["DiffChange"];
+export type ConfigExport = Schemas["ConfigExport"];
+export type ImportResult = Schemas["ImportResult"];
+export type TransactionOut = Schemas["TransactionOut"];
+export type TransactionType = TransactionOut["type"];
+export type TransactionsPage = Schemas["TransactionsPage"];
+export type TotalByCurrency = Schemas["TotalByCurrency"];
 
 export type AccessTokenGetter = () => Promise<string | null | undefined>;
 

@@ -1,10 +1,10 @@
 "use client";
 
 import { LoaderCircleIcon, PlusIcon, Trash2Icon } from "lucide-react";
-import Link from "next/link";
 import { useMemo, useState } from "react";
 
 import { AlertMessage } from "@/components/alert-message";
+import { ConfigHeader } from "@/components/config/config-header";
 import { CheckboxField, SelectField, TextAreaField, TextField } from "@/components/config/fields";
 import { SaveBar } from "@/components/config/save-bar";
 import { Button } from "@/components/ui/button";
@@ -68,20 +68,13 @@ export function SourcesEditor() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <p className="text-sm text-text-muted">
-          <Link href="/config" className="hover:text-text hover:underline">
-            Config
-          </Link>{" "}
-          / News sources
-        </p>
-        <h1 className="text-2xl font-semibold tracking-tight">News sources</h1>
-        <p className="mt-1 max-w-prose text-sm text-text-muted">
+      <ConfigHeader title="News sources" domain="news-sources">
+        <p>
           The feeds the news check reads and how far each outlet is trusted. A source added here is
           read on the next run. Tier 1 (the company, regulators, official newswires) confirms a
           story alone; tier 2 needs a second independent outlet; tier 3 is sentiment only.
         </p>
-      </div>
+      </ConfigHeader>
       {editor.status.kind === "loading" ? (
         <p className="flex items-center gap-2 text-sm text-text-muted" role="status">
           <LoaderCircleIcon aria-hidden="true" className="size-4 animate-spin" />

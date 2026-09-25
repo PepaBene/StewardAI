@@ -1,10 +1,10 @@
 "use client";
 
 import { LoaderCircleIcon, PlusIcon, Trash2Icon } from "lucide-react";
-import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 
 import { AlertMessage } from "@/components/alert-message";
+import { ConfigHeader } from "@/components/config/config-header";
 import { SaveBar } from "@/components/config/save-bar";
 import { SelectField, TextAreaField, TextField } from "@/components/config/fields";
 import { EmptyState } from "@/components/empty-state";
@@ -90,21 +90,14 @@ export function ThesesEditor() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <p className="text-sm text-text-muted">
-          <Link href="/config" className="hover:text-text hover:underline">
-            Config
-          </Link>{" "}
-          / Theses
-        </p>
-        <h1 className="text-2xl font-semibold tracking-tight">Theses</h1>
-        <p className="mt-1 max-w-prose text-sm text-text-muted">
+      <ConfigHeader title="Theses" domain="theses">
+        <p>
           Why you own each holding, and the KPIs that must hold. Thresholds are absolute: the
           earnings check extracts the figures from the company&rsquo;s release and judges each KPI
           pass, breach or unknown. Saving creates a new version; earlier verdicts stay tied to the
           version they were judged under.
         </p>
-      </div>
+      </ConfigHeader>
 
       {editor.status.kind === "loading" ? (
         <p className="flex items-center gap-2 text-sm text-text-muted" role="status">

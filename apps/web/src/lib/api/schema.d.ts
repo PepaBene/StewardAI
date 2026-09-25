@@ -333,6 +333,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/jobs/fact-reconcile": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Run Fact Reconcile
+         * @description Check stored results figures against the issuers' 10-Q/10-K XBRL now.
+         */
+        post: operations["run_fact_reconcile"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/jobs/earnings-calendar": {
         parameters: {
             query?: never;
@@ -347,6 +367,27 @@ export interface paths {
          * @description Refresh every holding's next report date now.
          */
         post: operations["run_earnings_calendar"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/theses/board": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Thesis Board
+         * @description Every holding with a thesis, once: each KPI's current pass / breach / unknown with the
+         *     verdict behind it. A KPI never judged is listed as unknown, never left out.
+         */
+        get: operations["get_thesis_board"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -406,10 +447,32 @@ export interface paths {
         put?: never;
         /**
          * Review Fact
-         * @description Release or reject a fact the validator held for review (sanity bound, restatement,
-         *     currency). Verdicts for the holding are re-run afterwards.
+         * @description Decide on a fact: accept a held or quarantined one, correct any fact (the owner's
+         *     value is stored as a new fact that wins), or reject it. The decision and its reason are
+         *     logged, and the holding's verdicts are re-judged by the worker.
          */
         post: operations["review_fact"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/facts/review-queue": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Review Queue
+         * @description Facts waiting for the owner: held by the validator or quarantined by reconciliation,
+         *     each with its snippet, source, the checks it broke and the reconciliation behind it.
+         */
+        get: operations["get_review_queue"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -1001,6 +1064,55 @@ export interface components {
             /** Invested */
             invested: number;
         };
+        /** BoardKpi */
+        BoardKpi: {
+            kpi: components["schemas"]["ThesisKPI"];
+            /**
+             * Status
+             * @description The current verdict's status; unknown when there is none yet.
+             * @enum {string}
+             */
+            status: "pass" | "breach" | "unknown";
+            /** @description Null: never judged (shown as unknown). */
+            verdict: components["schemas"]["VerdictOut"] | null;
+        };
+        /** BoardRow */
+        BoardRow: {
+            /** Ticker */
+            ticker: string;
+            /** Name */
+            name: string | null;
+            /** Why Owned */
+            why_owned: string;
+            /** Review Date */
+            review_date: string | null;
+            /** Review Overdue */
+            review_overdue: boolean;
+            /**
+             * Held
+             * @description In the latest portfolio snapshot.
+             */
+            held: boolean;
+            /** Weight */
+            weight: number | null;
+            /**
+             * Overall
+             * @description breach if any KPI breaches, else unknown if any is unknown, else pass.
+             * @enum {string}
+             */
+            overall: "breach" | "unknown" | "pass" | "no_kpis";
+            /** Counts */
+            counts: {
+                [key: string]: number;
+            };
+            /** Kpis */
+            kpis: components["schemas"]["BoardKpi"][];
+            /**
+             * Open Review Items
+             * @description Held or quarantined facts for this holding.
+             */
+            open_review_items: number;
+        };
         /** BucketDrift */
         BucketDrift: {
             /** Bucket */
@@ -1509,6 +1621,12 @@ export interface components {
              * @default 120
              */
             lookahead_days: number;
+            /**
+             * Refresh Within Days
+             * @description The weekly run refreshes holdings reporting within this many days (and those with no date); the quarterly run refreshes every holding.
+             * @default 14
+             */
+            refresh_within_days: number;
         };
         /** EarningsCheckRequest */
         EarningsCheckRequest: {
@@ -1813,6 +1931,12 @@ export interface components {
             /** Reviewed At */
             reviewed_at: string | null;
             /**
+             * Origin
+             * @description owner: a correction the owner entered; it wins over the extracted value.
+             * @enum {string}
+             */
+            origin: "extraction" | "owner";
+            /**
              * Confidence
              * @enum {string}
              */
@@ -1824,9 +1948,17 @@ export interface components {
              * Action
              * @enum {string}
              */
-            action: "verify" | "reject";
-            /** Note */
-            note?: string | null;
+            action: "accept" | "correct" | "reject";
+            /**
+             * Reason
+             * @description Logged with the decision.
+             */
+            reason: string;
+            /**
+             * Value
+             * @description For `correct`: the right value, in the fact's printed scale (the same scale as `value`, e.g. millions).
+             */
+            value?: number | string | null;
         };
         /** FactReviewResult */
         FactReviewResult: {
@@ -1837,7 +1969,16 @@ export interface components {
              * @enum {string}
              */
             status: "verified" | "rejected";
+            /** Corrected Fact Id */
+            corrected_fact_id: number | null;
             verdict_job: components["schemas"]["JobSummary"];
+        };
+        /** FailedCheck */
+        FailedCheck: {
+            /** Check */
+            check: string;
+            /** Detail */
+            detail: string;
         };
         /** Freshness */
         Freshness: {
@@ -2175,10 +2316,14 @@ export interface components {
             schema_version: 1;
             /** @description Trading212 sync, FX rates and drift. Default: daily at 22:30 Prague time. */
             portfolio_sync?: components["schemas"]["JobSchedule"];
-            /** @description Refresh every holding's next report date. Default: Sundays 06:00. */
+            /** @description Refresh the report date of holdings reporting soon (see earnings_calendar_settings.refresh_within_days). Default: Sundays 06:00. */
             earnings_calendar?: components["schemas"]["JobSchedule"];
+            /** @description Refresh every holding's report date from its IR calendar. Default: quarterly, 1 Jan/Apr/Jul/Oct 05:00. */
+            earnings_calendar_full?: components["schemas"]["JobSchedule"];
             /** @description Queue earnings checks for holdings that reported. Default: daily 08:00. */
             earnings_due?: components["schemas"]["JobSchedule"];
+            /** @description Check stored results figures against the issuers' 10-Q/10-K XBRL. Default: daily 09:00. */
+            fact_reconcile?: components["schemas"]["JobSchedule"];
             /** @description Ingest, classify, corroborate and alert. Default: every 2 h, 06:00-22:00. */
             news_ingest?: components["schemas"]["JobSchedule"];
             /** @description Daily digest of the last 24 h. Default: weekdays 07:00. */
@@ -2673,6 +2818,43 @@ export interface components {
             /** Detail */
             detail?: string | null;
         };
+        /** ReconcileRequest */
+        ReconcileRequest: {
+            /**
+             * Ticker
+             * @description One holding, or all when null.
+             */
+            ticker?: string | null;
+        };
+        /** ReconciliationOut */
+        ReconciliationOut: {
+            /** Concept */
+            concept: string | null;
+            /** Accession */
+            accession: string | null;
+            /** Form */
+            form: string | null;
+            /** Period End */
+            period_end: string | null;
+            /** Derivation */
+            derivation: string | null;
+            /** Xbrl Value */
+            xbrl_value: number | null;
+            /** Difference */
+            difference: number | null;
+            /**
+             * Outcome
+             * @enum {string}
+             */
+            outcome: "match" | "mismatch" | "no_data";
+            /** Detail */
+            detail: string | null;
+            /**
+             * Checked At
+             * Format: date-time
+             */
+            checked_at: string;
+        };
         /** ReportOut */
         ReportOut: {
             /** Id */
@@ -2733,6 +2915,28 @@ export interface components {
                     [key: string]: string;
                 };
             };
+        };
+        /** ReviewItem */
+        ReviewItem: {
+            /** Ticker */
+            ticker: string;
+            /** Name */
+            name: string | null;
+            fact: components["schemas"]["FactOut"];
+            /**
+             * Why
+             * @description Held by the validator, or quarantined by reconciliation.
+             */
+            why: string;
+            /**
+             * Failed Checks
+             * @description The checks (bounds) the figure broke, with their detail.
+             */
+            failed_checks: components["schemas"]["FailedCheck"][];
+            /** @description The stored fact a restatement differs from. */
+            restates: components["schemas"]["FactOut"] | null;
+            /** Reconciliation */
+            reconciliation: components["schemas"]["ReconciliationOut"][];
         };
         /** RuleMatch */
         RuleMatch: {
@@ -2975,6 +3179,18 @@ export interface components {
             /** Note */
             note: string | null;
             body: components["schemas"]["ThesesConfig"];
+        };
+        /** ThesisBoard */
+        ThesisBoard: {
+            /** Theses Config Version Id */
+            theses_config_version_id: number | null;
+            /**
+             * As Of
+             * @description Newest verdict shown.
+             */
+            as_of: string | null;
+            /** Rows */
+            rows: components["schemas"]["BoardRow"][];
         };
         /** ThesisConfig */
         ThesisConfig: {
@@ -3725,6 +3941,39 @@ export interface operations {
             };
         };
     };
+    run_fact_reconcile: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ReconcileRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["JobSummary"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     run_earnings_calendar: {
         parameters: {
             query?: never;
@@ -3741,6 +3990,26 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["JobSummary"];
+                };
+            };
+        };
+    };
+    get_thesis_board: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ThesisBoard"];
                 };
             };
         };
@@ -3829,6 +4098,37 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["FactReviewResult"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_review_queue: {
+        parameters: {
+            query?: {
+                ticker?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReviewItem"][];
                 };
             };
             /** @description Validation Error */
