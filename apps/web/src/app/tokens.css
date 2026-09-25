@@ -1,0 +1,114 @@
+/*
+ * StewardAI colour tokens: the ONLY file in src/ allowed to contain colour
+ * literals. `npm run lint:colors` (also run by `npm test`) enforces this.
+ *
+ * Rules (from the Design and UI section of the spec):
+ * - Light is the default theme; dark is applied via the `.dark` class that
+ *   next-themes sets on <html> (manual toggle or system preference).
+ * - Both themes define the SAME variable names, so no component is designed
+ *   for one theme and patched for the other.
+ * - gain/loss are reserved for financial state (gains, losses, pass/breach).
+ * - neutral/warning/info-signal and disputed form a separate, muted palette
+ *   for severity and confidence (grey, amber, blue, red-ish) and must never be
+ *   used for gain/loss.
+ * - One accent colour for primary actions and links.
+ *
+ * Tailwind v4's default palette is removed below (`--color-*: initial`), so
+ * classes like `bg-slate-100` produce no CSS at all; only token classes such as
+ * `bg-surface text-text border-border text-gain` exist.
+ */
+
+:root {
+  color-scheme: light;
+
+  /* Surfaces */
+  --surface: oklch(0.985 0.002 264);
+  --surface-muted: oklch(0.962 0.004 264);
+  --surface-raised: oklch(1 0 0);
+
+  /* Lines and text */
+  --border: oklch(0.905 0.006 264);
+  --text: oklch(0.21 0.02 265);
+  --text-muted: oklch(0.49 0.02 264);
+
+  /* The single accent (primary actions, links, focus) */
+  --accent: oklch(0.5 0.19 277);
+  --accent-foreground: oklch(0.985 0.002 264);
+  --focus-ring: oklch(0.56 0.2 277);
+
+  /* Financial state */
+  --gain: oklch(0.52 0.14 152);
+  --gain-subtle: oklch(0.95 0.04 152);
+  --loss: oklch(0.53 0.19 27);
+  --loss-subtle: oklch(0.955 0.03 27);
+
+  /* Severity / confidence (muted; never gain/loss) */
+  --neutral-signal: oklch(0.5 0.012 264);
+  --neutral-signal-subtle: oklch(0.955 0.004 264);
+  --warning-signal: oklch(0.52 0.11 70);
+  --warning-signal-subtle: oklch(0.965 0.04 85);
+  --info-signal: oklch(0.5 0.08 240);
+  --info-signal-subtle: oklch(0.955 0.02 240);
+  --disputed: oklch(0.5 0.11 355);
+  --disputed-subtle: oklch(0.96 0.02 355);
+}
+
+.dark {
+  color-scheme: dark;
+
+  --surface: oklch(0.17 0.01 265);
+  --surface-muted: oklch(0.205 0.012 265);
+  --surface-raised: oklch(0.225 0.012 265);
+
+  --border: oklch(0.32 0.014 265);
+  --text: oklch(0.95 0.005 265);
+  --text-muted: oklch(0.72 0.015 265);
+
+  --accent: oklch(0.7 0.15 277);
+  --accent-foreground: oklch(0.17 0.01 265);
+  --focus-ring: oklch(0.74 0.14 277);
+
+  --gain: oklch(0.75 0.15 152);
+  --gain-subtle: oklch(0.27 0.05 152);
+  --loss: oklch(0.71 0.17 27);
+  --loss-subtle: oklch(0.27 0.06 27);
+
+  --neutral-signal: oklch(0.73 0.012 264);
+  --neutral-signal-subtle: oklch(0.26 0.01 264);
+  --warning-signal: oklch(0.82 0.12 80);
+  --warning-signal-subtle: oklch(0.28 0.05 75);
+  --info-signal: oklch(0.76 0.08 240);
+  --info-signal-subtle: oklch(0.27 0.04 240);
+  --disputed: oklch(0.74 0.1 355);
+  --disputed-subtle: oklch(0.27 0.045 355);
+}
+
+/* Drop Tailwind's default palette so only token colours exist. */
+@theme {
+  --color-*: initial;
+}
+
+/* Expose tokens to Tailwind utilities (bg-surface, text-text-muted, ...). */
+@theme inline {
+  --color-surface: var(--surface);
+  --color-surface-muted: var(--surface-muted);
+  --color-surface-raised: var(--surface-raised);
+  --color-border: var(--border);
+  --color-text: var(--text);
+  --color-text-muted: var(--text-muted);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-focus: var(--focus-ring);
+  --color-gain: var(--gain);
+  --color-gain-subtle: var(--gain-subtle);
+  --color-loss: var(--loss);
+  --color-loss-subtle: var(--loss-subtle);
+  --color-neutral-signal: var(--neutral-signal);
+  --color-neutral-signal-subtle: var(--neutral-signal-subtle);
+  --color-warning-signal: var(--warning-signal);
+  --color-warning-signal-subtle: var(--warning-signal-subtle);
+  --color-info-signal: var(--info-signal);
+  --color-info-signal-subtle: var(--info-signal-subtle);
+  --color-disputed: var(--disputed);
+  --color-disputed-subtle: var(--disputed-subtle);
+}

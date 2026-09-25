@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
+  <!-- Static favicon asset (outside src/, so outside the colour-token rule). -->
+  <style>
+    rect { fill: #4f46e5; }
+    path { stroke: #ffffff; }
+    @media (prefers-color-scheme: dark) { rect { fill: #818cf8; } path { stroke: #111827; } }
+  </style>
+  <rect width="32" height="32" rx="7"/>
+  <path d="M21 10.5c-1.2-1.3-3-2-5-2-3 0-5 1.6-5 3.8 0 5 10 2.8 10 7.6 0 2.3-2.1 3.8-5 3.8-2.2 0-4.1-.8-5.4-2.2" fill="none" stroke-width="2.6" stroke-linecap="round"/>
+</svg>
