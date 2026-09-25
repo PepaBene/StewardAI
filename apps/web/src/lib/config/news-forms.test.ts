@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
 
+import { EVENT_TYPES } from "@/lib/news/labels";
+
 import {
   DEFAULT_NOTIFICATIONS,
   eventRulesFromBody,
@@ -65,7 +67,7 @@ describe("event rules form", () => {
   it("fills every event type and keeps overrides", () => {
     const form = eventRulesFromBody({ schema_version: 1, severities: { other: 1 }, overrides: [{ ticker: "AAPL_US_EQ", event_type: "product_business", severity: 3 }] } as never);
     const body = eventRulesToBody(form);
-    expect(Object.keys(body.severities!)).toHaveLength(16);
+    expect(Object.keys(body.severities!)).toHaveLength(EVENT_TYPES.length);
     expect(body.severities!.other).toBe(1);
     expect(body.severities!.m_and_a).toBe(3);
     expect(body.overrides).toEqual([{ ticker: "AAPL_US_EQ", event_type: "product_business", severity: 3 }]);

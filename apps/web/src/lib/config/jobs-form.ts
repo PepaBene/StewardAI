@@ -44,6 +44,21 @@ export const SCHEDULES: Record<ScheduleKey, { label: string; description: string
     description: "Check stored results figures against the issuers' 10-Q/10-K XBRL.",
     cron: "0 9 * * *",
   },
+  reference_data: {
+    label: "Reference data",
+    description: "Identity, listings, legal entities and group structure (OpenFIGI, ESMA, GLEIF, Wikidata).",
+    cron: "30 4 * * 1",
+  },
+  price_history: {
+    label: "Price history",
+    description: "Daily prices from Stooq and FX history after the close.",
+    cron: "15 23 * * 1-5",
+  },
+  holiday_refresh: {
+    label: "Holiday calendar",
+    description: "Public holidays for this and next year (Nager.Date).",
+    cron: "0 4 2 1,7 *",
+  },
   news_ingest: {
     label: "News check",
     description: "Ingest, classify, corroborate and alert.",

@@ -1,4 +1,5 @@
 import { CONFIG_DOMAINS, DOMAIN_SLUGS, historyHref } from "@/lib/config/domains";
+import { reviewQueueHref } from "@/lib/evidence/review";
 import { SECTIONS, sectionHref } from "@/lib/nav";
 
 /*
@@ -35,6 +36,8 @@ export const CONFIG_PAGES = [
 
 /** Pages that are not a section or a config editor. */
 export const OTHER_PAGES = [
+  { href: "/theses", label: "Thesis board", keywords: "theses kpi verdicts pass breach unknown status holdings overview" },
+  { href: "/review", label: "Review queue", keywords: "held quarantined figures facts accept correct reject override validator reconciliation" },
   { href: "/transactions", label: "Transactions and dividends", keywords: "orders dividends cash deposits withdrawals history holdings" },
   { href: "/config", label: "Config: Export or import", keywords: "backup json file git" },
 ] as const;
@@ -89,6 +92,13 @@ export function holdingCommands(holdings: { ticker: string; name?: string | null
         href: `/holdings/${encodeURIComponent(h.ticker)}`,
       },
       {
+        id: `review:${h.ticker}`,
+        label: `Review queue: ${name}`,
+        group: "Holdings" as const,
+        keywords: `${h.ticker} held quarantined figures accept correct reject`,
+        href: reviewQueueHref(h.ticker),
+      },
+      {
         id: `earnings:${h.ticker}`,
         label: `Re-run earnings check: ${name}`,
         group: "Actions" as const,
@@ -102,7 +112,7 @@ export function holdingCommands(holdings: { ticker: string; name?: string | null
 export function filterCommands(commands: PaletteCommand[], query: string, limit = 12): PaletteCommand[] {
   const words = query.toLowerCase().split(/\s+/).filter(Boolean);
   if (words.length === 0) {
-    return commands.filter((c) => c.action?.kind !== "earnings-check").slice(0, limit);
+    return commands.filter((c) => c.action?.kind !== "earnings-check" && !c.id.startsWith("review:")).slice(0, limit);
   }
   const scored = commands
     .map((c) => {

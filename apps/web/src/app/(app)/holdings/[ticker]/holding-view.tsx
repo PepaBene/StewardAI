@@ -4,18 +4,21 @@ import {
   ChevronDownIcon,
   ChevronRightIcon,
   ExternalLinkIcon,
-  FileSearchIcon,
+  InboxIcon,
+  LayoutGridIcon,
   LoaderCircleIcon,
   PencilIcon,
   PlayIcon,
   RefreshCwIcon,
 } from "lucide-react";
 import Link from "next/link";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { Fragment, useCallback, useEffect, useMemo, useState } from "react";
 
 import { AlertMessage } from "@/components/alert-message";
 import { EmptyState } from "@/components/empty-state";
 import { ConfidenceBadge } from "@/components/evidence/confidence-badge";
+import { EvidenceLinks } from "@/components/evidence/evidence-links";
+import { FactReviewForm, type ReviewResolution } from "@/components/evidence/fact-review-form";
 import { VerdictStatusBadge } from "@/components/evidence/verdict-status-badge";
 import { DriftStatusBadge } from "@/components/portfolio/drift-status-badge";
 import { FreshnessLabel } from "@/components/portfolio/freshness-label";
@@ -32,15 +35,16 @@ import {
   type KpiStatus,
   type VerdictOut,
 } from "@/lib/api/client";
+import { NEVER_JUDGED } from "@/lib/evidence/board";
 import {
   formatFactValue,
   formatObserved,
   formatTarget,
   humanizeMetric,
 } from "@/lib/evidence/confidence";
+import { allowedReviewActions, isHeld, REVIEW_ACTIONS, reviewQueueHref } from "@/lib/evidence/review";
 import { formatDate, formatMoney, formatPercent, formatRelative, gainLossTone } from "@/lib/format";
 import { useApiResource } from "@/lib/hooks/use-api-resource";
-import { cn } from "@/lib/utils";
 
 const POLL_MS = 3000;
 const POLL_LIMIT_MS = 10 * 60 * 1000;
@@ -142,12 +146,20 @@ export function HoldingContent({
           <h2 id="thesis-heading" className="text-lg font-semibold">
             Thesis
           </h2>
-          <Button asChild variant="ghost" size="sm">
-            <Link href={`/config/theses#${encodeURIComponent(detail.ticker)}`}>
-              <PencilIcon aria-hidden="true" />
-              Edit thesis
-            </Link>
-          </Button>
+          <span className="flex flex-wrap gap-1">
+            <Button asChild variant="ghost" size="sm">
+              <Link href="/theses">
+                <LayoutGridIcon aria-hidden="true" />
+                Thesis board
+              </Link>
+            </Button>
+            <Button asChild variant="ghost" size="sm">
+              <Link href={`/config/theses#${encodeURIComponent(detail.ticker)}`}>
+                <PencilIcon aria-hidden="true" />
+                Edit thesis
+              </Link>
+            </Button>
+          </span>
         </div>
         {thesis ? (
           <div className="space-y-3 rounded-lg border border-border bg-surface-raised p-4 text-sm">
@@ -183,7 +195,7 @@ export function HoldingContent({
 
       <HoldingNews ticker={detail.ticker} />
 
-      <FactsSection facts={detail.facts} reload={reload} onQueued={onQueued} />
+      <FactsSection ticker={detail.ticker} facts={detail.facts} reload={reload} onQueued={onQueued} />
     </>
   );
 }
@@ -436,7 +448,10 @@ function KpiRows({
               ) : null}
             </span>
           ) : (
-            <span className="text-text-muted">Not judged yet</span>
+            <span className="inline-flex flex-wrap items-center gap-1">
+              <VerdictStatusBadge status="unknown" />
+              <span className="text-xs text-text-muted">never judged</span>
+            </span>
           )}
         </td>
         <td className="px-3 py-2">{current ? <ConfidenceBadge confidence={current.confidence} /> : null}</td>
@@ -444,7 +459,7 @@ function KpiRows({
       {expanded ? (
         <tr className="border-b border-border bg-surface-muted/60">
           <td colSpan={6} id={panelId} className="space-y-4 px-4 py-3">
-            {current ? <VerdictEvidence verdict={current} facts={facts} /> : <p>No verdict yet.</p>}
+            {current ? <VerdictEvidence verdict={current} facts={facts} /> : <p>{NEVER_JUDGED}.</p>}
             {history.length > 1 ? (
               <div>
                 <p className="mb-1 text-xs font-medium tracking-wide text-text-muted uppercase">History</p>
@@ -487,28 +502,6 @@ function VerdictEvidence({ verdict, facts }: { verdict: VerdictOut; facts: Map<n
   );
 }
 
-function EvidenceLinks({ fact }: { fact: FactOut }) {
-  return (
-    <span className="inline-flex flex-wrap items-center gap-3 text-xs">
-      <Link
-        href={`/evidence/${fact.id}`}
-        className="inline-flex items-center gap-1 text-accent underline-offset-4 hover:underline"
-      >
-        <FileSearchIcon aria-hidden="true" className="size-3.5" />
-        Evidence
-      </Link>
-      <a
-        href={fact.source_url}
-        target="_blank"
-        rel="noreferrer"
-        className="inline-flex items-center gap-1 text-text-muted hover:text-text hover:underline"
-      >
-        Source <ExternalLinkIcon aria-hidden="true" className="size-3" />
-      </a>
-    </span>
-  );
-}
-
 function FactEvidence({ fact }: { fact: FactOut }) {
   return (
     <figure className="rounded-md border border-border bg-surface-raised p-3">
@@ -529,49 +522,79 @@ function FactEvidence({ fact }: { fact: FactOut }) {
 }
 
 function FactsSection({
+  ticker,
   facts,
   reload,
   onQueued,
 }: {
+  ticker: string;
   facts: FactOut[];
   reload: () => void;
   onQueued: (job: JobSummary) => void;
 }) {
+  const [lastReview, setLastReview] = useState<ReviewResolution | null>(null);
   const shown = facts.filter((f) => f.status !== "rejected");
   const rejected = facts.filter((f) => f.status === "rejected");
+  const held = facts.filter((f) => isHeld(f.status)).length;
+
+  function onResolved(resolution: ReviewResolution) {
+    setLastReview(resolution);
+    onQueued(resolution.result.verdict_job);
+    reload();
+  }
+
   return (
     <section aria-labelledby="facts-heading" className="space-y-3">
-      <h2 id="facts-heading" className="text-lg font-semibold">
-        Extracted figures
-      </h2>
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <h2 id="facts-heading" className="text-lg font-semibold">
+          Extracted figures
+        </h2>
+        {held > 0 ? (
+          <Button asChild variant="outline" size="sm">
+            <Link href={reviewQueueHref(ticker)}>
+              <InboxIcon aria-hidden="true" />
+              <span className="num">{held}</span> held figure{held === 1 ? "" : "s"}: open the review queue
+            </Link>
+          </Button>
+        ) : null}
+      </div>
+      {held > 0 ? (
+        <p className="text-sm text-text-muted">
+          Held and quarantined figures are used in no verdict until you accept or correct them.
+        </p>
+      ) : null}
+      <div role="status" aria-live="polite">
+        {lastReview ? (
+          <p className="rounded-md border border-border bg-surface-muted p-2 text-sm">
+            <span className="font-medium">
+              {REVIEW_ACTIONS[lastReview.action].done} {humanizeMetric(lastReview.fact.metric)} {lastReview.fact.period}.
+            </span>{" "}
+            Verdicts are being re-judged (job #{lastReview.result.verdict_job.id}); the KPI table above updates when the run
+            finishes.
+          </p>
+        ) : null}
+      </div>
       {facts.length === 0 ? (
         <EmptyState title="No figures yet">
           Run an earnings check to read this company&rsquo;s latest results release.
         </EmptyState>
       ) : (
-        <FactTable facts={shown} reload={reload} onQueued={onQueued} />
+        <FactTable facts={shown} onResolved={onResolved} />
       )}
       {rejected.length > 0 ? (
         <details className="rounded-lg border border-border bg-surface-raised p-3 text-sm">
           <summary className="cursor-pointer font-medium">
-            {rejected.length} figure{rejected.length === 1 ? "" : "s"} rejected by the validator
+            {rejected.length} figure{rejected.length === 1 ? "" : "s"} rejected by the validator or by you
           </summary>
-          <FactTable facts={rejected} reload={reload} onQueued={onQueued} />
+          <FactTable facts={rejected} onResolved={onResolved} />
         </details>
       ) : null}
     </section>
   );
 }
 
-function FactTable({
-  facts,
-  reload,
-  onQueued,
-}: {
-  facts: FactOut[];
-  reload: () => void;
-  onQueued: (job: JobSummary) => void;
-}) {
+function FactTable({ facts, onResolved }: { facts: FactOut[]; onResolved: (resolution: ReviewResolution) => void }) {
+  const [open, setOpen] = useState<number | null>(null);
   if (facts.length === 0) return null;
   return (
     <div className="mt-2 overflow-x-auto rounded-lg border border-border bg-surface-raised">
@@ -586,82 +609,68 @@ function FactTable({
           </tr>
         </thead>
         <tbody>
-          {facts.map((f) => (
-            <tr key={f.id} className="border-b border-border align-top last:border-0">
-              <td className="px-3 py-2 whitespace-nowrap">{f.period}</td>
-              <th scope="row" className="px-3 py-2 text-left font-normal">
-                {humanizeMetric(f.metric)}
-                {f.basis === "adjusted" ? <span className="ml-1 text-xs text-text-muted">(adjusted)</span> : null}
-              </th>
-              <td className="num px-3 py-2 text-right whitespace-nowrap">{formatFactValue(f)}</td>
-              <td className="px-3 py-2">
-                <ConfidenceBadge confidence={f.confidence} />
-                {f.status_reason ? <p className="mt-1 max-w-xs text-xs text-text-muted">{f.status_reason}</p> : null}
-                {f.status === "unverified" ? <ReviewButtons fact={f} reload={reload} onQueued={onQueued} /> : null}
-              </td>
-              <td className="px-3 py-2">
-                <EvidenceLinks fact={f} />
-              </td>
-            </tr>
-          ))}
+          {facts.map((f) => {
+            const actions = allowedReviewActions(f.status);
+            const expanded = open === f.id;
+            const panelId = `review-fact-${f.id}`;
+            return (
+              <Fragment key={f.id}>
+                <tr className="border-b border-border align-top last:border-0">
+                  <td className="px-3 py-2 whitespace-nowrap">{f.period}</td>
+                  <th scope="row" className="px-3 py-2 text-left font-normal">
+                    {humanizeMetric(f.metric)}
+                    {f.basis === "adjusted" ? <span className="ml-1 text-xs text-text-muted">(adjusted)</span> : null}
+                    {f.origin === "owner" ? <span className="ml-1 text-xs text-text-muted">(your correction)</span> : null}
+                  </th>
+                  <td className="num px-3 py-2 text-right whitespace-nowrap">{formatFactValue(f)}</td>
+                  <td className="px-3 py-2">
+                    <ConfidenceBadge confidence={f.confidence} />
+                    {f.status_reason ? <p className="mt-1 max-w-xs text-xs text-text-muted">{f.status_reason}</p> : null}
+                    {actions.length > 0 ? (
+                      <Button
+                        size="sm"
+                        variant={isHeld(f.status) ? "outline" : "ghost"}
+                        className="mt-1"
+                        aria-expanded={expanded}
+                        aria-controls={expanded ? panelId : undefined}
+                        onClick={() => setOpen(expanded ? null : f.id)}
+                      >
+                        {expanded ? <ChevronDownIcon aria-hidden="true" /> : <ChevronRightIcon aria-hidden="true" />}
+                        {isHeld(f.status) ? "Review" : "Correct or reject"}
+                        <span className="sr-only">
+                          {" "}
+                          {humanizeMetric(f.metric)} {f.period}
+                        </span>
+                      </Button>
+                    ) : null}
+                  </td>
+                  <td className="px-3 py-2">
+                    <EvidenceLinks fact={f} />
+                  </td>
+                </tr>
+                {expanded ? (
+                  <tr className="border-b border-border bg-surface-muted/60">
+                    <td colSpan={5} id={panelId} className="px-4 py-3">
+                      <blockquote className="mb-3 border-l-2 border-border pl-3 font-mono text-xs break-words text-text-muted">
+                        {f.snippet}
+                      </blockquote>
+                      <FactReviewForm
+                        fact={f}
+                        onCancel={() => setOpen(null)}
+                        onResolved={(resolution) => {
+                          setOpen(null);
+                          onResolved(resolution);
+                        }}
+                        className="max-w-2xl"
+                      />
+                    </td>
+                  </tr>
+                ) : null}
+              </Fragment>
+            );
+          })}
         </tbody>
       </table>
-    </div>
-  );
-}
-
-function ReviewButtons({
-  fact,
-  reload,
-  onQueued,
-}: {
-  fact: FactOut;
-  reload: () => void;
-  onQueued: (job: JobSummary) => void;
-}) {
-  const [pending, setPending] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [reason, setReason] = useState("");
-  const reasonId = `review-reason-${fact.id}`;
-  async function review(action: "accept" | "reject") {
-    // The API logs every decision with the owner's reason; it is required.
-    if (!reason.trim()) {
-      setError("Give a reason first.");
-      return;
-    }
-    setPending(true);
-    setError(null);
-    const result = await getBrowserApiClient()
-      .POST("/facts/{fact_id}/review", {
-        params: { path: { fact_id: fact.id } },
-        body: { action, reason: reason.trim() },
-      })
-      .catch((err: unknown) => ({ data: undefined, error: err, response: { status: 0 } as Response }));
-    setPending(false);
-    if (result.data) onQueued(result.data.verdict_job);
-    else setError(`Review failed (HTTP ${result.response.status}).`);
-    reload();
-  }
-  return (
-    <div className="mt-1 flex flex-wrap items-center gap-1">
-      <Label htmlFor={reasonId} className="sr-only">
-        Reason for the decision
-      </Label>
-      <Input
-        id={reasonId}
-        value={reason}
-        maxLength={500}
-        placeholder="Reason"
-        onChange={(e) => setReason(e.target.value)}
-        className="h-8 w-40"
-      />
-      <Button size="sm" variant="outline" disabled={pending} onClick={() => void review("accept")}>
-        Accept
-      </Button>
-      <Button size="sm" variant="ghost" disabled={pending} onClick={() => void review("reject")}>
-        Reject
-      </Button>
-      {error ? <span className={cn("text-xs text-text")}>{error}</span> : null}
     </div>
   );
 }

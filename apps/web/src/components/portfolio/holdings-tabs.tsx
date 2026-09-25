@@ -7,15 +7,17 @@ import { cn } from "@/lib/utils";
 
 const TABS = [
   { href: "/holdings", label: "Positions" },
+  { href: "/theses", label: "Thesis board" },
+  { href: "/review", label: "Review queue" },
   { href: "/transactions", label: "Transactions and dividends" },
 ] as const;
 
-/** Switches between the open positions and the transaction history, both part of Holdings. */
+/** Switches between the views of Holdings: positions, thesis board, review queue and transactions. */
 export function HoldingsTabs() {
   const pathname = usePathname();
   return (
     <nav aria-label="Holdings views">
-      <ul className="flex gap-1 border-b border-border">
+      <ul className="flex gap-1 overflow-x-auto border-b border-border">
         {TABS.map((tab) => {
           const active = pathname === tab.href;
           return (
@@ -24,7 +26,7 @@ export function HoldingsTabs() {
                 href={tab.href}
                 aria-current={active ? "page" : undefined}
                 className={cn(
-                  "-mb-px inline-flex h-9 items-center border-b-2 px-3 text-sm transition-colors",
+                  "-mb-px inline-flex h-9 items-center border-b-2 px-3 text-sm whitespace-nowrap transition-colors",
                   active ? "border-accent font-medium text-text" : "border-transparent text-text-muted hover:text-text",
                 )}
               >

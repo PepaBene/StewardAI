@@ -259,6 +259,8 @@ export const DEFAULT_SEVERITIES: Record<EventType, number> = {
   sector_competitor: 1,
   index_change: 1,
   analyst_rating: 0,
+  delisting: 2,
+  entity_status: 1,
   other: 0,
 };
 

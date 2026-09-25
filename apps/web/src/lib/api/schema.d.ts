@@ -962,6 +962,208 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/holdings/{ticker}/identity": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Holding Identity
+         * @description Identifiers, listings, home market, legal entity, group structure and the
+         *     relationships waiting for confirmation.
+         */
+        get: operations["get_holding_identity"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/relationships/{relationship_id}/confirm": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Confirm Relationship
+         * @description Confirm a suggested relationship. A competitor, supplier or customer is added to the
+         *     holding profile (a new config version), so the next news run matches on it.
+         */
+        post: operations["confirm_relationship"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/relationships/{relationship_id}/reject": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Reject Relationship
+         * @description Reject a suggested relationship; it is never suggested again.
+         */
+        post: operations["reject_relationship"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/holdings/{ticker}/prices": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Price History
+         * @description Daily closes with the benchmark, and the risk card computed from the stored bars.
+         */
+        get: operations["get_price_history"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/reference/gaps": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Reference Gaps
+         * @description Instruments whose identity could not be resolved, and symbols with no price history.
+         */
+        get: operations["get_reference_gaps"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/calendar/exchanges": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Exchange Calendar
+         * @description Confirmed exchange closures and the public holidays suggested as closures.
+         */
+        get: operations["get_exchange_calendar"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/calendar/exchanges/closures": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Add Exchange Closures
+         * @description Confirm closures into the Jobs config (a new version); used from the next run.
+         */
+        post: operations["add_exchange_closures"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/jobs/reference-data": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Run Reference Data
+         * @description Resolve identity, reference data and structure now.
+         */
+        post: operations["run_reference_data"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/jobs/price-history": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Run Price History
+         * @description Collect price and FX history now.
+         */
+        post: operations["run_price_history"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/jobs/holiday-refresh": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Run Holiday Refresh
+         * @description Load public holidays for this and next year now.
+         */
+        post: operations["run_holiday_refresh"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -1033,6 +1235,15 @@ export interface components {
              * Format: date-time
              */
             created_at: string;
+        };
+        /** AliasOut */
+        AliasOut: {
+            /** Alias */
+            alias: string;
+            /** Kind */
+            kind: string;
+            /** Source */
+            source: string;
         };
         /** AllocationSlice */
         AllocationSlice: {
@@ -1188,6 +1399,22 @@ export interface components {
             note: string | null;
             body: components["schemas"]["BudgetConfig"];
         };
+        /**
+         * CalendarSettings
+         * @description The expected-gap calendar: days when a source has nothing to publish or collect.
+         */
+        CalendarSettings: {
+            /**
+             * Holiday Countries
+             * @description Countries whose public holidays are loaded from Nager.Date.
+             */
+            holiday_countries?: string[];
+            /**
+             * Exchange Closures
+             * @description Days an exchange is closed (public holidays are not exchange calendars; confirm the suggestions on the calendar page). Used without a deploy.
+             */
+            exchange_closures?: components["schemas"]["ExchangeClosure"][];
+        };
         /** CashDrift */
         CashDrift: {
             /** Value Base */
@@ -1303,6 +1530,28 @@ export interface components {
             /** Bucket */
             bucket?: string | null;
         };
+        /** ClosureConfirmation */
+        ClosureConfirmation: {
+            /** Closures */
+            closures: components["schemas"]["ExchangeClosure"][];
+        };
+        /** ClosureResult */
+        ClosureResult: {
+            /** Jobs Version Id */
+            jobs_version_id: number;
+        };
+        /** ClosureSuggestion */
+        ClosureSuggestion: {
+            /** Mic */
+            mic: string;
+            /**
+             * Date
+             * Format: date
+             */
+            date: string;
+            /** Name */
+            name: string;
+        };
         /** ConfigDiff */
         ConfigDiff: {
             /** Domain */
@@ -1397,6 +1646,13 @@ export interface components {
              * @description Number of changed paths against the previous version; null for the first.
              */
             changes: number | null;
+        };
+        /** Correlation */
+        Correlation: {
+            /** Ticker */
+            ticker: string;
+            /** Correlation */
+            correlation: number | null;
         };
         /** DiffChange */
         DiffChange: {
@@ -1720,7 +1976,7 @@ export interface components {
              * Escalate When Thesis Linked
              * @description Event types raised one level (max 3) when the item touches a thesis KPI or exit condition.
              */
-            escalate_when_thesis_linked?: ("guidance_change" | "m_and_a" | "dividend_cut" | "earnings_release" | "management_change" | "regulatory_legal" | "capital_allocation" | "credit_rating" | "central_bank" | "macro_surprise" | "insider_transaction" | "product_business" | "sector_competitor" | "index_change" | "analyst_rating" | "other")[];
+            escalate_when_thesis_linked?: ("guidance_change" | "m_and_a" | "dividend_cut" | "earnings_release" | "management_change" | "regulatory_legal" | "capital_allocation" | "credit_rating" | "central_bank" | "macro_surprise" | "insider_transaction" | "product_business" | "sector_competitor" | "index_change" | "analyst_rating" | "delisting" | "entity_status" | "other")[];
             /**
              * Insider Cluster Count
              * @description Insider transactions for one holding within the window that count as cluster buying or selling (raised to severity 2).
@@ -1748,7 +2004,7 @@ export interface components {
              * Earnings Check On
              * @description Confirmed stories of these types queue an earnings thesis check for the holding, unless one ran in the last 10 days.
              */
-            earnings_check_on?: ("guidance_change" | "m_and_a" | "dividend_cut" | "earnings_release" | "management_change" | "regulatory_legal" | "capital_allocation" | "credit_rating" | "central_bank" | "macro_surprise" | "insider_transaction" | "product_business" | "sector_competitor" | "index_change" | "analyst_rating" | "other")[];
+            earnings_check_on?: ("guidance_change" | "m_and_a" | "dividend_cut" | "earnings_release" | "management_change" | "regulatory_legal" | "capital_allocation" | "credit_rating" | "central_bank" | "macro_surprise" | "insider_transaction" | "product_business" | "sector_competitor" | "index_change" | "analyst_rating" | "delisting" | "entity_status" | "other")[];
         };
         /** EventRulesConfigVersion */
         EventRulesConfigVersion: {
@@ -1769,7 +2025,7 @@ export interface components {
              * Id
              * @enum {string}
              */
-            id: "guidance_change" | "m_and_a" | "dividend_cut" | "earnings_release" | "management_change" | "regulatory_legal" | "capital_allocation" | "credit_rating" | "central_bank" | "macro_surprise" | "insider_transaction" | "product_business" | "sector_competitor" | "index_change" | "analyst_rating" | "other";
+            id: "guidance_change" | "m_and_a" | "dividend_cut" | "earnings_release" | "management_change" | "regulatory_legal" | "capital_allocation" | "credit_rating" | "central_bank" | "macro_surprise" | "insider_transaction" | "product_business" | "sector_competitor" | "index_change" | "analyst_rating" | "delisting" | "entity_status" | "other";
             /** Description */
             description: string;
         };
@@ -1815,6 +2071,41 @@ export interface components {
              * @description The archived text around the snippet.
              */
             context: string | null;
+        };
+        /** ExchangeCalendar */
+        ExchangeCalendar: {
+            /**
+             * Exchanges
+             * @description Home MIC of a holding -> its country.
+             */
+            exchanges: {
+                [key: string]: string;
+            };
+            /**
+             * Closures
+             * @description Confirmed (in the Jobs config).
+             */
+            closures: components["schemas"]["ExchangeClosure"][];
+            /**
+             * Suggestions
+             * @description Public holidays in an exchange's country not yet confirmed as closures.
+             */
+            suggestions: components["schemas"]["ClosureSuggestion"][];
+        };
+        /** ExchangeClosure */
+        ExchangeClosure: {
+            /**
+             * Mic
+             * @example XNYS
+             */
+            mic: string;
+            /**
+             * Date
+             * Format: date
+             */
+            date: string;
+            /** Name */
+            name: string;
         };
         /** ExportedDomain */
         ExportedDomain: {
@@ -2102,6 +2393,76 @@ export interface components {
             last_earnings_check: components["schemas"]["JobSummary"] | null;
             last_verdict_run: components["schemas"]["JobSummary"] | null;
         };
+        /** HoldingIdentity */
+        HoldingIdentity: {
+            /** Ticker */
+            ticker: string;
+            /** Isin */
+            isin: string | null;
+            /** Share Class Figi */
+            share_class_figi: string | null;
+            /** Security Type */
+            security_type: string | null;
+            /** Home Mic */
+            home_mic: string | null;
+            /** Home Country */
+            home_country: string | null;
+            /** Price Symbol */
+            price_symbol: string | null;
+            /** Identity Resolved At */
+            identity_resolved_at: string | null;
+            /**
+             * Identity Error
+             * @description Why identity is incomplete; null when fine.
+             */
+            identity_error: string | null;
+            /**
+             * Identifiers
+             * @description Composite (per-country) listings.
+             */
+            identifiers: components["schemas"]["IdentifierOut"][];
+            /**
+             * Identifier Count
+             * @description All OpenFIGI listings of the share class.
+             */
+            identifier_count: number;
+            /** Listings */
+            listings: components["schemas"]["ListingOut"][];
+            liquidity: components["schemas"]["LiquidityOut"] | null;
+            legal_entity: components["schemas"]["LegalEntityOut"] | null;
+            /**
+             * Parents
+             * @description Direct and ultimate consolidating parents.
+             */
+            parents: components["schemas"]["RelationshipOut"][];
+            /**
+             * Parent Exceptions
+             * @description GLEIF's stated reasons that no parent is reported.
+             */
+            parent_exceptions: components["schemas"]["ReportingExceptionOut"][];
+            /** Subsidiaries */
+            subsidiaries: components["schemas"]["RelationshipOut"][];
+            /** Subsidiary Count */
+            subsidiary_count: number;
+            /** Owners */
+            owners: components["schemas"]["RelationshipOut"][];
+            /**
+             * Suggested
+             * @description Waiting for the owner to confirm.
+             */
+            suggested: components["schemas"]["RelationshipOut"][];
+            /**
+             * Related
+             * @description Confirmed competitors, suppliers and customers.
+             */
+            related: components["schemas"]["RelationshipOut"][];
+            /** Aliases */
+            aliases: components["schemas"]["AliasOut"][];
+            /** Wikidata */
+            wikidata: {
+                [key: string]: unknown;
+            } | null;
+        };
         /** HoldingProfile */
         HoldingProfile: {
             /**
@@ -2158,6 +2519,11 @@ export interface components {
              */
             fiscal_year_end_month: number;
             /**
+             * Price Symbol
+             * @description Stooq symbol for price history when the one derived from OpenFIGI is wrong or missing (e.g. 'sap.de').
+             */
+            price_symbol?: string | null;
+            /**
              * Reporting Currency
              * @description Currency the company reports in; figures in another are held.
              */
@@ -2212,6 +2578,30 @@ export interface components {
              * @description Every open position once, by value descending.
              */
             holdings: components["schemas"]["Holding"][];
+        };
+        /** IdentifierOut */
+        IdentifierOut: {
+            /** Figi */
+            figi: string;
+            /** Composite Figi */
+            composite_figi: string | null;
+            /** Listing Ticker */
+            listing_ticker: string | null;
+            /** Exch Code */
+            exch_code: string | null;
+            /** Security Type */
+            security_type: string | null;
+            /** Name */
+            name: string | null;
+        };
+        /** IdentityGap */
+        IdentityGap: {
+            /** Ticker */
+            ticker: string;
+            /** Name */
+            name: string | null;
+            /** Problem */
+            problem: string;
         };
         /** ImportResult */
         ImportResult: {
@@ -2324,6 +2714,12 @@ export interface components {
             earnings_due?: components["schemas"]["JobSchedule"];
             /** @description Check stored results figures against the issuers' 10-Q/10-K XBRL. Default: daily 09:00. */
             fact_reconcile?: components["schemas"]["JobSchedule"];
+            /** @description Identity, listings, legal entities and group structure. Default: Mondays 04:30. */
+            reference_data?: components["schemas"]["JobSchedule"];
+            /** @description Daily prices (Stooq) and FX history after the close. Default: weekdays 23:15. */
+            price_history?: components["schemas"]["JobSchedule"];
+            /** @description Public holidays for this and next year. Default: 2 January and 2 July. */
+            holiday_refresh?: components["schemas"]["JobSchedule"];
             /** @description Ingest, classify, corroborate and alert. Default: every 2 h, 06:00-22:00. */
             news_ingest?: components["schemas"]["JobSchedule"];
             /** @description Daily digest of the last 24 h. Default: weekdays 07:00. */
@@ -2334,6 +2730,9 @@ export interface components {
             earnings_calendar_settings?: components["schemas"]["EarningsCalendarSettings"];
             news?: components["schemas"]["NewsSettings"];
             digest?: components["schemas"]["DigestSettings"];
+            reference?: components["schemas"]["ReferenceSettings"];
+            prices?: components["schemas"]["PriceSettings"];
+            calendar?: components["schemas"]["CalendarSettings"];
         };
         /** JobsConfigVersion */
         JobsConfigVersion: {
@@ -2358,6 +2757,68 @@ export interface components {
              * @description Latest verdict per period, newest first.
              */
             history: components["schemas"]["VerdictOut"][];
+        };
+        /** LegalEntityOut */
+        LegalEntityOut: {
+            /** Lei */
+            lei: string;
+            /** Legal Name */
+            legal_name: string;
+            /** Other Names */
+            other_names: string[];
+            /** Jurisdiction */
+            jurisdiction: string | null;
+            /** Legal Form */
+            legal_form: string | null;
+            /** Hq Country */
+            hq_country: string | null;
+            /** Status */
+            status: string | null;
+            /** Registration Status */
+            registration_status: string | null;
+            /** Next Renewal */
+            next_renewal: string | null;
+            /** Successor Lei */
+            successor_lei: string | null;
+            /**
+             * Fetched At
+             * Format: date-time
+             */
+            fetched_at: string;
+        };
+        /** LiquidityOut */
+        LiquidityOut: {
+            /** Liquid */
+            liquid: boolean | null;
+            /** Avg Daily Turnover */
+            avg_daily_turnover: number | null;
+            /** Turnover Currency */
+            turnover_currency: string | null;
+            /** Avg Daily Trades */
+            avg_daily_trades: number | null;
+            /** Most Relevant Market */
+            most_relevant_market: string | null;
+            /** Period To */
+            period_to: string | null;
+        };
+        /** ListingOut */
+        ListingOut: {
+            /** Mic */
+            mic: string;
+            /** Full Name */
+            full_name: string | null;
+            /** Cfi */
+            cfi: string | null;
+            /** Currency */
+            currency: string | null;
+            /** First Trade At */
+            first_trade_at: string | null;
+            /** Terminated At */
+            terminated_at: string | null;
+            /** Status */
+            status: string | null;
+            /** Home */
+            home: boolean;
         };
         /** ModelPrice */
         ModelPrice: {
@@ -2615,7 +3076,7 @@ export interface components {
             /** Muted Tickers */
             muted_tickers?: string[];
             /** Muted Event Types */
-            muted_event_types?: ("guidance_change" | "m_and_a" | "dividend_cut" | "earnings_release" | "management_change" | "regulatory_legal" | "capital_allocation" | "credit_rating" | "central_bank" | "macro_surprise" | "insider_transaction" | "product_business" | "sector_competitor" | "index_change" | "analyst_rating" | "other")[];
+            muted_event_types?: ("guidance_change" | "m_and_a" | "dividend_cut" | "earnings_release" | "management_change" | "regulatory_legal" | "capital_allocation" | "credit_rating" | "central_bank" | "macro_surprise" | "insider_transaction" | "product_business" | "sector_competitor" | "index_change" | "analyst_rating" | "delisting" | "entity_status" | "other")[];
             /**
              * Repeat Throttle Hours
              * @description Another story with the same holding and event type within this many hours of an alert is not alerted again.
@@ -2776,6 +3237,94 @@ export interface components {
             /** Ticker */
             ticker?: string | null;
         };
+        /** PriceGap */
+        PriceGap: {
+            /**
+             * Key
+             * @description Ticker, or the benchmark symbol.
+             */
+            key: string;
+            /** Symbol */
+            symbol: string | null;
+            /** Reason */
+            reason: string;
+        };
+        /** PriceHistory */
+        PriceHistory: {
+            /** Ticker */
+            ticker: string;
+            /** Symbol */
+            symbol: string | null;
+            /**
+             * Source
+             * @default Stooq
+             * @constant
+             */
+            source: "Stooq";
+            /**
+             * As Of
+             * @description Date of the latest stored close.
+             */
+            as_of: string | null;
+            /** Fetched At */
+            fetched_at: string | null;
+            /** Bars */
+            bars: components["schemas"]["PricePoint"][];
+            /** Benchmark Symbol */
+            benchmark_symbol: string | null;
+            /** Benchmark */
+            benchmark: components["schemas"]["PricePoint"][];
+            risk: components["schemas"]["RiskCard"] | null;
+            /**
+             * Correlations
+             * @description With each other holding, last 252 days.
+             */
+            correlations: components["schemas"]["Correlation"][];
+            /**
+             * Gap
+             * @description Why there is no price history, when there is none.
+             */
+            gap: string | null;
+            /**
+             * Plausibility
+             * @description Latest Stooq close vs Trading212's price on a sync day.
+             */
+            plausibility: {
+                [key: string]: unknown;
+            } | null;
+        };
+        /** PricePoint */
+        PricePoint: {
+            /**
+             * Date
+             * Format: date
+             */
+            date: string;
+            /** Close */
+            close: number;
+        };
+        /**
+         * PriceSettings
+         * @description Daily price history (Stooq) and the risk figures computed from it.
+         */
+        PriceSettings: {
+            /**
+             * Benchmark Symbols
+             * @description Stooq symbols of the benchmarks (^spx S&P 500, ^dax DAX, ^ukx FTSE 100). The first is used for beta and the holding charts.
+             */
+            benchmark_symbols?: string[];
+            /**
+             * History Years
+             * @default 2
+             */
+            history_years: number;
+            /**
+             * Plausibility Tolerance Pct
+             * @description Largest gap between Stooq's close and Trading212's price on a sync day before it is flagged.
+             * @default 1
+             */
+            plausibility_tolerance_pct: number;
+        };
         /** QuietHours */
         QuietHours: {
             /**
@@ -2855,6 +3404,102 @@ export interface components {
              */
             checked_at: string;
         };
+        /** ReferenceGaps */
+        ReferenceGaps: {
+            /** Identity */
+            identity: components["schemas"]["IdentityGap"][];
+            /** Prices */
+            prices: components["schemas"]["PriceGap"][];
+            /** Prices Checked At */
+            prices_checked_at: string | null;
+        };
+        /** ReferenceRunRequest */
+        ReferenceRunRequest: {
+            /**
+             * Ticker
+             * @description One holding, or all when null.
+             */
+            ticker?: string | null;
+            /**
+             * Force
+             * @description Refresh OpenFIGI and Wikidata now.
+             * @default false
+             */
+            force: boolean;
+        };
+        /**
+         * ReferenceSettings
+         * @description Identity and reference data: OpenFIGI, ESMA FIRDS/FITRS, GLEIF, Wikidata.
+         */
+        ReferenceSettings: {
+            /**
+             * Openfigi Refresh Days
+             * @description Re-map each ISIN through OpenFIGI this often.
+             * @default 30
+             */
+            openfigi_refresh_days: number;
+            /**
+             * Wikidata Enabled
+             * @description Read aliases and suggested relationships from Wikidata.
+             * @default true
+             */
+            wikidata_enabled: boolean;
+            /**
+             * Wikidata Refresh Days
+             * @default 30
+             */
+            wikidata_refresh_days: number;
+            /**
+             * Max Subsidiary Aliases
+             * @description Most GLEIF subsidiary names added to a holding's news aliases.
+             * @default 50
+             */
+            max_subsidiary_aliases: number;
+        };
+        /** RelationshipDecision */
+        RelationshipDecision: {
+            relationship: components["schemas"]["RelationshipOut"];
+            /**
+             * Holding Profiles Version Id
+             * @description The new holding-profiles version, when the confirmation changed it.
+             */
+            holding_profiles_version_id: number | null;
+        };
+        /** RelationshipOut */
+        RelationshipOut: {
+            /** Id */
+            id: number;
+            /**
+             * Type
+             * @enum {string}
+             */
+            type: "parent" | "ultimate_parent" | "subsidiary" | "owner" | "competitor" | "supplier" | "customer";
+            /** Object Name */
+            object_name: string;
+            /** Object Lei */
+            object_lei: string | null;
+            /** Source */
+            source: string;
+            /**
+             * Sources
+             * @description Every source that reported it.
+             */
+            sources: string[];
+            /** Source Ref */
+            source_ref: string | null;
+            /** As Of */
+            as_of: string | null;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "confirmed" | "suggested" | "rejected";
+            /**
+             * Tier
+             * @description 1 GLEIF or a filing, 3 Wikidata; owner decisions win.
+             */
+            tier: number;
+        };
         /** ReportOut */
         ReportOut: {
             /** Id */
@@ -2916,6 +3561,13 @@ export interface components {
                 };
             };
         };
+        /** ReportingExceptionOut */
+        ReportingExceptionOut: {
+            /** Category */
+            category: string;
+            /** Reason */
+            reason: string;
+        };
         /** ReviewItem */
         ReviewItem: {
             /** Ticker */
@@ -2938,6 +3590,33 @@ export interface components {
             /** Reconciliation */
             reconciliation: components["schemas"]["ReconciliationOut"][];
         };
+        /** RiskCard */
+        RiskCard: {
+            /**
+             * Returns
+             * @description 1m, 3m, 6m, 1y, 2y (fractions).
+             */
+            returns: {
+                [key: string]: number | null;
+            };
+            /**
+             * Volatility
+             * @description Annualised, last 252 trading days.
+             */
+            volatility: number | null;
+            /**
+             * Max Drawdown
+             * @description Worst fall from a peak, stored history.
+             */
+            max_drawdown: number | null;
+            /**
+             * Beta
+             * @description Against the first benchmark, last 252 days.
+             */
+            beta: number | null;
+            /** Observations */
+            observations: number;
+        };
         /** RuleMatch */
         RuleMatch: {
             /**
@@ -2951,7 +3630,7 @@ export interface components {
              * Event Types
              * @description Empty: any type.
              */
-            event_types?: ("guidance_change" | "m_and_a" | "dividend_cut" | "earnings_release" | "management_change" | "regulatory_legal" | "capital_allocation" | "credit_rating" | "central_bank" | "macro_surprise" | "insider_transaction" | "product_business" | "sector_competitor" | "index_change" | "analyst_rating" | "other")[];
+            event_types?: ("guidance_change" | "m_and_a" | "dividend_cut" | "earnings_release" | "management_change" | "regulatory_legal" | "capital_allocation" | "credit_rating" | "central_bank" | "macro_surprise" | "insider_transaction" | "product_business" | "sector_competitor" | "index_change" | "analyst_rating" | "delisting" | "entity_status" | "other")[];
             /**
              * Tickers
              * @description Empty: any holding.
@@ -2978,7 +3657,7 @@ export interface components {
              * Event Type
              * @enum {string}
              */
-            event_type: "guidance_change" | "m_and_a" | "dividend_cut" | "earnings_release" | "management_change" | "regulatory_legal" | "capital_allocation" | "credit_rating" | "central_bank" | "macro_surprise" | "insider_transaction" | "product_business" | "sector_competitor" | "index_change" | "analyst_rating" | "other";
+            event_type: "guidance_change" | "m_and_a" | "dividend_cut" | "earnings_release" | "management_change" | "regulatory_legal" | "capital_allocation" | "credit_rating" | "central_bank" | "macro_surprise" | "insider_transaction" | "product_business" | "sector_competitor" | "index_change" | "analyst_rating" | "delisting" | "entity_status" | "other";
             /** Severity */
             severity: number;
         };
@@ -3130,7 +3809,7 @@ export interface components {
              * @default guidance_change
              * @enum {string}
              */
-            event_type: "guidance_change" | "m_and_a" | "dividend_cut" | "earnings_release" | "management_change" | "regulatory_legal" | "capital_allocation" | "credit_rating" | "central_bank" | "macro_surprise" | "insider_transaction" | "product_business" | "sector_competitor" | "index_change" | "analyst_rating" | "other";
+            event_type: "guidance_change" | "m_and_a" | "dividend_cut" | "earnings_release" | "management_change" | "regulatory_legal" | "capital_allocation" | "credit_rating" | "central_bank" | "macro_surprise" | "insider_transaction" | "product_business" | "sector_competitor" | "index_change" | "analyst_rating" | "delisting" | "entity_status" | "other";
             /** Ticker */
             ticker?: string | null;
         };
@@ -5114,6 +5793,278 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_holding_identity: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                ticker: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HoldingIdentity"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    confirm_relationship: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                relationship_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RelationshipDecision"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    reject_relationship: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                relationship_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RelationshipDecision"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_price_history: {
+        parameters: {
+            query?: {
+                days?: number;
+            };
+            header?: never;
+            path: {
+                ticker: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PriceHistory"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_reference_gaps: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReferenceGaps"];
+                };
+            };
+        };
+    };
+    get_exchange_calendar: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ExchangeCalendar"];
+                };
+            };
+        };
+    };
+    add_exchange_closures: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ClosureConfirmation"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ClosureResult"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    run_reference_data: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ReferenceRunRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["JobSummary"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    run_price_history: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["JobSummary"];
+                };
+            };
+        };
+    };
+    run_holiday_refresh: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["JobSummary"];
                 };
             };
         };

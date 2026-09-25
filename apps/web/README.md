@@ -46,9 +46,11 @@ to `http://localhost:3000`.
 | Route | What it shows |
 | --- | --- |
 | `/` | Overview: value, allocation, drift, freshness |
-| `/holdings` | Every open position; each row opens its holding page. A tab switches to the transactions view. |
+| `/holdings` | Every open position; each row opens its holding page. Tabs switch to the thesis board, the review queue and the transactions view. |
+| `/theses` | Thesis board: every holding with a thesis once, breaches first, with its overall status, pass / breach / unknown counts and one cell per KPI. Clicking a KPI's status opens its verdict below the row (rationale, observed value against the threshold it was judged under, period, confidence badge, a stale marker, and a link to each fact's evidence page). A KPI never judged is shown as unknown ("Never judged — no verified figure yet"), dashed, never left out. Shows overdue thesis reviews, the number of held figures per holding (linking to the review queue for it) and "Verdicts as of" the newest verdict. Part of the Holdings section. |
+| `/review` | Review queue: every held (validator) or quarantined (reconciliation) figure, grouped by holding, with its value as printed (scale, currency), confidence badge, the checks and bounds it broke, the quoted snippet, source and evidence links, the stored figure a restatement differs from (side by side) and the XBRL reconciliation rows (filing, concept, XBRL value and difference in the figure's printed scale). **Accept**, **Correct** (a value in the printed scale) or **Reject**, each with a required reason (1–500 characters). A resolved figure leaves the list at once; the page then polls the holding every 2 s (up to 30 s) until the verdict run the review queued has finished, and shows the affected KPIs' new status (and what it was). `?ticker=` filters by holding. Part of the Holdings section. |
 | `/transactions` | Orders, dividends and cash movements, filterable by type, ticker and period (filters live in the URL), with **Load more** paging that never repeats a row. The dividend total per currency and the totals per type, subtype and currency are computed by the API over every matching row, not the loaded page. Part of the Holdings section. |
-| `/holdings/[ticker]` | Position, thesis, KPI verdicts (open a row for the rationale, the facts behind it, their snippets and evidence links, and the KPI's history), every extracted figure with its confidence badge, and Accept / Reject for figures the validator held. Runs an earnings check or re-runs verdicts. |
+| `/holdings/[ticker]` | Position, thesis, KPI verdicts (open a row for the rationale, the facts behind it, their snippets and evidence links, and the KPI's history), every extracted figure with its confidence badge, and a **Review** control on held or quarantined figures (Accept / Correct / Reject with a reason; verified figures offer Correct / Reject), with a link to the review queue for the holding. Runs an earnings check or re-runs verdicts. |
 | `/evidence/[factId]` | One fact: the quoted snippet, the archived text around it, the original URL and a signed link to the archived copy |
 | `/news` | News feed grouped by story, filterable by holding, severity, confidence and source tier (filters live in the URL); each story shows its copies, why it is (un)confirmed and its corroborating links |
 | `/reports`, `/reports/[id]` | Daily and weekly digests; each sentence carries numbered citations linking to its news items (with a source-card sidebar showing tier) or to `/evidence/[factId]` |
@@ -60,7 +62,7 @@ to `http://localhost:3000`.
 | `/config/theses`, `/config/holding-profiles` | Editors for those config domains. Form state converts to the generated `ThesesConfig` / `HoldingProfilesConfig` types; the backend's Pydantic model validates, and its 422 errors are shown next to each field. Saving theses queues a verdict run, so a changed threshold shows up at once. |
 
 The **command palette** (Cmd/Ctrl+K, or Search in the header) reaches every section, config
-editor, config history, the transactions view and every holding, and runs checks (sync, news check, digests, verdicts, an earnings check per
+editor, config history, the thesis board, the review queue (also per holding), the transactions view and every holding, and runs checks (sync, news check, digests, verdicts, an earnings check per
 holding) from the keyboard.
 
 Confidence badges (`components/evidence/confidence-badge.tsx`) use the four labels of the
@@ -76,7 +78,7 @@ palette. Pass and breach use gain and loss; unknown is dashed and neutral.
 | `npm run lint` | ESLint (flat config, `eslint-config-next`), then `lint:colors`. |
 | `npm run lint:colors` | Fails on any colour literal or Tailwind palette class in `src/` outside `src/app/tokens.css`. |
 | `npm run typecheck` | `next typegen` (route types for `PageProps`/`LayoutProps`), then `tsc --noEmit`. |
-| `npm test` | Vitest. Covers the auth/MFA decision logic, the typed API client, the colour rule, the pure form <-> body conversions of the config editors (the strategy and jobs forms round-trip a fully populated body without loss), cron readings, history and import helpers, and the transaction filters. |
+| `npm test` | Vitest. Covers the auth/MFA decision logic, the typed API client, the colour rule, the pure form <-> body conversions of the config editors (the strategy and jobs forms round-trip a fully populated body without loss), cron readings, history and import helpers, the transaction filters, the thesis board helpers and the review rules (allowed actions, reason and corrected-value validation, printed scale, verdict-run polling, affected KPIs). |
 | `npm run gen:api` | Regenerates `src/lib/api/schema.d.ts` from `../backend/openapi.json`. |
 
 ## Auth and MFA enforcement

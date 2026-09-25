@@ -14,13 +14,23 @@ describe("command palette", () => {
     for (const p of CONFIG_PAGES) expect(hrefs).toContain(p.href);
     for (const p of OTHER_PAGES) expect(hrefs).toContain(p.href);
     for (const slug of DOMAIN_SLUGS) expect(hrefs).toContain(historyHref(slug));
-    for (const href of ["/config/strategy", "/config/jobs", "/transactions"]) expect(hrefs).toContain(href);
+    for (const href of ["/config/strategy", "/config/jobs", "/transactions", "/theses", "/review"]) {
+      expect(hrefs).toContain(href);
+    }
   });
 
   it("finds the new pages by typing", () => {
     expect(filterCommands(commands, "dividends")[0].href).toBe("/transactions");
     expect(filterCommands(commands, "history strategy")[0].href).toBe("/config/history/strategy");
     expect(filterCommands(commands, "cron").map((c) => c.href)).toContain("/config/jobs");
+  });
+
+  it("finds the thesis board and the review queue by typing", () => {
+    expect(filterCommands(commands, "thesis board")[0].href).toBe("/theses");
+    expect(filterCommands(commands, "breach").map((c) => c.href)).toContain("/theses");
+    expect(filterCommands(commands, "review queue")[0].href).toBe("/review");
+    expect(filterCommands(commands, "quarantined").map((c) => c.href)).toContain("/review");
+    expect(filterCommands(commands, "review apple")[0].href).toBe("/review?ticker=AAPL_US_EQ");
   });
 
   it("finds the re-run earnings check action by typing", () => {
@@ -34,7 +44,8 @@ describe("command palette", () => {
     expect(filterCommands(commands, "news zebra")).toEqual([]);
   });
 
-  it("hides per-holding actions until something is typed", () => {
-    expect(filterCommands(commands, "", 100).some((c) => c.id.startsWith("earnings:"))).toBe(false);
+  it("hides per-holding actions and queues until something is typed", () => {
+    const shown = filterCommands(commands, "", 100);
+    expect(shown.some((c) => c.id.startsWith("earnings:") || c.id.startsWith("review:"))).toBe(false);
   });
 });
