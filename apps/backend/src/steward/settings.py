@@ -9,6 +9,7 @@ needs to start and to reach its dependencies.
 from functools import lru_cache
 from pathlib import Path
 from typing import Annotated, Literal
+from urllib.parse import urlsplit
 
 from pydantic import Field, SecretStr, field_validator
 from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
@@ -59,8 +60,17 @@ class Settings(BaseSettings):
 
     @field_validator("supabase_url")
     @classmethod
-    def _strip_trailing_slash(cls, value: str | None) -> str | None:
-        return value.rstrip("/") if value else value
+    def _project_url_only(cls, value: str | None) -> str | None:
+        if not value:
+            return value
+        value = value.rstrip("/")
+        parts = urlsplit(value)
+        if parts.scheme not in ("http", "https") or not parts.netloc or parts.path:
+            raise ValueError(
+                "SUPABASE_URL must be the bare project URL, e.g. https://<ref>.supabase.co "
+                "(no /rest/v1 or other path)"
+            )
+        return value
 
     def secret_values(self) -> list[str]:
         """Every configured secret, for the log scrubber."""

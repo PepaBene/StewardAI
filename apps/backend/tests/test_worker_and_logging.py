@@ -88,3 +88,23 @@ def test_filter_keeps_uvicorn_access_log_args_intact() -> None:
     line = AccessFormatter("%(client_addr)s %(request_line)s %(status_code)s").format(record)
     assert "GET /health?token=[REDACTED] HTTP/1.1" in line
     assert "200" in line and "s3cr3t-value" not in line
+
+
+@pytest.mark.parametrize(
+    "url",
+    ["https://abc.supabase.co/rest/v1/", "https://abc.supabase.co/auth/v1", "abc.supabase.co"],
+)
+def test_supabase_url_must_be_bare_project_url(url: str) -> None:
+    from pydantic import ValidationError
+
+    from steward.settings import Settings
+
+    with pytest.raises(ValidationError, match="bare project URL"):
+        Settings(_env_file=None, supabase_url=url)  # type: ignore[call-arg]
+
+
+def test_supabase_url_trailing_slash_is_trimmed() -> None:
+    from steward.settings import Settings
+
+    settings = Settings(_env_file=None, supabase_url="https://abc.supabase.co/")  # type: ignore[call-arg]
+    assert settings.supabase_url == "https://abc.supabase.co"

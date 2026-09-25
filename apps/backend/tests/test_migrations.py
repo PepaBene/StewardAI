@@ -19,8 +19,8 @@ STRANGER = uuid.UUID("00000000-0000-0000-0000-00000000000b")
 
 
 async def test_all_migrations_apply(migrated_db: MigratedDatabase) -> None:
-    assert "20260925000100_app_backend_role.sql" in migrated_db.applied
-    assert "20260925000300_foundation_tables.sql" in migrated_db.applied
+    assert "20260925141607_app_backend_role.sql" in migrated_db.applied
+    assert "20260925141643_foundation_tables.sql" in migrated_db.applied
 
 
 async def test_backend_reads_and_writes_foundation_tables(migrated_db: MigratedDatabase) -> None:
@@ -194,7 +194,7 @@ async def test_pgmq_enabled_and_usable_by_backend(migrated_db: MigratedDatabase)
     """Phase 0 AC: `select * from pgmq.list_queues();` returns empty with no error.
 
     Runs where pgmq is installed (CI uses a pgmq Postgres image; Supabase ships it)."""
-    if "20260925000200_enable_pgmq.sql" not in migrated_db.applied:
+    if "20260925141614_enable_pgmq.sql" not in migrated_db.applied:
         pytest.skip("pgmq extension not available on this server")
     backend = await asyncpg.connect(migrated_db.backend_url)
     admin = await asyncpg.connect(migrated_db.admin_url)

@@ -19,9 +19,9 @@ jobs:
       run:
         working-directory: apps/backend
     services:
-      # Plain Postgres 17 plus pgmq, so the pgmq migration is exercised too.
+      # Postgres 17 + pgmq 1.5.1, the version Supabase runs, so the pgmq migration is tested too.
       postgres:
-        image: ghcr.io/pgmq/pg17-pgmq:v1.13.0
+        image: ghcr.io/pgmq/pg17-pgmq:v1.5.1
         env:
           POSTGRES_PASSWORD: postgres
         ports: ["5432:5432"]
