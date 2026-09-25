@@ -118,11 +118,24 @@ async def _sleep_or_stop(stop: asyncio.Event, seconds: float) -> None:
         await asyncio.wait_for(stop.wait(), timeout=seconds)
 
 
+def install_stop_handlers(loop: asyncio.AbstractEventLoop, stop: asyncio.Event) -> None:
+    """Set `stop` on SIGINT (Ctrl+C) or SIGTERM.
+
+    asyncio's add_signal_handler exists only on Unix event loops; on Windows it raises
+    NotImplementedError, so fall back to plain signal handlers that hand the event back
+    to the loop thread-safely.
+    """
+    for sig in (signal.SIGINT, signal.SIGTERM):
+        try:
+            loop.add_signal_handler(sig, stop.set)
+        except NotImplementedError:
+            signal.signal(sig, lambda _signum, _frame: loop.call_soon_threadsafe(stop.set))
+
+
 async def run() -> None:
     stop = asyncio.Event()
     loop = asyncio.get_running_loop()
-    for sig in (signal.SIGINT, signal.SIGTERM):
-        loop.add_signal_handler(sig, stop.set)
+    install_stop_handlers(loop, stop)
 
     settings = get_settings()
     scheduler = build_scheduler()
