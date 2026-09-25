@@ -8,6 +8,9 @@
 --                      corrects). Owner overrides always win.
 --   fact_review        every owner decision on a held or quarantined fact (accept, correct,
 --                      reject), with its reason. Append-only.
+--   instrument         + pending_report_date: a passed report date whose earnings check has not
+--                      succeeded yet, kept when the calendar moves next_report_date on, so the
+--                      +2 and +4 day retries still run.
 --   fact_reconciliation cross-source checks of stored facts against the issuer's later
 --                      10-Q/10-K XBRL figures. A mismatch quarantines the fact.
 --
@@ -29,6 +32,15 @@ comment on column public.job_step.prices is
   'Budget config prices the step was costed with: cost_usd = tokens x these prices.';
 
 create index job_step_cost on public.job_step (started_at) where cost_usd is not null;
+
+-- ---------------------------------------------------------------------------
+-- Earnings-check triggers
+-- ---------------------------------------------------------------------------
+alter table public.instrument add column pending_report_date date;
+
+comment on column public.instrument.pending_report_date is
+  'A report date that has passed without a successful earnings check; retried until the '
+  'last configured offset even after next_report_date moved to the following report.';
 
 -- ---------------------------------------------------------------------------
 -- Owner review and overrides

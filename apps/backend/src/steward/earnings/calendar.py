@@ -1,14 +1,20 @@
 """Report dates and the trigger that turns them into earnings checks.
 
-`earnings_calendar` (weekly by default) sets each holding's `instrument.next_report_date`:
+`earnings_calendar` (weekly, Sundays by default) refreshes the holdings that report within
+`refresh_within_days` (default 14) or have no date yet; `earnings_calendar_full`
+(quarterly) refreshes every holding. Each sets `instrument.next_report_date`:
 - from Finnhub's earnings calendar when FINNHUB_API_KEY is set and it lists the symbol;
 - otherwise from the company's IR financial calendar page (holding profile), read by a
   Claude call whose every date must be quoted verbatim from the page and must visibly
   contain that day and month.
+A report date that has passed without a successful check is kept as
+`pending_report_date` when the refresh moves `next_report_date` on, so its retries still run.
 
-`earnings_due` (daily) queues an `earnings_check` for every holding whose report date was
-N days ago, for each N in the Jobs config (default +1, +2, +4), unless a check for that
-report date already succeeded or is already queued.
+`earnings_due` (daily) queues an `earnings_check` for every holding whose report date (next
+or pending) was N days ago, for each N in the Jobs config (default +1, +2, +4), unless a
+check for that report date already succeeded or is already queued. So a report date gives
+at most those attempts and none after the first success; a date moved by the calendar
+moves the attempts with it.
 """
 
 import calendar as cal
@@ -138,16 +144,96 @@ async def _holding_tickers(pool: asyncpg.Pool, theses_tickers: list[str]) -> lis
     return sorted({r["ticker"] for r in rows} | set(theses_tickers))
 
 
+async def due_for_refresh(
+    pool: asyncpg.Pool, tickers: list[str], today: dt.date, within_days: int
+) -> list[str]:
+    """Holdings with no upcoming date, or one within `within_days`."""
+    rows = await pool.fetch(
+        "select t212_ticker, next_report_date from public.instrument"
+        " where t212_ticker = any($1::text[])",
+        tickers,
+    )
+    dates = {r["t212_ticker"]: r["next_report_date"] for r in rows}
+    horizon = today + dt.timedelta(days=within_days)
+    return [t for t in tickers if dates.get(t) is None or dates[t] < today or dates[t] <= horizon]
+
+
+async def _check_succeeded(pool: asyncpg.Pool, ticker: str, report_date: dt.date) -> bool:
+    return bool(
+        await pool.fetchval(
+            "select exists (select 1 from public.job where job_type = 'earnings_check'"
+            " and params ->> 'ticker' = $1 and params ->> 'report_date' = $2"
+            " and status = 'succeeded')",
+            ticker,
+            report_date.isoformat(),
+        )
+    )
+
+
+async def set_report_date(
+    pool: asyncpg.Pool,
+    ticker: str,
+    found: dt.date | None,
+    source: str,
+    today: dt.date,
+    retry_days: int,
+) -> dt.date | None:
+    """Store a refreshed date. A passed date still inside its retry window and without a
+    successful check becomes `pending_report_date`. Returns that pending date, if any."""
+    row = await pool.fetchrow(
+        "select next_report_date, pending_report_date from public.instrument"
+        " where t212_ticker = $1",
+        ticker,
+    )
+    if row is None:
+        return None
+    current: dt.date | None = row["next_report_date"]
+    pending: dt.date | None = row["pending_report_date"]
+    if (
+        found is not None
+        and current is not None
+        and current != found
+        and current < today
+        and (today - current).days <= retry_days
+        and not await _check_succeeded(pool, ticker, current)
+    ):
+        pending = current
+    if pending is not None and (today - pending).days > retry_days:
+        pending = None
+    await pool.execute(
+        "update public.instrument set report_date_checked_at = now(),"
+        " next_report_date = coalesce($2, next_report_date),"
+        " report_date_source = case when $2::date is null then report_date_source"
+        " else $3 end, pending_report_date = $4 where t212_ticker = $1",
+        ticker,
+        found,
+        source,
+        pending,
+    )
+    return pending
+
+
 async def earnings_calendar_handler(ctx: JobContext) -> None:
+    await refresh_calendar(ctx, full=False)
+
+
+async def earnings_calendar_full_handler(ctx: JobContext) -> None:
+    await refresh_calendar(ctx, full=True)
+
+
+async def refresh_calendar(ctx: JobContext, *, full: bool) -> None:
     settings = get_settings()
     pool = ctx.pool
+    today = local_today()
     async with ctx.step("load_config") as step:
         config = await load_config(ctx)
         cal_settings = config.jobs.earnings_calendar_settings
         tickers = await _holding_tickers(pool, [t.ticker for t in config.theses.theses])
-        step.detail["tickers"] = tickers
+        if not full and not ctx.params.get("all"):
+            tickers = await due_for_refresh(pool, tickers, today, cal_settings.refresh_within_days)
+        step.detail.update(tickers=tickers, scope="all" if full else "due")
+    retry_days = max(config.jobs.earnings_check.check_days_after_report, default=0)
 
-    today = local_today()
     end = today + dt.timedelta(days=cal_settings.lookahead_days)
     client: anthropic.AsyncAnthropic | None
     try:
@@ -166,15 +252,9 @@ async def earnings_calendar_handler(ctx: JobContext) -> None:
                     http, client, finnhub_key, profile, cal_settings, today, end, step
                 )
                 step.detail.update(next_report_date=found, source=source)
-                await pool.execute(
-                    "update public.instrument set report_date_checked_at = now(),"
-                    " next_report_date = coalesce($2, next_report_date),"
-                    " report_date_source = case when $2::date is null then report_date_source"
-                    " else $3 end where t212_ticker = $1",
-                    ticker,
-                    found,
-                    source,
-                )
+                pending = await set_report_date(pool, ticker, found, source, today, retry_days)
+                if pending is not None:
+                    step.detail["pending_report_date"] = pending
 
 
 async def _find_date(
@@ -218,24 +298,29 @@ async def _find_date(
 
 
 async def earnings_due_handler(ctx: JobContext) -> None:
-    pool = ctx.pool
     async with ctx.step("load_config") as step:
         config = await load_config(ctx)
         offsets = sorted(set(config.jobs.earnings_check.check_days_after_report))
         step.detail["offsets"] = offsets
-    today = local_today()
     async with ctx.step("queue_checks") as step:
-        queued: list[str] = []
-        rows = await pool.fetch(
-            "select t212_ticker, next_report_date from public.instrument"
-            " where next_report_date is not null and next_report_date <= $1",
-            today,
-        )
-        for row in rows:
-            report_date: dt.date = row["next_report_date"]
+        step.detail["queued"] = await queue_due_checks(ctx.pool, offsets, local_today())
+
+
+async def queue_due_checks(pool: asyncpg.Pool, offsets: list[int], today: dt.date) -> list[str]:
+    """Queue an earnings check for every (holding, report date) that is exactly N days old
+    today for an N in `offsets`, unless a check for that date succeeded or is in flight."""
+    queued: list[str] = []
+    rows = await pool.fetch(
+        "select t212_ticker, next_report_date, pending_report_date from public.instrument"
+        " where next_report_date <= $1 or pending_report_date <= $1",
+        today,
+    )
+    for row in rows:
+        ticker = row["t212_ticker"]
+        dates = {d for d in (row["next_report_date"], row["pending_report_date"]) if d}
+        for report_date in sorted(dates):
             if (today - report_date).days not in offsets:
                 continue
-            ticker = row["t212_ticker"]
             done = await pool.fetchval(
                 "select exists (select 1 from public.job where job_type = 'earnings_check'"
                 " and params ->> 'ticker' = $1 and params ->> 'report_date' = $2"
@@ -254,4 +339,4 @@ async def earnings_due_handler(ctx: JobContext) -> None:
                 )
                 await queue.enqueue(conn, job_id, "earnings_check")
             queued.append(f"{ticker} ({report_date.isoformat()})")
-        step.detail["queued"] = queued
+    return queued

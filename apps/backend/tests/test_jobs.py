@@ -214,7 +214,9 @@ async def test_schedule_follows_the_jobs_config() -> None:
     assert apply_jobs_config(scheduler, JobsConfig(), run) == [
         "daily_digest",
         "earnings_calendar",
+        "earnings_calendar_full",
         "earnings_due",
+        "fact_reconcile",
         "news_ingest",
         "portfolio_sync",
         "weekly_digest",

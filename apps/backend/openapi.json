@@ -863,6 +863,53 @@
         ]
       }
     },
+    "/jobs/fact-reconcile": {
+      "post": {
+        "tags": [
+          "jobs"
+        ],
+        "summary": "Run Fact Reconcile",
+        "description": "Check stored results figures against the issuers' 10-Q/10-K XBRL now.",
+        "operationId": "run_fact_reconcile",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReconcileRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "202": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/JobSummary"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
     "/jobs/earnings-calendar": {
       "post": {
         "tags": [
@@ -878,6 +925,33 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/JobSummary"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/theses/board": {
+      "get": {
+        "tags": [
+          "holdings"
+        ],
+        "summary": "Get Thesis Board",
+        "description": "Every holding with a thesis, once: each KPI's current pass / breach / unknown with the\nverdict behind it. A KPI never judged is listed as unknown, never left out.",
+        "operationId": "get_thesis_board",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ThesisBoard"
                 }
               }
             }
@@ -993,7 +1067,7 @@
           "holdings"
         ],
         "summary": "Review Fact",
-        "description": "Release or reject a fact the validator held for review (sanity bound, restatement,\ncurrency). Verdicts for the holding are re-run afterwards.",
+        "description": "Decide on a fact: accept a held or quarantined one, correct any fact (the owner's\nvalue is stored as a new fact that wins), or reject it. The decision and its reason are\nlogged, and the holding's verdicts are re-judged by the worker.",
         "operationId": "review_fact",
         "security": [
           {
@@ -1028,6 +1102,66 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/FactReviewResult"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/facts/review-queue": {
+      "get": {
+        "tags": [
+          "holdings"
+        ],
+        "summary": "Get Review Queue",
+        "description": "Facts waiting for the owner: held by the validator or quarantined by reconciliation,\neach with its snippet, source, the checks it broke and the reconciliation behind it.",
+        "operationId": "get_review_queue",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "ticker",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "pattern": "^[A-Za-z0-9._-]{1,32}$"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Ticker"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/ReviewItem"
+                  },
+                  "title": "Response Get Review Queue"
                 }
               }
             }
@@ -2984,6 +3118,141 @@
         ],
         "title": "BaseTotals"
       },
+      "BoardKpi": {
+        "properties": {
+          "kpi": {
+            "$ref": "#/components/schemas/ThesisKPI"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "pass",
+              "breach",
+              "unknown"
+            ],
+            "title": "Status",
+            "description": "The current verdict's status; unknown when there is none yet."
+          },
+          "verdict": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/VerdictOut"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Null: never judged (shown as unknown)."
+          }
+        },
+        "type": "object",
+        "required": [
+          "kpi",
+          "status",
+          "verdict"
+        ],
+        "title": "BoardKpi"
+      },
+      "BoardRow": {
+        "properties": {
+          "ticker": {
+            "type": "string",
+            "title": "Ticker"
+          },
+          "name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
+          },
+          "why_owned": {
+            "type": "string",
+            "title": "Why Owned"
+          },
+          "review_date": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Review Date"
+          },
+          "review_overdue": {
+            "type": "boolean",
+            "title": "Review Overdue"
+          },
+          "held": {
+            "type": "boolean",
+            "title": "Held",
+            "description": "In the latest portfolio snapshot."
+          },
+          "weight": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Weight"
+          },
+          "overall": {
+            "type": "string",
+            "enum": [
+              "breach",
+              "unknown",
+              "pass",
+              "no_kpis"
+            ],
+            "title": "Overall",
+            "description": "breach if any KPI breaches, else unknown if any is unknown, else pass."
+          },
+          "counts": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "type": "object",
+            "title": "Counts"
+          },
+          "kpis": {
+            "items": {
+              "$ref": "#/components/schemas/BoardKpi"
+            },
+            "type": "array",
+            "title": "Kpis"
+          },
+          "open_review_items": {
+            "type": "integer",
+            "title": "Open Review Items",
+            "description": "Held or quarantined facts for this holding."
+          }
+        },
+        "type": "object",
+        "required": [
+          "ticker",
+          "name",
+          "why_owned",
+          "review_date",
+          "review_overdue",
+          "held",
+          "weight",
+          "overall",
+          "counts",
+          "kpis",
+          "open_review_items"
+        ],
+        "title": "BoardRow"
+      },
       "BucketDrift": {
         "properties": {
           "bucket": {
@@ -4189,6 +4458,14 @@
             "minimum": 7.0,
             "title": "Lookahead Days",
             "default": 120
+          },
+          "refresh_within_days": {
+            "type": "integer",
+            "maximum": 120.0,
+            "minimum": 1.0,
+            "title": "Refresh Within Days",
+            "description": "The weekly run refreshes holdings reporting within this many days (and those with no date); the quarterly run refreshes every holding.",
+            "default": 14
           }
         },
         "additionalProperties": false,
@@ -4903,6 +5180,15 @@
             ],
             "title": "Reviewed At"
           },
+          "origin": {
+            "type": "string",
+            "enum": [
+              "extraction",
+              "owner"
+            ],
+            "title": "Origin",
+            "description": "owner: a correction the owner entered; it wins over the extracted value."
+          },
           "confidence": {
             "type": "string",
             "enum": [
@@ -4939,6 +5225,7 @@
           "restates_fact_id",
           "extracted_at",
           "reviewed_at",
+          "origin",
           "confidence"
         ],
         "title": "FactOut"
@@ -4948,27 +5235,40 @@
           "action": {
             "type": "string",
             "enum": [
-              "verify",
+              "accept",
+              "correct",
               "reject"
             ],
             "title": "Action"
           },
-          "note": {
+          "reason": {
+            "type": "string",
+            "maxLength": 500,
+            "minLength": 1,
+            "title": "Reason",
+            "description": "Logged with the decision."
+          },
+          "value": {
             "anyOf": [
               {
+                "type": "number"
+              },
+              {
                 "type": "string",
-                "maxLength": 500
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
               },
               {
                 "type": "null"
               }
             ],
-            "title": "Note"
+            "title": "Value",
+            "description": "For `correct`: the right value, in the fact's printed scale (the same scale as `value`, e.g. millions)."
           }
         },
         "type": "object",
         "required": [
-          "action"
+          "action",
+          "reason"
         ],
         "title": "FactReview"
       },
@@ -4986,6 +5286,17 @@
             ],
             "title": "Status"
           },
+          "corrected_fact_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Corrected Fact Id"
+          },
           "verdict_job": {
             "$ref": "#/components/schemas/JobSummary"
           }
@@ -4994,9 +5305,28 @@
         "required": [
           "fact_id",
           "status",
+          "corrected_fact_id",
           "verdict_job"
         ],
         "title": "FactReviewResult"
+      },
+      "FailedCheck": {
+        "properties": {
+          "check": {
+            "type": "string",
+            "title": "Check"
+          },
+          "detail": {
+            "type": "string",
+            "title": "Detail"
+          }
+        },
+        "type": "object",
+        "required": [
+          "check",
+          "detail"
+        ],
+        "title": "FailedCheck"
       },
       "Freshness": {
         "properties": {
@@ -5963,11 +6293,19 @@
           },
           "earnings_calendar": {
             "$ref": "#/components/schemas/JobSchedule",
-            "description": "Refresh every holding's next report date. Default: Sundays 06:00."
+            "description": "Refresh the report date of holdings reporting soon (see earnings_calendar_settings.refresh_within_days). Default: Sundays 06:00."
+          },
+          "earnings_calendar_full": {
+            "$ref": "#/components/schemas/JobSchedule",
+            "description": "Refresh every holding's report date from its IR calendar. Default: quarterly, 1 Jan/Apr/Jul/Oct 05:00."
           },
           "earnings_due": {
             "$ref": "#/components/schemas/JobSchedule",
             "description": "Queue earnings checks for holdings that reported. Default: daily 08:00."
+          },
+          "fact_reconcile": {
+            "$ref": "#/components/schemas/JobSchedule",
+            "description": "Check stored results figures against the issuers' 10-Q/10-K XBRL. Default: daily 09:00."
           },
           "news_ingest": {
             "$ref": "#/components/schemas/JobSchedule",
@@ -7188,6 +7526,149 @@
         ],
         "title": "ReadinessResponse"
       },
+      "ReconcileRequest": {
+        "properties": {
+          "ticker": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^[A-Za-z0-9._-]{1,32}$",
+                "examples": [
+                  "AAPL_US_EQ"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ticker",
+            "description": "One holding, or all when null."
+          }
+        },
+        "type": "object",
+        "title": "ReconcileRequest"
+      },
+      "ReconciliationOut": {
+        "properties": {
+          "concept": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Concept"
+          },
+          "accession": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Accession"
+          },
+          "form": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Form"
+          },
+          "period_end": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Period End"
+          },
+          "derivation": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Derivation"
+          },
+          "xbrl_value": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Xbrl Value"
+          },
+          "difference": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Difference"
+          },
+          "outcome": {
+            "type": "string",
+            "enum": [
+              "match",
+              "mismatch",
+              "no_data"
+            ],
+            "title": "Outcome"
+          },
+          "detail": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Detail"
+          },
+          "checked_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Checked At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "concept",
+          "accession",
+          "form",
+          "period_end",
+          "derivation",
+          "xbrl_value",
+          "difference",
+          "outcome",
+          "detail",
+          "checked_at"
+        ],
+        "title": "ReconciliationOut"
+      },
       "ReportOut": {
         "properties": {
           "id": {
@@ -7362,6 +7843,70 @@
           "delivery"
         ],
         "title": "ReportSummary"
+      },
+      "ReviewItem": {
+        "properties": {
+          "ticker": {
+            "type": "string",
+            "title": "Ticker"
+          },
+          "name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
+          },
+          "fact": {
+            "$ref": "#/components/schemas/FactOut"
+          },
+          "why": {
+            "type": "string",
+            "title": "Why",
+            "description": "Held by the validator, or quarantined by reconciliation."
+          },
+          "failed_checks": {
+            "items": {
+              "$ref": "#/components/schemas/FailedCheck"
+            },
+            "type": "array",
+            "title": "Failed Checks",
+            "description": "The checks (bounds) the figure broke, with their detail."
+          },
+          "restates": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/FactOut"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The stored fact a restatement differs from."
+          },
+          "reconciliation": {
+            "items": {
+              "$ref": "#/components/schemas/ReconciliationOut"
+            },
+            "type": "array",
+            "title": "Reconciliation"
+          }
+        },
+        "type": "object",
+        "required": [
+          "ticker",
+          "name",
+          "fact",
+          "why",
+          "failed_checks",
+          "restates",
+          "reconciliation"
+        ],
+        "title": "ReviewItem"
       },
       "RuleMatch": {
         "properties": {
@@ -8029,6 +8574,48 @@
           "body"
         ],
         "title": "ThesesConfigVersion"
+      },
+      "ThesisBoard": {
+        "properties": {
+          "theses_config_version_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Theses Config Version Id"
+          },
+          "as_of": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "As Of",
+            "description": "Newest verdict shown."
+          },
+          "rows": {
+            "items": {
+              "$ref": "#/components/schemas/BoardRow"
+            },
+            "type": "array",
+            "title": "Rows"
+          }
+        },
+        "type": "object",
+        "required": [
+          "theses_config_version_id",
+          "as_of",
+          "rows"
+        ],
+        "title": "ThesisBoard"
       },
       "ThesisConfig": {
         "properties": {

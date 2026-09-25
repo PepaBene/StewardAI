@@ -64,6 +64,13 @@ class EarningsCalendarSettings(ConfigModel):
         default="claude-haiku-4-5", description="Reads report dates off IR calendar pages."
     )
     lookahead_days: int = Field(default=120, ge=7, le=400)
+    refresh_within_days: int = Field(
+        default=14,
+        ge=1,
+        le=120,
+        description="The weekly run refreshes holdings reporting within this many days (and "
+        "those with no date); the quarterly run refreshes every holding.",
+    )
 
 
 class NewsSettings(ConfigModel):
@@ -126,11 +133,22 @@ class JobsConfig(ConfigModel):
 
     earnings_calendar: JobSchedule = Field(
         default_factory=lambda: JobSchedule(cron="0 6 * * 0"),
-        description="Refresh every holding's next report date. Default: Sundays 06:00.",
+        description="Refresh the report date of holdings reporting soon (see "
+        "earnings_calendar_settings.refresh_within_days). Default: Sundays 06:00.",
+    )
+    earnings_calendar_full: JobSchedule = Field(
+        default_factory=lambda: JobSchedule(cron="0 5 1 1,4,7,10 *"),
+        description="Refresh every holding's report date from its IR calendar. Default: "
+        "quarterly, 1 Jan/Apr/Jul/Oct 05:00.",
     )
     earnings_due: JobSchedule = Field(
         default_factory=lambda: JobSchedule(cron="0 8 * * *"),
         description="Queue earnings checks for holdings that reported. Default: daily 08:00.",
+    )
+    fact_reconcile: JobSchedule = Field(
+        default_factory=lambda: JobSchedule(cron="0 9 * * *"),
+        description="Check stored results figures against the issuers' 10-Q/10-K XBRL. "
+        "Default: daily 09:00.",
     )
     news_ingest: JobSchedule = Field(
         default_factory=lambda: JobSchedule(cron="0 6-22/2 * * *"),
@@ -155,7 +173,9 @@ class JobsConfig(ConfigModel):
         return {
             "portfolio_sync": self.portfolio_sync,
             "earnings_calendar": self.earnings_calendar,
+            "earnings_calendar_full": self.earnings_calendar_full,
             "earnings_due": self.earnings_due,
+            "fact_reconcile": self.fact_reconcile,
             "news_ingest": self.news_ingest,
             "daily_digest": self.daily_digest,
             "weekly_digest": self.weekly_digest,

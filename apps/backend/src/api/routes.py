@@ -3,6 +3,7 @@ versioned config."""
 
 import datetime as dt
 from collections.abc import AsyncIterator
+from decimal import Decimal
 from typing import Annotated, Any, Literal
 
 import httpx
@@ -21,14 +22,19 @@ from steward.config import (
 )
 from steward.config.common import Ticker
 from steward.config.store import StoredConfig, load_active, save_config
+from steward.earnings.check import local_today
 from steward.earnings.read import (
     FACT_CONFIDENCE,
     EvidenceLink,
     HoldingDetail,
+    ThesisBoard,
     document_text,
     holding_detail,
     snippet_context,
+    thesis_board,
 )
+from steward.earnings.review import ReviewError, ReviewItem, review_queue
+from steward.earnings.review import review_fact as review_fact_in_db
 from steward.jobs import queue
 from steward.jobs.runner import create_job
 from steward.portfolio.read import (
@@ -168,10 +174,22 @@ async def run_thesis_verdicts(body: ThesisVerdictsRequest, pool: Pool, owner: Ow
     )
 
 
+class ReconcileRequest(BaseModel):
+    ticker: Ticker | None = Field(default=None, description="One holding, or all when null.")
+
+
+@router.post("/jobs/fact-reconcile", tags=["jobs"], status_code=status.HTTP_202_ACCEPTED)
+async def run_fact_reconcile(body: ReconcileRequest, pool: Pool, owner: Owner) -> JobSummary:
+    """Check stored results figures against the issuers' 10-Q/10-K XBRL now."""
+    return await _enqueue(
+        pool, "fact_reconcile", owner.user_id, body.model_dump(mode="json", exclude_none=True)
+    )
+
+
 @router.post("/jobs/earnings-calendar", tags=["jobs"], status_code=status.HTTP_202_ACCEPTED)
 async def run_earnings_calendar(pool: Pool, owner: Owner) -> JobSummary:
     """Refresh every holding's next report date now."""
-    return await _enqueue(pool, "earnings_calendar", owner.user_id)
+    return await _enqueue(pool, "earnings_calendar", owner.user_id, {"all": True})
 
 
 # ---------------------------------------------------------------------------
@@ -195,6 +213,13 @@ async def get_storage() -> AsyncIterator[EvidenceStore]:
 
 
 Storage = Annotated[EvidenceStore, Depends(get_storage)]
+
+
+@router.get("/theses/board", tags=["holdings"])
+async def get_thesis_board(pool: Pool, _owner: Owner) -> ThesisBoard:
+    """Every holding with a thesis, once: each KPI's current pass / breach / unknown with the
+    verdict behind it. A KPI never judged is listed as unknown, never left out."""
+    return await thesis_board(pool, local_today())
 
 
 @router.get("/holdings/{ticker}", tags=["holdings"])
@@ -249,41 +274,57 @@ async def get_fact_evidence(
 
 
 class FactReview(BaseModel):
-    action: Literal["verify", "reject"]
-    note: str | None = Field(default=None, max_length=500)
+    action: Literal["accept", "correct", "reject"]
+    reason: str = Field(min_length=1, max_length=500, description="Logged with the decision.")
+    value: Decimal | None = Field(
+        default=None,
+        description="For `correct`: the right value, in the fact's printed scale (the same "
+        "scale as `value`, e.g. millions).",
+    )
 
 
 class FactReviewResult(BaseModel):
     fact_id: int
     status: Literal["verified", "rejected"]
+    corrected_fact_id: int | None
     verdict_job: JobSummary
 
 
 @router.post("/facts/{fact_id}/review", tags=["holdings"])
 async def review_fact(fact_id: int, body: FactReview, pool: Pool, owner: Owner) -> FactReviewResult:
-    """Release or reject a fact the validator held for review (sanity bound, restatement,
-    currency). Verdicts for the holding are re-run afterwards."""
-    new_status: Literal["verified", "rejected"] = (
-        "verified" if body.action == "verify" else "rejected"
-    )
-    reason = f"owner {body.action}" + (f": {body.note}" if body.note else "")
-    ticker = await pool.fetchval(
-        "update public.fact set status = $2, status_reason = $3, reviewed_at = now(),"
-        " reviewed_by = $4::uuid where id = $1 and status = 'unverified' returning ticker",
-        fact_id,
-        new_status,
-        reason,
-        owner.user_id,
-    )
-    if ticker is None:
-        exists = await pool.fetchval("select status from public.fact where id = $1", fact_id)
-        if exists is None:
-            raise HTTPException(status.HTTP_404_NOT_FOUND, f"No fact {fact_id}")
-        raise HTTPException(
-            status.HTTP_409_CONFLICT, f"Fact {fact_id} is {exists}; only held facts are reviewed"
+    """Decide on a fact: accept a held or quarantined one, correct any fact (the owner's
+    value is stored as a new fact that wins), or reject it. The decision and its reason are
+    logged, and the holding's verdicts are re-judged by the worker."""
+    try:
+        outcome = await review_fact_in_db(
+            pool,
+            fact_id,
+            body.action,
+            body.reason,
+            owner_id=owner.user_id,
+            corrected_value=body.value,
         )
-    job = await _enqueue(pool, "thesis_verdicts", owner.user_id, {"ticker": ticker})
-    return FactReviewResult(fact_id=fact_id, status=new_status, verdict_job=job)
+    except ReviewError as exc:
+        code = status.HTTP_404_NOT_FOUND if exc.not_found else status.HTTP_409_CONFLICT
+        raise HTTPException(code, str(exc)) from exc
+    job = await _enqueue(pool, "thesis_verdicts", owner.user_id, {"ticker": outcome.ticker})
+    return FactReviewResult(
+        fact_id=fact_id,
+        status="verified" if outcome.status == "verified" else "rejected",
+        corrected_fact_id=outcome.corrected_fact_id,
+        verdict_job=job,
+    )
+
+
+@router.get("/facts/review-queue", tags=["holdings"])
+async def get_review_queue(
+    pool: Pool,
+    _owner: Owner,
+    ticker: Annotated[str | None, Query(pattern=r"^[A-Za-z0-9._-]{1,32}$")] = None,
+) -> list[ReviewItem]:
+    """Facts waiting for the owner: held by the validator or quarantined by reconciliation,
+    each with its snippet, source, the checks it broke and the reconciliation behind it."""
+    return await review_queue(pool, ticker)
 
 
 # ---------------------------------------------------------------------------
