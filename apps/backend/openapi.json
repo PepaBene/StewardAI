@@ -1,0 +1,923 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "StewardAI API",
+    "version": "0.1.0"
+  },
+  "paths": {
+    "/health": {
+      "get": {
+        "tags": [
+          "system"
+        ],
+        "summary": "Health",
+        "description": "Liveness check for the frontend and the uptime monitor. No auth.",
+        "operationId": "health",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HealthResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/config/strategy/validate": {
+      "post": {
+        "tags": [
+          "config"
+        ],
+        "summary": "Validate Strategy",
+        "description": "Validate a strategy config without saving it. Returns it with defaults applied;\nan invalid body gets a 422 listing every error.",
+        "operationId": "validate_strategy",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/StrategyConfig"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StrategyConfig"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/config/theses/validate": {
+      "post": {
+        "tags": [
+          "config"
+        ],
+        "summary": "Validate Theses",
+        "description": "Validate the theses config without saving it. Returns it with defaults applied;\nan invalid body gets a 422 listing every error.",
+        "operationId": "validate_theses",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ThesesConfig"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ThesesConfig"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "CashWeightRule": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "maxLength": 64,
+            "pattern": "^[a-z0-9]+(-[a-z0-9]+)*$",
+            "title": "Id",
+            "examples": [
+              "max-single-position"
+            ]
+          },
+          "operator": {
+            "type": "string",
+            "enum": [
+              "<",
+              "<=",
+              ">",
+              ">=",
+              "=="
+            ],
+            "title": "Operator"
+          },
+          "on_breach": {
+            "type": "string",
+            "enum": [
+              "severity_1",
+              "severity_2",
+              "severity_3"
+            ],
+            "title": "On Breach",
+            "default": "severity_2"
+          },
+          "description": {
+            "type": "string",
+            "title": "Description",
+            "default": ""
+          },
+          "type": {
+            "type": "string",
+            "const": "cash_weight",
+            "title": "Type"
+          },
+          "value": {
+            "type": "number",
+            "maximum": 1.0,
+            "minimum": 0.0,
+            "title": "Value"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "id",
+          "operator",
+          "type",
+          "value"
+        ],
+        "title": "CashWeightRule"
+      },
+      "CategoryTarget": {
+        "properties": {
+          "target_weight": {
+            "type": "number",
+            "maximum": 1.0,
+            "minimum": 0.0,
+            "title": "Target Weight"
+          },
+          "band": {
+            "type": "number",
+            "maximum": 1.0,
+            "minimum": 0.0,
+            "title": "Band",
+            "description": "Allowed absolute deviation from the target, as a fraction (0.02 = ±2 pp).",
+            "default": 0.02
+          },
+          "dimension": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9_]{0,31}$",
+            "title": "Dimension",
+            "examples": [
+              "sector"
+            ]
+          },
+          "bucket": {
+            "type": "string",
+            "maxLength": 64,
+            "minLength": 1,
+            "title": "Bucket",
+            "examples": [
+              "Semiconductors"
+            ]
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "target_weight",
+          "dimension",
+          "bucket"
+        ],
+        "title": "CategoryTarget"
+      },
+      "CategoryWeightRule": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "maxLength": 64,
+            "pattern": "^[a-z0-9]+(-[a-z0-9]+)*$",
+            "title": "Id",
+            "examples": [
+              "max-single-position"
+            ]
+          },
+          "operator": {
+            "type": "string",
+            "enum": [
+              "<",
+              "<=",
+              ">",
+              ">=",
+              "=="
+            ],
+            "title": "Operator"
+          },
+          "on_breach": {
+            "type": "string",
+            "enum": [
+              "severity_1",
+              "severity_2",
+              "severity_3"
+            ],
+            "title": "On Breach",
+            "default": "severity_2"
+          },
+          "description": {
+            "type": "string",
+            "title": "Description",
+            "default": ""
+          },
+          "type": {
+            "type": "string",
+            "const": "category_weight",
+            "title": "Type"
+          },
+          "value": {
+            "type": "number",
+            "maximum": 1.0,
+            "minimum": 0.0,
+            "title": "Value"
+          },
+          "dimension": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9_]{0,31}$",
+            "title": "Dimension",
+            "examples": [
+              "sector"
+            ]
+          },
+          "bucket": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 64,
+                "minLength": 1,
+                "examples": [
+                  "Semiconductors"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Bucket"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "id",
+          "operator",
+          "type",
+          "value",
+          "dimension"
+        ],
+        "title": "CategoryWeightRule",
+        "description": "Limit on a category's weight; with no bucket it applies to every bucket of the dimension."
+      },
+      "HTTPValidationError": {
+        "properties": {
+          "detail": {
+            "items": {
+              "$ref": "#/components/schemas/ValidationError"
+            },
+            "type": "array",
+            "title": "Detail"
+          }
+        },
+        "type": "object",
+        "title": "HTTPValidationError"
+      },
+      "HealthResponse": {
+        "properties": {
+          "status": {
+            "type": "string",
+            "const": "ok",
+            "title": "Status"
+          },
+          "version": {
+            "type": "string",
+            "title": "Version"
+          }
+        },
+        "type": "object",
+        "required": [
+          "status",
+          "version"
+        ],
+        "title": "HealthResponse"
+      },
+      "PositionCountRule": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "maxLength": 64,
+            "pattern": "^[a-z0-9]+(-[a-z0-9]+)*$",
+            "title": "Id",
+            "examples": [
+              "max-single-position"
+            ]
+          },
+          "operator": {
+            "type": "string",
+            "enum": [
+              "<",
+              "<=",
+              ">",
+              ">=",
+              "=="
+            ],
+            "title": "Operator"
+          },
+          "on_breach": {
+            "type": "string",
+            "enum": [
+              "severity_1",
+              "severity_2",
+              "severity_3"
+            ],
+            "title": "On Breach",
+            "default": "severity_2"
+          },
+          "description": {
+            "type": "string",
+            "title": "Description",
+            "default": ""
+          },
+          "type": {
+            "type": "string",
+            "const": "position_count",
+            "title": "Type"
+          },
+          "value": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Value"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "id",
+          "operator",
+          "type",
+          "value"
+        ],
+        "title": "PositionCountRule"
+      },
+      "PositionTarget": {
+        "properties": {
+          "target_weight": {
+            "type": "number",
+            "maximum": 1.0,
+            "minimum": 0.0,
+            "title": "Target Weight"
+          },
+          "band": {
+            "type": "number",
+            "maximum": 1.0,
+            "minimum": 0.0,
+            "title": "Band",
+            "description": "Allowed absolute deviation from the target, as a fraction (0.02 = ±2 pp).",
+            "default": 0.02
+          },
+          "ticker": {
+            "type": "string",
+            "pattern": "^[A-Za-z0-9._-]{1,32}$",
+            "title": "Ticker",
+            "examples": [
+              "AAPL_US_EQ"
+            ]
+          },
+          "hard_limit": {
+            "anyOf": [
+              {
+                "type": "number",
+                "maximum": 1.0,
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Hard Limit",
+            "description": "Weight above which the position raises an alert, not just a digest flag."
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "target_weight",
+          "ticker"
+        ],
+        "title": "PositionTarget"
+      },
+      "PositionWeightRule": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "maxLength": 64,
+            "pattern": "^[a-z0-9]+(-[a-z0-9]+)*$",
+            "title": "Id",
+            "examples": [
+              "max-single-position"
+            ]
+          },
+          "operator": {
+            "type": "string",
+            "enum": [
+              "<",
+              "<=",
+              ">",
+              ">=",
+              "=="
+            ],
+            "title": "Operator"
+          },
+          "on_breach": {
+            "type": "string",
+            "enum": [
+              "severity_1",
+              "severity_2",
+              "severity_3"
+            ],
+            "title": "On Breach",
+            "default": "severity_2"
+          },
+          "description": {
+            "type": "string",
+            "title": "Description",
+            "default": ""
+          },
+          "type": {
+            "type": "string",
+            "const": "position_weight",
+            "title": "Type"
+          },
+          "value": {
+            "type": "number",
+            "maximum": 1.0,
+            "minimum": 0.0,
+            "title": "Value"
+          },
+          "ticker": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^[A-Za-z0-9._-]{1,32}$",
+                "examples": [
+                  "AAPL_US_EQ"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ticker"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "id",
+          "operator",
+          "type",
+          "value"
+        ],
+        "title": "PositionWeightRule",
+        "description": "Limit on a single position's weight; with no ticker it applies to every position."
+      },
+      "StrategyConfig": {
+        "properties": {
+          "schema_version": {
+            "type": "integer",
+            "const": 1,
+            "title": "Schema Version",
+            "default": 1
+          },
+          "base_currency": {
+            "type": "string",
+            "pattern": "^[A-Z]{3}$",
+            "title": "Base Currency",
+            "description": "Currency every value is converted to for the overview and allocation.",
+            "examples": [
+              "CZK"
+            ]
+          },
+          "fx_source": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "cnb",
+                  "ecb"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fx Source",
+            "description": "Reference FX rates. Defaults to ČNB for a CZK base currency, ECB otherwise."
+          },
+          "weight_basis": {
+            "type": "string",
+            "enum": [
+              "total",
+              "invested"
+            ],
+            "title": "Weight Basis",
+            "description": "'total' weighs positions against positions plus cash; 'invested' against positions only.",
+            "default": "total"
+          },
+          "goals": {
+            "type": "string",
+            "title": "Goals",
+            "default": ""
+          },
+          "horizon_years": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "maximum": 100.0,
+                "minimum": 1.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Horizon Years"
+          },
+          "notes": {
+            "type": "string",
+            "title": "Notes",
+            "description": "Free-text guidance the AI reads; never evaluated by code.",
+            "default": ""
+          },
+          "categories": {
+            "items": {
+              "type": "string",
+              "pattern": "^[a-z][a-z0-9_]{0,31}$",
+              "examples": [
+                "sector"
+              ]
+            },
+            "type": "array",
+            "title": "Categories",
+            "description": "Allocation dimensions. 'currency' is derived from the instrument unless a classification overrides it."
+          },
+          "classifications": {
+            "patternProperties": {
+              "^[A-Za-z0-9._-]{1,32}$": {
+                "patternProperties": {
+                  "^[a-z][a-z0-9_]{0,31}$": {
+                    "type": "string",
+                    "maxLength": 64,
+                    "minLength": 1,
+                    "examples": [
+                      "Semiconductors"
+                    ]
+                  }
+                },
+                "propertyNames": {
+                  "examples": [
+                    "sector"
+                  ]
+                },
+                "type": "object"
+              }
+            },
+            "propertyNames": {
+              "examples": [
+                "AAPL_US_EQ"
+              ]
+            },
+            "type": "object",
+            "title": "Classifications",
+            "description": "Bucket per dimension for each holding, e.g. {'ASML_EQ': {'sector': 'Semis'}}."
+          },
+          "cash_target": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/TargetBand"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "target_positions": {
+            "items": {
+              "$ref": "#/components/schemas/PositionTarget"
+            },
+            "type": "array",
+            "title": "Target Positions"
+          },
+          "target_categories": {
+            "items": {
+              "$ref": "#/components/schemas/CategoryTarget"
+            },
+            "type": "array",
+            "title": "Target Categories"
+          },
+          "rules": {
+            "items": {
+              "oneOf": [
+                {
+                  "$ref": "#/components/schemas/PositionWeightRule"
+                },
+                {
+                  "$ref": "#/components/schemas/CategoryWeightRule"
+                },
+                {
+                  "$ref": "#/components/schemas/CashWeightRule"
+                },
+                {
+                  "$ref": "#/components/schemas/PositionCountRule"
+                }
+              ],
+              "discriminator": {
+                "propertyName": "type",
+                "mapping": {
+                  "cash_weight": "#/components/schemas/CashWeightRule",
+                  "category_weight": "#/components/schemas/CategoryWeightRule",
+                  "position_count": "#/components/schemas/PositionCountRule",
+                  "position_weight": "#/components/schemas/PositionWeightRule"
+                }
+              }
+            },
+            "type": "array",
+            "title": "Rules"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "base_currency"
+        ],
+        "title": "StrategyConfig",
+        "description": "The owner's investment strategy.\n\nStored as the body of `config_version` rows with domain `strategy`."
+      },
+      "TargetBand": {
+        "properties": {
+          "target_weight": {
+            "type": "number",
+            "maximum": 1.0,
+            "minimum": 0.0,
+            "title": "Target Weight"
+          },
+          "band": {
+            "type": "number",
+            "maximum": 1.0,
+            "minimum": 0.0,
+            "title": "Band",
+            "description": "Allowed absolute deviation from the target, as a fraction (0.02 = ±2 pp).",
+            "default": 0.02
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "target_weight"
+        ],
+        "title": "TargetBand"
+      },
+      "ThesesConfig": {
+        "properties": {
+          "schema_version": {
+            "type": "integer",
+            "const": 1,
+            "title": "Schema Version",
+            "default": 1
+          },
+          "theses": {
+            "items": {
+              "$ref": "#/components/schemas/ThesisConfig"
+            },
+            "type": "array",
+            "title": "Theses"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "ThesesConfig",
+        "description": "All theses. Stored as the body of `config_version` rows, domain `theses`."
+      },
+      "ThesisConfig": {
+        "properties": {
+          "ticker": {
+            "type": "string",
+            "pattern": "^[A-Za-z0-9._-]{1,32}$",
+            "title": "Ticker",
+            "examples": [
+              "AAPL_US_EQ"
+            ]
+          },
+          "why_owned": {
+            "type": "string",
+            "minLength": 1,
+            "title": "Why Owned"
+          },
+          "kpis": {
+            "items": {
+              "$ref": "#/components/schemas/ThesisKPI"
+            },
+            "type": "array",
+            "title": "Kpis"
+          },
+          "exit_conditions": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Exit Conditions",
+            "description": "Conditions that would end the thesis, in plain words."
+          },
+          "review_date": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Review Date"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "ticker",
+          "why_owned"
+        ],
+        "title": "ThesisConfig"
+      },
+      "ThesisKPI": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "maxLength": 64,
+            "pattern": "^[a-z0-9]+(-[a-z0-9]+)*$",
+            "title": "Id",
+            "examples": [
+              "max-single-position"
+            ]
+          },
+          "metric": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9_]{0,63}$",
+            "title": "Metric",
+            "description": "Metric name the extraction job looks for.",
+            "examples": [
+              "revenue_growth_yoy"
+            ]
+          },
+          "operator": {
+            "type": "string",
+            "enum": [
+              "<",
+              "<=",
+              ">",
+              ">=",
+              "=="
+            ],
+            "title": "Operator"
+          },
+          "threshold": {
+            "type": "number",
+            "title": "Threshold"
+          },
+          "unit": {
+            "type": "string",
+            "maxLength": 32,
+            "minLength": 1,
+            "title": "Unit",
+            "examples": [
+              "%",
+              "EUR bn"
+            ]
+          },
+          "basis": {
+            "type": "string",
+            "enum": [
+              "reported",
+              "adjusted"
+            ],
+            "title": "Basis",
+            "default": "reported"
+          },
+          "period": {
+            "type": "string",
+            "enum": [
+              "quarter",
+              "annual",
+              "ttm"
+            ],
+            "title": "Period",
+            "default": "quarter"
+          },
+          "description": {
+            "type": "string",
+            "title": "Description",
+            "default": ""
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "id",
+          "metric",
+          "operator",
+          "threshold",
+          "unit"
+        ],
+        "title": "ThesisKPI",
+        "description": "An absolute threshold the owner sets. v1 has no consensus-estimate comparisons."
+      },
+      "ValidationError": {
+        "properties": {
+          "loc": {
+            "items": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "integer"
+                }
+              ]
+            },
+            "type": "array",
+            "title": "Location"
+          },
+          "msg": {
+            "type": "string",
+            "title": "Message"
+          },
+          "type": {
+            "type": "string",
+            "title": "Error Type"
+          },
+          "input": {
+            "title": "Input"
+          },
+          "ctx": {
+            "type": "object",
+            "title": "Context"
+          }
+        },
+        "type": "object",
+        "required": [
+          "loc",
+          "msg",
+          "type"
+        ],
+        "title": "ValidationError"
+      }
+    },
+    "securitySchemes": {
+      "HTTPBearer": {
+        "type": "http",
+        "scheme": "bearer"
+      }
+    }
+  }
+}

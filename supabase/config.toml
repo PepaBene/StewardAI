@@ -1,0 +1,43 @@
+# Supabase CLI config for the local development stack (`supabase start`).
+# The hosted project does NOT read this file for auth settings: mirror the [auth]
+# section in the dashboard (Authentication -> Sign In / Providers and -> Multi-Factor),
+# or push it with `supabase config push`. See README.md.
+
+project_id = "stewardai"
+
+[api]
+enabled = true
+port = 54321
+# `private` (owner check, internal helpers) is deliberately not exposed.
+schemas = ["public", "graphql_public"]
+extra_search_path = ["public", "extensions"]
+max_rows = 1000
+
+[db]
+port = 54322
+major_version = 17
+
+[realtime]
+enabled = true
+
+[auth]
+enabled = true
+site_url = "http://localhost:3000"
+additional_redirect_urls = ["http://localhost:3000"]
+jwt_expiry = 3600
+# Single-user app: the owner account is created by hand; nobody can sign up.
+enable_signup = false
+enable_anonymous_sign_ins = false
+
+[auth.email]
+enable_signup = false
+enable_confirmations = false
+
+[auth.mfa]
+max_enrolled_factors = 10
+
+# TOTP is required for every session (enforced by the web app and the API, which
+# rejects tokens below aal2).
+[auth.mfa.totp]
+enroll_enabled = true
+verify_enabled = true
