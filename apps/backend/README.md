@@ -37,6 +37,15 @@ the frontend shares (`cp .env.example .env` in the repo root; `/.env.example` sa
 get every value). Empty `KEY=` lines count as unset. On the live host, use its secrets
 manager instead of a file.
 
+## Windows
+
+- Stop the worker with Ctrl+C (Windows has no SIGTERM in practice).
+- `WinError 10013` when the API starts means Windows won't let it bind the port, usually
+  because Hyper-V/WSL/Docker reserved a range that includes 8000
+  (`netsh interface ipv4 show excludedportrange protocol=tcp` lists them) or antivirus
+  blocked it. Use another port, e.g. `uv run uvicorn api.main:app --reload --port 8765`,
+  and set `NEXT_PUBLIC_API_BASE_URL=http://localhost:8765` in `.env`.
+
 ## Everyday commands
 
 ```bash

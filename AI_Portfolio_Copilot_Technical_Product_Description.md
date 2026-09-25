@@ -135,7 +135,149 @@ No paid market-data provider in v1. Trading212 supplies holdings and current pri
 | Company profile, moat, competition, risks | Deep-research job | High for qualitative content | Every claim carries a source link |
 | Valuation multiples | Computed in code from Trading212 price + extracted fundamentals | Medium | Never taken from third-party sites |
 
-**Not covered in v1:** consensus estimates, historical price series for volatility and correlation, standardised cross-company fundamentals for non-US companies. Theses use absolute KPI thresholds, so v1 does not need them.
+**Not covered in v1:** consensus estimates and standardised cross-company fundamentals for non-US companies. Theses use absolute KPI thresholds, so v1 does not need them. Historical price series for volatility and correlation, originally listed here, are now planned from Stooq (see Additional data sources).
+
+## Additional data sources
+
+Twelve further free sources, added to the plan on 2026-09-25. Each one gets an adapter behind the provider interface, a trust tier, a refresh cadence, and storage of both its normalised fields and its raw payload (for audit and later use). They are implemented end to end: collected, stored, verified, and surfaced in the app (holding page, news feed, digests, research or monthly review), not only fetched. Every field a source provides is either used by a named feature below or stored raw with a stated reason; nothing is dropped silently.
+
+Access was checked from a cloud host on 2026-09-25. OpenFIGI, ESMA FIRDS, GLEIF, Eurostat, Nager.Date, Frankfurter, SEC EDGAR full-text search, Investegate, the LSE news pages and EQS News all responded. Stooq closed the connection, so its availability from the live backend host is an open risk (see Risks). dgap.de now redirects to eqs-news.com (DGAP is today's EQS News), and api.frankfurter.app redirects to api.frankfurter.dev/v1.
+
+**Order matters.** Identity comes first: OpenFIGI, FIRDS and GLEIF turn each Trading212 instrument into a share class, its listings, its issuer's LEI and its home market. News matching, 13F, Stooq symbols and corporate structure all key off those identifiers.
+
+### Identity and reference data
+
+**OpenFIGI** (`api.openfigi.com/v3`, free; an API key raises the rate limit)
+- Provides: FIGI (per listing), composite FIGI (per country), share-class FIGI (global), ticker, exchange code, name, market sector, security type and type 2, security description. Endpoints: mapping (ISIN, CUSIP, SEDOL, ticker + exchange code to FIGI), search, filter, and the lists of valid values.
+- Used for:
+  - Resolving each Trading212 instrument to one share class and all its listings, so a company listed on several exchanges is one holding. An ISIN identifies the security, not the listing.
+  - Every listing's ticker goes into the holding's news aliases.
+  - The ticker and exchange code derive the Stooq symbol.
+  - Mapping 13F positions, which carry only a CUSIP, to holdings.
+  - Security type separates common stock, ADRs, ETFs and preferred shares for allocation and classification defaults.
+- Stored: `instrument_identifier`. Refresh: on a new instrument, then monthly.
+
+**ESMA FIRDS and FITRS** (ESMA registers API for per-ISIN lookup; daily full and delta XML files for bulk)
+- FIRDS provides, per ISIN and trading venue: full name, CFI code, issuer LEI, venue MIC, currency, admission and first-trade date, termination date (debt fields such as maturity are not used; v1 holds no bonds).
+- FITRS (the transparency register) provides: liquidity flag, average daily turnover, number of trades, and the most relevant market.
+- Used for:
+  - The authoritative list of EU venues for each holding.
+  - The issuer LEI links to GLEIF.
+  - The CFI code sets the instrument class (shares, ETF units, depositary receipts).
+  - The most relevant market sets the home market, and so which regulatory news source applies: RNS for UK, EQS for Germany, the national OAM otherwise.
+  - A termination date raises a delisting event (severity 2).
+  - Liquidity and turnover flag hard-to-trade positions in the monthly review.
+- Tier 1 (regulator). Refresh: weekly delta, monthly full check.
+
+**GLEIF Level 1 and Level 2** (`api.gleif.org/api/v1`, no key)
+- Level 1 provides: legal name, other and transliterated names, legal and headquarters address, jurisdiction, legal form, entity status and category, registration authority and ID, successor LEI, registration status and next renewal date, and mappings from LEI to ISIN, BIC, MIC and OpenCorporates ID.
+- Level 2 provides: direct and ultimate accounting-consolidation parent, direct and ultimate children, the relationship period, status and validation level, and reporting exceptions with their reason (for example "natural persons" or "non-consolidating").
+- Used for:
+  - Legal and other names go into news aliases.
+  - Jurisdiction and headquarters give the default geography classification.
+  - Parents and children form the group structure on the holding page.
+  - Children's names go into news aliases, so news about a subsidiary reaches the holding.
+  - Holdings sharing an ultimate parent are combined in concentration checks.
+  - An entity-status change, a successor LEI or a lapsed LEI raises a corporate-event signal.
+  - Reporting exceptions are shown as the stated reason no parent is listed.
+  - The ISIN mapping cross-checks the OpenFIGI and FIRDS resolution.
+- Level 2 describes accounting consolidation, not shareholdings; shareholder data comes from 13F and from voting-rights notices (RNS "Holding(s) in Company", EQS voting-rights announcements). Tier 1. Refresh: weekly (GLEIF publishes a golden copy several times a day).
+
+**Wikidata** (SPARQL at `query.wikidata.org`, CC0, descriptive User-Agent required)
+- Provides, for a company:
+  - Identifiers: ISIN (P946), LEI (P1278), SEC CIK (P5531), ticker as a qualifier (P249) on stock exchange (P414).
+  - Ownership: parent organization (P749), has subsidiary (P355), owned by (P127, with share qualifiers where present), owner of (P1830).
+  - Business: industry (P452), products (P1056), country (P17), headquarters (P159), official website (P856), inception (P571).
+  - People: founder (P112), CEO (P169), chairperson (P488).
+  - Figures: employees (P1128); revenue, net profit and total assets (P2139, P2295, P2403) with point-in-time qualifiers.
+  - Index membership, aliases in every language, and sitelinks.
+- Used for:
+  - Multilingual aliases and former names in the news profile (Czech and German outlets name companies differently).
+  - Parent, subsidiary and owner links, cross-checked against GLEIF.
+  - Industry plus index membership suggest competitors.
+  - Products suggest watch topics.
+  - Current CEO and chair help match and verify management-change events.
+  - The official website helps find the IR page.
+- Wikidata has **no competitor, supplier or customer property**. Competitors are inferred (same industry and index); customers and suppliers come from EDGAR full-text search (below).
+- Wikidata is community-edited: its facts are tier 3, and its financial figures are only compared with filing-derived facts as a plausibility check, never shown as data. Relationships from Wikidata alone appear as "suggested" until the owner confirms them into the holding profile or GLEIF or a filing corroborates them.
+- Refresh: monthly.
+
+### Prices, FX and calendars
+
+**Stooq** (daily CSV download, `stooq.com/q/d/l/?s=<symbol>&i=d`; unofficial, no key, personal use)
+- Provides: daily, weekly and monthly OHLCV (date, open, high, low, close, volume) for equities (`.us`, `.uk`, `.de`, …), indices (e.g. S&P 500, DAX, FTSE 100), FX pairs, commodities and bond yields.
+- Used for:
+  - Per holding: returns over periods, volatility, maximum drawdown, beta against a configured benchmark, and a correlation matrix across holdings. This closes the v1 gap "historical price series for volatility and correlation".
+  - The ±8 % price-move trigger on close-to-close moves, independent of when the sync runs.
+  - A benchmark comparison on the Overview.
+  - Valuation-multiple history in research.
+  - Volume, to flag unusual activity next to news.
+  - A plausibility check of Trading212 prices.
+- Symbols come from the OpenFIGI ticker and exchange, with a per-holding override in config.
+- Tier 2. Refresh: daily after the market close.
+
+**Frankfurter** (`api.frankfurter.dev/v1`, no key)
+- Provides: ECB reference rates (latest, by date, and time series over a range) for any base currency, plus the currency list.
+- Used for:
+  - Backfilling FX history in one request per range, for historical snapshots and performance in the base currency.
+  - Fallback when the ECB Data Portal is unreachable, before falling back to stored rates.
+  - A daily consistency check against the Data Portal fetch.
+- It republishes ECB data, so it adds redundancy, not independent corroboration.
+
+**Nager.Date** (`date.nager.at/api/v3`, no key)
+- Provides: public holidays per country and year (date, local and English name, fixed or movable, national or regional with the regions, holiday types), long weekends, the next holidays, and country info.
+- Used for, via an expected-gap calendar:
+  - No FX-staleness warning when ČNB or ECB publish no rate on a holiday.
+  - No missed-run alert for a sync or collector that has nothing to collect.
+  - The digest marks market holidays.
+  - Earnings dates that fall on holidays are flagged as implausible.
+  - Notification rules can treat holidays like weekends.
+- Public holidays are not exchange calendars (NYSE closes on Good Friday, which is not a US federal holiday; Xetra and the LSE have their own closures). Nager seeds a per-exchange closure list in config that the owner confirms. Refresh: yearly, plus on demand.
+
+### Regulatory news and filings
+
+**RNS for UK-listed holdings** (the London Stock Exchange's news pages, or Investegate.co.uk)
+- Provides, per announcement: time, company and TIDM, headline, announcement type (category), announcement ID, full text, and links to attachments.
+- Used for:
+  - Layer-1 news for UK holdings.
+  - The announcement type maps to the event taxonomy (in the Event rules config).
+  - Results and trading-statement announcements trigger the earnings thesis check immediately, instead of at report date + 1.
+  - Director and PDMR dealings become insider events.
+  - "Holding(s) in Company" notices update the ownership view.
+  - Full texts are archived in the `evidence` bucket.
+- Neither site offers a documented public API: the LSE pages load their content from a JSON backend, and Investegate serves HTML per company. A spike confirms the terms of use and a stable access method before building; Investegate is the fallback. Tier 1 (issuer disclosures).
+
+**EQS News, formerly DGAP, for German-listed holdings** (`eqs-news.com`)
+- Provides: ad-hoc disclosures (Art. 17 MAR), directors' dealings (Art. 19 MAR), voting-rights notifications (§ 40 WpHG), corporate news, financial-report publication notices and AGM invitations, each with issuer, ISIN, time, category and full text (German and English).
+- Used for: the same as RNS for German holdings. Ad-hoc disclosures are the main source of severity-3 events (profit warnings). Voting rights update the ownership view.
+- Access method (feed or per-issuer pages) confirmed in the same spike. Tier 1.
+
+**SEC EDGAR full-text search** (`efts.sec.gov/LATEST/search-index`, JSON, filings since 2001, User-Agent required, SEC fair-access rate limits)
+- Provides, per hit: accession number, CIKs and company names, form type, filing and period dates, and the file within the filing.
+- Used for:
+  1. **Customers and suppliers:** other companies' 10-K and 20-F filings that name a holding, e.g. as a key supplier or major customer, become relationship suggestions with the filing as the source.
+  2. **Competitors:** the holding's own 10-K Competition section and rivals' filings that name it.
+  3. **Watch topics:** each topic in the holding profiles runs as a saved search over new 8-K, 6-K, 10-Q and 10-K filings; new hits enter the news pipeline as tier-1 items.
+  4. **Risk terms:** a watched term appearing for the first time in a holding's filings becomes a digest highlight.
+- Refresh: with the news ingest, 06:00–22:00, every 2 h.
+
+**Form 13F** (13F-HR filings on EDGAR; SEC quarterly Form 13F data sets for bulk loading)
+- Provides, per manager and quarter: filer CIK and name, report period, and per position the issuer name, title of class, CUSIP, value, shares or principal amount, put/call, investment discretion, other managers, and voting authority (sole, shared, none).
+- Used for, per US-listed holding:
+  - Number of institutional holders, total shares held, quarter-over-quarter change, top holders, and new and exited positions, shown on the holding page and in the research ownership section.
+  - Crowding and concentration signals in the monthly review.
+  - An optional "tracked managers" list in config, whose new and exited positions matching the portfolio or a watchlist appear in the digest.
+- Limits: filed up to 45 days after quarter end; covers only 13(f) securities of managers above USD 100 M; positions are matched by CUSIP through OpenFIGI; the value unit changed from thousands of dollars to dollars in 2023 and is normalised. Refresh: quarterly after the filing deadline.
+
+### Macro
+
+**Eurostat** (dissemination API, JSON-stat 2.0 and SDMX; no key; release calendar)
+- Provides: HICP (flash and final, by category), unemployment, GDP and components, industrial production, retail trade, producer prices, business and consumer confidence, trade and government finance, per country and aggregate (CZ, DE, euro area, EU), plus release dates.
+- Used for:
+  - `macro_series` straight from the primary source, including Czech series.
+  - Macro-surprise detection: evaluated only on release days, comparing the new value with the previous one and the configured band.
+  - Digests cite the release date and the source URL.
+- The probe found `prc_hicp_manr` last updated in February 2026, consistent with HICP moving to COICOP 2018 datasets; confirm dataset codes when implementing. Tier 1. Refresh: on release days from the calendar.
 
 ## News coverage
 
@@ -146,11 +288,14 @@ News comes in three layers. Primary-source feeds are ingested by code for free. 
 | Source | Events it carries | Access | Scope |
 | --- | --- | --- | --- |
 | Company IR news and press-release pages | Results, guidance, dividends, buybacks, M&A, management changes | RSS where offered, else daily page fetch + diff; URL per holding in config | All holdings |
-| EU regulatory announcements (MAR ad-hoc disclosures, managers' transactions) | Inside information, profit warnings, insider dealings | The issuer's regulatory-news page; the home country's officially appointed mechanism (OAM) as fallback | EU-listed holdings |
+| RNS (London Stock Exchange news pages or Investegate) | Results, trading statements, PDMR dealings, holdings in company, all UK regulatory announcements | Per-company pages; access method confirmed in a spike (no documented public API) | UK-listed holdings |
+| EQS News (formerly DGAP) | Ad-hoc disclosures (Art. 17 MAR), directors' dealings (Art. 19 MAR), voting rights (§ 40 WpHG), corporate news | eqs-news.com feed or per-issuer pages | German-listed holdings |
+| Other EU regulatory announcements (MAR ad-hoc disclosures, managers' transactions) | Inside information, profit warnings, insider dealings | The issuer's regulatory-news page; the home country's officially appointed mechanism (OAM) as fallback | EU-listed holdings outside the UK and Germany (home market from FIRDS) |
 | SEC EDGAR company filing feeds | 8-K (material events; item 2.02 = results), 10-Q, 10-K, Form 4 insider trades, SC 13D/G stakes | Atom feed per CIK, no key | US issuers |
+| SEC EDGAR full-text search | Watch-topic and name mentions in any filing: customers, suppliers, competitors, new risk terms | Saved searches on efts.sec.gov, no key | All holdings (mentions in US filings) |
 | Newswires: GlobeNewswire, PR Newswire, Business Wire | Official press releases as distributed | RSS by company or keyword where available | Mostly US and larger EU issuers |
 | Central banks: Fed, ECB, ČNB | Rate decisions, statements, meeting calendars | Official press pages and RSS | Macro |
-| Statistics offices: BLS, BEA, Eurostat, ČSÚ | CPI, jobs, GDP, PCE, HICP release values | Release calendars; values via FRED and the ECB Data Portal | Macro |
+| Statistics offices: BLS, BEA, Eurostat, ČSÚ | CPI, jobs, GDP, PCE, HICP release values | Release calendars; US values via FRED, EU and Czech values direct from the Eurostat API | Macro |
 
 **Layer 2: curated outlets (trust tier 2)**
 
@@ -319,7 +464,7 @@ Every preference lives in versioned config records in Supabase, edited in a sett
 **Versioning and safety**
 
 - Each save creates a new `config_version` row with a diff against the previous one; rollback is one click.
-- Invalid config is rejected at save time by the zod schema, never at run time.
+- Invalid config is rejected at save time by the backend's Pydantic schema (the frontend's generated types catch most errors before sending), never at run time.
 - **Replay preview:** before saving event or notification changes, the app re-runs the last 7 days of classified items against the draft config and shows which alerts would have fired. This uses stored results only, so it costs nothing.
 - Export and import as a JSON file, so config can also be kept in git.
 - Strategy and thesis changes never rewrite history: old verdicts stay tied to the version they were judged under.
@@ -345,6 +490,14 @@ Supabase Postgres, one schema, migrations kept in git and applied with the Supab
 | `alert` | severity, ticker, cluster\_id, message, channel, sent\_at, suppressed\_reason | Notifier |
 | `feedback` | target\_type, target\_id, verdict (wrong, irrelevant, useful), note, created\_at | Owner via UI |
 | `job` / `job_step` | job type, status, config\_version\_id, step index, model, input\_tokens, output\_tokens, searches, cost\_usd, error | Scheduler + workers |
+| `instrument_identifier` | ticker, figi, composite\_figi, share\_class\_figi, exch\_code, security\_type, security\_type2, market\_sector, cusip, source, raw, fetched\_at | Collector (OpenFIGI) |
+| `listing` | isin, mic, full\_name, cfi, currency, issuer\_lei, admitted\_at, first\_trade\_at, terminated\_at, most\_relevant\_market, liquid, avg\_daily\_turnover | Collector (FIRDS, FITRS) |
+| `legal_entity` | lei, legal\_name, other\_names, jurisdiction, legal\_form, hq\_address, legal\_address, status, successor\_lei, registration\_status, next\_renewal, raw | Collector (GLEIF L1) |
+| `entity_relationship` | subject, object, type (parent, ultimate\_parent, subsidiary, owner, competitor, supplier, customer), source (gleif, wikidata, edgar, owner), source\_ref, as\_of, status (confirmed, suggested, rejected), exception\_reason | Collector + owner |
+| `price_bar` | symbol, date, open, high, low, close, volume, source | Collector (Stooq) |
+| `holiday` | country or mic, date, name, scope (national, regional, exchange), source | Collector (Nager.Date) + owner |
+| `institutional_holding` | quarter, filer\_cik, filer\_name, cusip, ticker, value\_usd, shares, put\_call, discretion, voting\_sole, voting\_shared, voting\_none, accession | Collector (13F) |
+| `filing_hit` | query\_id, accession, cik, form, filed\_at, file, matched\_term | Collector (EDGAR full-text search) |
 | Storage bucket `evidence` | Raw fetched pages and PDFs, keyed by hash | Workers |
 
 `job_step` makes silent misses visible: a holding with no successful news or earnings run in its expected window raises its own alert. The `evidence` bucket means every stored figure can be traced back to the exact page it came from, even after the website changes.
@@ -356,7 +509,7 @@ Event triggers do the expensive work; timed jobs stay cheap. Outside earnings se
 | Trigger | Condition | Action |
 | --- | --- | --- |
 | Daily 07:00 CET | Weekday | News triage → escalations → daily digest |
-| Daily 22:30 CET | Weekday | Trading212 sync, FX, macro series; drift check |
+| Daily 22:30 CET | Every day by default; the Jobs config can limit it to weekdays | Trading212 sync, FX, macro series; drift check |
 | Weekly, Sunday | Always | Weekly digest; refresh `next_report_date` for holdings due in the next 14 days |
 | Quarterly | 1st day of Jan, Apr, Jul, Oct | Fetch IR financial calendars for non-US holdings |
 | Report date + 1 day | Holding reported | Earnings thesis check; retry at +2 and +4 days if no document found |
@@ -486,7 +639,7 @@ A Prague-based, EU-region VPS (Hetzner) keeps latency to Supabase's EU region lo
 
 **Supabase plan:** Free projects [pause after one week of inactivity and have no automatic backups](https://supabase.com/pricing), so use Free for development only. Run the live system on Pro, from $25 a month, which never pauses and keeps daily backups for 7 days. The Python backend connects to Supabase Postgres with a [direct connection](https://supabase.com/docs/guides/database/connecting-to-postgres) (suited to a persistent process), not the serverless-oriented pooler.
 
-**Provider adapter:** all data access goes through one Python interface (`get_positions`, `get_filings`, `get_earnings_calendar`, `get_news`, `get_macro`). Swapping a free source for a paid one later changes one adapter module.
+**Provider adapter:** all data access goes through one Python interface (`get_positions`, `get_filings`, `get_earnings_calendar`, `get_news`, `get_macro`, and, from phase 2b, `resolve_identity`, `get_reference_data`, `get_relationships`, `get_price_history`, `get_fx_history`, `get_holidays`, `search_filings`, `get_institutional_holdings`). Swapping a free source for a paid one later changes one adapter module.
 
 ## Design and UI
 
@@ -586,6 +739,12 @@ The biggest technical risk is extraction from European reports, which often arri
 | Cost runaway | Bill spike | Step and search caps, budget config, Console spend limit |
 | Multi-currency not supported by the Trading212 API | FX effects hidden | Compute FX from ČNB and ECB rates; flag in the dashboard |
 | Licence scope | Commercial use would breach personal-use terms | Keep v1 personal; re-license before any product use |
+| Stooq is unofficial (and refused a connection from the cloud test host) | No price history, so no risk metrics or close-based price-move trigger | Verify from the backend host in phase 2b; features degrade visibly; a paid end-of-day source can replace it behind `get_price_history` |
+| RNS and EQS pages have no documented API; terms of use may restrict automated access | UK/German regulatory news missing or blocked | Spike confirms terms and method first; polite rate; OAM and issuer IR pages as fallback |
+| Wikidata is community-edited | Wrong parent or competitor links | Tier 3; relationships stay "suggested" until GLEIF, a filing or the owner confirms them; its financial figures are never shown as data |
+| GLEIF Level 2 is accounting consolidation, not ownership | Parent shown as if it were a shareholding | Labelled "consolidating parent"; shareholders come only from 13F and voting-rights notices |
+| Public holidays are not exchange calendars | False "market closed" or missed-run alerts | Nager seeds a per-exchange closure list the owner confirms in config |
+| 13F lag and coverage | Stale or partial ownership picture | Every figure shows its quarter and filing date; ownership is never used for alerts |
 
 **Open questions**
 
@@ -597,11 +756,55 @@ The biggest technical risk is extraction from European reports, which often arri
 
 Two tracks run in parallel over about 10 weeks: **backend** (Python: FastAPI + worker, Supabase schema, collectors, AI jobs, verification) and **frontend** (Next.js: config editor, dashboard, chat). A solo builder alternates tracks day to day or week to week; the plan works the same way if a second person takes one track. Each phase is done only when every task's acceptance criterion (AC) holds — not when the code merely runs.
 
+### Plan gap review (2026-09-25)
+
+A full pass of the spec against the phase tasks found features, config domains, triggers, defence layers and operational needs that the spec describes but no task delivered. Each gap is now a task with an acceptance criterion, in the phase where its dependencies exist. Phases 1b and 2 follow-ups are new; the other fixes extend existing phases. Together with phase 2b the plan grows from about 10 to about 13 weeks; the week numbers of later phases are left as originally written.
+
+| Gap | Where the spec asks for it | Fixed in |
+| --- | --- | --- |
+| No always-on host before phase 6, yet phase 1 requires 5 and 10 consecutive scheduled syncs | Phase 1 AC and sync point; Risks (restart policy, uptime check) | Phase 1b |
+| Strategy editor never scheduled | Configuration; Config section | Phase 1b |
+| Jobs (schedule) editor never scheduled | Configuration table | Phase 1b |
+| Config version history, diff view, one-click rollback, JSON export/import | Configuration: versioning and safety | Phase 1b |
+| Transactions and dividends are synced but never shown | What the app does, item 1 | Phase 1b |
+| Phase 1 ACs that need live data were never checked (Trading212 totals, Realtime within 2 s, consecutive runs) | Phase 1 | Phase 1b |
+| Thesis board (all holdings' status at a glance) | What the app does, item 2 | Phase 2 follow-ups |
+| Earnings-check trigger at report date + 1 with retries at + 2 and + 4; weekly refresh of `next_report_date` | Scheduling and triggers | Phase 2 follow-ups |
+| Cross-source reconciliation (press release vs 10-Q XBRL) and restatement handling | Defence, layer 3 | Phase 2 follow-ups |
+| Owner review queue for facts held by sanity bounds or quarantined; owner overrides | Defence, layers 3 and 6 | Phase 2 follow-ups |
+| Cost per Claude call is never computed, so `job_step.cost_usd` and the cost page have no data | Cost control; Phase 6 cost page | Phase 2 follow-ups |
+| Event escalation job (Sonnet impact note linked to the thesis) | AI pipelines table | Phase 3 |
+| Drift, hard-limit and strategy-rule breaches never reach the digest or an alert | Scheduling (drift); strategy `on_breach` | Phase 3 |
+| Price-move trigger (±8 %) | Scheduling and triggers | Phase 3 |
+| Weekly digest job (only the view was planned) | What the app does, item 4; Scheduling | Phase 3 |
+| Macro: FRED and ECB collectors, central-bank feeds, daily AI macro summary | Data sources; News layer 1; AI-substituted data | Phase 3 |
+| Time checks (freshness window, event vs publish date, recycled stories) | Defence, layer 5 | Phase 3 |
+| Unconfirmed re-check for 48 h, disputed side-by-side view, tier-3 "sentiment" handling | Defence, layer 2; News layer 3 | Phase 3 |
+| Per-ticker muting and repeat-event throttling | Notifications config | Phase 3 |
+| Alerts for failed jobs and missed runs (the Activity page only displays them) | Scheduling (missed run); Risks (Trading212 beta) | Phase 3 |
+| Thesis review dates and exit conditions never evaluated | Theses config | Phase 3 |
+| Source registry editor and event-rules editor (phase 4 previews a rules editor nobody builds) | Configuration; Phase 4 | Phase 3 |
+| Freshness label on the news feed and every report | Design and UI | Phase 3 |
+| Verification config domain has no schema, editor or consumer | Configuration table | Phase 4 |
+| Eval sets never grow from items flagged wrong | Defence, layer 7 | Phase 4 |
+| Snippet hover preview on citations; source sidebar on digests | Design and UI | Phase 4 |
+| Chat cannot trigger jobs | What the app does, item 7 | Phase 5 |
+| Reports section (searchable archive of digests, reviews, research) | Information architecture | Phase 5 |
+| "Research again" on the holding page | Design and UI | Phase 5 |
+| Budget editor (phase 6 has budget rules but no editor) | Configuration | Phase 6 |
+| Deployment packaging: restart policy, uptime monitor, Vercel production deploy | Tech stack; Risks | Phase 6 |
+| Accessibility and responsive pass | Design and UI: mobile and access | Phase 6 |
+
+Three contradictions inside the spec are corrected in place:
+- Config validation is Pydantic, not zod.
+- The portfolio sync runs daily by default, and the Jobs config can restrict it to weekdays.
+- The phase 0 pgmq check lists the `jobs` queue from phase 1 on.
+
 ### Phase 0 — Foundations (week 1)
 
 **Backend tasks**
 
-- [ ] Create the Supabase project (Free tier) and enable the `pgmq` extension. **AC:** `select * from pgmq.list_queues();` returns an empty result with no error.
+- [ ] Create the Supabase project (Free tier) and enable the `pgmq` extension. **AC:** `select * from pgmq.list_queues();` returns an empty result with no error (from phase 1 on it lists the `jobs` queue).
 - [ ] Write the initial Postgres migration: `config_version`, `instrument`, and the `app_backend` role with table grants and no RLS bypass beyond what's granted. **AC:** `supabase db push` applies cleanly to a fresh project; connecting as `app_backend` can read/write those tables and cannot read any table owned by `anon`-restricted policies it wasn't granted.
 - [ ] Scaffold the FastAPI app and the worker entrypoint from one `apps/backend` Python package (`uv` for dependencies). **AC:** `uv run uvicorn` serves `/health` returning 200; `uv run python -m worker` starts and logs "scheduler started" with zero registered jobs.
 - [ ] Define the strategy and thesis Pydantic models and export OpenAPI JSON. **AC:** `openapi.json` validates against the OpenAPI 3.1 spec and includes a `StrategyConfig` and `ThesisConfig` schema.
@@ -634,6 +837,24 @@ Two tracks run in parallel over about 10 weeks: **backend** (Python: FastAPI + w
 
 **Sync point:** the backend ships the portfolio read API and 10 consecutive clean daily syncs by end of week 2; the frontend builds Overview and Holdings against that live data, not fixtures, from week 3.
 
+### Phase 1b — Config foundation, hosting and phase 1 sign-off (next, about 1 week)
+
+Added by the gap review. Phase 1 is built; these are the pieces it assumed but nobody delivered, plus the owner-facing config the later phases need.
+
+**Backend tasks**
+
+- [ ] Always-on dev host for the API and worker (Docker Compose or systemd, restart always), an external uptime check on `/health`, and a Vercel preview deployment of the web app. **AC:** 10 consecutive scheduled syncs complete on the host with no error (this is phase 1's sync point); stopping the API raises an uptime alert within 5 minutes; killing either process brings it back within 1 minute.
+- [ ] Config history API: list versions per domain, diff between any two, roll back (the old body saved as a new active version), and export/import of all domains as one JSON file. **AC:** a rollback creates a new version whose body equals the chosen one; importing an exported file into an empty project recreates every active version; an invalid file is rejected with every error listed and nothing saved.
+- [ ] Phase 1 sign-off on live data. **AC:** with at least 3 positions in 3 currencies, the Overview total matches the Trading212 app within FX rounding; a sync started in a second tab updates the first tab's indicator within 2 seconds; 5 consecutive scheduled runs produce one snapshot row per position per day.
+
+**Frontend tasks**
+
+- [ ] Config section shell with the strategy editor: base currency, FX source, weight basis, categories and classifications, position, category and cash targets with bands and hard limits, and rules. Forms are generated from the backend's Pydantic-derived types. **AC:** changing a target and saving changes the Overview drift with no code change; targets summing above 100 % are rejected with a field-level error before saving; the editor round-trips every field of the active version without loss.
+- [ ] Jobs editor (schedule, enabled, time zone) and a version-history view with diff and rollback for every config domain. **AC:** a new schedule saved in the UI is used by the worker within 5 minutes with no restart; rolling back from the history view restores the previous drift figures.
+- [ ] Transactions and dividends view: orders, dividends and cash movements with filters by type, ticker and period. **AC:** every `transaction` row appears exactly once; the dividend total for a period equals a direct SQL sum.
+
+**Sync point:** the host and config history API land first (days 1–3); the editors build on them through the end of the week.
+
 ### Phase 2 — Extraction and earnings checks (weeks 3–5)
 
 **Backend tasks**
@@ -653,6 +874,42 @@ Two tracks run in parallel over about 10 weeks: **backend** (Python: FastAPI + w
 
 **Sync point:** the backend ships the `fact`/`verdict` read API and the thesis config schema by week 4; the frontend builds the holding page and thesis editor against it through week 5.
 
+### Phase 2 follow-ups (with phase 2b, weeks 5–6)
+
+Phase 2 is built on its own branch; these gap-review tasks extend it.
+
+**Backend tasks**
+
+- [ ] Earnings-check triggers: enqueue the check at report date + 1, retry at + 2 and + 4 days when no document is found, and refresh `next_report_date` every Sunday for holdings reporting within 14 days. **AC:** a recorded report date produces exactly these attempts and stops after the first success; a date change found on Sunday moves the trigger.
+- [ ] Cross-source reconciliation and restatements: US press-release figures are checked against the later 10-Q/10-K XBRL value; a new value for an already stored period is kept beside the old one and flagged. **AC:** a seeded mismatch quarantines the fact and recomputes its verdicts; a seeded restatement keeps both values and never overwrites.
+- [ ] Owner review queue and overrides: facts held by sanity bounds or quarantined wait for the owner, who can accept, correct or reject; an override always wins and is logged with a reason. **AC:** a held fact is used in no verdict until accepted; a correction recomputes the affected verdicts within one worker cycle.
+- [ ] Cost accounting per Claude call: a model price table in the Budget config; every AI step records input and output tokens, searches and `cost_usd`. **AC:** the cost of every step equals tokens and searches times the configured prices, to the cent.
+
+**Frontend tasks**
+
+- [ ] Thesis board: every holding's thesis status (pass, breach, unknown per KPI) on one screen, with "unknown" styled distinctly and never omitted. **AC:** every holding with a thesis appears once; each status opens its verdict and evidence in one click.
+- [ ] Review queue screen for held and quarantined facts. **AC:** every held fact is listed with its snippet, source and the bound it broke; resolving one removes it and shows the recomputed verdict.
+
+### Phase 2b — Identity, reference data and market history (weeks 5–6)
+
+Added 2026-09-25 for the sources in "Additional data sources". It sits between phases 2 and 3 because the news pipeline matches on the identifiers, names and relationships it produces. It moves phases 3–6 back by about 1.5 weeks.
+
+**Backend tasks**
+
+- [ ] Identity resolution with OpenFIGI, ESMA FIRDS/FITRS and GLEIF Level 1 for every instrument; `instrument_identifier`, `listing` and `legal_entity` tables. **AC:** every open position has a share-class FIGI, its listings, a home market (MIC) and, where one exists, an issuer LEI; for one US, one UK and one German test holding every stored field matches a hand check; an instrument that cannot be resolved is listed on the Activity page, never skipped silently.
+- [ ] Corporate structure from GLEIF Level 2 and Wikidata; `entity_relationship` table with source, as-of date, validation level and status (confirmed or suggested). **AC:** for 5 test issuers, direct and ultimate parents equal GLEIF's; subsidiary and legal/other names appear in the holding's news aliases; a relationship found only in Wikidata is stored as suggested, never as confirmed.
+- [ ] Price history from Stooq; `price_bar` table; returns, volatility, maximum drawdown, beta and correlation computed in code. **AC:** 2 years of daily bars for every holding and configured benchmark; the latest close is within 1 % of Trading212's price on sync days (or the difference is explained by timing); each metric equals an independent calculation on the stored bars; a symbol Stooq does not return shows as a visible gap, not a failed job.
+- [ ] FX history from Frankfurter, and Frankfurter as the first fallback for the ECB source. **AC:** 2 years of rates backfilled with one request per range; 10 sampled dates equal the ECB Data Portal's values exactly.
+- [ ] Expected-gap calendar from Nager.Date plus a per-exchange closure list in config. **AC:** a Czech public holiday produces no FX-staleness warning; a sync with nothing to collect on an exchange holiday produces no missed-run alert; a closure added to config takes effect without a deploy.
+- [ ] Instrument lifecycle events: a FIRDS termination date or a GLEIF status change, successor LEI or lapsed LEI raises an event in the existing taxonomy. **AC:** replaying a recorded delisting and a recorded merger (successor LEI) each produces exactly one event with its source record linked.
+
+**Frontend tasks**
+
+- [ ] Holding page, identity and structure: identifiers, listings, home market, group structure (parents and subsidiaries), and suggested relationships with confirm/reject. **AC:** confirming a suggested competitor writes a new holding-profile config version and the next news run matches on it; rejecting one keeps it from being suggested again.
+- [ ] Holding page, price and risk: price chart with benchmark, and a risk card (volatility, drawdown, beta, correlation with the rest of the portfolio). **AC:** every figure on the card equals the backend's stored calculation, and the chart shows its data source and "as of" date.
+
+**Sync point:** the backend ships identity, structure and price-history reads by the middle of week 5; the frontend builds the holding-page sections against them through week 6.
+
 ### Phase 3 — News pipeline (weeks 5–7)
 
 **Backend tasks**
@@ -665,12 +922,31 @@ Two tracks run in parallel over about 10 weeks: **backend** (Python: FastAPI + w
 - [ ] Telegram and email notifier, quiet hours, daily alert cap, per notification-rules config. **AC:** a severity-3 test alert reaches Telegram within 60 seconds outside quiet hours, and is held until the end of quiet hours when inside them.
 - [ ] Daily digest job (Batch API). **AC:** the digest for a day with zero severity-2+ events still generates and sends, with an explicit "nothing material" state, not silence.
 
+- [ ] RNS (UK) and EQS News (Germany) as layer-1 sources, with announcement type mapped to the event taxonomy in the Event rules config; home market from FIRDS decides which applies. **AC:** over 48 hours, every announcement for the UK and German test holdings shown on the source's own site is ingested exactly once; a results or trading-statement announcement starts the earnings thesis check within one ingest cycle.
+- [ ] SEC EDGAR full-text search: saved searches for each holding's names and watch topics. **AC:** a new filing that mentions a watched term becomes a `news_item` within one ingest cycle; a 10-K or 20-F naming a holding as customer or supplier is stored as a suggested relationship linked to the filing.
+- [ ] Eurostat macro series (HICP, unemployment, GDP, industrial production, confidence for CZ, DE and the euro area) and its release calendar. **AC:** each series matches the value on Eurostat's own site for its latest release; a macro surprise is evaluated only on a release day and cites the release date and source URL.
+
+- [ ] Event escalation job (Sonnet, 5 steps): for each confirmed severity-2+ cluster, an impact note linked to the affected thesis KPIs and exit conditions. **AC:** every escalation cites the cluster's sources and names the KPI or exit condition it touches, or states that none applies.
+- [ ] Drift, hard-limit and strategy-rule checks after each sync: out-of-band positions are flagged in the next digest; a hard-limit or rule breach alerts at its configured `on_breach` severity. **AC:** a seeded breach alerts once, not on every sync, and clears when back in band.
+- [ ] Price-move trigger: a daily close-to-close move beyond the configured threshold (default ±8 %) enqueues an escalation for that holding. **AC:** a seeded 9 % move produces one escalation; a 7 % move produces none; changing the threshold in config changes this with no deploy.
+- [ ] Weekly digest job (Sunday): the week's events by holding, thesis status changes, drift, and theses past their review date. **AC:** a week with no events still produces a digest saying so; a thesis past its `review_date` is listed until its review date moves.
+- [ ] Macro collectors and central-bank sources: FRED and ECB Data Portal series into `macro_series`; Fed, ECB and ČNB press pages or feeds as layer-1 sources; a daily AI macro and central-bank summary for the digest (qualitative only, numbers from the collectors). **AC:** every macro number in a digest comes from `macro_series` with its source and date; a rate decision appears in the next digest.
+- [ ] Time checks: drop items outside the freshness window, compare the event date with the publish date, and match new items against stored clusters so a known event never alerts twice. **AC:** a republished 2-year-old story and a second outlet's copy of a known event each produce no new alert.
+- [ ] Corroboration lifecycle: unconfirmed items are re-checked for 48 hours; contradicting sources mark the cluster disputed and freeze verdict changes until resolved; tier-3 items are labelled "sentiment", off by default, and never alert on their own. **AC:** a seeded single-outlet claim that gains a second independent source within 48 hours becomes confirmed; a disputed cluster changes no verdict.
+- [ ] Notification-rule completeness: per-ticker and per-event-type muting, repeat-event throttling, and holidays from the phase 2b calendar. **AC:** a muted ticker's severity-3 event goes to the digest, not to an alert; the same event repeated within the throttle window alerts once.
+- [ ] Alerts for failed jobs and missed runs through the notifier: a failed sync or collector, or a holding with no successful run in its window. **AC:** a forced Trading212 authentication failure alerts once with the job's error; a holding with no news run for 48 hours alerts once.
+
 **Frontend tasks**
 
 - [ ] News feed, filterable by holding, severity, confidence and source tier. **AC:** every filter combination returns a result set consistent with a direct SQL query using the same filters.
 - [ ] Notification-rules editor. **AC:** changing a severity's channel in the UI and saving changes where the next matching test alert is routed, with no backend restart.
 - [ ] Digest view (daily and weekly), with claim-level source links per item. **AC:** every factual sentence in a rendered digest links to a `news_item` or `fact` it was generated from.
 - [ ] Command palette (Cmd/Ctrl+K) for navigation and re-running a check. **AC:** every primary navigation destination and at least one action (re-run earnings check) is reachable from the palette with no mouse.
+
+- [ ] Source registry editor: name, tier, type, URL, enabled, per-holding scope, domain allow and block lists, freshness window, tier-3 handling. **AC:** disabling a source in the UI removes it from the next ingest run with no deploy.
+- [ ] Event-rules editor: severity per event type, per-holding overrides, price-move and macro-surprise thresholds (phase 4 adds the replay preview to it). **AC:** raising an event type to severity 3 in the UI makes the next matching test item alert.
+- [ ] Disputed-story view with both versions side by side and their sources. **AC:** every disputed cluster shows each conflicting claim with its source and tier.
+- [ ] Freshness label ("as of" or "synced … ago") on the news feed and every report view. **AC:** each of these screens shows the timestamp of the data it renders.
 
 **Sync point:** the backend ships the `news_item`/`story_cluster` read API and the notification-rules schema by week 6; the frontend builds the feed, rules editor and digest view against it through week 7.
 
@@ -683,11 +959,19 @@ Two tracks run in parallel over about 10 weeks: **backend** (Python: FastAPI + w
 - [ ] Evals in CI: golden earnings set at ≥ 98% exact match, news classification set at ≥ 85%, both blocking merges on regression. **AC:** a deliberately broken prompt fails CI; reverting it passes.
 - [ ] Replay preview endpoint: re-run the last 7 days of classified items against a draft config, no live calls. **AC:** the response returns in under 5 seconds using only stored data.
 
+- [ ] Trust tiers and corroboration for the new sources (tier 1: FIRDS, GLEIF, RNS, EQS, EDGAR, Eurostat; tier 2: Stooq, OpenFIGI; tier 3: Wikidata). **AC:** a Wikidata-only relationship is never shown as confirmed; a GLEIF parent contradicting Wikidata is shown as disputed with both sources.
+
+- [ ] Verification config domain: schema, and the corroboration, sanity-bound and claim-verifier jobs read their thresholds from it. **AC:** changing the sanity band in config changes which seeded facts are held, with no deploy.
+- [ ] Eval sets grow from feedback: an item marked wrong can be added to the golden or labelled set with its corrected value. **AC:** a flagged fact added this way is part of the next CI eval run.
+
 **Frontend tasks**
 
 - [ ] Wrong/irrelevant/useful controls on every fact, alert, verdict and report claim already shipped in phases 1–3. **AC:** every one of those surfaces has the controls, verified by a checklist pass over each screen, not just new ones.
 - [ ] Activity page: job log, per-holding coverage gaps, missed-run alerts. **AC:** stopping a scheduled job for one holding for 48 hours produces a visible gap on this page with no manual query.
 - [ ] Replay preview UI on the notification-rules and event-rules editors. **AC:** saving a rule change shows the preview's diff before the save is confirmed.
+
+- [ ] Verification config editor. **AC:** every field of the verification schema is editable and validated before saving.
+- [ ] Citation hover preview (snippet and source tier) on every claim-level citation, and a source sidebar on digests. **AC:** hovering any citation in a digest shows the exact snippet it links to.
 
 **Sync point:** the backend ships the feedback endpoint and the golden-set eval results by week 7; the frontend wires feedback into every existing surface and builds the Activity page through week 8.
 
@@ -699,12 +983,20 @@ Two tracks run in parallel over about 10 weeks: **backend** (Python: FastAPI + w
 - [ ] Monthly review job: rule compliance, proposed actions cited to a rule or KPI. **AC:** every proposed action in a test run cites a `strategy_rule` id or thesis KPI; none is generated with no citation.
 - [ ] Chat endpoint: DB queries plus search/fetch as tool calls, answers cited. **AC:** 10 manual test questions each return an answer with at least one source link or an explicit "no source" statement, never an uncited factual claim.
 
+- [ ] Form 13F institutional ownership from the SEC quarterly data sets, matched by CUSIP through OpenFIGI; optional tracked managers in config. **AC:** for 3 US test holdings, holder count and total shares per quarter equal an independent aggregation of the same SEC data set; tracked-manager new or exited positions appear in the next digest.
+- [ ] Research and monthly review use the new data: an ownership section (13F, voting-rights notices), a relationships section (GLEIF, confirmed Wikidata and EDGAR links), risk metrics (Stooq), liquidity (FITRS) and shared-ultimate-parent concentration. **AC:** every relationship, ownership or risk figure in a report cites its stored source record.
+
+- [ ] Chat can start jobs (re-run an earnings check, start research, run a sync) after an explicit confirmation in the chat. **AC:** each of these three actions can be started from chat and appears in the job log with its trigger.
+
 **Frontend tasks**
 
 - [ ] Research report view with a source-card sidebar. **AC:** every source used in a report appears in the sidebar with its tier, and every claim-level citation in the body links to one of those cards.
 - [ ] Research-profile editor (sections, depth, model, search budget, source tiers). **AC:** running research with two different profiles on the same ticker produces visibly different reports (section count or depth).
 - [ ] Monthly review view. **AC:** the compliance table renders every strategy rule with a pass/breach state, with no rule silently omitted.
 - [ ] Chat panel, reachable from the command palette. **AC:** a chat answer's source links open the same evidence pages as the rest of the app, not a separate broken path.
+
+- [ ] Reports section: an archive of digests, monthly reviews and research reports, with full-text search. **AC:** searching a ticker or phrase returns every report containing it, newest first.
+- [ ] "Research again" on the holding page, choosing a research profile. **AC:** the action starts a research job for that ticker and profile, and the result links back to the holding.
 
 **Sync point:** the backend ships the report and chat APIs by week 9; the frontend builds their views last, since they depend on every data shape from phases 1–4, through week 10.
 
@@ -716,13 +1008,18 @@ Two tracks run in parallel over about 10 weeks: **backend** (Python: FastAPI + w
 - [ ] Budget rules: step/search caps, Anthropic Console spend limit, behaviour at the cap. **AC:** artificially lowering the monthly cap in config and running jobs causes non-critical jobs to pause or downgrade model exactly as configured, verified in a test run.
 - [ ] Weekly error report job, summarising feedback-flagged items. **AC:** a week containing at least one flagged fact produces a non-empty report; a week with none says so explicitly.
 
+- [ ] Deployment packaging for the live host: container or systemd units with restart always, health checks, the uptime monitor from phase 1b, and the Vercel production deployment with its environment variables. **AC:** a fresh host runs the documented setup with no manual steps beyond secrets; both processes come back within 1 minute after being killed.
+
 **Frontend tasks**
 
 - [ ] Cost page: spend vs. budget, broken down by job type. **AC:** the total shown matches the sum of `job_step.cost_usd` for the period to the cent.
 - [ ] Empty, loading and error states across every screen built in phases 1–5. **AC:** a full pass with the backend stopped shows a clear error state on every screen, never a blank page or an unhandled exception.
 
+- [ ] Budget editor: monthly cap, per-job caps, behaviour at the cap, model price table. **AC:** lowering the cap in the UI triggers the configured downgrade or pause on the next job with no deploy.
+- [ ] Accessibility and responsive pass: contrast in both themes, keyboard reachability of every action, no meaning by colour alone, usable at phone width. **AC:** an automated audit (axe) reports no serious issues on every screen, and a keyboard-only walkthrough completes every primary action.
+
 **Sync point:** both tracks close out together against the acceptance checks above; nothing in phase 6 starts until every prior phase's ACs are met.
 
-**What to cut if time runs short:** Google News discovery, insider-transaction events, the replay preview, the command palette and chat can all move to after phase 6 without weakening the core loop of sync, earnings checks, verified news and digest.
+**What to cut if time runs short:** Google News discovery, insider-transaction events, the replay preview, the command palette and chat can all move to after phase 6 without weakening the core loop of sync, earnings checks, verified news and digest. Of the phase 2b sources, Wikidata suggestions, 13F tracked managers and Stooq correlation can also move later; identity resolution (OpenFIGI, FIRDS, GLEIF) cannot, because news matching depends on it.
 
 **Decision point after phase 2:** if the extraction AC (95%, then 98%) is not met on your real European holdings' reports, add a paid fundamentals source for those tickers behind the provider adapter, and keep AI extraction for US and qualitative data.

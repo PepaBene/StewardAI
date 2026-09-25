@@ -108,3 +108,29 @@ def test_supabase_url_trailing_slash_is_trimmed() -> None:
 
     settings = Settings(_env_file=None, supabase_url="https://abc.supabase.co/")  # type: ignore[call-arg]
     assert settings.supabase_url == "https://abc.supabase.co"
+
+
+async def test_stop_handlers_fall_back_where_asyncio_has_no_signal_support(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Regression: on Windows loop.add_signal_handler raises NotImplementedError, which
+    crashed the worker at startup. The fallback must install plain handlers that stop it."""
+    import asyncio
+
+    from worker.__main__ import install_stop_handlers
+
+    loop = asyncio.get_running_loop()
+
+    def unsupported(*_args: object) -> None:
+        raise NotImplementedError
+
+    monkeypatch.setattr(loop, "add_signal_handler", unsupported)
+    installed: dict[int, object] = {}
+    monkeypatch.setattr(signal, "signal", lambda sig, handler: installed.setdefault(sig, handler))
+
+    stop = asyncio.Event()
+    install_stop_handlers(loop, stop)
+    assert set(installed) == {signal.SIGINT, signal.SIGTERM}
+
+    installed[signal.SIGINT](signal.SIGINT, None)  # type: ignore[operator]
+    await asyncio.wait_for(stop.wait(), timeout=1)
