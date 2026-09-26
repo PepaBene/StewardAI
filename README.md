@@ -5,7 +5,7 @@ owner's strategy and per-holding theses, and uses Claude to monitor, explain and
 The full design is in
 [AI_Portfolio_Copilot_Technical_Product_Description.md](AI_Portfolio_Copilot_Technical_Product_Description.md).
 
-**Status: phases 0-4 built, including the gap-review tasks (phase 1b, phase 2 follow-ups,
+**Status: phases 0-5 built, including the gap-review tasks (phase 1b, phase 2 follow-ups,
 phase 2b).** Phase 1 syncs Trading212 daily with ČNB/ECB FX and shows drift, Overview and
 Holdings. Phase 1b adds the strategy and jobs editors, config version history with diff,
 rollback and JSON export/import, the transactions view, deployment packaging (`deploy/`)
@@ -26,7 +26,12 @@ wrong / irrelevant / useful feedback (a wrong fact is quarantined and its verdic
 re-judged; sources lose trust and drop a tier), a claim verifier checks each written
 sentence against its cited snippets, rule edits show a 7-day replay preview before saving,
 the Activity page shows coverage gaps and the job log, and a CI gate re-runs the live evals
-whenever a prompt, model, schema or eval set changes.
+whenever a prompt, model, schema or eval set changes. Phase 5 adds deep research under
+configurable research profiles (figures written by code from stored records, prose by the
+model, every sentence cited; a killed run resumes from its last step), a monthly review
+whose compliance table lists every strategy rule and whose proposed actions must cite a
+rule or KPI, a chat panel that answers with sources or says it has none and starts jobs
+only on confirmation, Form 13F ownership from the SEC data sets, and full-text report search.
 
 Not yet verified: the acceptance criteria that need live data or time (consecutive
 scheduled runs on an always-on host, the Realtime 2-second update, the uptime alert,
@@ -34,7 +39,7 @@ Overview totals against the Trading212 app, 48-hour ingest runs, source figures 
 by hand), and the live-model evals (golden extraction 98 %, classification 85 %, claim
 verifier 20/20), which need an API key: add the `ANTHROPIC_API_KEY` repository secret and
 run `uv run python -m steward.verify.evals_gate --write-baseline` once. Run
-`uv run python -m steward.signoff` on the host for the phase 1 checks. Phases 5-6 are not
+`uv run python -m steward.signoff` on the host for the phase 1 checks. Phase 6 is not
 started.
 
 ## Repository layout

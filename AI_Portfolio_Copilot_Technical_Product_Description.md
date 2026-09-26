@@ -987,6 +987,8 @@ Added 2026-09-25 for the sources in "Additional data sources". It sits between p
 
 ### Phase 5 — Research and recommendations (weeks 8–10)
 
+*Status (2026-09-26): built. Covered by automated tests: resuming research after a killed worker, every published review action citing a rule or KPI, every strategy rule in the compliance table, chat sentences cited or marked "no source", the three chat-started jobs appearing with trigger `chat`, two profiles giving different reports, report search by ticker and phrase, tracked-manager changes in the digest, and 13F holders and shares equal to an independent aggregation (checked on the full SEC data set of 1 Mar–31 May 2026 for Apple, Microsoft and NVIDIA; the committed test uses a sample of its rows). Open: the 10 manual chat questions and every model-written section need live model runs; the screens are verified by types, unit tests and the build, not in a browser; code-written research sections are English even for a Czech profile.*
+
 **Backend tasks**
 
 - [ ] Research-profile execution as a checkpointed step chain in the worker. **AC:** killing the worker process mid-research and restarting it resumes from the last completed step, not from the start.
