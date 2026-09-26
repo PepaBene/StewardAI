@@ -4,43 +4,54 @@ import {
   ChevronDownIcon,
   ChevronRightIcon,
   ExternalLinkIcon,
-  FileSearchIcon,
+  InboxIcon,
+  LayoutGridIcon,
   LoaderCircleIcon,
   PencilIcon,
   PlayIcon,
   RefreshCwIcon,
 } from "lucide-react";
 import Link from "next/link";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { Fragment, useCallback, useEffect, useMemo, useState } from "react";
 
 import { AlertMessage } from "@/components/alert-message";
 import { EmptyState } from "@/components/empty-state";
 import { ConfidenceBadge } from "@/components/evidence/confidence-badge";
+import { EvidenceLinks } from "@/components/evidence/evidence-links";
+import { FactReviewForm, type ReviewResolution } from "@/components/evidence/fact-review-form";
 import { VerdictStatusBadge } from "@/components/evidence/verdict-status-badge";
+import { FeedbackControl } from "@/components/feedback/feedback-control";
 import { DriftStatusBadge } from "@/components/portfolio/drift-status-badge";
 import { FreshnessLabel } from "@/components/portfolio/freshness-label";
 import { HoldingNews } from "@/components/news/holding-news";
 import { StatCard } from "@/components/portfolio/stat-card";
+import { IdentitySection } from "@/components/reference/identity-section";
+import { OwnershipSection } from "@/components/reference/ownership-section";
+import { HoldingResearch } from "@/components/research/holding-research";
+import { PriceRiskSection } from "@/components/reference/price-risk-section";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
   getBrowserApiClient,
   type FactOut,
+  type FeedbackOut,
   type HoldingDetail,
   type JobSummary,
   type KpiStatus,
   type VerdictOut,
 } from "@/lib/api/client";
+import { NEVER_JUDGED } from "@/lib/evidence/board";
 import {
   formatFactValue,
   formatObserved,
   formatTarget,
   humanizeMetric,
 } from "@/lib/evidence/confidence";
+import { allowedReviewActions, isHeld, REVIEW_ACTIONS, reviewQueueHref, scaleHint } from "@/lib/evidence/review";
 import { formatDate, formatMoney, formatPercent, formatRelative, gainLossTone } from "@/lib/format";
 import { useApiResource } from "@/lib/hooks/use-api-resource";
-import { cn } from "@/lib/utils";
+import { jobHref } from "@/lib/jobs/job-detail";
 
 const POLL_MS = 3000;
 const POLL_LIMIT_MS = 10 * 60 * 1000;
@@ -116,6 +127,28 @@ export function HoldingContent({
   const name = instrument?.name ?? detail.profile?.company_name ?? detail.ticker;
   const facts = useMemo(() => new Map(detail.facts.map((f) => [f.id, f])), [detail.facts]);
 
+  // A fact marked wrong is quarantined and the verdicts re-judged: follow that run.
+  const onFeedback = useCallback(
+    (mark: FeedbackOut) => {
+      const job = mark.effects.verdict_job_id;
+      if (typeof job === "number") {
+        onQueued({
+          id: job,
+          job_type: "thesis_verdicts",
+          trigger: "event",
+          status: "queued",
+          error: null,
+          created_at: mark.created_at,
+          started_at: null,
+          finished_at: null,
+        });
+      } else if (mark.effects.quarantined) {
+        reload();
+      }
+    },
+    [onQueued, reload],
+  );
+
   return (
     <>
       <div className="flex flex-wrap items-end justify-between gap-3">
@@ -142,12 +175,20 @@ export function HoldingContent({
           <h2 id="thesis-heading" className="text-lg font-semibold">
             Thesis
           </h2>
-          <Button asChild variant="ghost" size="sm">
-            <Link href={`/config/theses#${encodeURIComponent(detail.ticker)}`}>
-              <PencilIcon aria-hidden="true" />
-              Edit thesis
-            </Link>
-          </Button>
+          <span className="flex flex-wrap gap-1">
+            <Button asChild variant="ghost" size="sm">
+              <Link href="/theses">
+                <LayoutGridIcon aria-hidden="true" />
+                Thesis board
+              </Link>
+            </Button>
+            <Button asChild variant="ghost" size="sm">
+              <Link href={`/config/theses#${encodeURIComponent(detail.ticker)}`}>
+                <PencilIcon aria-hidden="true" />
+                Edit thesis
+              </Link>
+            </Button>
+          </span>
         </div>
         {thesis ? (
           <div className="space-y-3 rounded-lg border border-border bg-surface-raised p-4 text-sm">
@@ -178,12 +219,20 @@ export function HoldingContent({
       </section>
 
       {thesis && thesis.kpis && thesis.kpis.length > 0 ? (
-        <KpiTable kpis={detail.kpis} facts={facts} />
+        <KpiTable kpis={detail.kpis} facts={facts} onFeedback={onFeedback} />
       ) : null}
+
+      <PriceRiskSection ticker={detail.ticker} currency={detail.position?.instrument_currency} />
 
       <HoldingNews ticker={detail.ticker} />
 
-      <FactsSection facts={detail.facts} reload={reload} onQueued={onQueued} />
+      <FactsSection ticker={detail.ticker} facts={detail.facts} reload={reload} onQueued={onQueued} onFeedback={onFeedback} />
+
+      <HoldingResearch ticker={detail.ticker} />
+
+      <OwnershipSection ticker={detail.ticker} />
+
+      <IdentitySection ticker={detail.ticker} />
     </>
   );
 }
@@ -249,6 +298,10 @@ function JobLine({ label, job }: { label: string; job: JobSummary | null | undef
       {label}: <span className="font-medium text-text">{job.status}</span>
       {" · "}
       <time dateTime={at}>{formatRelative(new Date(at))}</time>
+      {" · "}
+      <Link href={jobHref(job.id)} className="text-accent hover:underline">
+        job #{job.id}
+      </Link>
       {job.status === "failed" && job.error ? <span className="block text-text">{job.error}</span> : null}
     </p>
   );
@@ -328,7 +381,9 @@ function JobActions({
   );
 }
 
-function KpiTable({ kpis, facts }: { kpis: KpiStatus[]; facts: Map<number, FactOut> }) {
+type OnFeedback = (mark: FeedbackOut) => void;
+
+function KpiTable({ kpis, facts, onFeedback }: { kpis: KpiStatus[]; facts: Map<number, FactOut>; onFeedback: OnFeedback }) {
   const [open, setOpen] = useState<string | null>(null);
   return (
     <section aria-labelledby="kpi-heading" className="space-y-3">
@@ -364,6 +419,7 @@ function KpiTable({ kpis, facts }: { kpis: KpiStatus[]; facts: Map<number, FactO
                   expanded={expanded}
                   onToggle={() => setOpen(expanded ? null : kpi.id)}
                   facts={facts}
+                  onFeedback={onFeedback}
                 />
               );
             })}
@@ -385,6 +441,7 @@ function KpiRows({
   expanded,
   onToggle,
   facts,
+  onFeedback,
 }: {
   kpiId: string;
   label: string;
@@ -396,6 +453,7 @@ function KpiRows({
   expanded: boolean;
   onToggle: () => void;
   facts: Map<number, FactOut>;
+  onFeedback: OnFeedback;
 }) {
   const panelId = `kpi-${kpiId}`;
   return (
@@ -434,9 +492,16 @@ function KpiRows({
                   (old config)
                 </span>
               ) : null}
+              <FeedbackControl
+                target={{ kind: "verdict", id: current.id }}
+                label={`verdict on ${label}${current.period ? ` ${current.period}` : ""}`}
+              />
             </span>
           ) : (
-            <span className="text-text-muted">Not judged yet</span>
+            <span className="inline-flex flex-wrap items-center gap-1">
+              <VerdictStatusBadge status="unknown" />
+              <span className="text-xs text-text-muted">never judged</span>
+            </span>
           )}
         </td>
         <td className="px-3 py-2">{current ? <ConfidenceBadge confidence={current.confidence} /> : null}</td>
@@ -444,7 +509,7 @@ function KpiRows({
       {expanded ? (
         <tr className="border-b border-border bg-surface-muted/60">
           <td colSpan={6} id={panelId} className="space-y-4 px-4 py-3">
-            {current ? <VerdictEvidence verdict={current} facts={facts} /> : <p>No verdict yet.</p>}
+            {current ? <VerdictEvidence verdict={current} facts={facts} onFeedback={onFeedback} /> : <p>{NEVER_JUDGED}.</p>}
             {history.length > 1 ? (
               <div>
                 <p className="mb-1 text-xs font-medium tracking-wide text-text-muted uppercase">History</p>
@@ -455,6 +520,7 @@ function KpiRows({
                       <span className="num w-28 text-right">{formatObserved(v.observed_value, unit)}</span>
                       <VerdictStatusBadge status={v.status} />
                       <ConfidenceBadge confidence={v.confidence} />
+                      <FeedbackControl target={{ kind: "verdict", id: v.id }} label={`verdict on ${label} ${v.period ?? ""}`.trim()} />
                     </li>
                   ))}
                 </ul>
@@ -467,7 +533,15 @@ function KpiRows({
   );
 }
 
-function VerdictEvidence({ verdict, facts }: { verdict: VerdictOut; facts: Map<number, FactOut> }) {
+function VerdictEvidence({
+  verdict,
+  facts,
+  onFeedback,
+}: {
+  verdict: VerdictOut;
+  facts: Map<number, FactOut>;
+  onFeedback: OnFeedback;
+}) {
   const used = verdict.fact_ids.map((id) => facts.get(id)).filter((f): f is FactOut => Boolean(f));
   return (
     <div className="space-y-2 text-sm">
@@ -478,7 +552,7 @@ function VerdictEvidence({ verdict, facts }: { verdict: VerdictOut; facts: Map<n
         <ul className="space-y-2">
           {used.map((f) => (
             <li key={f.id}>
-              <FactEvidence fact={f} />
+              <FactEvidence fact={f} onFeedback={onFeedback} />
             </li>
           ))}
         </ul>
@@ -487,29 +561,7 @@ function VerdictEvidence({ verdict, facts }: { verdict: VerdictOut; facts: Map<n
   );
 }
 
-function EvidenceLinks({ fact }: { fact: FactOut }) {
-  return (
-    <span className="inline-flex flex-wrap items-center gap-3 text-xs">
-      <Link
-        href={`/evidence/${fact.id}`}
-        className="inline-flex items-center gap-1 text-accent underline-offset-4 hover:underline"
-      >
-        <FileSearchIcon aria-hidden="true" className="size-3.5" />
-        Evidence
-      </Link>
-      <a
-        href={fact.source_url}
-        target="_blank"
-        rel="noreferrer"
-        className="inline-flex items-center gap-1 text-text-muted hover:text-text hover:underline"
-      >
-        Source <ExternalLinkIcon aria-hidden="true" className="size-3" />
-      </a>
-    </span>
-  );
-}
-
-function FactEvidence({ fact }: { fact: FactOut }) {
+function FactEvidence({ fact, onFeedback }: { fact: FactOut; onFeedback: OnFeedback }) {
   return (
     <figure className="rounded-md border border-border bg-surface-raised p-3">
       <div className="flex flex-wrap items-center gap-2">
@@ -519,6 +571,7 @@ function FactEvidence({ fact }: { fact: FactOut }) {
         <span className="num">{formatFactValue(fact)}</span>
         <ConfidenceBadge confidence={fact.confidence} />
         <EvidenceLinks fact={fact} />
+        <FactFeedback fact={fact} onFeedback={onFeedback} />
       </div>
       <blockquote className="mt-2 border-l-2 border-border pl-3 font-mono text-xs break-words text-text-muted">
         {fact.snippet}
@@ -528,35 +581,86 @@ function FactEvidence({ fact }: { fact: FactOut }) {
   );
 }
 
+/** Wrong / irrelevant / useful on one figure; wrong quarantines it and re-judges the verdicts. */
+function FactFeedback({ fact, onFeedback }: { fact: FactOut; onFeedback: OnFeedback }) {
+  return (
+    <FeedbackControl
+      target={{ kind: "fact", id: fact.id }}
+      label={`figure ${humanizeMetric(fact.metric)} ${fact.period}`}
+      valueHint={scaleHint(fact)}
+      onMarked={onFeedback}
+    />
+  );
+}
+
 function FactsSection({
+  ticker,
   facts,
   reload,
   onQueued,
+  onFeedback,
 }: {
+  ticker: string;
   facts: FactOut[];
   reload: () => void;
   onQueued: (job: JobSummary) => void;
+  onFeedback: OnFeedback;
 }) {
+  const [lastReview, setLastReview] = useState<ReviewResolution | null>(null);
   const shown = facts.filter((f) => f.status !== "rejected");
   const rejected = facts.filter((f) => f.status === "rejected");
+  const held = facts.filter((f) => isHeld(f.status)).length;
+
+  function onResolved(resolution: ReviewResolution) {
+    setLastReview(resolution);
+    onQueued(resolution.result.verdict_job);
+    reload();
+  }
+
   return (
     <section aria-labelledby="facts-heading" className="space-y-3">
-      <h2 id="facts-heading" className="text-lg font-semibold">
-        Extracted figures
-      </h2>
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <h2 id="facts-heading" className="text-lg font-semibold">
+          Extracted figures
+        </h2>
+        {held > 0 ? (
+          <Button asChild variant="outline" size="sm">
+            <Link href={reviewQueueHref(ticker)}>
+              <InboxIcon aria-hidden="true" />
+              <span className="num">{held}</span> held figure{held === 1 ? "" : "s"}: open the review queue
+            </Link>
+          </Button>
+        ) : null}
+      </div>
+      {held > 0 ? (
+        <p className="text-sm text-text-muted">
+          Held and quarantined figures are used in no verdict until you accept or correct them.
+        </p>
+      ) : null}
+      <div role="status" aria-live="polite">
+        {lastReview ? (
+          <p className="rounded-md border border-border bg-surface-muted p-2 text-sm">
+            <span className="font-medium">
+              {REVIEW_ACTIONS[lastReview.action].done} {humanizeMetric(lastReview.fact.metric)} {lastReview.fact.period}.
+            </span>{" "}
+            Verdicts are being re-judged (job #{lastReview.result.verdict_job.id}); the KPI table above updates when the run
+            finishes.
+          </p>
+        ) : null}
+      </div>
       {facts.length === 0 ? (
         <EmptyState title="No figures yet">
           Run an earnings check to read this company&rsquo;s latest results release.
         </EmptyState>
       ) : (
-        <FactTable facts={shown} reload={reload} onQueued={onQueued} />
+        <FactTable facts={shown} onResolved={onResolved} onFeedback={onFeedback} />
       )}
       {rejected.length > 0 ? (
         <details className="rounded-lg border border-border bg-surface-raised p-3 text-sm">
           <summary className="cursor-pointer font-medium">
-            {rejected.length} figure{rejected.length === 1 ? "" : "s"} rejected by the validator
+            {rejected.length} figure{rejected.length === 1 ? "" : "s"} rejected by the validator or by you
           </summary>
-          <FactTable facts={rejected} reload={reload} onQueued={onQueued} />
+          <FactTable facts={rejected} onResolved={onResolved} onFeedback={onFeedback} />
         </details>
       ) : null}
     </section>
@@ -565,13 +669,14 @@ function FactsSection({
 
 function FactTable({
   facts,
-  reload,
-  onQueued,
+  onResolved,
+  onFeedback,
 }: {
   facts: FactOut[];
-  reload: () => void;
-  onQueued: (job: JobSummary) => void;
+  onResolved: (resolution: ReviewResolution) => void;
+  onFeedback: OnFeedback;
 }) {
+  const [open, setOpen] = useState<number | null>(null);
   if (facts.length === 0) return null;
   return (
     <div className="mt-2 overflow-x-auto rounded-lg border border-border bg-surface-raised">
@@ -583,64 +688,75 @@ function FactTable({
             <th scope="col" className="px-3 py-2 text-right font-medium">Value</th>
             <th scope="col" className="px-3 py-2 text-left font-medium">Confidence</th>
             <th scope="col" className="px-3 py-2 text-left font-medium">Source</th>
+            <th scope="col" className="px-3 py-2 text-left font-medium">Feedback</th>
           </tr>
         </thead>
         <tbody>
-          {facts.map((f) => (
-            <tr key={f.id} className="border-b border-border align-top last:border-0">
-              <td className="px-3 py-2 whitespace-nowrap">{f.period}</td>
-              <th scope="row" className="px-3 py-2 text-left font-normal">
-                {humanizeMetric(f.metric)}
-                {f.basis === "adjusted" ? <span className="ml-1 text-xs text-text-muted">(adjusted)</span> : null}
-              </th>
-              <td className="num px-3 py-2 text-right whitespace-nowrap">{formatFactValue(f)}</td>
-              <td className="px-3 py-2">
-                <ConfidenceBadge confidence={f.confidence} />
-                {f.status_reason ? <p className="mt-1 max-w-xs text-xs text-text-muted">{f.status_reason}</p> : null}
-                {f.status === "unverified" ? <ReviewButtons fact={f} reload={reload} onQueued={onQueued} /> : null}
-              </td>
-              <td className="px-3 py-2">
-                <EvidenceLinks fact={f} />
-              </td>
-            </tr>
-          ))}
+          {facts.map((f) => {
+            const actions = allowedReviewActions(f.status);
+            const expanded = open === f.id;
+            const panelId = `review-fact-${f.id}`;
+            return (
+              <Fragment key={f.id}>
+                <tr className="border-b border-border align-top last:border-0">
+                  <td className="px-3 py-2 whitespace-nowrap">{f.period}</td>
+                  <th scope="row" className="px-3 py-2 text-left font-normal">
+                    {humanizeMetric(f.metric)}
+                    {f.basis === "adjusted" ? <span className="ml-1 text-xs text-text-muted">(adjusted)</span> : null}
+                    {f.origin === "owner" ? <span className="ml-1 text-xs text-text-muted">(your correction)</span> : null}
+                  </th>
+                  <td className="num px-3 py-2 text-right whitespace-nowrap">{formatFactValue(f)}</td>
+                  <td className="px-3 py-2">
+                    <ConfidenceBadge confidence={f.confidence} />
+                    {f.status_reason ? <p className="mt-1 max-w-xs text-xs text-text-muted">{f.status_reason}</p> : null}
+                    {actions.length > 0 ? (
+                      <Button
+                        size="sm"
+                        variant={isHeld(f.status) ? "outline" : "ghost"}
+                        className="mt-1"
+                        aria-expanded={expanded}
+                        aria-controls={expanded ? panelId : undefined}
+                        onClick={() => setOpen(expanded ? null : f.id)}
+                      >
+                        {expanded ? <ChevronDownIcon aria-hidden="true" /> : <ChevronRightIcon aria-hidden="true" />}
+                        {isHeld(f.status) ? "Review" : "Correct or reject"}
+                        <span className="sr-only">
+                          {" "}
+                          {humanizeMetric(f.metric)} {f.period}
+                        </span>
+                      </Button>
+                    ) : null}
+                  </td>
+                  <td className="px-3 py-2">
+                    <EvidenceLinks fact={f} />
+                  </td>
+                  <td className="px-3 py-2">
+                    <FactFeedback fact={f} onFeedback={onFeedback} />
+                  </td>
+                </tr>
+                {expanded ? (
+                  <tr className="border-b border-border bg-surface-muted/60">
+                    <td colSpan={6} id={panelId} className="px-4 py-3">
+                      <blockquote className="mb-3 border-l-2 border-border pl-3 font-mono text-xs break-words text-text-muted">
+                        {f.snippet}
+                      </blockquote>
+                      <FactReviewForm
+                        fact={f}
+                        onCancel={() => setOpen(null)}
+                        onResolved={(resolution) => {
+                          setOpen(null);
+                          onResolved(resolution);
+                        }}
+                        className="max-w-2xl"
+                      />
+                    </td>
+                  </tr>
+                ) : null}
+              </Fragment>
+            );
+          })}
         </tbody>
       </table>
-    </div>
-  );
-}
-
-function ReviewButtons({
-  fact,
-  reload,
-  onQueued,
-}: {
-  fact: FactOut;
-  reload: () => void;
-  onQueued: (job: JobSummary) => void;
-}) {
-  const [pending, setPending] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  async function review(action: "verify" | "reject") {
-    setPending(true);
-    setError(null);
-    const result = await getBrowserApiClient()
-      .POST("/facts/{fact_id}/review", { params: { path: { fact_id: fact.id } }, body: { action } })
-      .catch((err: unknown) => ({ data: undefined, error: err, response: { status: 0 } as Response }));
-    setPending(false);
-    if (result.data) onQueued(result.data.verdict_job);
-    else setError(`Review failed (HTTP ${result.response.status}).`);
-    reload();
-  }
-  return (
-    <div className="mt-1 flex flex-wrap items-center gap-1">
-      <Button size="sm" variant="outline" disabled={pending} onClick={() => void review("verify")}>
-        Accept
-      </Button>
-      <Button size="sm" variant="ghost" disabled={pending} onClick={() => void review("reject")}>
-        Reject
-      </Button>
-      {error ? <span className={cn("text-xs text-text")}>{error}</span> : null}
     </div>
   );
 }

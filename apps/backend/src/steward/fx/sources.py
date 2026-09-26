@@ -5,12 +5,15 @@
 date. Rates are CZK per `Amount` units of the currency.
 
 ECB: the Data Portal's EXR dataflow as CSV. Rates are units of the currency per 1 EUR,
-so they are inverted to EUR per unit here; the published value is kept alongside.
+so they are inverted to EUR per unit here; the published value is kept alongside. When the
+Data Portal is unreachable, Frankfurter (which republishes the same ECB rates) is tried
+before the caller falls back to stored rates.
 """
 
 import csv
 import datetime as dt
 import io
+from dataclasses import replace
 from decimal import Decimal, InvalidOperation, localcontext
 
 import httpx
@@ -127,5 +130,22 @@ async def fetch_ecb(http: httpx.AsyncClient, date: dt.date) -> list[FxRate]:
 
 async def fetch_rates(http: httpx.AsyncClient, source: FxSourceName, date: dt.date) -> list[FxRate]:
     if source == "cnb":
-        return await fetch_cnb(http, date)
-    return await fetch_ecb(http, date)
+        return [replace(r, provider="cnb") for r in await fetch_cnb(http, date)]
+    try:
+        return [replace(r, provider="ecb-data-portal") for r in await fetch_ecb(http, date)]
+    except (FxSourceError, httpx.HTTPError) as portal_error:
+        from steward.sources.market import MarketDataError, frankfurter_series
+
+        try:
+            rates = await frankfurter_series(
+                http, date - dt.timedelta(days=ECB_LOOKBACK_DAYS), date
+            )
+        except (MarketDataError, httpx.HTTPError, ValueError) as exc:
+            raise FxSourceError(
+                f"ECB Data Portal failed ({portal_error}); Frankfurter failed too ({exc})"
+            ) from exc
+        if not rates:
+            raise FxSourceError(
+                f"ECB Data Portal failed ({portal_error}); Frankfurter had none"
+            ) from portal_error
+        return [replace(r, provider="frankfurter") for r in rates]

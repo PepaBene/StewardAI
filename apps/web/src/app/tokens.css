@@ -54,6 +54,10 @@
 
   /* Charts: allocation bars (a lighter step of the accent hue; never gain/loss) */
   --chart-bar: oklch(0.62 0.12 277);
+  /* Charts: price lines. The holding in the accent hue, its benchmark in neutral grey
+     (also dashed, so the two never differ by colour alone). */
+  --chart-line: oklch(0.5 0.17 277);
+  --chart-benchmark: oklch(0.56 0.015 264);
 }
 
 .dark {
@@ -86,6 +90,8 @@
   --disputed-subtle: oklch(0.27 0.045 355);
 
   --chart-bar: oklch(0.64 0.11 277);
+  --chart-line: oklch(0.72 0.14 277);
+  --chart-benchmark: oklch(0.68 0.012 264);
 }
 
 /* Drop Tailwind's default palette so only token colours exist. */
@@ -117,4 +123,6 @@
   --color-disputed: var(--disputed);
   --color-disputed-subtle: var(--disputed-subtle);
   --color-chart-bar: var(--chart-bar);
+  --color-chart-line: var(--chart-line);
+  --color-chart-benchmark: var(--chart-benchmark);
 }

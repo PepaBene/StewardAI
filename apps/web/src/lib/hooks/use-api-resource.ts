@@ -9,20 +9,20 @@ export type ApiResult<T> = { data?: T; error?: unknown; response: Response };
 export type ResourceState<T> =
   | { kind: "loading" }
   | { kind: "ok"; data: T }
-  | { kind: "error"; title: string; detail: string; previous: T | null };
+  | { kind: "error"; title: string; detail: string; previous: T | null; /** HTTP status; absent when unreachable. */ status?: number };
 
-function describeError(result: ApiResult<unknown>): { title: string; detail: string } {
+function describeError(result: ApiResult<unknown>): { title: string; detail: string; status: number } {
   const status = result.response.status;
   const error = result.error;
   const detail =
     error && typeof error === "object" && "detail" in error ? String(error.detail) : "";
   if (status === 401 || status === 403) {
-    return { title: "Not authorised", detail: detail || "Sign in again (with MFA) and retry." };
+    return { title: "Not authorised", detail: detail || "Sign in again (with MFA) and retry.", status };
   }
   if (status === 503) {
-    return { title: "Backend not ready", detail: detail || "The API cannot reach its database." };
+    return { title: "Backend not ready", detail: detail || "The API cannot reach its database.", status };
   }
-  return { title: `API responded with HTTP ${status}`, detail };
+  return { title: `API responded with HTTP ${status}`, detail, status };
 }
 
 async function settle<T>(fetcher: () => Promise<ApiResult<T>>): Promise<ResourceState<T>> {

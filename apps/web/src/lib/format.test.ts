@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  formatDateTime,
   formatMoney,
   formatPercent,
   formatPp,
@@ -72,5 +73,13 @@ describe("other formatters", () => {
     expect(gainLossTone(-5)).toBe("loss");
     expect(gainLossTone(0)).toBe("flat");
     expect(gainLossTone(null)).toBe("flat");
+  });
+});
+
+describe("formatDateTime", () => {
+  it("formats a timestamp with date and time, and a dash for garbage", () => {
+    const text = formatDateTime("2026-09-25T14:05:00Z", { locale: "en-GB", timeZone: "UTC" });
+    expect(text).toMatch(/^25 Sep\w* 2026, 14:05$/);
+    expect(formatDateTime("not a date")).toBe("—");
   });
 });

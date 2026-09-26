@@ -1,34 +1,62 @@
 "use client";
 
-import { ArrowRightIcon, CommandIcon, LoaderCircleIcon, PlayIcon, SearchIcon } from "lucide-react";
+import { ArrowRightIcon, CommandIcon, LoaderCircleIcon, MessageSquareIcon, PlayIcon, SearchIcon } from "lucide-react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
 
+import { openChatPanel } from "@/components/chat/chat-panel";
 import { Button } from "@/components/ui/button";
 import { getBrowserApiClient, type Holding } from "@/lib/api/client";
+import { jobHref } from "@/lib/jobs/job-detail";
 import {
   baseCommands,
   filterCommands,
   holdingCommands,
+  jobCommands,
   type PaletteAction,
   type PaletteCommand,
 } from "@/lib/palette";
 import { cn } from "@/lib/utils";
 
-async function runAction(action: PaletteAction): Promise<string> {
+function queue(action: PaletteAction) {
   const api = getBrowserApiClient();
-  const result =
-    action.kind === "earnings-check"
-      ? await api.POST("/jobs/earnings-check", { body: { ticker: action.ticker } })
-      : action.kind === "portfolio-sync"
-        ? await api.POST("/jobs/portfolio-sync")
-        : action.kind === "news-ingest"
-          ? await api.POST("/jobs/news-ingest")
-          : action.kind === "digest"
-            ? await api.POST("/jobs/digest", { body: { kind: action.period } })
-            : await api.POST("/jobs/thesis-verdicts", { body: {} });
-  if (!result.data) return `Could not queue it: the API answered HTTP ${result.response.status}.`;
-  return `Queued as job #${result.data.id}.`;
+  switch (action.kind) {
+    case "earnings-check":
+      return api.POST("/jobs/earnings-check", { body: { ticker: action.ticker } });
+    case "portfolio-sync":
+      return api.POST("/jobs/portfolio-sync");
+    case "news-ingest":
+      return api.POST("/jobs/news-ingest");
+    case "digest":
+      return api.POST("/jobs/digest", { body: { kind: action.period } });
+    case "thesis-verdicts":
+      return api.POST("/jobs/thesis-verdicts", { body: {} });
+    case "reference-data":
+      return api.POST("/jobs/reference-data", {
+        // One holding: re-read OpenFIGI and Wikidata now. All: the weekly job's normal refresh.
+        body: { ticker: action.ticker ?? null, force: Boolean(action.ticker) },
+      });
+    case "price-history":
+      return api.POST("/jobs/price-history");
+    case "holiday-refresh":
+      return api.POST("/jobs/holiday-refresh");
+    case "macro-collect":
+      return api.POST("/jobs/macro-collect");
+    case "monthly-review":
+      return api.POST("/jobs/monthly-review");
+    case "ownership-13f":
+      return api.POST("/jobs/ownership-13f");
+    case "research":
+      // The default research profile.
+      return api.POST("/jobs/research", { body: { ticker: action.ticker } });
+  }
+}
+
+async function runAction(action: PaletteAction): Promise<{ text: string; jobId: number | null }> {
+  const result = await queue(action);
+  if (!result.data) return { text: `Could not queue it: the API answered HTTP ${result.response.status}.`, jobId: null };
+  return { text: `Queued as job #${result.data.id}.`, jobId: result.data.id };
 }
 
 /**
@@ -43,10 +71,10 @@ export function CommandPalette() {
   const [query, setQuery] = useState("");
   const [active, setActive] = useState(0);
   const [holdings, setHoldings] = useState<Holding[]>([]);
-  const [status, setStatus] = useState<{ busy: boolean; text: string } | null>(null);
+  const [status, setStatus] = useState<{ busy: boolean; text: string; jobId?: number | null } | null>(null);
 
   const commands = useMemo(() => [...baseCommands(), ...holdingCommands(holdings)], [holdings]);
-  const results = useMemo(() => filterCommands(commands, query), [commands, query]);
+  const results = useMemo(() => [...jobCommands(query), ...filterCommands(commands, query)], [commands, query]);
   const selected = Math.min(active, Math.max(0, results.length - 1));
 
   const open = useCallback(() => {
@@ -75,6 +103,11 @@ export function CommandPalette() {
 
   async function execute(command: PaletteCommand | undefined) {
     if (!command) return;
+    if (command.ui === "open-chat") {
+      dialog.current?.close();
+      openChatPanel();
+      return;
+    }
     if (command.href) {
       dialog.current?.close();
       router.push(command.href);
@@ -83,7 +116,8 @@ export function CommandPalette() {
     if (command.action) {
       setStatus({ busy: true, text: `${command.label}…` });
       try {
-        setStatus({ busy: false, text: `${command.label}: ${await runAction(command.action)}` });
+        const outcome = await runAction(command.action);
+        setStatus({ busy: false, text: `${command.label}: ${outcome.text}`, jobId: outcome.jobId });
       } catch (err) {
         setStatus({ busy: false, text: err instanceof Error ? err.message : String(err) });
       }
@@ -154,7 +188,7 @@ export function CommandPalette() {
                 i === selected ? "bg-surface-muted text-text" : "text-text-muted",
               )}
             >
-              {c.action ? <PlayIcon aria-hidden="true" className="size-4" /> : <ArrowRightIcon aria-hidden="true" className="size-4" />}
+              {c.ui ? <MessageSquareIcon aria-hidden="true" className="size-4" /> : c.action ? <PlayIcon aria-hidden="true" className="size-4" /> : <ArrowRightIcon aria-hidden="true" className="size-4" />}
               <span className="flex-1 text-text">{c.label}</span>
               <span className="text-xs text-text-muted">{c.group}</span>
             </li>
@@ -165,6 +199,15 @@ export function CommandPalette() {
             <span className="flex items-center gap-1.5 text-text">
               {status.busy ? <LoaderCircleIcon aria-hidden="true" className="size-3.5 animate-spin" /> : null}
               {status.text}
+              {status.jobId ? (
+                <Link
+                  href={jobHref(status.jobId)}
+                  onClick={() => dialog.current?.close()}
+                  className="text-accent hover:underline"
+                >
+                  Follow it
+                </Link>
+              ) : null}
             </span>
           ) : (
             <span>↑↓ to move · Enter to open or run · Esc to close</span>

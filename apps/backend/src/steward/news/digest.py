@@ -33,6 +33,8 @@ from steward.config.holding_profiles import HoldingProfilesConfig
 from steward.config.jobs import DigestSettings, JobsConfig
 from steward.config.notifications import NotificationsConfig
 from steward.config.store import load_active
+from steward.config.thesis import ThesesConfig
+from steward.config.verification import ClaimVerifierSettings, VerificationConfig
 from steward.jobs.runner import JobContext, JobHandler
 from steward.news.link import short_name
 from steward.notify.channels import (
@@ -41,7 +43,17 @@ from steward.notify.channels import (
     ChannelError,
     channels_from_settings,
 )
+from steward.ownership.read import ManagerChange, tracked_manager_changes
 from steward.settings import get_settings
+from steward.verify.claims import (
+    CheckStatus,
+    Claim,
+    ClaimCheckOutcome,
+    ClaimCheckSummary,
+    ClaimVerifier,
+    ClaudeClaimVerifier,
+    check_claims,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -58,6 +70,12 @@ class Sentence(BaseModel):
     text: str
     news_item_ids: list[int] = Field(default_factory=list)
     fact_ids: list[int] = Field(default_factory=list)
+    check: CheckStatus | None = Field(
+        default=None,
+        description="The claim verifier's result: supported, unsupported (kept only in "
+        "'mark' mode) or unchecked (the verifier could not run). Null: not checked.",
+    )
+    check_reason: str | None = None
 
 
 class DigestSource(BaseModel):
@@ -67,6 +85,20 @@ class DigestSource(BaseModel):
     tier: int
     headline: str
     published_at: dt.datetime
+    summary: str | None = Field(default=None, description="The item's own text, as stored.")
+
+
+class DigestFactSource(BaseModel):
+    """A fact a digest sentence or verdict cites, with the snippet it was read from."""
+
+    fact_id: int
+    ticker: str
+    metric: str
+    period: str
+    value_as_written: str
+    snippet: str
+    source_url: str
+    status: str
 
 
 class DigestStory(BaseModel):
@@ -96,6 +128,48 @@ class DigestSection(BaseModel):
     verdicts: list[DigestVerdict] = Field(default_factory=list)
 
 
+class PortfolioFlag(BaseModel):
+    kind: Literal["band", "hard_limit", "rule"]
+    key: str
+    ticker: str | None
+    severity: int
+    detail: str
+    first_seen: dt.datetime
+    cleared_at: dt.datetime | None
+
+
+class ThesisChange(BaseModel):
+    ticker: str
+    kpi_id: str
+    period: str | None
+    from_status: Literal["pass", "breach", "unknown"] | None
+    to_status: Literal["pass", "breach", "unknown"]
+    verdict_id: int
+    fact_ids: list[int]
+
+
+class ReviewDue(BaseModel):
+    ticker: str
+    review_date: dt.date
+
+
+class MacroFigure(BaseModel):
+    series_id: str
+    label: str
+    value: float
+    unit: str | None
+    period: dt.date
+    release_date: dt.date | None
+    url: str
+    new: bool = Field(description="Released within the digest's window.")
+
+
+class MarketHoliday(BaseModel):
+    calendar: str
+    date: dt.date
+    name: str
+
+
 class DigestBody(BaseModel):
     kind: DigestKind
     window_start: dt.datetime
@@ -106,10 +180,32 @@ class DigestBody(BaseModel):
     sections: list[DigestSection] = Field(default_factory=list)
     sources: list[DigestSource] = Field(default_factory=list)
     alerts_sent: int = 0
+    portfolio: list[PortfolioFlag] = Field(
+        default_factory=list, description="Out-of-band weights and breaches open in the period."
+    )
+    thesis_changes: list[ThesisChange] = Field(default_factory=list)
+    reviews_due: list[ReviewDue] = Field(
+        default_factory=list, description="Theses past their review date."
+    )
+    macro: list[MacroFigure] = Field(
+        default_factory=list, description="Latest macro figures, each with its release and URL."
+    )
+    holidays: list[MarketHoliday] = Field(
+        default_factory=list, description="Public holidays in the period and the next 7 days."
+    )
     dropped_sentences: int = Field(
         default=0, description="Written sentences removed because they cited nothing given."
     )
     writer: str | None = None
+    fact_sources: list[DigestFactSource] = Field(default_factory=list)
+    ownership_changes: list[ManagerChange] = Field(
+        default_factory=list,
+        description="Tracked managers' new and exited positions in holdings, from 13F filings "
+        "received in the period.",
+    )
+    claims: ClaimCheckSummary | None = Field(
+        default=None, description="The claim verifier's pass over the written sentences."
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -341,6 +437,7 @@ async def gather(
                 tier=item["tier"],
                 headline=item["headline"],
                 published_at=item["published_at"],
+                summary=item["summary"],
             )
             material.summaries[item["id"]] = item["summary"]
         section(story["ticker"]).stories.append(
@@ -374,6 +471,87 @@ async def gather(
         )
         material.fact_ids |= set(v["fact_ids"])
     return material
+
+
+async def portfolio_flags(
+    pool: asyncpg.Pool, start: dt.datetime, end: dt.datetime
+) -> list[PortfolioFlag]:
+    rows = await pool.fetch(
+        "select kind, key, ticker, severity, detail, first_seen, cleared_at"
+        " from public.portfolio_breach where first_seen < $2"
+        " and (cleared_at is null or cleared_at >= $1) order by severity desc, key",
+        start,
+        end,
+    )
+    return [PortfolioFlag(**dict(r)) for r in rows]
+
+
+async def thesis_changes(
+    pool: asyncpg.Pool, start: dt.datetime, end: dt.datetime
+) -> list[ThesisChange]:
+    """Each KPI whose latest verdict in the window differs from its latest one before."""
+    rows = await pool.fetch(
+        "select distinct on (v.ticker, v.kpi_id) v.id, v.ticker, v.kpi_id, v.period, v.status,"
+        " v.fact_ids, (select p.status from public.verdict p where p.ticker = v.ticker"
+        "   and p.kpi_id = v.kpi_id and p.created_at < $1 order by p.id desc limit 1) as before"
+        " from public.verdict v where v.created_at >= $1 and v.created_at < $2"
+        " order by v.ticker, v.kpi_id, v.id desc",
+        start,
+        end,
+    )
+    return [
+        ThesisChange(
+            ticker=r["ticker"],
+            kpi_id=r["kpi_id"],
+            period=r["period"],
+            from_status=r["before"],
+            to_status=r["status"],
+            verdict_id=r["id"],
+            fact_ids=list(r["fact_ids"]),
+        )
+        for r in rows
+        if r["before"] != r["status"]
+    ]
+
+
+async def macro_figures(pool: asyncpg.Pool, start: dt.datetime) -> list[MacroFigure]:
+    rows = await pool.fetch(
+        "select distinct on (series_id) series_id, label, value, unit, period, release_date, url"
+        " from public.macro_series order by series_id, period desc"
+    )
+    return [
+        MacroFigure(
+            series_id=r["series_id"],
+            label=r["label"] or r["series_id"],
+            value=float(r["value"]),
+            unit=r["unit"],
+            period=r["period"],
+            release_date=r["release_date"],
+            url=r["url"],
+            new=r["release_date"] is not None and r["release_date"] >= start.date(),
+        )
+        for r in rows
+    ]
+
+
+async def market_holidays(
+    pool: asyncpg.Pool, start: dt.datetime, end: dt.datetime
+) -> list[MarketHoliday]:
+    rows = await pool.fetch(
+        "select calendar, date, name from public.holiday where scope in ('national', 'exchange')"
+        " and date between $1 and $2 order by date, calendar",
+        start.date(),
+        (end + dt.timedelta(days=7)).date(),
+    )
+    return [MarketHoliday(**dict(r)) for r in rows]
+
+
+def reviews_due(theses: ThesesConfig, today: dt.date) -> list[ReviewDue]:
+    return [
+        ReviewDue(ticker=t.ticker, review_date=t.review_date)
+        for t in theses.theses
+        if t.review_date is not None and t.review_date <= today
+    ]
 
 
 def material_prompt(material: Material) -> str:
@@ -470,7 +648,8 @@ def render_text(body: DigestBody, app_url: str | None, markdown: bool) -> str:
             if i in sources
         ]
         refs += [fact_link(f) for f in sentence.fact_ids]
-        return f" ({'; '.join(refs)})" if refs else ""
+        mark = " [not supported by its sources]" if sentence.check == "unsupported" else ""
+        return (f" ({'; '.join(refs)})" if refs else "") + mark
 
     title = f"{body.kind.capitalize()} digest, {body.window_end.date().isoformat()}"
     lines = [f"# {title}" if markdown else title, "", body.headline]
@@ -491,6 +670,46 @@ def render_text(body: DigestBody, app_url: str | None, markdown: bool) -> str:
         for v in section.verdicts:
             refs = ", ".join(fact_link(f) for f in v.fact_ids) or "no fact"
             lines.append(f"- {v.text} ({refs})")
+    if body.portfolio:
+        lines += ["", "## Portfolio" if markdown else "PORTFOLIO"]
+        for flag in body.portfolio:
+            state = " (cleared)" if flag.cleared_at else ""
+            kind = {"band": "out of band", "hard_limit": "hard limit", "rule": "rule breach"}
+            lines.append(f"- [{kind[flag.kind]}] {flag.detail}{state}")
+    if body.thesis_changes:
+        lines += ["", "## Thesis status changes" if markdown else "THESIS STATUS CHANGES"]
+        for c in body.thesis_changes:
+            refs = ", ".join(fact_link(f) for f in c.fact_ids) or "no fact"
+            lines.append(
+                f"- {c.ticker} KPI {c.kpi_id} ({c.period or 'no period'}): "
+                f"{c.from_status or 'new'} -> {c.to_status} ({refs})"
+            )
+    if body.reviews_due:
+        lines += ["", "## Theses to review" if markdown else "THESES TO REVIEW"]
+        lines += [
+            f"- {r.ticker}: review date {r.review_date.isoformat()}" for r in body.reviews_due
+        ]
+    if body.macro:
+        lines += ["", "## Macro figures" if markdown else "MACRO FIGURES"]
+        for m in body.macro:
+            unit = "%" if m.unit == "%" else f" {m.unit or ''}"
+            released = m.release_date.isoformat() if m.release_date else "release date unknown"
+            new = " (new)" if m.new else ""
+            lines.append(
+                f"- {m.label}: {m.value:g}{unit} for {m.period.isoformat()}{new}, "
+                f"released {released} ({link('source', m.url)})"
+            )
+    if body.ownership_changes:
+        lines += ["", "## Tracked managers (13F)" if markdown else "TRACKED MANAGERS (13F)"]
+        for mc in body.ownership_changes:
+            verb = "opened a position in" if mc.change == "new" else "exited"
+            lines.append(
+                f"- {mc.manager_name or mc.cik} {verb} {mc.ticker} (period {mc.period}, "
+                f"filing {mc.accession})"
+            )
+    if body.holidays:
+        lines += ["", "## Market holidays" if markdown else "MARKET HOLIDAYS"]
+        lines += [f"- {h.date.isoformat()} {h.calendar}: {h.name}" for h in body.holidays]
     if app_url:
         lines += ["", f"Open in StewardAI: {app_url.rstrip('/')}/reports"]
     return "\n".join(lines)
@@ -503,10 +722,23 @@ async def build_digest(
     profiles: HoldingProfilesConfig,
     settings: DigestSettings,
     writer: DigestWriter | None,
+    theses: ThesesConfig | None = None,
+    tracked_ciks: list[str] | None = None,
 ) -> tuple[DigestBody, Usage | None, str | None]:
     start = end - WINDOWS[kind]
     material = await gather(pool, start, end, profiles, settings.min_severity_summarised)
     headline, nothing = headline_for(kind, material)
+    flags = await portfolio_flags(pool, start, end)
+    breaches = [f for f in flags if f.kind != "band" and f.first_seen >= start]
+    if breaches:
+        count = len(breaches)
+        extra = f"{count} portfolio {'breach' if count == 1 else 'breaches'}"
+        headline = (
+            f"{extra} in the last {'24 hours' if kind == 'daily' else '7 days'}."
+            if nothing
+            else f"{headline.rstrip('.')}; {extra}."
+        )
+        nothing = False
     alerts = await pool.fetchval(
         "select count(*) from public.alert where status = 'sent' and kind <> 'test'"
         " and sent_at >= $1 and sent_at < $2",
@@ -529,6 +761,14 @@ async def build_digest(
         ),
         sources=list(material.sources.values()),
         alerts_sent=int(alerts or 0),
+        portfolio=flags,
+        thesis_changes=await thesis_changes(pool, start, end),
+        reviews_due=reviews_due(theses or ThesesConfig(), end.date()),
+        macro=await macro_figures(pool, start),
+        holidays=await market_holidays(pool, start, end),
+        ownership_changes=await tracked_manager_changes(pool, tracked_ciks or [], since=start)
+        if tracked_ciks
+        else [],
     )
     usage: Usage | None = None
     note: str | None = None
@@ -554,6 +794,68 @@ async def build_digest(
     elif not nothing:
         note = "summary not written: ANTHROPIC_API_KEY is not set"
     return body, usage, note
+
+
+async def load_fact_sources(pool: asyncpg.Pool, fact_ids: set[int]) -> list[DigestFactSource]:
+    rows = await pool.fetch(
+        "select id, ticker, metric, period, value_as_written, snippet, source_url, status"
+        " from public.fact where id = any($1::bigint[]) order by id",
+        sorted(fact_ids),
+    )
+    return [
+        DigestFactSource(fact_id=r["id"], **{k: r[k] for k in r.keys() if k != "id"}) for r in rows
+    ]
+
+
+def cited_fact_ids(body: DigestBody) -> set[int]:
+    ids = {f for s in body.overview for f in s.fact_ids}
+    for section in body.sections:
+        ids |= {f for s in section.summary for f in s.fact_ids}
+        ids |= {f for v in section.verdicts for f in v.fact_ids}
+    ids |= {f for c in body.thesis_changes for f in c.fact_ids}
+    return ids
+
+
+def evidence_for(
+    sentence: Sentence, sources: dict[int, DigestSource], facts: dict[int, DigestFactSource]
+) -> tuple[str, ...]:
+    out: list[str] = []
+    for item_id in sentence.news_item_ids:
+        source = sources.get(item_id)
+        if source is not None:
+            out.append(" ".join(p for p in (source.headline, source.summary) if p))
+    for fact_id in sentence.fact_ids:
+        fact = facts.get(fact_id)
+        if fact is not None:
+            out.append(f"{fact.metric} {fact.period}: {fact.value_as_written}. {fact.snippet}")
+    return tuple(out)
+
+
+async def verify_digest_claims(
+    body: DigestBody,
+    settings: ClaimVerifierSettings,
+    verifier: ClaimVerifier | None,
+    today: dt.date,
+) -> ClaimCheckOutcome:
+    """Check every written sentence against what it cites; strip or mark the unsupported."""
+    sources = {s.news_item_id: s for s in body.sources}
+    facts = {f.fact_id: f for f in body.fact_sources}
+    lists: list[list[Sentence]] = [body.overview, *(s.summary for s in body.sections)]
+    placed = [(lst, sentence) for lst in lists for sentence in lst]
+    claims = [
+        Claim(i, sentence.text, evidence_for(sentence, sources, facts))
+        for i, (_, sentence) in enumerate(placed)
+    ]
+    outcome = await check_claims(claims, settings, verifier, today)
+    removed = 0
+    for i, (lst, sentence) in enumerate(placed):
+        result = outcome.results[i]
+        sentence.check, sentence.check_reason = result.status, result.reason
+        if result.status == "unsupported" and settings.mode == "strip":
+            lst.remove(sentence)
+            removed += 1
+    body.claims = outcome.summary(settings.mode, removed)
+    return outcome
 
 
 async def deliver(
@@ -585,16 +887,22 @@ async def run_digest(
     channels: dict[str, Channel],
     now: dt.datetime,
     app_url: str | None,
+    claim_verifier: ClaimVerifier | None = None,
 ) -> int:
     pool = ctx.pool
     async with ctx.step("load_config") as step:
         notifications = await load_active(pool, "notifications", NotificationsConfig)
         profiles = await load_active(pool, "holding_profiles", HoldingProfilesConfig)
         jobs = await load_active(pool, "jobs", JobsConfig)
-        for stored in (notifications, profiles, jobs):
+        theses = await load_active(pool, "theses", ThesesConfig)
+        verification = await load_active(pool, "verification", VerificationConfig)
+        for stored in (notifications, profiles, jobs, theses, verification):
             await ctx.record_config_version(stored.id if stored else None)
         notify = notifications.body if notifications else NotificationsConfig()
         settings = (jobs.body if jobs else JobsConfig()).digest
+        claim_settings = (
+            verification.body if verification else VerificationConfig()
+        ).claim_verifier
         step.detail["channels"] = notify.digest_channels
 
     async with ctx.step("write") as step:
@@ -605,6 +913,8 @@ async def run_digest(
             profiles.body if profiles else HoldingProfilesConfig(),
             settings,
             writer,
+            theses.body if theses else None,
+            [m.cik for m in (jobs.body if jobs else JobsConfig()).ownership.tracked_managers],
         )
         if usage is not None:
             step.usage = usage.step_usage()
@@ -615,6 +925,18 @@ async def run_digest(
         )
         if note:
             step.detail["note"] = note
+        body.fact_sources = await load_fact_sources(pool, cited_fact_ids(body))
+
+    written = [s for lst in (body.overview, *(x.summary for x in body.sections)) for s in lst]
+    if written and claim_settings.enabled and f"{kind}_digest" in claim_settings.applies_to:
+        async with ctx.step("verify_claims") as step:
+            outcome = await verify_digest_claims(body, claim_settings, claim_verifier, now.date())
+            if outcome.usage is not None:
+                step.usage = outcome.usage.step_usage()
+            assert body.claims is not None
+            step.detail.update(body.claims.model_dump(exclude_none=True))
+
+    async with ctx.step("store") as step:
         report_id: int = await pool.fetchval(
             "insert into public.report (type, period, title, body, body_md, period_start,"
             " period_end, config_version_ids, job_id)"
@@ -646,12 +968,19 @@ def _handler(kind: DigestKind) -> JobHandler:
         settings = get_settings()
         stored_jobs = await load_active(ctx.pool, "jobs", JobsConfig)
         digest_settings = (stored_jobs.body if stored_jobs else JobsConfig()).digest
+        stored_verification = await load_active(ctx.pool, "verification", VerificationConfig)
+        claim_settings = (
+            stored_verification.body if stored_verification else VerificationConfig()
+        ).claim_verifier
+        writer: DigestWriter | None
+        verifier: ClaimVerifier | None
         try:
-            writer: DigestWriter | None = ClaudeDigestWriter(
-                create_client(settings), digest_settings
-            )
+            client = create_client(settings)
         except AINotConfigured:
-            writer = None
+            writer = verifier = None
+        else:
+            writer = ClaudeDigestWriter(client, digest_settings)
+            verifier = ClaudeClaimVerifier(client, claim_settings.model)
         async with httpx.AsyncClient(
             timeout=30.0, headers={"User-Agent": f"StewardAI/{__version__}"}
         ) as http:
@@ -662,6 +991,7 @@ def _handler(kind: DigestKind) -> JobHandler:
                 channels=channels_from_settings(http, settings),
                 now=dt.datetime.now(dt.UTC),
                 app_url=settings.app_url,
+                claim_verifier=verifier,
             )
 
     return handler

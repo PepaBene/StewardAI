@@ -1,13 +1,15 @@
 "use client";
 
-import { ExternalLinkIcon, LoaderCircleIcon, PlayIcon, RefreshCwIcon, XIcon } from "lucide-react";
+import { ExternalLinkIcon, LoaderCircleIcon, PlayIcon, RefreshCwIcon, ScaleIcon, XIcon } from "lucide-react";
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
 import { AlertMessage } from "@/components/alert-message";
 import { EmptyState } from "@/components/empty-state";
+import { FreshnessText } from "@/components/freshness/as-of-label";
 import { ConfidenceBadge } from "@/components/evidence/confidence-badge";
+import { FeedbackControl } from "@/components/feedback/feedback-control";
 import { SeverityBadge, TierBadge } from "@/components/news/severity-badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -30,6 +32,9 @@ import {
 } from "@/lib/news/feed-filters";
 import { CONFIDENCES, eventLabel, SEVERITY, STATUS_LABELS, TIERS } from "@/lib/news/labels";
 import { formatRelative } from "@/lib/format";
+import { ingestFreshness, ingestPrefix } from "@/lib/freshness";
+import { jobHref } from "@/lib/jobs/job-detail";
+import { disputedStoryHref } from "@/lib/news/disputed";
 import { useNow } from "@/lib/hooks/use-now";
 import { cn } from "@/lib/utils";
 
@@ -38,7 +43,14 @@ const PAGE = 50;
 type Load =
   | { kind: "loading" }
   | { kind: "error"; message: string }
-  | { kind: "ok"; items: NewsItemOut[]; next: number | null; lastIngest: JobSummary | null };
+  | {
+      kind: "ok";
+      items: NewsItemOut[];
+      next: number | null;
+      lastIngest: JobSummary | null;
+      /** When the next scheduled news check is due: the feed is current until then. */
+      nextIngestDueAt: string | null;
+    };
 
 function query(filters: FeedFilters, beforeId: number | null) {
   return {
@@ -67,7 +79,7 @@ export function NewsView() {
   const filters = useMemo(() => parseFilters(new URLSearchParams(params.toString())), [params]);
   const [load, setLoad] = useState<Load>({ kind: "loading" });
   const [holdings, setHoldings] = useState<Holding[]>([]);
-  const [queued, setQueued] = useState<string | null>(null);
+  const [queued, setQueued] = useState<{ text: string; jobId: number | null } | null>(null);
   const [reloadKey, setReloadKey] = useState(0);
 
   const setFilters = useCallback(
@@ -80,7 +92,13 @@ export function NewsView() {
     fetchFeed(filters, null)
       .then((feed) => {
         if (!cancelled) {
-          setLoad({ kind: "ok", items: feed.items, next: feed.next_before_id, lastIngest: feed.last_ingest });
+          setLoad({
+            kind: "ok",
+            items: feed.items,
+            next: feed.next_before_id,
+            lastIngest: feed.last_ingest,
+            nextIngestDueAt: feed.next_ingest_due_at ?? null,
+          });
         }
       })
       .catch((err: unknown) => {
@@ -107,7 +125,11 @@ export function NewsView() {
   async function runNow() {
     setQueued(null);
     const { data, response } = await getBrowserApiClient().POST("/jobs/news-ingest");
-    setQueued(data ? `News check queued (job #${data.id}). Reload in a minute to see new items.` : `Could not queue: HTTP ${response.status}.`);
+    setQueued(
+      data
+        ? { text: `News check queued (job #${data.id}). Reload in a minute to see new items.`, jobId: data.id }
+        : { text: `Could not queue: HTTP ${response.status}.`, jobId: null },
+    );
   }
 
   const groups = load.kind === "ok" ? groupByStory(load.items) : [];
@@ -123,8 +145,14 @@ export function NewsView() {
           </p>
         </div>
         <div className="flex flex-col items-end gap-2">
-          {load.kind === "ok" ? <IngestFreshness job={load.lastIngest} /> : null}
-          <div className="flex gap-2">
+          {load.kind === "ok" ? <IngestFreshness job={load.lastIngest} nextDueAt={load.nextIngestDueAt} /> : null}
+          <div className="flex flex-wrap justify-end gap-2">
+            <Button asChild variant="ghost" size="sm">
+              <Link href="/news/disputed">
+                <ScaleIcon aria-hidden="true" />
+                Disputed stories
+              </Link>
+            </Button>
             <Button variant="ghost" size="sm" onClick={() => setReloadKey((k) => k + 1)}>
               <RefreshCwIcon aria-hidden="true" />
               Reload
@@ -136,7 +164,16 @@ export function NewsView() {
           </div>
         </div>
       </div>
-      {queued ? <AlertMessage tone="info" title="Queued">{queued}</AlertMessage> : null}
+      {queued ? (
+        <AlertMessage tone="info" title="Queued">
+          {queued.text}{" "}
+          {queued.jobId !== null ? (
+            <Link href={jobHref(queued.jobId)} className="text-accent hover:underline">
+              Follow the job
+            </Link>
+          ) : null}
+        </AlertMessage>
+      ) : null}
 
       <Filters filters={filters} holdings={holdings} onChange={setFilters} />
 
@@ -171,17 +208,17 @@ export function NewsView() {
   );
 }
 
-function IngestFreshness({ job }: { job: JobSummary | null }) {
+function IngestFreshness({ job, nextDueAt }: { job: JobSummary | null; nextDueAt: string | null }) {
   const now = useNow();
-  if (!job) return <p className="text-sm text-text-muted">No news check has run yet.</p>;
-  const at = new Date(job.finished_at ?? job.started_at ?? job.created_at);
+  const value = ingestFreshness(job, now, undefined, nextDueAt);
+  if (!job || !value) return <p className="text-sm text-text-muted">No news check has run yet.</p>;
   return (
-    <p className="text-sm text-text-muted">
-      Last news check {job.status === "succeeded" ? "" : `(${job.status}) `}
-      <time dateTime={at.toISOString()} className="num">
-        {formatRelative(at, now)}
-      </time>
-    </p>
+    <div className="flex flex-col items-end gap-0.5">
+      <FreshnessText value={value} prefix={ingestPrefix(job.status)} />
+      <Link href={jobHref(job.id)} className="text-xs text-accent hover:underline">
+        Last check: job #{job.id}
+      </Link>
+    </div>
   );
 }
 
@@ -280,6 +317,16 @@ function Filters({
   );
 }
 
+/** The stored classification, to start a corrected label from. */
+function labelDefaults(item: NewsItemOut) {
+  return {
+    eventType: item.event_type ?? item.story.event_type,
+    affectedTicker: item.affected_ticker ?? item.story.ticker,
+    relevant: item.relevant,
+    rumour: item.rumour ?? item.story.rumour,
+  };
+}
+
 function StoryRow({ items: group, onStory }: { items: NewsItemOut[]; onStory: (id: number) => void }) {
   const now = useNow();
   const items = byLead(group);
@@ -315,12 +362,22 @@ function StoryRow({ items: group, onStory }: { items: NewsItemOut[]; onStory: (i
             {story.recycled ? <span className="rounded-sm border border-border px-1 text-xs">recycled</span> : null}
           </p>
         </div>
-        <div className="flex shrink-0 items-center gap-1.5">
-          <SeverityBadge severity={story.severity} />
-          <ConfidenceBadge confidence={story.confidence} />
+        <div className="flex shrink-0 flex-col items-end gap-1">
+          <span className="flex items-center gap-1.5">
+            <SeverityBadge severity={story.severity} />
+            <ConfidenceBadge confidence={story.confidence} />
+          </span>
+          <span className="flex items-center gap-1 text-xs text-text-muted">
+            Story
+            <FeedbackControl target={{ kind: "story", id: story.id }} label={`story “${lead.headline}”`} />
+          </span>
         </div>
       </div>
       {lead.summary ? <p className="max-w-prose text-sm text-text-muted">{lead.summary}</p> : null}
+      <p className="flex items-center gap-1 text-xs text-text-muted">
+        This item ({lead.outlet_name ?? lead.outlet ?? lead.source_id})
+        <FeedbackControl target={{ kind: "news_item", id: lead.id }} label={`news item “${lead.headline}”`} labelDefaults={labelDefaults(lead)} />
+      </p>
       <div className="flex flex-wrap items-center gap-2 text-sm">
         {lead.links.map((link) => (
           <Link
@@ -340,6 +397,11 @@ function StoryRow({ items: group, onStory }: { items: NewsItemOut[]; onStory: (i
           {STATUS_LABELS[story.status] ?? story.status}
           {story.status_reason ? `: ${story.status_reason}` : ""}
         </span>
+        {story.status === "disputed" ? (
+          <Link href={disputedStoryHref(story.id)} className="text-accent hover:underline">
+            Compare the versions
+          </Link>
+        ) : null}
         {story.source_count > items.length || copies.length > 0 ? (
           <button type="button" onClick={() => onStory(story.id)} className="text-accent hover:underline">
             {story.source_count} {story.source_count === 1 ? "outlet" : "outlets"}
@@ -354,6 +416,7 @@ function StoryRow({ items: group, onStory }: { items: NewsItemOut[]; onStory: (i
                 {copy.outlet_name ?? copy.outlet ?? copy.source_id}
               </a>
               <TierBadge tier={copy.tier} />
+              <FeedbackControl target={{ kind: "news_item", id: copy.id }} label={`news item “${copy.headline}”`} labelDefaults={labelDefaults(copy)} />
             </li>
           ))}
         </ul>

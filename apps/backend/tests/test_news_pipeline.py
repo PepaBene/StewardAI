@@ -29,6 +29,7 @@ from api.main import create_app
 from steward.ai import Usage
 from steward.config import (
     HoldingProfilesConfig,
+    JobsConfig,
     NewsSourcesConfig,
     NotificationsConfig,
     ThesesConfig,
@@ -179,6 +180,11 @@ async def setup_config(pool: asyncpg.Pool, extra_sources: Sequence[dict[str, Any
             ),
             created_by=None,
         )
+        if not await conn.fetchval("select to_regnamespace('pgmq') is not null"):
+            # Escalation reports are queued through pgmq; without it (plain local Postgres)
+            # the route step would fail. test_phase3_completion covers escalation.
+            jobs = JobsConfig.model_validate({"escalation": {"enabled": False}})
+            await save_config(conn, "jobs", jobs, created_by=None)
 
 
 @pytest.fixture
@@ -298,9 +304,18 @@ async def test_pipeline_end_to_end(backend_pool: asyncpg.Pool, feeds: Feeds, htt
     alerts = await backend_pool.fetch(
         "select cluster_id, status, suppressed_reason from alert where kind = 'news' order by id"
     )
-    # Guidance alert, then the deal: one sent, its twin story throttled as a repeat.
-    assert [a["status"] for a in alerts] == ["sent", "sent", "suppressed"]
-    assert "repeat" in (alerts[2]["suppressed_reason"] or "")
+    # Guidance alert, then the deal: one sent. Its twin story (another outlet's report of
+    # the same event) is a known event: no alert at all.
+    assert [a["status"] for a in alerts] == ["sent", "sent"]
+    twin = await backend_pool.fetchrow(
+        "select duplicate_of, status_reason from story_cluster where headline like"
+        " 'Microsoft agrees%'"
+    )
+    deal_id = await backend_pool.fetchval(
+        "select id from story_cluster"
+        " where headline = 'Microsoft to acquire Contoso for $5 billion'"
+    )
+    assert twin["duplicate_of"] == deal_id and "known event" in twin["status_reason"]
     assert len(telegram.sent) == 2
 
     # More runs over the same feeds (every 2 h): no new rows, never a duplicate URL.

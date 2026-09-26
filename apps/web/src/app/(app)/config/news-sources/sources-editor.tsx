@@ -1,17 +1,19 @@
 "use client";
 
 import { LoaderCircleIcon, PlusIcon, Trash2Icon } from "lucide-react";
-import Link from "next/link";
 import { useMemo, useState } from "react";
 
 import { AlertMessage } from "@/components/alert-message";
+import { ConfigHeader } from "@/components/config/config-header";
 import { CheckboxField, SelectField, TextAreaField, TextField } from "@/components/config/fields";
 import { SaveBar } from "@/components/config/save-bar";
 import { Button } from "@/components/ui/button";
 import { getBrowserApiClient, type NewsSourcesConfig } from "@/lib/api/client";
 import {
+  DEFAULT_SOURCES,
   newSource,
   PER_HOLDING,
+  PER_HOLDING_NOTES,
   SOURCE_TYPES,
   sourcesFromBody,
   sourcesToBody,
@@ -24,25 +26,6 @@ import { TIERS } from "@/lib/news/labels";
 const api = () => getBrowserApiClient();
 const TIER_OPTIONS = ([1, 2, 3] as const).map((t) => ({ value: t, label: `${TIERS[t].label}` }));
 
-/* The backend's defaults, shown when nothing is saved yet (it fills in the same values). */
-const DEFAULTS: NewsSourcesConfig = {
-  schema_version: 1,
-  sources: [
-    { id: "edgar-filings", name: "SEC EDGAR filings", tier: 1, type: "edgar", url: null, enabled: true, tickers: [] },
-    { id: "finnhub-company-news", name: "Finnhub company news", tier: 2, type: "finnhub", url: null, enabled: true, tickers: [] },
-    { id: "google-news", name: "Google News", tier: 2, type: "google_news", url: null, enabled: false, tickers: [] },
-  ],
-  domain_tiers: [
-    ...["sec.gov", "globenewswire.com", "prnewswire.com", "businesswire.com", "federalreserve.gov", "ecb.europa.eu", "cnb.cz"].map((domain) => ({ domain, tier: 1 as const })),
-    ...["reuters.com", "apnews.com", "cnbc.com", "marketwatch.com", "ft.com", "bloomberg.com", "wsj.com", "hn.cz", "e15.cz", "seznamzpravy.cz"].map((domain) => ({ domain, tier: 2 as const })),
-    ...["seekingalpha.com", "reddit.com", "x.com", "twitter.com", "medium.com"].map((domain) => ({ domain, tier: 3 as const })),
-  ],
-  blocked_domains: [],
-  unknown_outlet_tier: 3,
-  freshness_hours: 72,
-  include_tier3: false,
-};
-
 export function SourcesEditor() {
   const [form, setForm] = useState<SourcesForm | null>(null);
   const [baseline, setBaseline] = useState("");
@@ -51,7 +34,7 @@ export function SourcesEditor() {
     save: (body, note) => api().PUT("/config/news-sources", { body, params: { query: { note } } }),
     validate: (body) => api().POST("/config/news-sources/validate", { body }),
     onLoaded: (body) => {
-      const loaded = sourcesFromBody(body, DEFAULTS);
+      const loaded = sourcesFromBody(body, DEFAULT_SOURCES);
       setForm(loaded);
       setBaseline(body ? JSON.stringify(sourcesToBody(loaded)) : "");
     },
@@ -68,20 +51,13 @@ export function SourcesEditor() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <p className="text-sm text-text-muted">
-          <Link href="/config" className="hover:text-text hover:underline">
-            Config
-          </Link>{" "}
-          / News sources
-        </p>
-        <h1 className="text-2xl font-semibold tracking-tight">News sources</h1>
-        <p className="mt-1 max-w-prose text-sm text-text-muted">
+      <ConfigHeader title="News sources" domain="news-sources">
+        <p>
           The feeds the news check reads and how far each outlet is trusted. A source added here is
           read on the next run. Tier 1 (the company, regulators, official newswires) confirms a
           story alone; tier 2 needs a second independent outlet; tier 3 is sentiment only.
         </p>
-      </div>
+      </ConfigHeader>
       {editor.status.kind === "loading" ? (
         <p className="flex items-center gap-2 text-sm text-text-muted" role="status">
           <LoaderCircleIcon aria-hidden="true" className="size-4 animate-spin" />
@@ -115,13 +91,21 @@ export function SourcesEditor() {
                     </Button>
                   </div>
                   {perHolding ? (
-                    <p className="text-sm text-text-muted">Built per holding from its profile (CIK, symbol or names); no URL needed.</p>
+                    <p className="text-sm text-text-muted">
+                      Built per holding from its profile; no URL needed. {PER_HOLDING_NOTES[s.type] ?? ""}
+                    </p>
                   ) : (
                     <div className="grid gap-3 lg:grid-cols-[2fr_1fr]">
                       <TextField label={s.type === "rss" ? "Feed URL" : "Page URL"} type="url" path={`${path}.url`} errors={editor.errors} value={s.url} onChange={(v) => setSource(s.key, { url: v })} />
                       <TextAreaField label="About these holdings (optional)" path={`${path}.tickers`} errors={editor.errors} value={s.tickers} onChange={(v) => setSource(s.key, { tickers: v })} rows={1} hint="One ticker per line: items link to them without a name match (a company's own IR feed)." />
                     </div>
                   )}
+                  <CheckboxField
+                    label="Macro or central-bank source"
+                    checked={s.macro}
+                    onChange={(v) => setSource(s.key, { macro: v })}
+                    hint="Its items are kept without matching a holding and appear under Markets and macro in the digest."
+                  />
                 </div>
               );
             })}
@@ -147,6 +131,15 @@ export function SourcesEditor() {
               />
               <div className="space-y-3">
                 <TextAreaField label="Blocked outlets" path="blocked_domains" errors={editor.errors} value={form.blocked_domains} onChange={(v) => set({ blocked_domains: v })} rows={3} hint="One domain per line; their items are dropped." />
+                <TextAreaField
+                  label="Allowed outlets for aggregators (optional)"
+                  path="allowed_domains"
+                  errors={editor.errors}
+                  value={form.allowed_domains}
+                  onChange={(v) => set({ allowed_domains: v })}
+                  rows={3}
+                  hint="One domain per line. When set, Finnhub and Google News items are kept only from these outlets and the tier-1 and tier-2 outlets above. Empty: no allow list."
+                />
                 <SelectField label="Tier of an unlisted outlet (Finnhub, Google News)" path="unknown_outlet_tier" errors={editor.errors} value={form.unknown_outlet_tier} options={TIER_OPTIONS} onChange={(v) => set({ unknown_outlet_tier: v })} />
                 <TextField label="Freshness window (hours)" inputMode="numeric" path="freshness_hours" errors={editor.errors} value={form.freshness_hours} onChange={(v) => set({ freshness_hours: v })} hint="Older items are dropped." />
                 <CheckboxField label="Keep tier-3 items (labelled sentiment)" checked={form.include_tier3} onChange={(v) => set({ include_tier3: v })} />

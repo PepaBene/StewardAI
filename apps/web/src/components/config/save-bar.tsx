@@ -17,9 +17,15 @@ export function SaveBar({
   message,
   onValidate,
   onSave,
+  blocked = false,
+  saveLabel = "Save new version",
 }: {
   dirty: boolean;
-  busy: "saving" | "validating" | null;
+  /** Problems found before sending (shown in `errors`): Save stays disabled. */
+  blocked?: boolean;
+  /** "previewing": Save first asks for a replay preview (the rule editors). */
+  busy: "saving" | "validating" | "previewing" | null;
+  saveLabel?: string;
   errors: FieldErrors;
   message: string | null;
   onValidate: () => void;
@@ -55,10 +61,14 @@ export function SaveBar({
             onSave(note.trim() || null);
             setNote("");
           }}
-          disabled={busy !== null || !dirty}
+          disabled={busy !== null || !dirty || blocked}
         >
-          {busy === "saving" ? <LoaderCircleIcon aria-hidden="true" className="animate-spin" /> : <SaveIcon aria-hidden="true" />}
-          Save new version
+          {busy === "saving" || busy === "previewing" ? (
+            <LoaderCircleIcon aria-hidden="true" className="animate-spin" />
+          ) : (
+            <SaveIcon aria-hidden="true" />
+          )}
+          {saveLabel}
         </Button>
       </div>
       <p className="text-sm text-text-muted" role="status">

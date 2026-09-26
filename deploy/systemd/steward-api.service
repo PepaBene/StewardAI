@@ -1,0 +1,23 @@
+# StewardAI API. Install: see README.md ("Always-on host", systemd variant).
+[Unit]
+Description=StewardAI API (FastAPI)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=steward
+WorkingDirectory=/opt/stewardai/apps/backend
+EnvironmentFile=/etc/stewardai/env
+ExecStart=/opt/stewardai/apps/backend/.venv/bin/uvicorn api.main:app --host 127.0.0.1 --port 8000 --proxy-headers
+Restart=always
+RestartSec=5
+# Never give up restarting.
+StartLimitIntervalSec=0
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target

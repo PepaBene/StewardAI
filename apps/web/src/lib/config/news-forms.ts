@@ -39,6 +39,12 @@ export const QUIET_MODES: readonly { value: QuietMode; label: string }[] = [
   { value: "digest_only", label: "Digest only" },
 ];
 
+export type QuietDay = NonNullable<NotificationsConfig["quiet_all_day_on"]>[number];
+export const QUIET_DAYS: readonly { value: QuietDay; label: string }[] = [
+  { value: "weekends", label: "Weekends" },
+  { value: "holidays", label: "Public holidays" },
+];
+
 export type RuleForm = {
   key: string;
   id: string;
@@ -60,6 +66,9 @@ export type NotificationsForm = {
   muted_tickers: string;
   muted_event_types: EventType[];
   repeat_throttle_hours: string;
+  quiet_all_day_on: QuietDay[];
+  holiday_country: string;
+  system_alert_severity: 0 | 1 | 2 | 3;
   digest_channels: Channel[];
 };
 
@@ -93,6 +102,9 @@ export const DEFAULT_NOTIFICATIONS: NotificationsConfig = {
   muted_tickers: [],
   muted_event_types: [],
   repeat_throttle_hours: 24,
+  quiet_all_day_on: [],
+  holiday_country: "CZ",
+  system_alert_severity: 3,
   digest_channels: ["email"],
 };
 
@@ -118,6 +130,9 @@ export function notificationsFromBody(body: NotificationsConfig | null): Notific
     muted_tickers: (b.muted_tickers ?? []).join("\n"),
     muted_event_types: [...(b.muted_event_types ?? [])],
     repeat_throttle_hours: String(b.repeat_throttle_hours),
+    quiet_all_day_on: [...(b.quiet_all_day_on ?? [])],
+    holiday_country: b.holiday_country ?? "CZ",
+    system_alert_severity: (b.system_alert_severity ?? 3) as 0 | 1 | 2 | 3,
     digest_channels: [...(b.digest_channels ?? [])],
   };
 }
@@ -148,6 +163,12 @@ export function notificationsToBody(form: NotificationsForm): NotificationsConfi
     muted_tickers: lines(form.muted_tickers),
     muted_event_types: byOrder(EVENT_TYPES, form.muted_event_types),
     repeat_throttle_hours: numberOrText(form.repeat_throttle_hours) as number,
+    quiet_all_day_on: byOrder(
+      QUIET_DAYS.map((d) => d.value),
+      form.quiet_all_day_on,
+    ),
+    holiday_country: form.holiday_country.trim().toUpperCase(),
+    system_alert_severity: form.system_alert_severity,
     digest_channels: byOrder(CHANNELS, form.digest_channels),
   };
 }
@@ -163,8 +184,22 @@ export const SOURCE_TYPES: readonly { value: SourceType; label: string }[] = [
   { value: "edgar", label: "SEC EDGAR filings (per holding)" },
   { value: "finnhub", label: "Finnhub company news (per holding)" },
   { value: "google_news", label: "Google News query (per holding)" },
+  { value: "rns", label: "RNS, UK regulatory news (per holding)" },
+  { value: "eqs", label: "EQS News, German regulatory news (per holding)" },
+  { value: "edgar_fts", label: "SEC EDGAR full-text search (per holding)" },
 ];
-export const PER_HOLDING: readonly SourceType[] = ["edgar", "finnhub", "google_news"];
+/** Types whose URL is built per holding (apps/backend/src/steward/config/news_sources.py). */
+export const PER_HOLDING: readonly SourceType[] = ["edgar", "finnhub", "google_news", "rns", "eqs", "edgar_fts"];
+
+/** Where a per-holding source finds each holding, shown instead of a URL field. */
+export const PER_HOLDING_NOTES: Partial<Record<SourceType, string>> = {
+  edgar: "Every holding's SEC filings, from its CIK.",
+  finnhub: "US company news for each holding's symbol.",
+  google_news: "A Google News query per holding from its names (unofficial endpoint).",
+  rns: "UK regulatory announcements per holding (Investegate company page); applies to holdings whose home market is the UK.",
+  eqs: "German regulatory announcements from the holding profile's regulatory news URLs; applies to holdings whose home market is Germany.",
+  edgar_fts: "SEC full-text search for each holding's watch topics, and for other filers naming it.",
+};
 
 export type SourceForm = {
   key: string;
@@ -175,19 +210,48 @@ export type SourceForm = {
   url: string;
   enabled: boolean;
   tickers: string;
+  /** A macro or central-bank source: kept without matching a holding, shown under Markets and macro. */
+  macro: boolean;
 };
 
 export type SourcesForm = {
   sources: SourceForm[];
   domain_tiers: string;
   blocked_domains: string;
+  allowed_domains: string;
   unknown_outlet_tier: 1 | 2 | 3;
   freshness_hours: string;
   include_tier3: boolean;
 };
 
+/** The backend's defaults (news_sources.py), shown when nothing is saved yet (it fills in the same values). */
+export const DEFAULT_SOURCES: NewsSourcesConfig = {
+  schema_version: 1,
+  sources: [
+    { id: "edgar-filings", name: "SEC EDGAR filings", tier: 1, type: "edgar", url: null, enabled: true, tickers: [], macro: false },
+    { id: "edgar-full-text", name: "SEC EDGAR full-text search", tier: 1, type: "edgar_fts", url: null, enabled: true, tickers: [], macro: false },
+    { id: "finnhub-company-news", name: "Finnhub company news", tier: 2, type: "finnhub", url: null, enabled: true, tickers: [], macro: false },
+    { id: "google-news", name: "Google News", tier: 2, type: "google_news", url: null, enabled: false, tickers: [], macro: false },
+    { id: "rns-investegate", name: "RNS (Investegate)", tier: 1, type: "rns", url: null, enabled: false, tickers: [], macro: false },
+    { id: "eqs-news", name: "EQS News", tier: 1, type: "eqs", url: null, enabled: false, tickers: [], macro: false },
+    { id: "fed-press", name: "Federal Reserve press releases", tier: 1, type: "rss", url: "https://www.federalreserve.gov/feeds/press_monetary.xml", enabled: true, tickers: [], macro: true },
+    { id: "ecb-press", name: "ECB press releases", tier: 1, type: "rss", url: "https://www.ecb.europa.eu/rss/press.html", enabled: true, tickers: [], macro: true },
+    { id: "cnb-press", name: "ČNB press releases", tier: 1, type: "rss", url: "https://www.cnb.cz/en/.content/rss-feeds/press-releases.xml", enabled: true, tickers: [], macro: true },
+  ],
+  domain_tiers: [
+    ...["sec.gov", "globenewswire.com", "prnewswire.com", "businesswire.com", "federalreserve.gov", "ecb.europa.eu", "cnb.cz"].map((domain) => ({ domain, tier: 1 as const })),
+    ...["reuters.com", "apnews.com", "cnbc.com", "marketwatch.com", "ft.com", "bloomberg.com", "wsj.com", "hn.cz", "e15.cz", "seznamzpravy.cz"].map((domain) => ({ domain, tier: 2 as const })),
+    ...["seekingalpha.com", "reddit.com", "x.com", "twitter.com", "medium.com"].map((domain) => ({ domain, tier: 3 as const })),
+  ],
+  blocked_domains: [],
+  allowed_domains: [],
+  unknown_outlet_tier: 3,
+  freshness_hours: 72,
+  include_tier3: false,
+};
+
 export function newSource(): SourceForm {
-  return { key: nextKey(), id: "", name: "", tier: 2, type: "rss", url: "", enabled: true, tickers: "" };
+  return { key: nextKey(), id: "", name: "", tier: 2, type: "rss", url: "", enabled: true, tickers: "", macro: false };
 }
 
 /** "reuters.com 2" per line <-> [{domain, tier}]. */
@@ -210,9 +274,11 @@ export function sourcesFromBody(body: NewsSourcesConfig | null, defaults: NewsSo
       url: s.url ?? "",
       enabled: s.enabled ?? true,
       tickers: (s.tickers ?? []).join("\n"),
+      macro: s.macro ?? false,
     })),
     domain_tiers: (b.domain_tiers ?? []).map((d) => `${d.domain} ${d.tier}`).join("\n"),
     blocked_domains: (b.blocked_domains ?? []).join("\n"),
+    allowed_domains: (b.allowed_domains ?? []).join("\n"),
     unknown_outlet_tier: b.unknown_outlet_tier ?? 3,
     freshness_hours: String(b.freshness_hours ?? 72),
     include_tier3: b.include_tier3 ?? false,
@@ -230,9 +296,11 @@ export function sourcesToBody(form: SourcesForm): NewsSourcesConfig {
       url: PER_HOLDING.includes(s.type) ? null : s.url.trim() || null,
       enabled: s.enabled,
       tickers: lines(s.tickers),
+      macro: s.macro,
     })),
     domain_tiers: parseDomainTiers(form.domain_tiers) as NewsSourcesConfig["domain_tiers"],
     blocked_domains: lines(form.blocked_domains).map((d) => d.toLowerCase()),
+    allowed_domains: lines(form.allowed_domains).map((d) => d.toLowerCase()),
     unknown_outlet_tier: form.unknown_outlet_tier,
     freshness_hours: numberOrText(form.freshness_hours) as number,
     include_tier3: form.include_tier3,
@@ -259,10 +327,84 @@ export const DEFAULT_SEVERITIES: Record<EventType, number> = {
   sector_competitor: 1,
   index_change: 1,
   analyst_rating: 0,
+  delisting: 2,
+  entity_status: 1,
   other: 0,
 };
 
 export type OverrideForm = { key: string; ticker: string; event_type: EventType; severity: number };
+
+export type AnnouncementService = "rns" | "eqs" | "any";
+export type AnnouncementTarget = EventType | "classify";
+export const ANNOUNCEMENT_SERVICES: readonly { value: AnnouncementService; label: string }[] = [
+  { value: "any", label: "Any service" },
+  { value: "rns", label: "RNS (UK)" },
+  { value: "eqs", label: "EQS (Germany)" },
+];
+export type AnnouncementRuleForm = {
+  key: string;
+  service: AnnouncementService;
+  pattern: string;
+  event_type: AnnouncementTarget;
+};
+
+/**
+ * The backend's default announcement-type mapping (apps/backend/src/steward/config/
+ * event_rules.py, `_default_announcement_rules`), for when nothing is saved yet. First match
+ * wins; "classify" leaves the item to the classifier.
+ */
+export const DEFAULT_ANNOUNCEMENT_RULES: readonly Omit<AnnouncementRuleForm, "key">[] = [
+  { service: "any", pattern: String.raw`profit warning`, event_type: "guidance_change" },
+  {
+    service: "rns",
+    pattern: String.raw`(final|interim|half[- ]?year|preliminary|q[1-4]|quarterly|full[- ]year) results|results for the|annual financial report|half[- ]year report`,
+    event_type: "earnings_release",
+  },
+  { service: "rns", pattern: String.raw`trading (statement|update)|q[1-4] trading`, event_type: "earnings_release" },
+  { service: "rns", pattern: String.raw`director/pdmr|pdmr shareholding|director.?s? dealing`, event_type: "insider_transaction" },
+  {
+    service: "rns",
+    pattern: String.raw`offer for|possible offer|recommended (cash )?offer|rule 2\.[47]|scheme of arrangement|merger|acquisition|disposal`,
+    event_type: "m_and_a",
+  },
+  {
+    service: "rns",
+    pattern: String.raw`transaction in own shares|buyback|buy-back|dividend declaration|scrip dividend|capital raise|placing`,
+    event_type: "capital_allocation",
+  },
+  {
+    service: "rns",
+    pattern: String.raw`directorate change|board change|appointment of|ceo|chief executive|chief financial`,
+    event_type: "management_change",
+  },
+  {
+    service: "rns",
+    pattern: String.raw`holding\(s\) in company|total voting rights|notice of agm|result of agm|block listing|form 8`,
+    event_type: "other",
+  },
+  { service: "eqs", pattern: String.raw`ad-?hoc`, event_type: "classify" },
+  { service: "eqs", pattern: String.raw`directors.? dealings`, event_type: "insider_transaction" },
+  { service: "eqs", pattern: String.raw`voting rights`, event_type: "other" },
+  {
+    service: "eqs",
+    pattern: String.raw`financial reports?|half-?year report|quarterly (report|statement)|annual report`,
+    event_type: "earnings_release",
+  },
+  { service: "any", pattern: String.raw`.`, event_type: "classify" },
+];
+
+/** The backend's default macro surprise bands, per macro series key (in the series' own unit). */
+export const DEFAULT_MACRO_SURPRISE_BANDS: Record<string, number> = {
+  hicp: 0.3,
+  unemployment: 0.3,
+  gdp: 0.5,
+  industrial_production: 2.0,
+  sentiment: 3.0,
+  us_cpi: 0.3,
+  us_unemployment: 0.2,
+  ecb_deposit_rate: 0.0,
+  fed_funds: 0.0,
+};
 
 export type EventRulesForm = {
   severities: Record<EventType, number>;
@@ -273,10 +415,34 @@ export type EventRulesForm = {
   insider_cluster_count: string;
   insider_cluster_days: string;
   recycled_after_days: string;
+  price_move_threshold_pct: string;
+  /** "series_key band" per line, e.g. "hicp 0.3". */
+  macro_surprise_bands: string;
+  announcement_types: AnnouncementRuleForm[];
 };
 
 export function newOverride(): OverrideForm {
   return { key: nextKey(), ticker: "", event_type: "product_business", severity: 2 };
+}
+
+export function newAnnouncementRule(): AnnouncementRuleForm {
+  return { key: nextKey(), service: "rns", pattern: "", event_type: "classify" };
+}
+
+/** "hicp 0.3" per line <-> {hicp: 0.3}. A half-typed band stays text for the backend to reject. */
+export function parseSurpriseBands(text: string): Record<string, number | string> {
+  return Object.fromEntries(
+    lines(text).map((line) => {
+      const [key, band = ""] = line.split(/\s+/);
+      return [key.toLowerCase(), numberOrText(band.replace(",", "."))];
+    }),
+  );
+}
+
+export function formatSurpriseBands(bands: Record<string, number>): string {
+  return Object.entries(bands)
+    .map(([key, band]) => `${key} ${band}`)
+    .join("\n");
 }
 
 export function eventRulesFromBody(body: EventRulesConfig | null): EventRulesForm {
@@ -289,6 +455,14 @@ export function eventRulesFromBody(body: EventRulesConfig | null): EventRulesFor
     insider_cluster_count: String(body?.insider_cluster_count ?? 3),
     insider_cluster_days: String(body?.insider_cluster_days ?? 14),
     recycled_after_days: String(body?.recycled_after_days ?? 7),
+    price_move_threshold_pct: String(body?.price_move_threshold_pct ?? 8),
+    macro_surprise_bands: formatSurpriseBands(body?.macro_surprise_bands ?? DEFAULT_MACRO_SURPRISE_BANDS),
+    announcement_types: (body?.announcement_types ?? DEFAULT_ANNOUNCEMENT_RULES).map((r) => ({
+      key: nextKey(),
+      service: r.service ?? "any",
+      pattern: r.pattern,
+      event_type: r.event_type,
+    })),
   };
 }
 
@@ -304,5 +478,13 @@ export function eventRulesToBody(form: EventRulesForm): EventRulesConfig {
     insider_cluster_count: numberOrText(form.insider_cluster_count) as number,
     insider_cluster_days: numberOrText(form.insider_cluster_days) as number,
     recycled_after_days: numberOrText(form.recycled_after_days) as number,
+    price_move_threshold_pct: numberOrText(form.price_move_threshold_pct.replace(",", ".")) as number,
+    macro_surprise_bands: parseSurpriseBands(form.macro_surprise_bands) as Record<string, number>,
+    // The pattern is a regular expression: sent as typed (only trailing spaces trimmed).
+    announcement_types: form.announcement_types.map((r) => ({
+      service: r.service,
+      pattern: r.pattern.trimEnd(),
+      event_type: r.event_type,
+    })),
   };
 }

@@ -2,7 +2,9 @@
 versioned config."""
 
 import datetime as dt
+import json
 from collections.abc import AsyncIterator
+from decimal import Decimal
 from typing import Annotated, Any, Literal
 
 import httpx
@@ -12,6 +14,7 @@ from pydantic import BaseModel, Field
 from api.auth import Owner
 from api.db import Pool
 from steward.config import (
+    BudgetConfig,
     HoldingProfilesConfig,
     JobsConfig,
     StrategyConfig,
@@ -20,22 +23,35 @@ from steward.config import (
 )
 from steward.config.common import Ticker
 from steward.config.store import StoredConfig, load_active, save_config
+from steward.earnings.check import local_today
 from steward.earnings.read import (
     FACT_CONFIDENCE,
     EvidenceLink,
     HoldingDetail,
+    ThesisBoard,
     document_text,
     holding_detail,
     snippet_context,
+    thesis_board,
 )
+from steward.earnings.review import ReviewError, ReviewItem, review_queue
+from steward.earnings.review import review_fact as review_fact_in_db
 from steward.jobs import queue
 from steward.jobs.runner import create_job
 from steward.portfolio.read import (
     HoldingsResponse,
+    JobStatus,
     JobSummary,
     PortfolioOverview,
     portfolio_holdings,
     portfolio_overview,
+)
+from steward.portfolio.transactions import (
+    TransactionFilters,
+    TransactionsPage,
+    TransactionType,
+    decode_cursor,
+    list_transactions,
 )
 from steward.settings import get_settings
 from steward.storage import EvidenceStore, StorageError, SupabaseStorage
@@ -59,6 +75,40 @@ async def get_portfolio_overview(pool: Pool, _owner: Owner) -> PortfolioOverview
 async def get_portfolio_holdings(pool: Pool, _owner: Owner) -> HoldingsResponse:
     """Every open position of the latest snapshot, largest first."""
     return await portfolio_holdings(pool)
+
+
+@router.get("/portfolio/transactions", tags=["portfolio"])
+async def get_portfolio_transactions(
+    pool: Pool,
+    _owner: Owner,
+    type: Annotated[list[TransactionType] | None, Query(description="Any of these.")] = None,
+    ticker: Annotated[str | None, Query(pattern=r"^[A-Za-z0-9._-]{1,32}$")] = None,
+    start: Annotated[dt.date | None, Query(alias="from", description="On or after.")] = None,
+    end: Annotated[dt.date | None, Query(alias="to", description="On or before.")] = None,
+    cursor: Annotated[str | None, Query(max_length=200)] = None,
+    limit: Annotated[int, Query(ge=1, le=500)] = 100,
+) -> TransactionsPage:
+    """Orders, dividends and cash movements, newest first, with totals per type and
+    currency over every row matching the filters (dates are UTC days, both inclusive)."""
+    try:
+        decoded = decode_cursor(cursor) if cursor else None
+    except ValueError as exc:
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, "Malformed cursor") from exc
+    return await list_transactions(
+        pool,
+        TransactionFilters(
+            types=list(type or []),
+            ticker=ticker,
+            start=dt.datetime.combine(start, dt.time(0), tzinfo=dt.UTC) if start else None,
+            end=(
+                dt.datetime.combine(end + dt.timedelta(days=1), dt.time(0), tzinfo=dt.UTC)
+                if end
+                else None
+            ),
+            cursor=decoded,
+            limit=limit,
+        ),
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -87,6 +137,109 @@ async def run_portfolio_sync(pool: Pool, owner: Owner) -> JobSummary:
     """Queue a portfolio sync now. The worker runs it; a run already in progress finishes
     first (the job waits for it), so two syncs never write at the same time."""
     return await _enqueue(pool, "portfolio_sync", owner.user_id)
+
+
+class JobStepOut(BaseModel):
+    step_index: int
+    name: str
+    status: Literal["running", "succeeded", "failed"]
+    started_at: dt.datetime
+    finished_at: dt.datetime | None
+    error: str | None
+    detail: dict[str, Any] | None
+    model: str | None
+    cost_usd: float | None
+
+
+class JobDetail(JobSummary):
+    params: dict[str, Any]
+    steps: list[JobStepOut]
+
+
+class JobListItem(JobSummary):
+    params: dict[str, Any]
+    cost_usd: float | None = Field(description="Sum of the run's step costs; null if none.")
+    failed_step: str | None = Field(description="The first failed step's name, if any.")
+
+
+class JobList(BaseModel):
+    jobs: list[JobListItem]
+    next_before_id: int | None = Field(description="Pass as before_id for the next page.")
+
+
+@router.get("/jobs", tags=["jobs"])
+async def list_jobs(
+    pool: Pool,
+    _owner: Owner,
+    job_type: Annotated[list[str] | None, Query(description="Any of these job types.")] = None,
+    status_: Annotated[list[JobStatus] | None, Query(alias="status")] = None,
+    ticker: Annotated[
+        str | None, Query(pattern=r"^[A-Za-z0-9._-]{1,32}$", description="Runs for this holding.")
+    ] = None,
+    before_id: Annotated[int | None, Query()] = None,
+    limit: Annotated[int, Query(ge=1, le=200)] = 50,
+) -> JobList:
+    """The job log, newest first: every scheduled, manual and event-triggered run with its
+    outcome and cost. Filters combine (AND)."""
+    rows = await pool.fetch(
+        "select j.id, j.job_type, j.trigger, j.status, j.error, j.created_at, j.started_at,"
+        " j.finished_at, j.params, s.cost_usd, s.failed_step from public.job j"
+        " left join lateral (select sum(cost_usd) as cost_usd, (array_agg(name order by"
+        " step_index) filter (where status = 'failed'))[1] as failed_step"
+        " from public.job_step where job_id = j.id) s on true"
+        " where ($1::text[] is null or j.job_type = any($1))"
+        " and ($2::text[] is null or j.status = any($2))"
+        " and ($3::text is null or j.params ->> 'ticker' = $3)"
+        " and ($4::bigint is null or j.id < $4)"
+        " order by j.id desc limit $5",
+        job_type or None,
+        status_ or None,
+        ticker,
+        before_id,
+        limit + 1,
+    )
+    more = len(rows) > limit
+    items = [
+        JobListItem(
+            **{
+                **dict(r),
+                "params": json.loads(r["params"]) if r["params"] else {},
+                "cost_usd": float(r["cost_usd"]) if r["cost_usd"] is not None else None,
+            }
+        )
+        for r in rows[:limit]
+    ]
+    return JobList(jobs=items, next_before_id=items[-1].id if more and items else None)
+
+
+@router.get("/jobs/{job_id}", tags=["jobs"])
+async def get_job(job_id: int, pool: Pool, _owner: Owner) -> JobDetail:
+    """One job run with its steps, to follow an on-demand run to completion."""
+    row = await pool.fetchrow(
+        "select id, job_type, trigger, status, error, created_at, started_at, finished_at,"
+        " params from public.job where id = $1",
+        job_id,
+    )
+    if row is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, f"No job {job_id}")
+    steps = await pool.fetch(
+        "select step_index, name, status, started_at, finished_at, error, detail, model,"
+        " cost_usd from public.job_step where job_id = $1 order by step_index",
+        job_id,
+    )
+    return JobDetail(
+        **{**dict(row), "params": json.loads(row["params"])},
+        steps=[
+            JobStepOut(
+                **{
+                    **dict(s),
+                    "detail": json.loads(s["detail"]) if s["detail"] else None,
+                    "cost_usd": float(s["cost_usd"]) if s["cost_usd"] is not None else None,
+                }
+            )
+            for s in steps
+        ],
+    )
 
 
 class EarningsCheckRequest(BaseModel):
@@ -126,10 +279,22 @@ async def run_thesis_verdicts(body: ThesisVerdictsRequest, pool: Pool, owner: Ow
     )
 
 
+class ReconcileRequest(BaseModel):
+    ticker: Ticker | None = Field(default=None, description="One holding, or all when null.")
+
+
+@router.post("/jobs/fact-reconcile", tags=["jobs"], status_code=status.HTTP_202_ACCEPTED)
+async def run_fact_reconcile(body: ReconcileRequest, pool: Pool, owner: Owner) -> JobSummary:
+    """Check stored results figures against the issuers' 10-Q/10-K XBRL now."""
+    return await _enqueue(
+        pool, "fact_reconcile", owner.user_id, body.model_dump(mode="json", exclude_none=True)
+    )
+
+
 @router.post("/jobs/earnings-calendar", tags=["jobs"], status_code=status.HTTP_202_ACCEPTED)
 async def run_earnings_calendar(pool: Pool, owner: Owner) -> JobSummary:
     """Refresh every holding's next report date now."""
-    return await _enqueue(pool, "earnings_calendar", owner.user_id)
+    return await _enqueue(pool, "earnings_calendar", owner.user_id, {"all": True})
 
 
 # ---------------------------------------------------------------------------
@@ -153,6 +318,13 @@ async def get_storage() -> AsyncIterator[EvidenceStore]:
 
 
 Storage = Annotated[EvidenceStore, Depends(get_storage)]
+
+
+@router.get("/theses/board", tags=["holdings"])
+async def get_thesis_board(pool: Pool, _owner: Owner) -> ThesisBoard:
+    """Every holding with a thesis, once: each KPI's current pass / breach / unknown with the
+    verdict behind it. A KPI never judged is listed as unknown, never left out."""
+    return await thesis_board(pool, local_today())
 
 
 @router.get("/holdings/{ticker}", tags=["holdings"])
@@ -207,41 +379,57 @@ async def get_fact_evidence(
 
 
 class FactReview(BaseModel):
-    action: Literal["verify", "reject"]
-    note: str | None = Field(default=None, max_length=500)
+    action: Literal["accept", "correct", "reject"]
+    reason: str = Field(min_length=1, max_length=500, description="Logged with the decision.")
+    value: Decimal | None = Field(
+        default=None,
+        description="For `correct`: the right value, in the fact's printed scale (the same "
+        "scale as `value`, e.g. millions).",
+    )
 
 
 class FactReviewResult(BaseModel):
     fact_id: int
     status: Literal["verified", "rejected"]
+    corrected_fact_id: int | None
     verdict_job: JobSummary
 
 
 @router.post("/facts/{fact_id}/review", tags=["holdings"])
 async def review_fact(fact_id: int, body: FactReview, pool: Pool, owner: Owner) -> FactReviewResult:
-    """Release or reject a fact the validator held for review (sanity bound, restatement,
-    currency). Verdicts for the holding are re-run afterwards."""
-    new_status: Literal["verified", "rejected"] = (
-        "verified" if body.action == "verify" else "rejected"
-    )
-    reason = f"owner {body.action}" + (f": {body.note}" if body.note else "")
-    ticker = await pool.fetchval(
-        "update public.fact set status = $2, status_reason = $3, reviewed_at = now(),"
-        " reviewed_by = $4::uuid where id = $1 and status = 'unverified' returning ticker",
-        fact_id,
-        new_status,
-        reason,
-        owner.user_id,
-    )
-    if ticker is None:
-        exists = await pool.fetchval("select status from public.fact where id = $1", fact_id)
-        if exists is None:
-            raise HTTPException(status.HTTP_404_NOT_FOUND, f"No fact {fact_id}")
-        raise HTTPException(
-            status.HTTP_409_CONFLICT, f"Fact {fact_id} is {exists}; only held facts are reviewed"
+    """Decide on a fact: accept a held or quarantined one, correct any fact (the owner's
+    value is stored as a new fact that wins), or reject it. The decision and its reason are
+    logged, and the holding's verdicts are re-judged by the worker."""
+    try:
+        outcome = await review_fact_in_db(
+            pool,
+            fact_id,
+            body.action,
+            body.reason,
+            owner_id=owner.user_id,
+            corrected_value=body.value,
         )
-    job = await _enqueue(pool, "thesis_verdicts", owner.user_id, {"ticker": ticker})
-    return FactReviewResult(fact_id=fact_id, status=new_status, verdict_job=job)
+    except ReviewError as exc:
+        code = status.HTTP_404_NOT_FOUND if exc.not_found else status.HTTP_409_CONFLICT
+        raise HTTPException(code, str(exc)) from exc
+    job = await _enqueue(pool, "thesis_verdicts", owner.user_id, {"ticker": outcome.ticker})
+    return FactReviewResult(
+        fact_id=fact_id,
+        status="verified" if outcome.status == "verified" else "rejected",
+        corrected_fact_id=outcome.corrected_fact_id,
+        verdict_job=job,
+    )
+
+
+@router.get("/facts/review-queue", tags=["holdings"])
+async def get_review_queue(
+    pool: Pool,
+    _owner: Owner,
+    ticker: Annotated[str | None, Query(pattern=r"^[A-Za-z0-9._-]{1,32}$")] = None,
+) -> list[ReviewItem]:
+    """Facts waiting for the owner: held by the validator or quarantined by reconciliation,
+    each with its snippet, source, the checks it broke and the reconciliation behind it."""
+    return await review_queue(pool, ticker)
 
 
 # ---------------------------------------------------------------------------
@@ -275,6 +463,13 @@ class HoldingProfilesConfigVersion(BaseModel):
     created_at: dt.datetime
     note: str | None
     body: HoldingProfilesConfig
+
+
+class BudgetConfigVersion(BaseModel):
+    id: int
+    created_at: dt.datetime
+    note: str | None
+    body: BudgetConfig
 
 
 class VerificationConfigVersion(BaseModel):
@@ -354,6 +549,12 @@ async def save_jobs_config(
     return JobsConfigVersion(**_as_dict(stored))
 
 
+@router.post("/config/jobs/validate", tags=["config"])
+async def validate_jobs(body: JobsConfig, _owner: Owner) -> JobsConfig:
+    """Validate job schedules without saving. 422 lists every error."""
+    return body
+
+
 @router.get("/config/holding-profiles", tags=["config"])
 async def get_holding_profiles_config(pool: Pool, _owner: Owner) -> HoldingProfilesConfigVersion:
     stored = await load_active(pool, "holding_profiles", HoldingProfilesConfig)
@@ -398,3 +599,32 @@ async def save_verification_config(
     async with pool.acquire() as conn:
         stored = await save_config(conn, "verification", body, created_by=owner.user_id, note=note)
     return VerificationConfigVersion(**_as_dict(stored))
+
+
+@router.post("/config/verification/validate", tags=["config"])
+async def validate_verification(body: VerificationConfig, _owner: Owner) -> VerificationConfig:
+    return body
+
+
+@router.get("/config/budget", tags=["config"])
+async def get_budget_config(pool: Pool, _owner: Owner) -> BudgetConfigVersion:
+    """The saved price table. 404 means the default prices apply."""
+    stored = await load_active(pool, "budget", BudgetConfig)
+    if stored is None:
+        raise _not_found("budget")
+    return BudgetConfigVersion(**_as_dict(stored))
+
+
+@router.put("/config/budget", tags=["config"])
+async def save_budget_config(
+    body: BudgetConfig, pool: Pool, owner: Owner, note: NoteParam = None
+) -> BudgetConfigVersion:
+    """Save the price table. Every AI step from the next job on is costed with it."""
+    async with pool.acquire() as conn:
+        stored = await save_config(conn, "budget", body, created_by=owner.user_id, note=note)
+    return BudgetConfigVersion(**_as_dict(stored))
+
+
+@router.post("/config/budget/validate", tags=["config"])
+async def validate_budget(body: BudgetConfig, _owner: Owner) -> BudgetConfig:
+    return body

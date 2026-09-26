@@ -17,9 +17,14 @@ import logging
 from collections.abc import AsyncIterator, Awaitable, Callable
 from contextlib import asynccontextmanager
 from dataclasses import dataclass, field
+from decimal import Decimal
 from typing import Any, Literal
 
 import asyncpg
+
+from steward.config.budget import BudgetConfig
+from steward.config.store import load_active
+from steward.costs import PriceTable
 
 logger = logging.getLogger(__name__)
 
@@ -27,7 +32,7 @@ logger = logging.getLogger(__name__)
 # cannot collide with advisory locks taken for anything else.
 LOCK_NAMESPACE = 0x57A7
 
-JobTrigger = Literal["schedule", "manual", "event"]
+JobTrigger = Literal["schedule", "manual", "event", "chat"]
 
 # How long a run waits for the previous run of its type before giving up.
 DEFAULT_LOCK_TIMEOUT = dt.timedelta(hours=1)
@@ -39,13 +44,16 @@ class JobFailed(Exception):
 
 @dataclass
 class StepUsage:
-    """Model usage of one step (AI steps only), stored on its `job_step` row."""
+    """Model usage of one step (AI steps only), stored on its `job_step` row. The runner
+    prices it with the Budget config when the step finishes."""
 
     model: str
     input_tokens: int = 0
     output_tokens: int = 0
+    cache_write_tokens: int = 0
+    cache_read_tokens: int = 0
     searches: int = 0
-    cost_usd: float | None = None
+    batch: bool = False
 
 
 @dataclass
@@ -63,6 +71,39 @@ class JobContext:
     params: dict[str, Any] = field(default_factory=dict)
     _next_step: int = 0
     config_version_ids: list[int] = field(default_factory=list)
+    _prices: PriceTable | None = None
+    # A job the queue redelivered after the worker died mid-run (see run_job).
+    resumed: bool = False
+
+    async def checkpoint(self, key: str, compute: Callable[[], Awaitable[Any]]) -> Any:
+        """The stored output of step `key` if an earlier attempt of this job completed it;
+        else compute it, store it, and return it. Outputs must be JSON-serialisable."""
+        stored = await self.pool.fetchval(
+            "select output from public.job_checkpoint where job_id = $1 and key = $2",
+            self.job_id,
+            key,
+        )
+        if stored is not None:
+            return json.loads(stored)
+        output = await compute()
+        await self.pool.execute(
+            "insert into public.job_checkpoint (job_id, key, output) values ($1, $2, $3::jsonb)"
+            " on conflict (job_id, key) do update set output = excluded.output",
+            self.job_id,
+            key,
+            json.dumps(output, default=str),
+        )
+        return json.loads(json.dumps(output, default=str))
+
+    async def has_checkpoint(self, key: str) -> bool:
+        return bool(
+            await self.pool.fetchval(
+                "select exists (select 1 from public.job_checkpoint where job_id = $1"
+                " and key = $2)",
+                self.job_id,
+                key,
+            )
+        )
 
     @asynccontextmanager
     async def step(self, name: str) -> AsyncIterator[StepHandle]:
@@ -87,14 +128,37 @@ class JobContext:
             raise
         await self._finish_step(step_id, "succeeded", handle, None)
 
+    async def price_table(self) -> PriceTable:
+        """The Budget config's prices, read once per run (its version is recorded)."""
+        if self._prices is None:
+            stored = await load_active(self.pool, "budget", BudgetConfig)
+            await self.record_config_version(stored.id if stored else None)
+            self._prices = PriceTable(stored.body if stored else BudgetConfig())
+        return self._prices
+
     async def _finish_step(
         self, step_id: int, status: str, handle: StepHandle, error: str | None
     ) -> None:
         usage = handle.usage
+        prices: dict[str, Any] | None = None
+        cost: Decimal | None = None
+        if usage is not None:
+            table = await self.price_table()
+            prices = table.prices_for(usage.model)
+            cost = table.cost(
+                usage.model,
+                input_tokens=usage.input_tokens,
+                output_tokens=usage.output_tokens,
+                cache_write_tokens=usage.cache_write_tokens,
+                cache_read_tokens=usage.cache_read_tokens,
+                searches=usage.searches,
+                batch=usage.batch,
+            )
         await self.pool.execute(
             "update public.job_step set status = $2, finished_at = clock_timestamp(),"
             " detail = $3::jsonb, error = $4, model = $5, input_tokens = $6,"
-            " output_tokens = $7, searches = $8, cost_usd = $9 where id = $1",
+            " output_tokens = $7, searches = $8, cost_usd = $9, cache_write_tokens = $10,"
+            " cache_read_tokens = $11, batch = $12, prices = $13::jsonb where id = $1",
             step_id,
             status,
             _json(handle.detail),
@@ -103,7 +167,11 @@ class JobContext:
             usage.input_tokens if usage else None,
             usage.output_tokens if usage else None,
             usage.searches if usage else None,
-            usage.cost_usd if usage else None,
+            cost,
+            usage.cache_write_tokens if usage else None,
+            usage.cache_read_tokens if usage else None,
+            usage.batch if usage else None,
+            json.dumps(prices) if prices else None,
         )
 
     async def record_config_version(self, version_id: int | None) -> None:
@@ -157,13 +225,44 @@ async def run_job(
     """Run `handler` as job `job_id` (created here with `params` if None; an existing job's
     params are read from its row). Never raises for a job failure: the failure is recorded
     on the job and its step, and "failed" is returned."""
+    resumed = False
+    next_step = 0
+    versions: list[int] = []
     if job_id is None:
         job_id = await create_job(pool, job_type, trigger, params=params)
     else:
-        stored = await pool.fetchval("select params from public.job where id = $1", job_id)
-        params = json.loads(stored) if stored else {}
+        row = await pool.fetchrow(
+            "select params, status, config_version_ids,"
+            " (select max(step_index) from public.job_step where job_id = j.id) as last_step"
+            " from public.job j where id = $1",
+            job_id,
+        )
+        params = json.loads(row["params"]) if row and row["params"] else {}
+        if row is not None and row["status"] in ("succeeded", "failed"):
+            # Redelivered after it finished (the worker died before archiving the message).
+            logger.info("job %s already %s; not run again", job_id, row["status"])
+            return "succeeded" if row["status"] == "succeeded" else "failed"
+        if row is not None and row["last_step"] is not None:
+            # A run the worker was killed in: its open steps are closed, numbering continues,
+            # and the handler can pick up completed work from its checkpoints.
+            resumed = True
+            next_step = row["last_step"] + 1
+            versions = list(row["config_version_ids"] or [])
+            await pool.execute(
+                "update public.job_step set status = 'failed', finished_at = clock_timestamp(),"
+                " error = 'interrupted: the worker stopped during this step' where job_id = $1"
+                " and status = 'running'",
+                job_id,
+            )
     ctx = JobContext(
-        pool=pool, job_id=job_id, job_type=job_type, trigger=trigger, params=params or {}
+        pool=pool,
+        job_id=job_id,
+        job_type=job_type,
+        trigger=trigger,
+        params=params or {},
+        _next_step=next_step,
+        config_version_ids=versions,
+        resumed=resumed,
     )
     key = lock_key(job_type, ctx.params)
 

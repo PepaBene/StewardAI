@@ -44,3 +44,20 @@ export function flattenErrors(errors: FieldErrors): { path: string; message: str
     messages.map((message) => ({ path, message })),
   );
 }
+
+/**
+ * Errors of a keyed field's children ("macro_surprise_bands.hicp") folded into the field
+ * itself as "hicp: message", so a text area edited as "key value" lines shows them. Other
+ * paths are kept as they are.
+ */
+export function foldChildErrors(errors: FieldErrors, path: string): FieldErrors {
+  const folded: FieldErrors = {};
+  const own: string[] = [...(errors[path] ?? [])];
+  for (const [p, messages] of Object.entries(errors)) {
+    if (p === path) continue;
+    if (p.startsWith(`${path}.`)) own.push(...messages.map((m) => `${p.slice(path.length + 1)}: ${m}`));
+    else folded[p] = messages;
+  }
+  if (own.length > 0) folded[path] = own;
+  return folded;
+}

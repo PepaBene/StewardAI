@@ -1,11 +1,12 @@
 "use client";
 
 import { ArrowDownIcon, ArrowUpIcon, BellRingIcon, LoaderCircleIcon, PlusIcon, Trash2Icon } from "lucide-react";
-import Link from "next/link";
 import { useMemo, useState } from "react";
 
 import { AlertMessage } from "@/components/alert-message";
+import { ConfigHeader } from "@/components/config/config-header";
 import { CheckboxField, CheckboxGroup, SelectField, TextAreaField, TextField } from "@/components/config/fields";
+import { ReplayPreviewDialog, useReplayGate } from "@/components/config/replay-preview";
 import { SaveBar } from "@/components/config/save-bar";
 import { Button } from "@/components/ui/button";
 import {
@@ -21,6 +22,7 @@ import {
   newRule,
   notificationsFromBody,
   notificationsToBody,
+  QUIET_DAYS,
   QUIET_MODES,
   type NotificationsForm,
   type RuleForm,
@@ -33,6 +35,10 @@ const api = () => getBrowserApiClient();
 const EVENT_OPTIONS = EVENT_TYPES.map((t) => ({ value: t, label: EVENT_LABELS[t] }));
 const SEVERITY_OPTIONS = ([3, 2, 1] as const).map((s) => ({ value: s, label: `${s} · ${SEVERITY[s].label}` }));
 const CHANNEL_OPTIONS = CHANNELS.map((c) => ({ value: c, label: CHANNEL_LABELS[c] }));
+const SYSTEM_LEVELS = ([3, 2, 1, 0] as const).map((s) => ({
+  value: s,
+  label: s === 0 ? "0 · Never alert" : `${s} · ${SEVERITY[s].label}`,
+}));
 
 export function NotificationsEditor() {
   const [form, setForm] = useState<NotificationsForm | null>(null);
@@ -63,26 +69,25 @@ export function NotificationsEditor() {
       return { ...f, rules };
     });
 
-  async function save(note: string | null) {
-    if (body && (await editor.save(body, note))) setBaseline(JSON.stringify(body));
-  }
+  // Save shows the replay preview of the change first; only its confirm saves.
+  const replay = useReplayGate<NotificationsConfig>({
+    preview: (draft) => api().POST("/config/notifications/preview", { body: draft }),
+    save: async (draft, note) => {
+      if (await editor.save(draft, note)) setBaseline(JSON.stringify(draft));
+    },
+    onInvalid: (draft) => void editor.validate(draft),
+  });
 
   return (
     <div className="space-y-6">
-      <div>
-        <p className="text-sm text-text-muted">
-          <Link href="/config" className="hover:text-text hover:underline">
-            Config
-          </Link>{" "}
-          / Notifications
-        </p>
-        <h1 className="text-2xl font-semibold tracking-tight">Notifications</h1>
-        <p className="mt-1 max-w-prose text-sm text-text-muted">
+      <ConfigHeader title="Notifications" domain="notifications">
+        <p>
           Which confirmed events reach you right away, on which channel. Rules are checked top to
           bottom and the first match decides; anything no rule matches waits for the digest. Rumours
           and unconfirmed stories never alert. Changes apply to the next alert, no restart.
         </p>
-      </div>
+        <p>Saving first replays the last 7 days under your draft and shows which alerts would change; confirm to save.</p>
+      </ConfigHeader>
 
       {editor.status.kind === "loading" ? (
         <p className="flex items-center gap-2 text-sm text-text-muted" role="status">
@@ -134,6 +139,27 @@ export function NotificationsEditor() {
               <TextField label="Time zone" path="quiet_hours.timezone" errors={editor.errors} value={form.quiet_timezone} onChange={(v) => set({ quiet_timezone: v })} />
             </div>
             <div className="grid gap-3 sm:grid-cols-2">
+              <CheckboxGroup
+                label="Quiet all day on"
+                path="quiet_all_day_on"
+                errors={editor.errors}
+                values={form.quiet_all_day_on}
+                options={QUIET_DAYS}
+                onChange={(v) => set({ quiet_all_day_on: v })}
+                hint="These days are quiet from start to end: alerts are held (or go to the digest) as during quiet hours."
+              />
+              <TextField
+                label="Public holidays of (country)"
+                path="holiday_country"
+                errors={editor.errors}
+                value={form.holiday_country}
+                maxLength={2}
+                spellCheck={false}
+                onChange={(v) => set({ holiday_country: v.toUpperCase() })}
+                hint="Two-letter code, e.g. CZ. Used when public holidays are quiet; the holidays come from the Nager.Date calendar."
+              />
+            </div>
+            <div className="grid gap-3 sm:grid-cols-2">
               <TextField
                 label="Daily alert cap"
                 inputMode="numeric"
@@ -164,6 +190,16 @@ export function NotificationsEditor() {
                 onChange={(v) => set({ muted_event_types: v as EventType[] })}
               />
             </div>
+            <SelectField
+              className="max-w-sm"
+              label="Monitoring alert severity"
+              path="system_alert_severity"
+              errors={editor.errors}
+              value={form.system_alert_severity}
+              options={SYSTEM_LEVELS}
+              onChange={(v) => set({ system_alert_severity: v })}
+              hint="Severity of system alerts (a failed job, a missed run, a holding with no news coverage). They are routed by the rules above like any event."
+            />
             <CheckboxGroup
               label="Digest channels"
               path="digest_channels"
@@ -179,12 +215,14 @@ export function NotificationsEditor() {
 
           <SaveBar
             dirty={dirty}
-            busy={editor.busy}
+            busy={editor.busy ?? (replay.gate.kind === "previewing" ? "previewing" : null)}
             errors={editor.errors}
-            message={editor.message}
+            message={replay.gate.kind === "previewing" ? "Replaying the last 7 days under your draft…" : editor.message}
             onValidate={() => body && void editor.validate(body)}
-            onSave={(note) => void save(note)}
+            onSave={(note) => body && void replay.request(body, note)}
+            saveLabel="Preview and save"
           />
+          <ReplayPreviewDialog gate={replay.gate} onConfirm={() => void replay.confirm()} onCancel={replay.cancel} />
         </>
       ) : null}
     </div>

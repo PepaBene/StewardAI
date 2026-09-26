@@ -1,0 +1,250 @@
+import type {
+  FactOut,
+  FactReview,
+  FactStatus,
+  JobSummary,
+  KpiStatus,
+  ReviewAction,
+  VerdictStatus,
+} from "@/lib/api/client";
+import { isTicker } from "@/lib/portfolio/transactions";
+
+import { formatFactValue } from "./confidence";
+
+/*
+ * The owner's review of a held, quarantined or verified fact: accept, correct or reject,
+ * always with a reason (the API logs it with the decision). The worker then re-judges the
+ * holding's verdicts; the screens poll the holding until that run has finished.
+ */
+
+export const REASON_MAX = 500;
+
+export const REVIEW_ACTIONS = {
+  accept: {
+    label: "Accept",
+    submit: "Accept figure",
+    done: "Accepted",
+    description: "The figure is right as extracted. It becomes verified and verdicts may use it.",
+  },
+  correct: {
+    label: "Correct",
+    submit: "Save correction",
+    done: "Corrected",
+    description: "The figure is wrong. Your value is stored as a new verified figure that wins; this one is kept, rejected.",
+  },
+  reject: {
+    label: "Reject",
+    submit: "Reject figure",
+    done: "Rejected",
+    description: "The figure is wrong or irrelevant. It is kept for the record and used nowhere.",
+  },
+} as const satisfies Record<ReviewAction, { label: string; submit: string; done: string; description: string }>;
+
+/* Mirrors the API's rules (steward.earnings.review.ALLOWED_FROM); anything else is a 409. */
+const ALLOWED_FROM: Record<ReviewAction, readonly FactStatus[]> = {
+  accept: ["unverified", "quarantined"],
+  correct: ["unverified", "quarantined", "verified"],
+  reject: ["unverified", "quarantined", "verified"],
+};
+
+/** The actions the API accepts for a fact in this status, in display order. */
+export function allowedReviewActions(status: FactStatus): ReviewAction[] {
+  return (["accept", "correct", "reject"] as const).filter((a) => ALLOWED_FROM[a].includes(status));
+}
+
+/** Held (validator) or quarantined (reconciliation): waiting for the owner. */
+export function isHeld(status: FactStatus): boolean {
+  return status === "unverified" || status === "quarantined";
+}
+
+const PLAIN = /^-?(\d+(\.\d+)?|\.\d+)$/;
+const GROUPED = /^-?\d{1,3}(,\d{3})+(\.\d+)?$/;
+
+/**
+ * A corrected value as typed ("94,036", "94036.5", "-1.2") -> an exact decimal string for
+ * the API ("94036", "94036.5"), or null. Commas are only accepted as thousands separators.
+ */
+export function parseCorrectedValue(text: string): string | null {
+  const t = text.trim().replace(/\s+/g, "");
+  if (PLAIN.test(t)) return normalizeDecimal(t);
+  if (GROUPED.test(t)) return normalizeDecimal(t.replaceAll(",", ""));
+  return null;
+}
+
+function normalizeDecimal(t: string): string {
+  const negative = t.startsWith("-");
+  let [int, frac = ""] = (negative ? t.slice(1) : t).split(".");
+  int = int.replace(/^0+(?=\d)/, "") || "0";
+  frac = frac.replace(/0+$/, "");
+  const out = frac ? `${int}.${frac}` : int;
+  return negative && out !== "0" ? `-${out}` : out;
+}
+
+export type ReviewDraft = { action: ReviewAction | null; reason: string; value: string };
+export type ReviewErrors = { action?: string; reason?: string; value?: string };
+
+/** The request body, or the message to show next to each field. */
+export function validateReview(
+  draft: ReviewDraft,
+): { ok: true; body: FactReview } | { ok: false; errors: ReviewErrors } {
+  const errors: ReviewErrors = {};
+  const reason = draft.reason.trim();
+  if (!draft.action) errors.action = "Choose Accept, Correct or Reject.";
+  if (!reason) errors.reason = "Give a reason; it is logged with the decision.";
+  else if (reason.length > REASON_MAX) errors.reason = `Keep the reason to ${REASON_MAX} characters (${reason.length} now).`;
+  let value: string | null = null;
+  if (draft.action === "correct") {
+    value = parseCorrectedValue(draft.value);
+    if (!draft.value.trim()) errors.value = "Enter the right value.";
+    else if (value === null) errors.value = "Enter a number, e.g. 94036 or 1.57.";
+  }
+  if (!draft.action || Object.keys(errors).length > 0) return { ok: false, errors };
+  return {
+    ok: true,
+    body: draft.action === "correct" ? { action: "correct", reason, value: value! } : { action: draft.action, reason },
+  };
+}
+
+const SCALE_WORD: Record<FactOut["scale"], string> = {
+  units: "",
+  thousands: "thousands",
+  millions: "millions",
+  billions: "billions",
+};
+
+const SCALE_FACTOR: Record<FactOut["scale"], number> = {
+  units: 1,
+  thousands: 1e3,
+  millions: 1e6,
+  billions: 1e9,
+};
+
+/**
+ * How to type a correction: in the scale the figure was printed in. E.g. "Type the value in
+ * millions of USD, as printed: 94036 means USD 94,036 m."
+ */
+export function scaleHint(fact: Pick<FactOut, "scale" | "unit" | "currency" | "value_as_written">): string {
+  const example = `${fact.value_as_written} means ${formatFactValue(fact)}`;
+  const scale = SCALE_WORD[fact.scale];
+  switch (fact.unit) {
+    case "percent":
+      return `Type the percentage without the % sign, as printed: ${example}.`;
+    case "per_share":
+      return `Type the amount per share${fact.currency ? ` in ${fact.currency}` : ""}, as printed: ${example}.`;
+    case "ratio":
+      return `Type the ratio, as printed: ${example}.`;
+    case "count":
+      return scale ? `Type the count in ${scale}, as printed: ${example}.` : `Type the count, as printed: ${example}.`;
+    default: {
+      const what = [scale ? `${scale} of` : "", fact.currency ?? "the reporting currency"].filter(Boolean).join(" ");
+      return `Type the value in ${what}, as printed${scale ? " (not in units)" : ""}: ${example}.`;
+    }
+  }
+}
+
+/** A value in units (as XBRL reports it) in the fact's printed scale: 94036000000, millions -> 94036. */
+export function unitsToPrinted(units: number, scale: FactOut["scale"]): number {
+  return units / SCALE_FACTOR[scale];
+}
+
+/** An XBRL value or difference (in units) written like the fact: "USD 94,036 m". */
+export function formatInFactScale(
+  units: number | null | undefined,
+  fact: Pick<FactOut, "scale" | "unit" | "currency">,
+  { signed = false, locale }: { signed?: boolean; locale?: string } = {},
+): string {
+  if (units === null || units === undefined || !Number.isFinite(units)) return "—";
+  const written = new Intl.NumberFormat(locale, {
+    maximumFractionDigits: 3,
+    signDisplay: signed ? "exceptZero" : "auto",
+  }).format(unitsToPrinted(units, fact.scale));
+  return formatFactValue({ ...fact, value_as_written: written });
+}
+
+/** The review queue's filter, kept in the URL (?ticker=). */
+export function parseReviewTicker(params: URLSearchParams): string | null {
+  const ticker = params.get("ticker");
+  return ticker && isTicker(ticker) ? ticker : null;
+}
+
+export function reviewQueueHref(ticker?: string | null): string {
+  return ticker ? `/review?ticker=${encodeURIComponent(ticker)}` : "/review";
+}
+
+export type VerdictRunOutcome = "pending" | "succeeded" | "failed";
+
+/**
+ * Whether the verdict run queued by a review has finished, from the holding's latest
+ * verdict run. A newer run that has finished also covers the review (it re-judged after it).
+ */
+export function verdictRunOutcome(lastRun: JobSummary | null | undefined, jobId: number): VerdictRunOutcome {
+  if (!lastRun || lastRun.id < jobId) return "pending";
+  if (lastRun.status === "succeeded" || lastRun.status === "failed") return lastRun.status;
+  return "pending";
+}
+
+/** KPI metric and fact metric are the same figure or one derives from the other ("revenue" -> "revenue_growth_yoy"). */
+export function metricsRelated(kpiMetric: string, factMetric: string): boolean {
+  return kpiMetric === factMetric || kpiMetric.startsWith(`${factMetric}_`) || factMetric.startsWith(`${kpiMetric}_`);
+}
+
+export type AffectedKpi = {
+  kpi: KpiStatus["kpi"];
+  current: KpiStatus["current"];
+  /** Status before the review, when it was captured; null: never judged. */
+  before: VerdictStatus | null | undefined;
+  changed: boolean;
+};
+
+/**
+ * The KPIs a review can move: those whose current verdict uses the fact (or its correction),
+ * those whose metric relates to the fact's, and any whose status changed. When none match,
+ * every KPI of the holding, so the recomputed state is always shown.
+ */
+export function affectedKpis(
+  kpis: KpiStatus[],
+  fact: { metric: string; ids: number[] },
+  before?: Map<string, VerdictStatus | null>,
+): AffectedKpi[] {
+  const all = kpis.map(({ kpi, current }) => {
+    const prior = before?.get(kpi.id);
+    const now = current?.status ?? null;
+    return { kpi, current, before: prior, changed: before !== undefined && before.has(kpi.id) && prior !== now };
+  });
+  const related = all.filter(
+    (k) =>
+      k.changed ||
+      metricsRelated(k.kpi.metric, fact.metric) ||
+      (k.current?.fact_ids ?? []).some((id) => fact.ids.includes(id)),
+  );
+  return related.length > 0 ? related : all;
+}
+
+/** KPI id -> current status (null: never judged), to compare after the run. */
+export function kpiStatusSnapshot(kpis: KpiStatus[]): Map<string, VerdictStatus | null> {
+  return new Map(kpis.map(({ kpi, current }) => [kpi.id, current?.status ?? null]));
+}
+
+/** The API's error message: FastAPI's `detail` string, or its 422 list. */
+export function apiErrorDetail(error: unknown): string {
+  if (!error || typeof error !== "object" || !("detail" in error)) return "";
+  const detail = (error as { detail: unknown }).detail;
+  if (typeof detail === "string") return detail;
+  if (Array.isArray(detail)) {
+    return detail
+      .map((d) => (d && typeof d === "object" && "msg" in d ? String((d as { msg: unknown }).msg) : ""))
+      .filter(Boolean)
+      .join("; ");
+  }
+  return "";
+}
+
+/** A failed review, in words: 409 (already decided), 404, 422 or anything else. */
+export function describeReviewFailure(status: number, error: unknown): string {
+  const detail = apiErrorDetail(error);
+  if (status === 409) return `Not allowed for this figure now${detail ? `: ${detail}` : ""}. Reload to see its current status.`;
+  if (status === 404) return `This figure no longer exists${detail ? ` (${detail})` : ""}.`;
+  if (status === 422) return `The API rejected the input${detail ? `: ${detail}` : ""}.`;
+  if (status === 0) return detail || "The API could not be reached.";
+  return `The API answered HTTP ${status}${detail ? `: ${detail}` : ""}.`;
+}

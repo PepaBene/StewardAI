@@ -4,6 +4,7 @@ Severity 0 = ignored, 1 = digest, 2 = digest highlight linked to the thesis, 3 =
 The classification call only labels the event type; the severity always comes from here.
 """
 
+import re
 from typing import Annotated, Literal, Self, cast
 
 from pydantic import Field, model_validator
@@ -26,6 +27,8 @@ EventType = Literal[
     "sector_competitor",
     "index_change",
     "analyst_rating",
+    "delisting",
+    "entity_status",
     "other",
 ]
 
@@ -49,6 +52,8 @@ EVENT_DESCRIPTIONS: dict[str, str] = {
     "sector_competitor": "Event at a named competitor, supplier or customer, or in the sector",
     "index_change": "Index inclusion or exclusion",
     "analyst_rating": "Analyst rating or price target change",
+    "delisting": "Delisting: trading on the home market ends (regulator reference data)",
+    "entity_status": "Legal entity status change: entity inactive, LEI lapsed or retired",
     "other": "Anything else (market wrap, general commentary, periodic filing)",
 }
 
@@ -68,6 +73,8 @@ DEFAULT_SEVERITIES: dict[str, int] = {
     "sector_competitor": 1,
     "index_change": 1,
     "analyst_rating": 0,
+    "delisting": 2,
+    "entity_status": 1,
     "other": 0,
 }
 
@@ -78,6 +85,57 @@ class SeverityOverride(ConfigModel):
     ticker: Ticker
     event_type: EventType
     severity: SeverityLevel
+
+
+class AnnouncementRule(ConfigModel):
+    """Maps a regulatory announcement's type (the RNS headline or the EQS category) to an
+    event type. First match wins; `classify` leaves the item to the classifier."""
+
+    service: Literal["rns", "eqs", "any"] = "any"
+    pattern: str = Field(
+        min_length=1,
+        max_length=200,
+        description="Case-insensitive regular expression matched against the announcement "
+        "type (RNS: the headline, e.g. 'Final Results'; EQS: the category, e.g. 'Ad-hoc').",
+    )
+    event_type: EventType | Literal["classify"]
+
+    @model_validator(mode="after")
+    def _valid_pattern(self) -> Self:
+        try:
+            re.compile(self.pattern)
+        except re.error as exc:
+            raise ValueError(f"invalid pattern {self.pattern!r}: {exc}") from exc
+        return self
+
+
+def _default_announcement_rules() -> list[AnnouncementRule]:
+    rules: list[tuple[str, str, str]] = [
+        ("any", r"profit warning", "guidance_change"),
+        ("rns", r"(final|interim|half[- ]?year|preliminary|q[1-4]|quarterly|full[- ]year) "
+         r"results|results for the|annual financial report|half[- ]year report",
+         "earnings_release"),
+        ("rns", r"trading (statement|update)|q[1-4] trading", "earnings_release"),
+        ("rns", r"director/pdmr|pdmr shareholding|director.?s? dealing", "insider_transaction"),
+        ("rns", r"offer for|possible offer|recommended (cash )?offer|rule 2\.[47]|scheme of "
+         r"arrangement|merger|acquisition|disposal", "m_and_a"),
+        ("rns", r"transaction in own shares|buyback|buy-back|dividend declaration|"
+         r"scrip dividend|capital raise|placing", "capital_allocation"),
+        ("rns", r"directorate change|board change|appointment of|ceo|chief executive|"
+         r"chief financial", "management_change"),
+        ("rns", r"holding\(s\) in company|total voting rights|notice of agm|result of agm|"
+         r"block listing|form 8", "other"),
+        ("eqs", r"ad-?hoc", "classify"),
+        ("eqs", r"directors.? dealings", "insider_transaction"),
+        ("eqs", r"voting rights", "other"),
+        ("eqs", r"financial reports?|half-?year report|quarterly (report|statement)|"
+         r"annual report", "earnings_release"),
+        ("any", r".", "classify"),
+    ]  # fmt: skip
+    return [
+        AnnouncementRule.model_validate({"service": s, "pattern": p, "event_type": e})
+        for s, p, e in rules
+    ]
 
 
 class EventRulesConfig(ConfigModel):
@@ -116,6 +174,35 @@ class EventRulesConfig(ConfigModel):
         description="Severity of an alert for a KPI breach found by an earnings check "
         "(0: never alert, the digest still lists it).",
     )
+    price_move_threshold_pct: float = Field(
+        default=8.0,
+        gt=0,
+        le=100,
+        description="A daily close-to-close move beyond +-this percentage queues an event "
+        "escalation for the holding.",
+    )
+    macro_surprise_bands: dict[
+        Annotated[str, Field(pattern=r"^[a-z0-9_]{1,40}$")], Annotated[float, Field(ge=0)]
+    ] = Field(
+        default_factory=lambda: {
+            "hicp": 0.3,
+            "unemployment": 0.3,
+            "gdp": 0.5,
+            "industrial_production": 2.0,
+            "sentiment": 3.0,
+            "us_cpi": 0.3,
+            "us_unemployment": 0.2,
+            "ecb_deposit_rate": 0.0,
+            "fed_funds": 0.0,
+        },
+        description="Per macro series key: a new release that moves more than this against "
+        "the previous one is a macro surprise (in the series' own unit; 0: any change, e.g. "
+        "a policy rate). Evaluated only on release days.",
+    )
+    announcement_types: list[AnnouncementRule] = Field(
+        default_factory=_default_announcement_rules,
+        description="How RNS and EQS announcement types map to event types.",
+    )
     earnings_check_on: list[EventType] = Field(
         default_factory=lambda: cast(list[EventType], ["earnings_release"]),
         description="Confirmed stories of these types queue an earnings thesis check for "
@@ -128,6 +215,15 @@ class EventRulesConfig(ConfigModel):
         if len(pairs) != len(set(pairs)):
             raise ValueError("more than one override for the same ticker and event type")
         return self
+
+    def announcement_event(self, service: str, announcement_type: str) -> str | None:
+        """The event type for an announcement, or None to leave it to the classifier."""
+        for rule in self.announcement_types:
+            if rule.service not in ("any", service):
+                continue
+            if re.search(rule.pattern, announcement_type, re.IGNORECASE):
+                return None if rule.event_type == "classify" else rule.event_type
+        return None
 
     def severity(
         self,

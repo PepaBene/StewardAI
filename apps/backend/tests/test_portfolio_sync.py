@@ -246,6 +246,7 @@ async def test_snapshot_values_and_steps(backend_pool: asyncpg.Pool) -> None:
         "snapshot",
         "transactions",
         "drift",
+        "breaches",
     ]
     assert {s["status"] for s in steps} == {"succeeded"}
     assert await backend_pool.fetchval("select count(*) from fx_rate where source = 'cnb'") == 4

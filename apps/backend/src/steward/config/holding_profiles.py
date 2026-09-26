@@ -68,6 +68,12 @@ class HoldingProfile(ConfigModel):
         description="Month the fiscal year ends in (Apple: 9, Microsoft: 6). Maps fiscal "
         "quarters to calendar periods.",
     )
+    price_symbol: str | None = Field(
+        default=None,
+        pattern=r"^[a-z0-9._-]{1,24}$",
+        description="Stooq symbol for price history when the one derived from OpenFIGI is "
+        "wrong or missing (e.g. 'sap.de').",
+    )
     reporting_currency: CurrencyCode | None = Field(
         default=None, description="Currency the company reports in; figures in another are held."
     )

@@ -11,7 +11,7 @@ from pydantic import AnyHttpUrl, Field, model_validator
 from steward.config.common import ConfigModel, Slug, Ticker, require_unique
 
 Tier = Literal[1, 2, 3]
-SourceType = Literal["rss", "page", "edgar", "finnhub", "google_news"]
+SourceType = Literal["rss", "page", "edgar", "finnhub", "google_news", "rns", "eqs", "edgar_fts"]
 Domain = Annotated[
     str,
     Field(
@@ -21,8 +21,13 @@ Domain = Annotated[
     ),
 ]
 
-# Types whose URL comes from each holding (EDGAR CIK, Finnhub symbol, aliases), not the config.
-PER_HOLDING_TYPES: frozenset[str] = frozenset({"edgar", "finnhub", "google_news"})
+# Types whose URL comes from each holding (EDGAR CIK, Finnhub symbol, aliases, the regulatory
+# news page), not the config.
+PER_HOLDING_TYPES: frozenset[str] = frozenset(
+    {"edgar", "finnhub", "google_news", "rns", "eqs", "edgar_fts"}
+)
+# Regulatory news services and the home-market country they cover (from FIRDS/FITRS).
+REGULATORY_COUNTRY: dict[str, str] = {"rns": "GB", "eqs": "DE"}
 # Types that relay other outlets' items: an item's tier is its outlet's, not the source's.
 AGGREGATOR_TYPES: frozenset[str] = frozenset({"finnhub", "google_news"})
 
@@ -37,7 +42,11 @@ class NewsSource(ConfigModel):
     type: SourceType = Field(
         description="rss: an RSS or Atom feed. page: a news page read daily; new links on it "
         "become items. edgar: every holding's SEC filings. finnhub: US company news. "
-        "google_news: a Google News query per holding (unofficial endpoint)."
+        "google_news: a Google News query per holding (unofficial endpoint). "
+        "rns: UK regulatory announcements per holding (Investegate company page). "
+        "eqs: German regulatory announcements (EQS News company page from the holding "
+        "profile's regulatory_news_urls). edgar_fts: SEC full-text search for each holding's "
+        "watch topics and for other filers naming it."
     )
     url: AnyHttpUrl | None = Field(default=None, description="Feed or page URL (rss, page).")
     enabled: bool = True
@@ -45,6 +54,11 @@ class NewsSource(ConfigModel):
         default_factory=list,
         description="Holdings this source is about (e.g. a company's own IR feed): its items "
         "link to them without a name match. Empty: items are matched by name.",
+    )
+    macro: bool = Field(
+        default=False,
+        description="A macro or central-bank source: its items are kept without matching a "
+        "holding and appear under Markets and macro.",
     )
 
     @model_validator(mode="after")
@@ -62,10 +76,34 @@ class DomainTier(ConfigModel):
 
 
 def _default_sources() -> list[NewsSource]:
+    def central_bank(source_id: str, name: str, url: str) -> NewsSource:
+        return NewsSource.model_validate(
+            {"id": source_id, "name": name, "tier": 1, "type": "rss", "url": url, "macro": True}
+        )
+
     return [
         NewsSource(id="edgar-filings", name="SEC EDGAR filings", tier=1, type="edgar"),
+        NewsSource(
+            id="edgar-full-text", name="SEC EDGAR full-text search", tier=1, type="edgar_fts"
+        ),
         NewsSource(id="finnhub-company-news", name="Finnhub company news", tier=2, type="finnhub"),
         NewsSource(id="google-news", name="Google News", tier=2, type="google_news", enabled=False),
+        # Off until the owner has checked the services' terms for automated personal use.
+        NewsSource(
+            id="rns-investegate", name="RNS (Investegate)", tier=1, type="rns", enabled=False
+        ),
+        NewsSource(id="eqs-news", name="EQS News", tier=1, type="eqs", enabled=False),
+        central_bank(
+            "fed-press",
+            "Federal Reserve press releases",
+            "https://www.federalreserve.gov/feeds/press_monetary.xml",
+        ),
+        central_bank("ecb-press", "ECB press releases", "https://www.ecb.europa.eu/rss/press.html"),
+        central_bank(
+            "cnb-press",
+            "ČNB press releases",
+            "https://www.cnb.cz/en/.content/rss-feeds/press-releases.xml",
+        ),
     ]
 
 
@@ -101,6 +139,11 @@ class NewsSourcesConfig(ConfigModel):
     blocked_domains: list[Domain] = Field(
         default_factory=list, description="Items from these outlets are dropped."
     )
+    allowed_domains: list[Domain] = Field(
+        default_factory=list,
+        description="When set, aggregator items (Finnhub, Google News) are kept only from "
+        "these outlets (and the tiered ones above).",
+    )
     unknown_outlet_tier: Tier = Field(
         default=3,
         description="Tier for an aggregator's item from an outlet not listed above.",
@@ -130,6 +173,16 @@ class NewsSourcesConfig(ConfigModel):
                 if best is None or len(entry.domain) > best[0]:
                     best = (len(entry.domain), entry.tier)
         return best[1] if best else None
+
+    def allowed_aggregated(self, host: str | None) -> bool:
+        """Whether an aggregator's item from `host` passes the allow list."""
+        if not self.allowed_domains:
+            return True
+        if not host:
+            return False
+        host = host.lower().removeprefix("www.")
+        listed = [*self.allowed_domains, *(d.domain for d in self.domain_tiers if d.tier <= 2)]
+        return any(host == d or host.endswith(f".{d}") for d in listed)
 
     def blocked(self, host: str | None) -> bool:
         if not host:

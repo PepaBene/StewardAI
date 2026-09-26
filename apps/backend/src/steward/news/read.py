@@ -7,8 +7,11 @@ from typing import Any, Literal
 import asyncpg
 from pydantic import BaseModel, Field
 
+from steward.config.jobs import JobsConfig
 from steward.news.digest import DigestBody
-from steward.portfolio.read import JobSummary
+from steward.news.escalation import EscalationBody
+from steward.news.normalize import host_of
+from steward.portfolio.read import JobStatus, JobSummary
 
 Confidence = Literal["verified", "corroborated", "unconfirmed", "disputed"]
 StoryStatus = Literal["pending", "confirmed", "unconfirmed", "disputed", "sentiment"]
@@ -61,6 +64,11 @@ class NewsFeed(BaseModel):
     items: list[NewsItemOut]
     next_before_id: int | None = Field(description="Pass as before_id for the next page.")
     last_ingest: JobSummary | None
+    next_ingest_due_at: dt.datetime | None = Field(
+        default=None,
+        description="The scheduled news check after the last one: the feed is stale once "
+        "this has passed (plus a margin) with no newer check. Null when the job is disabled.",
+    )
 
 
 class FeedFilters(BaseModel):
@@ -138,7 +146,9 @@ FEED_SELECT = (
 )
 
 
-async def news_feed(pool: asyncpg.Pool, filters: FeedFilters) -> NewsFeed:
+async def news_feed(
+    pool: asyncpg.Pool, filters: FeedFilters, jobs: JobsConfig | None = None
+) -> NewsFeed:
     where, args = feed_where(filters)
     args.append(filters.limit + 1)
     rows = await pool.fetch(
@@ -176,12 +186,15 @@ async def news_feed(pool: asyncpg.Pool, filters: FeedFilters) -> NewsFeed:
         items=items,
         next_before_id=items[-1].id if more and items else None,
         last_ingest=JobSummary(**dict(job)) if job else None,
+        next_ingest_due_at=(jobs or JobsConfig()).next_run_after("news_ingest", job["created_at"])
+        if job
+        else None,
     )
 
 
 class AlertOut(BaseModel):
     id: int
-    kind: Literal["news", "thesis_breach", "test"]
+    kind: Literal["news", "thesis_breach", "test", "portfolio", "system"]
     severity: int
     ticker: str | None
     event_type: str | None
@@ -197,12 +210,15 @@ class AlertOut(BaseModel):
     created_at: dt.datetime
 
 
-async def recent_alerts(pool: asyncpg.Pool, limit: int) -> list[AlertOut]:
+async def recent_alerts(
+    pool: asyncpg.Pool, limit: int, kinds: list[str] | None = None
+) -> list[AlertOut]:
     rows = await pool.fetch(
         "select id, kind, severity, ticker, event_type, cluster_id, verdict_id, channel, message,"
         " status, send_after, sent_at, suppressed_reason, error, created_at"
-        " from public.alert order by id desc limit $1",
+        " from public.alert where ($2::text[] is null or kind = any($2)) order by id desc limit $1",
         limit,
+        kinds or None,
     )
     return [AlertOut(**dict(r)) for r in rows]
 
@@ -216,6 +232,11 @@ class ReportSummary(BaseModel):
     nothing_material: bool | None
     created_at: dt.datetime
     delivery: dict[str, dict[str, str]]
+    next_due_at: dt.datetime | None = Field(
+        default=None,
+        description="When the next report of this kind is scheduled: this one is current "
+        "until then. Null for unscheduled kinds or a disabled schedule.",
+    )
 
 
 class ReportOut(BaseModel):
@@ -229,14 +250,29 @@ class ReportOut(BaseModel):
     body: DigestBody
     body_md: str
     delivery: dict[str, dict[str, str]]
+    next_due_at: dt.datetime | None = Field(
+        default=None, description="When the next report of this kind is scheduled."
+    )
 
 
 def _json(value: Any) -> Any:
     return json.loads(value) if isinstance(value, str) else value
 
 
+def _next_due(
+    jobs: JobsConfig | None, report_type: str, period: str | None, created_at: dt.datetime
+) -> dt.datetime | None:
+    if report_type != "digest" or period not in ("daily", "weekly"):
+        return None
+    return (jobs or JobsConfig()).next_run_after(f"{period}_digest", created_at)
+
+
 async def list_reports(
-    pool: asyncpg.Pool, report_type: str, period: str | None, limit: int
+    pool: asyncpg.Pool,
+    report_type: str,
+    period: str | None,
+    limit: int,
+    jobs: JobsConfig | None = None,
 ) -> list[ReportSummary]:
     rows = await pool.fetch(
         "select id, type, period, title, created_at, delivery, body ->> 'headline' as headline,"
@@ -246,10 +282,21 @@ async def list_reports(
         period,
         limit,
     )
-    return [ReportSummary(**{**dict(r), "delivery": _json(r["delivery"])}) for r in rows]
+    return [
+        ReportSummary(
+            **{
+                **dict(r),
+                "delivery": _json(r["delivery"]),
+                "next_due_at": _next_due(jobs, r["type"], r["period"], r["created_at"]),
+            }
+        )
+        for r in rows
+    ]
 
 
-async def get_report(pool: asyncpg.Pool, report_id: int) -> ReportOut | None:
+async def get_report(
+    pool: asyncpg.Pool, report_id: int, jobs: JobsConfig | None = None
+) -> ReportOut | None:
     row = await pool.fetchrow(
         "select id, type, period, title, created_at, period_start, period_end, body, body_md,"
         " delivery from public.report where id = $1",
@@ -262,5 +309,170 @@ async def get_report(pool: asyncpg.Pool, report_id: int) -> ReportOut | None:
             **dict(row),
             "body": DigestBody.model_validate(_json(row["body"])),
             "delivery": _json(row["delivery"]),
+            "next_due_at": _next_due(jobs, row["type"], row["period"], row["created_at"]),
         }
     )
+
+
+# ---------------------------------------------------------------------------
+# Disputed stories: both versions side by side
+# ---------------------------------------------------------------------------
+
+
+class ClaimSource(BaseModel):
+    url: str
+    outlet: str | None
+    tier: int
+    headline: str | None = None
+    published_at: dt.datetime | None = None
+    news_item_id: int | None = None
+
+
+class DisputedStory(BaseModel):
+    id: int
+    ticker: str | None
+    event_type: str | None
+    severity: int | None
+    headline: str
+    status_reason: str | None
+    first_seen: dt.datetime
+    last_seen: dt.datetime
+    claim: list[ClaimSource] = Field(description="The story's own sources (the claim).")
+    contradicting: list[ClaimSource] = Field(description="Verified sources that dispute it.")
+    supporting: list[ClaimSource] = Field(description="Verified sources found to support it.")
+    note: str | None = Field(description="What the corroboration search found, in a sentence.")
+    resolution: Literal["confirmed", "false"] | None
+    resolution_note: str | None
+    resolved_at: dt.datetime | None
+    verdicts_frozen: bool = Field(
+        description="The holding's verdicts do not change until this story is resolved."
+    )
+
+
+def _sources(doc: Any, key: str) -> list[ClaimSource]:
+    if not doc:
+        return []
+    data = json.loads(doc) if isinstance(doc, str) else doc
+    return [ClaimSource(url=u, outlet=host_of(u), tier=int(t)) for u, t in data.get(key, [])]
+
+
+async def disputed_stories(pool: asyncpg.Pool, include_resolved: bool) -> list[DisputedStory]:
+    rows = await pool.fetch(
+        "select id, ticker, event_type, severity, headline, status_reason, first_seen,"
+        " last_seen, corroboration, resolution, resolution_note, resolved_at"
+        " from public.story_cluster where (status = 'disputed' or resolution is not null)"
+        " and ($1 or resolved_at is null) order by last_seen desc limit 100",
+        include_resolved,
+    )
+    out = []
+    for r in rows:
+        items = await pool.fetch(
+            "select id, url, outlet, tier, headline, published_at from public.news_item"
+            " where cluster_id = $1 order by tier, published_at, id",
+            r["id"],
+        )
+        doc = json.loads(r["corroboration"]) if r["corroboration"] else {}
+        out.append(
+            DisputedStory(
+                id=r["id"],
+                ticker=r["ticker"],
+                event_type=r["event_type"],
+                severity=r["severity"],
+                headline=r["headline"],
+                status_reason=r["status_reason"],
+                first_seen=r["first_seen"],
+                last_seen=r["last_seen"],
+                claim=[
+                    ClaimSource(
+                        url=i["url"],
+                        outlet=i["outlet"],
+                        tier=i["tier"],
+                        headline=i["headline"],
+                        published_at=i["published_at"],
+                        news_item_id=i["id"],
+                    )
+                    for i in items
+                ],
+                contradicting=_sources(doc, "contradicting"),
+                supporting=_sources(doc, "supporting"),
+                note=doc.get("note"),
+                resolution=r["resolution"],
+                resolution_note=r["resolution_note"],
+                resolved_at=r["resolved_at"],
+                verdicts_frozen=r["resolved_at"] is None
+                and r["ticker"] is not None
+                and (r["severity"] or 0) >= 2,
+            )
+        )
+    return out
+
+
+async def resolve_story(
+    pool: asyncpg.Pool, story_id: int, resolution: str, note: str | None
+) -> bool:
+    """The owner's resolution of a disputed story: confirmed (it happened) or false. The
+    story's verdict freeze lifts; a confirmed story is routed on the next news run."""
+    updated = await pool.fetchval(
+        "update public.story_cluster set resolution = $2, resolution_note = $3,"
+        " resolved_at = now(), status = case when $2 = 'confirmed' then 'confirmed'"
+        " else status end, confidence = case when $2 = 'confirmed' then 'corroborated'"
+        " else confidence end, status_reason = case when $2 = 'confirmed' then"
+        " 'resolved by the owner' else 'marked false by the owner' end,"
+        " last_seen = greatest(last_seen, now())"
+        " where id = $1 and (status = 'disputed' or resolution is not null) returning id",
+        story_id,
+        resolution,
+        note,
+    )
+    return updated is not None
+
+
+# ---------------------------------------------------------------------------
+# Escalations
+# ---------------------------------------------------------------------------
+
+
+class EscalationOut(BaseModel):
+    id: int
+    ticker: str | None
+    title: str
+    created_at: dt.datetime
+    body: EscalationBody
+    body_md: str
+    job_id: int | None = Field(description="The event_escalation run that wrote the note.")
+    job_status: JobStatus | None
+    cost_usd: float | None = Field(
+        description="Model and search cost of that run (sum of its steps); null when no "
+        "step recorded a cost."
+    )
+    models: list[str] = Field(description="Models the run called.")
+
+
+async def list_escalations(
+    pool: asyncpg.Pool, ticker: str | None, limit: int, report_id: int | None = None
+) -> list[EscalationOut]:
+    rows = await pool.fetch(
+        "select r.id, r.ticker, r.title, r.created_at, r.body, r.body_md, r.job_id,"
+        " j.status as job_status, s.cost_usd, coalesce(s.models, '{}') as models"
+        " from public.report r left join public.job j on j.id = r.job_id"
+        " left join lateral (select sum(cost_usd) as cost_usd,"
+        " array_agg(distinct model) filter (where model is not null) as models"
+        " from public.job_step where job_id = r.job_id) s on true"
+        " where r.type = 'escalation' and ($1::text is null or r.ticker = $1)"
+        " and ($3::bigint is null or r.id = $3)"
+        " order by r.id desc limit $2",
+        ticker,
+        limit,
+        report_id,
+    )
+    return [
+        EscalationOut(
+            **{
+                **dict(r),
+                "body": EscalationBody.model_validate(_json(r["body"])),
+                "cost_usd": float(r["cost_usd"]) if r["cost_usd"] is not None else None,
+                "models": list(r["models"]),
+            }
+        )
+        for r in rows
+    ]

@@ -6,6 +6,10 @@ For every case directory: load case.json, decompress the archived document, conv
 the same converter the extraction pipeline uses, and check that each figure's snippet is
 found in that text, that value_as_written appears verbatim in the snippet, that figure keys
 are unique, and that `value` is the plain reading of `value_as_written`.
+
+Cases with `"origin": "feedback"` were added from the owner's feedback
+(`python -m steward.verify.export_evals`): they label only the corrected figure, so the
+rule that every metric is labelled or declared absent does not apply to them.
 """
 
 import gzip
@@ -14,6 +18,7 @@ import re
 import sys
 from pathlib import Path
 
+from steward.documents.fetch import Document
 from steward.documents.text import contains, html_to_text
 
 HERE = Path(__file__).resolve().parent
@@ -46,7 +51,12 @@ def check_case(case_dir: Path) -> list[str]:
     if case.get("id") != case_dir.name:
         errors.append(f"id {case.get('id')!r} != directory name {case_dir.name!r}")
 
-    text = html_to_text(decode(gzip.decompress((case_dir / case["document"]).read_bytes())))
+    feedback = case.get("origin") == "feedback"
+    raw = gzip.decompress((case_dir / case["document"]).read_bytes())
+    if feedback:
+        text = Document(case["source_url"], case["content_type"], raw).text()
+    else:
+        text = html_to_text(decode(raw))
     fy = case["period"]["fiscal_year"]
     fp = case["period"]["fiscal_period"]
 
@@ -89,7 +99,7 @@ def check_case(case_dir: Path) -> list[str]:
             errors.append(f"{where}: XBRL crosscheck mismatch (value {cc.get('value')}); see notes")
 
     # every metric is either labelled (current + prior-year quarter) or declared absent
-    for metric in METRICS - set(case.get("absent_metrics", [])):
+    for metric in METRICS - set(case.get("absent_metrics", [])) if not feedback else ():
         for year in (fy, fy - 1):
             if (metric, "reported", year, fp) not in seen:
                 errors.append(f"missing reported {metric} for {year}{fp}")

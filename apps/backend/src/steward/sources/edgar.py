@@ -21,6 +21,7 @@ from steward.documents.text import html_to_text
 
 TICKERS_URL = "https://www.sec.gov/files/company_tickers.json"
 SUBMISSIONS_URL = "https://data.sec.gov/submissions/CIK{cik}.json"
+COMPANY_FACTS_URL = "https://data.sec.gov/api/xbrl/companyfacts/CIK{cik}.json"
 ARCHIVE_URL = "https://www.sec.gov/Archives/edgar/data/{cik}/{folder}/{name}"
 
 MIN_INTERVAL = 0.15  # seconds between requests (< 10/s)
@@ -93,6 +94,23 @@ class EdgarClient:
     async def filings(self, cik: str) -> list[Filing]:
         data = (await self._get(SUBMISSIONS_URL.format(cik=pad_cik(cik)))).json()
         return parse_submissions(pad_cik(cik), data)
+
+    async def exchanges(self, cik: str) -> list[str]:
+        """Exchanges the issuer's securities trade on, as EDGAR lists them ("Nasdaq")."""
+        data = (await self._get(SUBMISSIONS_URL.format(cik=pad_cik(cik)))).json()
+        return [str(e) for e in data.get("exchanges") or [] if e]
+
+    async def company_facts(self, cik: str) -> dict[str, Any]:
+        """Every XBRL fact the issuer has filed (10-Q, 10-K, 20-F, ...), by taxonomy and
+        concept. A 404 (no XBRL filings) is an empty result, not an error."""
+        try:
+            response = await self._get(COMPANY_FACTS_URL.format(cik=pad_cik(cik)))
+        except EdgarError as exc:
+            if "HTTP 404" in str(exc):
+                return {}
+            raise
+        data: dict[str, Any] = response.json()
+        return data
 
     async def exhibit_documents(self, filing: Filing) -> list[tuple[str, str]]:
         """(type, file name) of every document in the filing, from its index page."""
@@ -177,3 +195,14 @@ def pick_press_release(documents: list[tuple[str, str]]) -> str | None:
     exhibits = [(t, n) for t, n in documents if t.startswith("EX-99")]
     exhibits.sort(key=lambda d: (d[0] != "EX-99.1", d[1].lower().endswith(".pdf"), d[0]))
     return exhibits[0][1] if exhibits else None
+
+
+# EDGAR's exchange names -> operating MIC.
+EXCHANGE_MIC: dict[str, str] = {
+    "Nasdaq": "XNAS",
+    "NYSE": "XNYS",
+    "NYSE American": "XASE",
+    "NYSE Arca": "ARCX",
+    "CBOE": "BATS",
+    "Cboe BZX": "BATS",
+}

@@ -6,6 +6,7 @@ import { useCallback } from "react";
 
 import { AlertMessage } from "@/components/alert-message";
 import { ConfidenceBadge } from "@/components/evidence/confidence-badge";
+import { FeedbackControl } from "@/components/feedback/feedback-control";
 import { Button } from "@/components/ui/button";
 import { getBrowserApiClient, type EvidenceLink } from "@/lib/api/client";
 import { humanizeMetric } from "@/lib/evidence/confidence";
@@ -61,6 +62,10 @@ function Evidence({ link }: { link: EvidenceLink }) {
           <span className="num font-mono text-xl">{link.value_as_written}</span>
           <ConfidenceBadge confidence={link.confidence} />
         </h1>
+        <p className="mt-2 flex flex-wrap items-center gap-2 text-sm text-text-muted">
+          Is this figure right?
+          <FeedbackControl target={{ kind: "fact", id: link.fact_id }} label={`figure ${humanizeMetric(link.metric)} ${link.period}`} />
+        </p>
       </div>
 
       <section aria-labelledby="quote-heading" className="space-y-2">

@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 import { connection } from "next/server";
 
 import { AppNav } from "@/components/app-nav";
+import { ChatPanel } from "@/components/chat/chat-panel";
 import { CommandPalette } from "@/components/command-palette";
 import { SignOutButton } from "@/components/sign-out-button";
 import { SyncErrorBanner } from "@/components/sync/sync-error-banner";
@@ -51,6 +52,7 @@ export default async function AppLayout({ children }: LayoutProps<"/">) {
           </Link>
           <div className="ml-auto flex items-center gap-1">
             <CommandPalette />
+            <ChatPanel />
             <SyncIndicator />
             {state.user?.email ? (
               <span className="hidden truncate text-sm text-text-muted lg:inline">

@@ -41,6 +41,8 @@ class FxRate:
     rate: Decimal
     published_amount: Decimal
     published_rate: Decimal
+    # Which service delivered it (Frankfurter republishes the ECB's rates); None if unknown.
+    provider: str | None = None
 
     @property
     def home_currency(self) -> str:

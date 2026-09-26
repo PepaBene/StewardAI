@@ -1,0 +1,23 @@
+# StewardAI worker (scheduler, queue consumer, alert dispatcher, heartbeat).
+[Unit]
+Description=StewardAI worker
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=steward
+WorkingDirectory=/opt/stewardai/apps/backend
+EnvironmentFile=/etc/stewardai/env
+ExecStart=/opt/stewardai/apps/backend/.venv/bin/python -m worker
+Restart=always
+RestartSec=5
+StartLimitIntervalSec=0
+TimeoutStopSec=30
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target

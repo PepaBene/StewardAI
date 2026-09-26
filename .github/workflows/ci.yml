@@ -41,6 +41,24 @@ jobs:
       - run: uv run mypy
       - run: uv run pytest -q -rs
 
+  # Live evals of the model-facing code (prompts, schemas, default models, eval sets): they
+  # run only when a fingerprint differs from apps/backend/evals/baseline.json. Blocking when
+  # the ANTHROPIC_API_KEY secret is set; see steward/verify/evals_gate.py.
+  evals:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/backend
+    env:
+      ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+        with:
+          enable-cache: true
+      - run: uv sync --locked
+      - run: uv run python -m steward.verify.evals_gate
+
   web:
     runs-on: ubuntu-latest
     defaults:

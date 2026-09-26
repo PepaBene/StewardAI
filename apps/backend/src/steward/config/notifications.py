@@ -121,6 +121,19 @@ class NotificationsConfig(ConfigModel):
         description="Another story with the same holding and event type within this many "
         "hours of an alert is not alerted again.",
     )
+    quiet_all_day_on: list[Literal["weekends", "holidays"]] = Field(
+        default_factory=list,
+        description="Days treated as quiet from start to end: alerts are held (or go to the "
+        "digest) as during quiet hours. Holidays are the public holidays of holiday_country.",
+    )
+    holiday_country: str = Field(default="CZ", pattern=r"^[A-Z]{2}$")
+    system_alert_severity: int = Field(
+        default=3,
+        ge=0,
+        le=3,
+        description="Severity of monitoring alerts (a failed job, a missed run, a holding "
+        "with no news coverage); routed by the rules like any event. 0: never alert.",
+    )
     digest_channels: list[Channel] = Field(
         default_factory=lambda: cast(list[Channel], ["email"]),
         description="Where the daily and weekly digests go.",

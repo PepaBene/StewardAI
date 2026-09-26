@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
-import { SECTIONS, sectionHref } from "@/lib/nav";
+import { isSectionActive, SECTIONS, sectionHref } from "@/lib/nav";
 import { cn } from "@/lib/utils";
 
 export function AppNav() {
@@ -14,8 +14,7 @@ export function AppNav() {
       <ul className="flex min-w-max gap-1">
         {SECTIONS.map((section) => {
           const href = sectionHref(section);
-          const active =
-            href === "/" ? pathname === "/" : pathname === href || pathname.startsWith(`${href}/`);
+          const active = isSectionActive(href, pathname);
           return (
             <li key={section.label}>
               <Link

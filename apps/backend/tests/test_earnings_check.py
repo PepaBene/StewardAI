@@ -349,8 +349,12 @@ async def test_review_endpoint_only_touches_held_facts(
     await _setup(backend_pool)
     await _check(backend_pool, deps, "2025-07-31")
     fact_id = await backend_pool.fetchval("select min(id) from fact")
-    response = await api.post(f"/facts/{fact_id}/review", json={"action": "reject"})
-    assert response.status_code == 409 and "only held facts" in response.json()["detail"]
+    response = await api.post(
+        f"/facts/{fact_id}/review", json={"action": "accept", "reason": "looks right"}
+    )
+    assert response.status_code == 409 and "cannot be accepted" in response.json()["detail"]
+    missing_reason = await api.post(f"/facts/{fact_id}/review", json={"action": "reject"})
+    assert missing_reason.status_code == 422
 
 
 async def test_held_fact_review_requeues_verdicts(
@@ -371,7 +375,7 @@ async def test_held_fact_review_requeues_verdicts(
     held = await backend_pool.fetchval(
         "select id from fact where status = 'unverified' and metric = 'revenue' limit 1"
     )
-    response = await api.post(f"/facts/{held}/review", json={"action": "verify", "note": "ok"})
+    response = await api.post(f"/facts/{held}/review", json={"action": "accept", "reason": "ok"})
     assert response.status_code == 200
     body = response.json()
     assert body["status"] == "verified" and body["verdict_job"]["job_type"] == "thesis_verdicts"

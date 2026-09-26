@@ -7,6 +7,7 @@ import { useMemo, useState } from "react";
 import { AlertMessage } from "@/components/alert-message";
 import { EmptyState } from "@/components/empty-state";
 import { DriftStatusBadge } from "@/components/portfolio/drift-status-badge";
+import { HoldingsTabs } from "@/components/portfolio/holdings-tabs";
 import { FreshnessLabel } from "@/components/portfolio/freshness-label";
 import { Button } from "@/components/ui/button";
 import { getBrowserApiClient, type HoldingsResponse } from "@/lib/api/client";
@@ -51,6 +52,7 @@ export function HoldingsView() {
           />
         ) : null}
       </div>
+      <HoldingsTabs />
 
       {state.kind === "loading" ? (
         <p className="flex items-center gap-2 text-sm text-text-muted" role="status">

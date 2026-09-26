@@ -1,0 +1,242 @@
+"""Authenticated API routes for Phase 5: deep research, the monthly review, report search,
+research profiles and the 13F collector."""
+
+import datetime as dt
+import json
+from typing import Annotated, Any, Literal
+
+from fastapi import APIRouter, HTTPException, Path, Query, status
+from pydantic import BaseModel, Field
+
+from api.auth import Owner
+from api.db import Pool
+from api.routes import NoteParam, _as_dict, _enqueue, _not_found
+from steward.config import ResearchProfilesConfig
+from steward.config.store import load_active, save_config
+from steward.portfolio.read import JobSummary
+from steward.research.run import ResearchBody
+from steward.review.monthly import ReviewBody
+
+router = APIRouter()
+
+TickerPath = Annotated[str, Path(pattern=r"^[A-Za-z0-9._-]{1,32}$")]
+
+
+# ---------------------------------------------------------------------------
+# Research
+# ---------------------------------------------------------------------------
+
+
+class ResearchRequest(BaseModel):
+    ticker: Annotated[str, Field(pattern=r"^[A-Za-z0-9._-]{1,32}$")] = Field(
+        description="Any ticker, owned or not (a Trading212 ticker gives the richest data)."
+    )
+    profile: str | None = Field(
+        default=None, description="Research profile id; default if omitted."
+    )
+    name: str | None = Field(default=None, max_length=120, description="Company name hint.")
+
+
+@router.post("/jobs/research", tags=["research"], status_code=status.HTTP_202_ACCEPTED)
+async def run_research_now(body: ResearchRequest, pool: Pool, owner: Owner) -> JobSummary:
+    """Queue a deep research run for a ticker under a research profile."""
+    stored = await load_active(pool, "research_profiles", ResearchProfilesConfig)
+    profiles = stored.body if stored else ResearchProfilesConfig()
+    profile = profiles.get(body.profile)
+    if profile is None:
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, f"No profile {body.profile!r}")
+    params: dict[str, Any] = {"ticker": body.ticker, "profile": profile.id}
+    if body.name:
+        params["name"] = body.name
+    return await _enqueue(pool, "research", owner.user_id, params)
+
+
+class ResearchSummary(BaseModel):
+    id: int
+    ticker: str | None
+    title: str
+    profile: str | None
+    headline: str | None
+    created_at: dt.datetime
+    job_id: int | None
+
+
+@router.get("/research", tags=["research"])
+async def list_research(
+    pool: Pool,
+    _owner: Owner,
+    ticker: Annotated[str | None, Query(pattern=r"^[A-Za-z0-9._-]{1,32}$")] = None,
+    limit: Annotated[int, Query(ge=1, le=200)] = 50,
+) -> list[ResearchSummary]:
+    rows = await pool.fetch(
+        "select id, ticker, title, profile, body ->> 'headline' as headline, created_at, job_id"
+        " from public.report where type = 'research' and ($1::text is null or ticker = $1)"
+        " order by id desc limit $2",
+        ticker,
+        limit,
+    )
+    return [ResearchSummary(**dict(r)) for r in rows]
+
+
+class ResearchReportOut(BaseModel):
+    id: int
+    ticker: str | None
+    title: str
+    created_at: dt.datetime
+    job_id: int | None
+    body: ResearchBody
+    body_md: str
+
+
+@router.get("/research/{report_id}", tags=["research"])
+async def get_research(report_id: int, pool: Pool, _owner: Owner) -> ResearchReportOut:
+    """A research report: sections of cited sentences, computed valuation figures and the
+    source list every citation points into."""
+    row = await pool.fetchrow(
+        "select id, ticker, title, created_at, job_id, body, body_md from public.report"
+        " where id = $1 and type = 'research'",
+        report_id,
+    )
+    if row is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, f"No research report {report_id}")
+    return ResearchReportOut(
+        **{**dict(row), "body": ResearchBody.model_validate(json.loads(row["body"]))}
+    )
+
+
+# ---------------------------------------------------------------------------
+# Monthly review
+# ---------------------------------------------------------------------------
+
+
+class ReviewReportOut(BaseModel):
+    id: int
+    title: str
+    created_at: dt.datetime
+    job_id: int | None
+    body: ReviewBody
+    body_md: str
+
+
+@router.get("/reviews", tags=["research"])
+async def list_reviews(
+    pool: Pool, _owner: Owner, limit: Annotated[int, Query(ge=1, le=100)] = 24
+) -> list[ResearchSummary]:
+    rows = await pool.fetch(
+        "select id, ticker, title, profile, body ->> 'headline' as headline, created_at, job_id"
+        " from public.report where type = 'review' order by id desc limit $1",
+        limit,
+    )
+    return [ResearchSummary(**dict(r)) for r in rows]
+
+
+@router.get("/reviews/{report_id}", tags=["research"])
+async def get_review(report_id: int, pool: Pool, _owner: Owner) -> ReviewReportOut:
+    """A monthly review: every strategy rule, hard limit and band with pass / breach /
+    unknown, thesis KPI statuses, flags, and proposed actions each citing a rule or KPI."""
+    row = await pool.fetchrow(
+        "select id, title, created_at, job_id, body, body_md from public.report"
+        " where id = $1 and type = 'review'",
+        report_id,
+    )
+    if row is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, f"No review {report_id}")
+    return ReviewReportOut(
+        **{**dict(row), "body": ReviewBody.model_validate(json.loads(row["body"]))}
+    )
+
+
+@router.post("/jobs/monthly-review", tags=["jobs"], status_code=status.HTTP_202_ACCEPTED)
+async def run_monthly_review(pool: Pool, owner: Owner) -> JobSummary:
+    """Write a monthly review now (a manual run is not limited to the first weekday)."""
+    return await _enqueue(pool, "monthly_review", owner.user_id)
+
+
+# ---------------------------------------------------------------------------
+# Report search
+# ---------------------------------------------------------------------------
+
+
+class ReportHit(BaseModel):
+    id: int
+    type: Literal["digest", "research", "review", "escalation"]
+    period: str | None
+    ticker: str | None
+    profile: str | None
+    title: str
+    created_at: dt.datetime
+    excerpt: str = Field(description="The matching passage, with matches in <b></b>.")
+
+
+@router.get("/reports/search", tags=["reports"])
+async def search_reports(
+    pool: Pool,
+    _owner: Owner,
+    q: Annotated[
+        str,
+        Query(
+            min_length=1, max_length=200, description='Words, a ticker, "a phrase", or -excluded.'
+        ),
+    ],
+    type: Annotated[
+        list[Literal["digest", "research", "review", "escalation"]] | None, Query()
+    ] = None,
+    limit: Annotated[int, Query(ge=1, le=200)] = 50,
+) -> list[ReportHit]:
+    """Full-text search over every report (title, ticker, profile and text), newest first."""
+    rows = await pool.fetch(
+        "select id, type, period, ticker, profile, title, created_at,"
+        " ts_headline('simple', body_md, websearch_to_tsquery('simple', $1),"
+        " 'MaxFragments=2, MaxWords=30, MinWords=10') as excerpt"
+        " from public.report where search @@ websearch_to_tsquery('simple', $1)"
+        " and ($2::text[] is null or type = any($2)) order by created_at desc, id desc limit $3",
+        q,
+        list(type) if type else None,
+        limit,
+    )
+    return [ReportHit(**dict(r)) for r in rows]
+
+
+# ---------------------------------------------------------------------------
+# Research profiles config, 13F collector
+# ---------------------------------------------------------------------------
+
+
+class ResearchProfilesConfigVersion(BaseModel):
+    id: int
+    created_at: dt.datetime
+    note: str | None
+    body: ResearchProfilesConfig
+
+
+@router.get("/config/research-profiles", tags=["config"])
+async def get_research_profiles_config(pool: Pool, _owner: Owner) -> ResearchProfilesConfigVersion:
+    """The saved research profiles. 404 means the defaults (standard, quick) apply."""
+    stored = await load_active(pool, "research_profiles", ResearchProfilesConfig)
+    if stored is None:
+        raise _not_found("research profiles")
+    return ResearchProfilesConfigVersion(**_as_dict(stored))
+
+
+@router.put("/config/research-profiles", tags=["config"])
+async def save_research_profiles_config(
+    body: ResearchProfilesConfig, pool: Pool, owner: Owner, note: NoteParam = None
+) -> ResearchProfilesConfigVersion:
+    async with pool.acquire() as conn:
+        stored = await save_config(
+            conn, "research_profiles", body, created_by=owner.user_id, note=note
+        )
+    return ResearchProfilesConfigVersion(**_as_dict(stored))
+
+
+@router.post("/config/research-profiles/validate", tags=["config"])
+async def validate_research_profiles(
+    body: ResearchProfilesConfig, _owner: Owner
+) -> ResearchProfilesConfig:
+    return body
+
+
+@router.post("/jobs/ownership-13f", tags=["jobs"], status_code=status.HTTP_202_ACCEPTED)
+async def run_ownership_13f(pool: Pool, owner: Owner) -> JobSummary:
+    """Load new SEC Form 13F data sets now (about 100 MB each)."""
+    return await _enqueue(pool, "ownership_13f", owner.user_id)

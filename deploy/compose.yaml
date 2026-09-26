@@ -1,0 +1,42 @@
+# The always-on backend host: API and worker from one image, restarted whenever they exit.
+#
+#   cp ../.env.example ../.env   # fill in the [backend] values (or use the host's secrets)
+#   docker compose -f deploy/compose.yaml up -d --build
+#
+# `restart: always` brings a killed or crashed process back within seconds. Health checks
+# mark a container unhealthy when the API stops answering or the worker's heartbeat goes
+# stale; the external uptime monitor (README: "Always-on host") alerts on both.
+name: stewardai
+
+x-backend: &backend
+  build:
+    context: ../apps/backend
+  image: stewardai-backend
+  env_file: ../.env
+  restart: always
+  stop_grace_period: 30s
+  logging:
+    driver: json-file
+    options: { max-size: "10m", max-file: "5" }
+
+services:
+  api:
+    <<: *backend
+    ports: ["127.0.0.1:8000:8000"]
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=5).status == 200 else 1)"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 20s
+
+  worker:
+    <<: *backend
+    command: ["python", "-m", "worker"]
+    healthcheck:
+      # Unhealthy when the heartbeat row in the database is older than 3 minutes.
+      test: ["CMD", "python", "-m", "steward.heartbeat_check"]
+      interval: 60s
+      timeout: 20s
+      retries: 3
+      start_period: 60s

@@ -36,6 +36,9 @@ class RouteContext:
     alerts_today: int = 0
     # Id of an alert for the same holding and event type inside the throttle window.
     recent_alert_id: int | None = None
+    # Set on a day the config treats as quiet all day (weekend, public holiday): when the
+    # quiet period ends.
+    quiet_until: dt.datetime | None = None
 
 
 def day_start(config: NotificationsConfig, now: dt.datetime) -> dt.datetime:
@@ -75,7 +78,7 @@ def route(
     ):
         return suppressed(f"daily cap of {config.daily_alert_cap} alerts reached")
 
-    quiet_end = config.quiet_hours.end_if_quiet(ctx.now)
+    quiet_end = ctx.quiet_until or config.quiet_hours.end_if_quiet(ctx.now)
     if quiet_end is None or rule.during_quiet_hours == "send":
         rows = [RoutedAlert(c, "pending", ctx.now) for c in rule.channels]
         return rows, f"{explanation}: sending now to {', '.join(rule.channels)}"
@@ -87,3 +90,26 @@ def route(
         f"{explanation}: quiet hours, held until {quiet_end.strftime('%H:%M %Z')} "
         f"for {', '.join(rule.channels)}"
     )
+
+
+def quiet_day_end(
+    config: NotificationsConfig, now: dt.datetime, holidays: set[dt.date]
+) -> dt.datetime | None:
+    """When today is a quiet day (weekend or holiday, as configured), the end of quiet hours
+    on the next day that is not; else None."""
+    if not config.quiet_all_day_on:
+        return None
+    tz = ZoneInfo(config.quiet_hours.timezone)
+
+    def quiet(day: dt.date) -> bool:
+        return ("weekends" in config.quiet_all_day_on and day.weekday() >= 5) or (
+            "holidays" in config.quiet_all_day_on and day in holidays
+        )
+
+    day = now.astimezone(tz).date()
+    if not quiet(day):
+        return None
+    while quiet(day):
+        day += dt.timedelta(days=1)
+    end = dt.time.fromisoformat(config.quiet_hours.end)
+    return dt.datetime.combine(day, end, tzinfo=tz)

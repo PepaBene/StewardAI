@@ -841,6 +841,8 @@ Three contradictions inside the spec are corrected in place:
 
 Added by the gap review. Phase 1 is built; these are the pieces it assumed but nobody delivered, plus the owner-facing config the later phases need.
 
+*Status (2026-09-25): built. The config-history, strategy-editor, jobs-editor and transactions ACs are covered by automated tests. Open until checked on live data: the always-on host (`deploy/`, heartbeat and `/health/ready` are in place; 10 consecutive syncs, the uptime alert and restart timing need the host), the Vercel preview, and the phase 1 sign-off (`python -m steward.signoff` prints the figures to compare with the Trading212 app; the Realtime check needs two browsers).*
+
 **Backend tasks**
 
 - [ ] Always-on dev host for the API and worker (Docker Compose or systemd, restart always), an external uptime check on `/health`, and a Vercel preview deployment of the web app. **AC:** 10 consecutive scheduled syncs complete on the host with no error (this is phase 1's sync point); stopping the API raises an uptime alert within 5 minutes; killing either process brings it back within 1 minute.
@@ -878,6 +880,8 @@ Added by the gap review. Phase 1 is built; these are the pieces it assumed but n
 
 Phase 2 is built on its own branch; these gap-review tasks extend it.
 
+*Status (2026-09-25): built; the trigger, reconciliation, review-queue and cost ACs are covered by automated tests with seeded data. The screens' one-click and recompute ACs still need a pass on live data.*
+
 **Backend tasks**
 
 - [ ] Earnings-check triggers: enqueue the check at report date + 1, retry at + 2 and + 4 days when no document is found, and refresh `next_report_date` every Sunday for holdings reporting within 14 days. **AC:** a recorded report date produces exactly these attempts and stops after the first success; a date change found on Sunday moves the trigger.
@@ -893,6 +897,8 @@ Phase 2 is built on its own branch; these gap-review tasks extend it.
 ### Phase 2b — Identity, reference data and market history (weeks 5–6)
 
 Added 2026-09-25 for the sources in "Additional data sources". It sits between phases 2 and 3 because the news pipeline matches on the identifiers, names and relationships it produces. It moves phases 3–6 back by about 1.5 weeks.
+
+*Status (2026-09-25): built and tested against recorded source responses. Open until checked on live data: the hand checks of identity and structure for the named test holdings, the 1 % Stooq-vs-Trading212 close check, and the 10 sampled ECB dates.*
 
 **Backend tasks**
 
@@ -911,6 +917,8 @@ Added 2026-09-25 for the sources in "Additional data sources". It sits between p
 **Sync point:** the backend ships identity, structure and price-history reads by the middle of week 5; the frontend builds the holding-page sections against them through week 6.
 
 ### Phase 3 — News pipeline (weeks 5–7)
+
+*Status (2026-09-25): built, including every gap-review task. Tested with recorded pages, feeds and seeded data; the 48-hour ingest ACs, Eurostat values against its site and Telegram delivery time need live runs. The RNS (Investegate) and EQS collectors ship disabled: enable them only after checking each site's terms. Eurostat releases are detected from each dataset's update date, not from a separate release calendar.*
 
 **Backend tasks**
 
@@ -952,6 +960,8 @@ Added 2026-09-25 for the sources in "Additional data sources". It sits between p
 
 ### Phase 4 — Verification hardening (weeks 7–8)
 
+*Status (2026-09-26): built. Covered by automated tests: fact quarantine and verdict recompute from feedback, trust drop and tier demotion, the replay preview (1,500 stored stories well under 5 s), Wikidata-only never confirmed and GLEIF-vs-Wikidata disputes, the sanity band from config, eval candidates exported into the golden and labelled sets, and the evals gate failing a changed prompt and passing its revert (with a stub scorer). Open: the claim verifier's 100 % on the 20 injected cases and the 98 %/85 % eval targets need live model runs (the code check alone catches the 12 numeric cases); the gate blocks merges only once the `ANTHROPIC_API_KEY` secret is set and the job is marked required; the screens are verified by types, unit tests and the build, not yet by a pass in a browser.*
+
 **Backend tasks**
 
 - [ ] Claim verifier: a separate Haiku call checking every factual sentence in a report/digest/alert against its cited snippet before publishing. **AC:** a deliberately injected unsupported sentence in a test report is flagged or stripped, per config, on 100% of 20 injected-error test cases.
@@ -976,6 +986,8 @@ Added 2026-09-25 for the sources in "Additional data sources". It sits between p
 **Sync point:** the backend ships the feedback endpoint and the golden-set eval results by week 7; the frontend wires feedback into every existing surface and builds the Activity page through week 8.
 
 ### Phase 5 — Research and recommendations (weeks 8–10)
+
+*Status (2026-09-26): built. Covered by automated tests: resuming research after a killed worker, every published review action citing a rule or KPI, every strategy rule in the compliance table, chat sentences cited or marked "no source", the three chat-started jobs appearing with trigger `chat`, two profiles giving different reports, report search by ticker and phrase, tracked-manager changes in the digest, and 13F holders and shares equal to an independent aggregation (checked on the full SEC data set of 1 Mar–31 May 2026 for Apple, Microsoft and NVIDIA; the committed test uses a sample of its rows). Open: the 10 manual chat questions and every model-written section need live model runs; the screens are verified by types, unit tests and the build, not in a browser; code-written research sections are English even for a Czech profile.*
 
 **Backend tasks**
 

@@ -16,7 +16,9 @@ from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
 
 # One .env at the repository root holds every setting for both apps (see /.env.example).
 # Real environment variables take precedence; on the live host there is no file at all.
-REPO_ROOT_ENV_FILE = Path(__file__).resolve().parents[4] / ".env"
+# Outside a repository checkout (a container image) there is no such file; env vars only.
+_HERE = Path(__file__).resolve()
+REPO_ROOT_ENV_FILE = _HERE.parents[4] / ".env" if len(_HERE.parents) > 4 else None
 
 
 class Settings(BaseSettings):
@@ -59,6 +61,10 @@ class Settings(BaseSettings):
     sec_user_agent: str | None = None
     # Finnhub free tier: US earnings calendar.
     finnhub_api_key: SecretStr | None = None
+    # FRED (St. Louis Fed) macro series need a free API key.
+    fred_api_key: SecretStr | None = None
+    # OpenFIGI works without a key; a key raises its rate limit.
+    openfigi_api_key: SecretStr | None = None
 
     # Notifications: Telegram Bot API and email through Resend (HTTP API).
     telegram_bot_token: SecretStr | None = None
@@ -68,6 +74,9 @@ class Settings(BaseSettings):
     alert_email_to: str | None = None
     # Public URL of the web app, for links in alerts and digests.
     app_url: str | None = None
+    # Dead-man's switch: the worker GETs this URL every minute (e.g. a healthchecks.io check),
+    # so a stopped or stuck worker raises an alert outside this host.
+    heartbeat_ping_url: SecretStr | None = None
 
     @field_validator("cors_origins", mode="before")
     @classmethod
@@ -100,8 +109,11 @@ class Settings(BaseSettings):
             self.anthropic_api_key,
             self.supabase_secret_key,
             self.finnhub_api_key,
+            self.openfigi_api_key,
+            self.fred_api_key,
             self.telegram_bot_token,
             self.resend_api_key,
+            self.heartbeat_ping_url,
         ]
         return [s.get_secret_value() for s in secrets if s is not None and s.get_secret_value()]
 
