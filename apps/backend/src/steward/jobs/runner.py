@@ -32,7 +32,7 @@ logger = logging.getLogger(__name__)
 # cannot collide with advisory locks taken for anything else.
 LOCK_NAMESPACE = 0x57A7
 
-JobTrigger = Literal["schedule", "manual", "event"]
+JobTrigger = Literal["schedule", "manual", "event", "chat"]
 
 # How long a run waits for the previous run of its type before giving up.
 DEFAULT_LOCK_TIMEOUT = dt.timedelta(hours=1)
@@ -72,6 +72,38 @@ class JobContext:
     _next_step: int = 0
     config_version_ids: list[int] = field(default_factory=list)
     _prices: PriceTable | None = None
+    # A job the queue redelivered after the worker died mid-run (see run_job).
+    resumed: bool = False
+
+    async def checkpoint(self, key: str, compute: Callable[[], Awaitable[Any]]) -> Any:
+        """The stored output of step `key` if an earlier attempt of this job completed it;
+        else compute it, store it, and return it. Outputs must be JSON-serialisable."""
+        stored = await self.pool.fetchval(
+            "select output from public.job_checkpoint where job_id = $1 and key = $2",
+            self.job_id,
+            key,
+        )
+        if stored is not None:
+            return json.loads(stored)
+        output = await compute()
+        await self.pool.execute(
+            "insert into public.job_checkpoint (job_id, key, output) values ($1, $2, $3::jsonb)"
+            " on conflict (job_id, key) do update set output = excluded.output",
+            self.job_id,
+            key,
+            json.dumps(output, default=str),
+        )
+        return json.loads(json.dumps(output, default=str))
+
+    async def has_checkpoint(self, key: str) -> bool:
+        return bool(
+            await self.pool.fetchval(
+                "select exists (select 1 from public.job_checkpoint where job_id = $1"
+                " and key = $2)",
+                self.job_id,
+                key,
+            )
+        )
 
     @asynccontextmanager
     async def step(self, name: str) -> AsyncIterator[StepHandle]:
@@ -193,13 +225,44 @@ async def run_job(
     """Run `handler` as job `job_id` (created here with `params` if None; an existing job's
     params are read from its row). Never raises for a job failure: the failure is recorded
     on the job and its step, and "failed" is returned."""
+    resumed = False
+    next_step = 0
+    versions: list[int] = []
     if job_id is None:
         job_id = await create_job(pool, job_type, trigger, params=params)
     else:
-        stored = await pool.fetchval("select params from public.job where id = $1", job_id)
-        params = json.loads(stored) if stored else {}
+        row = await pool.fetchrow(
+            "select params, status, config_version_ids,"
+            " (select max(step_index) from public.job_step where job_id = j.id) as last_step"
+            " from public.job j where id = $1",
+            job_id,
+        )
+        params = json.loads(row["params"]) if row and row["params"] else {}
+        if row is not None and row["status"] in ("succeeded", "failed"):
+            # Redelivered after it finished (the worker died before archiving the message).
+            logger.info("job %s already %s; not run again", job_id, row["status"])
+            return "succeeded" if row["status"] == "succeeded" else "failed"
+        if row is not None and row["last_step"] is not None:
+            # A run the worker was killed in: its open steps are closed, numbering continues,
+            # and the handler can pick up completed work from its checkpoints.
+            resumed = True
+            next_step = row["last_step"] + 1
+            versions = list(row["config_version_ids"] or [])
+            await pool.execute(
+                "update public.job_step set status = 'failed', finished_at = clock_timestamp(),"
+                " error = 'interrupted: the worker stopped during this step' where job_id = $1"
+                " and status = 'running'",
+                job_id,
+            )
     ctx = JobContext(
-        pool=pool, job_id=job_id, job_type=job_type, trigger=trigger, params=params or {}
+        pool=pool,
+        job_id=job_id,
+        job_type=job_type,
+        trigger=trigger,
+        params=params or {},
+        _next_step=next_step,
+        config_version_ids=versions,
+        resumed=resumed,
     )
     key = lock_key(job_type, ctx.params)
 

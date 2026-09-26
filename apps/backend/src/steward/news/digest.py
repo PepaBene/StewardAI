@@ -43,6 +43,7 @@ from steward.notify.channels import (
     ChannelError,
     channels_from_settings,
 )
+from steward.ownership.read import ManagerChange, tracked_manager_changes
 from steward.settings import get_settings
 from steward.verify.claims import (
     CheckStatus,
@@ -197,6 +198,11 @@ class DigestBody(BaseModel):
     )
     writer: str | None = None
     fact_sources: list[DigestFactSource] = Field(default_factory=list)
+    ownership_changes: list[ManagerChange] = Field(
+        default_factory=list,
+        description="Tracked managers' new and exited positions in holdings, from 13F filings "
+        "received in the period.",
+    )
     claims: ClaimCheckSummary | None = Field(
         default=None, description="The claim verifier's pass over the written sentences."
     )
@@ -693,6 +699,14 @@ def render_text(body: DigestBody, app_url: str | None, markdown: bool) -> str:
                 f"- {m.label}: {m.value:g}{unit} for {m.period.isoformat()}{new}, "
                 f"released {released} ({link('source', m.url)})"
             )
+    if body.ownership_changes:
+        lines += ["", "## Tracked managers (13F)" if markdown else "TRACKED MANAGERS (13F)"]
+        for mc in body.ownership_changes:
+            verb = "opened a position in" if mc.change == "new" else "exited"
+            lines.append(
+                f"- {mc.manager_name or mc.cik} {verb} {mc.ticker} (period {mc.period}, "
+                f"filing {mc.accession})"
+            )
     if body.holidays:
         lines += ["", "## Market holidays" if markdown else "MARKET HOLIDAYS"]
         lines += [f"- {h.date.isoformat()} {h.calendar}: {h.name}" for h in body.holidays]
@@ -709,6 +723,7 @@ async def build_digest(
     settings: DigestSettings,
     writer: DigestWriter | None,
     theses: ThesesConfig | None = None,
+    tracked_ciks: list[str] | None = None,
 ) -> tuple[DigestBody, Usage | None, str | None]:
     start = end - WINDOWS[kind]
     material = await gather(pool, start, end, profiles, settings.min_severity_summarised)
@@ -751,6 +766,9 @@ async def build_digest(
         reviews_due=reviews_due(theses or ThesesConfig(), end.date()),
         macro=await macro_figures(pool, start),
         holidays=await market_holidays(pool, start, end),
+        ownership_changes=await tracked_manager_changes(pool, tracked_ciks or [], since=start)
+        if tracked_ciks
+        else [],
     )
     usage: Usage | None = None
     note: str | None = None
@@ -896,6 +914,7 @@ async def run_digest(
             settings,
             writer,
             theses.body if theses else None,
+            [m.cik for m in (jobs.body if jobs else JobsConfig()).ownership.tracked_managers],
         )
         if usage is not None:
             step.usage = usage.step_usage()

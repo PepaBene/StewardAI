@@ -12,6 +12,7 @@ from api.db import Pool
 from api.routes import _enqueue
 from steward.config.common import Ticker
 from steward.config.jobs import ExchangeClosure
+from steward.ownership.read import HoldingOwnership, holding_ownership
 from steward.portfolio.read import JobSummary
 from steward.reference.read import (
     ExchangeCalendar,
@@ -140,3 +141,13 @@ async def run_price_history(pool: Pool, owner: Owner) -> JobSummary:
 async def run_holiday_refresh(pool: Pool, owner: Owner) -> JobSummary:
     """Load public holidays for this and next year now."""
     return await _enqueue(pool, "holiday_refresh", owner.user_id)
+
+
+@router.get("/holdings/{ticker}/ownership", tags=["reference"])
+async def get_holding_ownership(
+    ticker: Annotated[str, Path(pattern=r"^[A-Za-z0-9._-]{1,32}$")], pool: Pool, _owner: Owner
+) -> HoldingOwnership:
+    """Institutional ownership from SEC Form 13F data sets: holders, shares and value per
+    report period (newest first) with changes, and the largest holders. Only US-listed
+    holdings are covered; every figure carries its period and filing date."""
+    return await holding_ownership(pool, ticker)

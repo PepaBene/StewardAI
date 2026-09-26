@@ -6,6 +6,7 @@ queue. Both look the handler up here.
 
 from typing import Literal
 
+from steward.chat.assistant import chat_handler
 from steward.earnings.calendar import (
     earnings_calendar_full_handler,
     earnings_calendar_handler,
@@ -19,9 +20,12 @@ from steward.monitor import monitor_handler
 from steward.news.digest import daily_digest_handler, weekly_digest_handler
 from steward.news.escalation import event_escalation_handler
 from steward.news.pipeline import news_ingest_handler
+from steward.ownership.collect import ownership_13f_handler
 from steward.portfolio.sync import portfolio_sync_handler
 from steward.reference.identity import reference_data_handler
 from steward.reference.prices import holiday_refresh_handler, price_history_handler
+from steward.research.run import research_handler
+from steward.review.monthly import monthly_review_handler
 
 JobType = Literal[
     "portfolio_sync",
@@ -40,6 +44,10 @@ JobType = Literal[
     "news_ingest",
     "daily_digest",
     "weekly_digest",
+    "research",
+    "ownership_13f",
+    "monthly_review",
+    "chat",
 ]
 
 JOB_HANDLERS: dict[str, JobHandler] = {
@@ -59,4 +67,8 @@ JOB_HANDLERS: dict[str, JobHandler] = {
     "news_ingest": news_ingest_handler,
     "daily_digest": daily_digest_handler,
     "weekly_digest": weekly_digest_handler,
+    "research": research_handler,
+    "ownership_13f": ownership_13f_handler,
+    "monthly_review": monthly_review_handler,
+    "chat": chat_handler,
 }

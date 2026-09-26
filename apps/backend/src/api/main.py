@@ -13,10 +13,12 @@ from fastapi.routing import APIRoute
 from pydantic import BaseModel
 
 from api.auth import Owner
+from api.chat_routes import router as chat_router
 from api.config_history_routes import router as config_history_router
 from api.db import close_pool, get_pool_or_error
 from api.news_routes import router as news_router
 from api.reference_routes import router as reference_router
+from api.research_routes import router as research_router
 from api.routes import router
 from api.verify_routes import router as verify_router
 from steward import __version__
@@ -127,9 +129,11 @@ def create_app() -> FastAPI:
 
     app.include_router(config_history_router)
     app.include_router(router)
+    app.include_router(research_router)  # before news: /reports/search vs /reports/{id}
     app.include_router(news_router)
     app.include_router(reference_router)
     app.include_router(verify_router)
+    app.include_router(chat_router)
     return app
 
 

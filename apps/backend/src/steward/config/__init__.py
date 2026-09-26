@@ -13,12 +13,12 @@ from steward.config.holding_profiles import HoldingProfile, HoldingProfilesConfi
 from steward.config.jobs import JobSchedule, JobsConfig
 from steward.config.news_sources import NewsSourcesConfig
 from steward.config.notifications import NotificationsConfig
+from steward.config.research import ResearchProfile, ResearchProfilesConfig
 from steward.config.strategy import StrategyConfig
 from steward.config.thesis import ThesesConfig, ThesisConfig, ThesisKPI
 from steward.config.verification import VerificationConfig
 
-# Domains implemented so far. The `config_version.domain` check constraint lists every
-# domain from the spec, so later phases only add a model here (research_profiles: Phase 5).
+# Every domain of the `config_version.domain` check constraint.
 CONFIG_MODELS: dict[str, type[BaseModel]] = {
     "strategy": StrategyConfig,
     "theses": ThesesConfig,
@@ -29,6 +29,7 @@ CONFIG_MODELS: dict[str, type[BaseModel]] = {
     "event_rules": EventRulesConfig,
     "notifications": NotificationsConfig,
     "budget": BudgetConfig,
+    "research_profiles": ResearchProfilesConfig,
 }
 
 __all__ = [
@@ -41,6 +42,8 @@ __all__ = [
     "JobsConfig",
     "NewsSourcesConfig",
     "NotificationsConfig",
+    "ResearchProfile",
+    "ResearchProfilesConfig",
     "StrategyConfig",
     "ThesesConfig",
     "ThesisConfig",

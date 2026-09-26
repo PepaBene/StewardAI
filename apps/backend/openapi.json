@@ -179,7 +179,8 @@
                 "news-sources",
                 "event-rules",
                 "notifications",
-                "budget"
+                "budget",
+                "research-profiles"
               ],
               "type": "string",
               "description": "Config domain, as in /config/<domain>.",
@@ -255,7 +256,8 @@
                 "news-sources",
                 "event-rules",
                 "notifications",
-                "budget"
+                "budget",
+                "research-profiles"
               ],
               "type": "string",
               "description": "Config domain, as in /config/<domain>.",
@@ -325,7 +327,8 @@
                 "news-sources",
                 "event-rules",
                 "notifications",
-                "budget"
+                "budget",
+                "research-profiles"
               ],
               "type": "string",
               "description": "Config domain, as in /config/<domain>.",
@@ -404,7 +407,8 @@
                 "news-sources",
                 "event-rules",
                 "notifications",
-                "budget"
+                "budget",
+                "research-profiles"
               ],
               "type": "string",
               "description": "Config domain, as in /config/<domain>.",
@@ -2099,6 +2103,559 @@
         ]
       }
     },
+    "/jobs/research": {
+      "post": {
+        "tags": [
+          "research"
+        ],
+        "summary": "Run Research Now",
+        "description": "Queue a deep research run for a ticker under a research profile.",
+        "operationId": "run_research_now",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ResearchRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "202": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/JobSummary"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/research": {
+      "get": {
+        "tags": [
+          "research"
+        ],
+        "summary": "List Research",
+        "operationId": "list_research",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "ticker",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "pattern": "^[A-Za-z0-9._-]{1,32}$"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Ticker"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 200,
+              "minimum": 1,
+              "default": 50,
+              "title": "Limit"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/ResearchSummary"
+                  },
+                  "title": "Response List Research"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/research/{report_id}": {
+      "get": {
+        "tags": [
+          "research"
+        ],
+        "summary": "Get Research",
+        "description": "A research report: sections of cited sentences, computed valuation figures and the\nsource list every citation points into.",
+        "operationId": "get_research",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "report_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Report Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResearchReportOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/reviews": {
+      "get": {
+        "tags": [
+          "research"
+        ],
+        "summary": "List Reviews",
+        "operationId": "list_reviews",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 100,
+              "minimum": 1,
+              "default": 24,
+              "title": "Limit"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/ResearchSummary"
+                  },
+                  "title": "Response List Reviews"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/reviews/{report_id}": {
+      "get": {
+        "tags": [
+          "research"
+        ],
+        "summary": "Get Review",
+        "description": "A monthly review: every strategy rule, hard limit and band with pass / breach /\nunknown, thesis KPI statuses, flags, and proposed actions each citing a rule or KPI.",
+        "operationId": "get_review",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "report_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Report Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReviewReportOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/jobs/monthly-review": {
+      "post": {
+        "tags": [
+          "jobs"
+        ],
+        "summary": "Run Monthly Review",
+        "description": "Write a monthly review now (a manual run is not limited to the first weekday).",
+        "operationId": "run_monthly_review",
+        "responses": {
+          "202": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/JobSummary"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/reports/search": {
+      "get": {
+        "tags": [
+          "reports"
+        ],
+        "summary": "Search Reports",
+        "description": "Full-text search over every report (title, ticker, profile and text), newest first.",
+        "operationId": "search_reports",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "q",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 200,
+              "description": "Words, a ticker, \"a phrase\", or -excluded.",
+              "title": "Q"
+            },
+            "description": "Words, a ticker, \"a phrase\", or -excluded."
+          },
+          {
+            "name": "type",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "array",
+                  "items": {
+                    "enum": [
+                      "digest",
+                      "research",
+                      "review",
+                      "escalation"
+                    ],
+                    "type": "string"
+                  }
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Type"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 200,
+              "minimum": 1,
+              "default": 50,
+              "title": "Limit"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/ReportHit"
+                  },
+                  "title": "Response Search Reports"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/config/research-profiles": {
+      "get": {
+        "tags": [
+          "config"
+        ],
+        "summary": "Get Research Profiles Config",
+        "description": "The saved research profiles. 404 means the defaults (standard, quick) apply.",
+        "operationId": "get_research_profiles_config",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResearchProfilesConfigVersion"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "config"
+        ],
+        "summary": "Save Research Profiles Config",
+        "operationId": "save_research_profiles_config",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "note",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "maxLength": 500
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Why this change was made.",
+              "title": "Note"
+            },
+            "description": "Why this change was made."
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ResearchProfilesConfig"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResearchProfilesConfigVersion"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/config/research-profiles/validate": {
+      "post": {
+        "tags": [
+          "config"
+        ],
+        "summary": "Validate Research Profiles",
+        "operationId": "validate_research_profiles",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ResearchProfilesConfig"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResearchProfilesConfig"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/jobs/ownership-13f": {
+      "post": {
+        "tags": [
+          "jobs"
+        ],
+        "summary": "Run Ownership 13F",
+        "description": "Load new SEC Form 13F data sets now (about 100 MB each).",
+        "operationId": "run_ownership_13f",
+        "responses": {
+          "202": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/JobSummary"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
     "/news": {
       "get": {
         "tags": [
@@ -3726,6 +4283,55 @@
         ]
       }
     },
+    "/holdings/{ticker}/ownership": {
+      "get": {
+        "tags": [
+          "reference"
+        ],
+        "summary": "Get Holding Ownership",
+        "description": "Institutional ownership from SEC Form 13F data sets: holders, shares and value per\nreport period (newest first) with changes, and the largest holders. Only US-listed\nholdings are covered; every figure carries its period and filing date.",
+        "operationId": "get_holding_ownership",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "ticker",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9._-]{1,32}$",
+              "title": "Ticker"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HoldingOwnership"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/feedback": {
       "post": {
         "tags": [
@@ -4070,6 +4676,304 @@
           }
         ]
       }
+    },
+    "/chat/conversations": {
+      "post": {
+        "tags": [
+          "chat"
+        ],
+        "summary": "Create Conversation",
+        "operationId": "create_conversation",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NewConversation"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConversationOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "tags": [
+          "chat"
+        ],
+        "summary": "List Conversations",
+        "operationId": "list_conversations",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 200,
+              "minimum": 1,
+              "default": 50,
+              "title": "Limit"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/ConversationOut"
+                  },
+                  "title": "Response List Conversations"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/chat/conversations/{conversation_id}": {
+      "get": {
+        "tags": [
+          "chat"
+        ],
+        "summary": "Get Conversation",
+        "operationId": "get_conversation",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "conversation_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Conversation Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConversationDetail"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/chat/conversations/{conversation_id}/messages": {
+      "post": {
+        "tags": [
+          "chat"
+        ],
+        "summary": "Post Message",
+        "description": "Store the owner's message and queue the answer; poll the conversation for it.",
+        "operationId": "post_message",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "conversation_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Conversation Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NewMessage"
+              }
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PostedMessage"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/chat/actions/{action_id}/confirm": {
+      "post": {
+        "tags": [
+          "chat"
+        ],
+        "summary": "Confirm Action",
+        "description": "Start a job the assistant proposed. It appears in the job log with trigger `chat`.",
+        "operationId": "confirm_action",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "action_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Action Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ActionOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/chat/actions/{action_id}/cancel": {
+      "post": {
+        "tags": [
+          "chat"
+        ],
+        "summary": "Cancel Action",
+        "operationId": "cancel_action",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "action_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Action Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ActionOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
@@ -4117,6 +5021,100 @@
           "realized_ppl"
         ],
         "title": "AccountTotals"
+      },
+      "ActionOut": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "message_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Message Id"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "earnings_check",
+              "research",
+              "portfolio_sync"
+            ],
+            "title": "Kind"
+          },
+          "params": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Params"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "proposed",
+              "confirmed",
+              "cancelled"
+            ],
+            "title": "Status"
+          },
+          "job_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Job Id"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "decided_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Decided At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "message_id",
+          "kind",
+          "params",
+          "reason",
+          "status",
+          "job_id",
+          "created_at",
+          "decided_at"
+        ],
+        "title": "ActionOut"
       },
       "ActivityCoverage": {
         "properties": {
@@ -5087,6 +6085,206 @@
         "title": "CategoryWeightRule",
         "description": "Limit on a category's weight; with no bucket it applies to every bucket of the dimension."
       },
+      "ChatAnswer": {
+        "properties": {
+          "sentences": {
+            "items": {
+              "$ref": "#/components/schemas/ChatSentence"
+            },
+            "type": "array",
+            "title": "Sentences"
+          },
+          "sources": {
+            "items": {
+              "$ref": "#/components/schemas/Source"
+            },
+            "type": "array",
+            "title": "Sources"
+          },
+          "tools_used": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Tools Used"
+          },
+          "actions": {
+            "items": {
+              "type": "integer"
+            },
+            "type": "array",
+            "title": "Actions",
+            "description": "Proposed actions waiting for confirmation."
+          },
+          "model": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Model"
+          },
+          "note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note"
+          }
+        },
+        "type": "object",
+        "required": [
+          "sentences",
+          "sources",
+          "tools_used",
+          "actions",
+          "model"
+        ],
+        "title": "ChatAnswer"
+      },
+      "ChatSentence": {
+        "properties": {
+          "text": {
+            "type": "string",
+            "title": "Text"
+          },
+          "source_ids": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Source Ids"
+          },
+          "no_source": {
+            "type": "boolean",
+            "title": "No Source",
+            "description": "Shown as 'no source': nothing checkable cites it."
+          },
+          "unsupported": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Unsupported",
+            "description": "Why a figure in it is not in its sources, when that is so."
+          }
+        },
+        "type": "object",
+        "required": [
+          "text",
+          "source_ids",
+          "no_source"
+        ],
+        "title": "ChatSentence"
+      },
+      "ChatSettings": {
+        "properties": {
+          "model": {
+            "type": "string",
+            "pattern": "^claude-[a-z0-9.-]{1,64}$",
+            "title": "Model",
+            "default": "claude-sonnet-5",
+            "examples": [
+              "claude-sonnet-5"
+            ]
+          },
+          "max_steps": {
+            "type": "integer",
+            "maximum": 20.0,
+            "minimum": 1.0,
+            "title": "Max Steps",
+            "description": "Claude calls plus tool rounds per answer.",
+            "default": 6
+          },
+          "max_searches": {
+            "type": "integer",
+            "maximum": 10.0,
+            "minimum": 0.0,
+            "title": "Max Searches",
+            "description": "Web searches per answer.",
+            "default": 3
+          },
+          "history_messages": {
+            "type": "integer",
+            "maximum": 50.0,
+            "minimum": 2.0,
+            "title": "History Messages",
+            "description": "Earlier messages of the conversation sent along.",
+            "default": 12
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "ChatSettings",
+        "description": "The chat panel's assistant: DB tools, web search on tiered outlets, cited answers."
+      },
+      "CitedSentence": {
+        "properties": {
+          "text": {
+            "type": "string",
+            "title": "Text"
+          },
+          "source_ids": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Source Ids"
+          },
+          "written_by": {
+            "type": "string",
+            "enum": [
+              "code",
+              "model"
+            ],
+            "title": "Written By",
+            "default": "code"
+          },
+          "check": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "supported",
+                  "unsupported",
+                  "unchecked"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Check"
+          },
+          "check_reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Check Reason"
+          }
+        },
+        "type": "object",
+        "required": [
+          "text"
+        ],
+        "title": "CitedSentence"
+      },
       "ClaimCheckSummary": {
         "properties": {
           "mode": {
@@ -5305,6 +6503,57 @@
           "name"
         ],
         "title": "ClosureSuggestion"
+      },
+      "ComplianceRow": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id",
+            "description": "The strategy rule id, or hard_limit:/band: keys."
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "rule",
+              "hard_limit",
+              "band"
+            ],
+            "title": "Kind"
+          },
+          "description": {
+            "type": "string",
+            "title": "Description"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "pass",
+              "breach",
+              "unknown"
+            ],
+            "title": "Status"
+          },
+          "detail": {
+            "type": "string",
+            "title": "Detail"
+          },
+          "source_ids": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Source Ids"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "kind",
+          "description",
+          "status",
+          "detail"
+        ],
+        "title": "ComplianceRow"
       },
       "ConfigDiff": {
         "properties": {
@@ -5561,6 +6810,75 @@
         ],
         "title": "ConfigVersionMeta"
       },
+      "ConversationDetail": {
+        "properties": {
+          "conversation": {
+            "$ref": "#/components/schemas/ConversationOut"
+          },
+          "messages": {
+            "items": {
+              "$ref": "#/components/schemas/MessageOut"
+            },
+            "type": "array",
+            "title": "Messages"
+          },
+          "actions": {
+            "items": {
+              "$ref": "#/components/schemas/ActionOut"
+            },
+            "type": "array",
+            "title": "Actions"
+          }
+        },
+        "type": "object",
+        "required": [
+          "conversation",
+          "messages",
+          "actions"
+        ],
+        "title": "ConversationDetail"
+      },
+      "ConversationOut": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "title": {
+            "type": "string",
+            "title": "Title"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Updated At"
+          },
+          "last_message": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Message"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "title",
+          "created_at",
+          "updated_at"
+        ],
+        "title": "ConversationOut"
+      },
       "Correlation": {
         "properties": {
           "ticker": {
@@ -5754,6 +7072,14 @@
             },
             "type": "array",
             "title": "Fact Sources"
+          },
+          "ownership_changes": {
+            "items": {
+              "$ref": "#/components/schemas/ManagerChange"
+            },
+            "type": "array",
+            "title": "Ownership Changes",
+            "description": "Tracked managers' new and exited positions in holdings, from 13F filings received in the period."
           },
           "claims": {
             "anyOf": [
@@ -8883,6 +10209,50 @@
         ],
         "title": "HoldingIdentity"
       },
+      "HoldingOwnership": {
+        "properties": {
+          "ticker": {
+            "type": "string",
+            "title": "Ticker"
+          },
+          "cusips": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Cusips"
+          },
+          "periods": {
+            "items": {
+              "$ref": "#/components/schemas/OwnershipPeriod"
+            },
+            "type": "array",
+            "title": "Periods",
+            "description": "Newest first."
+          },
+          "top_holders": {
+            "items": {
+              "$ref": "#/components/schemas/TopHolder"
+            },
+            "type": "array",
+            "title": "Top Holders",
+            "description": "Largest positions, latest period."
+          },
+          "source": {
+            "type": "string",
+            "title": "Source",
+            "default": "SEC Form 13F data sets"
+          }
+        },
+        "type": "object",
+        "required": [
+          "ticker",
+          "cusips",
+          "periods",
+          "top_holders"
+        ],
+        "title": "HoldingOwnership"
+      },
       "HoldingProfile": {
         "properties": {
           "ticker": {
@@ -9949,6 +11319,14 @@
             "$ref": "#/components/schemas/JobSchedule",
             "description": "Weekly digest of the last 7 days. Default: Sundays 18:00."
           },
+          "monthly_review": {
+            "$ref": "#/components/schemas/JobSchedule",
+            "description": "Monthly review on the first weekday of the month (a scheduled run on another day does nothing). Default: 07:00 on the 1st-3rd."
+          },
+          "ownership_13f": {
+            "$ref": "#/components/schemas/JobSchedule",
+            "description": "Load new SEC Form 13F data sets (published quarterly). Default: the 5th of each month, 05:00."
+          },
           "earnings_check": {
             "$ref": "#/components/schemas/EarningsCheckSettings"
           },
@@ -9978,6 +11356,15 @@
           },
           "calendar": {
             "$ref": "#/components/schemas/CalendarSettings"
+          },
+          "chat": {
+            "$ref": "#/components/schemas/ChatSettings"
+          },
+          "review": {
+            "$ref": "#/components/schemas/ReviewSettings"
+          },
+          "ownership": {
+            "$ref": "#/components/schemas/OwnershipSettings"
           }
         },
         "additionalProperties": false,
@@ -10019,6 +11406,76 @@
           "body"
         ],
         "title": "JobsConfigVersion"
+      },
+      "KpiRow": {
+        "properties": {
+          "ticker": {
+            "type": "string",
+            "title": "Ticker"
+          },
+          "kpi_id": {
+            "type": "string",
+            "title": "Kpi Id"
+          },
+          "ref": {
+            "type": "string",
+            "title": "Ref",
+            "description": "TICKER:kpi_id, as actions cite it."
+          },
+          "description": {
+            "type": "string",
+            "title": "Description"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "pass",
+              "breach",
+              "unknown"
+            ],
+            "title": "Status"
+          },
+          "period": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Period"
+          },
+          "verdict_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Verdict Id"
+          },
+          "source_ids": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Source Ids"
+          }
+        },
+        "type": "object",
+        "required": [
+          "ticker",
+          "kpi_id",
+          "ref",
+          "description",
+          "status",
+          "period",
+          "verdict_id"
+        ],
+        "title": "KpiRow"
       },
       "KpiStatus": {
         "properties": {
@@ -10446,6 +11903,76 @@
         "title": "MacroSettings",
         "description": "Macro series collected into `macro_series` (numbers in digests come only from here)."
       },
+      "ManagerChange": {
+        "properties": {
+          "cik": {
+            "type": "string",
+            "title": "Cik"
+          },
+          "manager_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Manager Name"
+          },
+          "ticker": {
+            "type": "string",
+            "title": "Ticker"
+          },
+          "change": {
+            "type": "string",
+            "title": "Change",
+            "description": "new or exited"
+          },
+          "period": {
+            "type": "string",
+            "format": "date",
+            "title": "Period"
+          },
+          "previous_period": {
+            "type": "string",
+            "format": "date",
+            "title": "Previous Period"
+          },
+          "shares": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Shares",
+            "description": "New: shares held; exited: shares held before."
+          },
+          "accession": {
+            "type": "string",
+            "title": "Accession"
+          }
+        },
+        "type": "object",
+        "required": [
+          "cik",
+          "manager_name",
+          "ticker",
+          "change",
+          "period",
+          "previous_period",
+          "shares",
+          "accession"
+        ],
+        "title": "ManagerChange"
+      },
       "MarketHoliday": {
         "properties": {
           "calendar": {
@@ -10469,6 +11996,73 @@
           "name"
         ],
         "title": "MarketHoliday"
+      },
+      "MessageOut": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "role": {
+            "type": "string",
+            "enum": [
+              "user",
+              "assistant"
+            ],
+            "title": "Role"
+          },
+          "content": {
+            "type": "string",
+            "title": "Content"
+          },
+          "answer": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ChatAnswer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Assistant messages: sentences and sources."
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "pending",
+              "done",
+              "failed"
+            ],
+            "title": "Status"
+          },
+          "job_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Job Id"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "role",
+          "content",
+          "answer",
+          "status",
+          "job_id",
+          "created_at"
+        ],
+        "title": "MessageOut"
       },
       "ModelPrice": {
         "properties": {
@@ -10533,6 +12127,39 @@
         "type": "object",
         "title": "MonitorSettings",
         "description": "Monitoring: failed jobs, missed scheduled runs and per-holding coverage gaps alert."
+      },
+      "NewConversation": {
+        "properties": {
+          "title": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 200
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Title"
+          }
+        },
+        "type": "object",
+        "title": "NewConversation"
+      },
+      "NewMessage": {
+        "properties": {
+          "content": {
+            "type": "string",
+            "maxLength": 4000,
+            "minLength": 1,
+            "title": "Content"
+          }
+        },
+        "type": "object",
+        "required": [
+          "content"
+        ],
+        "title": "NewMessage"
       },
       "NewsFeed": {
         "properties": {
@@ -11316,6 +12943,159 @@
         ],
         "title": "NotificationsConfigVersion"
       },
+      "OwnershipPeriod": {
+        "properties": {
+          "period": {
+            "type": "string",
+            "format": "date",
+            "title": "Period"
+          },
+          "holders": {
+            "type": "integer",
+            "title": "Holders"
+          },
+          "shares": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              }
+            ],
+            "title": "Shares"
+          },
+          "value_usd": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              }
+            ],
+            "title": "Value Usd"
+          },
+          "latest_filed": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Latest Filed"
+          },
+          "holders_change": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Holders Change",
+            "description": "Against the previous period loaded."
+          },
+          "shares_change": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Shares Change"
+          },
+          "new_holders": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "New Holders"
+          },
+          "exited_holders": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Exited Holders"
+          }
+        },
+        "type": "object",
+        "required": [
+          "period",
+          "holders",
+          "shares",
+          "value_usd",
+          "latest_filed",
+          "holders_change",
+          "shares_change",
+          "new_holders",
+          "exited_holders"
+        ],
+        "title": "OwnershipPeriod"
+      },
+      "OwnershipSettings": {
+        "properties": {
+          "enabled": {
+            "type": "boolean",
+            "title": "Enabled",
+            "default": true
+          },
+          "index_url": {
+            "type": "string",
+            "title": "Index Url",
+            "description": "The SEC page listing the data sets (zip files).",
+            "default": "https://www.sec.gov/data-research/sec-markets-data/form-13f-data-sets"
+          },
+          "datasets_per_run": {
+            "type": "integer",
+            "maximum": 8.0,
+            "minimum": 1.0,
+            "title": "Datasets Per Run",
+            "description": "Data sets (about 100 MB each) loaded per run.",
+            "default": 2
+          },
+          "tracked_managers": {
+            "items": {
+              "$ref": "#/components/schemas/TrackedManager"
+            },
+            "type": "array",
+            "title": "Tracked Managers",
+            "description": "Managers whose new and exited positions in the portfolio's holdings appear in the next digest."
+          },
+          "top_holders": {
+            "type": "integer",
+            "maximum": 50.0,
+            "minimum": 1.0,
+            "title": "Top Holders",
+            "default": 10
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "OwnershipSettings",
+        "description": "Form 13F institutional ownership from the SEC's quarterly data sets."
+      },
       "PlausibilityCheck": {
         "properties": {
           "date": {
@@ -11801,6 +13581,23 @@
         "title": "PositionWeightRule",
         "description": "Limit on a single position's weight; with no ticker it applies to every position."
       },
+      "PostedMessage": {
+        "properties": {
+          "message": {
+            "$ref": "#/components/schemas/MessageOut"
+          },
+          "job_id": {
+            "type": "integer",
+            "title": "Job Id"
+          }
+        },
+        "type": "object",
+        "required": [
+          "message",
+          "job_id"
+        ],
+        "title": "PostedMessage"
+      },
       "PriceGap": {
         "properties": {
           "key": {
@@ -12025,6 +13822,54 @@
         "type": "object",
         "title": "PriceSettings",
         "description": "Daily price history (Stooq) and the risk figures computed from it."
+      },
+      "ProposedAction": {
+        "properties": {
+          "action": {
+            "type": "string",
+            "title": "Action"
+          },
+          "ticker": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ticker"
+          },
+          "rationale": {
+            "type": "string",
+            "title": "Rationale"
+          },
+          "rule_ids": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Rule Ids",
+            "description": "Strategy rule ids it rests on."
+          },
+          "kpis": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Kpis",
+            "description": "Thesis KPIs it rests on, as TICKER:kpi_id."
+          }
+        },
+        "type": "object",
+        "required": [
+          "action",
+          "ticker",
+          "rationale",
+          "rule_ids",
+          "kpis"
+        ],
+        "title": "ProposedAction"
       },
       "QuietHours": {
         "properties": {
@@ -12681,6 +14526,83 @@
         ],
         "title": "ReplayPreview"
       },
+      "ReportHit": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "digest",
+              "research",
+              "review",
+              "escalation"
+            ],
+            "title": "Type"
+          },
+          "period": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Period"
+          },
+          "ticker": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ticker"
+          },
+          "profile": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Profile"
+          },
+          "title": {
+            "type": "string",
+            "title": "Title"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "excerpt": {
+            "type": "string",
+            "title": "Excerpt",
+            "description": "The matching passage, with matches in <b></b>."
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "type",
+          "period",
+          "ticker",
+          "profile",
+          "title",
+          "created_at",
+          "excerpt"
+        ],
+        "title": "ReportHit"
+      },
       "ReportOut": {
         "properties": {
           "id": {
@@ -12900,6 +14822,652 @@
         ],
         "title": "ReportingExceptionOut"
       },
+      "ResearchBody": {
+        "properties": {
+          "ticker": {
+            "type": "string",
+            "title": "Ticker"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "owned": {
+            "type": "boolean",
+            "title": "Owned"
+          },
+          "headline": {
+            "type": "string",
+            "title": "Headline"
+          },
+          "profile_id": {
+            "type": "string",
+            "title": "Profile Id"
+          },
+          "profile_name": {
+            "type": "string",
+            "title": "Profile Name"
+          },
+          "depth": {
+            "type": "string",
+            "title": "Depth"
+          },
+          "model": {
+            "type": "string",
+            "title": "Model"
+          },
+          "language": {
+            "type": "string",
+            "title": "Language"
+          },
+          "sections": {
+            "items": {
+              "$ref": "#/components/schemas/ResearchSection"
+            },
+            "type": "array",
+            "title": "Sections"
+          },
+          "valuation": {
+            "items": {
+              "$ref": "#/components/schemas/Valuation"
+            },
+            "type": "array",
+            "title": "Valuation"
+          },
+          "sources": {
+            "items": {
+              "$ref": "#/components/schemas/Source"
+            },
+            "type": "array",
+            "title": "Sources"
+          },
+          "claims": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ClaimCheckSummary"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "steps_used": {
+            "type": "integer",
+            "title": "Steps Used",
+            "default": 0
+          },
+          "searches_used": {
+            "type": "integer",
+            "title": "Searches Used",
+            "default": 0
+          },
+          "dropped_sentences": {
+            "type": "integer",
+            "title": "Dropped Sentences",
+            "description": "Model sentences removed for citing nothing checkable.",
+            "default": 0
+          },
+          "notes": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Notes"
+          }
+        },
+        "type": "object",
+        "required": [
+          "ticker",
+          "name",
+          "owned",
+          "headline",
+          "profile_id",
+          "profile_name",
+          "depth",
+          "model",
+          "language",
+          "sections",
+          "valuation",
+          "sources"
+        ],
+        "title": "ResearchBody"
+      },
+      "ResearchProfile": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "maxLength": 40,
+            "pattern": "^[a-z0-9]+(-[a-z0-9]+)*$",
+            "title": "Id"
+          },
+          "name": {
+            "type": "string",
+            "maxLength": 80,
+            "minLength": 1,
+            "title": "Name"
+          },
+          "sections": {
+            "items": {
+              "type": "string",
+              "enum": [
+                "business",
+                "financial_trend",
+                "moat_risks",
+                "valuation",
+                "strategy_fit",
+                "ownership",
+                "relationships",
+                "risk",
+                "liquidity",
+                "open_questions"
+              ]
+            },
+            "type": "array",
+            "minItems": 1,
+            "title": "Sections"
+          },
+          "depth": {
+            "type": "string",
+            "enum": [
+              "brief",
+              "standard",
+              "deep"
+            ],
+            "title": "Depth",
+            "description": "Sentences per model-written section: brief 3, standard 6, deep 12.",
+            "default": "standard"
+          },
+          "model": {
+            "type": "string",
+            "pattern": "^claude-[a-z0-9.-]{1,64}$",
+            "title": "Model",
+            "default": "claude-opus-5-5",
+            "examples": [
+              "claude-sonnet-5"
+            ]
+          },
+          "effort": {
+            "type": "string",
+            "enum": [
+              "low",
+              "medium",
+              "high",
+              "xhigh",
+              "max"
+            ],
+            "title": "Effort",
+            "default": "high"
+          },
+          "max_steps": {
+            "type": "integer",
+            "maximum": 60.0,
+            "minimum": 1.0,
+            "title": "Max Steps",
+            "description": "Claude calls plus web searches per run.",
+            "default": 20
+          },
+          "max_searches": {
+            "type": "integer",
+            "maximum": 40.0,
+            "minimum": 0.0,
+            "title": "Max Searches",
+            "default": 15
+          },
+          "source_tiers": {
+            "items": {
+              "type": "integer",
+              "enum": [
+                1,
+                2,
+                3
+              ]
+            },
+            "type": "array",
+            "minItems": 1,
+            "title": "Source Tiers",
+            "description": "Outlet tiers web search may use and the report may cite."
+          },
+          "include_peers": {
+            "type": "boolean",
+            "title": "Include Peers",
+            "description": "Name the holding's competitors and compare with them.",
+            "default": true
+          },
+          "valuation_methods": {
+            "items": {
+              "type": "string",
+              "enum": [
+                "pe_ttm",
+                "earnings_yield",
+                "dividend_yield_ttm"
+              ]
+            },
+            "type": "array",
+            "title": "Valuation Methods"
+          },
+          "language": {
+            "type": "string",
+            "enum": [
+              "en",
+              "cs"
+            ],
+            "title": "Language",
+            "default": "en"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "id",
+          "name",
+          "sections"
+        ],
+        "title": "ResearchProfile"
+      },
+      "ResearchProfilesConfig": {
+        "properties": {
+          "schema_version": {
+            "type": "integer",
+            "const": 1,
+            "title": "Schema Version",
+            "default": 1
+          },
+          "profiles": {
+            "items": {
+              "$ref": "#/components/schemas/ResearchProfile"
+            },
+            "type": "array",
+            "minItems": 1,
+            "title": "Profiles"
+          },
+          "default_profile": {
+            "type": "string",
+            "maxLength": 40,
+            "pattern": "^[a-z0-9]+(-[a-z0-9]+)*$",
+            "title": "Default Profile",
+            "default": "standard"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "ResearchProfilesConfig",
+        "description": "Stored as `config_version` rows, domain `research_profiles`."
+      },
+      "ResearchProfilesConfigVersion": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note"
+          },
+          "body": {
+            "$ref": "#/components/schemas/ResearchProfilesConfig"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "created_at",
+          "note",
+          "body"
+        ],
+        "title": "ResearchProfilesConfigVersion"
+      },
+      "ResearchReportOut": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "ticker": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ticker"
+          },
+          "title": {
+            "type": "string",
+            "title": "Title"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "job_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Job Id"
+          },
+          "body": {
+            "$ref": "#/components/schemas/ResearchBody"
+          },
+          "body_md": {
+            "type": "string",
+            "title": "Body Md"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "ticker",
+          "title",
+          "created_at",
+          "job_id",
+          "body",
+          "body_md"
+        ],
+        "title": "ResearchReportOut"
+      },
+      "ResearchRequest": {
+        "properties": {
+          "ticker": {
+            "type": "string",
+            "pattern": "^[A-Za-z0-9._-]{1,32}$",
+            "title": "Ticker",
+            "description": "Any ticker, owned or not (a Trading212 ticker gives the richest data)."
+          },
+          "profile": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Profile",
+            "description": "Research profile id; default if omitted."
+          },
+          "name": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 120
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name",
+            "description": "Company name hint."
+          }
+        },
+        "type": "object",
+        "required": [
+          "ticker"
+        ],
+        "title": "ResearchRequest"
+      },
+      "ResearchSection": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "title": {
+            "type": "string",
+            "title": "Title"
+          },
+          "written_by": {
+            "type": "string",
+            "title": "Written By",
+            "description": "code (figures from stored records) or model"
+          },
+          "sentences": {
+            "items": {
+              "$ref": "#/components/schemas/CitedSentence"
+            },
+            "type": "array",
+            "title": "Sentences"
+          },
+          "note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "title",
+          "written_by",
+          "sentences"
+        ],
+        "title": "ResearchSection"
+      },
+      "ResearchSummary": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "ticker": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ticker"
+          },
+          "title": {
+            "type": "string",
+            "title": "Title"
+          },
+          "profile": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Profile"
+          },
+          "headline": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Headline"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "job_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Job Id"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "ticker",
+          "title",
+          "profile",
+          "headline",
+          "created_at",
+          "job_id"
+        ],
+        "title": "ResearchSummary"
+      },
+      "ReviewBody": {
+        "properties": {
+          "month": {
+            "type": "string",
+            "title": "Month"
+          },
+          "headline": {
+            "type": "string",
+            "title": "Headline"
+          },
+          "as_of": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "As Of",
+            "description": "Snapshot date the compliance is judged on."
+          },
+          "total_base": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Total Base"
+          },
+          "base_currency": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Base Currency"
+          },
+          "compliance": {
+            "items": {
+              "$ref": "#/components/schemas/ComplianceRow"
+            },
+            "type": "array",
+            "title": "Compliance"
+          },
+          "kpis": {
+            "items": {
+              "$ref": "#/components/schemas/KpiRow"
+            },
+            "type": "array",
+            "title": "Kpis"
+          },
+          "reviews_due": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Reviews Due"
+          },
+          "flags": {
+            "items": {
+              "$ref": "#/components/schemas/CitedSentence"
+            },
+            "type": "array",
+            "title": "Flags"
+          },
+          "actions": {
+            "items": {
+              "$ref": "#/components/schemas/ProposedAction"
+            },
+            "type": "array",
+            "title": "Actions"
+          },
+          "dropped_actions": {
+            "type": "integer",
+            "title": "Dropped Actions",
+            "description": "Proposed actions citing nothing valid.",
+            "default": 0
+          },
+          "sources": {
+            "items": {
+              "$ref": "#/components/schemas/Source"
+            },
+            "type": "array",
+            "title": "Sources"
+          },
+          "model": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Model"
+          },
+          "notes": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Notes"
+          }
+        },
+        "type": "object",
+        "required": [
+          "month",
+          "headline",
+          "as_of",
+          "total_base",
+          "base_currency",
+          "compliance",
+          "kpis",
+          "reviews_due",
+          "flags",
+          "actions",
+          "sources"
+        ],
+        "title": "ReviewBody"
+      },
       "ReviewDue": {
         "properties": {
           "ticker": {
@@ -12982,6 +15550,96 @@
           "reconciliation"
         ],
         "title": "ReviewItem"
+      },
+      "ReviewReportOut": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "title": {
+            "type": "string",
+            "title": "Title"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "job_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Job Id"
+          },
+          "body": {
+            "$ref": "#/components/schemas/ReviewBody"
+          },
+          "body_md": {
+            "type": "string",
+            "title": "Body Md"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "title",
+          "created_at",
+          "job_id",
+          "body",
+          "body_md"
+        ],
+        "title": "ReviewReportOut"
+      },
+      "ReviewSettings": {
+        "properties": {
+          "model": {
+            "type": "string",
+            "pattern": "^claude-[a-z0-9.-]{1,64}$",
+            "title": "Model",
+            "default": "claude-opus-5-5",
+            "examples": [
+              "claude-sonnet-5"
+            ]
+          },
+          "effort": {
+            "type": "string",
+            "enum": [
+              "low",
+              "medium",
+              "high",
+              "xhigh",
+              "max"
+            ],
+            "title": "Effort",
+            "default": "high"
+          },
+          "max_steps": {
+            "type": "integer",
+            "maximum": 10.0,
+            "minimum": 1.0,
+            "title": "Max Steps",
+            "description": "Claude calls per review.",
+            "default": 3
+          },
+          "liquidity_days": {
+            "type": "number",
+            "maximum": 100.0,
+            "exclusiveMinimum": 0.0,
+            "title": "Liquidity Days",
+            "description": "A position larger than this many days of its home market's average daily turnover is flagged as hard to exit.",
+            "default": 1.0
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "ReviewSettings",
+        "description": "The monthly review: compliance and figures in code, proposed actions by the model."
       },
       "RiskCard": {
         "properties": {
@@ -13223,6 +15881,108 @@
           "severity"
         ],
         "title": "SeverityOverride"
+      },
+      "Source": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id",
+            "description": "Short id cited by sentences, e.g. S3."
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "fact",
+              "news_item",
+              "relationship",
+              "filing13f",
+              "price",
+              "listing",
+              "verdict",
+              "position",
+              "strategy",
+              "thesis",
+              "report",
+              "search"
+            ],
+            "title": "Kind"
+          },
+          "ref": {
+            "type": "string",
+            "title": "Ref",
+            "description": "The stored record: fact id, accession, URL, ..."
+          },
+          "title": {
+            "type": "string",
+            "title": "Title"
+          },
+          "url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Url",
+            "description": "External page, when there is one."
+          },
+          "app_path": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "App Path",
+            "description": "The app page for it, e.g. /evidence/12 or /holdings/X."
+          },
+          "tier": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tier"
+          },
+          "snippet": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Snippet",
+            "description": "The stored text it rests on."
+          },
+          "as_of": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "As Of"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "kind",
+          "ref",
+          "title"
+        ],
+        "title": "Source"
       },
       "SourceTrustOut": {
         "properties": {
@@ -14089,6 +16849,66 @@
         "type": "object",
         "title": "ThesisVerdictsRequest"
       },
+      "TopHolder": {
+        "properties": {
+          "cik": {
+            "type": "string",
+            "title": "Cik"
+          },
+          "manager_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Manager Name"
+          },
+          "shares": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              }
+            ],
+            "title": "Shares"
+          },
+          "value_usd": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Value Usd"
+          },
+          "accession": {
+            "type": "string",
+            "title": "Accession",
+            "description": "The filing the position is read from."
+          }
+        },
+        "type": "object",
+        "required": [
+          "cik",
+          "manager_name",
+          "shares",
+          "value_usd",
+          "accession"
+        ],
+        "title": "TopHolder"
+      },
       "TotalByCurrency": {
         "properties": {
           "type": {
@@ -14141,6 +16961,28 @@
           "amount"
         ],
         "title": "TotalByCurrency"
+      },
+      "TrackedManager": {
+        "properties": {
+          "cik": {
+            "type": "string",
+            "pattern": "^[0-9]{1,10}$",
+            "title": "Cik"
+          },
+          "name": {
+            "type": "string",
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Name"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "cik",
+          "name"
+        ],
+        "title": "TrackedManager"
       },
       "TransactionOut": {
         "properties": {
@@ -14373,6 +17215,60 @@
           "type"
         ],
         "title": "ValidationError"
+      },
+      "Valuation": {
+        "properties": {
+          "method": {
+            "type": "string",
+            "title": "Method"
+          },
+          "value": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Value"
+          },
+          "display": {
+            "type": "string",
+            "title": "Display"
+          },
+          "formula": {
+            "type": "string",
+            "title": "Formula"
+          },
+          "source_ids": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Source Ids"
+          },
+          "note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note"
+          }
+        },
+        "type": "object",
+        "required": [
+          "method",
+          "value",
+          "display",
+          "formula",
+          "source_ids"
+        ],
+        "title": "Valuation"
       },
       "VerdictOut": {
         "properties": {

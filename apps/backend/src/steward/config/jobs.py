@@ -358,6 +358,58 @@ class MonitorSettings(ConfigModel):
     )
 
 
+class ChatSettings(ConfigModel):
+    """The chat panel's assistant: DB tools, web search on tiered outlets, cited answers."""
+
+    model: ModelId = "claude-sonnet-5"
+    max_steps: int = Field(
+        default=6, ge=1, le=20, description="Claude calls plus tool rounds per answer."
+    )
+    max_searches: int = Field(default=3, ge=0, le=10, description="Web searches per answer.")
+    history_messages: int = Field(
+        default=12, ge=2, le=50, description="Earlier messages of the conversation sent along."
+    )
+
+
+class ReviewSettings(ConfigModel):
+    """The monthly review: compliance and figures in code, proposed actions by the model."""
+
+    model: ModelId = "claude-opus-5-5"
+    effort: Literal["low", "medium", "high", "xhigh", "max"] = "high"
+    max_steps: int = Field(default=3, ge=1, le=10, description="Claude calls per review.")
+    liquidity_days: float = Field(
+        default=1.0,
+        gt=0,
+        le=100,
+        description="A position larger than this many days of its home market's average "
+        "daily turnover is flagged as hard to exit.",
+    )
+
+
+class TrackedManager(ConfigModel):
+    cik: Annotated[str, Field(pattern=r"^[0-9]{1,10}$")]
+    name: str = Field(min_length=1, max_length=200)
+
+
+class OwnershipSettings(ConfigModel):
+    """Form 13F institutional ownership from the SEC's quarterly data sets."""
+
+    enabled: bool = True
+    index_url: str = Field(
+        default="https://www.sec.gov/data-research/sec-markets-data/form-13f-data-sets",
+        description="The SEC page listing the data sets (zip files).",
+    )
+    datasets_per_run: int = Field(
+        default=2, ge=1, le=8, description="Data sets (about 100 MB each) loaded per run."
+    )
+    tracked_managers: list[TrackedManager] = Field(
+        default_factory=list,
+        description="Managers whose new and exited positions in the portfolio's holdings "
+        "appear in the next digest.",
+    )
+    top_holders: int = Field(default=10, ge=1, le=50)
+
+
 class JobsConfig(ConfigModel):
     """Schedules for the worker's timed jobs. Stored as `config_version` rows, domain `jobs`.
 
@@ -424,6 +476,16 @@ class JobsConfig(ConfigModel):
         default_factory=lambda: JobSchedule(cron="0 18 * * 0"),
         description="Weekly digest of the last 7 days. Default: Sundays 18:00.",
     )
+    monthly_review: JobSchedule = Field(
+        default_factory=lambda: JobSchedule(cron="0 7 1-3 * *"),
+        description="Monthly review on the first weekday of the month (a scheduled run on "
+        "another day does nothing). Default: 07:00 on the 1st-3rd.",
+    )
+    ownership_13f: JobSchedule = Field(
+        default_factory=lambda: JobSchedule(cron="0 5 5 * *"),
+        description="Load new SEC Form 13F data sets (published quarterly). Default: the 5th "
+        "of each month, 05:00.",
+    )
     earnings_check: EarningsCheckSettings = Field(default_factory=EarningsCheckSettings)
     earnings_calendar_settings: EarningsCalendarSettings = Field(
         default_factory=EarningsCalendarSettings
@@ -436,6 +498,9 @@ class JobsConfig(ConfigModel):
     reference: ReferenceSettings = Field(default_factory=ReferenceSettings)
     prices: PriceSettings = Field(default_factory=PriceSettings)
     calendar: CalendarSettings = Field(default_factory=CalendarSettings)
+    chat: ChatSettings = Field(default_factory=ChatSettings)
+    review: ReviewSettings = Field(default_factory=ReviewSettings)
+    ownership: OwnershipSettings = Field(default_factory=OwnershipSettings)
 
     def schedules(self) -> dict[str, JobSchedule]:
         return {
@@ -452,6 +517,8 @@ class JobsConfig(ConfigModel):
             "news_ingest": self.news_ingest,
             "daily_digest": self.daily_digest,
             "weekly_digest": self.weekly_digest,
+            "monthly_review": self.monthly_review,
+            "ownership_13f": self.ownership_13f,
         }
 
     def next_run_after(self, job_type: str, moment: dt.datetime) -> dt.datetime | None:

@@ -723,6 +723,200 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/jobs/research": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Run Research Now
+         * @description Queue a deep research run for a ticker under a research profile.
+         */
+        post: operations["run_research_now"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/research": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Research */
+        get: operations["list_research"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/research/{report_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Research
+         * @description A research report: sections of cited sentences, computed valuation figures and the
+         *     source list every citation points into.
+         */
+        get: operations["get_research"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/reviews": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Reviews */
+        get: operations["list_reviews"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/reviews/{report_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Review
+         * @description A monthly review: every strategy rule, hard limit and band with pass / breach /
+         *     unknown, thesis KPI statuses, flags, and proposed actions each citing a rule or KPI.
+         */
+        get: operations["get_review"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/jobs/monthly-review": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Run Monthly Review
+         * @description Write a monthly review now (a manual run is not limited to the first weekday).
+         */
+        post: operations["run_monthly_review"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/reports/search": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Search Reports
+         * @description Full-text search over every report (title, ticker, profile and text), newest first.
+         */
+        get: operations["search_reports"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/config/research-profiles": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Research Profiles Config
+         * @description The saved research profiles. 404 means the defaults (standard, quick) apply.
+         */
+        get: operations["get_research_profiles_config"];
+        /** Save Research Profiles Config */
+        put: operations["save_research_profiles_config"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/config/research-profiles/validate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Validate Research Profiles */
+        post: operations["validate_research_profiles"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/jobs/ownership-13f": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Run Ownership 13F
+         * @description Load new SEC Form 13F data sets now (about 100 MB each).
+         */
+        post: operations["run_ownership_13f"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/news": {
         parameters: {
             query?: never;
@@ -1306,6 +1500,28 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/holdings/{ticker}/ownership": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Holding Ownership
+         * @description Institutional ownership from SEC Form 13F data sets: holders, shares and value per
+         *     report period (newest first) with changes, and the largest holders. Only US-listed
+         *     holdings are covered; every figure carries its period and filing date.
+         */
+        get: operations["get_holding_ownership"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/feedback": {
         parameters: {
             query?: never;
@@ -1439,6 +1655,98 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/chat/conversations": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Conversations */
+        get: operations["list_conversations"];
+        put?: never;
+        /** Create Conversation */
+        post: operations["create_conversation"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/chat/conversations/{conversation_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Conversation */
+        get: operations["get_conversation"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/chat/conversations/{conversation_id}/messages": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Post Message
+         * @description Store the owner's message and queue the answer; poll the conversation for it.
+         */
+        post: operations["post_message"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/chat/actions/{action_id}/confirm": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Confirm Action
+         * @description Start a job the assistant proposed. It appears in the job log with trigger `chat`.
+         */
+        post: operations["confirm_action"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/chat/actions/{action_id}/cancel": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Cancel Action */
+        post: operations["cancel_action"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -1462,6 +1770,38 @@ export interface components {
             unrealized_ppl: number;
             /** Realized Ppl */
             realized_ppl: number;
+        };
+        /** ActionOut */
+        ActionOut: {
+            /** Id */
+            id: number;
+            /** Message Id */
+            message_id: number | null;
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "earnings_check" | "research" | "portfolio_sync";
+            /** Params */
+            params: {
+                [key: string]: unknown;
+            };
+            /** Reason */
+            reason: string | null;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "proposed" | "confirmed" | "cancelled";
+            /** Job Id */
+            job_id: number | null;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Decided At */
+            decided_at: string | null;
         };
         /** ActivityCoverage */
         ActivityCoverage: {
@@ -1842,6 +2182,88 @@ export interface components {
             /** Bucket */
             bucket?: string | null;
         };
+        /** ChatAnswer */
+        ChatAnswer: {
+            /** Sentences */
+            sentences: components["schemas"]["ChatSentence"][];
+            /** Sources */
+            sources: components["schemas"]["Source"][];
+            /** Tools Used */
+            tools_used: string[];
+            /**
+             * Actions
+             * @description Proposed actions waiting for confirmation.
+             */
+            actions: number[];
+            /** Model */
+            model: string | null;
+            /** Note */
+            note?: string | null;
+        };
+        /** ChatSentence */
+        ChatSentence: {
+            /** Text */
+            text: string;
+            /** Source Ids */
+            source_ids: string[];
+            /**
+             * No Source
+             * @description Shown as 'no source': nothing checkable cites it.
+             */
+            no_source: boolean;
+            /**
+             * Unsupported
+             * @description Why a figure in it is not in its sources, when that is so.
+             */
+            unsupported?: string | null;
+        };
+        /**
+         * ChatSettings
+         * @description The chat panel's assistant: DB tools, web search on tiered outlets, cited answers.
+         */
+        ChatSettings: {
+            /**
+             * Model
+             * @default claude-sonnet-5
+             * @example claude-sonnet-5
+             */
+            model: string;
+            /**
+             * Max Steps
+             * @description Claude calls plus tool rounds per answer.
+             * @default 6
+             */
+            max_steps: number;
+            /**
+             * Max Searches
+             * @description Web searches per answer.
+             * @default 3
+             */
+            max_searches: number;
+            /**
+             * History Messages
+             * @description Earlier messages of the conversation sent along.
+             * @default 12
+             */
+            history_messages: number;
+        };
+        /** CitedSentence */
+        CitedSentence: {
+            /** Text */
+            text: string;
+            /** Source Ids */
+            source_ids?: string[];
+            /**
+             * Written By
+             * @default code
+             * @enum {string}
+             */
+            written_by: "code" | "model";
+            /** Check */
+            check?: ("supported" | "unsupported" | "unchecked") | null;
+            /** Check Reason */
+            check_reason?: string | null;
+        };
         /**
          * ClaimCheckSummary
          * @description What the claim verifier did to a report, stored with it.
@@ -1949,6 +2371,30 @@ export interface components {
             /** Name */
             name: string;
         };
+        /** ComplianceRow */
+        ComplianceRow: {
+            /**
+             * Id
+             * @description The strategy rule id, or hard_limit:/band: keys.
+             */
+            id: string;
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "rule" | "hard_limit" | "band";
+            /** Description */
+            description: string;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "pass" | "breach" | "unknown";
+            /** Detail */
+            detail: string;
+            /** Source Ids */
+            source_ids?: string[];
+        };
         /** ConfigDiff */
         ConfigDiff: {
             /** Domain */
@@ -2043,6 +2489,33 @@ export interface components {
              * @description Number of changed paths against the previous version; null for the first.
              */
             changes: number | null;
+        };
+        /** ConversationDetail */
+        ConversationDetail: {
+            conversation: components["schemas"]["ConversationOut"];
+            /** Messages */
+            messages: components["schemas"]["MessageOut"][];
+            /** Actions */
+            actions: components["schemas"]["ActionOut"][];
+        };
+        /** ConversationOut */
+        ConversationOut: {
+            /** Id */
+            id: number;
+            /** Title */
+            title: string;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /**
+             * Updated At
+             * Format: date-time
+             */
+            updated_at: string;
+            /** Last Message */
+            last_message?: string | null;
         };
         /** Correlation */
         Correlation: {
@@ -2150,6 +2623,11 @@ export interface components {
             writer?: string | null;
             /** Fact Sources */
             fact_sources?: components["schemas"]["DigestFactSource"][];
+            /**
+             * Ownership Changes
+             * @description Tracked managers' new and exited positions in holdings, from 13F filings received in the period.
+             */
+            ownership_changes?: components["schemas"]["ManagerChange"][];
             /** @description The claim verifier's pass over the written sentences. */
             claims?: components["schemas"]["ClaimCheckSummary"] | null;
         };
@@ -3360,6 +3838,28 @@ export interface components {
             /** @description Tier 3: community-edited. */
             wikidata: components["schemas"]["WikidataSummary"] | null;
         };
+        /** HoldingOwnership */
+        HoldingOwnership: {
+            /** Ticker */
+            ticker: string;
+            /** Cusips */
+            cusips: string[];
+            /**
+             * Periods
+             * @description Newest first.
+             */
+            periods: components["schemas"]["OwnershipPeriod"][];
+            /**
+             * Top Holders
+             * @description Largest positions, latest period.
+             */
+            top_holders: components["schemas"]["TopHolder"][];
+            /**
+             * Source
+             * @default SEC Form 13F data sets
+             */
+            source: string;
+        };
         /** HoldingProfile */
         HoldingProfile: {
             /**
@@ -3736,6 +4236,10 @@ export interface components {
             daily_digest?: components["schemas"]["JobSchedule"];
             /** @description Weekly digest of the last 7 days. Default: Sundays 18:00. */
             weekly_digest?: components["schemas"]["JobSchedule"];
+            /** @description Monthly review on the first weekday of the month (a scheduled run on another day does nothing). Default: 07:00 on the 1st-3rd. */
+            monthly_review?: components["schemas"]["JobSchedule"];
+            /** @description Load new SEC Form 13F data sets (published quarterly). Default: the 5th of each month, 05:00. */
+            ownership_13f?: components["schemas"]["JobSchedule"];
             earnings_check?: components["schemas"]["EarningsCheckSettings"];
             earnings_calendar_settings?: components["schemas"]["EarningsCalendarSettings"];
             news?: components["schemas"]["NewsSettings"];
@@ -3746,6 +4250,9 @@ export interface components {
             reference?: components["schemas"]["ReferenceSettings"];
             prices?: components["schemas"]["PriceSettings"];
             calendar?: components["schemas"]["CalendarSettings"];
+            chat?: components["schemas"]["ChatSettings"];
+            review?: components["schemas"]["ReviewSettings"];
+            ownership?: components["schemas"]["OwnershipSettings"];
         };
         /** JobsConfigVersion */
         JobsConfigVersion: {
@@ -3759,6 +4266,31 @@ export interface components {
             /** Note */
             note: string | null;
             body: components["schemas"]["JobsConfig"];
+        };
+        /** KpiRow */
+        KpiRow: {
+            /** Ticker */
+            ticker: string;
+            /** Kpi Id */
+            kpi_id: string;
+            /**
+             * Ref
+             * @description TICKER:kpi_id, as actions cite it.
+             */
+            ref: string;
+            /** Description */
+            description: string;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "pass" | "breach" | "unknown";
+            /** Period */
+            period: string | null;
+            /** Verdict Id */
+            verdict_id: number | null;
+            /** Source Ids */
+            source_ids?: string[];
         };
         /** KpiStatus */
         KpiStatus: {
@@ -3875,6 +4407,37 @@ export interface components {
             /** Ecb */
             ecb?: components["schemas"]["EcbSeries"][];
         };
+        /** ManagerChange */
+        ManagerChange: {
+            /** Cik */
+            cik: string;
+            /** Manager Name */
+            manager_name: string | null;
+            /** Ticker */
+            ticker: string;
+            /**
+             * Change
+             * @description new or exited
+             */
+            change: string;
+            /**
+             * Period
+             * Format: date
+             */
+            period: string;
+            /**
+             * Previous Period
+             * Format: date
+             */
+            previous_period: string;
+            /**
+             * Shares
+             * @description New: shares held; exited: shares held before.
+             */
+            shares: number | string | null;
+            /** Accession */
+            accession: string;
+        };
         /** MarketHoliday */
         MarketHoliday: {
             /** Calendar */
@@ -3886,6 +4449,32 @@ export interface components {
             date: string;
             /** Name */
             name: string;
+        };
+        /** MessageOut */
+        MessageOut: {
+            /** Id */
+            id: number;
+            /**
+             * Role
+             * @enum {string}
+             */
+            role: "user" | "assistant";
+            /** Content */
+            content: string;
+            /** @description Assistant messages: sentences and sources. */
+            answer: components["schemas"]["ChatAnswer"] | null;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "pending" | "done" | "failed";
+            /** Job Id */
+            job_id: number | null;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
         };
         /** ModelPrice */
         ModelPrice: {
@@ -3927,6 +4516,16 @@ export interface components {
              * @default 48
              */
             news_coverage_hours: number;
+        };
+        /** NewConversation */
+        NewConversation: {
+            /** Title */
+            title?: string | null;
+        };
+        /** NewMessage */
+        NewMessage: {
+            /** Content */
+            content: string;
         };
         /** NewsFeed */
         NewsFeed: {
@@ -4255,6 +4854,66 @@ export interface components {
             note: string | null;
             body: components["schemas"]["NotificationsConfig"];
         };
+        /** OwnershipPeriod */
+        OwnershipPeriod: {
+            /**
+             * Period
+             * Format: date
+             */
+            period: string;
+            /** Holders */
+            holders: number;
+            /** Shares */
+            shares: number | string;
+            /** Value Usd */
+            value_usd: number | string;
+            /** Latest Filed */
+            latest_filed: string | null;
+            /**
+             * Holders Change
+             * @description Against the previous period loaded.
+             */
+            holders_change: number | null;
+            /** Shares Change */
+            shares_change: number | string | null;
+            /** New Holders */
+            new_holders: number | null;
+            /** Exited Holders */
+            exited_holders: number | null;
+        };
+        /**
+         * OwnershipSettings
+         * @description Form 13F institutional ownership from the SEC's quarterly data sets.
+         */
+        OwnershipSettings: {
+            /**
+             * Enabled
+             * @default true
+             */
+            enabled: boolean;
+            /**
+             * Index Url
+             * @description The SEC page listing the data sets (zip files).
+             * @default https://www.sec.gov/data-research/sec-markets-data/form-13f-data-sets
+             */
+            index_url: string;
+            /**
+             * Datasets Per Run
+             * @description Data sets (about 100 MB each) loaded per run.
+             * @default 2
+             */
+            datasets_per_run: number;
+            /**
+             * Tracked Managers
+             * @description Managers whose new and exited positions in the portfolio's holdings appear in the next digest.
+             */
+            tracked_managers?: components["schemas"]["TrackedManager"][];
+            /**
+             * Top Holders
+             * @default 10
+             */
+            top_holders: number;
+        };
         /** PlausibilityCheck */
         PlausibilityCheck: {
             /**
@@ -4432,6 +5091,12 @@ export interface components {
             /** Ticker */
             ticker?: string | null;
         };
+        /** PostedMessage */
+        PostedMessage: {
+            message: components["schemas"]["MessageOut"];
+            /** Job Id */
+            job_id: number;
+        };
         /** PriceGap */
         PriceGap: {
             /**
@@ -4519,6 +5184,25 @@ export interface components {
              * @default 1
              */
             plausibility_tolerance_pct: number;
+        };
+        /** ProposedAction */
+        ProposedAction: {
+            /** Action */
+            action: string;
+            /** Ticker */
+            ticker: string | null;
+            /** Rationale */
+            rationale: string;
+            /**
+             * Rule Ids
+             * @description Strategy rule ids it rests on.
+             */
+            rule_ids: string[];
+            /**
+             * Kpis
+             * @description Thesis KPIs it rests on, as TICKER:kpi_id.
+             */
+            kpis: string[];
         };
         /** QuietHours */
         QuietHours: {
@@ -4783,6 +5467,34 @@ export interface components {
             /** Elapsed Ms */
             elapsed_ms: number;
         };
+        /** ReportHit */
+        ReportHit: {
+            /** Id */
+            id: number;
+            /**
+             * Type
+             * @enum {string}
+             */
+            type: "digest" | "research" | "review" | "escalation";
+            /** Period */
+            period: string | null;
+            /** Ticker */
+            ticker: string | null;
+            /** Profile */
+            profile: string | null;
+            /** Title */
+            title: string;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /**
+             * Excerpt
+             * @description The matching passage, with matches in <b></b>.
+             */
+            excerpt: string;
+        };
         /** ReportOut */
         ReportOut: {
             /** Id */
@@ -4861,6 +5573,253 @@ export interface components {
             /** Reason */
             reason: string;
         };
+        /** ResearchBody */
+        ResearchBody: {
+            /** Ticker */
+            ticker: string;
+            /** Name */
+            name: string;
+            /** Owned */
+            owned: boolean;
+            /** Headline */
+            headline: string;
+            /** Profile Id */
+            profile_id: string;
+            /** Profile Name */
+            profile_name: string;
+            /** Depth */
+            depth: string;
+            /** Model */
+            model: string;
+            /** Language */
+            language: string;
+            /** Sections */
+            sections: components["schemas"]["ResearchSection"][];
+            /** Valuation */
+            valuation: components["schemas"]["Valuation"][];
+            /** Sources */
+            sources: components["schemas"]["Source"][];
+            claims?: components["schemas"]["ClaimCheckSummary"] | null;
+            /**
+             * Steps Used
+             * @default 0
+             */
+            steps_used: number;
+            /**
+             * Searches Used
+             * @default 0
+             */
+            searches_used: number;
+            /**
+             * Dropped Sentences
+             * @description Model sentences removed for citing nothing checkable.
+             * @default 0
+             */
+            dropped_sentences: number;
+            /** Notes */
+            notes?: string[];
+        };
+        /** ResearchProfile */
+        ResearchProfile: {
+            /** Id */
+            id: string;
+            /** Name */
+            name: string;
+            /** Sections */
+            sections: ("business" | "financial_trend" | "moat_risks" | "valuation" | "strategy_fit" | "ownership" | "relationships" | "risk" | "liquidity" | "open_questions")[];
+            /**
+             * Depth
+             * @description Sentences per model-written section: brief 3, standard 6, deep 12.
+             * @default standard
+             * @enum {string}
+             */
+            depth: "brief" | "standard" | "deep";
+            /**
+             * Model
+             * @default claude-opus-5-5
+             * @example claude-sonnet-5
+             */
+            model: string;
+            /**
+             * Effort
+             * @default high
+             * @enum {string}
+             */
+            effort: "low" | "medium" | "high" | "xhigh" | "max";
+            /**
+             * Max Steps
+             * @description Claude calls plus web searches per run.
+             * @default 20
+             */
+            max_steps: number;
+            /**
+             * Max Searches
+             * @default 15
+             */
+            max_searches: number;
+            /**
+             * Source Tiers
+             * @description Outlet tiers web search may use and the report may cite.
+             */
+            source_tiers?: (1 | 2 | 3)[];
+            /**
+             * Include Peers
+             * @description Name the holding's competitors and compare with them.
+             * @default true
+             */
+            include_peers: boolean;
+            /** Valuation Methods */
+            valuation_methods?: ("pe_ttm" | "earnings_yield" | "dividend_yield_ttm")[];
+            /**
+             * Language
+             * @default en
+             * @enum {string}
+             */
+            language: "en" | "cs";
+        };
+        /**
+         * ResearchProfilesConfig
+         * @description Stored as `config_version` rows, domain `research_profiles`.
+         */
+        ResearchProfilesConfig: {
+            /**
+             * Schema Version
+             * @default 1
+             * @constant
+             */
+            schema_version: 1;
+            /** Profiles */
+            profiles?: components["schemas"]["ResearchProfile"][];
+            /**
+             * Default Profile
+             * @default standard
+             */
+            default_profile: string;
+        };
+        /** ResearchProfilesConfigVersion */
+        ResearchProfilesConfigVersion: {
+            /** Id */
+            id: number;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Note */
+            note: string | null;
+            body: components["schemas"]["ResearchProfilesConfig"];
+        };
+        /** ResearchReportOut */
+        ResearchReportOut: {
+            /** Id */
+            id: number;
+            /** Ticker */
+            ticker: string | null;
+            /** Title */
+            title: string;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Job Id */
+            job_id: number | null;
+            body: components["schemas"]["ResearchBody"];
+            /** Body Md */
+            body_md: string;
+        };
+        /** ResearchRequest */
+        ResearchRequest: {
+            /**
+             * Ticker
+             * @description Any ticker, owned or not (a Trading212 ticker gives the richest data).
+             */
+            ticker: string;
+            /**
+             * Profile
+             * @description Research profile id; default if omitted.
+             */
+            profile?: string | null;
+            /**
+             * Name
+             * @description Company name hint.
+             */
+            name?: string | null;
+        };
+        /** ResearchSection */
+        ResearchSection: {
+            /** Id */
+            id: string;
+            /** Title */
+            title: string;
+            /**
+             * Written By
+             * @description code (figures from stored records) or model
+             */
+            written_by: string;
+            /** Sentences */
+            sentences: components["schemas"]["CitedSentence"][];
+            /** Note */
+            note?: string | null;
+        };
+        /** ResearchSummary */
+        ResearchSummary: {
+            /** Id */
+            id: number;
+            /** Ticker */
+            ticker: string | null;
+            /** Title */
+            title: string;
+            /** Profile */
+            profile: string | null;
+            /** Headline */
+            headline: string | null;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Job Id */
+            job_id: number | null;
+        };
+        /** ReviewBody */
+        ReviewBody: {
+            /** Month */
+            month: string;
+            /** Headline */
+            headline: string;
+            /**
+             * As Of
+             * @description Snapshot date the compliance is judged on.
+             */
+            as_of: string | null;
+            /** Total Base */
+            total_base: number | null;
+            /** Base Currency */
+            base_currency: string | null;
+            /** Compliance */
+            compliance: components["schemas"]["ComplianceRow"][];
+            /** Kpis */
+            kpis: components["schemas"]["KpiRow"][];
+            /** Reviews Due */
+            reviews_due: string[];
+            /** Flags */
+            flags: components["schemas"]["CitedSentence"][];
+            /** Actions */
+            actions: components["schemas"]["ProposedAction"][];
+            /**
+             * Dropped Actions
+             * @description Proposed actions citing nothing valid.
+             * @default 0
+             */
+            dropped_actions: number;
+            /** Sources */
+            sources: components["schemas"]["Source"][];
+            /** Model */
+            model?: string | null;
+            /** Notes */
+            notes?: string[];
+        };
         /** ReviewDue */
         ReviewDue: {
             /** Ticker */
@@ -4892,6 +5851,53 @@ export interface components {
             restates: components["schemas"]["FactOut"] | null;
             /** Reconciliation */
             reconciliation: components["schemas"]["ReconciliationOut"][];
+        };
+        /** ReviewReportOut */
+        ReviewReportOut: {
+            /** Id */
+            id: number;
+            /** Title */
+            title: string;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Job Id */
+            job_id: number | null;
+            body: components["schemas"]["ReviewBody"];
+            /** Body Md */
+            body_md: string;
+        };
+        /**
+         * ReviewSettings
+         * @description The monthly review: compliance and figures in code, proposed actions by the model.
+         */
+        ReviewSettings: {
+            /**
+             * Model
+             * @default claude-opus-5-5
+             * @example claude-sonnet-5
+             */
+            model: string;
+            /**
+             * Effort
+             * @default high
+             * @enum {string}
+             */
+            effort: "low" | "medium" | "high" | "xhigh" | "max";
+            /**
+             * Max Steps
+             * @description Claude calls per review.
+             * @default 3
+             */
+            max_steps: number;
+            /**
+             * Liquidity Days
+             * @description A position larger than this many days of its home market's average daily turnover is flagged as hard to exit.
+             * @default 1
+             */
+            liquidity_days: number;
         };
         /** RiskCard */
         RiskCard: {
@@ -4970,6 +5976,45 @@ export interface components {
             event_type: "guidance_change" | "m_and_a" | "dividend_cut" | "earnings_release" | "management_change" | "regulatory_legal" | "capital_allocation" | "credit_rating" | "central_bank" | "macro_surprise" | "insider_transaction" | "product_business" | "sector_competitor" | "index_change" | "analyst_rating" | "delisting" | "entity_status" | "other";
             /** Severity */
             severity: number;
+        };
+        /** Source */
+        Source: {
+            /**
+             * Id
+             * @description Short id cited by sentences, e.g. S3.
+             */
+            id: string;
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "fact" | "news_item" | "relationship" | "filing13f" | "price" | "listing" | "verdict" | "position" | "strategy" | "thesis" | "report" | "search";
+            /**
+             * Ref
+             * @description The stored record: fact id, accession, URL, ...
+             */
+            ref: string;
+            /** Title */
+            title: string;
+            /**
+             * Url
+             * @description External page, when there is one.
+             */
+            url?: string | null;
+            /**
+             * App Path
+             * @description The app page for it, e.g. /evidence/12 or /holdings/X.
+             */
+            app_path?: string | null;
+            /** Tier */
+            tier?: number | null;
+            /**
+             * Snippet
+             * @description The stored text it rests on.
+             */
+            snippet?: string | null;
+            /** As Of */
+            as_of?: string | null;
         };
         /** SourceTrustOut */
         SourceTrustOut: {
@@ -5307,6 +6352,22 @@ export interface components {
              */
             ticker?: string | null;
         };
+        /** TopHolder */
+        TopHolder: {
+            /** Cik */
+            cik: string;
+            /** Manager Name */
+            manager_name: string | null;
+            /** Shares */
+            shares: number | string;
+            /** Value Usd */
+            value_usd: number | string | null;
+            /**
+             * Accession
+             * @description The filing the position is read from.
+             */
+            accession: string;
+        };
         /** TotalByCurrency */
         TotalByCurrency: {
             /**
@@ -5325,6 +6386,13 @@ export interface components {
              * @description Sum of `amount` over the filtered rows.
              */
             amount: number;
+        };
+        /** TrackedManager */
+        TrackedManager: {
+            /** Cik */
+            cik: string;
+            /** Name */
+            name: string;
         };
         /** TransactionOut */
         TransactionOut: {
@@ -5419,6 +6487,21 @@ export interface components {
             input?: unknown;
             /** Context */
             ctx?: Record<string, never>;
+        };
+        /** Valuation */
+        Valuation: {
+            /** Method */
+            method: string;
+            /** Value */
+            value: number | null;
+            /** Display */
+            display: string;
+            /** Formula */
+            formula: string;
+            /** Source Ids */
+            source_ids: string[];
+            /** Note */
+            note?: string | null;
         };
         /** VerdictOut */
         VerdictOut: {
@@ -5686,7 +6769,7 @@ export interface operations {
             header?: never;
             path: {
                 /** @description Config domain, as in /config/<domain>. */
-                domain: "strategy" | "theses" | "jobs" | "holding-profiles" | "verification" | "news-sources" | "event-rules" | "notifications" | "budget";
+                domain: "strategy" | "theses" | "jobs" | "holding-profiles" | "verification" | "news-sources" | "event-rules" | "notifications" | "budget" | "research-profiles";
             };
             cookie?: never;
         };
@@ -5718,7 +6801,7 @@ export interface operations {
             header?: never;
             path: {
                 /** @description Config domain, as in /config/<domain>. */
-                domain: "strategy" | "theses" | "jobs" | "holding-profiles" | "verification" | "news-sources" | "event-rules" | "notifications" | "budget";
+                domain: "strategy" | "theses" | "jobs" | "holding-profiles" | "verification" | "news-sources" | "event-rules" | "notifications" | "budget" | "research-profiles";
                 version_id: number;
             };
             cookie?: never;
@@ -5754,7 +6837,7 @@ export interface operations {
             header?: never;
             path: {
                 /** @description Config domain, as in /config/<domain>. */
-                domain: "strategy" | "theses" | "jobs" | "holding-profiles" | "verification" | "news-sources" | "event-rules" | "notifications" | "budget";
+                domain: "strategy" | "theses" | "jobs" | "holding-profiles" | "verification" | "news-sources" | "event-rules" | "notifications" | "budget" | "research-profiles";
             };
             cookie?: never;
         };
@@ -5786,7 +6869,7 @@ export interface operations {
             header?: never;
             path: {
                 /** @description Config domain, as in /config/<domain>. */
-                domain: "strategy" | "theses" | "jobs" | "holding-profiles" | "verification" | "news-sources" | "event-rules" | "notifications" | "budget";
+                domain: "strategy" | "theses" | "jobs" | "holding-profiles" | "verification" | "news-sources" | "event-rules" | "notifications" | "budget" | "research-profiles";
                 version_id: number;
             };
             cookie?: never;
@@ -6770,6 +7853,327 @@ export interface operations {
             };
         };
     };
+    run_research_now: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ResearchRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["JobSummary"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_research: {
+        parameters: {
+            query?: {
+                ticker?: string | null;
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ResearchSummary"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_research: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                report_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ResearchReportOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_reviews: {
+        parameters: {
+            query?: {
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ResearchSummary"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_review: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                report_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReviewReportOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    run_monthly_review: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["JobSummary"];
+                };
+            };
+        };
+    };
+    search_reports: {
+        parameters: {
+            query: {
+                /** @description Words, a ticker, "a phrase", or -excluded. */
+                q: string;
+                type?: ("digest" | "research" | "review" | "escalation")[] | null;
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReportHit"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_research_profiles_config: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ResearchProfilesConfigVersion"];
+                };
+            };
+        };
+    };
+    save_research_profiles_config: {
+        parameters: {
+            query?: {
+                /** @description Why this change was made. */
+                note?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ResearchProfilesConfig"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ResearchProfilesConfigVersion"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    validate_research_profiles: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ResearchProfilesConfig"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ResearchProfilesConfig"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    run_ownership_13f: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["JobSummary"];
+                };
+            };
+        };
+    };
     get_news: {
         parameters: {
             query?: {
@@ -7701,6 +9105,37 @@ export interface operations {
             };
         };
     };
+    get_holding_ownership: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                ticker: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HoldingOwnership"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     get_feedback: {
         parameters: {
             query?: {
@@ -7891,6 +9326,198 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ActivityCoverage"];
+                };
+            };
+        };
+    };
+    list_conversations: {
+        parameters: {
+            query?: {
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ConversationOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_conversation: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["NewConversation"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ConversationOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_conversation: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                conversation_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ConversationDetail"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    post_message: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                conversation_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["NewMessage"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PostedMessage"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    confirm_action: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                action_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ActionOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    cancel_action: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                action_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ActionOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };
