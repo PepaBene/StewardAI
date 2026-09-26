@@ -210,12 +210,15 @@ class AlertOut(BaseModel):
     created_at: dt.datetime
 
 
-async def recent_alerts(pool: asyncpg.Pool, limit: int) -> list[AlertOut]:
+async def recent_alerts(
+    pool: asyncpg.Pool, limit: int, kinds: list[str] | None = None
+) -> list[AlertOut]:
     rows = await pool.fetch(
         "select id, kind, severity, ticker, event_type, cluster_id, verdict_id, channel, message,"
         " status, send_after, sent_at, suppressed_reason, error, created_at"
-        " from public.alert order by id desc limit $1",
+        " from public.alert where ($2::text[] is null or kind = any($2)) order by id desc limit $1",
         limit,
+        kinds or None,
     )
     return [AlertOut(**dict(r)) for r in rows]
 

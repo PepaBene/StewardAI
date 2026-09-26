@@ -117,10 +117,16 @@ async def get_event_types(_owner: Owner) -> list[EventTypeInfo]:
 
 @router.get("/alerts", tags=["alerts"])
 async def get_alerts(
-    pool: Pool, _owner: Owner, limit: Annotated[int, Query(ge=1, le=200)] = 50
+    pool: Pool,
+    _owner: Owner,
+    limit: Annotated[int, Query(ge=1, le=200)] = 50,
+    kind: Annotated[
+        list[Literal["news", "thesis_breach", "test", "portfolio", "system"]] | None,
+        Query(description="Any of these kinds; system = failed jobs, missed runs, gaps."),
+    ] = None,
 ) -> list[AlertOut]:
     """Recent alert decisions: sent, held for quiet hours, suppressed (with why) or failed."""
-    return await recent_alerts(pool, limit)
+    return await recent_alerts(pool, limit, list(kind) if kind else None)
 
 
 class TestAlertRequest(BaseModel):

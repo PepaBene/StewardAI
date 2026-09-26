@@ -1418,6 +1418,27 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/activity/coverage": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Activity Coverage
+         * @description Per open holding: when news, earnings checks and prices last covered it, and whether
+         *     that is a gap (no news run within the monitoring window, or stale price bars).
+         */
+        get: operations["get_activity_coverage"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -1441,6 +1462,23 @@ export interface components {
             unrealized_ppl: number;
             /** Realized Ppl */
             realized_ppl: number;
+        };
+        /** ActivityCoverage */
+        ActivityCoverage: {
+            /**
+             * Checked At
+             * Format: date-time
+             */
+            checked_at: string;
+            /** News Window Hours */
+            news_window_hours: number;
+            /** Holdings */
+            holdings: components["schemas"]["HoldingCoverage"][];
+            /**
+             * Gaps
+             * @description Holdings with at least one gap.
+             */
+            gaps: number;
         };
         /** AlertOut */
         AlertOut: {
@@ -3192,6 +3230,38 @@ export interface components {
              * @enum {string}
              */
             drift_status: "in_band" | "above_band" | "below_band" | "above_hard_limit" | "no_target";
+        };
+        /** HoldingCoverage */
+        HoldingCoverage: {
+            /** Ticker */
+            ticker: string;
+            /** Name */
+            name: string | null;
+            /**
+             * Held Since
+             * Format: date-time
+             */
+            held_since: string;
+            /** News Last Covered */
+            news_last_covered: string | null;
+            /**
+             * News Gap
+             * @description No successful news run covered it within the window.
+             */
+            news_gap: boolean;
+            /** Earnings Last Check */
+            earnings_last_check: string | null;
+            /** Earnings Last Status */
+            earnings_last_status: string | null;
+            /** Price Symbol */
+            price_symbol: string | null;
+            /** Prices Last Date */
+            prices_last_date: string | null;
+            /**
+             * Prices Gap
+             * @description A price symbol whose latest bar is more than 4 days old.
+             */
+            prices_gap: boolean;
         };
         /** HoldingDetail */
         HoldingDetail: {
@@ -6830,6 +6900,8 @@ export interface operations {
         parameters: {
             query?: {
                 limit?: number;
+                /** @description Any of these kinds; system = failed jobs, missed runs, gaps. */
+                kind?: ("news" | "thesis_breach" | "test" | "portfolio" | "system")[] | null;
             };
             header?: never;
             path?: never;
@@ -7799,6 +7871,26 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["EvalCandidateOut"][];
+                };
+            };
+        };
+    };
+    get_activity_coverage: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ActivityCoverage"];
                 };
             };
         };

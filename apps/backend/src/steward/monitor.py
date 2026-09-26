@@ -14,11 +14,11 @@ the rules like any event, and each has a dedupe key, so a condition never alerts
 """
 
 import datetime as dt
-import json
 
 import asyncpg
 from apscheduler.triggers.cron import CronTrigger
 
+from steward.activity import held_since, news_last_covered
 from steward.config.jobs import JobsConfig
 from steward.config.notifications import NotificationsConfig
 from steward.config.store import load_active
@@ -192,33 +192,18 @@ async def run_monitor(ctx: JobContext, now: dt.datetime) -> None:
         outcomes = []
         if jobs.news_ingest.enabled:
             window = dt.timedelta(hours=settings.news_coverage_hours)
-            holdings = await pool.fetch(
-                "select p.ticker, min(p.captured_at) as since from public.position_snapshot p"
-                " where p.ticker in (select ticker from public.position_snapshot"
-                " where snapshot_date = (select max(snapshot_date) from public.position_snapshot))"
-                " group by p.ticker"
-            )
-            runs = await pool.fetch(
-                "select j.finished_at, s.detail from public.job j join public.job_step s"
-                " on s.job_id = j.id and s.name = 'load_config' where j.job_type = 'news_ingest'"
-                " and j.status = 'succeeded' and j.finished_at >= $1 order by j.finished_at desc",
-                now - window - dt.timedelta(days=7),
-            )
-            covered: dict[str, dt.datetime] = {}
-            for run in runs:
-                detail = json.loads(run["detail"]) if run["detail"] else {}
-                for ticker in detail.get("holdings", []):
-                    covered.setdefault(ticker, run["finished_at"])
-            for h in holdings:
-                last = covered.get(h["ticker"])
+            held = await held_since(pool)
+            covered = await news_last_covered(pool, now - window - dt.timedelta(days=7))
+            for ticker, held_from in sorted(held.items()):
+                last = covered.get(ticker)
                 if last is not None and last >= now - window:
                     continue
-                if h["since"] > now - window:
+                if held_from > now - window:
                     continue  # held for less than the window
                 since = last.isoformat() if last else "never"
                 lines = [
-                    f"no news coverage for {h['ticker']}",
-                    f"No successful news run has covered {h['ticker']} since {since} "
+                    f"no news coverage for {ticker}",
+                    f"No successful news run has covered {ticker} since {since} "
                     f"(window {settings.news_coverage_hours} h).",
                 ]
                 outcome = await _alert(
@@ -227,9 +212,9 @@ async def run_monitor(ctx: JobContext, now: dt.datetime) -> None:
                     version,
                     severity,
                     "coverage_gap",
-                    h["ticker"],
+                    ticker,
                     lines,
-                    f"coverage:news:{h['ticker']}:{since}",
+                    f"coverage:news:{ticker}:{since}",
                     now,
                     ctx.job_id,
                 )

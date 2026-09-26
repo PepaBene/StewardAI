@@ -10,7 +10,8 @@ from pydantic import BaseModel
 
 from api.auth import Owner
 from api.db import Pool
-from steward.config import EventRulesConfig, NotificationsConfig, VerificationConfig
+from steward.activity import ActivityCoverage, coverage
+from steward.config import EventRulesConfig, JobsConfig, NotificationsConfig, VerificationConfig
 from steward.config.store import load_active
 from steward.verify.feedback import (
     FeedbackError,
@@ -118,3 +119,11 @@ async def get_eval_candidates(pool: Pool, _owner: Owner) -> list[EvalCandidateOu
         " exported_to from public.eval_candidate order by id desc limit 500"
     )
     return [EvalCandidateOut(**{**dict(r), "corrected": json.loads(r["corrected"])}) for r in rows]
+
+
+@router.get("/activity/coverage", tags=["jobs"])
+async def get_activity_coverage(pool: Pool, _owner: Owner) -> ActivityCoverage:
+    """Per open holding: when news, earnings checks and prices last covered it, and whether
+    that is a gap (no news run within the monitoring window, or stale price bars)."""
+    stored = await load_active(pool, "jobs", JobsConfig)
+    return await coverage(pool, stored.body if stored else JobsConfig(), dt.datetime.now(dt.UTC))

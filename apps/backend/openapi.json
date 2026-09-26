@@ -2439,6 +2439,34 @@
               "default": 50,
               "title": "Limit"
             }
+          },
+          {
+            "name": "kind",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "array",
+                  "items": {
+                    "enum": [
+                      "news",
+                      "thesis_breach",
+                      "test",
+                      "portfolio",
+                      "system"
+                    ],
+                    "type": "string"
+                  }
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Any of these kinds; system = failed jobs, missed runs, gaps.",
+              "title": "Kind"
+            },
+            "description": "Any of these kinds; system = failed jobs, missed runs, gaps."
           }
         ],
         "responses": {
@@ -4015,6 +4043,33 @@
           }
         ]
       }
+    },
+    "/activity/coverage": {
+      "get": {
+        "tags": [
+          "jobs"
+        ],
+        "summary": "Get Activity Coverage",
+        "description": "Per open holding: when news, earnings checks and prices last covered it, and whether\nthat is a gap (no news run within the monitoring window, or stale price bars).",
+        "operationId": "get_activity_coverage",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ActivityCoverage"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
     }
   },
   "components": {
@@ -4062,6 +4117,39 @@
           "realized_ppl"
         ],
         "title": "AccountTotals"
+      },
+      "ActivityCoverage": {
+        "properties": {
+          "checked_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Checked At"
+          },
+          "news_window_hours": {
+            "type": "integer",
+            "title": "News Window Hours"
+          },
+          "holdings": {
+            "items": {
+              "$ref": "#/components/schemas/HoldingCoverage"
+            },
+            "type": "array",
+            "title": "Holdings"
+          },
+          "gaps": {
+            "type": "integer",
+            "title": "Gaps",
+            "description": "Holdings with at least one gap."
+          }
+        },
+        "type": "object",
+        "required": [
+          "checked_at",
+          "news_window_hours",
+          "holdings",
+          "gaps"
+        ],
+        "title": "ActivityCoverage"
       },
       "AlertOut": {
         "properties": {
@@ -8315,6 +8403,112 @@
           "drift_status"
         ],
         "title": "Holding"
+      },
+      "HoldingCoverage": {
+        "properties": {
+          "ticker": {
+            "type": "string",
+            "title": "Ticker"
+          },
+          "name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
+          },
+          "held_since": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Held Since"
+          },
+          "news_last_covered": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "News Last Covered"
+          },
+          "news_gap": {
+            "type": "boolean",
+            "title": "News Gap",
+            "description": "No successful news run covered it within the window."
+          },
+          "earnings_last_check": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Earnings Last Check"
+          },
+          "earnings_last_status": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Earnings Last Status"
+          },
+          "price_symbol": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Price Symbol"
+          },
+          "prices_last_date": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Prices Last Date"
+          },
+          "prices_gap": {
+            "type": "boolean",
+            "title": "Prices Gap",
+            "description": "A price symbol whose latest bar is more than 4 days old."
+          }
+        },
+        "type": "object",
+        "required": [
+          "ticker",
+          "name",
+          "held_since",
+          "news_last_covered",
+          "news_gap",
+          "earnings_last_check",
+          "earnings_last_status",
+          "price_symbol",
+          "prices_last_date",
+          "prices_gap"
+        ],
+        "title": "HoldingCoverage"
       },
       "HoldingDetail": {
         "properties": {

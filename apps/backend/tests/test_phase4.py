@@ -953,3 +953,64 @@ def test_the_repository_fingerprints_cover_prompt_model_and_set() -> None:
     for component in COMPONENTS:
         assert all(p.exists() for p in component.code), component.name
         assert len(fingerprint(component)) == 64
+
+
+# ---------------------------------------------------------------------------
+# Activity page: coverage and system alerts
+# ---------------------------------------------------------------------------
+
+
+async def hold(pool: asyncpg.Pool, ticker: str, since: dt.datetime) -> None:
+    job = await add_job(pool, "portfolio_sync", "succeeded", created_at=since)
+    await pool.execute(
+        "insert into instrument (t212_ticker, name) values ($1, $1) on conflict do nothing",
+        ticker,
+    )
+    await pool.execute(
+        "insert into position_snapshot (snapshot_date, ticker, job_id, captured_at, quantity,"
+        " avg_price, current_price, instrument_currency, value, account_currency, value_account,"
+        " cost_account, ppl, base_currency, fx_source, fx_rate, value_base) values"
+        " ($1, $2, $3, $4, 1, 1, 1, 'USD', 1, 'USD', 1, 1, 0, 'USD', 'ecb', 1, 1)",
+        since.date(),
+        ticker,
+        job,
+        since,
+    )
+
+
+async def test_a_holding_no_news_run_covered_for_48_hours_shows_a_gap(
+    api: httpx.AsyncClient, backend_pool: asyncpg.Pool
+) -> None:
+    now = dt.datetime.now(dt.UTC)
+    for ticker in ("AAPL_US_EQ", "MSFT_US_EQ"):
+        await hold(backend_pool, ticker, now - dt.timedelta(days=5))
+    # News runs kept covering Apple; Microsoft was dropped from them three days ago.
+    for hours, holdings in ((80, ["AAPL_US_EQ", "MSFT_US_EQ"]), (2, ["AAPL_US_EQ"])):
+        job = await add_job(
+            backend_pool,
+            "news_ingest",
+            "succeeded",
+            created_at=now - dt.timedelta(hours=hours),
+            steps=[("load_config", "succeeded", None, None)],
+        )
+        await backend_pool.execute(
+            "update job_step set detail = $2::jsonb where job_id = $1",
+            job,
+            json.dumps({"holdings": holdings}),
+        )
+    view = (await api.get("/activity/coverage")).json()
+    by_ticker = {h["ticker"]: h for h in view["holdings"]}
+    assert by_ticker["AAPL_US_EQ"]["news_gap"] is False
+    assert by_ticker["MSFT_US_EQ"]["news_gap"] is True
+    covered = dt.datetime.fromisoformat(by_ticker["MSFT_US_EQ"]["news_last_covered"])
+    assert now - covered > dt.timedelta(hours=79)
+    assert view["gaps"] == 1 and view["news_window_hours"] == 48
+
+    await backend_pool.execute(
+        "insert into alert (kind, severity, channel, message, status, send_after, dedupe_key)"
+        " values ('system', 2, 'telegram', 'no news coverage for MSFT_US_EQ', 'pending', now(),"
+        " 'coverage:news:MSFT_US_EQ:x'), ('news', 3, 'telegram', 'Apple', 'sent', now(), null)"
+    )
+    system = (await api.get("/alerts", params={"kind": "system"})).json()
+    assert [a["message"] for a in system] == ["no news coverage for MSFT_US_EQ"]
+    assert len((await api.get("/alerts")).json()) == 2
