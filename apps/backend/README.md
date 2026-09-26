@@ -39,6 +39,10 @@ src/
     heartbeat.py     worker heartbeat row + external ping (`python -m steward.heartbeat_check`)
     signoff.py       Phase 1 live-data sign-off report (`python -m steward.signoff`)
     activity.py      per-holding coverage for the Activity page
+    research/        deep research (checkpointed step chain) and the source registry
+    review/          the monthly review
+    chat/            the chat assistant: tools, loop, confirmed job actions
+    ownership/       Form 13F data sets: collector and ownership figures
     verify/          Phase 4: source trust, owner feedback, claim verifier (+ its eval,
                      `python -m steward.verify.eval`), replay preview, eval export from
                      feedback (`python -m steward.verify.export_evals`), CI evals gate
@@ -134,6 +138,13 @@ extension; CI runs against a Postgres image that has it.
 | `POST /feedback`, `GET /feedback` | Wrong / irrelevant / useful on facts, verdicts, alerts, news items, stories, report sentences; `effects` says what it did |
 | `GET /sources/trust` | Trust per source host that feedback has moved, and whether it is demoted a tier |
 | `GET /eval-candidates` | Items marked wrong and added to an eval set, and whether they are exported |
+| `POST /jobs/research`, `GET /research`, `GET /research/{id}` | Queue deep research for any ticker under a profile; research reports with their source list |
+| `GET /reviews`, `GET /reviews/{id}`, `POST /jobs/monthly-review` | Monthly reviews: compliance table, KPI statuses, flags, cited proposed actions |
+| `GET /reports/search?q=` | Full-text search over every report (ticker, words, "a phrase"), newest first |
+| `POST /chat/conversations`, `GET /chat/conversations[/{id}]`, `POST /chat/conversations/{id}/messages` | Chat: a message is answered by a `chat` job; poll the conversation |
+| `POST /chat/actions/{id}/confirm`, `/cancel` | Start (as trigger `chat`) or drop a job the assistant proposed |
+| `GET /holdings/{ticker}/ownership`, `POST /jobs/ownership-13f` | 13F holders, shares and changes per period, top holders; load new SEC data sets |
+| `GET`/`PUT /config/research-profiles` | Research profiles (sections, depth, model, budgets, tiers, language) |
 | `POST /config/{event-rules,notifications}/preview` | Replay the last 7 days of stored stories and alerts under a draft; the changed outcomes |
 | `POST /jobs/{portfolio-sync,earnings-check,thesis-verdicts,fact-reconcile,earnings-calendar,news-ingest,digest,macro-collect,reference-data,price-history,holiday-refresh}` | Queue a run now (202); the worker runs it |
 | `GET`/`PUT /config/{strategy,theses,jobs,holding-profiles,verification,budget,news-sources,event-rules,notifications}` | Active config version / save a new one |
@@ -296,6 +307,44 @@ All but the two health routes need the owner's MFA-verified Supabase JWT.
   below the recorded score; without the secret the change fails as unmeasured, until a
   live run is recorded with `--write-baseline`. Before a baseline exists, a run without the
   secret only warns. To make it block merges, add the secret and mark the job required.
+- **Resumable jobs.** A queued job's message is archived only after the run, so a job the
+  worker died in is delivered again with the same id. The runner then closes the steps
+  left `running` as interrupted, continues the step numbering, and the handler reads the
+  outputs of completed steps from `job_checkpoint` instead of redoing (and paying for)
+  them. A job delivered again after it finished is not run twice.
+- **Deep research** (`research`, on demand). Under a research profile: gather (code) builds
+  a source registry of stored records and writes the code sections, so every figure cites
+  its record: financial trend from verified facts (growth computed here), valuation
+  computed here (trailing P/E and earnings yield from four consecutive quarters of
+  diluted EPS and the Trading212 or Stooq price in the same currency, dividend yield from
+  dividends received), 13F ownership and voting-rights notices, GLEIF and confirmed
+  relationships (and holdings sharing an ultimate parent), Stooq risk metrics, FITRS
+  liquidity. Each model section is one call on the profile's model, citing registry ids
+  or search results from outlets of the allowed tiers; anything else is dropped. The claim
+  verifier then checks the model sentences. The step budget (calls plus searches) is
+  spread over the sections; a section it does not reach says so. Sections written from
+  stored records are in English even for a Czech profile.
+- **Monthly review** (`monthly_review`, first weekday of the month). Code writes the
+  compliance table (every strategy rule, hard limit and band: pass, breach or unknown from
+  the latest snapshot), KPI statuses, theses due for review and flags (hard-to-exit
+  positions against FITRS turnover, holdings sharing an ultimate parent, 13F holders down
+  10 % or more). The model proposes actions; each must cite a rule id or `TICKER:kpi_id`
+  that exists, or it is dropped (counted in `dropped_actions`).
+- **Chat** (`chat`, per message). Sonnet 5 with read-only tools (portfolio, holding, stored
+  news, report search), web search on tier-1/2 outlets and `propose_job`. Answers are
+  sentences citing registry ids (each resolves to an app page or the outlet) or search
+  results; a sentence without a checkable citation is kept but marked `no_source`, and a
+  figure none of its sources contains marks it unsupported. Proposed jobs (earnings check,
+  research, sync) start only when the owner confirms them, as jobs with trigger `chat`.
+- **13F ownership** (`ownership_13f`, monthly check for new quarterly data sets; needs
+  `SEC_USER_AGENT`). Every holdings filing is stored (so a restatement that drops a
+  position replaces the original) and positions only for the portfolio's CUSIPs (from US
+  and Canadian ISINs, or OpenFIGI). Per manager and period the latest original or
+  restatement counts, plus NEW HOLDINGS amendments; holders and shares count share
+  positions only (no puts, calls or principal amounts). On the SEC's 1 Mar-31 May 2026
+  data set this equals an independent aggregation for Apple, Microsoft and NVIDIA (the
+  fixture test repeats it on a sample of real rows). Tracked managers' new and exited
+  positions appear in the next digest.
 - **Config is validated here.** `steward.config` holds the Pydantic model per config domain.
   `POST /config/{domain}/validate` exposes them, which also puts `StrategyConfig`,
   `ThesesConfig` and `ThesisConfig` into `openapi.json` for the frontend's generated types.
