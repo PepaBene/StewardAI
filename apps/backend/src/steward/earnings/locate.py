@@ -118,7 +118,6 @@ class ClaudeSearchLocator:
             try:
                 response = await self._client.messages.parse(
                     model=self._model,
-                    max_tokens=8000,
                     system=self._system,
                     messages=messages,  # type: ignore[arg-type]
                     # Haiku 4 models take only the older web search tool version.
@@ -127,7 +126,7 @@ class ClaudeSearchLocator:
                         [web_search_tool(self._model, self._max_searches, tuple(request.domains))],
                     ),
                     output_format=LocatedDocument,
-                    **effort_kwargs(self._model, self._effort),
+                    **effort_kwargs(self._model, self._effort, 8000),
                 )
             except anthropic.APIError as exc:
                 raise LocateError(f"search call failed: {exc}", usage) from exc

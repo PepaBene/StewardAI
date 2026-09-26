@@ -188,12 +188,11 @@ class ClaudeEscalator:
             try:
                 response = await self._client.messages.parse(
                     model=self._settings.model,
-                    max_tokens=4000,
                     system=self._system,
                     messages=cast(Any, messages),
                     tools=cast(Any, tools if tools else anthropic.omit),
                     output_format=ImpactDraft,
-                    **effort_kwargs(self._settings.model, self._settings.effort),
+                    **effort_kwargs(self._settings.model, self._settings.effort, 4000),
                     # With web search, later sampling steps and pause_turn continuations
                     # re-read the prefix cached; one call without tools would only pay the
                     # cache write premium.

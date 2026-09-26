@@ -32,8 +32,8 @@ export const TIER_OPTIONS: readonly { value: Tier; label: string }[] = [
 ];
 
 export const BOUNDS = {
-  max_steps: { min: 1, max: 60 },
-  max_searches: { min: 0, max: 40 },
+  max_steps: { min: 1, max: 200 },
+  max_searches: { min: 0, max: 100 },
   top_holders: { min: 1, max: 20 },
   name: { max: 80 },
   id: { max: 40 },
@@ -63,8 +63,8 @@ export const DEFAULT_RESEARCH_PROFILES: ResearchProfilesConfig = {
       depth: "standard",
       model: "claude-opus-5-5",
       effort: "high",
-      max_steps: 20,
-      max_searches: 15,
+      max_steps: 60,
+      max_searches: 40,
       source_tiers: [1, 2],
       include_peers: true,
       valuation_methods: ["pe_ttm", "earnings_yield", "dividend_yield_ttm"],
@@ -78,8 +78,8 @@ export const DEFAULT_RESEARCH_PROFILES: ResearchProfilesConfig = {
       depth: "brief",
       model: "claude-sonnet-5",
       effort: "medium",
-      max_steps: 6,
-      max_searches: 3,
+      max_steps: 20,
+      max_searches: 10,
       source_tiers: [1, 2],
       include_peers: false,
       valuation_methods: ["pe_ttm"],

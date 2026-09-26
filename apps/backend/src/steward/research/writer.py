@@ -18,10 +18,11 @@ from dataclasses import dataclass, field
 from typing import Any, Protocol, cast
 
 import anthropic
-from anthropic.types import MessageParam, OutputConfigParam
+from anthropic.types import MessageParam
 from pydantic import BaseModel, Field
 
 from steward.ai import Usage
+from steward.config.jobs import effort_kwargs
 
 SECTION_TITLES = {
     "business": "Business",
@@ -165,7 +166,6 @@ class ClaudeResearchWriter:
             try:
                 response = await self._client.messages.parse(
                     model=self._model,
-                    max_tokens=16000,
                     system=[
                         {
                             "type": "text",
@@ -175,7 +175,7 @@ class ClaudeResearchWriter:
                     ],
                     messages=cast(list[MessageParam], messages),
                     tools=cast(Any, tools if tools else anthropic.omit),
-                    output_config=cast(OutputConfigParam, {"effort": self._effort}),
+                    **effort_kwargs(self._model, self._effort, 16000),
                     output_format=SectionDraft,
                 )
             except anthropic.APIError as exc:

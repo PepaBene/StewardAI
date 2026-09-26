@@ -96,12 +96,12 @@ describe("verification form", () => {
 });
 
 describe("verification form: claim verifier effort", () => {
-  it("sends an unset effort as null and rejects one on Haiku 4", () => {
+  it("sends an unset effort as null and accepts one on Haiku 4 (a thinking budget)", () => {
     const form = verificationFromBody(null);
     expect(form.claimEffort).toBe("");
     expect(verificationToBody(form).claim_verifier!.effort).toBeNull();
     form.claimEffort = "low";
-    expect(validateVerificationForm(form)["claim_verifier.effort"]).toEqual([expect.stringMatching(/Haiku 4/)]);
+    expect(validateVerificationForm(form)["claim_verifier.effort"]).toBeUndefined();
     form.claimModel = "claude-sonnet-5";
     expect(validateVerificationForm(form)["claim_verifier.effort"]).toBeUndefined();
     expect(verificationToBody(form).claim_verifier!.effort).toBe("low");

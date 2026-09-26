@@ -101,7 +101,6 @@ async def dates_from_ir_page(
     text = await document.text_async()
     response = await client.messages.parse(
         model=settings.model,
-        max_tokens=4000,
         system=system,
         messages=[
             {
@@ -117,7 +116,7 @@ async def dates_from_ir_page(
             }
         ],
         output_format=CalendarPage,
-        **effort_kwargs(settings.model, settings.effort),
+        **effort_kwargs(settings.model, settings.effort, 4000),
     )
     usage.add(response.usage)
     page = response.parsed_output

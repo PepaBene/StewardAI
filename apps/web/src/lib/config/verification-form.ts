@@ -240,9 +240,6 @@ export function validateVerificationForm(form: VerificationForm): FieldErrors {
   checkNumber(errors, "trust.useful_reward", form.usefulReward, { min: 0, max: 1 });
   checkNumber(errors, "trust.demote_below", form.demoteBelow, { min: 0, max: 1 });
   if (!MODEL.test(form.claimModel.trim())) errors["claim_verifier.model"] = ["A Claude model id, e.g. claude-haiku-4-5."];
-  if (form.claimEffort && form.claimModel.trim().startsWith("claude-haiku-4")) {
-    errors["claim_verifier.effort"] = ["Haiku 4 models take no effort: leave it on the model default."];
-  }
   return errors;
 }
 

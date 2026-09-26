@@ -57,6 +57,8 @@ class ModelPrice(ConfigModel):
 
 def _default_prices() -> list[ModelPrice]:
     table = {
+        "claude-fable-5-1": (10, 50),
+        "claude-opus-4-8": (5, 25),
         "claude-haiku-4-5": (1, 5),
         "claude-sonnet-5": (2, 10),
         "claude-sonnet-4-6": (3, 15),

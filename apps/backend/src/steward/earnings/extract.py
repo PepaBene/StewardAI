@@ -14,9 +14,10 @@ from typing import Any, Protocol, cast
 
 import anthropic
 import pydantic
-from anthropic.types import MessageParam, OutputConfigParam
+from anthropic.types import MessageParam
 
 from steward.ai import Usage
+from steward.config.jobs import effort_kwargs
 from steward.documents.fetch import PDF, Document
 from steward.earnings.periods import period_label
 from steward.earnings.schema import ExtractionResult
@@ -152,12 +153,11 @@ class ClaudeExtractor:
         try:
             response = await self._client.messages.parse(
                 model=self._model,
-                max_tokens=32000,
                 system=[
                     {"type": "text", "text": self._system, "cache_control": {"type": "ephemeral"}}
                 ],
                 messages=[cast(MessageParam, {"role": "user", "content": content})],
-                output_config=cast(OutputConfigParam, {"effort": self._effort}),
+                **effort_kwargs(self._model, self._effort, 32000),
                 output_format=ExtractionResult,
             )
         except anthropic.APIError as exc:

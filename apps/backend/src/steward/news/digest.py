@@ -23,14 +23,13 @@ import anthropic
 import asyncpg
 import httpx
 from anthropic import transform_schema
-from anthropic.types import MessageParam
 from pydantic import BaseModel, Field, ValidationError
 
 from steward import __version__
 from steward.ai import AINotConfigured, Usage, create_client
 from steward.config.event_rules import EVENT_DESCRIPTIONS
 from steward.config.holding_profiles import HoldingProfilesConfig
-from steward.config.jobs import DigestSettings, JobsConfig, effort_kwargs
+from steward.config.jobs import DigestSettings, JobsConfig, reasoning_kwargs
 from steward.config.notifications import NotificationsConfig
 from steward.config.prompts import load_prompts
 from steward.config.store import load_active
@@ -259,17 +258,14 @@ No price predictions, no advice.
 """
 
 
-def _output_config(model: str | None = None, effort: str | None = None) -> dict[str, Any]:
-    """The response format, plus `effort` when set and `model` takes it."""
-    config: dict[str, Any] = {
+def _output_config() -> dict[str, Any]:
+    """The response format."""
+    return {
         "format": {
             "type": "json_schema",
             "schema": transform_schema(DigestDraft.model_json_schema()),
         }
     }
-    if model is not None:
-        config |= effort_kwargs(model, effort).get("output_config", {})
-    return config
 
 
 class ClaudeDigestWriter:
@@ -288,7 +284,6 @@ class ClaudeDigestWriter:
     def _params(self, material: str, today: dt.date) -> dict[str, Any]:
         return {
             "model": self._settings.model,
-            "max_tokens": 8000,
             "system": self._system,
             "messages": [
                 {
@@ -296,7 +291,8 @@ class ClaudeDigestWriter:
                     "content": f"Today is {today.isoformat()}.\n\nMaterial:\n{material}",
                 }
             ],
-            "output_config": _output_config(self._settings.model, self._settings.effort),
+            # max_tokens, output_config (format and effort) and, on Haiku 4, thinking.
+            **reasoning_kwargs(self._settings.model, self._settings.effort, 8000, _output_config()),
         }
 
     async def write(self, material: str, today: dt.date) -> tuple[DigestDraft, Usage]:
@@ -310,13 +306,7 @@ class ClaudeDigestWriter:
     async def _write_direct(self, params: dict[str, Any]) -> tuple[DigestDraft, Usage]:
         usage = Usage(model=self._settings.model)
         try:
-            response = await self._client.messages.create(
-                model=params["model"],
-                max_tokens=params["max_tokens"],
-                system=params["system"],
-                messages=cast(list[MessageParam], params["messages"]),
-                output_config=cast(Any, params["output_config"]),
-            )
+            response = await self._client.messages.create(**cast(Any, params))
         except anthropic.APIError as exc:
             raise DigestError(f"digest call failed: {exc}") from exc
         usage.add(response.usage)

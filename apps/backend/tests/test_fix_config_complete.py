@@ -181,9 +181,9 @@ def test_other_old_bodies_validate_with_todays_defaults() -> None:
         (ClaimVerifierSettings, {"effort": "low"}),  # default model is Haiku 4.5
     ],
 )
-def test_effort_on_haiku_4_is_rejected(model: Any, body: dict[str, Any]) -> None:
-    with pytest.raises(ValidationError, match="does not support the effort parameter"):
-        model.model_validate(body)
+def test_effort_on_haiku_4_is_accepted(model: Any, body: dict[str, Any]) -> None:
+    # Haiku 4 maps the level to an extended-thinking budget (see reasoning_kwargs).
+    model.model_validate(body)
 
 
 def test_effort_on_a_model_that_takes_it_is_accepted() -> None:
@@ -197,9 +197,15 @@ def test_effort_on_a_model_that_takes_it_is_accepted() -> None:
 
 
 def test_effort_kwargs() -> None:
-    assert effort_kwargs("claude-sonnet-5", None) == {}
-    assert effort_kwargs("claude-haiku-4-5", "low") == {}
-    assert effort_kwargs("claude-sonnet-5", "low") == {"output_config": {"effort": "low"}}
+    assert effort_kwargs("claude-sonnet-5", None, 100) == {"max_tokens": 100}
+    assert effort_kwargs("claude-haiku-4-5", "low", 100) == {
+        "max_tokens": 2148,
+        "thinking": {"type": "enabled", "budget_tokens": 2048},
+    }
+    assert effort_kwargs("claude-sonnet-5", "low", 100) == {
+        "max_tokens": 100,
+        "output_config": {"effort": "low"},
+    }
 
 
 REQUEST = SearchRequest("AAPL", "Apple", dt.date(2025, 7, 31), (2025, "Q3"), ["x.test"], [])
@@ -667,3 +673,32 @@ async def test_research_top_holders(monkeypatch: pytest.MonkeyPatch) -> None:
     assert seen == [3, 7]
     profile = ResearchProfile(id="p", name="P", sections=["ownership"], top_holders=5)
     assert profile.top_holders == 5
+
+
+def test_effort_maps_to_the_model() -> None:
+    from steward.config.jobs import THINKING_BUDGET, reasoning_kwargs
+
+    fmt = {"format": {"type": "json_schema"}}
+    # Models that take effort get it in output_config, merged with the format.
+    assert reasoning_kwargs("claude-sonnet-5", "high", 8000, fmt) == {
+        "max_tokens": 8000,
+        "output_config": {"format": {"type": "json_schema"}, "effort": "high"},
+    }
+    # Haiku 4 gets the equivalent: extended thinking, with max_tokens grown by the budget.
+    out = reasoning_kwargs("claude-haiku-4-5", "medium", 4000, fmt)
+    assert out == {
+        "max_tokens": 4000 + THINKING_BUDGET["medium"],
+        "thinking": {"type": "enabled", "budget_tokens": THINKING_BUDGET["medium"]},
+        "output_config": {"format": {"type": "json_schema"}},
+    }
+    assert out["thinking"]["budget_tokens"] >= 1024
+    # xhigh is not a 4.6 level.
+    assert reasoning_kwargs("claude-sonnet-4-6", "xhigh", 100)["output_config"] == {
+        "effort": "high"
+    }
+    # No effort: nothing but max_tokens (the model's default).
+    assert reasoning_kwargs("claude-haiku-4-5", None, 4000) == {"max_tokens": 4000}
+    assert reasoning_kwargs("claude-opus-5-5", None, 4000, fmt) == {
+        "max_tokens": 4000,
+        "output_config": fmt,
+    }

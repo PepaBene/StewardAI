@@ -68,7 +68,7 @@ class NewConversation(BaseModel):
 
 
 class NewMessage(BaseModel):
-    content: str = Field(min_length=1, max_length=4000)
+    content: str = Field(min_length=1, max_length=100_000)
 
 
 class PostedMessage(BaseModel):

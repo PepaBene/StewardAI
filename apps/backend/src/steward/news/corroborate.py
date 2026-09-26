@@ -249,12 +249,11 @@ class ClaudeCorroborator:
             try:
                 response = await self._client.messages.parse(
                     model=self._model,
-                    max_tokens=4000,
                     system=self._system,
                     messages=messages,  # type: ignore[arg-type]
                     tools=cast(Any, [self._tool(request)]),
                     output_format=CorroborationAnswer,
-                    **effort_kwargs(self._model, self._effort),
+                    **effort_kwargs(self._model, self._effort, 4000),
                     # Automatic caching: the server caches after each search result inside
                     # the request, so later sampling steps and a pause_turn continuation read
                     # the searched pages at a tenth of the price instead of paying for them

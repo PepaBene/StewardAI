@@ -108,7 +108,7 @@ describe("research profiles form", () => {
     expect(validateResearchProfiles(form)).toEqual({});
     form.profiles[1].id = "deep-dive";
     form.profiles[0].sections = [];
-    form.profiles[0].max_steps = "61";
+    form.profiles[0].max_steps = "201";
     form.profiles[1].model = "gpt-5";
     form.profiles[1].source_tiers = [];
     form.profiles[1].name = " ";

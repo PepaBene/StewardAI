@@ -98,7 +98,7 @@ export const DEFAULT_NOTIFICATIONS: NotificationsConfig = {
     },
   ],
   quiet_hours: { enabled: true, start: "22:00", end: "07:00", timezone: "Europe/Prague" },
-  daily_alert_cap: 5,
+  daily_alert_cap: null,
   muted_tickers: [],
   muted_event_types: [],
   repeat_throttle_hours: 24,

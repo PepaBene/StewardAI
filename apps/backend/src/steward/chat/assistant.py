@@ -125,12 +125,11 @@ class ClaudeChatAssistant:
             try:
                 response = await self._client.messages.parse(
                     model=self._settings.model,
-                    max_tokens=8000,
                     system=self._system,
                     messages=cast(list[MessageParam], messages),
                     tools=cast(Any, definitions),
                     output_format=ChatAnswerDraft,
-                    **effort_kwargs(self._settings.model, self._settings.effort),
+                    **effort_kwargs(self._settings.model, self._settings.effort, 8000),
                     # Each step resends the whole growing transcript (tool results, search
                     # pages): automatic caching lets it read the previous step's prefix at a
                     # tenth of the input price. Messages are only appended, never edited, so
@@ -159,7 +158,7 @@ class ClaudeChatAssistant:
                             {
                                 "type": "tool_result",
                                 "tool_use_id": block.id,
-                                "content": json.dumps(output, default=str)[:30000],
+                                "content": json.dumps(output, default=str)[:200_000],
                             }
                         )
                 messages.append({"role": "user", "content": results})
@@ -333,7 +332,7 @@ async def run_chat(ctx: JobContext, deps: ChatDeps) -> int:
                 "insert into public.chat_message (conversation_id, role, content, body, job_id,"
                 " status) values ($1, 'assistant', $2, $3::jsonb, $4, $5) returning id",
                 conversation_id,
-                text[:20000],
+                text[:100_000],
                 answer.model_dump_json(),
                 ctx.job_id,
                 "done" if sentences else "failed",

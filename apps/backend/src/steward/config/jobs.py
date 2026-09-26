@@ -83,7 +83,10 @@ def cron_trigger(expression: str, tz: ZoneInfo) -> CronTrigger:
 ModelId = Annotated[str, Field(pattern=r"^claude-[a-z0-9.-]{1,64}$", examples=["claude-sonnet-5"])]
 
 Effort = Literal["low", "medium", "high", "xhigh", "max"]
-EFFORT_HELP = "Unset: effort is not sent and the model's default applies. Not on Haiku 4."
+EFFORT_HELP = (
+    "Unset: effort is not sent and the model's default applies. On Haiku 4 models the level "
+    "sets an extended-thinking budget instead (low 2k to max 32k tokens)."
+)
 # Web-search tiers: 1 the company, regulators and statistics offices; 2 established outlets;
 # 3 everything else on the allow-list.
 SourceTier = Literal[1, 2, 3]
@@ -95,20 +98,54 @@ def supports_effort(model: str) -> bool:
     return not model.startswith("claude-haiku-4")
 
 
-def effort_kwargs(model: str, effort: str | None) -> dict[str, Any]:
-    """`output_config` carrying `effort` for a Messages call, or nothing when effort is
-    unset (the model's default) or `model` does not take it."""
-    if effort is None or not supports_effort(model):
-        return {}
-    return {"output_config": {"effort": effort}}
+# Claude Haiku 4 models take no effort parameter; their equivalent is extended thinking with
+# a token budget, sized per effort level.
+THINKING_BUDGET: dict[str, int] = {
+    "low": 2048,
+    "medium": 4096,
+    "high": 8192,
+    "xhigh": 16384,
+    "max": 32000,
+}
+
+
+def reasoning_kwargs(
+    model: str,
+    effort: str | None,
+    max_tokens: int,
+    output_config: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    """`max_tokens`, `output_config` and `thinking` for a Messages call at `effort`.
+
+    Models that take effort get it in `output_config` (merged with `output_config`, e.g. a
+    response format). Haiku 4 models get extended thinking with `THINKING_BUDGET[effort]`
+    tokens instead, and `max_tokens` grows by that budget so the answer keeps its room.
+    No effort: nothing is added (the model's default)."""
+    config = dict(output_config or {})
+    out: dict[str, Any] = {"max_tokens": max_tokens}
+    if effort is not None:
+        if supports_effort(model):
+            # xhigh arrived with Opus 4.7; the 4.6 models top out at high below max.
+            if effort == "xhigh" and model.endswith("-4-6"):
+                effort = "high"
+            config["effort"] = effort
+        else:
+            budget = THINKING_BUDGET[effort]
+            out["thinking"] = {"type": "enabled", "budget_tokens": budget}
+            out["max_tokens"] = max_tokens + budget
+    if config:
+        out["output_config"] = config
+    return out
+
+
+def effort_kwargs(model: str, effort: str | None, max_tokens: int) -> dict[str, Any]:
+    """`reasoning_kwargs` without a response format."""
+    return reasoning_kwargs(model, effort, max_tokens)
 
 
 def check_effort(model: str, effort: str | None, field: str) -> None:
-    if effort is not None and not supports_effort(model):
-        raise ValueError(
-            f"{field}: {model} does not support the effort parameter; leave effort unset "
-            "or pick another model"
-        )
+    """Every effort level is valid for every model (Haiku 4 maps it to a thinking budget)."""
+    del model, effort, field
 
 
 def _unique_tiers(tiers: list[int]) -> list[int]:
@@ -128,9 +165,9 @@ class EarningsCheckSettings(ConfigModel):
     effort: Effort = "high"
     locate_effort: Effort | None = Field(default=None, description=EFFORT_HELP)
     max_steps: int = Field(
-        default=8, ge=2, le=50, description="Claude calls plus document fetches per run."
+        default=40, ge=2, le=200, description="Claude calls plus document fetches per run."
     )
-    max_searches: int = Field(default=3, ge=0, le=20, description="Web searches per run.")
+    max_searches: int = Field(default=20, ge=0, le=100, description="Web searches per run.")
     check_days_after_report: list[Annotated[int, Field(ge=0, le=30)]] = Field(
         default_factory=lambda: [1, 2, 4],
         description="Days after the report date on which the check runs until it finds the "
@@ -183,12 +220,12 @@ class NewsSettings(ConfigModel):
     corroboration_model: ModelId = "claude-haiku-4-5"
     corroboration_effort: Effort | None = Field(default=None, description=EFFORT_HELP)
     corroboration_max_searches: int = Field(
-        default=3, ge=0, le=10, description="Web searches per corroboration call."
+        default=10, ge=0, le=50, description="Web searches per corroboration call."
     )
     corroboration_rounds: int = Field(
-        default=2,
+        default=3,
         ge=0,
-        le=5,
+        le=20,
         description="Corroboration searches per story: one when it is first seen, the rest "
         "spread over the re-check window.",
     )
@@ -196,7 +233,7 @@ class NewsSettings(ConfigModel):
         default=48, ge=1, le=168, description="How long an unconfirmed story is re-checked."
     )
     max_items_per_run: int = Field(
-        default=500, ge=10, le=5000, description="Classification cap per run (cost guard)."
+        default=10_000, ge=10, le=100_000, description="Classification cap per run (cost guard)."
     )
 
     @model_validator(mode="after")
@@ -334,9 +371,9 @@ class EscalationSettings(ConfigModel):
     model: ModelId = "claude-sonnet-5"
     effort: Effort | None = Field(default=None, description=EFFORT_HELP)
     max_steps: int = Field(
-        default=5, ge=1, le=20, description="Claude calls plus web searches per escalation."
+        default=30, ge=1, le=100, description="Claude calls plus web searches per escalation."
     )
-    max_searches: int = Field(default=3, ge=0, le=10)
+    max_searches: int = Field(default=15, ge=0, le=50)
     min_severity: int = Field(default=2, ge=1, le=3)
     source_tiers: list[SourceTier] = Field(
         default_factory=lambda: list(DEFAULT_SOURCE_TIERS),
@@ -480,11 +517,11 @@ class ChatSettings(ConfigModel):
     model: ModelId = "claude-sonnet-5"
     effort: Effort | None = Field(default=None, description=EFFORT_HELP)
     max_steps: int = Field(
-        default=6, ge=1, le=20, description="Claude calls plus tool rounds per answer."
+        default=30, ge=1, le=100, description="Claude calls plus tool rounds per answer."
     )
-    max_searches: int = Field(default=3, ge=0, le=10, description="Web searches per answer.")
+    max_searches: int = Field(default=15, ge=0, le=50, description="Web searches per answer.")
     history_messages: int = Field(
-        default=12, ge=2, le=50, description="Earlier messages of the conversation sent along."
+        default=100, ge=2, le=500, description="Earlier messages of the conversation sent along."
     )
     source_tiers: list[SourceTier] = Field(
         default_factory=lambda: list(DEFAULT_SOURCE_TIERS),
@@ -505,7 +542,7 @@ class ReviewSettings(ConfigModel):
 
     model: ModelId = "claude-opus-5-5"
     effort: Effort = "high"
-    max_steps: int = Field(default=3, ge=1, le=10, description="Claude calls per review.")
+    max_steps: int = Field(default=10, ge=1, le=50, description="Claude calls per review.")
     use_batch: bool = Field(
         default=True, description="Propose the actions through the Batch API (half price)."
     )

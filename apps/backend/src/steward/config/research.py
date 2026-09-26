@@ -52,9 +52,9 @@ class ResearchProfile(ConfigModel):
     model: ModelId = "claude-opus-5-5"
     effort: Literal["low", "medium", "high", "xhigh", "max"] = "high"
     max_steps: int = Field(
-        default=20, ge=1, le=60, description="Claude calls plus web searches per run."
+        default=60, ge=1, le=200, description="Claude calls plus web searches per run."
     )
-    max_searches: int = Field(default=15, ge=0, le=40)
+    max_searches: int = Field(default=40, ge=0, le=100)
     source_tiers: list[Tier] = Field(
         default_factory=lambda: list(DEFAULT_TIERS),
         min_length=1,
@@ -106,8 +106,8 @@ def _defaults() -> list[ResearchProfile]:
             depth="brief",
             model="claude-sonnet-5",
             effort="medium",
-            max_steps=6,
-            max_searches=3,
+            max_steps=20,
+            max_searches=10,
             include_peers=False,
             valuation_methods=["pe_ttm"],
         ),

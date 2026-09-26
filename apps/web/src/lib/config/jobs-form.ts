@@ -123,8 +123,8 @@ export const DEFAULT_JOBS: JobsConfig = {
     locate_model: "claude-sonnet-5",
     effort: "high",
     locate_effort: null,
-    max_steps: 8,
-    max_searches: 3,
+    max_steps: 40,
+    max_searches: 20,
     check_days_after_report: [1, 2, 4],
     max_document_mb: 20,
     kpi_history_periods: 8,
@@ -136,10 +136,10 @@ export const DEFAULT_JOBS: JobsConfig = {
     classification_batch_size: 50,
     corroboration_model: "claude-haiku-4-5",
     corroboration_effort: null,
-    corroboration_max_searches: 3,
-    corroboration_rounds: 2,
+    corroboration_max_searches: 10,
+    corroboration_rounds: 3,
     recheck_hours: 48,
-    max_items_per_run: 500,
+    max_items_per_run: 10_000,
   },
   digest: {
     model: "claude-sonnet-5",
@@ -155,8 +155,8 @@ export const DEFAULT_JOBS: JobsConfig = {
     enabled: true,
     model: "claude-sonnet-5",
     effort: null,
-    max_steps: 5,
-    max_searches: 3,
+    max_steps: 30,
+    max_searches: 15,
     min_severity: 2,
     source_tiers: [1, 2],
     price_move_news_days: 3,
@@ -209,11 +209,11 @@ export const DEFAULT_JOBS: JobsConfig = {
   },
   prices: { benchmark_symbols: ["^spx"], history_years: 2, plausibility_tolerance_pct: 1 },
   calendar: { holiday_countries: ["CZ", "US", "DE", "GB"], exchange_closures: [] },
-  chat: { model: "claude-sonnet-5", effort: null, max_steps: 6, max_searches: 3, history_messages: 12, source_tiers: [1, 2] },
+  chat: { model: "claude-sonnet-5", effort: null, max_steps: 30, max_searches: 15, history_messages: 100, source_tiers: [1, 2] },
   review: {
     model: "claude-opus-5-5",
     effort: "high",
-    max_steps: 3,
+    max_steps: 10,
     use_batch: true,
     batch_wait_minutes: 60,
     liquidity_days: 1,
@@ -229,9 +229,18 @@ export const DEFAULT_JOBS: JobsConfig = {
 };
 
 /** Model ids offered as suggestions; any `claude-…` id is accepted. */
-export const MODEL_SUGGESTIONS = ["claude-opus-5-5", "claude-sonnet-5", "claude-haiku-4-5"];
+export const MODEL_SUGGESTIONS = [
+  "claude-fable-5-1",
+  "claude-opus-5-5",
+  "claude-opus-5",
+  "claude-opus-4-8",
+  "claude-sonnet-5",
+  "claude-sonnet-4-6",
+  "claude-haiku-4-5",
+];
 export const EFFORTS = ["low", "medium", "high", "xhigh", "max"] as const;
-export const EFFORT_OPTIONAL_HINT = "Model default: effort is not sent. Haiku 4 models take no effort.";
+export const EFFORT_OPTIONAL_HINT =
+  "Model default: effort is not sent. On Haiku 4 models the level sets an extended-thinking budget (low 2k to max 32k tokens).";
 export const TIERS = [1, 2, 3] as const;
 
 /** "2, 1, 2" -> [1, 2]: outlet tiers, ascending and unique; anything else is dropped. */
@@ -277,8 +286,8 @@ export const SETTINGS: { [S in SettingsKey]: { title: string; description: strin
       { key: "locate_model", label: "Locate model", kind: "model", hint: "Searches for the release when EDGAR has none." },
       { key: "effort", label: "Extraction effort", kind: "effort" },
       { key: "locate_effort", label: "Locate effort", kind: "effort-optional", hint: EFFORT_OPTIONAL_HINT },
-      { key: "max_steps", label: "Step cap per run", kind: "int", min: 2, max: 50, hint: "Claude calls plus document fetches." },
-      { key: "max_searches", label: "Web searches per run", kind: "int", min: 0, max: 20 },
+      { key: "max_steps", label: "Step cap per run", kind: "int", min: 2, max: 200, hint: "Claude calls plus document fetches." },
+      { key: "max_searches", label: "Web searches per run", kind: "int", min: 0, max: 100 },
       { key: "check_days_after_report", label: "Days after the report date to check", kind: "int-list", hint: "Comma separated, e.g. 1, 2, 4 (retries until the release is found)." },
       { key: "max_document_mb", label: "Largest document (MB)", kind: "int", min: 1, max: 32 },
       { key: "kpi_history_periods", label: "KPI history (periods)", kind: "int", min: 1, max: 40, hint: "Past quarters (or years, for annual KPIs) judged for each KPI." },
@@ -303,10 +312,10 @@ export const SETTINGS: { [S in SettingsKey]: { title: string; description: strin
       { key: "classification_batch_size", label: "Items per classification call", kind: "int", min: 5, max: 100 },
       { key: "corroboration_model", label: "Corroboration model", kind: "model" },
       { key: "corroboration_effort", label: "Corroboration effort", kind: "effort-optional", hint: EFFORT_OPTIONAL_HINT },
-      { key: "corroboration_max_searches", label: "Searches per corroboration call", kind: "int", min: 0, max: 10 },
-      { key: "corroboration_rounds", label: "Corroboration rounds per story", kind: "int", min: 0, max: 5 },
+      { key: "corroboration_max_searches", label: "Searches per corroboration call", kind: "int", min: 0, max: 50 },
+      { key: "corroboration_rounds", label: "Corroboration rounds per story", kind: "int", min: 0, max: 20 },
       { key: "recheck_hours", label: "Re-check unconfirmed stories for (hours)", kind: "int", min: 1, max: 168 },
-      { key: "max_items_per_run", label: "Classification cap per run", kind: "int", min: 10, max: 5000, hint: "Cost guard." },
+      { key: "max_items_per_run", label: "Classification cap per run", kind: "int", min: 10, max: 100_000, hint: "Cost guard." },
     ],
   },
   digest: {
@@ -330,8 +339,8 @@ export const SETTINGS: { [S in SettingsKey]: { title: string; description: strin
       { key: "enabled", label: "Write impact notes", kind: "bool", hint: "Off: no escalation is queued." },
       { key: "model", label: "Model", kind: "model" },
       { key: "effort", label: "Effort", kind: "effort-optional", hint: EFFORT_OPTIONAL_HINT },
-      { key: "max_steps", label: "Step cap per note", kind: "int", min: 1, max: 20, hint: "Claude calls plus web searches." },
-      { key: "max_searches", label: "Web searches per note", kind: "int", min: 0, max: 10, hint: "Restricted to the outlet tiers below." },
+      { key: "max_steps", label: "Step cap per note", kind: "int", min: 1, max: 100, hint: "Claude calls plus web searches." },
+      { key: "max_searches", label: "Web searches per note", kind: "int", min: 0, max: 50, hint: "Restricted to the outlet tiers below." },
       { key: "source_tiers", label: "Outlet tiers web search may use", kind: "tiers", hint: "Tiers are set per domain in Config: News sources." },
       { key: "min_severity", label: "Escalate stories from severity", kind: "severity" },
       { key: "price_move_news_days", label: "Price-move note: news from (days before)", kind: "int", min: 0, max: 30 },
@@ -387,9 +396,9 @@ export const SETTINGS: { [S in SettingsKey]: { title: string; description: strin
     fields: [
       { key: "model", label: "Model", kind: "model" },
       { key: "effort", label: "Effort", kind: "effort-optional", hint: EFFORT_OPTIONAL_HINT },
-      { key: "max_steps", label: "Step cap per answer", kind: "int", min: 1, max: 20, hint: "Claude calls plus tool rounds." },
-      { key: "max_searches", label: "Web searches per answer", kind: "int", min: 0, max: 10 },
-      { key: "history_messages", label: "Earlier messages sent along", kind: "int", min: 2, max: 50 },
+      { key: "max_steps", label: "Step cap per answer", kind: "int", min: 1, max: 100, hint: "Claude calls plus tool rounds." },
+      { key: "max_searches", label: "Web searches per answer", kind: "int", min: 0, max: 50 },
+      { key: "history_messages", label: "Earlier messages sent along", kind: "int", min: 2, max: 500 },
       { key: "source_tiers", label: "Outlet tiers web search may use and answers may cite", kind: "tiers", hint: "Tiers are set per domain in Config: News sources." },
     ],
   },
@@ -399,7 +408,7 @@ export const SETTINGS: { [S in SettingsKey]: { title: string; description: strin
     fields: [
       { key: "model", label: "Model", kind: "model" },
       { key: "effort", label: "Effort", kind: "effort" },
-      { key: "max_steps", label: "Claude calls per review", kind: "int", min: 1, max: 10 },
+      { key: "max_steps", label: "Claude calls per review", kind: "int", min: 1, max: 50 },
       { key: "use_batch", label: "Propose through the Batch API (half price)", kind: "bool" },
       { key: "batch_wait_minutes", label: "Wait for the batch (minutes)", kind: "int", min: 1, max: 720, hint: "Then the actions are proposed directly." },
       {

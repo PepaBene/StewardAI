@@ -6857,31 +6857,31 @@
               }
             ],
             "title": "Effort",
-            "description": "Unset: effort is not sent and the model's default applies. Not on Haiku 4."
+            "description": "Unset: effort is not sent and the model's default applies. On Haiku 4 models the level sets an extended-thinking budget instead (low 2k to max 32k tokens)."
           },
           "max_steps": {
             "type": "integer",
-            "maximum": 20.0,
+            "maximum": 100.0,
             "minimum": 1.0,
             "title": "Max Steps",
             "description": "Claude calls plus tool rounds per answer.",
-            "default": 6
+            "default": 30
           },
           "max_searches": {
             "type": "integer",
-            "maximum": 10.0,
+            "maximum": 50.0,
             "minimum": 0.0,
             "title": "Max Searches",
             "description": "Web searches per answer.",
-            "default": 3
+            "default": 15
           },
           "history_messages": {
             "type": "integer",
-            "maximum": 50.0,
+            "maximum": 500.0,
             "minimum": 2.0,
             "title": "History Messages",
             "description": "Earlier messages of the conversation sent along.",
-            "default": 12
+            "default": 100
           },
           "source_tiers": {
             "items": {
@@ -7106,7 +7106,7 @@
               }
             ],
             "title": "Effort",
-            "description": "Unset: effort is not sent and the model's default applies. Not on Haiku 4."
+            "description": "Unset: effort is not sent and the model's default applies. On Haiku 4 models the level sets an extended-thinking budget instead (low 2k to max 32k tokens)."
           },
           "mode": {
             "type": "string",
@@ -8010,7 +8010,7 @@
               }
             ],
             "title": "Effort",
-            "description": "Unset: effort is not sent and the model's default applies. Not on Haiku 4."
+            "description": "Unset: effort is not sent and the model's default applies. On Haiku 4 models the level sets an extended-thinking budget instead (low 2k to max 32k tokens)."
           },
           "use_batch": {
             "type": "boolean",
@@ -8525,7 +8525,7 @@
               }
             ],
             "title": "Effort",
-            "description": "Unset: effort is not sent and the model's default applies. Not on Haiku 4."
+            "description": "Unset: effort is not sent and the model's default applies. On Haiku 4 models the level sets an extended-thinking budget instead (low 2k to max 32k tokens)."
           },
           "lookahead_days": {
             "type": "integer",
@@ -8642,23 +8642,23 @@
               }
             ],
             "title": "Locate Effort",
-            "description": "Unset: effort is not sent and the model's default applies. Not on Haiku 4."
+            "description": "Unset: effort is not sent and the model's default applies. On Haiku 4 models the level sets an extended-thinking budget instead (low 2k to max 32k tokens)."
           },
           "max_steps": {
             "type": "integer",
-            "maximum": 50.0,
+            "maximum": 200.0,
             "minimum": 2.0,
             "title": "Max Steps",
             "description": "Claude calls plus document fetches per run.",
-            "default": 8
+            "default": 40
           },
           "max_searches": {
             "type": "integer",
-            "maximum": 20.0,
+            "maximum": 100.0,
             "minimum": 0.0,
             "title": "Max Searches",
             "description": "Web searches per run.",
-            "default": 3
+            "default": 20
           },
           "check_days_after_report": {
             "items": {
@@ -9016,22 +9016,22 @@
               }
             ],
             "title": "Effort",
-            "description": "Unset: effort is not sent and the model's default applies. Not on Haiku 4."
+            "description": "Unset: effort is not sent and the model's default applies. On Haiku 4 models the level sets an extended-thinking budget instead (low 2k to max 32k tokens)."
           },
           "max_steps": {
             "type": "integer",
-            "maximum": 20.0,
+            "maximum": 100.0,
             "minimum": 1.0,
             "title": "Max Steps",
             "description": "Claude calls plus web searches per escalation.",
-            "default": 5
+            "default": 30
           },
           "max_searches": {
             "type": "integer",
-            "maximum": 10.0,
+            "maximum": 50.0,
             "minimum": 0.0,
             "title": "Max Searches",
-            "default": 3
+            "default": 15
           },
           "min_severity": {
             "type": "integer",
@@ -13155,7 +13155,7 @@
         "properties": {
           "content": {
             "type": "string",
-            "maxLength": 4000,
+            "maxLength": 100000,
             "minLength": 1,
             "title": "Content"
           }
@@ -13446,7 +13446,7 @@
               }
             ],
             "title": "Classification Effort",
-            "description": "Unset: effort is not sent and the model's default applies. Not on Haiku 4."
+            "description": "Unset: effort is not sent and the model's default applies. On Haiku 4 models the level sets an extended-thinking budget instead (low 2k to max 32k tokens)."
           },
           "classification_batch_size": {
             "type": "integer",
@@ -13482,23 +13482,23 @@
               }
             ],
             "title": "Corroboration Effort",
-            "description": "Unset: effort is not sent and the model's default applies. Not on Haiku 4."
+            "description": "Unset: effort is not sent and the model's default applies. On Haiku 4 models the level sets an extended-thinking budget instead (low 2k to max 32k tokens)."
           },
           "corroboration_max_searches": {
             "type": "integer",
-            "maximum": 10.0,
+            "maximum": 50.0,
             "minimum": 0.0,
             "title": "Corroboration Max Searches",
             "description": "Web searches per corroboration call.",
-            "default": 3
+            "default": 10
           },
           "corroboration_rounds": {
             "type": "integer",
-            "maximum": 5.0,
+            "maximum": 20.0,
             "minimum": 0.0,
             "title": "Corroboration Rounds",
             "description": "Corroboration searches per story: one when it is first seen, the rest spread over the re-check window.",
-            "default": 2
+            "default": 3
           },
           "recheck_hours": {
             "type": "integer",
@@ -13510,11 +13510,11 @@
           },
           "max_items_per_run": {
             "type": "integer",
-            "maximum": 5000.0,
+            "maximum": 100000.0,
             "minimum": 10.0,
             "title": "Max Items Per Run",
             "description": "Classification cap per run (cost guard).",
-            "default": 500
+            "default": 10000
           }
         },
         "additionalProperties": false,
@@ -13854,7 +13854,7 @@
             "anyOf": [
               {
                 "type": "integer",
-                "maximum": 100.0,
+                "maximum": 10000.0,
                 "minimum": 1.0
               },
               {
@@ -13862,8 +13862,7 @@
               }
             ],
             "title": "Daily Alert Cap",
-            "description": "Most alerts sent per day (in the quiet-hours timezone); the rest wait for the digest. Null: no cap.",
-            "default": 5
+            "description": "Most alerts sent per day (in the quiet-hours timezone); the rest wait for the digest. Null: no cap."
           },
           "muted_tickers": {
             "items": {
@@ -16174,18 +16173,18 @@
           },
           "max_steps": {
             "type": "integer",
-            "maximum": 60.0,
+            "maximum": 200.0,
             "minimum": 1.0,
             "title": "Max Steps",
             "description": "Claude calls plus web searches per run.",
-            "default": 20
+            "default": 60
           },
           "max_searches": {
             "type": "integer",
-            "maximum": 40.0,
+            "maximum": 100.0,
             "minimum": 0.0,
             "title": "Max Searches",
-            "default": 15
+            "default": 40
           },
           "source_tiers": {
             "items": {
@@ -16803,11 +16802,11 @@
           },
           "max_steps": {
             "type": "integer",
-            "maximum": 10.0,
+            "maximum": 50.0,
             "minimum": 1.0,
             "title": "Max Steps",
             "description": "Claude calls per review.",
-            "default": 3
+            "default": 10
           },
           "use_batch": {
             "type": "boolean",

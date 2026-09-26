@@ -178,7 +178,7 @@ describe("chat: actions and messages", () => {
 
   it("checks a message before sending and links a conversation", () => {
     expect(validateMessage("  ")).toBe("Type a question.");
-    expect(validateMessage("x".repeat(4001))).toMatch(/At most 4000/);
+    expect(validateMessage("x".repeat(100_001))).toMatch(/At most 100\S*000/);
     expect(validateMessage("Why?")).toBeNull();
     expect(chatHref(12)).toBe("/chat?c=12");
     expect(chatHref()).toBe("/chat");

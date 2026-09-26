@@ -24,11 +24,11 @@ import anthropic
 import asyncpg
 import pydantic
 from anthropic import transform_schema
-from anthropic.types import MessageParam, OutputConfigParam
+from anthropic.types import MessageParam
 from pydantic import BaseModel, Field
 
 from steward.ai import AINotConfigured, Usage, create_client
-from steward.config.jobs import JobsConfig, ReviewSettings
+from steward.config.jobs import JobsConfig, ReviewSettings, effort_kwargs, reasoning_kwargs
 from steward.config.prompts import load_prompts
 from steward.config.store import load_active
 from steward.config.strategy import (
@@ -164,16 +164,19 @@ class ClaudeReviewWriter:
         usage = Usage(model=self._settings.model, batch=True)
         params = {
             "model": self._settings.model,
-            "max_tokens": 16000,
             "system": self._system,
             "messages": self._messages(material, today),
-            "output_config": {
-                "effort": self._settings.effort,
-                "format": {
-                    "type": "json_schema",
-                    "schema": transform_schema(ReviewDraft.model_json_schema()),
+            **reasoning_kwargs(
+                self._settings.model,
+                self._settings.effort,
+                16000,
+                {
+                    "format": {
+                        "type": "json_schema",
+                        "schema": transform_schema(ReviewDraft.model_json_schema()),
+                    }
                 },
-            },
+            ),
         }
         try:
             batch = await self._client.messages.batches.create(
@@ -217,10 +220,9 @@ class ClaudeReviewWriter:
             try:
                 response = await self._client.messages.parse(
                     model=self._settings.model,
-                    max_tokens=16000,
                     system=self._system,
                     messages=self._messages(material, today),
-                    output_config=cast(OutputConfigParam, {"effort": self._settings.effort}),
+                    **effort_kwargs(self._settings.model, self._settings.effort, 16000),
                     output_format=ReviewDraft,
                 )
             except anthropic.APIError as exc:

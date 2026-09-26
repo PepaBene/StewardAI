@@ -38,6 +38,8 @@ export const JOB_TYPE_LABELS: Record<JobType, string> = Object.fromEntries(
 
 /** The backend's default prices, for when nothing is saved yet (a 404). */
 const DEFAULT_PRICES: [string, number, number][] = [
+  ["claude-fable-5-1", 10, 50],
+  ["claude-opus-4-8", 5, 25],
   ["claude-haiku-4-5", 1, 5],
   ["claude-sonnet-5", 2, 10],
   ["claude-sonnet-4-6", 3, 15],

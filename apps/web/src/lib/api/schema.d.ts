@@ -2359,25 +2359,25 @@ export interface components {
             model: string;
             /**
              * Effort
-             * @description Unset: effort is not sent and the model's default applies. Not on Haiku 4.
+             * @description Unset: effort is not sent and the model's default applies. On Haiku 4 models the level sets an extended-thinking budget instead (low 2k to max 32k tokens).
              */
             effort?: ("low" | "medium" | "high" | "xhigh" | "max") | null;
             /**
              * Max Steps
              * @description Claude calls plus tool rounds per answer.
-             * @default 6
+             * @default 30
              */
             max_steps: number;
             /**
              * Max Searches
              * @description Web searches per answer.
-             * @default 3
+             * @default 15
              */
             max_searches: number;
             /**
              * History Messages
              * @description Earlier messages of the conversation sent along.
-             * @default 12
+             * @default 100
              */
             history_messages: number;
             /**
@@ -2471,7 +2471,7 @@ export interface components {
             model: string;
             /**
              * Effort
-             * @description Unset: effort is not sent and the model's default applies. Not on Haiku 4.
+             * @description Unset: effort is not sent and the model's default applies. On Haiku 4 models the level sets an extended-thinking budget instead (low 2k to max 32k tokens).
              */
             effort?: ("low" | "medium" | "high" | "xhigh" | "max") | null;
             /**
@@ -2860,7 +2860,7 @@ export interface components {
             model: string;
             /**
              * Effort
-             * @description Unset: effort is not sent and the model's default applies. Not on Haiku 4.
+             * @description Unset: effort is not sent and the model's default applies. On Haiku 4 models the level sets an extended-thinking budget instead (low 2k to max 32k tokens).
              */
             effort?: ("low" | "medium" | "high" | "xhigh" | "max") | null;
             /**
@@ -3071,7 +3071,7 @@ export interface components {
             model: string;
             /**
              * Effort
-             * @description Unset: effort is not sent and the model's default applies. Not on Haiku 4.
+             * @description Unset: effort is not sent and the model's default applies. On Haiku 4 models the level sets an extended-thinking budget instead (low 2k to max 32k tokens).
              */
             effort?: ("low" | "medium" | "high" | "xhigh" | "max") | null;
             /**
@@ -3130,19 +3130,19 @@ export interface components {
             effort: "low" | "medium" | "high" | "xhigh" | "max";
             /**
              * Locate Effort
-             * @description Unset: effort is not sent and the model's default applies. Not on Haiku 4.
+             * @description Unset: effort is not sent and the model's default applies. On Haiku 4 models the level sets an extended-thinking budget instead (low 2k to max 32k tokens).
              */
             locate_effort?: ("low" | "medium" | "high" | "xhigh" | "max") | null;
             /**
              * Max Steps
              * @description Claude calls plus document fetches per run.
-             * @default 8
+             * @default 40
              */
             max_steps: number;
             /**
              * Max Searches
              * @description Web searches per run.
-             * @default 3
+             * @default 20
              */
             max_searches: number;
             /**
@@ -3288,18 +3288,18 @@ export interface components {
             model: string;
             /**
              * Effort
-             * @description Unset: effort is not sent and the model's default applies. Not on Haiku 4.
+             * @description Unset: effort is not sent and the model's default applies. On Haiku 4 models the level sets an extended-thinking budget instead (low 2k to max 32k tokens).
              */
             effort?: ("low" | "medium" | "high" | "xhigh" | "max") | null;
             /**
              * Max Steps
              * @description Claude calls plus web searches per escalation.
-             * @default 5
+             * @default 30
              */
             max_steps: number;
             /**
              * Max Searches
-             * @default 3
+             * @default 15
              */
             max_searches: number;
             /**
@@ -4898,7 +4898,7 @@ export interface components {
             classification_model: string;
             /**
              * Classification Effort
-             * @description Unset: effort is not sent and the model's default applies. Not on Haiku 4.
+             * @description Unset: effort is not sent and the model's default applies. On Haiku 4 models the level sets an extended-thinking budget instead (low 2k to max 32k tokens).
              */
             classification_effort?: ("low" | "medium" | "high" | "xhigh" | "max") | null;
             /**
@@ -4915,19 +4915,19 @@ export interface components {
             corroboration_model: string;
             /**
              * Corroboration Effort
-             * @description Unset: effort is not sent and the model's default applies. Not on Haiku 4.
+             * @description Unset: effort is not sent and the model's default applies. On Haiku 4 models the level sets an extended-thinking budget instead (low 2k to max 32k tokens).
              */
             corroboration_effort?: ("low" | "medium" | "high" | "xhigh" | "max") | null;
             /**
              * Corroboration Max Searches
              * @description Web searches per corroboration call.
-             * @default 3
+             * @default 10
              */
             corroboration_max_searches: number;
             /**
              * Corroboration Rounds
              * @description Corroboration searches per story: one when it is first seen, the rest spread over the re-check window.
-             * @default 2
+             * @default 3
              */
             corroboration_rounds: number;
             /**
@@ -4939,7 +4939,7 @@ export interface components {
             /**
              * Max Items Per Run
              * @description Classification cap per run (cost guard).
-             * @default 500
+             * @default 10000
              */
             max_items_per_run: number;
         };
@@ -5106,9 +5106,8 @@ export interface components {
             /**
              * Daily Alert Cap
              * @description Most alerts sent per day (in the quiet-hours timezone); the rest wait for the digest. Null: no cap.
-             * @default 5
              */
-            daily_alert_cap: number | null;
+            daily_alert_cap?: number | null;
             /** Muted Tickers */
             muted_tickers?: string[];
             /** Muted Event Types */
@@ -6003,12 +6002,12 @@ export interface components {
             /**
              * Max Steps
              * @description Claude calls plus web searches per run.
-             * @default 20
+             * @default 60
              */
             max_steps: number;
             /**
              * Max Searches
-             * @default 15
+             * @default 40
              */
             max_searches: number;
             /**
@@ -6249,7 +6248,7 @@ export interface components {
             /**
              * Max Steps
              * @description Claude calls per review.
-             * @default 3
+             * @default 10
              */
             max_steps: number;
             /**

@@ -269,7 +269,6 @@ class ClaudeClassifier:
         try:
             response = await self._client.messages.parse(
                 model=self._model,
-                max_tokens=12000,
                 # No cache breakpoint: the prefix (about 600 tokens of instructions and event
                 # types plus the holdings block, which is filtered to each batch's candidates
                 # and so differs between batches) stays under Haiku 4.5's 4096-token cacheable
@@ -280,7 +279,7 @@ class ClaudeClassifier:
                 ],
                 messages=[cast(MessageParam, {"role": "user", "content": user})],
                 output_format=ClassificationOutput,
-                **effort_kwargs(self._model, self._effort),
+                **effort_kwargs(self._model, self._effort, 12000),
             )
         except anthropic.APIError as exc:
             raise ClassificationError(f"classification call failed: {exc}") from exc

@@ -178,11 +178,10 @@ class ClaudeClaimVerifier:
             batch = claims[start : start + BATCH]
             response = await self._client.messages.parse(
                 model=self._model,
-                max_tokens=4000,
                 system=self._system,
                 messages=[{"role": "user", "content": claims_prompt(batch, today)}],
                 output_format=ClaimVerdicts,
-                **effort_kwargs(self._model, self._effort),
+                **effort_kwargs(self._model, self._effort, 4000),
             )
             usage.add(response.usage)
             parsed: Any = response.parsed_output
