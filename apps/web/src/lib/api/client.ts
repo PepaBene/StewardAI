@@ -113,6 +113,29 @@ export type ReviewDue = Schemas["ReviewDue"];
 export type MacroFigure = Schemas["MacroFigure"];
 export type MarketHoliday = Schemas["MarketHoliday"];
 export type AnnouncementRule = Schemas["AnnouncementRule"];
+// Phase 4: verification hardening.
+export type FeedbackIn = Schemas["FeedbackIn"];
+export type FeedbackOut = Schemas["FeedbackOut"];
+export type FeedbackTargetKind = FeedbackIn["target_kind"];
+export type FeedbackRating = FeedbackIn["rating"];
+export type NewsLabel = Schemas["NewsLabel"];
+export type SourceTrustOut = Schemas["SourceTrustOut"];
+export type EvalCandidateOut = Schemas["EvalCandidateOut"];
+export type ActivityCoverage = Schemas["ActivityCoverage"];
+export type HoldingCoverage = Schemas["HoldingCoverage"];
+export type JobList = Schemas["JobList"];
+export type JobListItem = Schemas["JobListItem"];
+export type ReplayPreview = Schemas["ReplayPreview"];
+export type ReplayChange = Schemas["ReplayChange"];
+export type ReplayOutcome = Schemas["ReplayOutcome"];
+export type VerificationConfig = Schemas["VerificationConfig"];
+export type ClaimVerifierSettings = Schemas["ClaimVerifierSettings"];
+export type ClaimTarget = NonNullable<ClaimVerifierSettings["applies_to"]>[number];
+export type ClaimCheckSummary = Schemas["ClaimCheckSummary"];
+export type SentenceCheck = NonNullable<DigestSentence["check"]>;
+export type DigestFactSource = Schemas["DigestFactSource"];
+export type DigestStory = Schemas["DigestStory"];
+export type AlertKind = AlertOut["kind"];
 
 export type AccessTokenGetter = () => Promise<string | null | undefined>;
 

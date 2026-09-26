@@ -6,6 +6,7 @@ import { useMemo, useState } from "react";
 import { AlertMessage } from "@/components/alert-message";
 import { ConfigHeader } from "@/components/config/config-header";
 import { CheckboxField, CheckboxGroup, SelectField, TextAreaField, TextField } from "@/components/config/fields";
+import { ReplayPreviewDialog, useReplayGate } from "@/components/config/replay-preview";
 import { SaveBar } from "@/components/config/save-bar";
 import { Button } from "@/components/ui/button";
 import {
@@ -68,9 +69,14 @@ export function NotificationsEditor() {
       return { ...f, rules };
     });
 
-  async function save(note: string | null) {
-    if (body && (await editor.save(body, note))) setBaseline(JSON.stringify(body));
-  }
+  // Save shows the replay preview of the change first; only its confirm saves.
+  const replay = useReplayGate<NotificationsConfig>({
+    preview: (draft) => api().POST("/config/notifications/preview", { body: draft }),
+    save: async (draft, note) => {
+      if (await editor.save(draft, note)) setBaseline(JSON.stringify(draft));
+    },
+    onInvalid: (draft) => void editor.validate(draft),
+  });
 
   return (
     <div className="space-y-6">
@@ -80,6 +86,7 @@ export function NotificationsEditor() {
           bottom and the first match decides; anything no rule matches waits for the digest. Rumours
           and unconfirmed stories never alert. Changes apply to the next alert, no restart.
         </p>
+        <p>Saving first replays the last 7 days under your draft and shows which alerts would change; confirm to save.</p>
       </ConfigHeader>
 
       {editor.status.kind === "loading" ? (
@@ -208,12 +215,14 @@ export function NotificationsEditor() {
 
           <SaveBar
             dirty={dirty}
-            busy={editor.busy}
+            busy={editor.busy ?? (replay.gate.kind === "previewing" ? "previewing" : null)}
             errors={editor.errors}
-            message={editor.message}
+            message={replay.gate.kind === "previewing" ? "Replaying the last 7 days under your draft…" : editor.message}
             onValidate={() => body && void editor.validate(body)}
-            onSave={(note) => void save(note)}
+            onSave={(note) => body && void replay.request(body, note)}
+            saveLabel="Preview and save"
           />
+          <ReplayPreviewDialog gate={replay.gate} onConfirm={() => void replay.confirm()} onCancel={replay.cancel} />
         </>
       ) : null}
     </div>

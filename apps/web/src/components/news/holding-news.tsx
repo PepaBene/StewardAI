@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 
 import { ConfidenceBadge } from "@/components/evidence/confidence-badge";
+import { FeedbackControl } from "@/components/feedback/feedback-control";
 import { SeverityBadge, TierBadge } from "@/components/news/severity-badge";
 import { FreshnessText } from "@/components/freshness/as-of-label";
 import { getBrowserApiClient, type JobSummary, type NewsItemOut } from "@/lib/api/client";
@@ -20,8 +21,9 @@ export function HoldingNews({ ticker }: { ticker: string }) {
   const [items, setItems] = useState<NewsItemOut[] | null>(null);
   const [failed, setFailed] = useState(false);
   const [lastIngest, setLastIngest] = useState<JobSummary | null>(null);
+  const [nextDueAt, setNextDueAt] = useState<string | null>(null);
   const now = useNow();
-  const freshness = ingestFreshness(lastIngest, now);
+  const freshness = ingestFreshness(lastIngest, now, undefined, nextDueAt);
 
   useEffect(() => {
     let cancelled = false;
@@ -32,6 +34,7 @@ export function HoldingNews({ ticker }: { ticker: string }) {
         if (data) {
           setItems(data.items);
           setLastIngest(data.last_ingest);
+          setNextDueAt(data.next_ingest_due_at ?? null);
         } else setFailed(true);
       })
       .catch(() => !cancelled && setFailed(true));
@@ -85,9 +88,10 @@ export function HoldingNews({ ticker }: { ticker: string }) {
                     <span>{eventLabel(lead.story.event_type)}</span>
                   </p>
                 </div>
-                <div className="flex items-center gap-1.5">
+                <div className="flex flex-wrap items-center justify-end gap-1.5">
                   <SeverityBadge severity={lead.story.severity} />
                   <ConfidenceBadge confidence={lead.story.confidence} />
+                  <FeedbackControl target={{ kind: "story", id: lead.story.id }} label={`story “${lead.headline}”`} />
                 </div>
               </li>
             );

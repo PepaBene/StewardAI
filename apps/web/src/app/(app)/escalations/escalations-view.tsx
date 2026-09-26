@@ -8,11 +8,13 @@ import { useEffect, useState } from "react";
 import { AlertMessage } from "@/components/alert-message";
 import { EmptyState } from "@/components/empty-state";
 import { AsOfLabel } from "@/components/freshness/as-of-label";
+import { JobStatusBadge } from "@/components/jobs/job-status-badge";
 import { EscalationStatusBadge } from "@/components/news/escalation-status-badge";
 import { ReportsTabs } from "@/components/news/reports-tabs";
 import { SeverityBadge } from "@/components/news/severity-badge";
 import { Button } from "@/components/ui/button";
 import { getBrowserApiClient, type EscalationOut, type Holding } from "@/lib/api/client";
+import { formatCost } from "@/lib/jobs/job-detail";
 import { escalationHref, formatMovePct, parsePriceMove, thesisLink, TRIGGER_LABELS } from "@/lib/news/escalation";
 import { eventLabel } from "@/lib/news/labels";
 
@@ -148,7 +150,17 @@ function EscalationRow({ escalation: e }: { escalation: EscalationOut }) {
           <span aria-hidden="true">·</span>
           <span>{link.kind === "none" ? link.text : `Touches ${[...link.kpis.map((k) => `KPI ${k.id}`), ...link.exitConditions.map(() => "an exit condition")].join(", ")}`}</span>
         </span>
-        <AsOfLabel at={e.created_at} kind="escalation" prefix="Written" className="text-xs" />
+        <span className="flex flex-wrap items-center gap-x-3 gap-y-1">
+          <AsOfLabel at={e.created_at} kind="escalation" prefix="Written" className="text-xs" />
+          {e.job_status ? (
+            <span className="inline-flex items-center gap-1 text-xs text-text-muted">
+              run <span className="num">#{e.job_id}</span> <JobStatusBadge status={e.job_status} />
+            </span>
+          ) : null}
+          <span className="num text-xs text-text-muted" title={e.models.join(", ") || undefined}>
+            cost {e.cost_usd === null ? "none recorded" : formatCost(e.cost_usd)}
+          </span>
+        </span>
       </Link>
     </li>
   );

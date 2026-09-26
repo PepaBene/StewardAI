@@ -81,3 +81,53 @@ describe("news feed freshness", () => {
     expect(ingestPrefix("running")).toBe("News check running since");
   });
 });
+
+describe("schedule-aware freshness", () => {
+  // A Friday daily digest (window end Fri 25 Sep 05:00 UTC); daily digests run on weekdays,
+  // so the next one is due on Monday 28 Sep 05:00 UTC.
+  const friday = "2026-09-25T05:00:00Z";
+  const monday = "2026-09-28T05:00:00Z";
+
+  it("keeps a Friday daily digest current over the weekend", () => {
+    for (const at of ["2026-09-26T09:00:00Z", "2026-09-27T20:00:00Z", "2026-09-28T06:59:00Z"]) {
+      const f = freshness(friday, "daily_digest", new Date(at), { nextDueAt: monday })!;
+      expect(f.ageHours).toBeGreaterThan(26);
+      expect(f.stale).toBe(false);
+      expect(f.staleReason).toBeNull();
+      expect(f.nextDueAt).toBe(new Date(monday).toISOString());
+      expect(f.nextDue).toMatch(/^Next due /);
+    }
+  });
+
+  it("marks it stale once the next digest is more than 2 h overdue, saying when it was due", () => {
+    const f = freshness(friday, "daily_digest", new Date("2026-09-28T07:01:00Z"), { nextDueAt: monday, locale: L })!;
+    expect(f.stale).toBe(true);
+    expect(f.staleReason).toMatch(/^the next daily digest was due at .+ and no newer digest has been written$/);
+  });
+
+  it("gives the news feed a 30 min grace after the next check was due", () => {
+    const now = new Date("2026-09-25T12:00:00Z");
+    const due = (minutesAgo: number) => new Date(now.getTime() - minutesAgo * 60_000).toISOString();
+    expect(freshness(hoursAgo(2.3), "news", now, { nextDueAt: due(29) })!.stale).toBe(false);
+    const late = freshness(hoursAgo(2.3), "news", now, { nextDueAt: due(31), locale: L })!;
+    expect(late.stale).toBe(true);
+    expect(late.staleReason).toMatch(/^the next news check was due at \d{1,2}:\d{2}/);
+    // Overnight: 11 h old, but the next check (06:00) is not due yet.
+    expect(freshness(hoursAgo(11), "news", now, { nextDueAt: due(-30) })!.stale).toBe(false);
+  });
+
+  it("falls back to the fixed thresholds without a schedule", () => {
+    expect(freshness(hoursAgo(27), "daily_digest", now, { nextDueAt: null })!.stale).toBe(true);
+    expect(freshness(hoursAgo(27), "daily_digest", now, { nextDueAt: "garbage" })!.staleReason).toMatch(/^older than 26 h/);
+    // Impact notes have no schedule: a due time is ignored.
+    expect(freshness(hoursAgo(80), "escalation", now, { nextDueAt: hoursAgo(-10) })!.stale).toBe(true);
+  });
+
+  it("still forces stale when the last run failed", () => {
+    const job = { status: "failed" as const, created_at: hoursAgo(1), started_at: hoursAgo(1), finished_at: hoursAgo(0.9), error: "boom" };
+    expect(ingestFreshness(job, now, L, hoursAgo(-1))).toMatchObject({ stale: true, staleReason: "the last news check failed" });
+    const ok = { ...job, status: "succeeded" as const, error: null };
+    expect(ingestFreshness(ok, now, L, hoursAgo(-1))).toMatchObject({ stale: false });
+    expect(ingestFreshness(ok, now, L, hoursAgo(1))!.stale).toBe(true);
+  });
+});

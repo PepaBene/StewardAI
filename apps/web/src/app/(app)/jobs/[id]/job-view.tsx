@@ -50,8 +50,8 @@ export function JobView({ id }: { id: number }) {
   return (
     <div className="space-y-6">
       <p className="text-sm text-text-muted">
-        <Link href="/status" className="hover:text-text hover:underline">
-          Status
+        <Link href="/activity#job-log" className="hover:text-text hover:underline">
+          Activity
         </Link>{" "}
         / Job <span className="num">#{id}</span>
       </p>

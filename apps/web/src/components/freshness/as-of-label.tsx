@@ -38,6 +38,11 @@ export function FreshnessText({
         </time>{" "}
         · {value.age}
       </span>
+      {value.nextDue && !value.stale ? (
+        <span className="num text-xs text-text-muted" title="When the next scheduled run is due; the data is current until then">
+          · {value.nextDue}
+        </span>
+      ) : null}
       {value.stale ? (
         <span
           title={value.staleReason ?? undefined}
@@ -50,22 +55,27 @@ export function FreshnessText({
   );
 }
 
-/** The freshness label for a timestamp, refreshed every 30 s. Renders nothing without one. */
+/**
+ * The freshness label for a timestamp, refreshed every 30 s. Renders nothing without one.
+ * `nextDueAt` (the next scheduled run, from the API) makes staleness follow the schedule.
+ */
 export function AsOfLabel({
   at,
   kind,
   prefix,
   forceStale,
+  nextDueAt,
   className,
 }: {
   at: string | null | undefined;
   kind: FreshnessKind;
   prefix?: string;
   forceStale?: string;
+  nextDueAt?: string | null;
   className?: string;
 }) {
   const now = useNow();
-  const value = freshness(at, kind, now, { forceStale });
+  const value = freshness(at, kind, now, { forceStale, nextDueAt });
   if (!value) return null;
   return <FreshnessText value={value} prefix={prefix} className={className} />;
 }

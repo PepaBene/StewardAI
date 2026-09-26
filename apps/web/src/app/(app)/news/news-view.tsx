@@ -9,6 +9,7 @@ import { AlertMessage } from "@/components/alert-message";
 import { EmptyState } from "@/components/empty-state";
 import { FreshnessText } from "@/components/freshness/as-of-label";
 import { ConfidenceBadge } from "@/components/evidence/confidence-badge";
+import { FeedbackControl } from "@/components/feedback/feedback-control";
 import { SeverityBadge, TierBadge } from "@/components/news/severity-badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -42,7 +43,14 @@ const PAGE = 50;
 type Load =
   | { kind: "loading" }
   | { kind: "error"; message: string }
-  | { kind: "ok"; items: NewsItemOut[]; next: number | null; lastIngest: JobSummary | null };
+  | {
+      kind: "ok";
+      items: NewsItemOut[];
+      next: number | null;
+      lastIngest: JobSummary | null;
+      /** When the next scheduled news check is due: the feed is current until then. */
+      nextIngestDueAt: string | null;
+    };
 
 function query(filters: FeedFilters, beforeId: number | null) {
   return {
@@ -84,7 +92,13 @@ export function NewsView() {
     fetchFeed(filters, null)
       .then((feed) => {
         if (!cancelled) {
-          setLoad({ kind: "ok", items: feed.items, next: feed.next_before_id, lastIngest: feed.last_ingest });
+          setLoad({
+            kind: "ok",
+            items: feed.items,
+            next: feed.next_before_id,
+            lastIngest: feed.last_ingest,
+            nextIngestDueAt: feed.next_ingest_due_at ?? null,
+          });
         }
       })
       .catch((err: unknown) => {
@@ -131,7 +145,7 @@ export function NewsView() {
           </p>
         </div>
         <div className="flex flex-col items-end gap-2">
-          {load.kind === "ok" ? <IngestFreshness job={load.lastIngest} /> : null}
+          {load.kind === "ok" ? <IngestFreshness job={load.lastIngest} nextDueAt={load.nextIngestDueAt} /> : null}
           <div className="flex flex-wrap justify-end gap-2">
             <Button asChild variant="ghost" size="sm">
               <Link href="/news/disputed">
@@ -194,9 +208,9 @@ export function NewsView() {
   );
 }
 
-function IngestFreshness({ job }: { job: JobSummary | null }) {
+function IngestFreshness({ job, nextDueAt }: { job: JobSummary | null; nextDueAt: string | null }) {
   const now = useNow();
-  const value = ingestFreshness(job, now);
+  const value = ingestFreshness(job, now, undefined, nextDueAt);
   if (!job || !value) return <p className="text-sm text-text-muted">No news check has run yet.</p>;
   return (
     <div className="flex flex-col items-end gap-0.5">
@@ -303,6 +317,16 @@ function Filters({
   );
 }
 
+/** The stored classification, to start a corrected label from. */
+function labelDefaults(item: NewsItemOut) {
+  return {
+    eventType: item.event_type ?? item.story.event_type,
+    affectedTicker: item.affected_ticker ?? item.story.ticker,
+    relevant: item.relevant,
+    rumour: item.rumour ?? item.story.rumour,
+  };
+}
+
 function StoryRow({ items: group, onStory }: { items: NewsItemOut[]; onStory: (id: number) => void }) {
   const now = useNow();
   const items = byLead(group);
@@ -338,12 +362,22 @@ function StoryRow({ items: group, onStory }: { items: NewsItemOut[]; onStory: (i
             {story.recycled ? <span className="rounded-sm border border-border px-1 text-xs">recycled</span> : null}
           </p>
         </div>
-        <div className="flex shrink-0 items-center gap-1.5">
-          <SeverityBadge severity={story.severity} />
-          <ConfidenceBadge confidence={story.confidence} />
+        <div className="flex shrink-0 flex-col items-end gap-1">
+          <span className="flex items-center gap-1.5">
+            <SeverityBadge severity={story.severity} />
+            <ConfidenceBadge confidence={story.confidence} />
+          </span>
+          <span className="flex items-center gap-1 text-xs text-text-muted">
+            Story
+            <FeedbackControl target={{ kind: "story", id: story.id }} label={`story “${lead.headline}”`} />
+          </span>
         </div>
       </div>
       {lead.summary ? <p className="max-w-prose text-sm text-text-muted">{lead.summary}</p> : null}
+      <p className="flex items-center gap-1 text-xs text-text-muted">
+        This item ({lead.outlet_name ?? lead.outlet ?? lead.source_id})
+        <FeedbackControl target={{ kind: "news_item", id: lead.id }} label={`news item “${lead.headline}”`} labelDefaults={labelDefaults(lead)} />
+      </p>
       <div className="flex flex-wrap items-center gap-2 text-sm">
         {lead.links.map((link) => (
           <Link
@@ -382,6 +416,7 @@ function StoryRow({ items: group, onStory }: { items: NewsItemOut[]; onStory: (i
                 {copy.outlet_name ?? copy.outlet ?? copy.source_id}
               </a>
               <TierBadge tier={copy.tier} />
+              <FeedbackControl target={{ kind: "news_item", id: copy.id }} label={`news item “${copy.headline}”`} labelDefaults={labelDefaults(copy)} />
             </li>
           ))}
         </ul>

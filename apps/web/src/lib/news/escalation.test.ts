@@ -8,6 +8,7 @@ import {
   escalationStatus,
   formatMovePct,
   parsePriceMove,
+  noteCitationPreview,
   sentenceCitations,
   thesisLink,
 } from "./escalation";
@@ -80,5 +81,27 @@ describe("escalations", () => {
     expect(parsePriceMove(null)).toBeNull();
     expect(formatMovePct(9.24, "en-US")).toBe("+9.2 %");
     expect(formatMovePct(-8.4, "en-US")).toBe("-8.4 %");
+  });
+});
+
+describe("impact-note citation preview", () => {
+  const sources = [
+    { ...body.sources[0], snippet: "The Commission fined Apple EUR 1.8 billion." },
+    { ...body.sources[1], snippet: null },
+  ];
+
+  it("shows the stored snippet a sentence was checked against, with the tier", () => {
+    expect(noteCitationPreview(sources, "https://ec.europa.eu/a")).toEqual({
+      kind: "note",
+      title: "Commission decision",
+      snippet: "The Commission fined Apple EUR 1.8 billion.",
+      tier: 1,
+      tierLabel: "Tier 1",
+      source: "ec.europa.eu",
+      url: "https://ec.europa.eu/a",
+    });
+    expect(noteCitationPreview(sources, "https://reuters.com/b")).toMatchObject({ title: "reuters.com", snippet: null, tierLabel: "Tier 2" });
+    expect(noteCitationPreview(sources, "https://elsewhere.org/c")).toBeNull();
+    expect(noteCitationPreview([{ url: "https://x.org/p", kind: "price" }], "https://x.org/p")).toMatchObject({ tier: null, tierLabel: "Tier unknown", title: "x.org" });
   });
 });

@@ -86,3 +86,17 @@ describe("command palette: phase 3", () => {
     expect(jobCommands("news")).toEqual([]);
   });
 });
+
+describe("command palette: phase 4", () => {
+  it("reaches the verification editor and the Activity page's sections", () => {
+    expect(filterCommands(commands, "verification")[0].href).toBe("/config/verification");
+    expect(filterCommands(commands, "claim verifier").map((c) => c.href)).toContain("/config/verification");
+    expect(filterCommands(commands, "history verification")[0].href).toBe("/config/history/verification");
+    expect(filterCommands(commands, "activity")[0].href).toBe("/activity");
+    expect(filterCommands(commands, "job log")[0].href).toBe("/activity#job-log");
+    expect(filterCommands(commands, "coverage gaps")[0].href).toBe("/activity#coverage");
+    expect(filterCommands(commands, "source trust")[0].href).toBe("/activity#source-trust");
+    expect(filterCommands(commands, "eval").map((c) => c.href)).toContain("/activity#eval-candidates");
+    expect(filterCommands(commands, "missed runs").map((c) => c.href)).toContain("/activity#alerts");
+  });
+});

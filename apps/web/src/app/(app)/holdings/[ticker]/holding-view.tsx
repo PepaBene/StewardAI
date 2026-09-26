@@ -20,6 +20,7 @@ import { ConfidenceBadge } from "@/components/evidence/confidence-badge";
 import { EvidenceLinks } from "@/components/evidence/evidence-links";
 import { FactReviewForm, type ReviewResolution } from "@/components/evidence/fact-review-form";
 import { VerdictStatusBadge } from "@/components/evidence/verdict-status-badge";
+import { FeedbackControl } from "@/components/feedback/feedback-control";
 import { DriftStatusBadge } from "@/components/portfolio/drift-status-badge";
 import { FreshnessLabel } from "@/components/portfolio/freshness-label";
 import { HoldingNews } from "@/components/news/holding-news";
@@ -32,6 +33,7 @@ import { Label } from "@/components/ui/label";
 import {
   getBrowserApiClient,
   type FactOut,
+  type FeedbackOut,
   type HoldingDetail,
   type JobSummary,
   type KpiStatus,
@@ -44,7 +46,7 @@ import {
   formatTarget,
   humanizeMetric,
 } from "@/lib/evidence/confidence";
-import { allowedReviewActions, isHeld, REVIEW_ACTIONS, reviewQueueHref } from "@/lib/evidence/review";
+import { allowedReviewActions, isHeld, REVIEW_ACTIONS, reviewQueueHref, scaleHint } from "@/lib/evidence/review";
 import { formatDate, formatMoney, formatPercent, formatRelative, gainLossTone } from "@/lib/format";
 import { useApiResource } from "@/lib/hooks/use-api-resource";
 import { jobHref } from "@/lib/jobs/job-detail";
@@ -123,6 +125,28 @@ export function HoldingContent({
   const name = instrument?.name ?? detail.profile?.company_name ?? detail.ticker;
   const facts = useMemo(() => new Map(detail.facts.map((f) => [f.id, f])), [detail.facts]);
 
+  // A fact marked wrong is quarantined and the verdicts re-judged: follow that run.
+  const onFeedback = useCallback(
+    (mark: FeedbackOut) => {
+      const job = mark.effects.verdict_job_id;
+      if (typeof job === "number") {
+        onQueued({
+          id: job,
+          job_type: "thesis_verdicts",
+          trigger: "event",
+          status: "queued",
+          error: null,
+          created_at: mark.created_at,
+          started_at: null,
+          finished_at: null,
+        });
+      } else if (mark.effects.quarantined) {
+        reload();
+      }
+    },
+    [onQueued, reload],
+  );
+
   return (
     <>
       <div className="flex flex-wrap items-end justify-between gap-3">
@@ -193,14 +217,14 @@ export function HoldingContent({
       </section>
 
       {thesis && thesis.kpis && thesis.kpis.length > 0 ? (
-        <KpiTable kpis={detail.kpis} facts={facts} />
+        <KpiTable kpis={detail.kpis} facts={facts} onFeedback={onFeedback} />
       ) : null}
 
       <PriceRiskSection ticker={detail.ticker} currency={detail.position?.instrument_currency} />
 
       <HoldingNews ticker={detail.ticker} />
 
-      <FactsSection ticker={detail.ticker} facts={detail.facts} reload={reload} onQueued={onQueued} />
+      <FactsSection ticker={detail.ticker} facts={detail.facts} reload={reload} onQueued={onQueued} onFeedback={onFeedback} />
 
       <IdentitySection ticker={detail.ticker} />
     </>
@@ -351,7 +375,9 @@ function JobActions({
   );
 }
 
-function KpiTable({ kpis, facts }: { kpis: KpiStatus[]; facts: Map<number, FactOut> }) {
+type OnFeedback = (mark: FeedbackOut) => void;
+
+function KpiTable({ kpis, facts, onFeedback }: { kpis: KpiStatus[]; facts: Map<number, FactOut>; onFeedback: OnFeedback }) {
   const [open, setOpen] = useState<string | null>(null);
   return (
     <section aria-labelledby="kpi-heading" className="space-y-3">
@@ -387,6 +413,7 @@ function KpiTable({ kpis, facts }: { kpis: KpiStatus[]; facts: Map<number, FactO
                   expanded={expanded}
                   onToggle={() => setOpen(expanded ? null : kpi.id)}
                   facts={facts}
+                  onFeedback={onFeedback}
                 />
               );
             })}
@@ -408,6 +435,7 @@ function KpiRows({
   expanded,
   onToggle,
   facts,
+  onFeedback,
 }: {
   kpiId: string;
   label: string;
@@ -419,6 +447,7 @@ function KpiRows({
   expanded: boolean;
   onToggle: () => void;
   facts: Map<number, FactOut>;
+  onFeedback: OnFeedback;
 }) {
   const panelId = `kpi-${kpiId}`;
   return (
@@ -457,6 +486,10 @@ function KpiRows({
                   (old config)
                 </span>
               ) : null}
+              <FeedbackControl
+                target={{ kind: "verdict", id: current.id }}
+                label={`verdict on ${label}${current.period ? ` ${current.period}` : ""}`}
+              />
             </span>
           ) : (
             <span className="inline-flex flex-wrap items-center gap-1">
@@ -470,7 +503,7 @@ function KpiRows({
       {expanded ? (
         <tr className="border-b border-border bg-surface-muted/60">
           <td colSpan={6} id={panelId} className="space-y-4 px-4 py-3">
-            {current ? <VerdictEvidence verdict={current} facts={facts} /> : <p>{NEVER_JUDGED}.</p>}
+            {current ? <VerdictEvidence verdict={current} facts={facts} onFeedback={onFeedback} /> : <p>{NEVER_JUDGED}.</p>}
             {history.length > 1 ? (
               <div>
                 <p className="mb-1 text-xs font-medium tracking-wide text-text-muted uppercase">History</p>
@@ -481,6 +514,7 @@ function KpiRows({
                       <span className="num w-28 text-right">{formatObserved(v.observed_value, unit)}</span>
                       <VerdictStatusBadge status={v.status} />
                       <ConfidenceBadge confidence={v.confidence} />
+                      <FeedbackControl target={{ kind: "verdict", id: v.id }} label={`verdict on ${label} ${v.period ?? ""}`.trim()} />
                     </li>
                   ))}
                 </ul>
@@ -493,7 +527,15 @@ function KpiRows({
   );
 }
 
-function VerdictEvidence({ verdict, facts }: { verdict: VerdictOut; facts: Map<number, FactOut> }) {
+function VerdictEvidence({
+  verdict,
+  facts,
+  onFeedback,
+}: {
+  verdict: VerdictOut;
+  facts: Map<number, FactOut>;
+  onFeedback: OnFeedback;
+}) {
   const used = verdict.fact_ids.map((id) => facts.get(id)).filter((f): f is FactOut => Boolean(f));
   return (
     <div className="space-y-2 text-sm">
@@ -504,7 +546,7 @@ function VerdictEvidence({ verdict, facts }: { verdict: VerdictOut; facts: Map<n
         <ul className="space-y-2">
           {used.map((f) => (
             <li key={f.id}>
-              <FactEvidence fact={f} />
+              <FactEvidence fact={f} onFeedback={onFeedback} />
             </li>
           ))}
         </ul>
@@ -513,7 +555,7 @@ function VerdictEvidence({ verdict, facts }: { verdict: VerdictOut; facts: Map<n
   );
 }
 
-function FactEvidence({ fact }: { fact: FactOut }) {
+function FactEvidence({ fact, onFeedback }: { fact: FactOut; onFeedback: OnFeedback }) {
   return (
     <figure className="rounded-md border border-border bg-surface-raised p-3">
       <div className="flex flex-wrap items-center gap-2">
@@ -523,6 +565,7 @@ function FactEvidence({ fact }: { fact: FactOut }) {
         <span className="num">{formatFactValue(fact)}</span>
         <ConfidenceBadge confidence={fact.confidence} />
         <EvidenceLinks fact={fact} />
+        <FactFeedback fact={fact} onFeedback={onFeedback} />
       </div>
       <blockquote className="mt-2 border-l-2 border-border pl-3 font-mono text-xs break-words text-text-muted">
         {fact.snippet}
@@ -532,16 +575,30 @@ function FactEvidence({ fact }: { fact: FactOut }) {
   );
 }
 
+/** Wrong / irrelevant / useful on one figure; wrong quarantines it and re-judges the verdicts. */
+function FactFeedback({ fact, onFeedback }: { fact: FactOut; onFeedback: OnFeedback }) {
+  return (
+    <FeedbackControl
+      target={{ kind: "fact", id: fact.id }}
+      label={`figure ${humanizeMetric(fact.metric)} ${fact.period}`}
+      valueHint={scaleHint(fact)}
+      onMarked={onFeedback}
+    />
+  );
+}
+
 function FactsSection({
   ticker,
   facts,
   reload,
   onQueued,
+  onFeedback,
 }: {
   ticker: string;
   facts: FactOut[];
   reload: () => void;
   onQueued: (job: JobSummary) => void;
+  onFeedback: OnFeedback;
 }) {
   const [lastReview, setLastReview] = useState<ReviewResolution | null>(null);
   const shown = facts.filter((f) => f.status !== "rejected");
@@ -590,21 +647,29 @@ function FactsSection({
           Run an earnings check to read this company&rsquo;s latest results release.
         </EmptyState>
       ) : (
-        <FactTable facts={shown} onResolved={onResolved} />
+        <FactTable facts={shown} onResolved={onResolved} onFeedback={onFeedback} />
       )}
       {rejected.length > 0 ? (
         <details className="rounded-lg border border-border bg-surface-raised p-3 text-sm">
           <summary className="cursor-pointer font-medium">
             {rejected.length} figure{rejected.length === 1 ? "" : "s"} rejected by the validator or by you
           </summary>
-          <FactTable facts={rejected} onResolved={onResolved} />
+          <FactTable facts={rejected} onResolved={onResolved} onFeedback={onFeedback} />
         </details>
       ) : null}
     </section>
   );
 }
 
-function FactTable({ facts, onResolved }: { facts: FactOut[]; onResolved: (resolution: ReviewResolution) => void }) {
+function FactTable({
+  facts,
+  onResolved,
+  onFeedback,
+}: {
+  facts: FactOut[];
+  onResolved: (resolution: ReviewResolution) => void;
+  onFeedback: OnFeedback;
+}) {
   const [open, setOpen] = useState<number | null>(null);
   if (facts.length === 0) return null;
   return (
@@ -617,6 +682,7 @@ function FactTable({ facts, onResolved }: { facts: FactOut[]; onResolved: (resol
             <th scope="col" className="px-3 py-2 text-right font-medium">Value</th>
             <th scope="col" className="px-3 py-2 text-left font-medium">Confidence</th>
             <th scope="col" className="px-3 py-2 text-left font-medium">Source</th>
+            <th scope="col" className="px-3 py-2 text-left font-medium">Feedback</th>
           </tr>
         </thead>
         <tbody>
@@ -658,10 +724,13 @@ function FactTable({ facts, onResolved }: { facts: FactOut[]; onResolved: (resol
                   <td className="px-3 py-2">
                     <EvidenceLinks fact={f} />
                   </td>
+                  <td className="px-3 py-2">
+                    <FactFeedback fact={f} onFeedback={onFeedback} />
+                  </td>
                 </tr>
                 {expanded ? (
                   <tr className="border-b border-border bg-surface-muted/60">
-                    <td colSpan={5} id={panelId} className="px-4 py-3">
+                    <td colSpan={6} id={panelId} className="px-4 py-3">
                       <blockquote className="mb-3 border-l-2 border-border pl-3 font-mono text-xs break-words text-text-muted">
                         {f.snippet}
                       </blockquote>

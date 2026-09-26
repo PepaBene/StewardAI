@@ -5,9 +5,11 @@ import type { DigestBody } from "@/lib/api/client";
 import {
   allSentences,
   citationLinks,
+  digestCitationPreview,
   formatMacroValue,
   groupHolidays,
   hasStatusSections,
+  hostOf,
   sortFlags,
   sortMacro,
   sourceNumbers,
@@ -119,5 +121,69 @@ describe("digest status sections", () => {
   it("knows when there is anything to show", () => {
     expect(hasStatusSections(body)).toBe(false);
     expect(hasStatusSections({ ...body, reviews_due: [{ ticker: "AAPL_US_EQ", review_date: "2026-09-01" }] })).toBe(true);
+  });
+});
+
+describe("citation hover preview", () => {
+  const withText: DigestBody = {
+    ...body,
+    sources: [
+      { ...body.sources![0], summary: "Apple lowered its revenue outlook for the fourth quarter to 94,036 m." },
+      { ...body.sources![1], summary: null },
+    ],
+    fact_sources: [
+      {
+        fact_id: 7,
+        ticker: "AAPL_US_EQ",
+        metric: "services_revenue",
+        period: "Q3 2026",
+        value_as_written: "24,213",
+        snippet: "Services net sales were $24,213 million.",
+        source_url: "https://www.sec.gov/x.htm",
+        status: "verified",
+      },
+    ],
+  };
+
+  it("shows the exact stored text each citation of a digest links to, with its tier", () => {
+    // Every citation in the digest resolves to a preview.
+    for (const sentence of allSentences(withText)) {
+      for (const link of citationLinks(sentence, withText.sources ?? [], sourceNumbers(withText.sources ?? []))) {
+        expect(digestCitationPreview(withText, link.ref)).not.toBeNull();
+      }
+    }
+    expect(digestCitationPreview(withText, { kind: "news", id: 11 })).toEqual({
+      kind: "news",
+      title: "Apple updates outlook",
+      snippet: "Apple lowered its revenue outlook for the fourth quarter to 94,036 m.",
+      tier: 1,
+      tierLabel: "Tier 1",
+      source: "apple.com",
+      url: "https://ir.apple.com/a",
+    });
+    expect(digestCitationPreview(withText, { kind: "news", id: 12 })).toMatchObject({ snippet: null, tierLabel: "Tier 2" });
+    expect(digestCitationPreview(withText, { kind: "fact", id: 7 })).toEqual({
+      kind: "fact",
+      title: "services revenue Q3 2026: 24,213",
+      snippet: "Services net sales were $24,213 million.",
+      tier: null,
+      tierLabel: "Figure status: verified",
+      source: "sec.gov",
+      url: "https://www.sec.gov/x.htm",
+    });
+  });
+
+  it("returns null for an item the digest does not carry", () => {
+    expect(digestCitationPreview(withText, { kind: "news", id: 99 })).toBeNull();
+    expect(digestCitationPreview(body, { kind: "fact", id: 7 })).toBeNull();
+  });
+
+  it("carries the reference on every citation link", () => {
+    const links = citationLinks(body.sections![0].summary![0], body.sources ?? [], sourceNumbers(body.sources ?? []));
+    expect(links.map((l) => l.ref)).toEqual([
+      { kind: "news", id: 11 },
+      { kind: "news", id: 12 },
+    ]);
+    expect(hostOf("not a url")).toBe("not a url");
   });
 });

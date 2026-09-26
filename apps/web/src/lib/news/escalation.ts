@@ -1,5 +1,7 @@
 import type { EscalationBody, EscalationSource, NoteSentence } from "@/lib/api/client";
 
+import { hostOf, type CitationPreview } from "./digest";
+
 /*
  * Display rules for escalations (impact notes on a confirmed severity-2+ story or a large
  * price move): numbered citations, the thesis link, whether a model assessed it, and the
@@ -55,6 +57,21 @@ export function sentenceCitations(sentence: Pick<NoteSentence, "source_urls">, s
       title: source ? [source.headline, source.outlet].filter(Boolean).join(" · ") || url : url,
     };
   });
+}
+
+/** The preview of an impact-note citation: the stored snippet the sentence was checked against. */
+export function noteCitationPreview(sources: EscalationSource[], url: string): CitationPreview | null {
+  const source = sources.find((s) => s.url === url);
+  if (!source) return null;
+  return {
+    kind: "note",
+    title: source.headline?.trim() || source.outlet || hostOf(url),
+    snippet: source.snippet?.trim() || null,
+    tier: typeof source.tier === "number" ? source.tier : null,
+    tierLabel: typeof source.tier === "number" ? `Tier ${source.tier}` : "Tier unknown",
+    source: source.outlet ?? hostOf(url),
+    url,
+  };
 }
 
 export type ThesisLink =

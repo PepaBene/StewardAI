@@ -10,7 +10,7 @@ export const CONFIG_DOMAINS: Record<ConfigDomainSlug, { label: string; editor: s
   theses: { label: "Theses", editor: "/config/theses" },
   jobs: { label: "Jobs", editor: "/config/jobs" },
   "holding-profiles": { label: "Holding profiles", editor: "/config/holding-profiles" },
-  verification: { label: "Verification", editor: null, note: "Editor in phase 4" },
+  verification: { label: "Verification", editor: "/config/verification" },
   "news-sources": { label: "News sources", editor: "/config/news-sources" },
   "event-rules": { label: "Event rules", editor: "/config/event-rules" },
   notifications: { label: "Notifications", editor: "/config/notifications" },

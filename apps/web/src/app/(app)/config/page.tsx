@@ -52,10 +52,15 @@ const DOMAINS: { slug: ConfigDomainSlug; href: string; title: string; body: stri
     title: "Notifications",
     body: "Which confirmed events reach you, on which channel; quiet hours, caps, digests. Send a test alert.",
   },
+  {
+    slug: "verification",
+    href: "/config/verification",
+    title: "Verification",
+    body: "Sanity bounds and tolerances for extracted figures, the corroboration rules, source trust from your feedback, and the claim verifier.",
+  },
 ];
 
 const LATER: { title: string; note: string; slug?: ConfigDomainSlug }[] = [
-  { title: "Verification", note: "Corroboration rules, sanity bounds and tolerances; editor in phase 4 (PUT /config/verification works today)", slug: "verification" },
   { title: "Research profiles", note: "Sections, depth, model and budgets per research run; phase 5" },
   { title: "Budget", note: "Monthly and per-job caps and what happens at the cap; editor in phase 6", slug: "budget" },
 ];

@@ -16,6 +16,8 @@ import {
   sortParents,
   sourceLabel,
   tierLabel,
+  disputeChoices,
+  parseConflict,
 } from "./identity";
 
 const NOW = new Date("2026-09-25T12:00:00Z");
@@ -163,5 +165,30 @@ describe("decision messages", () => {
     expect(
       decisionMessage("reject", { relationship: { ...suggestion, status: "rejected" }, holding_profiles_version_id: null }),
     ).toBe("Rejected Oracle as competitor. It will not be suggested again.");
+  });
+});
+
+describe("disputed relationships", () => {
+  it("reads the contradicting claim", () => {
+    expect(
+      parseConflict({ source: "gleif", tier: 1, type: "parent", object_key: "lei:X", object_name: " Parent AG ", source_ref: "https://api.gleif.org/x" }),
+    ).toEqual({ source: "gleif", tier: 1, type: "parent", objectName: "Parent AG", sourceRef: "https://api.gleif.org/x" });
+    expect(parseConflict({ object_name: "Parent AG", type: "weird" })).toEqual({
+      source: "unknown",
+      tier: null,
+      type: null,
+      objectName: "Parent AG",
+      sourceRef: null,
+    });
+    expect(parseConflict(null)).toBeNull();
+    expect(parseConflict({ source: "gleif" })).toBeNull();
+  });
+
+  it("says what each decision does", () => {
+    const conflict = parseConflict({ source: "gleif", tier: 1, type: "parent", object_name: "Parent AG" });
+    const choices = disputeChoices({ object_name: "Other Holding", type: "parent" }, conflict);
+    expect(choices.confirm).toBe("Confirm Other Holding as consolidating parent (direct): your decision wins over Parent AG (GLEIF).");
+    expect(choices.reject).toMatch(/^Reject Other Holding .*: Parent AG \(GLEIF\) stands/);
+    expect(disputeChoices({ object_name: "X", type: "parent" }, null).reject).toMatch(/the other source's version stands/);
   });
 });

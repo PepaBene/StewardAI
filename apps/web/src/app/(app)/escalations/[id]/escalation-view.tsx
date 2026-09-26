@@ -5,18 +5,25 @@ import Link from "next/link";
 import { useCallback } from "react";
 
 import { AlertMessage } from "@/components/alert-message";
+import { FeedbackControl } from "@/components/feedback/feedback-control";
 import { AsOfLabel } from "@/components/freshness/as-of-label";
+import { JobStatusBadge } from "@/components/jobs/job-status-badge";
+import { CitationLink } from "@/components/news/citation";
 import { EscalationStatusBadge } from "@/components/news/escalation-status-badge";
 import { SeverityBadge, TierBadge } from "@/components/news/severity-badge";
 import { Button } from "@/components/ui/button";
+import { checkedTextClass, ClaimsSummaryLine, SentenceCheckMark } from "@/components/verify/sentence-check";
 import { getBrowserApiClient, type EscalationOut } from "@/lib/api/client";
+import { noteSentencePath } from "@/lib/feedback/feedback";
 import { formatDateTime } from "@/lib/format";
 import { useApiResource } from "@/lib/hooks/use-api-resource";
+import { formatCost, jobHref } from "@/lib/jobs/job-detail";
 import {
   ESCALATIONS_HREF,
   escalationsForTicker,
   escalationStatus,
   formatMovePct,
+  noteCitationPreview,
   parsePriceMove,
   sentenceCitations,
   SOURCE_KIND_LABELS,
@@ -122,6 +129,8 @@ function Escalation({ escalation: e }: { escalation: EscalationOut }) {
             ) : null}
           </section>
 
+          <RunSection escalation={e} />
+
           {status.kind === "not_assessed" ? (
             <AlertMessage title="Not assessed by a model">
               <p>
@@ -135,24 +144,28 @@ function Escalation({ escalation: e }: { escalation: EscalationOut }) {
               <h2 id="note-heading" className="text-lg font-semibold">
                 What happened
               </h2>
+              <ClaimsSummaryLine claims={body.claims} />
               {body.sentences.map((sentence, i) => (
                 <p key={i} className="max-w-prose text-sm">
-                  {sentence.text}
+                  <span className={checkedTextClass(sentence)}>{sentence.text}</span>
                   <span className="ml-1 inline-flex flex-wrap gap-0.5 align-baseline">
                     {sentenceCitations(sentence, sources).map((c) => (
-                      <a
+                      <CitationLink
                         key={c.url}
                         href={c.url}
-                        target="_blank"
-                        rel="noreferrer"
+                        label={c.number === null ? "src" : String(c.number)}
                         title={c.title}
-                        className="num rounded-sm border border-border px-1 text-xs text-accent hover:border-accent"
-                      >
-                        {c.number ?? "src"}
-                        <span className="sr-only">: {c.title}</span>
-                      </a>
+                        external
+                        preview={noteCitationPreview(sources, c.url)}
+                      />
                     ))}
                   </span>
+                  <SentenceCheckMark sentence={sentence} />
+                  <FeedbackControl
+                    className="ml-1"
+                    target={{ kind: "report_sentence", id: e.id, sentencePath: noteSentencePath(i) }}
+                    label={`sentence “${sentence.text.slice(0, 60)}${sentence.text.length > 60 ? "…" : ""}”`}
+                  />
                 </p>
               ))}
               {body.dropped_sentences ? (
@@ -218,11 +231,47 @@ function Escalation({ escalation: e }: { escalation: EscalationOut }) {
                   {s.headline ?? s.url}
                   <ExternalLinkIcon aria-hidden="true" className="mt-0.5 size-3 shrink-0 text-text-muted" />
                 </a>
+                {s.snippet ? (
+                  <details className="mt-1 text-xs">
+                    <summary className="cursor-pointer text-text-muted">Stored snippet</summary>
+                    <p className="mt-1 break-words whitespace-pre-line text-text-muted">{s.snippet}</p>
+                  </details>
+                ) : null}
               </li>
             ))}
           </ol>
         </aside>
       </div>
     </div>
+  );
+}
+
+/** The event_escalation run that wrote the note: its status, cost and the models it called. */
+function RunSection({ escalation: e }: { escalation: EscalationOut }) {
+  return (
+    <section aria-labelledby="run-heading" className="space-y-1 rounded-lg border border-border bg-surface-raised p-4 text-sm">
+      <h2 id="run-heading" className="font-medium">
+        The run that wrote it
+      </h2>
+      {e.job_id === null ? (
+        <p className="text-text-muted">No job run is recorded for this note.</p>
+      ) : (
+        <dl className="grid grid-cols-[max-content_1fr] gap-x-6 gap-y-1">
+          <dt className="text-text-muted">Run</dt>
+          <dd className="flex flex-wrap items-center gap-2">
+            <Link href={jobHref(e.job_id)} className={LINK}>
+              Job <span className="num">#{e.job_id}</span>
+            </Link>
+            {e.job_status ? <JobStatusBadge status={e.job_status} /> : <span className="text-text-muted">status unknown</span>}
+          </dd>
+          <dt className="text-text-muted">Cost</dt>
+          <dd className="num" title={e.cost_usd === null ? undefined : `${e.cost_usd} USD`}>
+            {e.cost_usd === null ? "No model or search cost recorded" : formatCost(e.cost_usd)}
+          </dd>
+          <dt className="text-text-muted">Models</dt>
+          <dd className="font-mono text-xs">{e.models.length > 0 ? e.models.join(", ") : <span className="font-sans text-text-muted">None called</span>}</dd>
+        </dl>
+      )}
+    </section>
   );
 }

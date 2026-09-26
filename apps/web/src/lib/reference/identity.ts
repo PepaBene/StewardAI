@@ -159,3 +159,42 @@ export function decisionMessage(action: "confirm" | "reject", decision: Relation
   }
   return `Confirmed ${r.object_name} as ${what}.`;
 }
+
+// ---------------------------------------------------------------------------
+// Disputed relationships: a tier-3 claim that a tier-1 source contradicts
+// ---------------------------------------------------------------------------
+
+export type RelationshipConflict = {
+  source: string;
+  tier: number | null;
+  type: RelationshipType | null;
+  objectName: string;
+  sourceRef: string | null;
+};
+
+const RELATIONSHIP_TYPES = Object.keys(RELATIONSHIP_LABELS) as RelationshipType[];
+
+/** The contradicting claim stored with a disputed relationship ({source, tier, type, object_name, source_ref}). */
+export function parseConflict(raw: RelationshipOut["conflict"]): RelationshipConflict | null {
+  if (!raw || typeof raw !== "object") return null;
+  const name = raw.object_name;
+  if (typeof name !== "string" || !name.trim()) return null;
+  const type = typeof raw.type === "string" && (RELATIONSHIP_TYPES as string[]).includes(raw.type) ? (raw.type as RelationshipType) : null;
+  return {
+    source: typeof raw.source === "string" && raw.source ? raw.source : "unknown",
+    tier: typeof raw.tier === "number" && Number.isFinite(raw.tier) ? raw.tier : null,
+    type,
+    objectName: name.trim(),
+    sourceRef: typeof raw.source_ref === "string" && raw.source_ref ? raw.source_ref : null,
+  };
+}
+
+/** What confirming or rejecting a disputed claim means, for the buttons' descriptions. */
+export function disputeChoices(r: Pick<RelationshipOut, "object_name" | "type">, conflict: RelationshipConflict | null) {
+  const what = RELATIONSHIP_LABELS[r.type].toLowerCase();
+  const other = conflict ? `${conflict.objectName} (${sourceLabel(conflict.source)})` : "the other source's version";
+  return {
+    confirm: `Confirm ${r.object_name} as ${what}: your decision wins over ${other}.`,
+    reject: `Reject ${r.object_name} as ${what}: ${other} stands, and this claim is not suggested again.`,
+  };
+}

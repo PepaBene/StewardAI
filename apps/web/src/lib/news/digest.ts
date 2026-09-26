@@ -1,5 +1,6 @@
 import type {
   DigestBody,
+  DigestFactSource,
   DigestSentence,
   DigestSource,
   MacroFigure,
@@ -14,6 +15,8 @@ import type {
  * the number in the text matches the card in the sidebar.
  */
 
+export type CitationRef = { kind: "news"; id: number } | { kind: "fact"; id: number };
+
 export type CitationLink = {
   key: string;
   label: string;
@@ -21,7 +24,74 @@ export type CitationLink = {
   title: string;
   external: boolean;
   anchor?: string;
+  ref: CitationRef;
 };
+
+/** What hovering or focusing a citation shows: the exact text it links to, and its source. */
+export type CitationPreview = {
+  kind: "news" | "fact" | "note";
+  /** The item's headline, or "Revenue Q3 2026: 94,036" for a figure. */
+  title: string;
+  /** The stored text the citation stands for (news item summary, fact snippet); null if none. */
+  snippet: string | null;
+  tier: number | null;
+  /** "Tier 1", or for a figure its status ("Figure status: verified"). */
+  tierLabel: string;
+  /** Outlet, or the host of the source URL. */
+  source: string;
+  url: string;
+};
+
+export function hostOf(url: string): string {
+  try {
+    return new URL(url).hostname.replace(/^www\./, "");
+  } catch {
+    return url;
+  }
+}
+
+function tierText(tier: number | null | undefined): string {
+  return typeof tier === "number" ? `Tier ${tier}` : "Tier unknown";
+}
+
+/**
+ * The preview of one digest citation: a news item's headline and stored summary (the text
+ * the claim verifier checked the sentence against) with its tier, or a figure's snippet.
+ * Null when the digest does not carry the cited item.
+ */
+export function digestCitationPreview(
+  body: Pick<DigestBody, "sources" | "fact_sources">,
+  ref: CitationRef,
+): CitationPreview | null {
+  if (ref.kind === "news") {
+    const source = (body.sources ?? []).find((s) => s.news_item_id === ref.id);
+    if (!source) return null;
+    return {
+      kind: "news",
+      title: source.headline,
+      snippet: source.summary?.trim() || null,
+      tier: source.tier,
+      tierLabel: tierText(source.tier),
+      source: source.outlet ?? hostOf(source.url),
+      url: source.url,
+    };
+  }
+  const fact = (body.fact_sources ?? []).find((f) => f.fact_id === ref.id);
+  if (!fact) return null;
+  return factPreview(fact);
+}
+
+export function factPreview(fact: DigestFactSource): CitationPreview {
+  return {
+    kind: "fact",
+    title: `${fact.metric.replaceAll("_", " ")} ${fact.period}: ${fact.value_as_written}`,
+    snippet: fact.snippet.trim() || null,
+    tier: null,
+    tierLabel: `Figure status: ${fact.status}`,
+    source: hostOf(fact.source_url),
+    url: fact.source_url,
+  };
+}
 
 export function sourceNumbers(sources: DigestSource[]): Map<number, number> {
   return new Map(sources.map((s, i) => [s.news_item_id, i + 1]));
@@ -49,6 +119,7 @@ export function citationLinks(
       title: `${source.headline} (${source.outlet ?? "source"}, tier ${source.tier})`,
       external: true,
       anchor: sourceAnchor(number),
+      ref: { kind: "news", id },
     });
   }
   for (const id of sentence.fact_ids ?? []) {
@@ -58,6 +129,7 @@ export function citationLinks(
       href: `/evidence/${id}`,
       title: `Extracted figure #${id}: open its source snippet and archived page`,
       external: false,
+      ref: { kind: "fact", id },
     });
   }
   return links;

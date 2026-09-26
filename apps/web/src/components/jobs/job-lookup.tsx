@@ -1,6 +1,7 @@
 "use client";
 
 import { ArrowRightIcon } from "lucide-react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useId, useState } from "react";
 
@@ -10,7 +11,7 @@ import { Label } from "@/components/ui/label";
 import { jobHref } from "@/lib/jobs/job-detail";
 
 /**
- * Open one job run by its number. There is no job list yet (the Activity page, phase 4);
+ * Open one job run by its number. The full job log, with filters, is on the Activity page;
  * job numbers are shown wherever a run is queued or reported.
  */
 export function JobLookup() {
@@ -27,7 +28,11 @@ export function JobLookup() {
       </h2>
       <p className="text-sm text-text-muted">
         Open a run to see its steps, errors, detail and model cost. Its number is shown when you start a check, next to the
-        last news check and on each holding&rsquo;s last earnings check and verdict run.
+        last news check and on each holding&rsquo;s last earnings check and verdict run. Every run is listed in the{" "}
+        <Link href="/activity#job-log" className="text-accent hover:underline">
+          job log
+        </Link>
+        .
       </p>
       <form
         className="flex items-end gap-2"

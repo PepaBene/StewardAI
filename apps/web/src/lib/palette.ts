@@ -36,7 +36,8 @@ export const CONFIG_PAGES = [
   { href: "/config/calendar", label: "Exchange calendar", keywords: "holidays closures exchanges mic market closed nager public holiday" },
   { href: "/config/news-sources", label: "News sources", keywords: "feeds rss tiers outlets rns eqs edgar full-text central bank macro allow list" },
   { href: "/config/event-rules", label: "Event rules", keywords: "severity taxonomy price move threshold macro surprise bands announcement types rns eqs" },
-  { href: "/config/notifications", label: "Notifications", keywords: "alerts telegram email quiet hours channels weekends holidays monitoring system alerts" },
+  { href: "/config/notifications", label: "Notifications", keywords: "alerts telegram email quiet hours channels weekends holidays monitoring system alerts replay preview" },
+  { href: "/config/verification", label: "Verification", keywords: "sanity bounds tolerance corroboration trust penalty reward demote claim verifier strip mark numeric check" },
 ] as const;
 
 /** Pages that are not a section or a config editor. */
@@ -48,9 +49,15 @@ export const OTHER_PAGES = [
   { href: "/status#reference-gaps", label: "Reference data gaps", keywords: "identity unresolved figi isin lei stooq prices missing symbol coverage" },
   { href: "/news/disputed", label: "Disputed stories", keywords: "news contradicted conflicting sources resolve confirm false side by side" },
   { href: "/escalations", label: "Impact notes (escalations)", keywords: "escalations reports thesis kpi exit price move confirmed stories" },
+  { href: "/activity#job-log", label: "Job log", keywords: "activity jobs runs cost failed step history" },
+  { href: "/activity#coverage", label: "Coverage gaps", keywords: "activity holdings news prices missed monitoring gap" },
+  { href: "/activity#alerts", label: "Monitoring alerts", keywords: "activity system failed jobs missed runs coverage alerts" },
+  { href: "/activity#source-trust", label: "Source trust", keywords: "activity feedback trust score demoted outlets" },
+  { href: "/activity#eval-candidates", label: "Eval candidates", keywords: "activity evaluation golden labelled set feedback export evals" },
+  { href: "/status", label: "API status", keywords: "health backend version" },
 ] as const;
 
-/** A job number, with or without a leading "#" or "job": open that job run (there is no job list yet). */
+/** A job number, with or without a leading "#" or "job": open that job run (the list is on Activity). */
 export function jobCommands(query: string): PaletteCommand[] {
   const match = /^(?:job\s*)?#?(\d{1,12})$/i.exec(query.trim());
   if (!match) return [];

@@ -13,7 +13,7 @@ export const SECTIONS = [
 export type Section = (typeof SECTIONS)[number];
 
 /** Sections with a real page of their own; the rest render the [section] placeholder. */
-export const BUILT_SLUGS: readonly string[] = ["", "holdings", "news", "reports", "config"];
+export const BUILT_SLUGS: readonly string[] = ["", "holdings", "news", "reports", "config", "activity"];
 
 export const PLACEHOLDER_SECTIONS = SECTIONS.filter((s) => !BUILT_SLUGS.includes(s.slug));
 
@@ -25,8 +25,8 @@ export function sectionHref(section: Pick<Section, "slug">) {
 export const SECTION_ALIASES: Record<string, readonly string[]> = {
   "/holdings": ["/transactions", "/theses", "/review"],
   "/reports": ["/escalations"],
-  // A job run's page belongs to the job log.
-  "/activity": ["/jobs"],
+  // A job run's page belongs to the job log; API health and reference gaps sit beside it.
+  "/activity": ["/jobs", "/status"],
 };
 
 export function isSectionActive(href: string, pathname: string): boolean {

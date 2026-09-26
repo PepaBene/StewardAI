@@ -27,3 +27,13 @@ describe("phase 3 pages", () => {
     expect(isSectionActive("/activity", "/jobsx")).toBe(false);
   });
 });
+
+describe("phase 4 pages", () => {
+  it("builds the Activity section and highlights it on job runs and the API status page", async () => {
+    const { PLACEHOLDER_SECTIONS } = await import("./nav");
+    expect(PLACEHOLDER_SECTIONS.map((s) => s.slug)).not.toContain("activity");
+    expect(isSectionActive("/activity", "/activity")).toBe(true);
+    expect(isSectionActive("/activity", "/status")).toBe(true);
+    expect(isSectionActive("/config", "/config/verification")).toBe(true);
+  });
+});

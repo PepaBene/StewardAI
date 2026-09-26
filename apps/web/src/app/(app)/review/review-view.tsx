@@ -21,6 +21,7 @@ import { EmptyState } from "@/components/empty-state";
 import { ConfidenceBadge } from "@/components/evidence/confidence-badge";
 import { EvidenceLinks } from "@/components/evidence/evidence-links";
 import { FactReviewForm, type ReviewResolution } from "@/components/evidence/fact-review-form";
+import { FeedbackControl } from "@/components/feedback/feedback-control";
 import { VerdictStatusBadge } from "@/components/evidence/verdict-status-badge";
 import { HoldingsTabs } from "@/components/portfolio/holdings-tabs";
 import { Button } from "@/components/ui/button";
@@ -42,6 +43,7 @@ import {
   parseReviewTicker,
   REVIEW_ACTIONS,
   reviewQueueHref,
+  scaleHint,
   verdictRunOutcome,
   type VerdictRunOutcome,
 } from "@/lib/evidence/review";
@@ -299,6 +301,11 @@ function ReviewItemCard({ item, onResolved }: { item: ReviewItem; onResolved: (r
             {fact.scale !== "units" ? ` · in ${fact.scale}` : ""}
             {fact.currency ? ` · ${fact.currency}` : ""}
           </span>
+          <FeedbackControl
+            target={{ kind: "fact", id: fact.id }}
+            label={`figure ${humanizeMetric(fact.metric)} ${fact.period}`}
+            valueHint={scaleHint(fact)}
+          />
         </div>
       </header>
 

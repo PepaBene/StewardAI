@@ -19,6 +19,7 @@ import { AlertMessage } from "@/components/alert-message";
 import { EmptyState } from "@/components/empty-state";
 import { ConfidenceBadge } from "@/components/evidence/confidence-badge";
 import { VerdictStatusBadge } from "@/components/evidence/verdict-status-badge";
+import { FeedbackControl } from "@/components/feedback/feedback-control";
 import { HoldingsTabs } from "@/components/portfolio/holdings-tabs";
 import { Button } from "@/components/ui/button";
 import { getBrowserApiClient, type BoardKpi, type BoardRow, type ThesisBoard } from "@/lib/api/client";
@@ -381,8 +382,12 @@ function VerdictPanel({ row, cell }: { row: BoardRow; cell: BoardKpi }) {
           <dl className="grid grid-cols-2 gap-x-6 gap-y-2 sm:grid-cols-3 lg:grid-cols-6">
             <div>
               <dt className="text-xs text-text-muted">Verdict</dt>
-              <dd className="mt-0.5">
+              <dd className="mt-0.5 flex flex-wrap items-center gap-1">
                 <VerdictStatusBadge status={verdict.status} />
+                <FeedbackControl
+                  target={{ kind: "verdict", id: verdict.id }}
+                  label={`verdict on ${kpiLabel(kpi)} for ${row.name ?? row.ticker}`}
+                />
               </dd>
             </div>
             <div>

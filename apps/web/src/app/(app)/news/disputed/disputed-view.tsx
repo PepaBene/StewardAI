@@ -15,6 +15,7 @@ import { useEffect, useId, useState } from "react";
 
 import { AlertMessage } from "@/components/alert-message";
 import { EmptyState } from "@/components/empty-state";
+import { FeedbackControl } from "@/components/feedback/feedback-control";
 import { SeverityBadge, TierBadge } from "@/components/news/severity-badge";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
@@ -188,9 +189,10 @@ function StoryCard({ story, onResolved }: { story: DisputedStory; onResolved: (u
             </Link>
           </p>
         </div>
-        <div className="flex items-center gap-1.5">
+        <div className="flex flex-wrap items-center justify-end gap-1.5">
           <SeverityBadge severity={story.severity} />
           <ResolutionBadge story={story} />
+          <FeedbackControl target={{ kind: "story", id: story.id }} label={`story “${story.headline}”`} />
         </div>
       </div>
 
@@ -293,6 +295,13 @@ function SourceColumn({
               <span className="break-words">{s.headline ?? s.url}</span>
               <ExternalLinkIcon aria-hidden="true" className="mt-0.5 size-3 shrink-0 text-text-muted" />
             </a>
+            {typeof s.news_item_id === "number" ? (
+              <FeedbackControl
+                className="flex"
+                target={{ kind: "news_item", id: s.news_item_id }}
+                label={`news item “${s.headline ?? sourceOutlet(s)}”`}
+              />
+            ) : null}
           </li>
         ))}
       </ul>

@@ -14,7 +14,7 @@ const LINK = "text-accent underline-offset-4 hover:underline";
 
 /**
  * Instruments whose identity could not be resolved and symbols Stooq returns no history
- * for: never skipped silently. The interim surface until the Activity page (phase 4).
+ * for: never skipped silently. Shown on /status, which the Activity page links to.
  */
 export function ReferenceGapsPanel() {
   const { state, reload } = useApiResource(fetchGaps);

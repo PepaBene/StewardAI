@@ -10,6 +10,7 @@ import {
   HouseIcon,
   LoaderCircleIcon,
   RefreshCwIcon,
+  ScaleIcon,
   XIcon,
 } from "lucide-react";
 import Link from "next/link";
@@ -34,9 +35,11 @@ import {
   CONSOLIDATION_NOTE,
   decisionMessage,
   describeException,
+  disputeChoices,
   gleifHref,
   groupRelated,
   listingState,
+  parseConflict,
   parseWikidata,
   RELATIONSHIP_LABELS,
   safeHref,
@@ -181,6 +184,7 @@ function IdentityContent({ identity, reload }: { identity: HoldingIdentity; relo
         </AlertMessage>
       ) : null}
 
+      <DisputedRelationships identity={identity} reload={reload} />
       <Suggestions identity={identity} reload={reload} />
 
       <div className="grid gap-4 lg:grid-cols-2">
@@ -600,25 +604,7 @@ function Suggestions({ identity, reload }: { identity: HoldingIdentity; reload: 
       note="Found only in a tier-3 source such as Wikidata, so not used until you confirm them. Confirming a competitor, supplier or customer adds it to the holding profile (a new config version) and the next news run matches on it; rejecting one means it is never suggested again."
       className={identity.suggested.length > 0 ? "border-info-signal/40" : undefined}
     >
-      <div role="status" aria-live="polite">
-        {last ? (
-          <p className="rounded-md border border-border bg-surface-muted p-2 text-sm">
-            {decisionMessage(last.action, last.result)}
-            {last.result.holding_profiles_version_id !== null ? (
-              <>
-                {" "}
-                <Link href={`/config/holding-profiles#${encodeURIComponent(identity.ticker)}`} className={LINK}>
-                  Open the profile
-                </Link>{" "}
-                ·{" "}
-                <Link href={historyHref("holding-profiles")} className={LINK}>
-                  version history
-                </Link>
-              </>
-            ) : null}
-          </p>
-        ) : null}
-      </div>
+      <DecisionMessage last={last} ticker={identity.ticker} />
       {identity.suggested.length === 0 ? (
         <p className="text-sm text-text-muted">Nothing waiting for a decision.</p>
       ) : (
@@ -640,16 +626,8 @@ function Suggestions({ identity, reload }: { identity: HoldingIdentity; reload: 
   );
 }
 
-function SuggestionItem({
-  r,
-  onDecided,
-  onStale,
-}: {
-  r: RelationshipOut;
-  onDecided: (d: Decision) => void;
-  onStale: () => void;
-}) {
-  const [confirmReject, setConfirmReject] = useState(false);
+/** Confirm or reject one suggested or disputed relationship. */
+function useRelationshipDecision(r: RelationshipOut, onDecided: (d: Decision) => void, onStale: () => void) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -679,6 +657,156 @@ function SuggestionItem({
       setBusy(false);
     }
   }
+
+  return { busy, error, decide };
+}
+
+function DecisionMessage({ last, ticker }: { last: Decision | null; ticker: string }) {
+  return (
+    <div role="status" aria-live="polite">
+      {last ? (
+        <p className="rounded-md border border-border bg-surface-muted p-2 text-sm">
+          {decisionMessage(last.action, last.result)}
+          {last.result.holding_profiles_version_id !== null ? (
+            <>
+              {" "}
+              <Link href={`/config/holding-profiles#${encodeURIComponent(ticker)}`} className={LINK}>
+                Open the profile
+              </Link>{" "}
+              ·{" "}
+              <Link href={historyHref("holding-profiles")} className={LINK}>
+                version history
+              </Link>
+            </>
+          ) : null}
+        </p>
+      ) : null}
+    </div>
+  );
+}
+
+/**
+ * Relationships two sources disagree on: a tier-3 claim (Wikidata) beside the tier-1 source
+ * (GLEIF) that contradicts it, with both sources and tiers. Neither is used until the owner
+ * confirms the claim (it wins) or rejects it (the tier-1 version stands).
+ */
+function DisputedRelationships({ identity, reload }: { identity: HoldingIdentity; reload: () => void }) {
+  const [last, setLast] = useState<Decision | null>(null);
+  const disputed = identity.disputed ?? [];
+  if (disputed.length === 0 && !last) return null;
+  return (
+    <Panel
+      title="Disputed relationships"
+      note="A claim from a community-edited source (tier 3) that a regulator or filing (tier 1) contradicts. Neither version is used until you decide."
+      className={disputed.length > 0 ? "border-disputed/40" : undefined}
+    >
+      <DecisionMessage last={last} ticker={identity.ticker} />
+      {disputed.length === 0 ? <p className="text-sm text-text-muted">Nothing disputed any more.</p> : null}
+      <ul className="divide-y divide-border">
+        {disputed.map((r) => (
+          <DisputedItem
+            key={r.id}
+            r={r}
+            onDecided={(d) => {
+              setLast(d);
+              reload();
+            }}
+            onStale={reload}
+          />
+        ))}
+      </ul>
+    </Panel>
+  );
+}
+
+function DisputedItem({ r, onDecided, onStale }: { r: RelationshipOut; onDecided: (d: Decision) => void; onStale: () => void }) {
+  const { busy, error, decide } = useRelationshipDecision(r, onDecided, onStale);
+  const [confirmReject, setConfirmReject] = useState(false);
+  const conflict = parseConflict(r.conflict);
+  const choices = disputeChoices(r, conflict);
+  const name = `${r.object_name} as ${RELATIONSHIP_LABELS[r.type].toLowerCase()}`;
+  return (
+    <li className="space-y-3 py-3 text-sm">
+      <p className="flex flex-wrap items-center gap-2">
+        <span className="text-xs font-medium tracking-wide text-text-muted uppercase">{RELATIONSHIP_LABELS[r.type]}</span>
+        <span className="inline-flex items-center gap-1 rounded-sm border border-disputed/40 bg-disputed-subtle px-1.5 py-0.5 text-xs font-medium">
+          <ScaleIcon aria-hidden="true" className="size-3.5 text-disputed" />
+          Disputed
+        </span>
+      </p>
+      <div className="grid gap-3 sm:grid-cols-2">
+        <section aria-label="The claim" className="space-y-1 rounded-md border border-border p-3">
+          <h4 className="text-xs font-medium text-text-muted">The claim</h4>
+          <p className="font-medium">{r.object_name}</p>
+          {r.object_lei ? <LeiLink lei={r.object_lei} /> : null}
+          <RelationshipMeta r={r} />
+        </section>
+        <section aria-label="Contradicted by" className="space-y-1 rounded-md border border-disputed/40 p-3">
+          <h4 className="text-xs font-medium text-text-muted">
+            Contradicted by {conflict ? sourceLabel(conflict.source) : "another source"}
+          </h4>
+          {conflict ? (
+            <>
+              <p className="font-medium">{conflict.objectName}</p>
+              {conflict.type && conflict.type !== r.type ? (
+                <p className="text-xs text-text-muted">as {RELATIONSHIP_LABELS[conflict.type].toLowerCase()}</p>
+              ) : null}
+              <span className="inline-flex flex-wrap items-center gap-x-2 text-xs text-text-muted">
+                <span>{sourceLabel(conflict.source)}</span>
+                <span>{conflict.tier === null ? "Tier unknown" : tierLabel(conflict.tier)}</span>
+                <SourceLink href={conflict.sourceRef} />
+              </span>
+            </>
+          ) : (
+            <p className="text-text-muted">The other source&rsquo;s version was not stored.</p>
+          )}
+        </section>
+      </div>
+      {error ? (
+        <p role="alert" className="text-xs text-text">
+          {error}
+        </p>
+      ) : null}
+      <div className="flex flex-wrap items-center gap-1.5">
+        {confirmReject ? (
+          <>
+            <span className="text-xs text-text-muted">{choices.reject}</span>
+            <Button size="sm" variant="outline" disabled={busy} onClick={() => void decide("reject")} aria-label={`Reject ${name} for good`}>
+              <XIcon aria-hidden="true" />
+              Reject the claim
+            </Button>
+            <Button size="sm" variant="ghost" disabled={busy} onClick={() => setConfirmReject(false)}>
+              Cancel
+            </Button>
+          </>
+        ) : (
+          <>
+            <Button size="sm" disabled={busy} onClick={() => void decide("confirm")} aria-label={`Confirm ${name}`} title={choices.confirm}>
+              {busy ? <LoaderCircleIcon aria-hidden="true" className="animate-spin" /> : <CheckIcon aria-hidden="true" />}
+              Confirm the claim
+            </Button>
+            <Button size="sm" variant="outline" disabled={busy} onClick={() => setConfirmReject(true)} aria-label={`Reject ${name}`} title={choices.reject}>
+              <XIcon aria-hidden="true" />
+              Reject the claim
+            </Button>
+          </>
+        )}
+      </div>
+    </li>
+  );
+}
+
+function SuggestionItem({
+  r,
+  onDecided,
+  onStale,
+}: {
+  r: RelationshipOut;
+  onDecided: (d: Decision) => void;
+  onStale: () => void;
+}) {
+  const [confirmReject, setConfirmReject] = useState(false);
+  const { busy, error, decide } = useRelationshipDecision(r, onDecided, onStale);
 
   const name = `${r.object_name} as ${RELATIONSHIP_LABELS[r.type].toLowerCase()}`;
   return (

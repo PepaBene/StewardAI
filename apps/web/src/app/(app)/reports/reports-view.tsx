@@ -71,7 +71,12 @@ export function ReportsView() {
         </div>
         <div className="flex flex-col items-end gap-2">
           {reports && reports.length > 0 ? (
-            <AsOfLabel at={reports[0].created_at} kind={digestFreshnessKind(period)} prefix={`Latest ${period} digest written`} />
+            <AsOfLabel
+              at={reports[0].created_at}
+              kind={digestFreshnessKind(period)}
+              nextDueAt={reports[0].next_due_at}
+              prefix={`Latest ${period} digest written`}
+            />
           ) : null}
           <div className="flex flex-wrap justify-end gap-2">
             <Button variant="ghost" size="sm" onClick={() => void collectMacro()}>
