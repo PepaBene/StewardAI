@@ -34,13 +34,28 @@ UNWATCHED = {"monitor"}
 # Collectors that have nothing to collect when the markets are closed.
 MARKET_JOBS = {"portfolio_sync", "price_history"}
 SLOT_LOOKBACK = dt.timedelta(hours=48)
+# A run still open this long after it was created is taken to be dead (its worker was
+# killed), not as having run: its slot can be reported missed.
+MAX_OPEN_RUN = dt.timedelta(hours=6)
 
 
-def last_slot(trigger: CronTrigger, before: dt.datetime) -> dt.datetime | None:
+def last_slot(
+    trigger: CronTrigger, before: dt.datetime, lookback: dt.timedelta = dt.timedelta(days=8)
+) -> dt.datetime | None:
     """The latest fire time of an APScheduler trigger at or before `before`, looking back
-    at most 8 days."""
-    moment = before - dt.timedelta(days=8)
-    last = None
+    at most `lookback`."""
+    # Widen a window ending at `before` until it holds a fire time, so a frequent schedule
+    # is walked over a few minutes, not days of slots.
+    window = dt.timedelta(minutes=1)
+    while True:
+        first: dt.datetime | None = trigger.get_next_fire_time(None, before - window)
+        if first is not None and first <= before:
+            break
+        if window >= lookback:
+            return None
+        window = min(window * 2, lookback)
+    last = first
+    moment = first + dt.timedelta(seconds=1)
     for _ in range(2000):
         nxt: dt.datetime | None = trigger.get_next_fire_time(None, moment)
         if nxt is None or nxt > before:
@@ -87,8 +102,9 @@ async def _market_closed(pool: asyncpg.Pool, jobs: JobsConfig, day: dt.date) -> 
         r["home_mic"]
         for r in await pool.fetch(
             "select distinct i.home_mic from public.instrument i join public.position_snapshot p"
-            " on p.ticker = i.t212_ticker where p.snapshot_date ="
-            " (select max(snapshot_date) from public.position_snapshot)"
+            " on p.ticker = i.t212_ticker where p.snapshot_date = coalesce("
+            " (select max(snapshot_date) from public.account_snapshot),"
+            " (select max(snapshot_date) from public.position_snapshot))"
         )
     ]
     if not mics:
@@ -157,10 +173,11 @@ async def run_monitor(ctx: JobContext, now: dt.datetime) -> None:
                 continue
             ran = await pool.fetchval(
                 "select exists (select 1 from public.job where job_type = $1"
-                " and created_at >= $2 and status in ('succeeded', 'running', 'waiting',"
-                " 'queued', 'failed'))",
+                " and created_at >= $2 and (status in ('succeeded', 'failed')"
+                " or (status in ('running', 'waiting', 'queued') and created_at >= $3)))",
                 job_type,
                 slot - dt.timedelta(minutes=5),
+                now - MAX_OPEN_RUN,
             )
             checked[job_type] = slot.isoformat()
             if ran:

@@ -49,7 +49,7 @@ class NewsLabel(BaseModel):
 class FeedbackIn(BaseModel):
     target_kind: TargetKind
     target_id: int = Field(
-        ge=1, description="The fact, verdict, alert, news item, story or report id."
+        ge=1, le=2**63 - 1, description="The fact, verdict, alert, news item, story or report id."
     )
     sentence_path: str | None = Field(
         default=None,

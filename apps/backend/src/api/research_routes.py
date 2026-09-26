@@ -9,10 +9,10 @@ from fastapi import APIRouter, HTTPException, Path, Query, status
 from pydantic import BaseModel, Field
 
 from api.auth import Owner
-from api.db import Pool
-from api.routes import NoteParam, _as_dict, _enqueue, _not_found
+from api.db import IdPath, Pool
+from api.routes import BaseVersionParam, NoteParam, _as_dict, _enqueue, _not_found, save_versioned
 from steward.config import ResearchProfilesConfig
-from steward.config.store import load_active, save_config
+from steward.config.store import load_active
 from steward.portfolio.read import JobSummary
 from steward.research.run import ResearchBody
 from steward.review.monthly import ReviewBody
@@ -89,7 +89,7 @@ class ResearchReportOut(BaseModel):
 
 
 @router.get("/research/{report_id}", tags=["research"])
-async def get_research(report_id: int, pool: Pool, _owner: Owner) -> ResearchReportOut:
+async def get_research(report_id: IdPath, pool: Pool, _owner: Owner) -> ResearchReportOut:
     """A research report: sections of cited sentences, computed valuation figures and the
     source list every citation points into."""
     row = await pool.fetchrow(
@@ -131,7 +131,7 @@ async def list_reviews(
 
 
 @router.get("/reviews/{report_id}", tags=["research"])
-async def get_review(report_id: int, pool: Pool, _owner: Owner) -> ReviewReportOut:
+async def get_review(report_id: IdPath, pool: Pool, _owner: Owner) -> ReviewReportOut:
     """A monthly review: every strategy rule, hard limit and band with pass / breach /
     unknown, thesis KPI statuses, flags, and proposed actions each citing a rule or KPI."""
     row = await pool.fetchrow(
@@ -220,12 +220,20 @@ async def get_research_profiles_config(pool: Pool, _owner: Owner) -> ResearchPro
 
 @router.put("/config/research-profiles", tags=["config"])
 async def save_research_profiles_config(
-    body: ResearchProfilesConfig, pool: Pool, owner: Owner, note: NoteParam = None
+    body: ResearchProfilesConfig,
+    pool: Pool,
+    owner: Owner,
+    note: NoteParam = None,
+    base_version_id: BaseVersionParam = None,
 ) -> ResearchProfilesConfigVersion:
-    async with pool.acquire() as conn:
-        stored = await save_config(
-            conn, "research_profiles", body, created_by=owner.user_id, note=note
-        )
+    stored = await save_versioned(
+        pool,
+        "research_profiles",
+        body,
+        created_by=owner.user_id,
+        note=note,
+        base_version_id=base_version_id,
+    )
     return ResearchProfilesConfigVersion(**_as_dict(stored))
 
 

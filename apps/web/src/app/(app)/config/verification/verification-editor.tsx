@@ -25,7 +25,7 @@ import {
   type OverrideRow,
   type VerificationForm,
 } from "@/lib/config/verification-form";
-import { useConfigEditor } from "@/lib/hooks/use-config-editor";
+import { configSaveQuery, useConfigEditor } from "@/lib/hooks/use-config-editor";
 
 const api = () => getBrowserApiClient();
 const TARGET_OPTIONS = CLAIM_TARGETS.map((t) => ({ value: t, label: CLAIM_TARGET_LABELS[t] }));
@@ -42,7 +42,7 @@ export function VerificationEditor() {
 
   const editor = useConfigEditor<VerificationConfig>({
     load: () => api().GET("/config/verification"),
-    save: (body, note) => api().PUT("/config/verification", { body, params: { query: { note } } }),
+    save: (body, note, base) => api().PUT("/config/verification", { body, params: { query: configSaveQuery(note, base) } }),
     validate: (body) => api().POST("/config/verification/validate", { body }),
     onLoaded: (body) => {
       const loaded = verificationFromBody(body);
@@ -296,6 +296,7 @@ export function VerificationEditor() {
 
           <SaveBar
             dirty={dirty}
+            savedVersionId={editor.version?.id ?? null}
             blocked={blocked}
             busy={editor.busy}
             errors={errors}

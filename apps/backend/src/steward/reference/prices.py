@@ -42,6 +42,7 @@ from steward.sources.market import (
     PriceBar,
     frankfurter_series,
     public_holidays,
+    stooq_currency,
     stooq_daily,
 )
 
@@ -49,6 +50,12 @@ GAPS_KEY = "price_gaps"
 CHECKS_KEY = "price_checks"
 FX_BACKFILL_KEY = "fx_history_backfill"
 RECENT_DAYS = 10
+# A re-fetched close this far from the stored one means Stooq restated its history (a split
+# or similar adjustment): the whole history is fetched again.
+RESTATEMENT_PCT = Decimal(5)
+# Close-to-close ratios that look like a share split (or reverse split) rather than a move.
+SPLIT_RATIOS = (2, 3, 4, 5, 10, 20)
+SPLIT_TOLERANCE = 0.02
 
 
 @dataclass
@@ -102,30 +109,67 @@ async def _save_state(pool: asyncpg.Pool, key: str, value: dict[str, Any]) -> No
 
 
 async def collect_symbol(
-    pool: asyncpg.Pool, deps: PriceDeps, symbol: str, years: int
+    pool: asyncpg.Pool,
+    deps: PriceDeps,
+    symbol: str,
+    years: int,
+    notes: dict[str, str] | None = None,
 ) -> tuple[int, str | None]:
-    """(bars stored, gap reason or None)."""
+    """(bars stored, gap reason or None).
+
+    The recent days are re-fetched each run; when they disagree with the stored closes
+    (Stooq adjusted its history for a split), the full history is fetched and overwrites
+    the stored bars, so drawdown, volatility and beta keep working on one adjusted series.
+    """
     last = await pool.fetchval(
         "select max(date) from public.price_bar where symbol = $1 and source = 'stooq'", symbol
     )
-    start = (
-        last - dt.timedelta(days=RECENT_DAYS)
-        if last
-        else deps.today - dt.timedelta(days=365 * years + 5)
-    )
+    full_start = deps.today - dt.timedelta(days=365 * years + 5)
+    start = last - dt.timedelta(days=RECENT_DAYS) if last else full_start
     try:
         bars = await stooq_daily(deps.http, symbol, start, deps.today)
     except (MarketDataError, httpx.HTTPError) as exc:
         return 0, f"Stooq unreachable: {type(exc).__name__}: {exc}"[:300]
     if not bars:
         return 0, None if last else f"Stooq has no data for {symbol}"
+    if last and await _restated(pool, bars):
+        try:
+            bars = await stooq_daily(deps.http, symbol, full_start, deps.today)
+        except (MarketDataError, httpx.HTTPError) as exc:
+            # Storing only the restated recent bars would put a false jump in the series.
+            return 0, f"Stooq restated history; refetch failed: {type(exc).__name__}: {exc}"[:300]
+        if notes is not None:
+            notes[symbol] = f"history restated by Stooq; refetched {len(bars)} bars"
     return await store_bars(pool, bars), None
 
 
+async def _restated(pool: asyncpg.Pool, bars: list[PriceBar]) -> bool:
+    """Whether any fetched close differs from the stored one on the same date by more
+    than RESTATEMENT_PCT."""
+    stored = {
+        r["date"]: Decimal(r["close"])
+        for r in await pool.fetch(
+            "select date, close from public.price_bar where symbol = $1 and source = 'stooq'"
+            " and date = any($2::date[])",
+            bars[0].symbol,
+            [b.date for b in bars],
+        )
+    }
+    return any(
+        b.date in stored and abs(b.close / stored[b.date] - 1) * 100 > RESTATEMENT_PCT for b in bars
+    )
+
+
 async def plausibility(
-    pool: asyncpg.Pool, ticker: str, symbol: str, tolerance_pct: float
+    pool: asyncpg.Pool,
+    ticker: str,
+    symbol: str,
+    tolerance_pct: float,
+    notes: dict[str, str] | None = None,
 ) -> dict[str, Any] | None:
-    """Latest Stooq close vs Trading212's price on the same day, when both exist."""
+    """Latest Stooq close vs Trading212's price on the same day, when both exist and are
+    quoted in the same currency (a line traded in another currency than the Stooq symbol
+    is skipped, with a note, rather than flagged every day)."""
     row = await pool.fetchrow(
         "select p.snapshot_date, p.current_price, p.instrument_currency, b.close"
         " from public.position_snapshot p join public.price_bar b on b.symbol = $2"
@@ -135,6 +179,14 @@ async def plausibility(
         symbol,
     )
     if row is None or not row["current_price"]:
+        return None
+    quoted = stooq_currency(symbol)
+    if quoted is None or row["instrument_currency"] != quoted:
+        if notes is not None:
+            notes[ticker] = (
+                f"not compared: Trading212 quotes {row['instrument_currency']},"
+                f" {symbol} is {quoted or 'in an unknown currency'}"
+            )
         return None
     diff = (Decimal(row["close"]) / Decimal(row["current_price"]) - 1) * 100
     return {
@@ -191,10 +243,25 @@ def _frankfurter(rate: FxRate) -> FxRate:
     return replace(rate, provider="frankfurter")
 
 
+def _looks_like_split(ratio: float) -> bool:
+    return any(
+        abs(ratio * n - 1) < SPLIT_TOLERANCE or abs(ratio / n - 1) < SPLIT_TOLERANCE
+        for n in SPLIT_RATIOS
+    )
+
+
 async def latest_move(
-    pool: asyncpg.Pool, ticker: str, symbol: str | None, today: dt.date
+    pool: asyncpg.Pool,
+    ticker: str,
+    symbol: str | None,
+    today: dt.date,
+    notes: dict[str, str] | None = None,
 ) -> tuple[dt.date, float, str] | None:
-    """(date, close-to-close % move, price source) of the latest close, if recent."""
+    """(date, close-to-close % move, price source) of the latest close, if recent.
+
+    Trading212's prices are not split-adjusted, so a fallback move whose ratio is a common
+    split ratio (2:1, 1:10, ...) is skipped with a note instead of raising a price move.
+    """
     rows = []
     source = symbol or "trading212"
     if symbol:
@@ -215,8 +282,12 @@ async def latest_move(
     day = rows[0]["date"]
     if day < today - dt.timedelta(days=4):
         return None  # history backfill, not today's move
-    pct = float((Decimal(rows[0]["close"]) / Decimal(rows[1]["close"]) - 1) * 100)
-    return day, pct, source
+    ratio = Decimal(rows[0]["close"]) / Decimal(rows[1]["close"])
+    if source == "trading212" and _looks_like_split(float(ratio)):
+        if notes is not None:
+            notes[ticker] = f"price ratio {float(ratio):.4f} on {day} looks like a split; skipped"
+        return None
+    return day, float((ratio - 1) * 100), source
 
 
 async def run_price_history(ctx: JobContext, deps: PriceDeps) -> None:
@@ -237,6 +308,8 @@ async def run_price_history(ctx: JobContext, deps: PriceDeps) -> None:
     checks: dict[str, Any] = {}
     async with ctx.step("prices") as step:
         counts: dict[str, int] = {}
+        restated: dict[str, str] = {}
+        unchecked: dict[str, str] = {}
         wanted = [(t, s) for t, s in symbols.items()] + [
             (None, b) for b in settings.benchmark_symbols
         ]
@@ -246,17 +319,21 @@ async def run_price_history(ctx: JobContext, deps: PriceDeps) -> None:
             if symbol is None:
                 gaps[key] = {"reason": "no Stooq symbol (set price_symbol in the holding profile)"}
                 continue
-            count, gap = await collect_symbol(pool, deps, symbol, settings.history_years)
+            count, gap = await collect_symbol(pool, deps, symbol, settings.history_years, restated)
             counts[symbol] = count
             if gap:
                 gaps[key] = {"symbol": symbol, "reason": gap}
             elif ticker is not None:
                 check = await plausibility(
-                    pool, ticker, symbol, settings.plausibility_tolerance_pct
+                    pool, ticker, symbol, settings.plausibility_tolerance_pct, unchecked
                 )
                 if check:
                     checks[ticker] = check
         step.detail.update(stored=counts, gaps=gaps)
+        if restated:
+            step.detail["restated"] = restated
+        if unchecked:
+            step.detail["plausibility_skipped"] = unchecked
         step.detail["flagged"] = {t: c for t, c in checks.items() if c["flagged"]}
         now = dt.datetime.now(dt.UTC).isoformat()
         await _save_state(pool, GAPS_KEY, {"at": now, "gaps": gaps})
@@ -267,8 +344,9 @@ async def run_price_history(ctx: JobContext, deps: PriceDeps) -> None:
         await ctx.record_config_version(rules.id if rules else None)
         threshold = (rules.body if rules else EventRulesConfig()).price_move_threshold_pct
         moves = []
+        splits: dict[str, str] = {}
         for ticker, symbol in symbols.items():
-            move = await latest_move(pool, ticker, symbol, deps.today)
+            move = await latest_move(pool, ticker, symbol, deps.today, splits)
             if move is None:
                 continue
             day, pct, used = move
@@ -287,6 +365,8 @@ async def run_price_history(ctx: JobContext, deps: PriceDeps) -> None:
             )
             moves.append(f"{ticker} {pct:+.2f}% on {day} (job {job or 'already queued'})")
         step.detail.update(threshold_pct=threshold, moves=moves)
+        if splits:
+            step.detail["split_skipped"] = splits
 
     async with ctx.step("fx_history") as step:
         await fx_history(pool, deps, settings.history_years, step.detail)

@@ -212,6 +212,27 @@ def lock_key(job_type: str, params: dict[str, Any]) -> str:
     return f"{job_type}:{ticker}" if isinstance(ticker, str) and ticker else job_type
 
 
+async def lock_connection(pool: asyncpg.Pool) -> asyncpg.Connection:
+    """A new connection with the pool's settings but outside it, for holding a job's
+    advisory lock. Holding the lock on a pooled connection would leave each running job
+    needing two pool connections, so enough concurrent runs could take every connection
+    as lock holders and then wait forever for one to write with. The caller closes it."""
+    # asyncpg has no public "connect like this pool" call; this is the pool's own factory
+    # (same DSN, server settings, init/setup hooks), without adding it to the pool.
+    conn: asyncpg.Connection = await pool._get_new_connection()
+    return conn
+
+
+async def try_lock(conn: asyncpg.Connection, key: str) -> bool:
+    return bool(
+        await conn.fetchval("select pg_try_advisory_lock($1, hashtext($2))", LOCK_NAMESPACE, key)
+    )
+
+
+async def unlock(conn: asyncpg.Connection, key: str) -> None:
+    await conn.execute("select pg_advisory_unlock($1, hashtext($2))", LOCK_NAMESPACE, key)
+
+
 async def run_job(
     pool: asyncpg.Pool,
     job_type: str,
@@ -221,86 +242,189 @@ async def run_job(
     job_id: int | None = None,
     params: dict[str, Any] | None = None,
     lock_timeout: dt.timedelta = DEFAULT_LOCK_TIMEOUT,
-) -> Literal["succeeded", "failed"]:
+    wait: bool = True,
+) -> Literal["succeeded", "failed", "busy"]:
     """Run `handler` as job `job_id` (created here with `params` if None; an existing job's
     params are read from its row). Never raises for a job failure: the failure is recorded
-    on the job and its step, and "failed" is returned."""
-    resumed = False
-    next_step = 0
-    versions: list[int] = []
+    on the job and its step, and "failed" is returned.
+
+    With `wait=False` a run whose lock is held by another run does not wait for it: the job
+    is left `waiting`, untouched otherwise, and "busy" is returned so the caller can retry
+    later (the queue consumer does, rather than parking a slot on the lock)."""
     if job_id is None:
         job_id = await create_job(pool, job_type, trigger, params=params)
     else:
-        row = await pool.fetchrow(
-            "select params, status, config_version_ids,"
-            " (select max(step_index) from public.job_step where job_id = j.id) as last_step"
-            " from public.job j where id = $1",
-            job_id,
-        )
+        row = await pool.fetchrow("select params, status from public.job where id = $1", job_id)
         params = json.loads(row["params"]) if row and row["params"] else {}
-        if row is not None and row["status"] in ("succeeded", "failed"):
+        if row is not None and row["status"] in _TERMINAL:
             # Redelivered after it finished (the worker died before archiving the message).
             logger.info("job %s already %s; not run again", job_id, row["status"])
             return "succeeded" if row["status"] == "succeeded" else "failed"
-        if row is not None and row["last_step"] is not None:
-            # A run the worker was killed in: its open steps are closed, numbering continues,
-            # and the handler can pick up completed work from its checkpoints.
-            resumed = True
-            next_step = row["last_step"] + 1
-            versions = list(row["config_version_ids"] or [])
-            await pool.execute(
-                "update public.job_step set status = 'failed', finished_at = clock_timestamp(),"
-                " error = 'interrupted: the worker stopped during this step' where job_id = $1"
-                " and status = 'running'",
-                job_id,
-            )
+    key = lock_key(job_type, params or {})
+
+    lock_conn = await lock_connection(pool)
+    try:
+        # Only a job nobody has started yet shows as waiting: a redelivered copy of a job
+        # that is running elsewhere must not relabel the live run.
+        await pool.execute(
+            "update public.job set status = 'waiting' where id = $1 and status = 'queued'",
+            job_id,
+        )
+        if not wait:
+            if not await try_lock(lock_conn, key):
+                return "busy"
+        else:
+            try:
+                await lock_conn.execute(
+                    "select pg_advisory_lock($1, hashtext($2))",
+                    LOCK_NAMESPACE,
+                    key,
+                    timeout=lock_timeout.total_seconds(),
+                )
+            except TimeoutError:
+                # Only fail a job that was waiting: a `running` one is a live run elsewhere
+                # (this is a redelivered copy of it) and is left alone.
+                await pool.execute(
+                    "update public.job set status = 'failed', error = $2,"
+                    " finished_at = clock_timestamp() where id = $1"
+                    " and status in ('queued', 'waiting')",
+                    job_id,
+                    f"gave up waiting {lock_timeout} for the lock",
+                )
+                return "failed"
+        try:
+            return await _run_locked(pool, job_type, handler, trigger, job_id, params or {})
+        finally:
+            await unlock(lock_conn, key)
+    finally:
+        await lock_conn.close()
+
+
+_TERMINAL = ("succeeded", "failed")
+
+
+async def _run_locked(
+    pool: asyncpg.Pool,
+    job_type: str,
+    handler: JobHandler,
+    trigger: JobTrigger,
+    job_id: int,
+    params: dict[str, Any],
+) -> Literal["succeeded", "failed"]:
+    """The run itself, with the job's lock held. Everything about the job's earlier
+    attempts is read only now: while another run of this job (the same queue message,
+    redelivered while the first was still going) held the lock, it could still change."""
+    row = await pool.fetchrow(
+        "select status, config_version_ids,"
+        " (select max(step_index) from public.job_step where job_id = j.id) as last_step"
+        " from public.job j where id = $1",
+        job_id,
+    )
+    resumed = False
+    next_step = 0
+    versions: list[int] = []
+    if row is not None and row["status"] in _TERMINAL:
+        # Another copy of this job ran it to completion while this one waited for the lock.
+        logger.info("job %s already %s; not run again", job_id, row["status"])
+        return "succeeded" if row["status"] == "succeeded" else "failed"
+    if row is not None and row["last_step"] is not None:
+        # A run the worker was killed in: its open steps are closed, numbering continues,
+        # and the handler can pick up completed work from its checkpoints. Nobody else
+        # can be running it (they would hold the lock).
+        resumed = True
+        next_step = row["last_step"] + 1
+        versions = list(row["config_version_ids"] or [])
+        await pool.execute(
+            "update public.job_step set status = 'failed', finished_at = clock_timestamp(),"
+            " error = 'interrupted: the worker stopped during this step' where job_id = $1"
+            " and status = 'running'",
+            job_id,
+        )
     ctx = JobContext(
         pool=pool,
         job_id=job_id,
         job_type=job_type,
         trigger=trigger,
-        params=params or {},
+        params=params,
         _next_step=next_step,
         config_version_ids=versions,
         resumed=resumed,
     )
-    key = lock_key(job_type, ctx.params)
+    await pool.execute(
+        "update public.job set status = 'running', started_at = clock_timestamp() where id = $1",
+        job_id,
+    )
+    logger.info("job %s (%s, %s) started", job_id, job_type, trigger)
+    try:
+        await handler(ctx)
+    except Exception as exc:
+        if isinstance(exc, JobFailed):
+            logger.error("job %s (%s) failed: %s", job_id, job_type, exc)
+        else:
+            logger.exception("job %s (%s) failed", job_id, job_type)
+        await _finish(pool, job_id, "failed", _error_text(exc))
+        return "failed"
+    await _finish(pool, job_id, "succeeded", None)
+    logger.info("job %s (%s) succeeded", job_id, job_type)
+    return "succeeded"
 
-    async with pool.acquire() as lock_conn:
-        await pool.execute("update public.job set status = 'waiting' where id = $1", job_id)
-        try:
-            await lock_conn.execute(
-                "select pg_advisory_lock($1, hashtext($2))",
-                LOCK_NAMESPACE,
-                key,
-                timeout=lock_timeout.total_seconds(),
-            )
-        except TimeoutError:
-            await _finish(pool, job_id, "failed", f"gave up waiting {lock_timeout} for the lock")
-            return "failed"
-        try:
-            await pool.execute(
-                "update public.job set status = 'running', started_at = clock_timestamp()"
-                " where id = $1",
-                job_id,
-            )
-            logger.info("job %s (%s, %s) started", job_id, job_type, trigger)
-            try:
-                await handler(ctx)
-            except Exception as exc:
-                if isinstance(exc, JobFailed):
-                    logger.error("job %s (%s) failed: %s", job_id, job_type, exc)
-                else:
-                    logger.exception("job %s (%s) failed", job_id, job_type)
-                await _finish(pool, job_id, "failed", _error_text(exc))
-                return "failed"
-            await _finish(pool, job_id, "succeeded", None)
-            logger.info("job %s (%s) succeeded", job_id, job_type)
-            return "succeeded"
-        finally:
-            await lock_conn.execute(
-                "select pg_advisory_unlock($1, hashtext($2))", LOCK_NAMESPACE, key
-            )
+
+async def fail_interrupted_scheduled_runs(
+    pool: asyncpg.Pool, *, stale_after: dt.timedelta = DEFAULT_LOCK_TIMEOUT
+) -> list[int]:
+    """At worker start: fail scheduled runs a killed worker left open, so they don't show as
+    running forever (a scheduled run is not redelivered by any queue). A `running` one
+    counts only when nobody holds its lock (no live run of that key anywhere); a `queued`
+    or `waiting` one only when older than `stale_after`, by which time a live one would have
+    started or given up. Returns the job ids failed."""
+    rows = await pool.fetch(
+        "select id, job_type, params, status from public.job where trigger = 'schedule'"
+        " and (status = 'running' or (status in ('queued', 'waiting')"
+        " and created_at < now() - $1::interval))"
+        " order by id",
+        stale_after,
+    )
+    failed: list[int] = []
+    if not rows:
+        return failed
+    conn = await lock_connection(pool)
+    try:
+        for r in rows:
+            params = json.loads(r["params"]) if r["params"] else {}
+            key = lock_key(r["job_type"], params if isinstance(params, dict) else {})
+            if r["status"] == "running":
+                if not await try_lock(conn, key):
+                    continue  # a live run holds the key; this one may be it
+                try:
+                    done = await _fail_open(pool, r["id"])
+                finally:
+                    await unlock(conn, key)
+            else:
+                done = await _fail_open(pool, r["id"])
+            if done:
+                failed.append(r["id"])
+                logger.warning("job %s (%s) was left open by a stopped worker; marked failed",
+                               r["id"], r["job_type"])  # fmt: skip
+    finally:
+        await conn.close()
+    return failed
+
+
+async def _fail_open(pool: asyncpg.Pool, job_id: int) -> bool:
+    async with pool.acquire() as conn, conn.transaction():
+        await conn.execute(
+            "update public.job_step set status = 'failed', finished_at = clock_timestamp(),"
+            " error = 'interrupted: the worker stopped during this step' where job_id = $1"
+            " and status = 'running'",
+            job_id,
+        )
+        result: str = await conn.execute(
+            "update public.job set status = 'failed', finished_at = clock_timestamp(),"
+            " error = 'interrupted (worker restarted)' where id = $1"
+            " and status in ('queued', 'waiting', 'running')",
+            job_id,
+        )
+    return result != "UPDATE 0"
 
 
 async def _finish(pool: asyncpg.Pool, job_id: int, status: str, error: str | None) -> None:

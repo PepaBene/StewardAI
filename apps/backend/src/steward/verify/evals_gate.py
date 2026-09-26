@@ -4,7 +4,9 @@
     uv run python -m steward.verify.evals_gate --write-baseline  # after a passing live run
 
 Three model-facing components each have a fingerprint: the source of the code that builds
-the prompt and parses the answer, the default model, and the evaluation set.
+the prompt and parses the answer, the default model, the settings and data the prompt is
+built from (the extraction effort, the event type descriptions), and the evaluation set
+(for earnings: each case's labels and its source document).
 
 | Component      | Code                          | Set                                 | Target |
 | -------------- | ----------------------------- | ----------------------------------- | ------ |
@@ -22,7 +24,8 @@ score. The check:
   Run `--write-baseline` with a key (it writes the baseline only if every changed component
   passes) and commit the file.
 
-With no baseline file at all (a fresh repository), a run without a key warns and passes.
+With no baseline file at all (a fresh repository), a run without a key warns and passes:
+no eval runs, so the model-facing code is unverified until a run with a key records one.
 Live runs cost roughly $2-3 (the golden set with Sonnet), a few cents for the other two.
 """
 
@@ -54,10 +57,25 @@ class Component:
     data: tuple[Path, ...]
     model: Callable[[], str]
     target: float
+    # Settings or data the prompt is built from that live outside `code` (hashed as text).
+    extra: Callable[[], str] = lambda: ""
 
 
 def _golden_files() -> tuple[Path, ...]:
-    return tuple(sorted((BACKEND / "tests" / "golden" / "earnings").glob("*/case.json")))
+    """Each golden case's labels and the source document it references."""
+    files: list[Path] = []
+    for case in sorted((BACKEND / "tests" / "golden" / "earnings").glob("*/case.json")):
+        files.append(case)
+        document = json.loads(case.read_text(encoding="utf-8")).get("document")
+        if document:
+            files.append(case.parent / document)
+    return tuple(files)
+
+
+def _event_descriptions() -> str:
+    from steward.config.event_rules import EVENT_DESCRIPTIONS, EVENT_TYPES
+
+    return json.dumps({name: EVENT_DESCRIPTIONS[name] for name in EVENT_TYPES})
 
 
 COMPONENTS: tuple[Component, ...] = (
@@ -67,6 +85,7 @@ COMPONENTS: tuple[Component, ...] = (
         (),  # the golden cases, listed at run time
         lambda: EarningsCheckSettings().extraction_model,
         0.98,
+        lambda: f"effort={EarningsCheckSettings().effort}",
     ),
     Component(
         "classification",
@@ -74,6 +93,7 @@ COMPONENTS: tuple[Component, ...] = (
         (BACKEND / "tests" / "news" / "news_classification.json",),
         lambda: NewsSettings().classification_model,
         0.85,
+        _event_descriptions,
     ),
     Component(
         "claims",
@@ -95,6 +115,10 @@ def fingerprint(component: Component) -> str:
         digest.update(path.read_bytes())
         digest.update(b"\0")
     digest.update(component.model().encode())
+    extra = component.extra()
+    if extra:
+        digest.update(b"\0")
+        digest.update(extra.encode())
     return digest.hexdigest()
 
 
@@ -160,8 +184,10 @@ async def run_gate(
         if not have_key:
             if baseline is None:
                 lines.append(
-                    f"::warning::{component.name}: no baseline and no ANTHROPIC_API_KEY; "
-                    "live eval not run"
+                    f"::warning::{component.name}: NO EVALS RAN. There is no baseline and no "
+                    "ANTHROPIC_API_KEY, so the live eval was skipped and this component's "
+                    "prompt, model and schema are unverified. Set ANTHROPIC_API_KEY and run "
+                    "`--write-baseline` to measure them."
                 )
                 continue
             ok = False

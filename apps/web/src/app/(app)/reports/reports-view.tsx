@@ -25,7 +25,9 @@ export function ReportsView() {
   const search = searchFromParams(params);
   const [reports, setReports] = useState<ReportSummary[] | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [queued, setQueued] = useState<{ text: string; jobId: number | null } | null>(null);
+  const [queued, setQueued] = useState<{ text: string; jobId: number } | null>(null);
+  const [queueError, setQueueError] = useState<string | null>(null);
+  const [pending, setPending] = useState<"digest" | "macro" | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -44,22 +46,29 @@ export function ReportsView() {
     };
   }, [period]);
 
-  async function sendNow() {
-    const { data, response } = await getBrowserApiClient().POST("/jobs/digest", { body: { kind: period } });
-    setQueued(
-      data
-        ? { text: `The ${period} digest is being written (job #${data.id}). It appears here when done.`, jobId: data.id }
-        : { text: `Could not queue: HTTP ${response.status}.`, jobId: null },
-    );
-  }
-
-  async function collectMacro() {
-    const { data, response } = await getBrowserApiClient().POST("/jobs/macro-collect");
-    setQueued(
-      data
-        ? { text: `Macro data is being collected (job #${data.id}); the next digest lists the new figures.`, jobId: data.id }
-        : { text: `Could not queue: HTTP ${response.status}.`, jobId: null },
-    );
+  // Queue one job, with the button disabled while the request is in flight (no duplicates).
+  async function queueJob(kind: "digest" | "macro") {
+    setPending(kind);
+    setQueued(null);
+    setQueueError(null);
+    try {
+      const api = getBrowserApiClient();
+      const { data, response } =
+        kind === "digest" ? await api.POST("/jobs/digest", { body: { kind: period } }) : await api.POST("/jobs/macro-collect");
+      if (!data) setQueueError(`Could not queue: the API answered HTTP ${response.status}.`);
+      else
+        setQueued({
+          text:
+            kind === "digest"
+              ? `The ${period} digest is being written (job #${data.id}). It appears here when done.`
+              : `Macro data is being collected (job #${data.id}); the next digest lists the new figures.`,
+          jobId: data.id,
+        });
+    } catch (err) {
+      setQueueError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setPending(null);
+    }
   }
 
   return (
@@ -83,12 +92,12 @@ export function ReportsView() {
             />
           ) : null}
           <div className="flex flex-wrap justify-end gap-2">
-            <Button variant="ghost" size="sm" onClick={() => void collectMacro()}>
-              <LandmarkIcon aria-hidden="true" />
+            <Button variant="ghost" size="sm" onClick={() => void queueJob("macro")} disabled={pending !== null}>
+              {pending === "macro" ? <LoaderCircleIcon aria-hidden="true" className="animate-spin" /> : <LandmarkIcon aria-hidden="true" />}
               Collect macro data now
             </Button>
-            <Button variant="outline" size="sm" onClick={() => void sendNow()}>
-              <SendIcon aria-hidden="true" />
+            <Button variant="outline" size="sm" onClick={() => void queueJob("digest")} disabled={pending !== null}>
+              {pending === "digest" ? <LoaderCircleIcon aria-hidden="true" className="animate-spin" /> : <SendIcon aria-hidden="true" />}
               Write {period} digest now
             </Button>
           </div>
@@ -97,13 +106,12 @@ export function ReportsView() {
       {queued ? (
         <AlertMessage tone="info" title="Queued">
           {queued.text}{" "}
-          {queued.jobId !== null ? (
-            <Link href={jobHref(queued.jobId)} className="text-accent hover:underline">
-              Follow the job
-            </Link>
-          ) : null}
+          <Link href={jobHref(queued.jobId)} className="text-accent hover:underline">
+            Follow the job
+          </Link>
         </AlertMessage>
       ) : null}
+      {queueError ? <AlertMessage title="Not queued">{queueError}</AlertMessage> : null}
 
       <ReportSearch key={search.q} state={search} />
 

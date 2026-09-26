@@ -69,6 +69,20 @@ async def load_active[M: BaseModel](
     )
 
 
+class ConfigConflictError(Exception):
+    """The domain's active version is not the one the caller based its change on: someone
+    saved in between. Nothing was saved."""
+
+    def __init__(self, domain: str, expected_id: int | None, active_id: int | None) -> None:
+        super().__init__(
+            f"the {domain} config changed since version #{expected_id} was loaded"
+            f" (the active version is now #{active_id}); reload it and apply the change again"
+        )
+        self.domain = domain
+        self.expected_id = expected_id
+        self.active_id = active_id
+
+
 async def save_config[M: BaseModel](
     conn: asyncpg.Connection,
     domain: str,
@@ -76,20 +90,33 @@ async def save_config[M: BaseModel](
     *,
     created_by: str | None,
     note: str | None = None,
+    expected_active_id: int | None = None,
 ) -> StoredConfig[M]:
     """Store `body` as the new active version of `domain`. A body identical to the active
-    version is not stored again; the active version is returned unchanged."""
+    version is not stored again; the active version is returned unchanged.
+
+    With `expected_active_id`, the save goes through only while that is still the active
+    version (else ConfigConflictError), so a change made from a stale copy cannot silently
+    overwrite a newer save."""
     if CONFIG_MODELS.get(domain) is not type(body):
         raise ValueError(f"{type(body).__name__} is not the model for config domain {domain!r}")
     new_body = body.model_dump(mode="json")
     schema_version = int(new_body.get("schema_version", 1))
 
     async with conn.transaction():
+        # Saves to one domain run one at a time. A row lock on the active version does not
+        # serialise them when there is no active row yet (or it changes while waiting), and
+        # two inserts would then collide on the one-active-version-per-domain index.
+        await conn.execute("select pg_advisory_xact_lock(hashtext('config:' || $1))", domain)
         current = await conn.fetchrow(
             "select id, created_at, note, body from public.config_version"
             " where domain = $1 and active for update",
             domain,
         )
+        if expected_active_id is not None:
+            active_id = current["id"] if current is not None else None
+            if active_id != expected_active_id:
+                raise ConfigConflictError(domain, expected_active_id, active_id)
         diff = None
         if current is not None:
             old_body = json.loads(current["body"])
@@ -196,10 +223,15 @@ class RollbackError(Exception):
 
 
 async def rollback(
-    conn: asyncpg.Connection, domain: str, version_id: int, *, created_by: str | None
+    conn: asyncpg.Connection,
+    domain: str,
+    version_id: int,
+    *,
+    created_by: str | None,
+    expected_active_id: int | None = None,
 ) -> StoredConfig[BaseModel] | None:
     """Save version `version_id`'s body as the new active version (history is never
-    rewritten). None when no such version exists."""
+    rewritten). None when no such version exists. `expected_active_id` as in save_config."""
     found = await get_version(conn, domain, version_id)
     if found is None:
         return None
@@ -208,7 +240,12 @@ async def rollback(
     except ValidationError as exc:
         raise RollbackError(json.loads(exc.json())) from exc
     return await save_config(
-        conn, domain, body, created_by=created_by, note=f"Rolled back to version #{version_id}"
+        conn,
+        domain,
+        body,
+        created_by=created_by,
+        note=f"Rolled back to version #{version_id}",
+        expected_active_id=expected_active_id,
     )
 
 
@@ -275,6 +312,10 @@ async def import_all(
     parsed = validate_import(bodies)
     saved: dict[str, StoredConfig[BaseModel]] = {}
     async with conn.transaction():
+        # Take every domain's save lock up front, in a fixed order, so two imports cannot
+        # deadlock on each other's locks.
+        for domain in sorted(parsed):
+            await conn.execute("select pg_advisory_xact_lock(hashtext('config:' || $1))", domain)
         for domain, body in parsed.items():
             saved[domain] = await save_config(
                 conn, domain, body, created_by=created_by, note=note or "Imported from file"

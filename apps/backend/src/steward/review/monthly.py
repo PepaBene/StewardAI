@@ -26,11 +26,18 @@ from pydantic import BaseModel, Field
 from steward.ai import AINotConfigured, Usage, create_client
 from steward.config.jobs import JobsConfig, ReviewSettings
 from steward.config.store import load_active
-from steward.config.strategy import StrategyConfig
+from steward.config.strategy import (
+    CashWeightRule,
+    CategoryWeightRule,
+    PositionWeightRule,
+    StrategyConfig,
+    StrategyRule,
+)
 from steward.config.thesis import ThesesConfig
 from steward.jobs.runner import JobContext
 from steward.ownership.read import holding_ownership
-from steward.portfolio.breaches import evaluate
+from steward.portfolio.breaches import _holds, evaluate
+from steward.portfolio.drift import DriftReport
 from steward.portfolio.read import portfolio_overview
 from steward.research.sources import CitedSentence, Registry, Source
 from steward.settings import get_settings
@@ -159,6 +166,43 @@ def _pct(x: float | None) -> str:
     return "n/a" if x is None else f"{x * 100:.2f}%"
 
 
+def _not_checked(rule: StrategyRule, drift: DriftReport) -> tuple[Status, str] | None:
+    """The status of a rule `evaluate` ran no check for, or None when it ran one.
+
+    `evaluate` checks held positions, existing buckets and a known cash weight only. A rule
+    on a position or bucket the portfolio does not hold is judged at a weight of 0 (so a
+    minimum is a breach); a cash rule with no cash weight, or a rule over every position of
+    an empty portfolio, is unknown.
+    """
+    limit = float(getattr(rule, "value", 0))
+    target: str | None = None
+    if isinstance(rule, PositionWeightRule):
+        held = [p for p in drift.positions if p.held]
+        if rule.ticker is None:
+            return None if held else ("unknown", "no positions held to check")
+        if any(p.ticker == rule.ticker for p in held):
+            return None
+        target = f"{rule.ticker} is not held"
+    elif isinstance(rule, CategoryWeightRule):
+        found = next((d for d in drift.categories if d.dimension == rule.dimension), None)
+        buckets = found.buckets if found else []
+        if rule.bucket is None:
+            return None if buckets else ("unknown", f"no {rule.dimension} buckets to check")
+        if any(b.bucket == rule.bucket for b in buckets):
+            return None
+        target = f"no holding is in {rule.dimension} {rule.bucket}"
+    elif isinstance(rule, CashWeightRule):
+        if drift.cash.weight is None:
+            return "unknown", "cash weight unknown in the latest snapshot"
+        return None
+    else:
+        return None
+    if _holds(0.0, rule.operator, limit):
+        return "pass", f"{target} (0.00%); holds ({rule.operator} {_pct(limit)})"
+    requires = f"the rule requires {rule.operator} {_pct(limit)}"
+    return "breach", f"Rule {rule.id}: {target} (0.00%); {requires}"
+
+
 async def compliance(
     pool: asyncpg.Pool, reg: Registry, strategy: StrategyConfig, strategy_version: int | None
 ) -> tuple[list[ComplianceRow], dt.date | None, float | None, str | None]:
@@ -193,11 +237,14 @@ async def compliance(
         hits = [f for f in findings if f.key.startswith(f"rule:{rule.id}:")]
         limit = f"{rule.operator} {getattr(rule, 'value', '')}"
         description = rule.description or f"{rule.type} {limit}"
+        unchecked = _not_checked(rule, drift) if drift is not None else None
         if drift is None:
             status: Status = "unknown"
             detail = "no portfolio snapshot yet"
         elif hits:
             status, detail = "breach", "; ".join(f.detail for f in hits)
+        elif unchecked is not None:
+            status, detail = unchecked
         else:
             status, detail = "pass", f"holds ({rule.type} {limit})"
         rows.append(
@@ -299,7 +346,9 @@ async def flags(pool: asyncpg.Pool, reg: Registry, settings: ReviewSettings) -> 
         " l.avg_daily_turnover, l.turnover_currency, l.liquid from public.position_snapshot p"
         " join public.instrument i on i.t212_ticker = p.ticker"
         " left join public.listing_liquidity l on l.isin = i.isin"
-        " where p.snapshot_date = (select max(snapshot_date) from public.position_snapshot)"
+        " where p.snapshot_date = coalesce("
+        " (select max(snapshot_date) from public.account_snapshot),"
+        " (select max(snapshot_date) from public.position_snapshot))"
     )
     for p in positions:
         if p["avg_daily_turnover"] and p["turnover_currency"] == p["instrument_currency"]:
@@ -513,6 +562,13 @@ async def run_review(ctx: JobContext, deps: ReviewDeps) -> int | None:
             step.detail["skipped"] = f"{today} is not the first weekday of the month"
             return None
     async with ctx.step("review") as step:
+        # A redelivered job keeps the report its first attempt stored, without a second call.
+        existing = await pool.fetchval(
+            "select id from public.report where job_id = $1 and type = 'review'", ctx.job_id
+        )
+        if existing is not None:
+            step.detail["report_id"] = existing
+            return int(existing)
         body, usage = await build_review(
             pool,
             deps.now,

@@ -36,7 +36,7 @@ import {
   type StrategyForm,
 } from "@/lib/config/strategy-form";
 import { formatPercent } from "@/lib/format";
-import { useConfigEditor } from "@/lib/hooks/use-config-editor";
+import { configSaveQuery, useConfigEditor } from "@/lib/hooks/use-config-editor";
 import { cn } from "@/lib/utils";
 
 const api = () => getBrowserApiClient();
@@ -50,7 +50,7 @@ export function StrategyEditor() {
   const [savedId, setSavedId] = useState<number | null>(null);
   const editor = useConfigEditor<StrategyConfig>({
     load: () => api().GET("/config/strategy"),
-    save: (body, note) => api().PUT("/config/strategy", { body, params: { query: { note } } }),
+    save: (body, note, base) => api().PUT("/config/strategy", { body, params: { query: configSaveQuery(note, base) } }),
     validate: (body) => api().POST("/config/strategy/validate", { body }),
     onLoaded: (body) => {
       const loaded = strategyFromBody(body);
@@ -138,6 +138,7 @@ export function StrategyEditor() {
           ) : null}
           <SaveBar
             dirty={dirty}
+            savedVersionId={editor.version?.id ?? null}
             blocked={blocked}
             busy={editor.busy}
             errors={errors}

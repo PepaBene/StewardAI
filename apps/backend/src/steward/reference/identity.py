@@ -721,8 +721,11 @@ async def _record(
 
 async def holding_tickers(pool: asyncpg.Pool) -> list[str]:
     rows = await pool.fetch(
-        "select ticker from public.position_snapshot where snapshot_date ="
-        " (select max(snapshot_date) from public.position_snapshot)"
+        # The latest sync's day (account_snapshot is written even when no position is
+        # left, so a fully closed portfolio gives no holdings rather than stale ones).
+        "select ticker from public.position_snapshot where snapshot_date = coalesce("
+        " (select max(snapshot_date) from public.account_snapshot),"
+        " (select max(snapshot_date) from public.position_snapshot))"
     )
     return sorted({r["ticker"] for r in rows})
 

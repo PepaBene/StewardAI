@@ -14,13 +14,14 @@ import logging
 import re
 from dataclasses import dataclass
 from typing import Any
+from urllib.parse import urlsplit
 from zoneinfo import ZoneInfo
 
 import asyncpg
 import httpx
 
 from steward import __version__
-from steward.ai import AINotConfigured, create_client
+from steward.ai import AINotConfigured, Usage, create_client
 from steward.config.holding_profiles import HoldingProfile, HoldingProfilesConfig
 from steward.config.jobs import EarningsCheckSettings, JobsConfig
 from steward.config.store import load_active
@@ -38,7 +39,7 @@ from steward.earnings.locate import (
 )
 from steward.earnings.periods import likely_reported_period
 from steward.earnings.schema import ExtractedFigure
-from steward.earnings.store import archive, load_known, store_facts
+from steward.earnings.store import archive, load_known, load_owner_rejected, store_facts
 from steward.earnings.validate import ValidationContext, validate
 from steward.earnings.verdicts import run_verdicts
 from steward.jobs.runner import JobContext, JobFailed
@@ -211,6 +212,18 @@ def _kpi_metrics(theses: ThesesConfig, ticker: str) -> tuple[list[str], dict[str
     return [k.metric for k in thesis.kpis], {k.metric: k.description for k in thesis.kpis}
 
 
+def is_sec_url(url: str) -> bool:
+    """Only SEC hosts get the SEC User-Agent (it carries the owner's contact address)."""
+    host = (urlsplit(url).hostname or "").lower()
+    return host == "sec.gov" or host.endswith(".sec.gov")
+
+
+def _record_failed_usage(step: Any, usage: Usage | None) -> None:
+    """A failed AI call still costs what its response used; record it on the step."""
+    if usage is not None and (usage.input_tokens or usage.output_tokens or usage.searches):
+        step.usage = usage.step_usage()
+
+
 def _usable(
     figures: list[ExtractedFigure], requested: set[str]
 ) -> tuple[list[ExtractedFigure], int]:
@@ -255,7 +268,7 @@ async def earnings_check(ctx: JobContext, deps: EarningsDeps) -> None:
         budget.spend("fetching the document")
         headers = (
             deps.edgar.headers
-            if deps.edgar is not None and "sec.gov" in located.url
+            if deps.edgar is not None and is_sec_url(located.url)
             else default_headers()
         )
         try:
@@ -265,7 +278,7 @@ async def earnings_check(ctx: JobContext, deps: EarningsDeps) -> None:
                 max_bytes=settings.max_document_mb * 1_000_000,
                 headers=headers,
             )
-            text = document.text()
+            text = await document.text_async()
         except FetchError as exc:
             raise JobFailed(str(exc)) from exc
         if len(text) < 200:
@@ -299,6 +312,7 @@ async def earnings_check(ctx: JobContext, deps: EarningsDeps) -> None:
         try:
             result, usage = await deps.extractor.extract(document, text, request)
         except ExtractionError as exc:
+            _record_failed_usage(step, exc.usage)
             raise JobFailed(str(exc)) from exc
         step.usage = usage.step_usage()
         figures, dropped = _usable(result.figures, set(wanted))
@@ -312,6 +326,7 @@ async def earnings_check(ctx: JobContext, deps: EarningsDeps) -> None:
 
     async with ctx.step("validate_and_store") as step:
         known = await load_known(pool, ticker)
+        owner_rejected = await load_owner_rejected(pool, ticker)
         validated = validate(
             figures,
             ValidationContext(
@@ -321,6 +336,7 @@ async def earnings_check(ctx: JobContext, deps: EarningsDeps) -> None:
                 reporting_currency=profile.reporting_currency,
                 config=config.verification,
                 known=known,
+                owner_rejected=owner_rejected,
             ),
         )
         summary = await store_facts(
@@ -397,6 +413,7 @@ async def _locate(
                 )
             )
         except LocateError as exc:
+            _record_failed_usage(step, exc.usage)
             attempts.append(f"search: {exc}")
         else:
             step.usage = usage.step_usage()

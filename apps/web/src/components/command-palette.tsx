@@ -9,6 +9,7 @@ import { openChatPanel } from "@/components/chat/chat-panel";
 import { Button } from "@/components/ui/button";
 import { getBrowserApiClient, type Holding } from "@/lib/api/client";
 import { jobHref } from "@/lib/jobs/job-detail";
+import { confirmLeave } from "@/lib/unsaved-changes";
 import {
   baseCommands,
   filterCommands,
@@ -102,13 +103,15 @@ export function CommandPalette() {
   }, [open]);
 
   async function execute(command: PaletteCommand | undefined) {
-    if (!command) return;
+    // One action at a time: Enter or a click while a job is being queued does nothing.
+    if (!command || status?.busy) return;
     if (command.ui === "open-chat") {
       dialog.current?.close();
       openChatPanel();
       return;
     }
     if (command.href) {
+      if (!confirmLeave()) return;
       dialog.current?.close();
       router.push(command.href);
       return;

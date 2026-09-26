@@ -20,7 +20,7 @@ import {
   type SourceForm,
   type SourcesForm,
 } from "@/lib/config/news-forms";
-import { useConfigEditor } from "@/lib/hooks/use-config-editor";
+import { configSaveQuery, useConfigEditor } from "@/lib/hooks/use-config-editor";
 import { TIERS } from "@/lib/news/labels";
 
 const api = () => getBrowserApiClient();
@@ -31,7 +31,7 @@ export function SourcesEditor() {
   const [baseline, setBaseline] = useState("");
   const editor = useConfigEditor<NewsSourcesConfig>({
     load: () => api().GET("/config/news-sources"),
-    save: (body, note) => api().PUT("/config/news-sources", { body, params: { query: { note } } }),
+    save: (body, note, base) => api().PUT("/config/news-sources", { body, params: { query: configSaveQuery(note, base) } }),
     validate: (body) => api().POST("/config/news-sources/validate", { body }),
     onLoaded: (body) => {
       const loaded = sourcesFromBody(body, DEFAULT_SOURCES);
@@ -147,7 +147,7 @@ export function SourcesEditor() {
             </div>
           </section>
 
-          <SaveBar dirty={dirty} busy={editor.busy} errors={editor.errors} message={editor.message} onValidate={() => body && void editor.validate(body)} onSave={(note) => void save(note)} />
+          <SaveBar dirty={dirty} savedVersionId={editor.version?.id ?? null} busy={editor.busy} errors={editor.errors} message={editor.message} onValidate={() => body && void editor.validate(body)} onSave={(note) => void save(note)} />
         </>
       ) : null}
     </div>

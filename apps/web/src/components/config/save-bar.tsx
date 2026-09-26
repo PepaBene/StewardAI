@@ -8,10 +8,17 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { flattenErrors, type FieldErrors } from "@/lib/api/validation-errors";
+import { noteDraftFor, type NoteDraft } from "@/lib/config/save-note";
+import { useUnsavedChangesGuard } from "@/lib/hooks/use-unsaved-changes-guard";
 
-/** Note + Validate + Save, with the API's validation errors summarised. */
+/**
+ * Note + Validate + Save, with the API's validation errors summarised. While `dirty`, leaving
+ * the page (a link, the palette, closing the tab) asks first. The note is kept until a save
+ * succeeds, which shows as a new `savedVersionId`.
+ */
 export function SaveBar({
   dirty,
+  savedVersionId,
   busy,
   errors,
   message,
@@ -21,6 +28,8 @@ export function SaveBar({
   saveLabel = "Save new version",
 }: {
   dirty: boolean;
+  /** The active version's id (the editor's `version?.id`); a change means a save went through. */
+  savedVersionId: number | null;
   /** Problems found before sending (shown in `errors`): Save stays disabled. */
   blocked?: boolean;
   /** "previewing": Save first asks for a replay preview (the rule editors). */
@@ -31,7 +40,11 @@ export function SaveBar({
   onValidate: () => void;
   onSave: (note: string | null) => void;
 }) {
-  const [note, setNote] = useState("");
+  const [draft, setDraft] = useState<NoteDraft>({ note: "", forVersion: savedVersionId });
+  const current = noteDraftFor(draft, savedVersionId);
+  if (current !== draft) setDraft(current);
+  const note = current.note;
+  useUnsavedChangesGuard(dirty);
   const noteId = useId();
   const problems = flattenErrors(errors);
   return (
@@ -50,17 +63,14 @@ export function SaveBar({
       <div className="flex flex-wrap items-end gap-2">
         <div className="min-w-60 flex-1 space-y-1">
           <Label htmlFor={noteId}>Why this change (optional)</Label>
-          <Input id={noteId} value={note} maxLength={500} onChange={(e) => setNote(e.target.value)} />
+          <Input id={noteId} value={note} maxLength={500} onChange={(e) => setDraft({ ...current, note: e.target.value })} />
         </div>
         <Button variant="outline" onClick={onValidate} disabled={busy !== null}>
           {busy === "validating" ? <LoaderCircleIcon aria-hidden="true" className="animate-spin" /> : <CheckIcon aria-hidden="true" />}
           Validate
         </Button>
         <Button
-          onClick={() => {
-            onSave(note.trim() || null);
-            setNote("");
-          }}
+          onClick={() => onSave(note.trim() || null)}
           disabled={busy !== null || !dirty || blocked}
         >
           {busy === "saving" || busy === "previewing" ? (

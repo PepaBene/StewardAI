@@ -16,11 +16,15 @@ class QueuedJob:
     job_type: str
 
 
-async def enqueue(conn: asyncpg.Connection | asyncpg.Pool, job_id: int, job_type: str) -> int:
+async def enqueue(
+    conn: asyncpg.Connection | asyncpg.Pool, job_id: int, job_type: str, *, delay: int = 0
+) -> int:
+    """Send a job to the queue, readable after `delay` seconds."""
     msg_id: int = await conn.fetchval(
-        "select * from pgmq.send($1, $2::jsonb)",
+        "select * from pgmq.send($1, $2::jsonb, $3::integer)",
         QUEUE,
         json.dumps({"job_id": job_id, "job_type": job_type}),
+        delay,
     )
     return msg_id
 
@@ -50,3 +54,10 @@ async def read(
 
 async def archive(conn: asyncpg.Connection | asyncpg.Pool, msg_id: int) -> None:
     await conn.execute("select pgmq.archive($1, $2::bigint)", QUEUE, msg_id)
+
+
+async def set_visibility(
+    conn: asyncpg.Connection | asyncpg.Pool, msg_id: int, seconds: int
+) -> None:
+    """Hide message `msg_id` from readers for `seconds` from now (0: visible again now)."""
+    await conn.execute("select pgmq.set_vt($1, $2::bigint, $3::integer)", QUEUE, msg_id, seconds)

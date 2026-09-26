@@ -97,17 +97,22 @@ class ClaudeChatAssistant:
         self, history: list[dict[str, str]], question: str, tools: ChatTools, today: dt.date
     ) -> AssistantResult:
         usage = Usage(model=self._settings.model)
-        definitions: list[Any] = list(TOOL_DEFINITIONS)
-        if self._settings.max_searches > 0 and self._domains:
-            definitions.append(
-                web_search_tool(self._settings.model, self._settings.max_searches, self._domains)
-            )
+        # `max_uses` caps one API request, and an answer takes several: pass what is left of
+        # the per-answer budget each time, and drop web search once it is spent.
+        searches_left = self._settings.max_searches if self._domains else 0
+        paused = False
         messages: list[dict[str, Any]] = [
             *history,
             {"role": "user", "content": f"Today is {today.isoformat()}.\n\n{question}"},
         ]
         titles: dict[str, str] = {}
         for _ in range(self._settings.max_steps):
+            definitions: list[Any] = list(TOOL_DEFINITIONS)
+            # A paused turn resumes a search in flight, so it keeps the tool (at least one use).
+            if searches_left > 0 or paused:
+                definitions.append(
+                    web_search_tool(self._settings.model, max(searches_left, 1), self._domains)
+                )
             try:
                 response = await self._client.messages.parse(
                     model=self._settings.model,
@@ -120,6 +125,8 @@ class ClaudeChatAssistant:
             except anthropic.APIError as exc:
                 return AssistantResult(None, usage, titles, f"the call failed: {exc}"[:300])
             usage.add(response.usage)
+            searches_left = max(0, searches_left - searches_used(response))
+            paused = response.stop_reason == "pause_turn"
             titles |= result_titles(response.content)
             if response.stop_reason == "refusal":
                 return AssistantResult(None, usage, titles, "the model declined")
@@ -148,6 +155,20 @@ class ClaudeChatAssistant:
                 None if response.parsed_output else "no parseable answer",
             )
         return AssistantResult(None, usage, titles, "the step cap was reached before an answer")
+
+
+def searches_used(response: Any) -> int:
+    """Web searches one response ran: the usage count, else its web search call blocks."""
+    server = getattr(getattr(response, "usage", None), "server_tool_use", None)
+    count = getattr(server, "web_search_requests", None)
+    if isinstance(count, int):
+        return count
+    return sum(
+        1
+        for block in getattr(response, "content", None) or []
+        if getattr(block, "type", None) == "server_tool_use"
+        and getattr(block, "name", None) == "web_search"
+    )
 
 
 def finish_answer(
@@ -214,6 +235,23 @@ async def run_chat(ctx: JobContext, deps: ChatDeps) -> int:
         )
         if question is None:
             raise JobFailed(f"no user message {message_id} in conversation {conversation_id}")
+        # A redelivered job: keep the answer the first attempt stored; if it stored none,
+        # cancel what that attempt proposed (still linked to the question) before answering
+        # again, so only the new answer's actions can be confirmed.
+        done = await pool.fetchval(
+            "select id from public.chat_message where job_id = $1 and role = 'assistant'",
+            ctx.job_id,
+        )
+        if done is not None:
+            step.detail["reply_id"] = done
+            return int(done)
+        stale = await pool.fetch(
+            "update public.chat_action set status = 'cancelled', decided_at = now()"
+            " where message_id = $1 and status = 'proposed' returning id",
+            message_id,
+        )
+        if stale:
+            step.detail["cancelled_actions"] = [r["id"] for r in stale]
         earlier = await pool.fetch(
             "select role, content from public.chat_message where conversation_id = $1"
             " and id < $2 and status = 'done' order by id desc limit $3",

@@ -8,7 +8,7 @@ from fastapi import APIRouter, HTTPException, Path, Query, status
 from pydantic import BaseModel, Field
 
 from api.auth import Owner
-from api.db import Pool
+from api.db import IdPath, Pool
 from api.routes import _enqueue
 from steward.config.common import Ticker
 from steward.config.jobs import ExchangeClosure
@@ -64,7 +64,7 @@ async def _decide(
 
 @router.post("/relationships/{relationship_id}/confirm", tags=["holdings"])
 async def confirm_relationship(
-    relationship_id: int, pool: Pool, owner: Owner
+    relationship_id: IdPath, pool: Pool, owner: Owner
 ) -> RelationshipDecision:
     """Confirm a suggested relationship. A competitor, supplier or customer is added to the
     holding profile (a new config version), so the next news run matches on it."""
@@ -73,7 +73,7 @@ async def confirm_relationship(
 
 @router.post("/relationships/{relationship_id}/reject", tags=["holdings"])
 async def reject_relationship(
-    relationship_id: int, pool: Pool, owner: Owner
+    relationship_id: IdPath, pool: Pool, owner: Owner
 ) -> RelationshipDecision:
     """Reject a suggested relationship; it is never suggested again."""
     return await _decide(relationship_id, False, pool, owner.user_id)

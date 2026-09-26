@@ -123,32 +123,54 @@ class Comparison:
     detail: str = ""
 
 
+def concept_points(
+    company_facts: dict[str, Any], taxonomy: str, concept: str, unit_key: str
+) -> list[XbrlPoint]:
+    """Duration facts from periodic reports for one XBRL concept."""
+    facts = company_facts.get("facts", {})
+    rows = facts.get(taxonomy, {}).get(concept, {}).get("units", {}).get(unit_key, [])
+    found = []
+    for r in rows:
+        if r.get("form") not in REPORT_FORMS or "start" not in r:
+            continue
+        try:
+            found.append(
+                XbrlPoint(
+                    concept=f"{taxonomy}:{concept}",
+                    start=dt.date.fromisoformat(r["start"]),
+                    end=dt.date.fromisoformat(r["end"]),
+                    value=Decimal(str(r["val"])),
+                    accession=r["accn"],
+                    form=r["form"],
+                    filed=dt.date.fromisoformat(r["filed"]),
+                )
+            )
+        except (KeyError, ValueError, ArithmeticError):
+            continue
+    return found
+
+
 def points(company_facts: dict[str, Any], metric: str, unit_key: str) -> list[XbrlPoint]:
     """Duration facts from periodic reports for the metric's first concept that has any."""
-    facts = company_facts.get("facts", {})
     for taxonomy, concept in CONCEPTS.get(metric, []):
-        rows = facts.get(taxonomy, {}).get(concept, {}).get("units", {}).get(unit_key, [])
-        found = []
-        for r in rows:
-            if r.get("form") not in REPORT_FORMS or "start" not in r:
-                continue
-            try:
-                found.append(
-                    XbrlPoint(
-                        concept=f"{taxonomy}:{concept}",
-                        start=dt.date.fromisoformat(r["start"]),
-                        end=dt.date.fromisoformat(r["end"]),
-                        value=Decimal(str(r["val"])),
-                        accession=r["accn"],
-                        form=r["form"],
-                        filed=dt.date.fromisoformat(r["filed"]),
-                    )
-                )
-            except (KeyError, ValueError, ArithmeticError):
-                continue
+        found = concept_points(company_facts, taxonomy, concept, unit_key)
         if found:
             return found
     return []
+
+
+def match_concepts(
+    fact: FactToCheck, company_facts: dict[str, Any], unit_key: str
+) -> tuple[XbrlPoint, str, Decimal] | None:
+    """The first concept in preference order that has a figure for the fact's period.
+    Chosen per period: issuers switch concepts over the years (Revenues ->
+    RevenueFromContractWithCustomer...), and each period is matched within one concept."""
+    for taxonomy, concept in CONCEPTS.get(fact.metric, []):
+        found = concept_points(company_facts, taxonomy, concept, unit_key)
+        matched = match_period(fact, found) if found else None
+        if matched is not None:
+            return matched
+    return None
 
 
 def unit_key(unit: str, currency: str | None) -> str | None:
@@ -210,7 +232,7 @@ def compare(fact: FactToCheck, company_facts: dict[str, Any], today: dt.date) ->
     key = unit_key(fact.unit, fact.currency)
     if key is None or fact.metric not in CONCEPTS:
         return Comparison("no_data", detail="not a reconcilable figure")
-    matched = match_period(fact, points(company_facts, fact.metric, key))
+    matched = match_concepts(fact, company_facts, key)
     if matched is None:
         kind = "annual" if fact.fiscal_period in ("FY", "H2") else "quarter"
         due = fact.period_end + dt.timedelta(days=NO_DATA_AFTER_DAYS[kind])

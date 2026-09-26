@@ -12,6 +12,7 @@ import { getBrowserApiClient, type EvidenceLink } from "@/lib/api/client";
 import { humanizeMetric } from "@/lib/evidence/confidence";
 import { formatDate } from "@/lib/format";
 import { useApiResource } from "@/lib/hooks/use-api-resource";
+import { isExternalUrl } from "@/lib/sources/sources";
 
 /*
  * One fact's evidence: the quoted snippet, the archived text around it, the original URL,
@@ -94,18 +95,25 @@ function Evidence({ link }: { link: EvidenceLink }) {
       </section>
 
       <div className="flex flex-wrap items-center gap-2">
-        <Button asChild>
-          <a href={link.evidence_url} target="_blank" rel="noreferrer">
-            <ArchiveIcon aria-hidden="true" />
-            Archived copy
-          </a>
-        </Button>
-        <Button asChild variant="outline">
-          <a href={link.source_url} target="_blank" rel="noreferrer">
-            <ExternalLinkIcon aria-hidden="true" />
-            Original source
-          </a>
-        </Button>
+        {isExternalUrl(link.evidence_url) ? (
+          <Button asChild>
+            <a href={link.evidence_url} target="_blank" rel="noreferrer">
+              <ArchiveIcon aria-hidden="true" />
+              Archived copy
+            </a>
+          </Button>
+        ) : null}
+        {isExternalUrl(link.source_url) ? (
+          <Button asChild variant="outline">
+            <a href={link.source_url} target="_blank" rel="noreferrer">
+              <ExternalLinkIcon aria-hidden="true" />
+              Original source
+            </a>
+          </Button>
+        ) : (
+          // Not an http(s) link: shown as text, never as a clickable href.
+          <span className="text-sm break-all text-text-muted">Original source: {link.source_url}</span>
+        )}
       </div>
       <p className="text-xs text-text-muted">
         Fetched {formatDate(new Date(link.fetched_at))} · {link.content_type} · SHA-256{" "}

@@ -175,18 +175,27 @@ def _accepted(value: str) -> dt.datetime | None:
 
 
 def parse_index(text: str) -> list[tuple[str, str]]:
-    """Rows of a filing index page as converted text: '2 | EX-99.1 | name.htm | EX-99.1 | 1234'."""
+    """Rows of a filing index page as converted text: '2 | EX-99.1 | name.htm | EX-99.1 | 1234'.
+
+    Columns are Seq | Description | Document | Type | Size, but the text conversion drops
+    empty cells, so a blank Description shifts the others left. The Type is therefore read
+    as the cell right after the Document cell, not by position."""
     documents = []
     for line in text.splitlines():
         cells = [c.strip() for c in line.split(" | ")]
-        if len(cells) < 4 or not cells[0].isdigit():
+        if len(cells) < 3 or not cells[0].isdigit():
             continue
-        name = next(
-            (c.split()[0] for c in cells if re.search(r"\.(htm|html|txt|pdf)\b", c, re.I)), None
+        at = next(
+            (i for i, c in enumerate(cells) if re.search(r"\.(htm|html|txt|pdf)\b", c, re.I)),
+            None,
         )
-        doc_type = cells[3] if len(cells) >= 4 else ""
-        if name:
-            documents.append((doc_type.upper(), name))
+        if at is None or at == 0:
+            continue
+        name = cells[at].split()[0]
+        after = cells[at + 1] if at + 1 < len(cells) else ""
+        # A blank Type leaves the Size (digits) next to the Document.
+        doc_type = "" if re.fullmatch(r"[\d,]*", after) else after
+        documents.append((doc_type.upper(), name))
     return documents
 
 

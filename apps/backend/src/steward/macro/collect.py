@@ -3,7 +3,10 @@
 - Eurostat (dissemination API, JSON-stat 2.0, no key): HICP, unemployment, GDP, industrial
   production and sentiment for the configured areas (CZ, DE, the euro area). The dataset's
   `updated` timestamp is the release date.
-- FRED (key: FRED_API_KEY): US series; an observation's realtime start is its release date.
+- FRED (key: FRED_API_KEY): US series. The request asks for the current vintage only, so
+  FRED's `realtime_start` is the day of the fetch (the vintage's start), not the day the
+  value was first published; it is stored as the release date because the job runs daily and
+  a new period is first seen on (or just after) its release day.
 - ECB Data Portal (no key): the policy rates; a new daily value is dated the day it is seen.
 
 A surprise is evaluated only for an observation seen for the first time (its release day),
@@ -151,6 +154,8 @@ def parse_fred(body: dict[str, Any], series: FredSeries) -> list[Observation]:
                 value=value,
                 label=series.label,
                 unit=series.unit,
+                # The fetch date for a current-vintage request (see the module docstring),
+                # which is the release day only when the job runs on that day.
                 release_date=dt.date.fromisoformat(row["realtime_start"])
                 if row.get("realtime_start")
                 else None,
@@ -271,7 +276,7 @@ async def store_and_evaluate(
     pool: asyncpg.Pool, observations: list[Observation], bands: dict[str, float]
 ) -> tuple[int, list[SyntheticEvent]]:
     """Insert new observations (revisions update the value but are never evaluated) and
-    return (new count, surprise events)."""
+    return (new count, surprise events). A series with nothing stored yet is only stored."""
     events: list[SyntheticEvent] = []
     new_count = 0
     by_series: dict[str, list[Observation]] = {}
@@ -279,6 +284,14 @@ async def store_and_evaluate(
         by_series.setdefault(o.series_id, []).append(o)
     for series_id, obs in by_series.items():
         obs.sort(key=lambda o: o.period)
+        # A series' first run stores the backfilled history as the baseline: comparing
+        # those old observations with each other would raise false surprises.
+        baseline = not await pool.fetchval(
+            "select exists (select 1 from public.macro_series where series_id = $1"
+            " and source = $2)",
+            series_id,
+            obs[0].source,
+        )
         for o in obs:
             inserted = await pool.fetchval(
                 "insert into public.macro_series (series_id, source, period, value, label, unit,"
@@ -297,6 +310,8 @@ async def store_and_evaluate(
             if not inserted:
                 continue
             new_count += 1
+            if baseline:
+                continue
             prev = await pool.fetchrow(
                 "select period, value, unit from public.macro_series where series_id = $1"
                 " and source = $2 and period < $3 order by period desc limit 1",

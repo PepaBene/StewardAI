@@ -8,7 +8,7 @@ import asyncpg
 
 from steward.documents.fetch import Document
 from steward.earnings.periods import period_label
-from steward.earnings.validate import FactKey, KnownFact, ValidatedFigure
+from steward.earnings.validate import FactKey, KnownFact, RejectedFact, ValidatedFigure
 from steward.storage import EvidenceStore, evidence_path
 
 
@@ -63,18 +63,38 @@ async def load_known(
     }
 
 
+async def load_owner_rejected(
+    pool: asyncpg.Pool | asyncpg.Connection, ticker: str
+) -> dict[FactKey, list[RejectedFact]]:
+    """Facts the owner rejected (or replaced with a correction), per key. A re-run of the
+    same release must not queue those values for review again."""
+    rows = await pool.fetch(
+        "select id, metric, basis, fiscal_year, fiscal_period, value_units, unit"
+        " from public.fact where ticker = $1 and status = 'rejected'"
+        " and reviewed_at is not null order by id",
+        ticker,
+    )
+    rejected: dict[FactKey, list[RejectedFact]] = {}
+    for r in rows:
+        key = FactKey(r["metric"], r["basis"], r["fiscal_year"], r["fiscal_period"])
+        rejected.setdefault(key, []).append(RejectedFact(r["id"], r["value_units"], r["unit"]))
+    return rejected
+
+
 @dataclass
 class StoreSummary:
     inserted: dict[str, int] = field(
         default_factory=lambda: {"verified": 0, "unverified": 0, "rejected": 0}
     )
     duplicates: int = 0
+    owner_rejected: int = 0
     reasons: list[str] = field(default_factory=list)
 
     def as_detail(self) -> dict[str, object]:
         return {
             "inserted": self.inserted,
             "already_stored": self.duplicates,
+            "rejected_by_owner_before": self.owner_rejected,
             "not_verified": self.reasons[:20],
         }
 
@@ -92,6 +112,9 @@ async def store_facts(
         for v in figures:
             if v.duplicate_of is not None:
                 summary.duplicates += 1
+                continue
+            if v.owner_rejected is not None:
+                summary.owner_rejected += 1
                 continue
             f = v.figure
             status = v.status

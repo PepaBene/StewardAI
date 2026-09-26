@@ -1,6 +1,6 @@
 import os
 import secrets
-from collections.abc import AsyncIterator
+from collections.abc import AsyncIterator, Iterator
 from dataclasses import dataclass
 from pathlib import Path
 from urllib.parse import urlsplit, urlunsplit
@@ -11,6 +11,27 @@ import pytest
 REPO_ROOT = Path(__file__).resolve().parents[3]
 MIGRATIONS_DIR = REPO_ROOT / "supabase" / "migrations"
 SHIM = Path(__file__).parent / "sql" / "supabase_shim.sql"
+
+# Alert channel credentials from the developer's environment must not change what tests see
+# (a test that routes alerts would otherwise treat email or Telegram as configured).
+CHANNEL_ENV = (
+    "TELEGRAM_BOT_TOKEN",
+    "TELEGRAM_CHAT_ID",
+    "RESEND_API_KEY",
+    "ALERT_EMAIL_FROM",
+    "ALERT_EMAIL_TO",
+)
+
+
+@pytest.fixture(autouse=True)
+def _no_channel_credentials(monkeypatch: pytest.MonkeyPatch) -> Iterator[None]:
+    from steward.settings import get_settings
+
+    for name in CHANNEL_ENV:
+        monkeypatch.delenv(name, raising=False)
+    get_settings.cache_clear()
+    yield
+    get_settings.cache_clear()
 
 
 @dataclass(frozen=True)

@@ -35,6 +35,7 @@ import { digestOverviewPath, digestSectionPath } from "@/lib/feedback/feedback";
 import { formatDate, formatDateTime, formatTime } from "@/lib/format";
 import { digestFreshnessKind } from "@/lib/freshness";
 import { useApiResource } from "@/lib/hooks/use-api-resource";
+import { isExternalUrl } from "@/lib/sources/sources";
 import {
   citationLinks,
   digestCitationPreview,
@@ -249,7 +250,7 @@ function Digest({ report }: { report: ReportOut }) {
                     return (
                       <li key={story.cluster_id} className="flex flex-wrap items-start justify-between gap-2 rounded-md border border-border p-3 text-sm">
                         <div className="min-w-0 flex-1">
-                          {lead ? (
+                          {lead && isExternalUrl(lead.url) ? (
                             <a href={lead.url} target="_blank" rel="noreferrer" className="font-medium hover:text-accent hover:underline">
                               {story.headline}
                             </a>
@@ -322,10 +323,14 @@ function Digest({ report }: { report: ReportOut }) {
                       <Link href={`/evidence/${f.fact_id}`} className="text-accent hover:underline">
                         Evidence (figure #{f.fact_id})
                       </Link>
-                      <a href={f.source_url} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-accent hover:underline">
-                        {hostOf(f.source_url)}
-                        <ExternalLinkIcon aria-hidden="true" className="size-3" />
-                      </a>
+                      {isExternalUrl(f.source_url) ? (
+                        <a href={f.source_url} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-accent hover:underline">
+                          {hostOf(f.source_url)}
+                          <ExternalLinkIcon aria-hidden="true" className="size-3" />
+                        </a>
+                      ) : (
+                        <span className="break-all text-text-muted">{f.source_url}</span>
+                      )}
                     </p>
                   </li>
                 ))}
@@ -357,10 +362,14 @@ function SourceCard({
           <TierBadge tier={s.tier} />
         </span>
       </p>
-      <a href={s.url} target="_blank" rel="noreferrer" className="inline-flex items-start gap-1 hover:text-accent hover:underline">
-        {s.headline}
-        <ExternalLinkIcon aria-hidden="true" className="mt-0.5 size-3 shrink-0 text-text-muted" />
-      </a>
+      {isExternalUrl(s.url) ? (
+        <a href={s.url} target="_blank" rel="noreferrer" className="inline-flex items-start gap-1 hover:text-accent hover:underline">
+          {s.headline}
+          <ExternalLinkIcon aria-hidden="true" className="mt-0.5 size-3 shrink-0 text-text-muted" />
+        </a>
+      ) : (
+        <p>{s.headline}</p>
+      )}
       <p className="num text-xs text-text-muted">
         {formatDateTime(s.published_at)} · trust {trust ? Math.round(trust.score * 100) / 100 : 1}
         {trust?.demoted ? <span className="text-text"> · demoted one tier (low trust)</span> : null}
@@ -486,10 +495,14 @@ function StatusSections({ body, facts }: { body: DigestBody; facts: Map<number, 
                 {macro.map((m) => (
                   <tr key={m.series_id} className="border-b border-border last:border-0">
                     <th scope="row" className="py-1.5 pr-3 text-left font-normal">
-                      <a href={m.url} target="_blank" rel="noreferrer" className="inline-flex items-start gap-1 hover:text-accent hover:underline">
-                        {m.label}
-                        <ExternalLinkIcon aria-hidden="true" className="mt-0.5 size-3 shrink-0 text-text-muted" />
-                      </a>
+                      {isExternalUrl(m.url) ? (
+                        <a href={m.url} target="_blank" rel="noreferrer" className="inline-flex items-start gap-1 hover:text-accent hover:underline">
+                          {m.label}
+                          <ExternalLinkIcon aria-hidden="true" className="mt-0.5 size-3 shrink-0 text-text-muted" />
+                        </a>
+                      ) : (
+                        m.label
+                      )}
                       {m.new ? (
                         <span className="ml-1.5 rounded-sm border border-info-signal/40 bg-info-signal-subtle px-1 text-xs">new</span>
                       ) : null}

@@ -193,11 +193,14 @@ class EventRulesConfig(ConfigModel):
             "us_cpi": 0.3,
             "us_unemployment": 0.2,
             "ecb_deposit_rate": 0.0,
-            "fed_funds": 0.0,
+            # The daily effective rate (DFF) drifts by a basis point or two; a Fed decision
+            # moves it by 25 bp, so only moves beyond 0.1 pp count.
+            "fed_funds": 0.1,
         },
         description="Per macro series key: a new release that moves more than this against "
         "the previous one is a macro surprise (in the series' own unit; 0: any change, e.g. "
-        "a policy rate). Evaluated only on release days.",
+        "a policy rate set exactly; fed_funds is the daily effective rate, which drifts, so "
+        "it needs a band). Evaluated only on release days.",
     )
     announcement_types: list[AnnouncementRule] = Field(
         default_factory=_default_announcement_rules,

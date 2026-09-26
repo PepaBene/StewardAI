@@ -156,7 +156,8 @@ export interface paths {
         /**
          * Rollback Config
          * @description Make an old version current again by saving its body as a new active version. The
-         *     next run of every job uses it. 409 if the old body no longer passes validation.
+         *     next run of every job uses it. 409 if the old body no longer passes validation, or if
+         *     `base_version_id` is given and is no longer the active version.
          */
         post: operations["rollback_config"];
         delete?: never;
@@ -3223,7 +3224,7 @@ export interface components {
             price_move_threshold_pct: number;
             /**
              * Macro Surprise Bands
-             * @description Per macro series key: a new release that moves more than this against the previous one is a macro surprise (in the series' own unit; 0: any change, e.g. a policy rate). Evaluated only on release days.
+             * @description Per macro series key: a new release that moves more than this against the previous one is a macro surprise (in the series' own unit; 0: any change, e.g. a policy rate set exactly; fed_funds is the daily effective rate, which drifts, so it needs a band). Evaluated only on release days.
              */
             macro_surprise_bands?: {
                 [key: string]: number;
@@ -6865,7 +6866,10 @@ export interface operations {
     };
     rollback_config: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description The version the edit started from. If another save has happened since, nothing is saved and the answer is 409. */
+                base_version_id?: number | null;
+            };
             header?: never;
             path: {
                 /** @description Config domain, as in /config/<domain>. */
@@ -7410,6 +7414,8 @@ export interface operations {
             query?: {
                 /** @description Why this change was made. */
                 note?: string | null;
+                /** @description The version the edit started from. If another save has happened since, nothing is saved and the answer is 409. */
+                base_version_id?: number | null;
             };
             header?: never;
             path?: never;
@@ -7466,6 +7472,8 @@ export interface operations {
             query?: {
                 /** @description Why this change was made. */
                 note?: string | null;
+                /** @description The version the edit started from. If another save has happened since, nothing is saved and the answer is 409. */
+                base_version_id?: number | null;
             };
             header?: never;
             path?: never;
@@ -7522,6 +7530,8 @@ export interface operations {
             query?: {
                 /** @description Why this change was made. */
                 note?: string | null;
+                /** @description The version the edit started from. If another save has happened since, nothing is saved and the answer is 409. */
+                base_version_id?: number | null;
             };
             header?: never;
             path?: never;
@@ -7611,6 +7621,8 @@ export interface operations {
             query?: {
                 /** @description Why this change was made. */
                 note?: string | null;
+                /** @description The version the edit started from. If another save has happened since, nothing is saved and the answer is 409. */
+                base_version_id?: number | null;
             };
             header?: never;
             path?: never;
@@ -7700,6 +7712,8 @@ export interface operations {
             query?: {
                 /** @description Why this change was made. */
                 note?: string | null;
+                /** @description The version the edit started from. If another save has happened since, nothing is saved and the answer is 409. */
+                base_version_id?: number | null;
             };
             header?: never;
             path?: never;
@@ -7789,6 +7803,8 @@ export interface operations {
             query?: {
                 /** @description Why this change was made. */
                 note?: string | null;
+                /** @description The version the edit started from. If another save has happened since, nothing is saved and the answer is 409. */
+                base_version_id?: number | null;
             };
             header?: never;
             path?: never;
@@ -8090,6 +8106,8 @@ export interface operations {
             query?: {
                 /** @description Why this change was made. */
                 note?: string | null;
+                /** @description The version the edit started from. If another save has happened since, nothing is saved and the answer is 409. */
+                base_version_id?: number | null;
             };
             header?: never;
             path?: never;
@@ -8591,6 +8609,8 @@ export interface operations {
             query?: {
                 /** @description Why this change was made. */
                 note?: string | null;
+                /** @description The version the edit started from. If another save has happened since, nothing is saved and the answer is 409. */
+                base_version_id?: number | null;
             };
             header?: never;
             path?: never;
@@ -8680,6 +8700,8 @@ export interface operations {
             query?: {
                 /** @description Why this change was made. */
                 note?: string | null;
+                /** @description The version the edit started from. If another save has happened since, nothing is saved and the answer is 409. */
+                base_version_id?: number | null;
             };
             header?: never;
             path?: never;
@@ -8769,6 +8791,8 @@ export interface operations {
             query?: {
                 /** @description Why this change was made. */
                 note?: string | null;
+                /** @description The version the edit started from. If another save has happened since, nothing is saved and the answer is 409. */
+                base_version_id?: number | null;
             };
             header?: never;
             path?: never;

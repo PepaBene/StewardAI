@@ -36,7 +36,7 @@ import {
   type SettingField,
   type SettingsKey,
 } from "@/lib/config/jobs-form";
-import { useConfigEditor } from "@/lib/hooks/use-config-editor";
+import { configSaveQuery, useConfigEditor } from "@/lib/hooks/use-config-editor";
 import { SEVERITY } from "@/lib/news/labels";
 
 const api = () => getBrowserApiClient();
@@ -51,7 +51,7 @@ export function JobsEditor() {
   const [baseline, setBaseline] = useState("");
   const editor = useConfigEditor<JobsConfig>({
     load: () => api().GET("/config/jobs"),
-    save: (body, note) => api().PUT("/config/jobs", { body, params: { query: { note } } }),
+    save: (body, note, base) => api().PUT("/config/jobs", { body, params: { query: configSaveQuery(note, base) } }),
     validate: (body) => api().POST("/config/jobs/validate", { body }),
     onLoaded: (body) => {
       const loaded = jobsFromBody(body);
@@ -154,6 +154,7 @@ export function JobsEditor() {
 
           <SaveBar
             dirty={dirty}
+            savedVersionId={editor.version?.id ?? null}
             busy={editor.busy}
             errors={editor.errors}
             message={editor.message ? `${editor.message}${editor.message.startsWith("Saved") ? " The worker uses it within 5 minutes." : ""}` : null}

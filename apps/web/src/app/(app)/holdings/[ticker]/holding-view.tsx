@@ -49,7 +49,7 @@ import {
   humanizeMetric,
 } from "@/lib/evidence/confidence";
 import { allowedReviewActions, isHeld, REVIEW_ACTIONS, reviewQueueHref, scaleHint } from "@/lib/evidence/review";
-import { formatDate, formatMoney, formatPercent, formatRelative, gainLossTone } from "@/lib/format";
+import { formatDate, formatMoney, formatPercent, formatPrice, formatQuantity, formatRelative, gainLossTone } from "@/lib/format";
 import { useApiResource } from "@/lib/hooks/use-api-resource";
 import { jobHref } from "@/lib/jobs/job-detail";
 
@@ -246,7 +246,7 @@ function PositionCards({ detail }: { detail: HoldingDetail }) {
       <StatCard
         label={`Value (${base || "base"})`}
         value={position ? formatMoney(position.value_base, base) : "Not held"}
-        sub={position ? `${position.quantity} × ${position.current_price} ${position.instrument_currency}` : null}
+        sub={position ? `${formatQuantity(position.quantity)} × ${formatPrice(position.current_price, position.instrument_currency)}` : null}
       />
       <StatCard
         label="Weight"

@@ -88,10 +88,24 @@ def holding_terms(
 
 def _name_pattern(term: str) -> re.Pattern[str]:
     """Whole-word match. Short or all-caps names (SAP, ASML) must match their case exactly
-    so ordinary words do not; longer names match case-insensitively."""
+    so ordinary words do not. A single-word name (Target, Apple, Shell) is often an ordinary
+    word too, so it matches as written or in capitals ("TARGET"), never "price target".
+    Longer multi-word names match case-insensitively."""
     escaped = re.escape(term).replace(r"\ ", r"\s+")
-    flags = 0 if (len(term) <= 4 or term.isupper()) else re.IGNORECASE
-    return re.compile(rf"(?<![\w&]){escaped}(?![\w&])", flags)
+    if len(term) <= 4 or term.isupper():
+        return re.compile(rf"(?<![\w&]){escaped}(?![\w&])")
+    if not re.search(r"\s", term.strip()):
+        upper = re.escape(term.upper())
+        return re.compile(rf"(?<![\w&])(?:{escaped}|{upper})(?![\w&])")
+    return re.compile(rf"(?<![\w&]){escaped}(?![\w&])", re.IGNORECASE)
+
+
+def _topic_pattern(topic: str) -> re.Pattern[str]:
+    """Whole-word match for a watch topic: "AI" must not match "said". A short all-caps topic
+    (AI, EV) matches its case exactly; any other topic matches case-insensitively."""
+    escaped = re.escape(topic).replace(r"\ ", r"\s+")
+    flags = 0 if (len(topic) <= 4 and topic.isupper()) else re.IGNORECASE
+    return re.compile(rf"(?<!\w){escaped}(?!\w)", flags)
 
 
 def _symbol_pattern(symbol: str) -> re.Pattern[str]:
@@ -117,8 +131,7 @@ class Linker:
             for via, term in h.relations:
                 self._patterns.append((h.ticker, via, term, _name_pattern(term)))
             for topic in h.topics:
-                pattern = re.compile(re.escape(topic).replace(r"\ ", r"\s+"), re.IGNORECASE)
-                self._patterns.append((h.ticker, "topic", topic, pattern))
+                self._patterns.append((h.ticker, "topic", topic, _topic_pattern(topic)))
 
     @property
     def tickers(self) -> list[str]:

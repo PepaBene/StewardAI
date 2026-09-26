@@ -8,7 +8,9 @@ threshold means: "%" (10 = 10 %), "x" (a plain ratio), a currency with an option
 import re
 from dataclasses import dataclass
 from decimal import Decimal, InvalidOperation
-from typing import Literal
+from typing import Literal, cast
+
+from steward.documents.text import normalize_for_match
 
 Scale = Literal["units", "thousands", "millions", "billions"]
 UnitKind = Literal["currency", "per_share", "percent", "count", "ratio"]
@@ -49,6 +51,16 @@ CURRENCY_MARKERS: dict[str, tuple[str, ...]] = {
 }
 
 
+# Currency codes and symbols a short scale abbreviation may follow ("EUR m", "$94.0 b").
+_SCALE_PREFIX = (
+    r"(?:[0-9]|[$€£¥]|(?<![a-z])(?:"
+    + "|".join(
+        sorted({c.casefold() for c in CURRENCY_MARKERS} | {"us$"}, key=len, reverse=True)
+    ).replace("$", r"\$")
+    + r"))"
+)
+
+
 def scale_markers_present(text: str, scale: Scale) -> bool:
     """Does `text` state the given scale? 'units' needs no statement."""
     if scale == "units":
@@ -56,15 +68,35 @@ def scale_markers_present(text: str, scale: Scale) -> bool:
     lowered = text.casefold()
     for word in SCALE_WORDS[scale]:
         if len(word) <= 2:
-            # Short abbreviations only count right after a digit or currency marker
-            # ("7.5bn", "EUR m", "$94.0 b"), never inside ordinary words.
-            if re.search(rf"(?<![a-z]){re.escape(word)}(?![a-z])", lowered) and re.search(
-                rf"([0-9]|[a-z]{{3}}|[$€£¥])\s?{re.escape(word)}(?![a-z])", lowered
-            ):
+            # Short abbreviations only count right after a digit, a currency symbol or a
+            # currency code ("7.5bn", "EUR m", "$94.0 b"), never inside ordinary words or
+            # after one ("Class B", "Series B").
+            if re.search(rf"{_SCALE_PREFIX}\s?{re.escape(word)}(?![a-z0-9])", lowered):
                 return True
         elif re.search(rf"(?<![a-z]){re.escape(word)}(?![a-z])", lowered):
             return True
     return False
+
+
+def scale_next_to(text: str, number: str) -> Scale | None:
+    """The scale printed right after `number` in `text` ("94.0 billion", "$1.2bn"), if any.
+    `number` must be the printed number; it is matched on digit boundaries."""
+    lowered = normalize_for_match(text)
+    words: list[tuple[str, Scale]] = sorted(
+        ((w, cast(Scale, s)) for s, ws in SCALE_WORDS.items() for w in ws if w[0].isalpha()),
+        key=lambda ws: len(ws[0]),
+        reverse=True,
+    )
+    alternatives = "|".join(re.escape(w) for w, _ in words)
+    pattern = (
+        rf"(?<![\d])(?<!\d[.,]){re.escape(normalize_for_match(number))}(?![\d])(?![.,]\d)"
+        rf"\s?({alternatives})(?![a-z0-9])"
+    )
+    match = re.search(pattern, lowered)
+    if match is None:
+        return None
+    word = match.group(1)
+    return next(s for w, s in words if w == word)
 
 
 def conflicting_scales(text: str, scale: Scale) -> list[str]:
@@ -95,10 +127,24 @@ def currency_markers_present(text: str, currency: str) -> bool:
 _NUMBER_CHARS = re.compile(r"[^0-9.,\-\u2212()]")
 
 
-def parse_written_number(written: str) -> Decimal | None:
+_DOT_THOUSANDS = re.compile(r"\d{1,3}(?:\.\d{3})+")
+
+
+def parse_written_number(written: str, *, decimal_comma: bool = False) -> Decimal | None:
     """The numeric reading of a figure as printed: '94,036' -> 94036, '(171)' -> -171,
-    '1.234,5' -> 1234.5, '7.52' -> 7.52, '\u22120.4' -> -0.4. None if it is not a number."""
-    text = written.strip().replace("\u2212", "-").replace("\xa0", " ").replace(" ", "")
+    '1.234,5' -> 1234.5, '1.234.567' -> 1234567, '7.52' -> 7.52, '\u22120.4' -> -0.4.
+    None if it is not a number.
+
+    A single dot group ('1.234') is ambiguous: a decimal point in English, a thousands
+    separator in most of Europe. It is read as a decimal point unless `decimal_comma` says
+    the surrounding text writes decimals with a comma."""
+    text = (
+        written.strip()
+        .replace("\u2212", "-")
+        .replace("\u2013", "-")
+        .replace("\xa0", " ")
+        .replace(" ", "")
+    )
     negative = (text.startswith("(") and text.endswith(")")) or text.startswith("-")
     text = _NUMBER_CHARS.sub("", text).strip("()-")
     if not text or not any(c.isdigit() for c in text):
@@ -112,19 +158,34 @@ def parse_written_number(written: str) -> Decimal | None:
     elif "," in text:
         head, _, tail = text.rpartition(",")
         # "94,036" is a thousands separator; "7,52" is a decimal comma.
-        if len(tail) == 3 and head.replace(",", "").isdigit():
+        if len(tail) == 3 and head.replace(",", "").isdigit() and not decimal_comma:
             text = text.replace(",", "")
         elif text.count(",") == 1:
             text = text.replace(",", ".")
         else:
             return None
     elif text.count(".") > 1:
+        # "1.234.567": only whole groups of three are thousands separators.
+        if not _DOT_THOUSANDS.fullmatch(text):
+            return None
+        text = text.replace(".", "")
+    elif decimal_comma and _DOT_THOUSANDS.fullmatch(text):
         text = text.replace(".", "")
     try:
         value = Decimal(text)
     except InvalidOperation:
         return None
     return -value if negative else value
+
+
+def uses_decimal_comma(text: str) -> bool | None:
+    """Does `text` write decimals with a comma ('7,52', '1.234,5')? True / False when its
+    numbers say so unambiguously, None when they don't (or disagree)."""
+    comma = re.search(r"(?<![\d.,])\d+,\d{1,2}(?![\d])|\d\.\d{3},\d", text) is not None
+    point = re.search(r"(?<![\d.,])\d+\.\d{1,2}(?![\d])|\d,\d{3}\.\d", text) is not None
+    if comma == point:
+        return None
+    return comma
 
 
 @dataclass(frozen=True)

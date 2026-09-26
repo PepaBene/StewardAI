@@ -18,7 +18,7 @@ import datetime as dt
 import json
 import logging
 from collections import defaultdict
-from collections.abc import Callable, Sequence
+from collections.abc import Callable, Collection, Sequence
 from dataclasses import dataclass, field
 from typing import Any
 
@@ -160,8 +160,9 @@ class Holdings:
 
 async def load_holdings(pool: asyncpg.Pool, config: NewsConfig) -> Holdings:
     rows = await pool.fetch(
-        "select ticker from public.position_snapshot where snapshot_date ="
-        " (select max(snapshot_date) from public.position_snapshot)"
+        "select ticker from public.position_snapshot where snapshot_date = coalesce("
+        " (select max(snapshot_date) from public.account_snapshot),"
+        " (select max(snapshot_date) from public.position_snapshot))"
     )
     tickers = sorted(
         {r["ticker"] for r in rows}
@@ -267,6 +268,38 @@ async def sync_sources(pool: asyncpg.Pool, sources: Sequence[NewsSource]) -> Non
     )
 
 
+async def undated_baseline(
+    pool: asyncpg.Pool, source_id: str, items: list[RawItem]
+) -> tuple[list[RawItem], list[str]]:
+    """Undated feed items are stored as first seen now, so they need the baseline a page
+    source has: the undated links on a feed's first read are recorded, never stored as news
+    (a new feed would otherwise flood alerts with old articles), and later reads keep only
+    undated links not seen before. Dated items pass through; the freshness window judges them."""
+    key = f"news_rss_undated:{source_id}"
+    stored = await pool.fetchval("select value from public.sync_state where key = $1", key)
+    previous = set(json.loads(stored)["links"]) if stored else None
+    undated = [canonical_url(i.url) for i in items if i.published_at is None]
+    if previous is None or undated:
+        await pool.execute(
+            "insert into public.sync_state (key, value) values ($1, $2::jsonb)"
+            " on conflict (key) do update set value = excluded.value",
+            key,
+            json.dumps({"links": list(dict.fromkeys(undated))[:1000]}),
+        )
+    kept = [
+        i
+        for i in items
+        if i.published_at is not None
+        or (previous is not None and canonical_url(i.url) not in previous)
+    ]
+    notes = (
+        [f"first read: {len(undated)} undated links recorded as baseline"]
+        if previous is None and undated
+        else []
+    )
+    return kept, notes
+
+
 async def collect_source(
     source: NewsSource,
     deps: NewsDeps,
@@ -280,7 +313,8 @@ async def collect_source(
     scoped = tuple(source.tickers)
     feeds = [h for h in holdings.feed_info if not scoped or h.ticker in scoped]
     if source.type == "rss":
-        return await collect_rss(deps.http, source.id, str(source.url), scoped), []
+        rss_items = await collect_rss(deps.http, source.id, str(source.url), scoped)
+        return await undated_baseline(pool, source.id, rss_items)
     if source.type == "page":
         key = f"news_page:{source.id}"
         stored = await pool.fetchval("select value from public.sync_state where key = $1", key)
@@ -757,6 +791,10 @@ async def other_stories(
         "select c.id, array_agg(i.tier) as tiers, array_agg(i.outlet) as outlets"
         " from public.story_cluster c join public.news_item i on i.cluster_id = c.id"
         " where c.id <> $1 and c.ticker = $2 and c.event_type = $3 and not c.rumour"
+        # A story the owner marked false, one sources dispute, or a known event's copy
+        # never counts as an independent source.
+        " and c.status <> 'disputed' and c.resolution is distinct from 'false'"
+        " and c.duplicate_of is null"
         " and c.last_seen >= $4 and c.first_seen <= $5"
         " group by c.id",
         story.id,
@@ -954,6 +992,7 @@ async def route_story(
     holdings: Holdings,
     now: dt.datetime,
     app_url: str | None,
+    available_channels: Collection[str] | None = None,
 ) -> str | None:
     if story.status != "confirmed" or story.rumour or story.recycled or story.severity < 1:
         return None
@@ -985,6 +1024,7 @@ async def route_story(
         config_version_id=config.notifications_version_id,
         cluster_id=story.id,
         job_id=ctx.job_id,
+        available_channels=available_channels,
     )
     return f"story {story.id}: {created.explanation}" if created.ids else None
 
@@ -992,12 +1032,19 @@ async def route_story(
 async def known_event(pool: asyncpg.Pool, story: StoryState) -> int | None:
     """An earlier confirmed story about the same holding and event: the same event date
     (+-1 day) when both are known, else first seen within 72 hours. Another outlet's copy
-    of a known event that did not cluster with it therefore never alerts twice."""
+    of a known event that did not cluster with it therefore never alerts twice.
+
+    Only a story that was itself alert-worthy counts as the known event: not a rumour (a
+    tier-1 outlet's rumour is still "confirmed" by the source rules), not recycled, relevant
+    (severity 1+), and not marked false by the owner. Otherwise an early rumour would swallow
+    the real announcement."""
     if story.ticker is None or story.event_type is None:
         return None
     found: int | None = await pool.fetchval(
         "select id from public.story_cluster where id <> $1 and ticker = $2"
         " and event_type = $3 and status = 'confirmed' and duplicate_of is null"
+        " and not rumour and not recycled and coalesce(severity, 0) >= 1"
+        " and resolution is distinct from 'false'"
         " and first_seen <= $4 and ("
         "   ($5::date is not null and event_date is not null"
         "    and abs(event_date - $5::date) <= 1)"
@@ -1143,7 +1190,9 @@ async def run_news_pipeline(ctx: JobContext, deps: NewsDeps) -> None:
         checks: list[str] = []
         escalations: list[str] = []
         for story in stories:
-            outcome = await route_story(ctx, story, config, holdings, now, deps.app_url)
+            outcome = await route_story(
+                ctx, story, config, holdings, now, deps.app_url, set(deps.channels)
+            )
             if outcome:
                 routed.append(outcome)
             check = await queue_earnings_check(ctx, story, config, now)

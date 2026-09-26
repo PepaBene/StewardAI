@@ -11,6 +11,7 @@ from dataclasses import dataclass
 from typing import Any, Protocol, cast
 
 import anthropic
+import pydantic
 from anthropic.types import MessageParam, OutputConfigParam
 
 from steward.ai import Usage
@@ -20,7 +21,12 @@ from steward.earnings.schema import ExtractionResult
 
 
 class ExtractionError(Exception):
-    pass
+    """The extraction call failed. `usage` holds the tokens already billed, when a response
+    arrived before the failure (so the step still records its cost)."""
+
+    def __init__(self, message: str, usage: Usage | None = None) -> None:
+        super().__init__(message)
+        self.usage = usage
 
 
 @dataclass(frozen=True)
@@ -51,6 +57,10 @@ Rules:
 or recall a figure from memory. If a requested metric is not printed, list it in not_found.
 - value_as_written is the number exactly as printed, with its thousands separators and \
 decimals, and parentheses if it is printed in parentheses. No currency symbol, no unit word.
+- value is the SIGNED numeric reading, in `scale`: negative for a loss, a decline, a \
+decrease or an outflow, and for a number printed in parentheses or with a minus sign. \
+"Net loss of $171 million" is net_income -171; "revenue decreased 3.2%" is a growth of \
+-3.2; "(171)" is -171.
 - source_snippet is the verbatim sentence or table row that contains value_as_written. \
 Copy it character for character from the plain-text version of the document; table \
 cells appear there separated by " | ". Keep it short: one row or one sentence.
@@ -142,12 +152,16 @@ class ClaudeExtractor:
             )
         except anthropic.APIError as exc:
             raise ExtractionError(f"extraction call failed: {exc}") from exc
+        except (pydantic.ValidationError, ValueError) as exc:
+            # The SDK parses the output inside `parse`, before the stop reason can be looked
+            # at: truncated or malformed JSON surfaces here, and the response's usage is lost.
+            raise ExtractionError(f"the extraction returned unparseable JSON: {exc}") from exc
         usage.add(response.usage)
         if response.stop_reason == "refusal":
-            raise ExtractionError("the model declined to extract from this document")
+            raise ExtractionError("the model declined to extract from this document", usage)
         if response.stop_reason == "max_tokens":
-            raise ExtractionError("the extraction hit max_tokens before finishing")
+            raise ExtractionError("the extraction hit max_tokens before finishing", usage)
         parsed = response.parsed_output
         if parsed is None:
-            raise ExtractionError("the extraction returned no parseable JSON")
+            raise ExtractionError("the extraction returned no parseable JSON", usage)
         return parsed, usage

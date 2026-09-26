@@ -119,7 +119,10 @@ def financial_trend(reg: Registry, facts: list[asyncpg.Record]) -> CodeSection:
         section.note = "No verified quarterly figures are stored for this ticker."
         return section
     latest = max(_qi(f) or 0 for f in quarterly)
-    by_key = {(f["metric"], _qi(f)): f for f in quarterly}
+    # Facts come newest first: keep the first (newest) per metric and quarter.
+    by_key: dict[tuple[str, int | None], asyncpg.Record] = {}
+    for f in quarterly:
+        by_key.setdefault((f["metric"], _qi(f)), f)
     for metric in BASE_METRICS:
         now = by_key.get((metric, latest))
         if now is None:
@@ -556,8 +559,9 @@ async def gather(
         ticker,
     )
     position = await pool.fetchrow(
-        "select * from public.position_snapshot where ticker = $1 and snapshot_date ="
-        " (select max(snapshot_date) from public.position_snapshot) ",
+        "select * from public.position_snapshot where ticker = $1 and snapshot_date = coalesce("
+        " (select max(snapshot_date) from public.account_snapshot),"
+        " (select max(snapshot_date) from public.position_snapshot))",
         ticker,
     )
     name = (inst["name"] if inst else None) or name_hint or ticker

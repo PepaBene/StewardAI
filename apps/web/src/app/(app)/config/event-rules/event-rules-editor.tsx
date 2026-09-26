@@ -24,7 +24,7 @@ import {
   type EventRulesForm,
   type OverrideForm,
 } from "@/lib/config/news-forms";
-import { useConfigEditor } from "@/lib/hooks/use-config-editor";
+import { configSaveQuery, useConfigEditor } from "@/lib/hooks/use-config-editor";
 import { EVENT_LABELS, EVENT_TYPES, SEVERITY } from "@/lib/news/labels";
 
 const api = () => getBrowserApiClient();
@@ -41,7 +41,7 @@ export function EventRulesEditor() {
   const [baseline, setBaseline] = useState("");
   const editor = useConfigEditor<EventRulesConfig>({
     load: () => api().GET("/config/event-rules"),
-    save: (body, note) => api().PUT("/config/event-rules", { body, params: { query: { note } } }),
+    save: (body, note, base) => api().PUT("/config/event-rules", { body, params: { query: configSaveQuery(note, base) } }),
     validate: (body) => api().POST("/config/event-rules/validate", { body }),
     onLoaded: (body) => {
       const loaded = eventRulesFromBody(body);
@@ -172,6 +172,7 @@ export function EventRulesEditor() {
 
           <SaveBar
             dirty={dirty}
+            savedVersionId={editor.version?.id ?? null}
             busy={editor.busy ?? (replay.gate.kind === "previewing" ? "previewing" : null)}
             errors={editor.errors}
             message={replay.gate.kind === "previewing" ? "Replaying the last 7 days under your draft…" : editor.message}

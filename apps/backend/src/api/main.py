@@ -6,11 +6,12 @@ from contextlib import asynccontextmanager
 from typing import Annotated, Literal
 
 import asyncpg
-from fastapi import Depends, FastAPI
+from fastapi import Depends, FastAPI, HTTPException, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from fastapi.routing import APIRoute
 from pydantic import BaseModel
+from starlette.types import ASGIApp, Message, Receive, Scope, Send
 
 from api.auth import Owner
 from api.chat_routes import router as chat_router
@@ -42,6 +43,83 @@ class ReadinessResponse(BaseModel):
     detail: str | None = None
 
 
+# Request bodies are small JSON documents. The limit is checked before anything reads the
+# body (and so before auth), so an anonymous client cannot make the API buffer and parse an
+# arbitrarily large upload. A config import carries every domain at once, so it gets more.
+MAX_BODY_BYTES = 2 * 1024 * 1024
+MAX_BODY_BYTES_BY_PATH = {"/config/import": 10 * 1024 * 1024}
+
+
+class _BodyTooLarge(HTTPException):
+    def __init__(self, limit: int) -> None:
+        super().__init__(*_too_large(limit))
+
+
+class BodySizeLimitMiddleware:
+    """Reject request bodies over the limit with 413: at once when Content-Length says so,
+    otherwise as soon as a streamed (chunked) body passes it."""
+
+    def __init__(self, app: ASGIApp) -> None:
+        self.app = app
+
+    async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
+        if scope["type"] != "http":
+            await self.app(scope, receive, send)
+            return
+        limit = MAX_BODY_BYTES_BY_PATH.get(scope["path"], MAX_BODY_BYTES)
+        for name, value in scope["headers"]:
+            if name == b"content-length":
+                try:
+                    declared = int(value)
+                except ValueError:
+                    await _reject(
+                        scope, send, status.HTTP_400_BAD_REQUEST, "Invalid Content-Length"
+                    )
+                    return
+                if declared > limit:
+                    await _reject(scope, send, *_too_large(limit))
+                    return
+
+        received = 0
+        started = False
+
+        async def limited_receive() -> Message:
+            nonlocal received
+            message = await receive()
+            if message["type"] == "http.request":
+                received += len(message.get("body", b""))
+                if received > limit:
+                    raise _BodyTooLarge(limit)
+            return message
+
+        async def tracking_send(message: Message) -> None:
+            nonlocal started
+            if message["type"] == "http.response.start":
+                started = True
+            await send(message)
+
+        try:
+            await self.app(scope, limited_receive, tracking_send)
+        except _BodyTooLarge:
+            # Normally FastAPI turns this into the 413 itself; this covers a body read
+            # outside a route's request parsing.
+            if started:
+                raise
+            await _reject(scope, send, *_too_large(limit))
+
+
+def _too_large(limit: int) -> tuple[int, str]:
+    return status.HTTP_413_CONTENT_TOO_LARGE, f"Request body is larger than {limit} bytes"
+
+
+async def _reject(scope: Scope, send: Send, code: int, detail: str) -> None:
+    await JSONResponse({"detail": detail}, status_code=code)(scope, _no_body, send)
+
+
+async def _no_body() -> Message:
+    return {"type": "http.disconnect"}
+
+
 def _operation_id(route: APIRoute) -> str:
     # Stable, readable operation ids for the generated TypeScript client.
     return route.name
@@ -66,6 +144,8 @@ def create_app() -> FastAPI:
         separate_input_output_schemas=False,
         lifespan=_lifespan,
     )
+    # Added first so it sits inside CORS: a 413 still carries the CORS headers.
+    app.add_middleware(BodySizeLimitMiddleware)
     app.add_middleware(
         CORSMiddleware,
         allow_origins=settings.cors_origins,

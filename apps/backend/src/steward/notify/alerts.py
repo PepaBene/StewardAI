@@ -9,13 +9,21 @@ never send the same alert twice.
 
 import datetime as dt
 import logging
+from collections.abc import Collection
 from dataclasses import dataclass, field
 
 import asyncpg
 
 from steward.config.notifications import NotificationsConfig
-from steward.notify.channels import MISSING_CHANNEL_HELP, Channel, ChannelError
-from steward.notify.route import AlertRequest, RouteContext, day_start, quiet_day_end, route
+from steward.notify.channels import (
+    MISSING_CHANNEL_HELP,
+    Channel,
+    ChannelError,
+    EmailChannel,
+    configured_channels,
+)
+from steward.notify.route import AlertRequest, RouteContext, day_start, quiet_until, route
+from steward.settings import get_settings
 
 logger = logging.getLogger(__name__)
 
@@ -44,25 +52,40 @@ async def create_alerts(
     job_id: int | None = None,
     dedupe_key: str | None = None,
     breach_id: int | None = None,
+    available_channels: Collection[str] | None = None,
 ) -> CreatedAlerts:
+    """`available_channels`: the channels that can deliver (None: those whose credentials
+    are set in the process settings). A rule naming only missing channels falls back to them."""
+    # The daily cap counts events, not rows: one event sent to two channels counts once.
+    # Rows of one event share its story, verdict or dedupe key, else its creation call.
     alerts_today = await conn.fetchval(
-        "select count(*) from public.alert where kind <> 'test'"
+        "select count(distinct coalesce('c' || cluster_id::text, 'v' || verdict_id::text,"
+        " 'k' || dedupe_key, concat_ws(':', kind, ticker, event_type, created_at::text)))"
+        " from public.alert where kind <> 'test'"
         " and status in ('sent', 'pending') and created_at >= $1",
         day_start(config, now),
     )
     recent = None
     if request.ticker and request.event_type and config.repeat_throttle_hours > 0:
+        # Another story of the same holding and event type. A thesis breach repeats only
+        # for the same KPI: a check that breaches two KPIs alerts both.
         recent = await conn.fetchval(
-            "select id from public.alert where kind = $1 and ticker = $2 and event_type = $3"
-            " and status in ('sent', 'pending') and created_at >= $4"
-            " and ($5::bigint is null or cluster_id is distinct from $5)"
-            " order by id desc limit 1",
+            "select a.id from public.alert a where a.kind = $1 and a.ticker = $2"
+            " and a.event_type = $3 and a.status in ('sent', 'pending') and a.created_at >= $4"
+            " and ($5::bigint is null or a.cluster_id is distinct from $5)"
+            " and ($6::bigint is null or (a.verdict_id is distinct from $6 and exists ("
+            "   select 1 from public.verdict v1 join public.verdict v2 on v2.kpi_id = v1.kpi_id"
+            "   where v1.id = a.verdict_id and v2.id = $6)))"
+            " order by a.id desc limit 1",
             request.kind,
             request.ticker,
             request.event_type,
             now - dt.timedelta(hours=config.repeat_throttle_hours),
             cluster_id,
+            verdict_id,
         )
+    if available_channels is None:
+        available_channels = configured_channels(get_settings())
     holidays: set[dt.date] = set()
     if "holidays" in config.quiet_all_day_on:
         holidays = {
@@ -82,7 +105,8 @@ async def create_alerts(
             now=now,
             alerts_today=alerts_today,
             recent_alert_id=recent,
-            quiet_until=quiet_day_end(config, now, holidays),
+            quiet_until=quiet_until(config, now, holidays),
+            available=frozenset(available_channels),
         ),
     )
     created = CreatedAlerts(explanation=explanation)
@@ -165,7 +189,14 @@ async def dispatch_due(
                 result.failed.append(row["id"])
                 continue
             try:
-                await channel.send(subject_of(row["message"]), row["message"])
+                subject = subject_of(row["message"])
+                if isinstance(channel, EmailChannel):
+                    # A retry after a timeout must not send the email twice.
+                    await channel.send(
+                        subject, row["message"], idempotency_key=f"steward-alert-{row['id']}"
+                    )
+                else:
+                    await channel.send(subject, row["message"])
             except ChannelError as exc:
                 final = attempts >= MAX_ATTEMPTS
                 await conn.execute(

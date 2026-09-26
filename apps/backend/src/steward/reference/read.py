@@ -412,8 +412,9 @@ async def price_history(pool: asyncpg.Pool, ticker: str, days: int) -> PriceHist
         others = await pool.fetch(
             "select distinct t212_ticker, price_symbol from public.instrument"
             " where price_symbol is not null and t212_ticker <> $1 and t212_ticker in"
-            " (select ticker from public.position_snapshot where snapshot_date ="
-            " (select max(snapshot_date) from public.position_snapshot))",
+            " (select ticker from public.position_snapshot where snapshot_date = coalesce("
+            " (select max(snapshot_date) from public.account_snapshot),"
+            " (select max(snapshot_date) from public.position_snapshot)))",
             ticker,
         )
         for other in others:

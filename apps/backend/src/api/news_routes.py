@@ -8,12 +8,12 @@ from fastapi import APIRouter, HTTPException, Query, status
 from pydantic import BaseModel, Field
 
 from api.auth import Owner
-from api.db import Pool
-from api.routes import NoteParam, _as_dict, _enqueue, _not_found
+from api.db import DB_ID_MAX, IdPath, IdQuery, Pool
+from api.routes import BaseVersionParam, NoteParam, _as_dict, _enqueue, _not_found, save_versioned
 from steward.config import EventRulesConfig, JobsConfig, NewsSourcesConfig, NotificationsConfig
 from steward.config.common import Ticker
 from steward.config.event_rules import EVENT_DESCRIPTIONS, EVENT_TYPES, EventType
-from steward.config.store import load_active, save_config
+from steward.config.store import load_active
 from steward.news.read import (
     AlertOut,
     Confidence,
@@ -53,11 +53,17 @@ async def get_news(
     pool: Pool,
     _owner: Owner,
     ticker: Annotated[str | None, Query(pattern=r"^[A-Za-z0-9._-]{1,32}$")] = None,
-    severity: Annotated[list[int] | None, Query(description="Story severity 0-3.")] = None,
+    severity: Annotated[
+        list[Annotated[int, Field(ge=0, le=3)]] | None, Query(description="Story severity 0-3.")
+    ] = None,
     confidence: Annotated[list[Confidence] | None, Query()] = None,
-    tier: Annotated[list[int] | None, Query(description="Source tier 1-3.")] = None,
-    story: Annotated[int | None, Query(description="Only this story's items.")] = None,
-    before_id: Annotated[int | None, Query()] = None,
+    tier: Annotated[
+        list[Annotated[int, Field(ge=1, le=3)]] | None, Query(description="Source tier 1-3.")
+    ] = None,
+    story: Annotated[
+        int | None, Query(ge=1, le=DB_ID_MAX, description="Only this story's items.")
+    ] = None,
+    before_id: IdQuery = None,
     limit: Annotated[int, Query(ge=1, le=200)] = 50,
 ) -> NewsFeed:
     """News items, newest first, each with its story's severity and confidence. Filters
@@ -91,7 +97,7 @@ class StoryResolution(BaseModel):
 
 @router.post("/stories/{story_id}/resolve", tags=["news"])
 async def resolve_disputed_story(
-    story_id: int, body: StoryResolution, pool: Pool, _owner: Owner
+    story_id: IdPath, body: StoryResolution, pool: Pool, _owner: Owner
 ) -> list[DisputedStory]:
     """Resolve a disputed story; returns the updated list (resolved ones included)."""
     if not await resolve_story(pool, story_id, body.resolution, body.note):
@@ -193,7 +199,7 @@ async def get_reports(
 
 
 @router.get("/reports/{report_id}", tags=["reports"])
-async def get_report_by_id(report_id: int, pool: Pool, _owner: Owner) -> ReportOut:
+async def get_report_by_id(report_id: IdPath, pool: Pool, _owner: Owner) -> ReportOut:
     """A digest with every sentence's citations and the source list."""
     report = await get_report(pool, report_id, await _jobs_config(pool))
     if report is None:
@@ -215,7 +221,7 @@ async def get_escalations(
 
 
 @router.get("/escalations/{report_id}", tags=["reports"])
-async def get_escalation(report_id: int, pool: Pool, _owner: Owner) -> EscalationOut:
+async def get_escalation(report_id: IdPath, pool: Pool, _owner: Owner) -> EscalationOut:
     found = await list_escalations(pool, None, 1, report_id=report_id)
     if not found:
         raise HTTPException(status.HTTP_404_NOT_FOUND, f"No escalation {report_id}")
@@ -286,11 +292,21 @@ async def get_news_sources_config(pool: Pool, _owner: Owner) -> NewsSourcesConfi
 
 @router.put("/config/news-sources", tags=["config"])
 async def save_news_sources_config(
-    body: NewsSourcesConfig, pool: Pool, owner: Owner, note: NoteParam = None
+    body: NewsSourcesConfig,
+    pool: Pool,
+    owner: Owner,
+    note: NoteParam = None,
+    base_version_id: BaseVersionParam = None,
 ) -> NewsSourcesConfigVersion:
     """Save the source registry. The next ingest run reads it; no deploy or restart."""
-    async with pool.acquire() as conn:
-        stored = await save_config(conn, "news_sources", body, created_by=owner.user_id, note=note)
+    stored = await save_versioned(
+        pool,
+        "news_sources",
+        body,
+        created_by=owner.user_id,
+        note=note,
+        base_version_id=base_version_id,
+    )
     return NewsSourcesConfigVersion(**_as_dict(stored))
 
 
@@ -310,10 +326,20 @@ async def get_event_rules_config(pool: Pool, _owner: Owner) -> EventRulesConfigV
 
 @router.put("/config/event-rules", tags=["config"])
 async def save_event_rules_config(
-    body: EventRulesConfig, pool: Pool, owner: Owner, note: NoteParam = None
+    body: EventRulesConfig,
+    pool: Pool,
+    owner: Owner,
+    note: NoteParam = None,
+    base_version_id: BaseVersionParam = None,
 ) -> EventRulesConfigVersion:
-    async with pool.acquire() as conn:
-        stored = await save_config(conn, "event_rules", body, created_by=owner.user_id, note=note)
+    stored = await save_versioned(
+        pool,
+        "event_rules",
+        body,
+        created_by=owner.user_id,
+        note=note,
+        base_version_id=base_version_id,
+    )
     return EventRulesConfigVersion(**_as_dict(stored))
 
 
@@ -333,11 +359,21 @@ async def get_notifications_config(pool: Pool, _owner: Owner) -> NotificationsCo
 
 @router.put("/config/notifications", tags=["config"])
 async def save_notifications_config(
-    body: NotificationsConfig, pool: Pool, owner: Owner, note: NoteParam = None
+    body: NotificationsConfig,
+    pool: Pool,
+    owner: Owner,
+    note: NoteParam = None,
+    base_version_id: BaseVersionParam = None,
 ) -> NotificationsConfigVersion:
     """Save notification rules. The next alert is routed with them; no restart."""
-    async with pool.acquire() as conn:
-        stored = await save_config(conn, "notifications", body, created_by=owner.user_id, note=note)
+    stored = await save_versioned(
+        pool,
+        "notifications",
+        body,
+        created_by=owner.user_id,
+        note=note,
+        base_version_id=base_version_id,
+    )
     return NotificationsConfigVersion(**_as_dict(stored))
 
 

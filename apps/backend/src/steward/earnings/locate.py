@@ -14,6 +14,7 @@ from typing import Any, Protocol
 from urllib.parse import urlsplit
 
 import anthropic
+import pydantic
 from pydantic import BaseModel, Field
 
 from steward.ai import Usage
@@ -21,7 +22,12 @@ from steward.earnings.periods import period_label
 
 
 class LocateError(Exception):
-    pass
+    """The search failed. `usage` holds the tokens already billed (earlier continuations,
+    or a response rejected after it arrived)."""
+
+    def __init__(self, message: str, usage: Usage | None = None) -> None:
+        super().__init__(message)
+        self.usage = usage
 
 
 @dataclass(frozen=True)
@@ -115,7 +121,9 @@ class ClaudeSearchLocator:
                     output_format=LocatedDocument,
                 )
             except anthropic.APIError as exc:
-                raise LocateError(f"search call failed: {exc}") from exc
+                raise LocateError(f"search call failed: {exc}", usage) from exc
+            except (pydantic.ValidationError, ValueError) as exc:
+                raise LocateError(f"the search answer was not valid JSON: {exc}", usage) from exc
             usage.add(response.usage)
             seen |= _result_urls(response.content)
             if response.stop_reason != "pause_turn":
@@ -125,7 +133,9 @@ class ClaudeSearchLocator:
         if answer is None or not answer.url:
             return None, usage
         if answer.url not in seen:
-            raise LocateError(f"the search answer {answer.url} was not among the search results")
+            raise LocateError(
+                f"the search answer {answer.url} was not among the search results", usage
+            )
         if not host_allowed(answer.url, request.domains):
-            raise LocateError(f"{answer.url} is outside the allowed domains")
+            raise LocateError(f"{answer.url} is outside the allowed domains", usage)
         return Located(answer.url, "search", answer.reason), usage

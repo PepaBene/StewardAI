@@ -271,6 +271,8 @@
             "required": true,
             "schema": {
               "type": "integer",
+              "maximum": 9223372036854775807,
+              "minimum": 1,
               "title": "Version Id"
             }
           }
@@ -342,6 +344,8 @@
             "required": true,
             "schema": {
               "type": "integer",
+              "maximum": 9223372036854775807,
+              "minimum": 1,
               "title": "From"
             }
           },
@@ -351,6 +355,8 @@
             "required": true,
             "schema": {
               "type": "integer",
+              "maximum": 9223372036854775807,
+              "minimum": 1,
               "title": "To"
             }
           }
@@ -385,7 +391,7 @@
           "config"
         ],
         "summary": "Rollback Config",
-        "description": "Make an old version current again by saving its body as a new active version. The\nnext run of every job uses it. 409 if the old body no longer passes validation.",
+        "description": "Make an old version current again by saving its body as a new active version. The\nnext run of every job uses it. 409 if the old body no longer passes validation, or if\n`base_version_id` is given and is no longer the active version.",
         "operationId": "rollback_config",
         "security": [
           {
@@ -422,8 +428,30 @@
             "required": true,
             "schema": {
               "type": "integer",
+              "maximum": 9223372036854775807,
+              "minimum": 1,
               "title": "Version Id"
             }
+          },
+          {
+            "name": "base_version_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer",
+                  "maximum": 9223372036854775807,
+                  "minimum": 1
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "The version the edit started from. If another save has happened since, nothing is saved and the answer is 409.",
+              "title": "Base Version Id"
+            },
+            "description": "The version the edit started from. If another save has happened since, nothing is saved and the answer is 409."
           }
         ],
         "responses": {
@@ -860,7 +888,9 @@
             "schema": {
               "anyOf": [
                 {
-                  "type": "integer"
+                  "type": "integer",
+                  "maximum": 9223372036854775807,
+                  "minimum": 1
                 },
                 {
                   "type": "null"
@@ -926,6 +956,8 @@
             "required": true,
             "schema": {
               "type": "integer",
+              "maximum": 9223372036854775807,
+              "minimum": 1,
               "title": "Job Id"
             }
           }
@@ -1218,6 +1250,8 @@
             "required": true,
             "schema": {
               "type": "integer",
+              "maximum": 9223372036854775807,
+              "minimum": 1,
               "title": "Fact Id"
             }
           }
@@ -1266,6 +1300,8 @@
             "required": true,
             "schema": {
               "type": "integer",
+              "maximum": 9223372036854775807,
+              "minimum": 1,
               "title": "Fact Id"
             }
           }
@@ -1420,6 +1456,26 @@
               "title": "Note"
             },
             "description": "Why this change was made."
+          },
+          {
+            "name": "base_version_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer",
+                  "maximum": 9223372036854775807,
+                  "minimum": 1
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "The version the edit started from. If another save has happened since, nothing is saved and the answer is 409.",
+              "title": "Base Version Id"
+            },
+            "description": "The version the edit started from. If another save has happened since, nothing is saved and the answer is 409."
           }
         ],
         "requestBody": {
@@ -1511,6 +1567,26 @@
               "title": "Note"
             },
             "description": "Why this change was made."
+          },
+          {
+            "name": "base_version_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer",
+                  "maximum": 9223372036854775807,
+                  "minimum": 1
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "The version the edit started from. If another save has happened since, nothing is saved and the answer is 409.",
+              "title": "Base Version Id"
+            },
+            "description": "The version the edit started from. If another save has happened since, nothing is saved and the answer is 409."
           }
         ],
         "requestBody": {
@@ -1604,6 +1680,26 @@
               "title": "Note"
             },
             "description": "Why this change was made."
+          },
+          {
+            "name": "base_version_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer",
+                  "maximum": 9223372036854775807,
+                  "minimum": 1
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "The version the edit started from. If another save has happened since, nothing is saved and the answer is 409.",
+              "title": "Base Version Id"
+            },
+            "description": "The version the edit started from. If another save has happened since, nothing is saved and the answer is 409."
           }
         ],
         "requestBody": {
@@ -1743,6 +1839,26 @@
               "title": "Note"
             },
             "description": "Why this change was made."
+          },
+          {
+            "name": "base_version_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer",
+                  "maximum": 9223372036854775807,
+                  "minimum": 1
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "The version the edit started from. If another save has happened since, nothing is saved and the answer is 409.",
+              "title": "Base Version Id"
+            },
+            "description": "The version the edit started from. If another save has happened since, nothing is saved and the answer is 409."
           }
         ],
         "requestBody": {
@@ -1882,6 +1998,26 @@
               "title": "Note"
             },
             "description": "Why this change was made."
+          },
+          {
+            "name": "base_version_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer",
+                  "maximum": 9223372036854775807,
+                  "minimum": 1
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "The version the edit started from. If another save has happened since, nothing is saved and the answer is 409.",
+              "title": "Base Version Id"
+            },
+            "description": "The version the edit started from. If another save has happened since, nothing is saved and the answer is 409."
           }
         ],
         "requestBody": {
@@ -2021,6 +2157,26 @@
               "title": "Note"
             },
             "description": "Why this change was made."
+          },
+          {
+            "name": "base_version_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer",
+                  "maximum": 9223372036854775807,
+                  "minimum": 1
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "The version the edit started from. If another save has happened since, nothing is saved and the answer is 409.",
+              "title": "Base Version Id"
+            },
+            "description": "The version the edit started from. If another save has happened since, nothing is saved and the answer is 409."
           }
         ],
         "requestBody": {
@@ -2241,6 +2397,8 @@
             "required": true,
             "schema": {
               "type": "integer",
+              "maximum": 9223372036854775807,
+              "minimum": 1,
               "title": "Report Id"
             }
           }
@@ -2343,6 +2501,8 @@
             "required": true,
             "schema": {
               "type": "integer",
+              "maximum": 9223372036854775807,
+              "minimum": 1,
               "title": "Report Id"
             }
           }
@@ -2547,6 +2707,26 @@
               "title": "Note"
             },
             "description": "Why this change was made."
+          },
+          {
+            "name": "base_version_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer",
+                  "maximum": 9223372036854775807,
+                  "minimum": 1
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "The version the edit started from. If another save has happened since, nothing is saved and the answer is 409.",
+              "title": "Base Version Id"
+            },
+            "description": "The version the edit started from. If another save has happened since, nothing is saved and the answer is 409."
           }
         ],
         "requestBody": {
@@ -2696,7 +2876,9 @@
                 {
                   "type": "array",
                   "items": {
-                    "type": "integer"
+                    "type": "integer",
+                    "maximum": 3,
+                    "minimum": 0
                   }
                 },
                 {
@@ -2742,7 +2924,9 @@
                 {
                   "type": "array",
                   "items": {
-                    "type": "integer"
+                    "type": "integer",
+                    "maximum": 3,
+                    "minimum": 1
                   }
                 },
                 {
@@ -2761,7 +2945,9 @@
             "schema": {
               "anyOf": [
                 {
-                  "type": "integer"
+                  "type": "integer",
+                  "maximum": 9223372036854775807,
+                  "minimum": 1
                 },
                 {
                   "type": "null"
@@ -2779,7 +2965,9 @@
             "schema": {
               "anyOf": [
                 {
-                  "type": "integer"
+                  "type": "integer",
+                  "maximum": 9223372036854775807,
+                  "minimum": 1
                 },
                 {
                   "type": "null"
@@ -2898,6 +3086,8 @@
             "required": true,
             "schema": {
               "type": "integer",
+              "maximum": 9223372036854775807,
+              "minimum": 1,
               "title": "Story Id"
             }
           }
@@ -3211,6 +3401,8 @@
             "required": true,
             "schema": {
               "type": "integer",
+              "maximum": 9223372036854775807,
+              "minimum": 1,
               "title": "Report Id"
             }
           }
@@ -3330,6 +3522,8 @@
             "required": true,
             "schema": {
               "type": "integer",
+              "maximum": 9223372036854775807,
+              "minimum": 1,
               "title": "Report Id"
             }
           }
@@ -3516,6 +3710,26 @@
               "title": "Note"
             },
             "description": "Why this change was made."
+          },
+          {
+            "name": "base_version_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer",
+                  "maximum": 9223372036854775807,
+                  "minimum": 1
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "The version the edit started from. If another save has happened since, nothing is saved and the answer is 409.",
+              "title": "Base Version Id"
+            },
+            "description": "The version the edit started from. If another save has happened since, nothing is saved and the answer is 409."
           }
         ],
         "requestBody": {
@@ -3654,6 +3868,26 @@
               "title": "Note"
             },
             "description": "Why this change was made."
+          },
+          {
+            "name": "base_version_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer",
+                  "maximum": 9223372036854775807,
+                  "minimum": 1
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "The version the edit started from. If another save has happened since, nothing is saved and the answer is 409.",
+              "title": "Base Version Id"
+            },
+            "description": "The version the edit started from. If another save has happened since, nothing is saved and the answer is 409."
           }
         ],
         "requestBody": {
@@ -3793,6 +4027,26 @@
               "title": "Note"
             },
             "description": "Why this change was made."
+          },
+          {
+            "name": "base_version_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer",
+                  "maximum": 9223372036854775807,
+                  "minimum": 1
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "The version the edit started from. If another save has happened since, nothing is saved and the answer is 409.",
+              "title": "Base Version Id"
+            },
+            "description": "The version the edit started from. If another save has happened since, nothing is saved and the answer is 409."
           }
         ],
         "requestBody": {
@@ -3944,6 +4198,8 @@
             "required": true,
             "schema": {
               "type": "integer",
+              "maximum": 9223372036854775807,
+              "minimum": 1,
               "title": "Relationship Id"
             }
           }
@@ -3992,6 +4248,8 @@
             "required": true,
             "schema": {
               "type": "integer",
+              "maximum": 9223372036854775807,
+              "minimum": 1,
               "title": "Relationship Id"
             }
           }
@@ -4424,7 +4682,9 @@
                 {
                   "type": "array",
                   "items": {
-                    "type": "integer"
+                    "type": "integer",
+                    "maximum": 9223372036854775807,
+                    "minimum": 1
                   }
                 },
                 {
@@ -4794,6 +5054,8 @@
             "required": true,
             "schema": {
               "type": "integer",
+              "maximum": 9223372036854775807,
+              "minimum": 1,
               "title": "Conversation Id"
             }
           }
@@ -4842,6 +5104,8 @@
             "required": true,
             "schema": {
               "type": "integer",
+              "maximum": 9223372036854775807,
+              "minimum": 1,
               "title": "Conversation Id"
             }
           }
@@ -4900,6 +5164,8 @@
             "required": true,
             "schema": {
               "type": "integer",
+              "maximum": 9223372036854775807,
+              "minimum": 1,
               "title": "Action Id"
             }
           }
@@ -4947,6 +5213,8 @@
             "required": true,
             "schema": {
               "type": "integer",
+              "maximum": 9223372036854775807,
+              "minimum": 1,
               "title": "Action Id"
             }
           }
@@ -8499,7 +8767,7 @@
             },
             "type": "object",
             "title": "Macro Surprise Bands",
-            "description": "Per macro series key: a new release that moves more than this against the previous one is a macro surprise (in the series' own unit; 0: any change, e.g. a policy rate). Evaluated only on release days."
+            "description": "Per macro series key: a new release that moves more than this against the previous one is a macro surprise (in the series' own unit; 0: any change, e.g. a policy rate set exactly; fed_funds is the daily effective rate, which drifts, so it needs a band). Evaluated only on release days."
           },
           "announcement_types": {
             "items": {
@@ -9231,6 +9499,7 @@
           },
           "target_id": {
             "type": "integer",
+            "maximum": 9.223372036854776e+18,
             "minimum": 1.0,
             "title": "Target Id",
             "description": "The fact, verdict, alert, news item, story or report id."

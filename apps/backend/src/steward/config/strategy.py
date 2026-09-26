@@ -162,6 +162,12 @@ class StrategyConfig(ConfigModel):
         for rule in self.rules:
             if isinstance(rule, CategoryWeightRule) and rule.dimension not in known:
                 raise ValueError(f"rule {rule.id!r} uses undeclared dimension {rule.dimension!r}")
+            if isinstance(rule, CashWeightRule) and self.weight_basis == "invested":
+                # Cash has no weight against positions only: the rule could never be checked.
+                raise ValueError(
+                    f"rule {rule.id!r} is a cash_weight rule, which needs weight_basis 'total'"
+                    " (with 'invested' weights exclude cash)"
+                )
 
         position_total = sum(p.target_weight for p in self.target_positions)
         if self.cash_target is not None:

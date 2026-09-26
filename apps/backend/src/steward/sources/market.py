@@ -24,6 +24,16 @@ FRANKFURTER_URL = "https://api.frankfurter.dev/v1"
 NAGER_URL = "https://date.nager.at/api/v3/PublicHolidays/{year}/{country}"
 
 
+# Quote currency of a Stooq symbol by market suffix (London quotes in pence, as Trading212
+# reports its GBX lines). Unknown suffixes give None.
+STOOQ_CURRENCY: dict[str, str] = {"us": "USD", "uk": "GBX", "de": "EUR", "jp": "JPY", "pl": "PLN"}
+
+
+def stooq_currency(symbol: str) -> str | None:
+    _, _, suffix = symbol.rpartition(".")
+    return STOOQ_CURRENCY.get(suffix.lower())
+
+
 class MarketDataError(Exception):
     pass
 

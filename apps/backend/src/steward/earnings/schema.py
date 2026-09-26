@@ -25,7 +25,11 @@ class ExtractedFigure(BaseModel):
         description="The number exactly as printed, e.g. '94,036', '(171)', '7.52'. No "
         "currency symbol or unit word."
     )
-    value: float = Field(description="Numeric reading of value_as_written, in `scale`.")
+    value: float = Field(
+        description="Signed numeric reading of value_as_written, in `scale`: negative for a "
+        "loss, decline, decrease or outflow, or when printed in parentheses or with a minus "
+        "('Net loss of $171 million' -> -171; 'revenue decreased 3.2%' -> -3.2)."
+    )
     scale: Scale
     unit: UnitKind
     currency: str | None = Field(description="ISO 4217 code for money and per-share figures.")
