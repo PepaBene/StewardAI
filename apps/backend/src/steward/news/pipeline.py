@@ -39,6 +39,7 @@ from steward.config.news_sources import (
 from steward.config.notifications import NotificationsConfig
 from steward.config.store import load_active
 from steward.config.thesis import ThesesConfig
+from steward.config.verification import TrustSettings, VerificationConfig
 from steward.documents.fetch import FetchError
 from steward.jobs import queue
 from steward.jobs.runner import JobContext, create_job
@@ -79,6 +80,7 @@ from steward.notify.route import AlertRequest
 from steward.reference.identity import object_key, upsert_relationship
 from steward.settings import get_settings
 from steward.sources.edgar import EdgarClient
+from steward.verify.trust import TrustTable, load_trust
 
 logger = logging.getLogger(__name__)
 
@@ -108,6 +110,8 @@ class NewsConfig:
     news: NewsSettings
     version_ids: tuple[int, ...]
     escalation: EscalationSettings = field(default_factory=EscalationSettings)
+    verification: VerificationConfig = field(default_factory=VerificationConfig)
+    trust: TrustTable = field(default_factory=lambda: TrustTable({}, TrustSettings()))
 
 
 async def load_news_config(ctx: JobContext) -> NewsConfig:
@@ -118,9 +122,11 @@ async def load_news_config(ctx: JobContext) -> NewsConfig:
     profiles = await load_active(pool, "holding_profiles", HoldingProfilesConfig)
     theses = await load_active(pool, "theses", ThesesConfig)
     jobs = await load_active(pool, "jobs", JobsConfig)
-    stored = (sources, rules, notifications, profiles, theses, jobs)
+    verification = await load_active(pool, "verification", VerificationConfig)
+    stored = (sources, rules, notifications, profiles, theses, jobs, verification)
     for s in stored:
         await ctx.record_config_version(s.id if s else None)
+    verification_body = verification.body if verification else VerificationConfig()
     return NewsConfig(
         sources=sources.body if sources else NewsSourcesConfig(),
         event_rules=rules.body if rules else EventRulesConfig(),
@@ -131,6 +137,8 @@ async def load_news_config(ctx: JobContext) -> NewsConfig:
         news=(jobs.body if jobs else JobsConfig()).news,
         escalation=(jobs.body if jobs else JobsConfig()).escalation,
         version_ids=tuple(s.id for s in stored if s is not None),
+        verification=verification_body,
+        trust=await load_trust(pool, verification_body.trust),
     )
 
 
@@ -673,7 +681,10 @@ def _finding_from_json(data: Any) -> SearchFinding | None:
 
 
 async def load_story(
-    pool: asyncpg.Pool, cluster_id: int, rules: EventRulesConfig
+    pool: asyncpg.Pool,
+    cluster_id: int,
+    rules: EventRulesConfig,
+    trust: TrustTable | None = None,
 ) -> StoryState | None:
     cluster = await pool.fetchrow(
         "select id, status, search_rounds, last_searched_at, corroboration, first_seen,"
@@ -707,7 +718,9 @@ async def load_story(
         relevant=bool(lead["relevant"]) if labelled else False,
         thesis_link=lead["thesis_link"],
         event_date=lead["event_date"],
-        best_tier=min(i["tier"] for i in items),
+        best_tier=min(
+            trust.effective_tier(i["tier"], i["outlet"]) if trust else i["tier"] for i in items
+        ),
         outlets=frozenset(i["outlet"] for i in items if i["outlet"]),
         published_at=min(i["published_at"] for i in items),
         first_seen=cluster["first_seen"],
@@ -736,12 +749,12 @@ async def insider_cluster(
 
 
 async def other_stories(
-    pool: asyncpg.Pool, story: StoryState, window: dt.timedelta
+    pool: asyncpg.Pool, story: StoryState, window: dt.timedelta, trust: TrustTable | None = None
 ) -> list[OtherStory]:
     if story.ticker is None or story.event_type is None:
         return []
     rows = await pool.fetch(
-        "select c.id, min(i.tier) as best_tier, array_agg(distinct i.outlet) as outlets"
+        "select c.id, array_agg(i.tier) as tiers, array_agg(i.outlet) as outlets"
         " from public.story_cluster c join public.news_item i on i.cluster_id = c.id"
         " where c.id <> $1 and c.ticker = $2 and c.event_type = $3 and not c.rumour"
         " and c.last_seen >= $4 and c.first_seen <= $5"
@@ -753,7 +766,15 @@ async def other_stories(
         story.first_seen + window,
     )
     return [
-        OtherStory(r["id"], r["best_tier"], frozenset(o for o in r["outlets"] if o)) for r in rows
+        OtherStory(
+            r["id"],
+            min(
+                trust.effective_tier(t, o) if trust else t
+                for t, o in zip(r["tiers"], r["outlets"], strict=True)
+            ),
+            frozenset(o for o in r["outlets"] if o),
+        )
+        for r in rows
     ]
 
 
@@ -778,13 +799,16 @@ async def assess(
         if story.best_tier == 1:
             confidence = "verified"
     else:
-        others = await other_stories(pool, story, window)
+        others = await other_stories(pool, story, window, config.trust)
+        rules_v = config.verification.corroboration
         decision = decide(
             best_tier=story.best_tier,
             outlets=story.outlets,
             rumour=story.rumour,
             others=others,
             finding=story.finding,
+            independent_needed=rules_v.independent_sources_to_confirm,
+            tier1_alone=rules_v.tier1_confirms_alone,
         )
         status, confidence, reason = decision.status, decision.confidence, decision.reason
     if story.resolution == "confirmed":
@@ -817,10 +841,12 @@ async def assess(
     return story
 
 
-def search_due(story: StoryState, settings: NewsSettings, now: dt.datetime) -> bool:
+def search_due(
+    story: StoryState, settings: NewsSettings, now: dt.datetime, tier1_alone: bool = True
+) -> bool:
     if story.status not in ("unconfirmed", "sentiment") or story.severity < 2:
         return False
-    if story.best_tier == 1 or story.recycled:
+    if (story.best_tier == 1 and tier1_alone) or story.recycled:
         return False
     if story.search_rounds >= settings.corroboration_rounds:
         return False
@@ -1094,7 +1120,7 @@ async def run_news_pipeline(ctx: JobContext, deps: NewsDeps) -> None:
         for _ in range(2):
             stories = []
             for cluster_id in ids:
-                story = await load_story(pool, cluster_id, config.event_rules)
+                story = await load_story(pool, cluster_id, config.event_rules, config.trust)
                 if story is not None:
                     stories.append(await assess(pool, story, config, now))
         counts: dict[str, int] = defaultdict(int)
@@ -1104,7 +1130,12 @@ async def run_news_pipeline(ctx: JobContext, deps: NewsDeps) -> None:
 
     if deps.corroborator is not None:
         for story in stories:
-            if search_due(story, config.news, now):
+            if search_due(
+                story,
+                config.news,
+                now,
+                config.verification.corroboration.tier1_confirms_alone,
+            ):
                 await corroborate_story(ctx, story, deps.corroborator, config, holdings, now)
 
     async with ctx.step("route") as step:
@@ -1137,7 +1168,7 @@ async def run_news_pipeline(ctx: JobContext, deps: NewsDeps) -> None:
         step.detail.update(alerts=routed, earnings_checks=checks, escalations=escalations)
 
     async with ctx.step("dispatch") as step:
-        result = await dispatch_due(pool, deps.channels)
+        result = await dispatch_due(pool, deps.channels, now=now)
         step.detail.update(sent=result.sent, failed=result.failed, retrying=result.retrying)
 
 

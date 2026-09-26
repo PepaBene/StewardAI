@@ -13,6 +13,11 @@ The rules (Defence against wrong information, layer 2), applied in code:
 | Tier 3 only                                            | sentiment   | unconfirmed  |
 | Anything else (one tier-2 outlet)                      | unconfirmed | unconfirmed  |
 
+The number of independent tier-2 sources and whether a tier-1 source confirms alone come
+from the Verification config; a source the owner has marked wrong often enough counts one
+tier lower (see `steward.verify.trust`), which the caller applies to `best_tier` and the
+other stories' tiers.
+
 Syndicated copies of one wire story are one story, so they count once however many outlets
 carry them. The search can only add sources the code can check: a URL counts only if it
 appeared in the search results, its outlet has a tier, and it is not an outlet the story
@@ -64,35 +69,39 @@ def decide(
     rumour: bool,
     others: Iterable[OtherStory] = (),
     finding: SearchFinding | None = None,
+    independent_needed: int = 2,
+    tier1_alone: bool = True,
 ) -> Decision:
     own = {o for o in outlets if o}
     others = list(others)
-    if best_tier == 1:
+    if best_tier == 1 and tier1_alone:
         return Decision("confirmed", "verified", "stated by a tier-1 source")
     if finding and finding.contradicting:
         urls = ", ".join(u for u, _ in finding.contradicting[:3])
         return Decision("disputed", "disputed", f"contradicted by {urls}")
     tier1_elsewhere = [o for o in others if o.best_tier == 1]
     tier1_found = [u for u, t in (finding.supporting if finding else ()) if t == 1]
-    if tier1_elsewhere or tier1_found:
+    if tier1_alone and (tier1_elsewhere or tier1_found):
         where = tier1_found[0] if tier1_found else f"story #{tier1_elsewhere[0].cluster_id}"
         return Decision("confirmed", "corroborated", f"a tier-1 source confirms it ({where})")
     if rumour:
         return Decision("unconfirmed", "unconfirmed", "rumour language; needs a tier-1 source")
     # Independent tier-2 sources: this story once (all its copies), plus each other story or
     # search result from an outlet not already counted.
-    counted: set[str] = set(own) if best_tier == 2 else set()
-    sources = 1 if best_tier == 2 else 0
+    # With tier1_alone off, a tier-1 source is one independent source like a tier-2 outlet.
+    countable = (1, 2) if not tier1_alone else (2,)
+    counted: set[str] = set(own) if best_tier in countable else set()
+    sources = 1 if best_tier in countable else 0
     for other in others:
-        if other.best_tier == 2 and not (other.outlets & counted):
+        if other.best_tier in countable and not (other.outlets & counted):
             counted |= other.outlets
             sources += 1
     for url, tier in finding.supporting if finding else ():
         host = host_of(url) or ""
-        if tier == 2 and host not in counted:
+        if tier in countable and host not in counted:
             counted.add(host)
             sources += 1
-    if sources >= 2:
+    if sources >= independent_needed:
         return Decision(
             "confirmed", "corroborated", f"{sources} independent tier-2 sources report it"
         )

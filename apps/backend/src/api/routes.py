@@ -40,6 +40,7 @@ from steward.jobs import queue
 from steward.jobs.runner import create_job
 from steward.portfolio.read import (
     HoldingsResponse,
+    JobStatus,
     JobSummary,
     PortfolioOverview,
     portfolio_holdings,
@@ -153,6 +154,62 @@ class JobStepOut(BaseModel):
 class JobDetail(JobSummary):
     params: dict[str, Any]
     steps: list[JobStepOut]
+
+
+class JobListItem(JobSummary):
+    params: dict[str, Any]
+    cost_usd: float | None = Field(description="Sum of the run's step costs; null if none.")
+    failed_step: str | None = Field(description="The first failed step's name, if any.")
+
+
+class JobList(BaseModel):
+    jobs: list[JobListItem]
+    next_before_id: int | None = Field(description="Pass as before_id for the next page.")
+
+
+@router.get("/jobs", tags=["jobs"])
+async def list_jobs(
+    pool: Pool,
+    _owner: Owner,
+    job_type: Annotated[list[str] | None, Query(description="Any of these job types.")] = None,
+    status_: Annotated[list[JobStatus] | None, Query(alias="status")] = None,
+    ticker: Annotated[
+        str | None, Query(pattern=r"^[A-Za-z0-9._-]{1,32}$", description="Runs for this holding.")
+    ] = None,
+    before_id: Annotated[int | None, Query()] = None,
+    limit: Annotated[int, Query(ge=1, le=200)] = 50,
+) -> JobList:
+    """The job log, newest first: every scheduled, manual and event-triggered run with its
+    outcome and cost. Filters combine (AND)."""
+    rows = await pool.fetch(
+        "select j.id, j.job_type, j.trigger, j.status, j.error, j.created_at, j.started_at,"
+        " j.finished_at, j.params, s.cost_usd, s.failed_step from public.job j"
+        " left join lateral (select sum(cost_usd) as cost_usd, (array_agg(name order by"
+        " step_index) filter (where status = 'failed'))[1] as failed_step"
+        " from public.job_step where job_id = j.id) s on true"
+        " where ($1::text[] is null or j.job_type = any($1))"
+        " and ($2::text[] is null or j.status = any($2))"
+        " and ($3::text is null or j.params ->> 'ticker' = $3)"
+        " and ($4::bigint is null or j.id < $4)"
+        " order by j.id desc limit $5",
+        job_type or None,
+        status_ or None,
+        ticker,
+        before_id,
+        limit + 1,
+    )
+    more = len(rows) > limit
+    items = [
+        JobListItem(
+            **{
+                **dict(r),
+                "params": json.loads(r["params"]) if r["params"] else {},
+                "cost_usd": float(r["cost_usd"]) if r["cost_usd"] is not None else None,
+            }
+        )
+        for r in rows[:limit]
+    ]
+    return JobList(jobs=items, next_before_id=items[-1].id if more and items else None)
 
 
 @router.get("/jobs/{job_id}", tags=["jobs"])

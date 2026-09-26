@@ -73,8 +73,13 @@ class RelationshipOut(BaseModel):
     sources: list[str] = Field(description="Every source that reported it.")
     source_ref: str | None
     as_of: dt.date | None
-    status: Literal["confirmed", "suggested", "rejected"]
+    status: Literal["confirmed", "suggested", "rejected", "disputed"]
     tier: int = Field(description="1 GLEIF or a filing, 3 Wikidata; owner decisions win.")
+    conflict: dict[str, Any] | None = Field(
+        default=None,
+        description="Disputed: the contradicting source's claim (source, tier, object_name, "
+        "source_ref).",
+    )
 
 
 class ReportingExceptionOut(BaseModel):
@@ -122,6 +127,11 @@ class HoldingIdentity(BaseModel):
     subsidiary_count: int
     owners: list[RelationshipOut]
     suggested: list[RelationshipOut] = Field(description="Waiting for the owner to confirm.")
+    disputed: list[RelationshipOut] = Field(
+        default_factory=list,
+        description="A tier-3 claim a tier-1 source contradicts; `conflict` holds the other "
+        "source's version. Waiting for the owner.",
+    )
     related: list[RelationshipOut] = Field(
         description="Confirmed competitors, suppliers and customers."
     )
@@ -144,6 +154,7 @@ def _rel(row: asyncpg.Record) -> RelationshipOut:
         as_of=row["as_of"],
         status=row["status"],
         tier=min(SOURCE_TIER.get(s, 3) for s in [row["source"], *row["sources"]]),
+        conflict=json.loads(row["conflict"]) if row["conflict"] else None,
     )
 
 
@@ -225,6 +236,7 @@ async def holding_identity(pool: asyncpg.Pool, ticker: str) -> HoldingIdentity |
         subsidiary_count=len(subsidiaries),
         owners=[r for r in confirmed if r.type == "owner"],
         suggested=[r for r in rels if r.status == "suggested"],
+        disputed=[r for r in rels if r.status == "disputed"],
         related=[r for r in confirmed if r.type in ("competitor", "supplier", "customer")],
         aliases=[AliasOut(**dict(a)) for a in aliases],
         wikidata=WikidataSummary.model_validate(json.loads(inst["wikidata"]))
@@ -260,7 +272,7 @@ async def decide_relationship(
         )
         if row is None:
             raise RelationshipDecisionError(f"No relationship {relationship_id}", not_found=True)
-        if row["status"] != "suggested":
+        if row["status"] not in ("suggested", "disputed"):
             raise RelationshipDecisionError(
                 f"Relationship {relationship_id} is {row['status']}, not a suggestion"
             )

@@ -769,6 +769,139 @@
         ]
       }
     },
+    "/jobs": {
+      "get": {
+        "tags": [
+          "jobs"
+        ],
+        "summary": "List Jobs",
+        "description": "The job log, newest first: every scheduled, manual and event-triggered run with its\noutcome and cost. Filters combine (AND).",
+        "operationId": "list_jobs",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "job_type",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Any of these job types.",
+              "title": "Job Type"
+            },
+            "description": "Any of these job types."
+          },
+          {
+            "name": "status",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "array",
+                  "items": {
+                    "enum": [
+                      "queued",
+                      "waiting",
+                      "running",
+                      "succeeded",
+                      "failed"
+                    ],
+                    "type": "string"
+                  }
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Status"
+            }
+          },
+          {
+            "name": "ticker",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "pattern": "^[A-Za-z0-9._-]{1,32}$"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Runs for this holding.",
+              "title": "Ticker"
+            },
+            "description": "Runs for this holding."
+          },
+          {
+            "name": "before_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Before Id"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 200,
+              "minimum": 1,
+              "default": 50,
+              "title": "Limit"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/JobList"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/jobs/{job_id}": {
       "get": {
         "tags": [
@@ -3564,6 +3697,324 @@
           }
         ]
       }
+    },
+    "/feedback": {
+      "post": {
+        "tags": [
+          "feedback"
+        ],
+        "summary": "Post Feedback",
+        "description": "Mark a fact, verdict, alert, news item, story or report sentence wrong, irrelevant or\nuseful. A fact marked wrong is quarantined and its holding's verdicts are re-judged by\nthe worker; wrong or useful moves the source's trust score. `effects` says what\nhappened.",
+        "operationId": "post_feedback",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/FeedbackIn"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FeedbackOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "tags": [
+          "feedback"
+        ],
+        "summary": "Get Feedback",
+        "description": "Feedback given, newest first: to show the owner's earlier marks next to each item.",
+        "operationId": "get_feedback",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "target_kind",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "enum": [
+                    "fact",
+                    "verdict",
+                    "alert",
+                    "news_item",
+                    "story",
+                    "report_sentence"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Target Kind"
+            }
+          },
+          {
+            "name": "target_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "array",
+                  "items": {
+                    "type": "integer"
+                  }
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Any of these ids.",
+              "title": "Target Id"
+            },
+            "description": "Any of these ids."
+          },
+          {
+            "name": "since",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date-time"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Since"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 500,
+              "minimum": 1,
+              "default": 100,
+              "title": "Limit"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/FeedbackOut"
+                  },
+                  "title": "Response Get Feedback"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/sources/trust": {
+      "get": {
+        "tags": [
+          "feedback"
+        ],
+        "summary": "Get Source Trust",
+        "description": "Every source whose trust feedback has moved, lowest first. Sources never judged are\nat 1 and not listed.",
+        "operationId": "get_source_trust",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/SourceTrustOut"
+                  },
+                  "type": "array",
+                  "title": "Response Get Source Trust"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/config/event-rules/preview": {
+      "post": {
+        "tags": [
+          "config"
+        ],
+        "summary": "Preview Event Rules",
+        "description": "Replay the last 7 days of stored stories and alerts under this draft (with the active\nnotification rules) and list every event whose alert outcome would change. Uses stored\nclassifications only: no model or network call, nothing saved.",
+        "operationId": "preview_event_rules",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EventRulesConfig"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReplayPreview"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/config/notifications/preview": {
+      "post": {
+        "tags": [
+          "config"
+        ],
+        "summary": "Preview Notifications",
+        "description": "Replay the last 7 days under this draft notifications config (with the active event\nrules): which alerts would have been sent, held or suppressed differently.",
+        "operationId": "preview_notifications",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NotificationsConfig"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReplayPreview"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/eval-candidates": {
+      "get": {
+        "tags": [
+          "feedback"
+        ],
+        "summary": "Get Eval Candidates",
+        "description": "Items marked wrong and added to an evaluation set. `exported_at` is set once\n`python -m steward.verify.export_evals` has written them into the repository.",
+        "operationId": "get_eval_candidates",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/EvalCandidateOut"
+                  },
+                  "type": "array",
+                  "title": "Response Get Eval Candidates"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
     }
   },
   "components": {
@@ -4548,6 +4999,56 @@
         "title": "CategoryWeightRule",
         "description": "Limit on a category's weight; with no bucket it applies to every bucket of the dimension."
       },
+      "ClaimCheckSummary": {
+        "properties": {
+          "mode": {
+            "type": "string",
+            "enum": [
+              "strip",
+              "mark"
+            ],
+            "title": "Mode"
+          },
+          "supported": {
+            "type": "integer",
+            "title": "Supported",
+            "default": 0
+          },
+          "unsupported": {
+            "type": "integer",
+            "title": "Unsupported",
+            "default": 0
+          },
+          "unchecked": {
+            "type": "integer",
+            "title": "Unchecked",
+            "default": 0
+          },
+          "removed": {
+            "type": "integer",
+            "title": "Removed",
+            "description": "Unsupported sentences removed (strip mode).",
+            "default": 0
+          },
+          "note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note"
+          }
+        },
+        "type": "object",
+        "required": [
+          "mode"
+        ],
+        "title": "ClaimCheckSummary",
+        "description": "What the claim verifier did to a report, stored with it."
+      },
       "ClaimSource": {
         "properties": {
           "url": {
@@ -4611,6 +5112,57 @@
           "tier"
         ],
         "title": "ClaimSource"
+      },
+      "ClaimVerifierSettings": {
+        "properties": {
+          "enabled": {
+            "type": "boolean",
+            "title": "Enabled",
+            "default": true
+          },
+          "model": {
+            "type": "string",
+            "pattern": "^claude-[a-z0-9.-]{1,64}$",
+            "title": "Model",
+            "default": "claude-haiku-4-5",
+            "examples": [
+              "claude-sonnet-5"
+            ]
+          },
+          "mode": {
+            "type": "string",
+            "enum": [
+              "strip",
+              "mark"
+            ],
+            "title": "Mode",
+            "description": "strip: remove an unsupported sentence; mark: keep it, marked unsupported.",
+            "default": "strip"
+          },
+          "numeric_check": {
+            "type": "boolean",
+            "title": "Numeric Check",
+            "description": "Before the model call, code checks that every number in a sentence appears in a snippet it cites; a sentence that fails is unsupported without a call.",
+            "default": true
+          },
+          "applies_to": {
+            "items": {
+              "type": "string",
+              "enum": [
+                "daily_digest",
+                "weekly_digest",
+                "escalation"
+              ]
+            },
+            "type": "array",
+            "title": "Applies To",
+            "description": "Reports whose sentences are checked. Alerts are composed in code from the source's own headline, so they have no model-written sentences to check."
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "ClaimVerifierSettings",
+        "description": "The claim verifier (layer 4): every model-written sentence is checked against the\nsnippets it cites before a report is stored or sent."
       },
       "ClosureConfirmation": {
         "properties": {
@@ -4946,6 +5498,28 @@
         ],
         "title": "Correlation"
       },
+      "CorroborationRules": {
+        "properties": {
+          "tier1_confirms_alone": {
+            "type": "boolean",
+            "title": "Tier1 Confirms Alone",
+            "description": "A tier-1 source (the company, a regulator, a statistics office) confirms a story on its own. Off: it counts as one independent source like a tier-2 outlet.",
+            "default": true
+          },
+          "independent_sources_to_confirm": {
+            "type": "integer",
+            "maximum": 5.0,
+            "minimum": 2.0,
+            "title": "Independent Sources To Confirm",
+            "description": "Independent tier-2 outlets (different stories, not copies of one wire story) needed to confirm a story.",
+            "default": 2
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "CorroborationRules",
+        "description": "When a news story counts as confirmed (layer 2)."
+      },
       "DiffChange": {
         "properties": {
           "path": {
@@ -5085,6 +5659,24 @@
               }
             ],
             "title": "Writer"
+          },
+          "fact_sources": {
+            "items": {
+              "$ref": "#/components/schemas/DigestFactSource"
+            },
+            "type": "array",
+            "title": "Fact Sources"
+          },
+          "claims": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ClaimCheckSummary"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The claim verifier's pass over the written sentences."
           }
         },
         "type": "object",
@@ -5096,6 +5688,55 @@
           "headline"
         ],
         "title": "DigestBody"
+      },
+      "DigestFactSource": {
+        "properties": {
+          "fact_id": {
+            "type": "integer",
+            "title": "Fact Id"
+          },
+          "ticker": {
+            "type": "string",
+            "title": "Ticker"
+          },
+          "metric": {
+            "type": "string",
+            "title": "Metric"
+          },
+          "period": {
+            "type": "string",
+            "title": "Period"
+          },
+          "value_as_written": {
+            "type": "string",
+            "title": "Value As Written"
+          },
+          "snippet": {
+            "type": "string",
+            "title": "Snippet"
+          },
+          "source_url": {
+            "type": "string",
+            "title": "Source Url"
+          },
+          "status": {
+            "type": "string",
+            "title": "Status"
+          }
+        },
+        "type": "object",
+        "required": [
+          "fact_id",
+          "ticker",
+          "metric",
+          "period",
+          "value_as_written",
+          "snippet",
+          "source_url",
+          "status"
+        ],
+        "title": "DigestFactSource",
+        "description": "A fact a digest sentence or verdict cites, with the snippet it was read from."
       },
       "DigestRequest": {
         "properties": {
@@ -5230,6 +5871,18 @@
             "type": "string",
             "format": "date-time",
             "title": "Published At"
+          },
+          "summary": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Summary",
+            "description": "The item's own text, as stored."
           }
         },
         "type": "object",
@@ -5930,6 +6583,16 @@
               }
             ],
             "title": "Price Move"
+          },
+          "claims": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ClaimCheckSummary"
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         },
         "type": "object",
@@ -5982,6 +6645,56 @@
           "body_md": {
             "type": "string",
             "title": "Body Md"
+          },
+          "job_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Job Id",
+            "description": "The event_escalation run that wrote the note."
+          },
+          "job_status": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "queued",
+                  "waiting",
+                  "running",
+                  "succeeded",
+                  "failed"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Job Status"
+          },
+          "cost_usd": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cost Usd",
+            "description": "Model and search cost of that run (sum of its steps); null when no step recorded a cost."
+          },
+          "models": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Models",
+            "description": "Models the run called."
           }
         },
         "type": "object",
@@ -5991,7 +6704,11 @@
           "title",
           "created_at",
           "body",
-          "body_md"
+          "body_md",
+          "job_id",
+          "job_status",
+          "cost_usd",
+          "models"
         ],
         "title": "EscalationOut"
       },
@@ -6087,6 +6804,18 @@
             ],
             "title": "Kind",
             "default": "story"
+          },
+          "snippet": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Snippet",
+            "description": "The stored text the note's sentences are checked against."
           }
         },
         "type": "object",
@@ -6136,6 +6865,101 @@
           "dataset"
         ],
         "title": "EurostatSeries"
+      },
+      "EvalCandidateOut": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "earnings_figure",
+              "news_label"
+            ],
+            "title": "Kind"
+          },
+          "fact_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fact Id"
+          },
+          "news_item_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "News Item Id"
+          },
+          "corrected": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Corrected"
+          },
+          "note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "exported_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Exported At"
+          },
+          "exported_to": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Exported To"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "kind",
+          "fact_id",
+          "news_item_id",
+          "corrected",
+          "note",
+          "created_at",
+          "exported_at",
+          "exported_to"
+        ],
+        "title": "EvalCandidateOut"
       },
       "EventRulesConfig": {
         "properties": {
@@ -6977,6 +7801,213 @@
         ],
         "title": "FailedCheck"
       },
+      "FeedbackIn": {
+        "properties": {
+          "target_kind": {
+            "type": "string",
+            "enum": [
+              "fact",
+              "verdict",
+              "alert",
+              "news_item",
+              "story",
+              "report_sentence"
+            ],
+            "title": "Target Kind"
+          },
+          "target_id": {
+            "type": "integer",
+            "minimum": 1.0,
+            "title": "Target Id",
+            "description": "The fact, verdict, alert, news item, story or report id."
+          },
+          "sentence_path": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^[a-z_]+(/[0-9a-z_]+)*$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sentence Path",
+            "description": "Report sentences only: where it sits in the report body, e.g. 'overview/0', 'sections/2/summary/1' (digest) or 'sentences/3' (impact note)."
+          },
+          "rating": {
+            "type": "string",
+            "enum": [
+              "wrong",
+              "irrelevant",
+              "useful"
+            ],
+            "title": "Rating"
+          },
+          "note": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 1000
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note"
+          },
+          "add_to_eval": {
+            "type": "boolean",
+            "title": "Add To Eval",
+            "description": "With rating 'wrong' on a fact or news item: add it to the golden or labelled evaluation set with the corrected value or label.",
+            "default": false
+          },
+          "corrected_value": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Corrected Value",
+            "description": "Facts: the right value, in the fact's printed scale."
+          },
+          "corrected_value_as_written": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 40
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Corrected Value As Written",
+            "description": "Facts added to the golden set: the right number exactly as printed, when it differs from the stored one (e.g. '94,036')."
+          },
+          "corrected_snippet": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 1000
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Corrected Snippet",
+            "description": "Facts added to the golden set: the document passage that states the right number, when the stored snippet does not contain it."
+          },
+          "corrected_label": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/NewsLabel"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "target_kind",
+          "target_id",
+          "rating"
+        ],
+        "title": "FeedbackIn"
+      },
+      "FeedbackOut": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "target_kind": {
+            "type": "string",
+            "enum": [
+              "fact",
+              "verdict",
+              "alert",
+              "news_item",
+              "story",
+              "report_sentence"
+            ],
+            "title": "Target Kind"
+          },
+          "target_id": {
+            "type": "integer",
+            "title": "Target Id"
+          },
+          "sentence_path": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sentence Path"
+          },
+          "rating": {
+            "type": "string",
+            "enum": [
+              "wrong",
+              "irrelevant",
+              "useful"
+            ],
+            "title": "Rating"
+          },
+          "note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note"
+          },
+          "source_hosts": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Source Hosts"
+          },
+          "effects": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Effects",
+            "description": "What the feedback did: quarantined fact, verdict job, trust scores, eval candidate."
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "target_kind",
+          "target_id",
+          "sentence_path",
+          "rating",
+          "note",
+          "source_hosts",
+          "effects",
+          "created_at"
+        ],
+        "title": "FeedbackOut"
+      },
       "FredSeries": {
         "properties": {
           "key": {
@@ -7594,6 +8625,14 @@
             "type": "array",
             "title": "Suggested",
             "description": "Waiting for the owner to confirm."
+          },
+          "disputed": {
+            "items": {
+              "$ref": "#/components/schemas/RelationshipOut"
+            },
+            "type": "array",
+            "title": "Disputed",
+            "description": "A tier-3 claim a tier-1 source contradicts; `conflict` holds the other source's version. Waiting for the owner."
           },
           "related": {
             "items": {
@@ -8309,6 +9348,146 @@
           "steps"
         ],
         "title": "JobDetail"
+      },
+      "JobList": {
+        "properties": {
+          "jobs": {
+            "items": {
+              "$ref": "#/components/schemas/JobListItem"
+            },
+            "type": "array",
+            "title": "Jobs"
+          },
+          "next_before_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Before Id",
+            "description": "Pass as before_id for the next page."
+          }
+        },
+        "type": "object",
+        "required": [
+          "jobs",
+          "next_before_id"
+        ],
+        "title": "JobList"
+      },
+      "JobListItem": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "job_type": {
+            "type": "string",
+            "title": "Job Type"
+          },
+          "trigger": {
+            "type": "string",
+            "title": "Trigger"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "queued",
+              "waiting",
+              "running",
+              "succeeded",
+              "failed"
+            ],
+            "title": "Status"
+          },
+          "error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "started_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Started At"
+          },
+          "finished_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Finished At"
+          },
+          "params": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Params"
+          },
+          "cost_usd": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cost Usd",
+            "description": "Sum of the run's step costs; null if none."
+          },
+          "failed_step": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Failed Step",
+            "description": "The first failed step's name, if any."
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "job_type",
+          "trigger",
+          "status",
+          "error",
+          "created_at",
+          "started_at",
+          "finished_at",
+          "params",
+          "cost_usd",
+          "failed_step"
+        ],
+        "title": "JobListItem"
       },
       "JobSchedule": {
         "properties": {
@@ -9191,6 +10370,19 @@
                 "type": "null"
               }
             ]
+          },
+          "next_ingest_due_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Ingest Due At",
+            "description": "The scheduled news check after the last one: the feed is stale once this has passed (plus a margin) with no newer check. Null when the job is disabled."
           }
         },
         "type": "object",
@@ -9343,6 +10535,62 @@
           "story"
         ],
         "title": "NewsItemOut"
+      },
+      "NewsLabel": {
+        "properties": {
+          "event_type": {
+            "type": "string",
+            "enum": [
+              "guidance_change",
+              "m_and_a",
+              "dividend_cut",
+              "earnings_release",
+              "management_change",
+              "regulatory_legal",
+              "capital_allocation",
+              "credit_rating",
+              "central_bank",
+              "macro_surprise",
+              "insider_transaction",
+              "product_business",
+              "sector_competitor",
+              "index_change",
+              "analyst_rating",
+              "delisting",
+              "entity_status",
+              "other"
+            ],
+            "title": "Event Type"
+          },
+          "affected_ticker": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Affected Ticker"
+          },
+          "relevant": {
+            "type": "boolean",
+            "title": "Relevant"
+          },
+          "rumour": {
+            "type": "boolean",
+            "title": "Rumour"
+          }
+        },
+        "type": "object",
+        "required": [
+          "event_type",
+          "affected_ticker",
+          "relevant",
+          "rumour"
+        ],
+        "title": "NewsLabel",
+        "description": "The right classification of a news item, for the labelled set."
       },
       "NewsSettings": {
         "properties": {
@@ -9627,6 +10875,34 @@
             },
             "type": "array",
             "title": "Source Urls"
+          },
+          "check": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "supported",
+                  "unsupported",
+                  "unchecked"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Check",
+            "description": "The claim verifier's result; null when not checked."
+          },
+          "check_reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Check Reason"
           }
         },
         "type": "object",
@@ -10987,7 +12263,8 @@
             "enum": [
               "confirmed",
               "suggested",
-              "rejected"
+              "rejected",
+              "disputed"
             ],
             "title": "Status"
           },
@@ -10995,6 +12272,19 @@
             "type": "integer",
             "title": "Tier",
             "description": "1 GLEIF or a filing, 3 Wikidata; owner decisions win."
+          },
+          "conflict": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Conflict",
+            "description": "Disputed: the contradicting source's claim (source, tier, object_name, source_ref)."
           }
         },
         "type": "object",
@@ -11011,6 +12301,191 @@
           "tier"
         ],
         "title": "RelationshipOut"
+      },
+      "ReplayChange": {
+        "properties": {
+          "key": {
+            "type": "string",
+            "title": "Key",
+            "description": "story:<id> or alert:<kind>:<id>."
+          },
+          "kind": {
+            "type": "string",
+            "title": "Kind"
+          },
+          "at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "At"
+          },
+          "cluster_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cluster Id"
+          },
+          "ticker": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ticker"
+          },
+          "event_type": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Event Type"
+          },
+          "headline": {
+            "type": "string",
+            "title": "Headline"
+          },
+          "before": {
+            "$ref": "#/components/schemas/ReplayOutcome"
+          },
+          "after": {
+            "$ref": "#/components/schemas/ReplayOutcome"
+          }
+        },
+        "type": "object",
+        "required": [
+          "key",
+          "kind",
+          "at",
+          "cluster_id",
+          "ticker",
+          "event_type",
+          "headline",
+          "before",
+          "after"
+        ],
+        "title": "ReplayChange"
+      },
+      "ReplayOutcome": {
+        "properties": {
+          "severity": {
+            "type": "integer",
+            "title": "Severity"
+          },
+          "decision": {
+            "type": "string",
+            "title": "Decision",
+            "description": "What routing decided, in one line."
+          },
+          "channels": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Channels",
+            "description": "Channels an alert would be sent or held for."
+          },
+          "held_until": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Held Until"
+          },
+          "suppressed": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Suppressed"
+          }
+        },
+        "type": "object",
+        "required": [
+          "severity",
+          "decision",
+          "channels"
+        ],
+        "title": "ReplayOutcome"
+      },
+      "ReplayPreview": {
+        "properties": {
+          "domain": {
+            "type": "string",
+            "enum": [
+              "event_rules",
+              "notifications"
+            ],
+            "title": "Domain"
+          },
+          "window_start": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Window Start"
+          },
+          "window_end": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Window End"
+          },
+          "events": {
+            "type": "integer",
+            "title": "Events",
+            "description": "Stored stories and alerts replayed."
+          },
+          "alerts_before": {
+            "type": "integer",
+            "title": "Alerts Before",
+            "description": "Events that would alert under the active config."
+          },
+          "alerts_after": {
+            "type": "integer",
+            "title": "Alerts After",
+            "description": "Events that would alert under the draft."
+          },
+          "changes": {
+            "items": {
+              "$ref": "#/components/schemas/ReplayChange"
+            },
+            "type": "array",
+            "title": "Changes"
+          },
+          "elapsed_ms": {
+            "type": "integer",
+            "title": "Elapsed Ms"
+          }
+        },
+        "type": "object",
+        "required": [
+          "domain",
+          "window_start",
+          "window_end",
+          "events",
+          "alerts_before",
+          "alerts_after",
+          "changes",
+          "elapsed_ms"
+        ],
+        "title": "ReplayPreview"
       },
       "ReportOut": {
         "properties": {
@@ -11088,6 +12563,19 @@
             },
             "type": "object",
             "title": "Delivery"
+          },
+          "next_due_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Due At",
+            "description": "When the next report of this kind is scheduled."
           }
         },
         "type": "object",
@@ -11172,6 +12660,19 @@
             },
             "type": "object",
             "title": "Delivery"
+          },
+          "next_due_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Due At",
+            "description": "When the next report of this kind is scheduled: this one is current until then. Null for unscheduled kinds or a disabled schedule."
           }
         },
         "type": "object",
@@ -11443,6 +12944,34 @@
             },
             "type": "array",
             "title": "Fact Ids"
+          },
+          "check": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "supported",
+                  "unsupported",
+                  "unchecked"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Check",
+            "description": "The claim verifier's result: supported, unsupported (kept only in 'mark' mode) or unchecked (the verifier could not run). Null: not checked."
+          },
+          "check_reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Check Reason"
           }
         },
         "type": "object",
@@ -11500,6 +13029,46 @@
           "severity"
         ],
         "title": "SeverityOverride"
+      },
+      "SourceTrustOut": {
+        "properties": {
+          "host": {
+            "type": "string",
+            "title": "Host"
+          },
+          "score": {
+            "type": "number",
+            "title": "Score"
+          },
+          "wrong_count": {
+            "type": "integer",
+            "title": "Wrong Count"
+          },
+          "useful_count": {
+            "type": "integer",
+            "title": "Useful Count"
+          },
+          "demoted": {
+            "type": "boolean",
+            "title": "Demoted",
+            "description": "Below the threshold: counts one tier lower."
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Updated At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "host",
+          "score",
+          "wrong_count",
+          "useful_count",
+          "demoted",
+          "updated_at"
+        ],
+        "title": "SourceTrustOut"
       },
       "StoryOut": {
         "properties": {
@@ -12539,6 +14108,38 @@
         ],
         "title": "TransactionsPage"
       },
+      "TrustSettings": {
+        "properties": {
+          "wrong_penalty": {
+            "type": "number",
+            "maximum": 1.0,
+            "minimum": 0.0,
+            "title": "Wrong Penalty",
+            "description": "Score lost each time the owner marks it wrong.",
+            "default": 0.2
+          },
+          "useful_reward": {
+            "type": "number",
+            "maximum": 1.0,
+            "minimum": 0.0,
+            "title": "Useful Reward",
+            "description": "Score gained each time the owner marks it useful.",
+            "default": 0.05
+          },
+          "demote_below": {
+            "type": "number",
+            "maximum": 1.0,
+            "minimum": 0.0,
+            "title": "Demote Below",
+            "description": "A source scoring below this counts one tier lower in corroboration (tier 1 as tier 2, tier 2 as tier 3).",
+            "default": 0.6
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "TrustSettings",
+        "description": "Source trust (layer 1): owner feedback moves a source's score between 0 and 1."
+      },
       "ValidationError": {
         "properties": {
           "loc": {
@@ -12773,6 +14374,15 @@
             "title": "Max Report Lag Days",
             "description": "Latest a release may come out after the end of the period it reports.",
             "default": 150
+          },
+          "corroboration": {
+            "$ref": "#/components/schemas/CorroborationRules"
+          },
+          "trust": {
+            "$ref": "#/components/schemas/TrustSettings"
+          },
+          "claim_verifier": {
+            "$ref": "#/components/schemas/ClaimVerifierSettings"
           }
         },
         "additionalProperties": false,

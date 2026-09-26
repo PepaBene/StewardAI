@@ -1,0 +1,145 @@
+{
+  "description": "Claim-verifier evaluation: 20 report sentences, each with the snippets it cites, a faithful version and a version with one injected unsupported claim. Phase 4 AC: every injected sentence is flagged (100 %). Numeric cases change a figure; semantic cases change a direction, cause, attribution, certainty or add a fact. Snippets paraphrase fictional or public September 2026-style material.",
+  "cases": [
+    {
+      "id": "clm-01",
+      "kind": "numeric",
+      "evidence": ["Apple reports third quarter results. Total net sales (1) | 94,036 | 85,777 | 313,695 | 296,105"],
+      "supported": "Apple's quarterly revenue was $94.0 billion, up from $85.8 billion a year earlier.",
+      "injected": "Apple's quarterly revenue was $96.0 billion, up from $85.8 billion a year earlier."
+    },
+    {
+      "id": "clm-02",
+      "kind": "numeric",
+      "evidence": ["Microsoft Cloud revenue was $46.7 billion and increased 27% (up 26% in constant currency)."],
+      "supported": "Microsoft Cloud revenue rose 27% to $46.7 billion.",
+      "injected": "Microsoft Cloud revenue rose 32% to $46.7 billion."
+    },
+    {
+      "id": "clm-03",
+      "kind": "numeric",
+      "evidence": ["NVIDIA said it expects fiscal third-quarter revenue of about $58 billion, plus or minus 2%, up from a prior outlook of $54 billion."],
+      "supported": "NVIDIA raised its third-quarter revenue outlook to about $58 billion from $54 billion.",
+      "injected": "NVIDIA raised its third-quarter revenue outlook to about $61 billion from $54 billion."
+    },
+    {
+      "id": "clm-04",
+      "kind": "numeric",
+      "evidence": ["Novo Nordisk now expects sales growth of 8-11% at constant exchange rates in 2026, compared with 10-13% previously."],
+      "supported": "Novo Nordisk cut its 2026 sales growth guidance to 8-11% from 10-13%.",
+      "injected": "Novo Nordisk cut its 2026 sales growth guidance to 6-9% from 10-13%."
+    },
+    {
+      "id": "clm-05",
+      "kind": "numeric",
+      "evidence": ["SAP: Current cloud backlog grew 28% to EUR 18.1 billion. Cloud revenue up 27% to EUR 5.1 billion."],
+      "supported": "SAP's current cloud backlog grew 28% to EUR 18.1 billion.",
+      "injected": "SAP's current cloud backlog grew 28% to EUR 19.4 billion."
+    },
+    {
+      "id": "clm-06",
+      "kind": "numeric",
+      "evidence": ["The board declared a cash dividend of $0.26 per share of the Company's common stock, payable on August 14."],
+      "supported": "Apple declared a dividend of $0.26 per share, payable on August 14.",
+      "injected": "Apple declared a dividend of $0.28 per share, payable on August 14."
+    },
+    {
+      "id": "clm-07",
+      "kind": "numeric",
+      "evidence": ["Gross margin | 46.5 % | 46.3 %"],
+      "supported": "Gross margin was 46.5%, against 46.3% a year ago.",
+      "injected": "Gross margin was 47.5%, against 46.3% a year ago."
+    },
+    {
+      "id": "clm-08",
+      "kind": "numeric",
+      "evidence": ["The company plans to cut about 6,000 jobs, or less than 3% of its workforce, it said on Tuesday."],
+      "supported": "The company plans to cut about 6,000 jobs, less than 3% of its workforce.",
+      "injected": "The company plans to cut about 9,000 jobs, less than 3% of its workforce."
+    },
+    {
+      "id": "clm-09",
+      "kind": "numeric",
+      "evidence": ["Diluted earnings per share | 1.57 | 1.40"],
+      "supported": "Diluted earnings per share rose to $1.57 from $1.40.",
+      "injected": "Diluted earnings per share rose to $1.62 from $1.40."
+    },
+    {
+      "id": "clm-10",
+      "kind": "numeric",
+      "evidence": ["The Board approved an additional $100 billion for share repurchases."],
+      "supported": "Apple added $100 billion to its buyback programme.",
+      "injected": "Apple added $110 billion to its buyback programme."
+    },
+    {
+      "id": "clm-11",
+      "kind": "numeric",
+      "evidence": ["Euro area annual inflation was 2.1% in August 2026, up from 2.0% in July, according to a flash estimate from Eurostat."],
+      "supported": "Euro-area inflation rose to 2.1% in August from 2.0% in July.",
+      "injected": "Euro-area inflation rose to 2.4% in August from 2.0% in July."
+    },
+    {
+      "id": "clm-12",
+      "kind": "numeric",
+      "evidence": ["The Czech National Bank left its two-week repo rate unchanged at 3.50%."],
+      "supported": "The Czech National Bank held its main rate at 3.50%.",
+      "injected": "The Czech National Bank held its main rate at 3.75%."
+    },
+    {
+      "id": "clm-13",
+      "kind": "semantic",
+      "evidence": ["Novo Nordisk now expects sales growth of 8-11% at constant exchange rates in 2026, compared with 10-13% previously."],
+      "supported": "Novo Nordisk lowered its 2026 sales growth outlook.",
+      "injected": "Novo Nordisk raised its 2026 sales growth outlook."
+    },
+    {
+      "id": "clm-14",
+      "kind": "semantic",
+      "evidence": ["Microsoft said Chief Financial Officer Amy Hood will remain in her role; the company announced no management changes."],
+      "supported": "Microsoft said its CFO will stay in her role.",
+      "injected": "Microsoft said its CFO will step down at the end of the year."
+    },
+    {
+      "id": "clm-15",
+      "kind": "semantic",
+      "evidence": ["People familiar with the matter said SAP is in early talks to acquire a U.S. data-management firm; no agreement has been reached and talks could collapse."],
+      "supported": "SAP is reportedly in early talks about an acquisition, with no agreement reached.",
+      "injected": "SAP has agreed to acquire a U.S. data-management firm."
+    },
+    {
+      "id": "clm-16",
+      "kind": "semantic",
+      "evidence": ["NVIDIA said the new export rules would not affect its current-quarter outlook."],
+      "supported": "NVIDIA said new export rules would not affect its current-quarter outlook.",
+      "injected": "NVIDIA said new export rules would weigh on its current-quarter outlook."
+    },
+    {
+      "id": "clm-17",
+      "kind": "semantic",
+      "evidence": ["Apple said iPhone revenue grew on strong demand in India; it did not comment on China."],
+      "supported": "Apple said strong demand in India lifted iPhone revenue.",
+      "injected": "Apple said strong demand in China lifted iPhone revenue."
+    },
+    {
+      "id": "clm-18",
+      "kind": "semantic",
+      "evidence": ["The European Commission opened an in-depth investigation into the proposed merger."],
+      "supported": "The European Commission opened an in-depth probe into the merger.",
+      "injected": "The European Commission approved the merger without conditions."
+    },
+    {
+      "id": "clm-19",
+      "kind": "semantic",
+      "evidence": ["Microsoft reported Azure growth of 39%, in line with its guidance."],
+      "supported": "Azure grew 39%, in line with Microsoft's guidance.",
+      "injected": "Azure grew 39%, beating Microsoft's guidance on AI demand."
+    },
+    {
+      "id": "clm-20",
+      "kind": "semantic",
+      "evidence": ["Moody's affirmed Apple's Aa1 rating with a stable outlook."],
+      "supported": "Moody's affirmed Apple's Aa1 rating with a stable outlook.",
+      "injected": "Moody's upgraded Apple to Aaa, citing its cash position."
+    }
+  ]
+}

@@ -13,6 +13,10 @@ Per holding, in order (news matching, Stooq symbols and structure all key off th
    parents, subsidiaries and owners it alone reports stay suggested unless GLEIF lists them,
    and inferred competitors are always suggestions. Relationships the owner rejected are
    never suggested again.
+5. Trust tiers (Phase 4): GLEIF is tier 1, Wikidata tier 3. A Wikidata parent that GLEIF
+   contradicts (GLEIF reports a different direct and ultimate parent) is `disputed`, with
+   GLEIF's parent kept beside it, until the owner decides; it never becomes confirmed on
+   Wikidata's word.
 
 A FIRDS termination on the home market, or a GLEIF successor, inactive status or lapsed
 registration, raises a lifecycle event. An instrument that cannot be resolved keeps the
@@ -131,6 +135,8 @@ async def upsert_relationship(
         " source = case when excluded.status = 'confirmed' then excluded.source"
         "   else entity_relationship.source end,"
         " status = case when entity_relationship.status = 'rejected' then 'rejected'"
+        "   when entity_relationship.status = 'disputed' and excluded.status <> 'confirmed'"
+        "   then 'disputed'"
         "   when excluded.status = 'confirmed' or entity_relationship.status = 'confirmed'"
         "   then 'confirmed' else 'suggested' end,"
         " object_name = excluded.object_name,"
@@ -152,6 +158,54 @@ async def upsert_relationship(
         exception_reason,
         json.dumps(detail) if detail else None,
     )
+
+
+def _same_entity(a: asyncpg.Record, b: asyncpg.Record) -> bool:
+    if a["object_lei"] and b["object_lei"]:
+        return bool(a["object_lei"] == b["object_lei"])
+    return bool(short_name(a["object_name"]).casefold() == short_name(b["object_name"]).casefold())
+
+
+async def reconcile_structure(conn: asyncpg.Connection | asyncpg.Pool, ticker: str) -> list[int]:
+    """Mark Wikidata parents that GLEIF contradicts as disputed (and clear disputes GLEIF no
+    longer supports). Returns the ids now disputed."""
+    rows = await conn.fetch(
+        "select id, type, object_key, object_name, object_lei, source, sources, source_ref,"
+        " status from public.entity_relationship where ticker = $1"
+        " and type in ('parent', 'ultimate_parent')",
+        ticker,
+    )
+    gleif = [r for r in rows if "gleif" in r["sources"] and r["status"] == "confirmed"]
+    disputed: list[int] = []
+    for row in rows:
+        if row["sources"] != ["wikidata"] or row["status"] not in ("suggested", "disputed"):
+            continue
+        # Wikidata's "parent organization" may be GLEIF's direct or ultimate parent.
+        contradicted = bool(gleif) and not any(_same_entity(row, g) for g in gleif)
+        if contradicted:
+            other = next((g for g in gleif if g["type"] == row["type"]), gleif[0])
+            conflict = {
+                "source": "gleif",
+                "tier": 1,
+                "type": other["type"],
+                "object_key": other["object_key"],
+                "object_name": other["object_name"],
+                "source_ref": other["source_ref"],
+            }
+            await conn.execute(
+                "update public.entity_relationship set status = 'disputed',"
+                " conflict = $2::jsonb where id = $1",
+                row["id"],
+                json.dumps(conflict),
+            )
+            disputed.append(row["id"])
+        elif row["status"] == "disputed":
+            await conn.execute(
+                "update public.entity_relationship set status = 'suggested', conflict = null"
+                " where id = $1",
+                row["id"],
+            )
+    return disputed
 
 
 async def replace_aliases(
@@ -619,6 +673,9 @@ async def resolve_holding(
             entity.legal_name if entity else name,
             result,
         )
+    disputed = await reconcile_structure(pool, ticker)
+    if disputed:
+        result.notes.append(f"{len(disputed)} Wikidata parent(s) contradicted by GLEIF")
     await _record(pool, ticker, result, inst, security_type=_security_type(resolution))
     return result
 

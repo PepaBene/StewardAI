@@ -33,10 +33,20 @@ from steward.config.jobs import EscalationSettings, JobsConfig
 from steward.config.news_sources import NewsSourcesConfig
 from steward.config.store import load_active
 from steward.config.thesis import ThesesConfig, ThesisConfig
+from steward.config.verification import ClaimVerifierSettings, VerificationConfig
 from steward.jobs import queue
 from steward.jobs.runner import JobContext, JobFailed, create_job
 from steward.news.corroborate import _result_urls
 from steward.settings import get_settings
+from steward.verify.claims import (
+    CheckStatus,
+    Claim,
+    ClaimCheckOutcome,
+    ClaimCheckSummary,
+    ClaimVerifier,
+    ClaudeClaimVerifier,
+    check_claims,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -44,6 +54,10 @@ logger = logging.getLogger(__name__)
 class NoteSentence(BaseModel):
     text: str
     source_urls: list[str] = Field(default_factory=list)
+    check: CheckStatus | None = Field(
+        default=None, description="The claim verifier's result; null when not checked."
+    )
+    check_reason: str | None = None
 
 
 class ImpactDraft(BaseModel):
@@ -65,6 +79,9 @@ class EscalationSource(BaseModel):
     tier: int | None = None
     headline: str | None = None
     kind: Literal["story", "search", "price"] = "story"
+    snippet: str | None = Field(
+        default=None, description="The stored text the note's sentences are checked against."
+    )
 
 
 class EscalationBody(BaseModel):
@@ -84,6 +101,7 @@ class EscalationBody(BaseModel):
     dropped_sentences: int = 0
     writer: str | None = None
     price_move: dict[str, Any] | None = None
+    claims: ClaimCheckSummary | None = None
 
 
 SYSTEM = """\
@@ -122,6 +140,7 @@ class DraftResult:
     usage: Usage
     seen_urls: set[str] = field(default_factory=set)
     note: str | None = None
+    titles: dict[str, str] = field(default_factory=dict)
 
 
 class ClaudeEscalator:
@@ -152,6 +171,7 @@ class ClaudeEscalator:
             {"role": "user", "content": f"Today is {today.isoformat()}.\n\n{request.material}"}
         ]
         seen: set[str] = set()
+        titles: dict[str, str] = {}
         response = None
         calls = 0
         while calls < max(1, self._settings.max_steps):
@@ -169,15 +189,34 @@ class ClaudeEscalator:
                 return DraftResult(None, usage, seen, f"escalation call failed: {exc}")
             usage.add(response.usage)
             seen |= _result_urls(response.content)
+            titles |= result_titles(response.content)
             if response.stop_reason != "pause_turn":
                 break
             messages.append({"role": "assistant", "content": response.content})
         draft = response.parsed_output if response is not None else None
-        return DraftResult(draft, usage, seen, None if draft else "no parseable note")
+        return DraftResult(draft, usage, seen, None if draft else "no parseable note", titles)
+
+
+def result_titles(content: list[Any]) -> dict[str, str]:
+    """Search-result page titles by URL: the only stored text a search source has."""
+    titles: dict[str, str] = {}
+    for block in content:
+        if getattr(block, "type", None) != "web_search_tool_result":
+            continue
+        results = getattr(block, "content", None)
+        if isinstance(results, list):
+            for r in results:
+                url, title = getattr(r, "url", None), getattr(r, "title", None)
+                if url and title:
+                    titles[url] = str(title)[:300]
+    return titles
 
 
 def check_draft(
-    draft: ImpactDraft, request: EscalationInput, search_urls: set[str]
+    draft: ImpactDraft,
+    request: EscalationInput,
+    search_urls: set[str],
+    titles: dict[str, str] | None = None,
 ) -> tuple[EscalationBody, int]:
     """Apply the code-side rules; returns the body and how many sentences were dropped."""
     given = {s.url for s in request.sources}
@@ -210,7 +249,10 @@ def check_draft(
         link = "none: no thesis KPI or exit condition applies"
     sources = list(request.sources)
     cited_search = {u for s in kept for u in s.source_urls} - given
-    sources += [EscalationSource(url=u, kind="search") for u in sorted(cited_search)]
+    sources += [
+        EscalationSource(url=u, kind="search", headline=(titles or {}).get(u))
+        for u in sorted(cited_search)
+    ]
     body = EscalationBody(
         ticker=request.ticker,
         trigger=request.trigger,
@@ -255,7 +297,8 @@ def render_md(body: EscalationBody, app_url: str | None) -> str:
     lines = [f"# {body.headline}", ""]
     for s in body.sentences:
         refs = ", ".join(f"[{i + 1}]({u})" for i, u in enumerate(s.source_urls))
-        lines.append(f"{s.text} ({refs})")
+        mark = " [not supported by its sources]" if s.check == "unsupported" else ""
+        lines.append(f"{s.text} ({refs}){mark}")
     lines += ["", f"**Thesis link:** {body.thesis_link}"]
     if body.rationale:
         lines.append(body.rationale)
@@ -303,7 +346,13 @@ async def story_input(
     )
     thesis = next((t for t in theses.theses if t.ticker == cluster["ticker"]), None)
     sources = [
-        EscalationSource(url=i["url"], outlet=i["outlet"], tier=i["tier"], headline=i["headline"])
+        EscalationSource(
+            url=i["url"],
+            outlet=i["outlet"],
+            tier=i["tier"],
+            headline=i["headline"],
+            snippet=(i["summary"] or "")[:800] or None,
+        )
         for i in items
     ]
     material = json.dumps(
@@ -427,6 +476,40 @@ class EscalationDeps:
     writer: ClaudeEscalator | None
     now: dt.datetime
     app_url: str | None = None
+    claim_verifier: ClaimVerifier | None = None
+
+
+def note_evidence(sentence: NoteSentence, sources: dict[str, EscalationSource]) -> tuple[str, ...]:
+    out = []
+    for url in sentence.source_urls:
+        source = sources.get(url)
+        if source is not None:
+            text = " ".join(p for p in (source.headline, source.snippet) if p)
+            if text:
+                out.append(text)
+    return tuple(out)
+
+
+async def verify_note_claims(
+    body: EscalationBody,
+    settings: ClaimVerifierSettings,
+    verifier: ClaimVerifier | None,
+    today: dt.date,
+) -> ClaimCheckOutcome:
+    """Check each sentence against the stored text of the sources it cites."""
+    sources = {s.url: s for s in body.sources}
+    claims = [Claim(i, s.text, note_evidence(s, sources)) for i, s in enumerate(body.sentences)]
+    outcome = await check_claims(claims, settings, verifier, today)
+    kept = []
+    for i, sentence in enumerate(body.sentences):
+        result = outcome.results[i]
+        sentence.check, sentence.check_reason = result.status, result.reason
+        if not (result.status == "unsupported" and settings.mode == "strip"):
+            kept.append(sentence)
+    removed = len(body.sentences) - len(kept)
+    body.sentences = kept
+    body.claims = outcome.summary(settings.mode, removed)
+    return outcome
 
 
 async def run_escalation(ctx: JobContext, deps: EscalationDeps) -> int:
@@ -435,8 +518,10 @@ async def run_escalation(ctx: JobContext, deps: EscalationDeps) -> int:
         theses = await load_active(pool, "theses", ThesesConfig)
         profiles = await load_active(pool, "holding_profiles", HoldingProfilesConfig)
         sources = await load_active(pool, "news_sources", NewsSourcesConfig)
-        for stored in (theses, profiles, sources):
+        stored_verification = await load_active(pool, "verification", VerificationConfig)
+        for stored in (theses, profiles, sources, stored_verification):
             await ctx.record_config_version(stored.id if stored else None)
+        verification = stored_verification.body if stored_verification else VerificationConfig()
         registry = sources.body if sources else NewsSourcesConfig()
         ir = [d for p in (profiles.body.profiles if profiles else []) for d in p.allowed_domains()]
         domains = tuple(
@@ -460,10 +545,23 @@ async def run_escalation(ctx: JobContext, deps: EscalationDeps) -> int:
             if result.draft is None:
                 body = code_only_body(request, result.note or "no note")
             else:
-                body, dropped = check_draft(result.draft, request, result.seen_urls)
+                body, dropped = check_draft(result.draft, request, result.seen_urls, result.titles)
                 body.writer = result.usage.model
                 step.detail["dropped_sentences"] = dropped
         step.detail.update(thesis_link=body.thesis_link, sentences=len(body.sentences))
+
+    claim_settings = verification.claim_verifier
+    if body.sentences and claim_settings.enabled and "escalation" in claim_settings.applies_to:
+        async with ctx.step("verify_claims") as step:
+            outcome = await verify_note_claims(
+                body, claim_settings, deps.claim_verifier, deps.now.date()
+            )
+            if outcome.usage is not None:
+                step.usage = outcome.usage.step_usage()
+            assert body.claims is not None
+            step.detail.update(body.claims.model_dump(exclude_none=True))
+
+    async with ctx.step("store") as step:
         report_id: int = await pool.fetchval(
             "insert into public.report (type, ticker, title, body, body_md, period_start,"
             " period_end, config_version_ids, job_id) values ('escalation', $1, $2, $3::jsonb,"
@@ -484,12 +582,27 @@ async def event_escalation_handler(ctx: JobContext) -> None:
     settings = get_settings()
     jobs = await load_active(ctx.pool, "jobs", JobsConfig)
     escalation = (jobs.body if jobs else JobsConfig()).escalation
+    stored_verification = await load_active(ctx.pool, "verification", VerificationConfig)
+    claim_model = (
+        stored_verification.body if stored_verification else VerificationConfig()
+    ).claim_verifier.model
+    writer: ClaudeEscalator | None
+    verifier: ClaimVerifier | None
     try:
-        writer: ClaudeEscalator | None = ClaudeEscalator(create_client(settings), escalation)
+        client = create_client(settings)
     except AINotConfigured:
-        writer = None
+        writer = verifier = None
+    else:
+        writer = ClaudeEscalator(client, escalation)
+        verifier = ClaudeClaimVerifier(client, claim_model)
     await run_escalation(
-        ctx, EscalationDeps(writer=writer, now=dt.datetime.now(dt.UTC), app_url=settings.app_url)
+        ctx,
+        EscalationDeps(
+            writer=writer,
+            now=dt.datetime.now(dt.UTC),
+            app_url=settings.app_url,
+            claim_verifier=verifier,
+        ),
     )
 
 

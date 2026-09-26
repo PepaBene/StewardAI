@@ -10,7 +10,7 @@ from pydantic import BaseModel, Field
 from api.auth import Owner
 from api.db import Pool
 from api.routes import NoteParam, _as_dict, _enqueue, _not_found
-from steward.config import EventRulesConfig, NewsSourcesConfig, NotificationsConfig
+from steward.config import EventRulesConfig, JobsConfig, NewsSourcesConfig, NotificationsConfig
 from steward.config.common import Ticker
 from steward.config.event_rules import EVENT_DESCRIPTIONS, EVENT_TYPES, EventType
 from steward.config.store import load_active, save_config
@@ -36,6 +36,11 @@ from steward.notify.route import AlertRequest
 from steward.portfolio.read import JobSummary
 
 router = APIRouter()
+
+
+async def _jobs_config(pool: Pool) -> JobsConfig:
+    stored = await load_active(pool, "jobs", JobsConfig)
+    return stored.body if stored else JobsConfig()
 
 
 # ---------------------------------------------------------------------------
@@ -66,7 +71,7 @@ async def get_news(
         before_id=before_id,
         limit=limit,
     )
-    return await news_feed(pool, filters)
+    return await news_feed(pool, filters, await _jobs_config(pool))
 
 
 @router.get("/stories/disputed", tags=["news"])
@@ -178,13 +183,13 @@ async def get_reports(
     period: Annotated[Literal["daily", "weekly"] | None, Query()] = None,
     limit: Annotated[int, Query(ge=1, le=200)] = 60,
 ) -> list[ReportSummary]:
-    return await list_reports(pool, type, period, limit)
+    return await list_reports(pool, type, period, limit, await _jobs_config(pool))
 
 
 @router.get("/reports/{report_id}", tags=["reports"])
 async def get_report_by_id(report_id: int, pool: Pool, _owner: Owner) -> ReportOut:
     """A digest with every sentence's citations and the source list."""
-    report = await get_report(pool, report_id)
+    report = await get_report(pool, report_id, await _jobs_config(pool))
     if report is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, f"No report {report_id}")
     return report
@@ -205,7 +210,7 @@ async def get_escalations(
 
 @router.get("/escalations/{report_id}", tags=["reports"])
 async def get_escalation(report_id: int, pool: Pool, _owner: Owner) -> EscalationOut:
-    found = [e for e in await list_escalations(pool, None, 500) if e.id == report_id]
+    found = await list_escalations(pool, None, 1, report_id=report_id)
     if not found:
         raise HTTPException(status.HTTP_404_NOT_FOUND, f"No escalation {report_id}")
     return found[0]

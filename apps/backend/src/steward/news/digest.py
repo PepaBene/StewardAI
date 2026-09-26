@@ -34,6 +34,7 @@ from steward.config.jobs import DigestSettings, JobsConfig
 from steward.config.notifications import NotificationsConfig
 from steward.config.store import load_active
 from steward.config.thesis import ThesesConfig
+from steward.config.verification import ClaimVerifierSettings, VerificationConfig
 from steward.jobs.runner import JobContext, JobHandler
 from steward.news.link import short_name
 from steward.notify.channels import (
@@ -43,6 +44,15 @@ from steward.notify.channels import (
     channels_from_settings,
 )
 from steward.settings import get_settings
+from steward.verify.claims import (
+    CheckStatus,
+    Claim,
+    ClaimCheckOutcome,
+    ClaimCheckSummary,
+    ClaimVerifier,
+    ClaudeClaimVerifier,
+    check_claims,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -59,6 +69,12 @@ class Sentence(BaseModel):
     text: str
     news_item_ids: list[int] = Field(default_factory=list)
     fact_ids: list[int] = Field(default_factory=list)
+    check: CheckStatus | None = Field(
+        default=None,
+        description="The claim verifier's result: supported, unsupported (kept only in "
+        "'mark' mode) or unchecked (the verifier could not run). Null: not checked.",
+    )
+    check_reason: str | None = None
 
 
 class DigestSource(BaseModel):
@@ -68,6 +84,20 @@ class DigestSource(BaseModel):
     tier: int
     headline: str
     published_at: dt.datetime
+    summary: str | None = Field(default=None, description="The item's own text, as stored.")
+
+
+class DigestFactSource(BaseModel):
+    """A fact a digest sentence or verdict cites, with the snippet it was read from."""
+
+    fact_id: int
+    ticker: str
+    metric: str
+    period: str
+    value_as_written: str
+    snippet: str
+    source_url: str
+    status: str
 
 
 class DigestStory(BaseModel):
@@ -166,6 +196,10 @@ class DigestBody(BaseModel):
         default=0, description="Written sentences removed because they cited nothing given."
     )
     writer: str | None = None
+    fact_sources: list[DigestFactSource] = Field(default_factory=list)
+    claims: ClaimCheckSummary | None = Field(
+        default=None, description="The claim verifier's pass over the written sentences."
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -397,6 +431,7 @@ async def gather(
                 tier=item["tier"],
                 headline=item["headline"],
                 published_at=item["published_at"],
+                summary=item["summary"],
             )
             material.summaries[item["id"]] = item["summary"]
         section(story["ticker"]).stories.append(
@@ -607,7 +642,8 @@ def render_text(body: DigestBody, app_url: str | None, markdown: bool) -> str:
             if i in sources
         ]
         refs += [fact_link(f) for f in sentence.fact_ids]
-        return f" ({'; '.join(refs)})" if refs else ""
+        mark = " [not supported by its sources]" if sentence.check == "unsupported" else ""
+        return (f" ({'; '.join(refs)})" if refs else "") + mark
 
     title = f"{body.kind.capitalize()} digest, {body.window_end.date().isoformat()}"
     lines = [f"# {title}" if markdown else title, "", body.headline]
@@ -742,6 +778,68 @@ async def build_digest(
     return body, usage, note
 
 
+async def load_fact_sources(pool: asyncpg.Pool, fact_ids: set[int]) -> list[DigestFactSource]:
+    rows = await pool.fetch(
+        "select id, ticker, metric, period, value_as_written, snippet, source_url, status"
+        " from public.fact where id = any($1::bigint[]) order by id",
+        sorted(fact_ids),
+    )
+    return [
+        DigestFactSource(fact_id=r["id"], **{k: r[k] for k in r.keys() if k != "id"}) for r in rows
+    ]
+
+
+def cited_fact_ids(body: DigestBody) -> set[int]:
+    ids = {f for s in body.overview for f in s.fact_ids}
+    for section in body.sections:
+        ids |= {f for s in section.summary for f in s.fact_ids}
+        ids |= {f for v in section.verdicts for f in v.fact_ids}
+    ids |= {f for c in body.thesis_changes for f in c.fact_ids}
+    return ids
+
+
+def evidence_for(
+    sentence: Sentence, sources: dict[int, DigestSource], facts: dict[int, DigestFactSource]
+) -> tuple[str, ...]:
+    out: list[str] = []
+    for item_id in sentence.news_item_ids:
+        source = sources.get(item_id)
+        if source is not None:
+            out.append(" ".join(p for p in (source.headline, source.summary) if p))
+    for fact_id in sentence.fact_ids:
+        fact = facts.get(fact_id)
+        if fact is not None:
+            out.append(f"{fact.metric} {fact.period}: {fact.value_as_written}. {fact.snippet}")
+    return tuple(out)
+
+
+async def verify_digest_claims(
+    body: DigestBody,
+    settings: ClaimVerifierSettings,
+    verifier: ClaimVerifier | None,
+    today: dt.date,
+) -> ClaimCheckOutcome:
+    """Check every written sentence against what it cites; strip or mark the unsupported."""
+    sources = {s.news_item_id: s for s in body.sources}
+    facts = {f.fact_id: f for f in body.fact_sources}
+    lists: list[list[Sentence]] = [body.overview, *(s.summary for s in body.sections)]
+    placed = [(lst, sentence) for lst in lists for sentence in lst]
+    claims = [
+        Claim(i, sentence.text, evidence_for(sentence, sources, facts))
+        for i, (_, sentence) in enumerate(placed)
+    ]
+    outcome = await check_claims(claims, settings, verifier, today)
+    removed = 0
+    for i, (lst, sentence) in enumerate(placed):
+        result = outcome.results[i]
+        sentence.check, sentence.check_reason = result.status, result.reason
+        if result.status == "unsupported" and settings.mode == "strip":
+            lst.remove(sentence)
+            removed += 1
+    body.claims = outcome.summary(settings.mode, removed)
+    return outcome
+
+
 async def deliver(
     body: DigestBody, channels: dict[str, Channel], wanted: Sequence[str], app_url: str | None
 ) -> dict[str, dict[str, str]]:
@@ -771,6 +869,7 @@ async def run_digest(
     channels: dict[str, Channel],
     now: dt.datetime,
     app_url: str | None,
+    claim_verifier: ClaimVerifier | None = None,
 ) -> int:
     pool = ctx.pool
     async with ctx.step("load_config") as step:
@@ -778,10 +877,14 @@ async def run_digest(
         profiles = await load_active(pool, "holding_profiles", HoldingProfilesConfig)
         jobs = await load_active(pool, "jobs", JobsConfig)
         theses = await load_active(pool, "theses", ThesesConfig)
-        for stored in (notifications, profiles, jobs, theses):
+        verification = await load_active(pool, "verification", VerificationConfig)
+        for stored in (notifications, profiles, jobs, theses, verification):
             await ctx.record_config_version(stored.id if stored else None)
         notify = notifications.body if notifications else NotificationsConfig()
         settings = (jobs.body if jobs else JobsConfig()).digest
+        claim_settings = (
+            verification.body if verification else VerificationConfig()
+        ).claim_verifier
         step.detail["channels"] = notify.digest_channels
 
     async with ctx.step("write") as step:
@@ -803,6 +906,18 @@ async def run_digest(
         )
         if note:
             step.detail["note"] = note
+        body.fact_sources = await load_fact_sources(pool, cited_fact_ids(body))
+
+    written = [s for lst in (body.overview, *(x.summary for x in body.sections)) for s in lst]
+    if written and claim_settings.enabled and f"{kind}_digest" in claim_settings.applies_to:
+        async with ctx.step("verify_claims") as step:
+            outcome = await verify_digest_claims(body, claim_settings, claim_verifier, now.date())
+            if outcome.usage is not None:
+                step.usage = outcome.usage.step_usage()
+            assert body.claims is not None
+            step.detail.update(body.claims.model_dump(exclude_none=True))
+
+    async with ctx.step("store") as step:
         report_id: int = await pool.fetchval(
             "insert into public.report (type, period, title, body, body_md, period_start,"
             " period_end, config_version_ids, job_id)"
@@ -834,12 +949,19 @@ def _handler(kind: DigestKind) -> JobHandler:
         settings = get_settings()
         stored_jobs = await load_active(ctx.pool, "jobs", JobsConfig)
         digest_settings = (stored_jobs.body if stored_jobs else JobsConfig()).digest
+        stored_verification = await load_active(ctx.pool, "verification", VerificationConfig)
+        claim_settings = (
+            stored_verification.body if stored_verification else VerificationConfig()
+        ).claim_verifier
+        writer: DigestWriter | None
+        verifier: ClaimVerifier | None
         try:
-            writer: DigestWriter | None = ClaudeDigestWriter(
-                create_client(settings), digest_settings
-            )
+            client = create_client(settings)
         except AINotConfigured:
-            writer = None
+            writer = verifier = None
+        else:
+            writer = ClaudeDigestWriter(client, digest_settings)
+            verifier = ClaudeClaimVerifier(client, claim_settings.model)
         async with httpx.AsyncClient(
             timeout=30.0, headers={"User-Agent": f"StewardAI/{__version__}"}
         ) as http:
@@ -850,6 +972,7 @@ def _handler(kind: DigestKind) -> JobHandler:
                 channels=channels_from_settings(http, settings),
                 now=dt.datetime.now(dt.UTC),
                 app_url=settings.app_url,
+                claim_verifier=verifier,
             )
 
     return handler

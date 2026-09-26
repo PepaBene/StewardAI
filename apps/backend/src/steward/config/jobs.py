@@ -453,3 +453,16 @@ class JobsConfig(ConfigModel):
             "daily_digest": self.daily_digest,
             "weekly_digest": self.weekly_digest,
         }
+
+    def next_run_after(self, job_type: str, moment: dt.datetime) -> dt.datetime | None:
+        """The first scheduled run of `job_type` after `moment`; None when the job has no
+        schedule or it is disabled. Data a run produced is due for renewal at this time,
+        so a Friday digest is not stale on Saturday when digests run on weekdays only."""
+        schedule = self.schedules().get(job_type)
+        if schedule is None or not schedule.enabled:
+            return None
+        # Strictly after: a run created on its own slot is not due again at that slot.
+        fire: dt.datetime | None = schedule.trigger().get_next_fire_time(
+            None, moment + dt.timedelta(seconds=1)
+        )
+        return fire

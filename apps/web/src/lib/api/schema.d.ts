@@ -291,6 +291,27 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/jobs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Jobs
+         * @description The job log, newest first: every scheduled, manual and event-triggered run with its
+         *     outcome and cost. Filters combine (AND).
+         */
+        get: operations["list_jobs"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/jobs/{job_id}": {
         parameters: {
             query?: never;
@@ -1285,6 +1306,118 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/feedback": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Feedback
+         * @description Feedback given, newest first: to show the owner's earlier marks next to each item.
+         */
+        get: operations["get_feedback"];
+        put?: never;
+        /**
+         * Post Feedback
+         * @description Mark a fact, verdict, alert, news item, story or report sentence wrong, irrelevant or
+         *     useful. A fact marked wrong is quarantined and its holding's verdicts are re-judged by
+         *     the worker; wrong or useful moves the source's trust score. `effects` says what
+         *     happened.
+         */
+        post: operations["post_feedback"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/sources/trust": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Source Trust
+         * @description Every source whose trust feedback has moved, lowest first. Sources never judged are
+         *     at 1 and not listed.
+         */
+        get: operations["get_source_trust"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/config/event-rules/preview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Preview Event Rules
+         * @description Replay the last 7 days of stored stories and alerts under this draft (with the active
+         *     notification rules) and list every event whose alert outcome would change. Uses stored
+         *     classifications only: no model or network call, nothing saved.
+         */
+        post: operations["preview_event_rules"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/config/notifications/preview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Preview Notifications
+         * @description Replay the last 7 days under this draft notifications config (with the active event
+         *     rules): which alerts would have been sent, held or suppressed differently.
+         */
+        post: operations["preview_notifications"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/eval-candidates": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Eval Candidates
+         * @description Items marked wrong and added to an evaluation set. `exported_at` is set once
+         *     `python -m steward.verify.export_evals` has written them into the repository.
+         */
+        get: operations["get_eval_candidates"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -1671,6 +1804,40 @@ export interface components {
             /** Bucket */
             bucket?: string | null;
         };
+        /**
+         * ClaimCheckSummary
+         * @description What the claim verifier did to a report, stored with it.
+         */
+        ClaimCheckSummary: {
+            /**
+             * Mode
+             * @enum {string}
+             */
+            mode: "strip" | "mark";
+            /**
+             * Supported
+             * @default 0
+             */
+            supported: number;
+            /**
+             * Unsupported
+             * @default 0
+             */
+            unsupported: number;
+            /**
+             * Unchecked
+             * @default 0
+             */
+            unchecked: number;
+            /**
+             * Removed
+             * @description Unsupported sentences removed (strip mode).
+             * @default 0
+             */
+            removed: number;
+            /** Note */
+            note?: string | null;
+        };
         /** ClaimSource */
         ClaimSource: {
             /** Url */
@@ -1685,6 +1852,42 @@ export interface components {
             published_at?: string | null;
             /** News Item Id */
             news_item_id?: number | null;
+        };
+        /**
+         * ClaimVerifierSettings
+         * @description The claim verifier (layer 4): every model-written sentence is checked against the
+         *     snippets it cites before a report is stored or sent.
+         */
+        ClaimVerifierSettings: {
+            /**
+             * Enabled
+             * @default true
+             */
+            enabled: boolean;
+            /**
+             * Model
+             * @default claude-haiku-4-5
+             * @example claude-sonnet-5
+             */
+            model: string;
+            /**
+             * Mode
+             * @description strip: remove an unsupported sentence; mark: keep it, marked unsupported.
+             * @default strip
+             * @enum {string}
+             */
+            mode: "strip" | "mark";
+            /**
+             * Numeric Check
+             * @description Before the model call, code checks that every number in a sentence appears in a snippet it cites; a sentence that fails is unsupported without a call.
+             * @default true
+             */
+            numeric_check: boolean;
+            /**
+             * Applies To
+             * @description Reports whose sentences are checked. Alerts are composed in code from the source's own headline, so they have no model-written sentences to check.
+             */
+            applies_to?: ("daily_digest" | "weekly_digest" | "escalation")[];
         };
         /** ClosureConfirmation */
         ClosureConfirmation: {
@@ -1810,6 +2013,24 @@ export interface components {
             /** Correlation */
             correlation: number | null;
         };
+        /**
+         * CorroborationRules
+         * @description When a news story counts as confirmed (layer 2).
+         */
+        CorroborationRules: {
+            /**
+             * Tier1 Confirms Alone
+             * @description A tier-1 source (the company, a regulator, a statistics office) confirms a story on its own. Off: it counts as one independent source like a tier-2 outlet.
+             * @default true
+             */
+            tier1_confirms_alone: boolean;
+            /**
+             * Independent Sources To Confirm
+             * @description Independent tier-2 outlets (different stories, not copies of one wire story) needed to confirm a story.
+             * @default 2
+             */
+            independent_sources_to_confirm: number;
+        };
         /** DiffChange */
         DiffChange: {
             /**
@@ -1889,6 +2110,32 @@ export interface components {
             dropped_sentences: number;
             /** Writer */
             writer?: string | null;
+            /** Fact Sources */
+            fact_sources?: components["schemas"]["DigestFactSource"][];
+            /** @description The claim verifier's pass over the written sentences. */
+            claims?: components["schemas"]["ClaimCheckSummary"] | null;
+        };
+        /**
+         * DigestFactSource
+         * @description A fact a digest sentence or verdict cites, with the snippet it was read from.
+         */
+        DigestFactSource: {
+            /** Fact Id */
+            fact_id: number;
+            /** Ticker */
+            ticker: string;
+            /** Metric */
+            metric: string;
+            /** Period */
+            period: string;
+            /** Value As Written */
+            value_as_written: string;
+            /** Snippet */
+            snippet: string;
+            /** Source Url */
+            source_url: string;
+            /** Status */
+            status: string;
         };
         /** DigestRequest */
         DigestRequest: {
@@ -1959,6 +2206,11 @@ export interface components {
              * Format: date-time
              */
             published_at: string;
+            /**
+             * Summary
+             * @description The item's own text, as stored.
+             */
+            summary?: string | null;
         };
         /** DigestStory */
         DigestStory: {
@@ -2255,6 +2507,7 @@ export interface components {
             price_move?: {
                 [key: string]: unknown;
             } | null;
+            claims?: components["schemas"]["ClaimCheckSummary"] | null;
         };
         /** EscalationOut */
         EscalationOut: {
@@ -2272,6 +2525,23 @@ export interface components {
             body: components["schemas"]["EscalationBody"];
             /** Body Md */
             body_md: string;
+            /**
+             * Job Id
+             * @description The event_escalation run that wrote the note.
+             */
+            job_id: number | null;
+            /** Job Status */
+            job_status: ("queued" | "waiting" | "running" | "succeeded" | "failed") | null;
+            /**
+             * Cost Usd
+             * @description Model and search cost of that run (sum of its steps); null when no step recorded a cost.
+             */
+            cost_usd: number | null;
+            /**
+             * Models
+             * @description Models the run called.
+             */
+            models: string[];
         };
         /**
          * EscalationSettings
@@ -2322,6 +2592,11 @@ export interface components {
              * @enum {string}
              */
             kind: "story" | "search" | "price";
+            /**
+             * Snippet
+             * @description The stored text the note's sentences are checked against.
+             */
+            snippet?: string | null;
         };
         /** EurostatSeries */
         EurostatSeries: {
@@ -2343,6 +2618,35 @@ export interface components {
              * @default %
              */
             unit: string;
+        };
+        /** EvalCandidateOut */
+        EvalCandidateOut: {
+            /** Id */
+            id: number;
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "earnings_figure" | "news_label";
+            /** Fact Id */
+            fact_id: number | null;
+            /** News Item Id */
+            news_item_id: number | null;
+            /** Corrected */
+            corrected: {
+                [key: string]: unknown;
+            };
+            /** Note */
+            note: string | null;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Exported At */
+            exported_at: string | null;
+            /** Exported To */
+            exported_to: string | null;
         };
         /**
          * EventRulesConfig
@@ -2684,6 +2988,88 @@ export interface components {
             /** Detail */
             detail: string;
         };
+        /** FeedbackIn */
+        FeedbackIn: {
+            /**
+             * Target Kind
+             * @enum {string}
+             */
+            target_kind: "fact" | "verdict" | "alert" | "news_item" | "story" | "report_sentence";
+            /**
+             * Target Id
+             * @description The fact, verdict, alert, news item, story or report id.
+             */
+            target_id: number;
+            /**
+             * Sentence Path
+             * @description Report sentences only: where it sits in the report body, e.g. 'overview/0', 'sections/2/summary/1' (digest) or 'sentences/3' (impact note).
+             */
+            sentence_path?: string | null;
+            /**
+             * Rating
+             * @enum {string}
+             */
+            rating: "wrong" | "irrelevant" | "useful";
+            /** Note */
+            note?: string | null;
+            /**
+             * Add To Eval
+             * @description With rating 'wrong' on a fact or news item: add it to the golden or labelled evaluation set with the corrected value or label.
+             * @default false
+             */
+            add_to_eval: boolean;
+            /**
+             * Corrected Value
+             * @description Facts: the right value, in the fact's printed scale.
+             */
+            corrected_value?: number | string | null;
+            /**
+             * Corrected Value As Written
+             * @description Facts added to the golden set: the right number exactly as printed, when it differs from the stored one (e.g. '94,036').
+             */
+            corrected_value_as_written?: string | null;
+            /**
+             * Corrected Snippet
+             * @description Facts added to the golden set: the document passage that states the right number, when the stored snippet does not contain it.
+             */
+            corrected_snippet?: string | null;
+            corrected_label?: components["schemas"]["NewsLabel"] | null;
+        };
+        /** FeedbackOut */
+        FeedbackOut: {
+            /** Id */
+            id: number;
+            /**
+             * Target Kind
+             * @enum {string}
+             */
+            target_kind: "fact" | "verdict" | "alert" | "news_item" | "story" | "report_sentence";
+            /** Target Id */
+            target_id: number;
+            /** Sentence Path */
+            sentence_path: string | null;
+            /**
+             * Rating
+             * @enum {string}
+             */
+            rating: "wrong" | "irrelevant" | "useful";
+            /** Note */
+            note: string | null;
+            /** Source Hosts */
+            source_hosts: string[];
+            /**
+             * Effects
+             * @description What the feedback did: quarantined fact, verdict job, trust scores, eval candidate.
+             */
+            effects: {
+                [key: string]: unknown;
+            };
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+        };
         /** FredSeries */
         FredSeries: {
             /** Key */
@@ -2889,6 +3275,11 @@ export interface components {
              * @description Waiting for the owner to confirm.
              */
             suggested: components["schemas"]["RelationshipOut"][];
+            /**
+             * Disputed
+             * @description A tier-3 claim a tier-1 source contradicts; `conflict` holds the other source's version. Waiting for the owner.
+             */
+            disputed?: components["schemas"]["RelationshipOut"][];
             /**
              * Related
              * @description Confirmed competitors, suppliers and customers.
@@ -3112,6 +3503,55 @@ export interface components {
             };
             /** Steps */
             steps: components["schemas"]["JobStepOut"][];
+        };
+        /** JobList */
+        JobList: {
+            /** Jobs */
+            jobs: components["schemas"]["JobListItem"][];
+            /**
+             * Next Before Id
+             * @description Pass as before_id for the next page.
+             */
+            next_before_id: number | null;
+        };
+        /** JobListItem */
+        JobListItem: {
+            /** Id */
+            id: number;
+            /** Job Type */
+            job_type: string;
+            /** Trigger */
+            trigger: string;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "queued" | "waiting" | "running" | "succeeded" | "failed";
+            /** Error */
+            error: string | null;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Started At */
+            started_at: string | null;
+            /** Finished At */
+            finished_at: string | null;
+            /** Params */
+            params: {
+                [key: string]: unknown;
+            };
+            /**
+             * Cost Usd
+             * @description Sum of the run's step costs; null if none.
+             */
+            cost_usd: number | null;
+            /**
+             * Failed Step
+             * @description The first failed step's name, if any.
+             */
+            failed_step: string | null;
         };
         /** JobSchedule */
         JobSchedule: {
@@ -3428,6 +3868,11 @@ export interface components {
              */
             next_before_id: number | null;
             last_ingest: components["schemas"]["JobSummary"] | null;
+            /**
+             * Next Ingest Due At
+             * @description The scheduled news check after the last one: the feed is stale once this has passed (plus a margin) with no newer check. Null when the job is disabled.
+             */
+            next_ingest_due_at?: string | null;
         };
         /** NewsItemOut */
         NewsItemOut: {
@@ -3465,6 +3910,23 @@ export interface components {
             /** Relevant */
             relevant: boolean | null;
             story: components["schemas"]["StoryOut"];
+        };
+        /**
+         * NewsLabel
+         * @description The right classification of a news item, for the labelled set.
+         */
+        NewsLabel: {
+            /**
+             * Event Type
+             * @enum {string}
+             */
+            event_type: "guidance_change" | "m_and_a" | "dividend_cut" | "earnings_release" | "management_change" | "regulatory_legal" | "capital_allocation" | "credit_rating" | "central_bank" | "macro_surprise" | "insider_transaction" | "product_business" | "sector_competitor" | "index_change" | "analyst_rating" | "delisting" | "entity_status" | "other";
+            /** Affected Ticker */
+            affected_ticker: string | null;
+            /** Relevant */
+            relevant: boolean;
+            /** Rumour */
+            rumour: boolean;
         };
         /**
          * NewsSettings
@@ -3624,6 +4086,13 @@ export interface components {
             text: string;
             /** Source Urls */
             source_urls?: string[];
+            /**
+             * Check
+             * @description The claim verifier's result; null when not checked.
+             */
+            check?: ("supported" | "unsupported" | "unchecked") | null;
+            /** Check Reason */
+            check_reason?: string | null;
         };
         /** NotificationRule */
         NotificationRule: {
@@ -4149,12 +4618,100 @@ export interface components {
              * Status
              * @enum {string}
              */
-            status: "confirmed" | "suggested" | "rejected";
+            status: "confirmed" | "suggested" | "rejected" | "disputed";
             /**
              * Tier
              * @description 1 GLEIF or a filing, 3 Wikidata; owner decisions win.
              */
             tier: number;
+            /**
+             * Conflict
+             * @description Disputed: the contradicting source's claim (source, tier, object_name, source_ref).
+             */
+            conflict?: {
+                [key: string]: unknown;
+            } | null;
+        };
+        /** ReplayChange */
+        ReplayChange: {
+            /**
+             * Key
+             * @description story:<id> or alert:<kind>:<id>.
+             */
+            key: string;
+            /** Kind */
+            kind: string;
+            /**
+             * At
+             * Format: date-time
+             */
+            at: string;
+            /** Cluster Id */
+            cluster_id: number | null;
+            /** Ticker */
+            ticker: string | null;
+            /** Event Type */
+            event_type: string | null;
+            /** Headline */
+            headline: string;
+            before: components["schemas"]["ReplayOutcome"];
+            after: components["schemas"]["ReplayOutcome"];
+        };
+        /** ReplayOutcome */
+        ReplayOutcome: {
+            /** Severity */
+            severity: number;
+            /**
+             * Decision
+             * @description What routing decided, in one line.
+             */
+            decision: string;
+            /**
+             * Channels
+             * @description Channels an alert would be sent or held for.
+             */
+            channels: string[];
+            /** Held Until */
+            held_until?: string | null;
+            /** Suppressed */
+            suppressed?: string | null;
+        };
+        /** ReplayPreview */
+        ReplayPreview: {
+            /**
+             * Domain
+             * @enum {string}
+             */
+            domain: "event_rules" | "notifications";
+            /**
+             * Window Start
+             * Format: date-time
+             */
+            window_start: string;
+            /**
+             * Window End
+             * Format: date-time
+             */
+            window_end: string;
+            /**
+             * Events
+             * @description Stored stories and alerts replayed.
+             */
+            events: number;
+            /**
+             * Alerts Before
+             * @description Events that would alert under the active config.
+             */
+            alerts_before: number;
+            /**
+             * Alerts After
+             * @description Events that would alert under the draft.
+             */
+            alerts_after: number;
+            /** Changes */
+            changes: components["schemas"]["ReplayChange"][];
+            /** Elapsed Ms */
+            elapsed_ms: number;
         };
         /** ReportOut */
         ReportOut: {
@@ -4187,6 +4744,11 @@ export interface components {
                     [key: string]: string;
                 };
             };
+            /**
+             * Next Due At
+             * @description When the next report of this kind is scheduled.
+             */
+            next_due_at?: string | null;
         };
         /** ReportSummary */
         ReportSummary: {
@@ -4216,6 +4778,11 @@ export interface components {
                     [key: string]: string;
                 };
             };
+            /**
+             * Next Due At
+             * @description When the next report of this kind is scheduled: this one is current until then. Null for unscheduled kinds or a disabled schedule.
+             */
+            next_due_at?: string | null;
         };
         /** ReportingExceptionOut */
         ReportingExceptionOut: {
@@ -4311,6 +4878,13 @@ export interface components {
             news_item_ids?: number[];
             /** Fact Ids */
             fact_ids?: number[];
+            /**
+             * Check
+             * @description The claim verifier's result: supported, unsupported (kept only in 'mark' mode) or unchecked (the verifier could not run). Null: not checked.
+             */
+            check?: ("supported" | "unsupported" | "unchecked") | null;
+            /** Check Reason */
+            check_reason?: string | null;
         };
         /** SeverityOverride */
         SeverityOverride: {
@@ -4326,6 +4900,27 @@ export interface components {
             event_type: "guidance_change" | "m_and_a" | "dividend_cut" | "earnings_release" | "management_change" | "regulatory_legal" | "capital_allocation" | "credit_rating" | "central_bank" | "macro_surprise" | "insider_transaction" | "product_business" | "sector_competitor" | "index_change" | "analyst_rating" | "delisting" | "entity_status" | "other";
             /** Severity */
             severity: number;
+        };
+        /** SourceTrustOut */
+        SourceTrustOut: {
+            /** Host */
+            host: string;
+            /** Score */
+            score: number;
+            /** Wrong Count */
+            wrong_count: number;
+            /** Useful Count */
+            useful_count: number;
+            /**
+             * Demoted
+             * @description Below the threshold: counts one tier lower.
+             */
+            demoted: boolean;
+            /**
+             * Updated At
+             * Format: date-time
+             */
+            updated_at: string;
         };
         /** StoryOut */
         StoryOut: {
@@ -4718,6 +5313,30 @@ export interface components {
              */
             next_cursor: string | null;
         };
+        /**
+         * TrustSettings
+         * @description Source trust (layer 1): owner feedback moves a source's score between 0 and 1.
+         */
+        TrustSettings: {
+            /**
+             * Wrong Penalty
+             * @description Score lost each time the owner marks it wrong.
+             * @default 0.2
+             */
+            wrong_penalty: number;
+            /**
+             * Useful Reward
+             * @description Score gained each time the owner marks it useful.
+             * @default 0.05
+             */
+            useful_reward: number;
+            /**
+             * Demote Below
+             * @description A source scoring below this counts one tier lower in corroboration (tier 1 as tier 2, tier 2 as tier 3).
+             * @default 0.6
+             */
+            demote_below: number;
+        };
         /** ValidationError */
         ValidationError: {
             /** Location */
@@ -4823,6 +5442,9 @@ export interface components {
              * @default 150
              */
             max_report_lag_days: number;
+            corroboration?: components["schemas"]["CorroborationRules"];
+            trust?: components["schemas"]["TrustSettings"];
+            claim_verifier?: components["schemas"]["ClaimVerifierSettings"];
         };
         /** VerificationConfigVersion */
         VerificationConfigVersion: {
@@ -5271,6 +5893,43 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["JobSummary"];
+                };
+            };
+        };
+    };
+    list_jobs: {
+        parameters: {
+            query?: {
+                /** @description Any of these job types. */
+                job_type?: string[] | null;
+                status?: ("queued" | "waiting" | "running" | "succeeded" | "failed")[] | null;
+                /** @description Runs for this holding. */
+                ticker?: string | null;
+                before_id?: number | null;
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["JobList"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };
@@ -6966,6 +7625,180 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["JobSummary"];
+                };
+            };
+        };
+    };
+    get_feedback: {
+        parameters: {
+            query?: {
+                target_kind?: ("fact" | "verdict" | "alert" | "news_item" | "story" | "report_sentence") | null;
+                /** @description Any of these ids. */
+                target_id?: number[] | null;
+                since?: string | null;
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FeedbackOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    post_feedback: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["FeedbackIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FeedbackOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_source_trust: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SourceTrustOut"][];
+                };
+            };
+        };
+    };
+    preview_event_rules: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["EventRulesConfig"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReplayPreview"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    preview_notifications: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["NotificationsConfig"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReplayPreview"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_eval_candidates: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EvalCandidateOut"][];
                 };
             };
         };
