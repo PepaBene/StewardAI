@@ -300,4 +300,12 @@ async def chat_handler(ctx: JobContext) -> None:
         )
     except AINotConfigured:
         assistant = None
-    await run_chat(ctx, ChatDeps(assistant=assistant, now=dt.datetime.now(dt.UTC)))
+    try:
+        await run_chat(ctx, ChatDeps(assistant=assistant, now=dt.datetime.now(dt.UTC)))
+    except Exception:
+        # The job failed before it wrote an answer: the question must not stay pending.
+        await ctx.pool.execute(
+            "update public.chat_message set status = 'failed' where id = $1 and status = 'pending'",
+            int(ctx.params.get("message_id", 0)),
+        )
+        raise

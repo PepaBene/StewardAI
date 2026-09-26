@@ -24,6 +24,7 @@ from steward.chat.assistant import (
     AssistantResult,
     ChatAnswerDraft,
     ChatDeps,
+    chat_handler,
     run_chat,
 )
 from steward.chat.tools import ChatTools
@@ -736,3 +737,22 @@ async def test_the_second_question_sends_the_conversation_so_far(
     assert assistant.history[0]["content"] == "First?"
     listed = (await api.get("/chat/conversations")).json()
     assert listed[0]["title"] == "Apple" and listed[0]["last_message"]
+
+
+async def test_a_failed_chat_job_does_not_leave_the_question_pending(
+    api: httpx.AsyncClient, backend_pool: asyncpg.Pool, migrated_db: MigratedDatabase,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:  # fmt: skip
+    needs_pgmq(migrated_db)
+    conv = (await api.post("/chat/conversations", json={})).json()
+    posted = (await api.post(f"/chat/conversations/{conv['id']}/messages",
+                             json={"content": "Hi"})).json()  # fmt: skip
+
+    async def broken(ctx: JobContext, deps: Any) -> int:
+        raise RuntimeError("database went away")
+
+    monkeypatch.setattr("steward.chat.assistant.run_chat", broken)
+    assert await run_job(backend_pool, "chat", chat_handler, trigger="chat",
+                         job_id=posted["job_id"]) == "failed"  # fmt: skip
+    detail = (await api.get(f"/chat/conversations/{conv['id']}")).json()
+    assert detail["messages"][0]["status"] == "failed"
