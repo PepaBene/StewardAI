@@ -100,3 +100,27 @@ describe("command palette: phase 4", () => {
     expect(filterCommands(commands, "missed runs").map((c) => c.href)).toContain("/activity#alerts");
   });
 });
+
+describe("command palette: phase 5", () => {
+  it("opens the chat panel from the palette", () => {
+    const [first] = filterCommands(commands, "open chat");
+    expect(first).toMatchObject({ id: "ui:chat", ui: "open-chat" });
+    expect(first.href).toBeUndefined();
+    expect(filterCommands(commands, "chat").map((c) => c.href)).toContain("/chat");
+  });
+
+  it("reaches research, the monthly reviews, the report search and the research profiles", () => {
+    expect(filterCommands(commands, "research")[0].href).toBe("/research");
+    expect(filterCommands(commands, "monthly reviews")[0].href).toBe("/reviews");
+    expect(filterCommands(commands, "search reports")[0].href).toBe("/reports?type=research");
+    expect(filterCommands(commands, "research profiles").map((c) => c.href)).toContain("/config/research-profiles");
+    expect(filterCommands(commands, "history research").map((c) => c.href)).toContain("/config/history/research-profiles");
+  });
+
+  it("runs the monthly review, the 13F load and research on a holding", () => {
+    expect(filterCommands(commands, "monthly review now")[0].action).toEqual({ kind: "monthly-review" });
+    expect(filterCommands(commands, "13f")[0].action).toEqual({ kind: "ownership-13f" });
+    expect(filterCommands(commands, "research apple")[0].action).toEqual({ kind: "research", ticker: "AAPL_US_EQ" });
+    expect(filterCommands(commands, "", 100).some((c) => c.id.startsWith("research:"))).toBe(false);
+  });
+});

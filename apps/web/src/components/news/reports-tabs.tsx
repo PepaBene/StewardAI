@@ -5,12 +5,14 @@ import { cn } from "@/lib/utils";
 const TABS = [
   { id: "daily", label: "Daily digests", href: "/reports" },
   { id: "weekly", label: "Weekly digests", href: "/reports?period=weekly" },
+  { id: "reviews", label: "Monthly reviews", href: "/reviews" },
   { id: "escalations", label: "Impact notes", href: "/escalations" },
+  { id: "research", label: "Research", href: "/research" },
 ] as const;
 
 export type ReportsTab = (typeof TABS)[number]["id"];
 
-/** Tabs of the Reports section: the digests by period and the escalation notes. */
+/** Tabs of the Reports section: the digests by period, monthly reviews, impact notes and research. */
 export function ReportsTabs({ active }: { active: ReportsTab }) {
   return (
     <nav aria-label="Report type" className="flex gap-1 overflow-x-auto border-b border-border">

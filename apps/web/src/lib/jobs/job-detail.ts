@@ -15,6 +15,8 @@ const OTHER_JOB_LABELS: Record<string, string> = {
   earnings_check: "Earnings check",
   thesis_verdicts: "Thesis verdicts",
   event_escalation: "Event escalation",
+  research: "Research",
+  chat: "Chat answer",
 };
 
 export function jobTypeLabel(jobType: string): string {

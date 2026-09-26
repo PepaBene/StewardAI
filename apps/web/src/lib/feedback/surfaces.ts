@@ -51,5 +51,11 @@ export const FEEDBACK_SURFACES: readonly FeedbackSurface[] = [
     file: "src/app/(app)/escalations/[id]/escalation-view.tsx",
     kinds: ["report_sentence"],
   },
+  {
+    surface: "Research report: each section sentence",
+    route: "/research/[id]",
+    file: "src/app/(app)/research/[id]/research-report-view.tsx",
+    kinds: ["report_sentence"],
+  },
   { surface: "Activity: alerts (system, or all)", route: "/activity", file: "src/app/(app)/activity/alerts-panel.tsx", kinds: ["alert"] },
 ];

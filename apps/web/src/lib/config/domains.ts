@@ -14,6 +14,7 @@ export const CONFIG_DOMAINS: Record<ConfigDomainSlug, { label: string; editor: s
   "news-sources": { label: "News sources", editor: "/config/news-sources" },
   "event-rules": { label: "Event rules", editor: "/config/event-rules" },
   notifications: { label: "Notifications", editor: "/config/notifications" },
+  "research-profiles": { label: "Research profiles", editor: "/config/research-profiles" },
   budget: { label: "Budget", editor: null, note: "Editor in phase 6" },
 };
 

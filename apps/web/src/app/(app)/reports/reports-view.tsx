@@ -9,17 +9,20 @@ import { AlertMessage } from "@/components/alert-message";
 import { EmptyState } from "@/components/empty-state";
 import { AsOfLabel } from "@/components/freshness/as-of-label";
 import { ReportsTabs } from "@/components/news/reports-tabs";
+import { ReportSearch } from "@/components/reports/report-search";
 import { Button } from "@/components/ui/button";
 import { getBrowserApiClient, type ReportSummary } from "@/lib/api/client";
 import { formatDate } from "@/lib/format";
 import { digestFreshnessKind } from "@/lib/freshness";
 import { jobHref } from "@/lib/jobs/job-detail";
+import { searchFromParams } from "@/lib/reports/search";
 
 type Period = "daily" | "weekly";
 
 export function ReportsView() {
   const params = useSearchParams();
   const period: Period = params.get("period") === "weekly" ? "weekly" : "daily";
+  const search = searchFromParams(params);
   const [reports, setReports] = useState<ReportSummary[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [queued, setQueued] = useState<{ text: string; jobId: number | null } | null>(null);
@@ -65,8 +68,9 @@ export function ReportsView() {
         <div>
           <h1 className="text-2xl font-semibold tracking-tight">Reports</h1>
           <p className="mt-1 max-w-prose text-sm text-text-muted">
-            Daily and weekly digests, and the impact notes on confirmed events. Every sentence links to the
-            news items or figures it was written from; a day with nothing material says so.
+            The archive: daily and weekly digests, monthly reviews, impact notes on confirmed events and research
+            reports, searchable in full text. Every sentence links to the items or figures it was written from; a
+            day with nothing material says so.
           </p>
         </div>
         <div className="flex flex-col items-end gap-2">
@@ -100,6 +104,8 @@ export function ReportsView() {
           ) : null}
         </AlertMessage>
       ) : null}
+
+      <ReportSearch key={search.q} state={search} />
 
       <ReportsTabs active={period} />
 

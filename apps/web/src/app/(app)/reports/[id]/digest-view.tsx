@@ -9,6 +9,7 @@ import {
   LoaderCircleIcon,
   ScaleIcon,
   TriangleAlertIcon,
+  UsersIcon,
 } from "lucide-react";
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
@@ -50,6 +51,7 @@ import {
   thesisChangeText,
 } from "@/lib/news/digest";
 import { eventLabel, TIERS } from "@/lib/news/labels";
+import { edgarFilingUrl, isNewPosition, managerChangeText, OWNERSHIP_NOTE, sortManagerChanges } from "@/lib/reference/ownership";
 
 export function DigestView({ id }: { id: number }) {
   const fetcher = useCallback(
@@ -376,13 +378,14 @@ function SourceCard({
 const SECTION = "space-y-2 rounded-lg border border-border bg-surface-raised p-4";
 const LINK = "text-accent underline-offset-4 hover:underline";
 
-/** Portfolio flags, thesis status changes, reviews due, macro figures and market holidays. */
+/** Portfolio flags, thesis status changes, reviews due, macro figures, tracked managers (13F) and market holidays. */
 function StatusSections({ body, facts }: { body: DigestBody; facts: Map<number, DigestFactSource> }) {
   const flags = sortFlags(body.portfolio ?? []);
   const changes = body.thesis_changes ?? [];
   const reviews = body.reviews_due ?? [];
   const macro = sortMacro(body.macro ?? []);
   const holidays = groupHolidays(body.holidays ?? []);
+  const managers = sortManagerChanges(body.ownership_changes ?? []);
   return (
     <div className="space-y-4">
       {flags.length > 0 ? (
@@ -499,6 +502,52 @@ function StatusSections({ body, facts }: { body: DigestBody; facts: Map<number, 
               </tbody>
             </table>
           </div>
+        </section>
+      ) : null}
+
+      {managers.length > 0 ? (
+        <section aria-labelledby="digest-managers" className={SECTION}>
+          <h2 id="digest-managers" className="flex items-center gap-1.5 text-lg font-semibold">
+            <UsersIcon aria-hidden="true" className="size-4 text-text-muted" />
+            Tracked managers (13F)
+          </h2>
+          <p className="text-xs text-text-muted">
+            New and exited positions of the managers you track, in your holdings, from 13F filings received in the period.{" "}
+            {OWNERSHIP_NOTE}
+          </p>
+          <ul className="space-y-1.5 text-sm">
+            {managers.map((c) => {
+              const filing = edgarFilingUrl(c.cik, c.accession);
+              return (
+                <li key={`${c.cik}:${c.ticker}:${c.change}:${c.period}`} className="flex flex-wrap items-center gap-x-2 gap-y-0.5">
+                  <span className="rounded-sm border border-border px-1.5 py-0.5 text-xs font-medium">
+                    {isNewPosition(c) ? "New position" : c.change === "exited" ? "Exited" : c.change}
+                  </span>
+                  <span className="font-medium">{c.manager_name ?? `CIK ${c.cik}`}</span>
+                  <Link href={`/holdings/${encodeURIComponent(c.ticker)}#ownership-heading`} className="font-mono text-xs text-accent hover:underline">
+                    {c.ticker}
+                  </Link>
+                  <span>{managerChangeText(c)}</span>
+                  <span className="num text-xs text-text-muted">
+                    quarter ended {formatDate(c.period)} (against {formatDate(c.previous_period)})
+                  </span>
+                  {filing ? (
+                    <a href={filing} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-xs text-accent hover:underline">
+                      filing {c.accession}
+                      <ExternalLinkIcon aria-hidden="true" className="size-3" />
+                    </a>
+                  ) : (
+                    <span className="font-mono text-xs text-text-muted">{c.accession}</span>
+                  )}
+                </li>
+              );
+            })}
+          </ul>
+          <p className="text-xs">
+            <Link href="/config/jobs#ownership-heading" className={LINK}>
+              Tracked managers in Config: Jobs
+            </Link>
+          </p>
         </section>
       ) : null}
 

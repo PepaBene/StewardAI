@@ -82,6 +82,11 @@ export function noteSentencePath(sentence: number): string {
   return `sentences/${index(sentence)}`;
 }
 
+/** A sentence of a research report section: "sections/<s>/sentences/<i>". */
+export function researchSentencePath(section: number, sentence: number): string {
+  return `sections/${index(section)}/sentences/${index(sentence)}`;
+}
+
 export function isSentencePath(path: string): boolean {
   return PATH.test(path);
 }

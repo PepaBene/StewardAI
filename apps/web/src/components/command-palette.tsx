@@ -1,10 +1,11 @@
 "use client";
 
-import { ArrowRightIcon, CommandIcon, LoaderCircleIcon, PlayIcon, SearchIcon } from "lucide-react";
+import { ArrowRightIcon, CommandIcon, LoaderCircleIcon, MessageSquareIcon, PlayIcon, SearchIcon } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
 
+import { openChatPanel } from "@/components/chat/chat-panel";
 import { Button } from "@/components/ui/button";
 import { getBrowserApiClient, type Holding } from "@/lib/api/client";
 import { jobHref } from "@/lib/jobs/job-detail";
@@ -42,6 +43,13 @@ function queue(action: PaletteAction) {
       return api.POST("/jobs/holiday-refresh");
     case "macro-collect":
       return api.POST("/jobs/macro-collect");
+    case "monthly-review":
+      return api.POST("/jobs/monthly-review");
+    case "ownership-13f":
+      return api.POST("/jobs/ownership-13f");
+    case "research":
+      // The default research profile.
+      return api.POST("/jobs/research", { body: { ticker: action.ticker } });
   }
 }
 
@@ -95,6 +103,11 @@ export function CommandPalette() {
 
   async function execute(command: PaletteCommand | undefined) {
     if (!command) return;
+    if (command.ui === "open-chat") {
+      dialog.current?.close();
+      openChatPanel();
+      return;
+    }
     if (command.href) {
       dialog.current?.close();
       router.push(command.href);
@@ -175,7 +188,7 @@ export function CommandPalette() {
                 i === selected ? "bg-surface-muted text-text" : "text-text-muted",
               )}
             >
-              {c.action ? <PlayIcon aria-hidden="true" className="size-4" /> : <ArrowRightIcon aria-hidden="true" className="size-4" />}
+              {c.ui ? <MessageSquareIcon aria-hidden="true" className="size-4" /> : c.action ? <PlayIcon aria-hidden="true" className="size-4" /> : <ArrowRightIcon aria-hidden="true" className="size-4" />}
               <span className="flex-1 text-text">{c.label}</span>
               <span className="text-xs text-text-muted">{c.group}</span>
             </li>

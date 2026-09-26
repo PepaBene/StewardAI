@@ -20,7 +20,7 @@ const DOMAINS: { slug: ConfigDomainSlug; href: string; title: string; body: stri
     slug: "jobs",
     href: "/config/jobs",
     title: "Jobs",
-    body: "When each scheduled job runs, whether it runs, its time zone, the models and caps of the jobs that call Claude, reference data, price benchmarks and the holiday calendar.",
+    body: "When each scheduled job runs, whether it runs, its time zone, the models and caps of the jobs that call Claude (including chat and the monthly review), reference data, price benchmarks, the holiday calendar and 13F ownership with tracked managers.",
   },
   {
     slug: "theses",
@@ -58,10 +58,15 @@ const DOMAINS: { slug: ConfigDomainSlug; href: string; title: string; body: stri
     title: "Verification",
     body: "Sanity bounds and tolerances for extracted figures, the corroboration rules, source trust from your feedback, and the claim verifier.",
   },
+  {
+    slug: "research-profiles",
+    href: "/config/research-profiles",
+    title: "Research profiles",
+    body: "The shapes a research run can take: sections and their order, depth, model, effort, step and search caps, source tiers, peers, valuation methods and language.",
+  },
 ];
 
 const LATER: { title: string; note: string; slug?: ConfigDomainSlug }[] = [
-  { title: "Research profiles", note: "Sections, depth, model and budgets per research run; phase 5" },
   { title: "Budget", note: "Monthly and per-job caps and what happens at the cap; editor in phase 6", slug: "budget" },
 ];
 

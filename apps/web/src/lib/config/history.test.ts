@@ -67,8 +67,10 @@ describe("error lists", () => {
 
 describe("config domains and files", () => {
   it("covers every domain slug and maps export names", () => {
-    expect(DOMAIN_SLUGS).toHaveLength(9);
+    expect(DOMAIN_SLUGS).toHaveLength(10);
     expect(domainFromName("holding_profiles")).toBe("holding-profiles");
+    expect(domainFromName("research_profiles")).toBe("research-profiles");
+    expect(CONFIG_DOMAINS["research-profiles"].editor).toBe("/config/research-profiles");
     expect(domainFromName("research")).toBeNull();
     expect(isDomainSlug("toString")).toBe(false);
     expect(CONFIG_DOMAINS.budget.editor).toBeNull();

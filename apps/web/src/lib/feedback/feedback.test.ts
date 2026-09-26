@@ -10,10 +10,12 @@ import {
   digestSectionPath,
   effectParts,
   emptyDraft,
+  isSentencePath,
   latestMarks,
   markKey,
   NOTE_MAX,
   noteSentencePath,
+  researchSentencePath,
   summarizeEffects,
 } from "./feedback";
 
@@ -35,6 +37,9 @@ describe("sentence paths", () => {
     expect(digestOverviewPath(0)).toBe("overview/0");
     expect(digestSectionPath(2, 1)).toBe("sections/2/summary/1");
     expect(noteSentencePath(3)).toBe("sentences/3");
+    // The backend's sentence_at walks dict keys and list indices, so this addresses a research sentence.
+    expect(researchSentencePath(1, 4)).toBe("sections/1/sentences/4");
+    expect(isSentencePath(researchSentencePath(0, 0))).toBe(true);
     expect(() => digestOverviewPath(-1)).toThrow();
     expect(() => noteSentencePath(1.5)).toThrow();
   });

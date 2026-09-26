@@ -195,5 +195,7 @@ export function groupHolidays(holidays: MarketHoliday[]): { date: string; entrie
 
 /** Whether any of the digest's portfolio, thesis, review, macro or holiday lists has entries. */
 export function hasStatusSections(body: DigestBody): boolean {
-  return [body.portfolio, body.thesis_changes, body.reviews_due, body.macro, body.holidays].some((l) => (l ?? []).length > 0);
+  return [body.portfolio, body.thesis_changes, body.reviews_due, body.macro, body.holidays, body.ownership_changes].some(
+    (l) => (l ?? []).length > 0,
+  );
 }

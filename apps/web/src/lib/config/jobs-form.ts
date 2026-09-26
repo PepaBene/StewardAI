@@ -24,7 +24,10 @@ export type SettingsKey =
   | "monitoring"
   | "reference"
   | "prices"
-  | "calendar";
+  | "calendar"
+  | "chat"
+  | "review"
+  | "ownership";
 type Settings<S extends SettingsKey> = NonNullable<JobsConfig[S]>;
 
 /** Labels and the backend's default cron per known schedule (apps/backend/src/steward/config/jobs.py). */
@@ -93,6 +96,17 @@ export const SCHEDULES: Record<ScheduleKey, { label: string; description: string
     label: "Weekly digest",
     description: "Digest of the last 7 days.",
     cron: "0 18 * * 0",
+  },
+  monthly_review: {
+    label: "Monthly review",
+    description:
+      "Strategy compliance, thesis KPIs and proposed actions for the month. A scheduled run does nothing unless it is the first weekday of the month, so the default fires on the 1st to 3rd and only one of them writes the review.",
+    cron: "0 7 1-3 * *",
+  },
+  ownership_13f: {
+    label: "Institutional ownership (13F)",
+    description: "Load new SEC Form 13F data sets (published quarterly, about 100 MB each).",
+    cron: "0 5 5 * *",
   },
 };
 export const SCHEDULE_KEYS = Object.keys(SCHEDULES) as ScheduleKey[];
@@ -166,6 +180,15 @@ export const DEFAULT_JOBS: JobsConfig = {
   reference: { openfigi_refresh_days: 30, wikidata_enabled: true, wikidata_refresh_days: 30, max_subsidiary_aliases: 50 },
   prices: { benchmark_symbols: ["^spx"], history_years: 2, plausibility_tolerance_pct: 1 },
   calendar: { holiday_countries: ["CZ", "US", "DE", "GB"], exchange_closures: [] },
+  chat: { model: "claude-sonnet-5", max_steps: 6, max_searches: 3, history_messages: 12 },
+  review: { model: "claude-opus-5-5", effort: "high", max_steps: 3, liquidity_days: 1 },
+  ownership: {
+    enabled: true,
+    index_url: "https://www.sec.gov/data-research/sec-markets-data/form-13f-data-sets",
+    datasets_per_run: 2,
+    tracked_managers: [],
+    top_holders: 10,
+  },
 };
 
 /** Model ids offered as suggestions; any `claude-…` id is accepted. */
@@ -180,7 +203,7 @@ export type SettingField<S extends SettingsKey> = {
    * commas or spaces. `words`: a list of identifiers as typed, separated by commas or spaces.
    * `number`: a decimal.
    */
-  kind: "model" | "int" | "number" | "bool" | "effort" | "int-list" | "severity" | "lines" | "codes" | "words";
+  kind: "model" | "text" | "int" | "number" | "bool" | "effort" | "int-list" | "severity" | "lines" | "codes" | "words";
   hint?: string;
   min?: number;
   max?: number;
@@ -285,6 +308,41 @@ export const SETTINGS: { [S in SettingsKey]: { title: string; description: strin
       { key: "holiday_countries", label: "Public-holiday countries", kind: "codes", hint: "Two-letter codes, e.g. CZ, US, DE, GB." },
     ],
   },
+  chat: {
+    title: "Chat",
+    description: "The chat panel's assistant: reads the app's records, searches tier-1 and tier-2 outlets, and cites every sentence.",
+    fields: [
+      { key: "model", label: "Model", kind: "model" },
+      { key: "max_steps", label: "Step cap per answer", kind: "int", min: 1, max: 20, hint: "Claude calls plus tool rounds." },
+      { key: "max_searches", label: "Web searches per answer", kind: "int", min: 0, max: 10 },
+      { key: "history_messages", label: "Earlier messages sent along", kind: "int", min: 2, max: 50 },
+    ],
+  },
+  review: {
+    title: "Monthly review",
+    description: "Compliance and figures are computed in code; the model only proposes actions, each citing a strategy rule or thesis KPI.",
+    fields: [
+      { key: "model", label: "Model", kind: "model" },
+      { key: "effort", label: "Effort", kind: "effort" },
+      { key: "max_steps", label: "Claude calls per review", kind: "int", min: 1, max: 10 },
+      {
+        key: "liquidity_days",
+        label: "Flag positions larger than (days of turnover)",
+        kind: "number",
+        hint: "A position above this many days of its home market's average daily turnover is flagged as hard to exit. Above 0, up to 100.",
+      },
+    ],
+  },
+  ownership: {
+    title: "Institutional ownership (13F)",
+    description: "SEC Form 13F data sets: holders of US-listed holdings (managers above USD 100 M; filed up to 45 days after quarter end).",
+    fields: [
+      { key: "enabled", label: "Load 13F data sets", kind: "bool", hint: "Off: the scheduled run does nothing." },
+      { key: "index_url", label: "Data set index page", kind: "text", hint: "The SEC page listing the quarterly zip files." },
+      { key: "datasets_per_run", label: "Data sets per run", kind: "int", min: 1, max: 8, hint: "About 100 MB each." },
+      { key: "top_holders", label: "Largest holders shown", kind: "int", min: 1, max: 50 },
+    ],
+  },
 };
 export const SETTINGS_KEYS = Object.keys(SETTINGS) as SettingsKey[];
 
@@ -325,10 +383,13 @@ export type ScheduleForm = { name: string; enabled: boolean; cron: string; timez
 export type SettingsForm = { values: Record<string, string | boolean>; rest: Record<string, unknown> };
 /** One confirmed exchange closure (`calendar.exchange_closures`), edited as a row. */
 export type ClosureForm = { key: string; mic: string; date: string; name: string; rest: Record<string, unknown> };
+/** One tracked 13F manager (`ownership.tracked_managers`), edited as a row. */
+export type ManagerForm = { key: string; cik: string; name: string; rest: Record<string, unknown> };
 export type JobsForm = {
   schedules: ScheduleForm[];
   settings: Record<SettingsKey, SettingsForm>;
   closures: ClosureForm[];
+  managers: ManagerForm[];
   macroSeries: Record<MacroSource, MacroSeriesForm[]>;
   /** Top-level properties this form does not know (kept as loaded). */
   rest: Record<string, unknown>;
@@ -338,6 +399,10 @@ let closureCounter = 0;
 
 export function newClosure(): ClosureForm {
   return { key: `c${++closureCounter}`, mic: "", date: "", name: "", rest: {} };
+}
+
+export function newManager(): ManagerForm {
+  return { key: `t${++closureCounter}`, cik: "", name: "", rest: {} };
 }
 
 export function newMacroSeries(source: MacroSource): MacroSeriesForm {
@@ -460,6 +525,13 @@ export function jobsFromBody(body: JobsConfig | null): JobsForm {
     const { mic, date, name, ...extra } = c;
     return { ...newClosure(), mic: String(mic ?? ""), date: String(date ?? ""), name: String(name ?? ""), rest: extra };
   });
+  // Tracked 13F managers are edited as rows.
+  const loadedManagers = settings.ownership.rest.tracked_managers;
+  delete settings.ownership.rest.tracked_managers;
+  const managers = (Array.isArray(loadedManagers) ? loadedManagers : []).map((m: Record<string, unknown>) => {
+    const { cik, name, ...extra } = m;
+    return { ...newManager(), cik: String(cik ?? ""), name: String(name ?? ""), rest: extra };
+  });
   // Macro series are edited as rows per source.
   const macroSeries = Object.fromEntries(
     MACRO_SOURCES.map(({ value }) => {
@@ -470,7 +542,7 @@ export function jobsFromBody(body: JobsConfig | null): JobsForm {
   ) as Record<MacroSource, MacroSeriesForm[]>;
   const known = new Set<string>(["schema_version", ...names, ...SETTINGS_KEYS]);
   const rest = Object.fromEntries(Object.entries(b).filter(([k]) => !known.has(k)));
-  return { schedules, settings, closures, macroSeries, rest };
+  return { schedules, settings, closures, managers, macroSeries, rest };
 }
 
 function list(text: string, separator: RegExp): string[] {
@@ -510,6 +582,10 @@ export function jobsToBody(form: JobsForm): JobsConfig {
         date: c.date.trim(),
         name: c.name.trim(),
       }));
+    }
+    if (key === "ownership") {
+      // Leading zeros are kept as typed: the CIK is matched as the SEC writes it.
+      out.tracked_managers = form.managers.map((m) => ({ ...m.rest, cik: m.cik.trim(), name: m.name.trim() }));
     }
     if (key === "macro") {
       for (const { value } of MACRO_SOURCES) out[value] = form.macroSeries[value].map(macroSeriesToBody);

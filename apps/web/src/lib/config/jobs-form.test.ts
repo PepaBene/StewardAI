@@ -9,6 +9,7 @@ import {
   jobsToBody,
   newClosure,
   newMacroSeries,
+  newManager,
   parseFilters,
   SCHEDULE_KEYS,
   SCHEDULES,
@@ -30,6 +31,8 @@ const FULL: JobsConfig = {
   news_ingest: { enabled: true, cron: "0 6-22/2 * * *", timezone: "Europe/Prague" },
   daily_digest: { enabled: true, cron: "0 7 * * mon-fri", timezone: "Europe/Prague" },
   weekly_digest: { enabled: false, cron: "0 18 * * sun", timezone: "Europe/London" },
+  monthly_review: { enabled: true, cron: "0 8 1-3 * *", timezone: "Europe/Prague" },
+  ownership_13f: { enabled: false, cron: "0 6 10 * *", timezone: "America/New_York" },
   earnings_check: {
     extraction_model: "claude-opus-5-5",
     locate_model: "claude-sonnet-5",
@@ -67,6 +70,18 @@ const FULL: JobsConfig = {
       { mic: "XETR", date: "2026-12-24", name: "Christmas Eve" },
     ],
   },
+  chat: { model: "claude-haiku-4-5", max_steps: 9, max_searches: 0, history_messages: 20 },
+  review: { model: "claude-sonnet-5", effort: "max", max_steps: 5, liquidity_days: 2.5 },
+  ownership: {
+    enabled: false,
+    index_url: "https://www.sec.gov/data-research/sec-markets-data/form-13f-data-sets?x=1",
+    datasets_per_run: 4,
+    tracked_managers: [
+      { cik: "1067983", name: "Berkshire Hathaway Inc" },
+      { cik: "0001350694", name: "Bridgewater Associates, LP" },
+    ],
+    top_holders: 25,
+  },
 };
 
 describe("jobs form", () => {
@@ -82,10 +97,10 @@ describe("jobs form", () => {
   });
 
   it("lists and keeps a schedule and a setting it does not know yet", () => {
-    const future = { ...FULL, monthly_review: { enabled: true, cron: "0 9 1 * *", timezone: "UTC" }, digest: { ...FULL.digest!, language: "cs" } };
+    const future = { ...FULL, quarterly_audit: { enabled: true, cron: "0 9 1 * *", timezone: "UTC" }, digest: { ...FULL.digest!, language: "cs" } };
     const form = jobsFromBody(future as JobsConfig);
-    expect(form.schedules.map((s) => s.name)).toContain("monthly_review");
-    expect(scheduleLabel("monthly_review")).toBe("Monthly review");
+    expect(form.schedules.map((s) => s.name)).toContain("quarterly_audit");
+    expect(scheduleLabel("quarterly_audit")).toBe("Quarterly audit");
     expect(jobsToBody(form)).toEqual(future);
   });
 
@@ -134,6 +149,41 @@ describe("jobs form: reference, prices and calendar", () => {
   it("defaults to no closures", () => {
     expect(jobsFromBody(null).closures).toEqual([]);
     expect(jobsToBody(jobsFromBody(null)).calendar).toEqual({ holiday_countries: ["CZ", "US", "DE", "GB"], exchange_closures: [] });
+  });
+});
+
+describe("jobs form: phase 5 schedules and settings", () => {
+  it("lists the monthly review and 13F schedules with the backend defaults", () => {
+    expect(SCHEDULES.monthly_review.cron).toBe("0 7 1-3 * *");
+    expect(SCHEDULES.monthly_review.description).toMatch(/first weekday/);
+    expect(SCHEDULES.ownership_13f.cron).toBe("0 5 5 * *");
+    const names = jobsFromBody(null).schedules.map((s) => s.name);
+    expect(names).toEqual(expect.arrayContaining(["monthly_review", "ownership_13f"]));
+  });
+
+  it("edits the chat, review and ownership settings", () => {
+    const form = jobsFromBody(FULL);
+    expect(form.settings.chat.values.history_messages).toBe("20");
+    expect(form.settings.review.values.effort).toBe("max");
+    expect(form.settings.ownership.values.enabled).toBe(false);
+    form.settings.review.values.liquidity_days = "0,5";
+    form.settings.chat.values.model = " claude-sonnet-5 ";
+    form.settings.ownership.values.index_url = " https://example.test/13f ";
+    const body = jobsToBody(form);
+    expect(body.review!.liquidity_days).toBe(0.5);
+    expect(body.chat!.model).toBe("claude-sonnet-5");
+    expect(body.ownership!.index_url).toBe("https://example.test/13f");
+  });
+
+  it("edits tracked managers as rows and keeps a CIK's leading zeros", () => {
+    const form = jobsFromBody(FULL);
+    expect(form.managers.map((m) => [m.cik, m.name])).toEqual([
+      ["1067983", "Berkshire Hathaway Inc"],
+      ["0001350694", "Bridgewater Associates, LP"],
+    ]);
+    form.managers = [{ ...newManager(), cik: " 0000102909 ", name: " Vanguard Group Inc " }];
+    expect(jobsToBody(form).ownership!.tracked_managers).toEqual([{ cik: "0000102909", name: "Vanguard Group Inc" }]);
+    expect(jobsToBody(jobsFromBody(null)).ownership!.tracked_managers).toEqual([]);
   });
 });
 

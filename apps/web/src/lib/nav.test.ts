@@ -37,3 +37,17 @@ describe("phase 4 pages", () => {
     expect(isSectionActive("/config", "/config/verification")).toBe(true);
   });
 });
+
+describe("phase 5 pages", () => {
+  it("builds Research and Chat, and highlights Reports on the monthly reviews", async () => {
+    const { PLACEHOLDER_SECTIONS, SECTIONS } = await import("./nav");
+    expect(PLACEHOLDER_SECTIONS).toEqual([]);
+    expect(SECTIONS.map((s) => s.slug)).toEqual(expect.arrayContaining(["research", "chat", "reports"]));
+    expect(isSectionActive("/reports", "/reviews")).toBe(true);
+    expect(isSectionActive("/reports", "/reviews/3")).toBe(true);
+    expect(isSectionActive("/research", "/research/4")).toBe(true);
+    expect(isSectionActive("/chat", "/chat")).toBe(true);
+    expect(isSectionActive("/config", "/config/research-profiles")).toBe(true);
+    expect(isSectionActive("/research", "/config/research-profiles")).toBe(false);
+  });
+});

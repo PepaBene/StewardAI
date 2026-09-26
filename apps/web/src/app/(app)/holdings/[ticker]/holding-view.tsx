@@ -26,6 +26,8 @@ import { FreshnessLabel } from "@/components/portfolio/freshness-label";
 import { HoldingNews } from "@/components/news/holding-news";
 import { StatCard } from "@/components/portfolio/stat-card";
 import { IdentitySection } from "@/components/reference/identity-section";
+import { OwnershipSection } from "@/components/reference/ownership-section";
+import { HoldingResearch } from "@/components/research/holding-research";
 import { PriceRiskSection } from "@/components/reference/price-risk-section";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -225,6 +227,10 @@ export function HoldingContent({
       <HoldingNews ticker={detail.ticker} />
 
       <FactsSection ticker={detail.ticker} facts={detail.facts} reload={reload} onQueued={onQueued} onFeedback={onFeedback} />
+
+      <HoldingResearch ticker={detail.ticker} />
+
+      <OwnershipSection ticker={detail.ticker} />
 
       <IdentitySection ticker={detail.ticker} />
     </>

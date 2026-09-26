@@ -21,6 +21,7 @@ import {
   MODEL_SUGGESTIONS,
   newClosure,
   newMacroSeries,
+  newManager,
   SCHEDULES,
   scheduleLabel,
   SETTINGS,
@@ -28,6 +29,7 @@ import {
   type ClosureForm,
   type JobsForm,
   type MacroSeriesForm,
+  type ManagerForm,
   type MacroSource,
   type ScheduleForm,
   type ScheduleKey,
@@ -129,6 +131,13 @@ export function JobsEditor() {
                   closures={form.closures}
                   errors={editor.errors}
                   onChange={(closures) => setForm((f) => (f ? { ...f, closures } : f))}
+                />
+              ) : null}
+              {section === "ownership" ? (
+                <ManagersEditor
+                  managers={form.managers}
+                  errors={editor.errors}
+                  onChange={(managers) => setForm((f) => (f ? { ...f, managers } : f))}
                 />
               ) : null}
               {section === "macro" ? (
@@ -373,6 +382,72 @@ function ClosuresEditor({
           </Link>
         </Button>
       </div>
+    </fieldset>
+  );
+}
+
+function ManagersEditor({
+  managers,
+  errors,
+  onChange,
+}: {
+  managers: ManagerForm[];
+  errors: FieldErrors;
+  onChange: (managers: ManagerForm[]) => void;
+}) {
+  const path = "ownership.tracked_managers";
+  const set = (key: string, change: Partial<ManagerForm>) =>
+    onChange(managers.map((m) => (m.key === key ? { ...m, ...change } : m)));
+  const own = errors[path] ?? [];
+  return (
+    <fieldset className="space-y-2">
+      <legend className="text-sm font-medium">
+        Tracked managers <span className="num text-text-muted">({managers.length})</span>
+      </legend>
+      <p className="text-xs text-text-muted">
+        Their new and exited positions in your holdings appear in the next digest (&ldquo;Tracked managers
+        (13F)&rdquo;). The CIK is the SEC&rsquo;s filer number, digits only.
+      </p>
+      {managers.length === 0 ? <p className="text-sm text-text-muted">No managers tracked.</p> : null}
+      {managers.map((m, i) => (
+        <div key={m.key} role="group" aria-label={`Tracked manager ${m.name || i + 1}`} className="grid grid-cols-[1fr_2fr_auto] items-end gap-2">
+          <TextField
+            label="CIK"
+            path={`${path}.${i}.cik`}
+            errors={errors}
+            value={m.cik}
+            maxLength={10}
+            inputMode="numeric"
+            placeholder="1067983"
+            spellCheck={false}
+            hideLabel={i > 0}
+            onChange={(v) => set(m.key, { cik: v })}
+          />
+          <TextField
+            label="Name"
+            path={`${path}.${i}.name`}
+            errors={errors}
+            value={m.name}
+            maxLength={200}
+            placeholder="Berkshire Hathaway Inc"
+            hideLabel={i > 0}
+            onChange={(v) => set(m.key, { name: v })}
+          />
+          <Button
+            variant="ghost"
+            size="icon"
+            aria-label={`Remove tracked manager ${m.name || m.cik || i + 1}`}
+            onClick={() => onChange(managers.filter((x) => x.key !== m.key))}
+          >
+            <Trash2Icon aria-hidden="true" />
+          </Button>
+        </div>
+      ))}
+      {own.length > 0 ? <p className="text-xs text-text">{own.join(" ")}</p> : null}
+      <Button variant="outline" size="sm" onClick={() => onChange([...managers, newManager()])}>
+        <PlusIcon aria-hidden="true" />
+        Add manager
+      </Button>
     </fieldset>
   );
 }

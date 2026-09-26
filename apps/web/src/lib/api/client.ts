@@ -136,6 +136,36 @@ export type SentenceCheck = NonNullable<DigestSentence["check"]>;
 export type DigestFactSource = Schemas["DigestFactSource"];
 export type DigestStory = Schemas["DigestStory"];
 export type AlertKind = AlertOut["kind"];
+// Phase 5: research, the monthly review, chat, report search and 13F ownership.
+export type Source = Schemas["Source"];
+export type SourceKind = Source["kind"];
+export type CitedSentence = Schemas["CitedSentence"];
+export type ResearchBody = Schemas["ResearchBody"];
+export type ResearchSection = Schemas["ResearchSection"];
+export type ResearchReportOut = Schemas["ResearchReportOut"];
+export type ResearchSummary = Schemas["ResearchSummary"];
+export type Valuation = Schemas["Valuation"];
+export type ResearchProfilesConfig = Schemas["ResearchProfilesConfig"];
+export type ResearchProfile = Schemas["ResearchProfile"];
+export type ResearchSectionId = ResearchProfile["sections"][number];
+export type ValuationMethod = NonNullable<ResearchProfile["valuation_methods"]>[number];
+export type ReviewBody = Schemas["ReviewBody"];
+export type ReviewReportOut = Schemas["ReviewReportOut"];
+export type ComplianceRow = Schemas["ComplianceRow"];
+export type KpiRow = Schemas["KpiRow"];
+export type ProposedAction = Schemas["ProposedAction"];
+export type ReportHit = Schemas["ReportHit"];
+export type ReportType = ReportHit["type"];
+export type ConversationOut = Schemas["ConversationOut"];
+export type ConversationDetail = Schemas["ConversationDetail"];
+export type MessageOut = Schemas["MessageOut"];
+export type ChatAnswer = Schemas["ChatAnswer"];
+export type ChatSentence = Schemas["ChatSentence"];
+export type ActionOut = Schemas["ActionOut"];
+export type HoldingOwnership = Schemas["HoldingOwnership"];
+export type OwnershipPeriod = Schemas["OwnershipPeriod"];
+export type TopHolder = Schemas["TopHolder"];
+export type ManagerChange = Schemas["ManagerChange"];
 
 export type AccessTokenGetter = () => Promise<string | null | undefined>;
 

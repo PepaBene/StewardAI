@@ -121,6 +121,23 @@ describe("digest status sections", () => {
   it("knows when there is anything to show", () => {
     expect(hasStatusSections(body)).toBe(false);
     expect(hasStatusSections({ ...body, reviews_due: [{ ticker: "AAPL_US_EQ", review_date: "2026-09-01" }] })).toBe(true);
+    expect(
+      hasStatusSections({
+        ...body,
+        ownership_changes: [
+          {
+            cik: "1067983",
+            manager_name: "Berkshire Hathaway Inc",
+            ticker: "AAPL_US_EQ",
+            change: "exited",
+            period: "2026-06-30",
+            previous_period: "2026-03-31",
+            shares: 1000,
+            accession: "0000950123-26-008123",
+          },
+        ],
+      }),
+    ).toBe(true);
   });
 });
 
