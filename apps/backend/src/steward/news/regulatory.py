@@ -247,7 +247,11 @@ EFTS_URL = "https://efts.sec.gov/LATEST/search-index"
 ARCHIVE = "https://www.sec.gov/Archives/edgar/data/{cik}/{folder}/{file}"
 TOPIC_FORMS = "8-K,6-K,10-Q,10-K,20-F"
 RELATION_FORMS = "10-K,20-F"
-MAX_HITS = 20
+# EFTS returns 100 hits per request, paged with `from` (a hit offset); Elasticsearch refuses
+# from + size above 10,000, so no query can read past that many hits.
+EFTS_PAGE_SIZE = 100
+EFTS_WINDOW = 10_000
+MAX_HITS = 100  # default per query (Jobs config: news.edgar_fts_max_hits)
 
 
 @dataclass(frozen=True)
@@ -265,9 +269,15 @@ def _filer(display: str) -> str:
     return re.sub(r"\s*\((?:CIK|[A-Z.\-]+)[^)]*\)", "", display).strip() or display
 
 
+def efts_total(body: dict[str, Any]) -> int:
+    total = body.get("hits", {}).get("total")
+    value = total.get("value") if isinstance(total, dict) else total
+    return int(value) if isinstance(value, int | str) and str(value).isdigit() else 0
+
+
 def parse_efts(body: dict[str, Any]) -> list[FilingHit]:
     hits = []
-    for h in body.get("hits", {}).get("hits", [])[:MAX_HITS]:
+    for h in body.get("hits", {}).get("hits", []):
         src = h.get("_source", {})
         accession, _, file = str(h.get("_id", "")).partition(":")
         ciks = src.get("ciks") or []
@@ -297,25 +307,44 @@ async def efts_search(
     forms: str,
     start: dt.date,
     end: dt.date,
+    max_hits: int = MAX_HITS,
+    truncated: list[str] | None = None,
 ) -> list[FilingHit]:
-    response = await http.get(
-        EFTS_URL,
-        params={
-            "q": query,
-            "forms": forms,
-            "dateRange": "custom",
-            "startdt": start.isoformat(),
-            "enddt": end.isoformat(),
-        },
-        headers=headers,
-    )
-    if response.status_code != 200:
-        raise httpx.HTTPStatusError(
-            f"EDGAR full-text search returned HTTP {response.status_code}",
-            request=response.request,
-            response=response,
+    """Every hit up to `max_hits`, paging by `from`. When more matched than were read, a note
+    goes to `truncated` (so the cap is visible in the job step, not silent)."""
+    limit = min(max_hits, EFTS_WINDOW)
+    hits: list[FilingHit] = []
+    offset, total = 0, 0
+    while offset < limit:
+        response = await http.get(
+            EFTS_URL,
+            params={
+                "q": query,
+                "forms": forms,
+                "dateRange": "custom",
+                "startdt": start.isoformat(),
+                "enddt": end.isoformat(),
+                **({"from": str(offset)} if offset else {}),
+            },
+            headers=headers,
         )
-    return parse_efts(response.json())
+        if response.status_code != 200:
+            raise httpx.HTTPStatusError(
+                f"EDGAR full-text search returned HTTP {response.status_code}",
+                request=response.request,
+                response=response,
+            )
+        body = response.json()
+        total = efts_total(body)
+        raw = body.get("hits", {}).get("hits", [])
+        hits += parse_efts(body)
+        # `from` is a raw hit offset: advance by what came back, before any filtering.
+        offset += len(raw)
+        if not raw or offset >= total:
+            break
+    if total > offset and truncated is not None:
+        truncated.append(f"{query} ({forms}): read {offset} of {total} hits (cap {limit})")
+    return hits[:limit]
 
 
 @dataclass
@@ -333,12 +362,22 @@ async def collect_edgar_fts(
     holdings: Sequence[HoldingFeedInfo],
     since: dt.date,
     today: dt.date,
+    max_hits: int = MAX_HITS,
 ) -> FtsResult:
     result = FtsResult()
     for holding in holdings:
         for topic in holding.topics:
             try:
-                hits = await efts_search(http, headers, f'"{topic}"', TOPIC_FORMS, since, today)
+                hits = await efts_search(
+                    http,
+                    headers,
+                    f'"{topic}"',
+                    TOPIC_FORMS,
+                    since,
+                    today,
+                    max_hits,
+                    result.errors,
+                )
             except (httpx.HTTPError, ValueError) as exc:
                 result.errors.append(f"{holding.ticker} topic {topic!r}: {exc}")
                 continue
@@ -368,7 +407,14 @@ async def collect_edgar_fts(
         for keyword, relation in (("customer", "supplier"), ("supplier", "customer")):
             try:
                 hits = await efts_search(
-                    http, headers, f'"{name}" {keyword}', RELATION_FORMS, since, today
+                    http,
+                    headers,
+                    f'"{name}" {keyword}',
+                    RELATION_FORMS,
+                    since,
+                    today,
+                    max_hits,
+                    result.errors,
                 )
             except (httpx.HTTPError, ValueError) as exc:
                 result.errors.append(f"{holding.ticker} {keyword}: {exc}")

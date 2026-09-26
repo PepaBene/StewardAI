@@ -21,6 +21,9 @@ from steward.documents.text import html_to_text
 
 TICKERS_URL = "https://www.sec.gov/files/company_tickers.json"
 SUBMISSIONS_URL = "https://data.sec.gov/submissions/CIK{cik}.json"
+# Older filings: `filings.recent` holds at least a year or 1,000 filings (whichever is more);
+# the rest are in the JSON pages listed in `filings.files` (name, filingFrom, filingTo).
+SUBMISSIONS_PAGE_URL = "https://data.sec.gov/submissions/{name}"
 COMPANY_FACTS_URL = "https://data.sec.gov/api/xbrl/companyfacts/CIK{cik}.json"
 ARCHIVE_URL = "https://www.sec.gov/Archives/edgar/data/{cik}/{folder}/{name}"
 
@@ -91,9 +94,20 @@ class EdgarClient:
             }
         return self._tickers.get(ticker.upper())
 
-    async def filings(self, cik: str) -> list[Filing]:
+    async def filings(self, cik: str, since: dt.date | None = None) -> list[Filing]:
+        """The issuer's filings. `recent` covers at least the last year (or 1,000 filings);
+        with `since` earlier than that, the older pages covering it are read too."""
         data = (await self._get(SUBMISSIONS_URL.format(cik=pad_cik(cik)))).json()
-        return parse_submissions(pad_cik(cik), data)
+        filings = parse_submissions(pad_cik(cik), data)
+        if since is None:
+            return filings
+        oldest = min((f.filing_date for f in filings), default=None)
+        if oldest is not None and oldest <= since:
+            return filings
+        for page in older_pages(data, since):
+            body = (await self._get(SUBMISSIONS_PAGE_URL.format(name=page))).json()
+            filings += parse_submissions(pad_cik(cik), {"filings": {"recent": body}})
+        return filings
 
     async def exchanges(self, cik: str) -> list[str]:
         """Exchanges the issuer's securities trade on, as EDGAR lists them ("Nasdaq")."""
@@ -123,7 +137,7 @@ class EdgarClient:
         """The results filing on or shortly after `report_date` and its press-release URL."""
         candidates = [
             f
-            for f in await self.filings(cik)
+            for f in await self.filings(cik, since=report_date - dt.timedelta(days=1))
             if report_date - dt.timedelta(days=1)
             <= f.filing_date
             <= report_date + dt.timedelta(days=window_days)
@@ -161,6 +175,19 @@ def parse_submissions(cik: str, data: dict[str, Any]) -> list[Filing]:
         except (KeyError, IndexError, ValueError):
             continue
     return filings
+
+
+def older_pages(data: dict[str, Any], since: dt.date) -> list[str]:
+    """Names of the `filings.files` pages holding filings on or after `since`."""
+    names = []
+    for page in data.get("filings", {}).get("files") or []:
+        try:
+            last = dt.date.fromisoformat(str(page.get("filingTo")))
+        except ValueError:
+            last = None
+        if page.get("name") and (last is None or last >= since):
+            names.append(str(page["name"]))
+    return names
 
 
 def _accepted(value: str) -> dt.datetime | None:

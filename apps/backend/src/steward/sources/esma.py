@@ -110,20 +110,41 @@ def parse_fitrs(body: dict[str, Any]) -> FitrsRecord | None:
     )
 
 
+# Solr returns `rows` documents from offset `start`; numFound is the full count. The
+# registers set no rows cap, but pages keep each response small. MAX_DOCS is a safety bound.
+PAGE_ROWS = 500
+MAX_DOCS = 20_000
+
+
 async def _solr(http: httpx.AsyncClient, url: str, isin: str, rows: int) -> dict[str, Any]:
-    response = await http.get(url, params={"q": f"isin:{isin}", "wt": "json", "rows": rows})
-    if response.status_code != 200:
-        raise EsmaError(f"ESMA registers returned HTTP {response.status_code}")
-    body: dict[str, Any] = response.json()
+    """Every document for the ISIN, paging with `start` until numFound is read."""
+    docs: list[dict[str, Any]] = []
+    body: dict[str, Any] = {}
+    while True:
+        response = await http.get(
+            url,
+            params={"q": f"isin:{isin}", "wt": "json", "rows": rows, "start": len(docs)},
+        )
+        if response.status_code != 200:
+            raise EsmaError(f"ESMA registers returned HTTP {response.status_code}")
+        body = response.json()
+        page = body.get("response", {}).get("docs", [])
+        docs += page
+        found = int(body.get("response", {}).get("numFound", len(docs)))
+        if not page or len(docs) >= found:
+            break
+        if len(docs) >= MAX_DOCS:
+            raise EsmaError(f"ESMA registers list {found} records for {isin}; over {MAX_DOCS}")
+    body.setdefault("response", {})["docs"] = docs
     return body
 
 
 async def firds(http: httpx.AsyncClient, isin: str) -> list[FirdsRecord]:
-    return parse_firds(await _solr(http, FIRDS_URL, isin, 500))
+    return parse_firds(await _solr(http, FIRDS_URL, isin, PAGE_ROWS))
 
 
 async def fitrs(http: httpx.AsyncClient, isin: str) -> FitrsRecord | None:
-    return parse_fitrs(await _solr(http, FITRS_URL, isin, 50))
+    return parse_fitrs(await _solr(http, FITRS_URL, isin, 100))
 
 
 # Segment and operating MICs of common home markets -> country.

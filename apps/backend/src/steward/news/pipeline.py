@@ -77,6 +77,7 @@ from steward.news.feeds import (
 )
 from steward.news.link import HoldingTerms, Linker, holding_terms
 from steward.news.normalize import canonical_url, host_of
+from steward.news.regulatory import MAX_HITS as FTS_MAX_HITS
 from steward.news.regulatory import FtsResult, collect_edgar_fts, collect_regulatory
 from steward.notify.alerts import create_alerts, dispatch_due
 from steward.notify.channels import Channel, channels_from_settings
@@ -311,6 +312,7 @@ async def collect_source(
     freshness_days: int,
     rules: EventRulesConfig | None = None,
     google_news_locale: GoogleNewsLocale | None = None,
+    fts_max_hits: int = FTS_MAX_HITS,
 ) -> tuple[list[RawItem], list[str]]:
     rules = rules or EventRulesConfig()
     scoped = tuple(source.tickers)
@@ -358,7 +360,13 @@ async def collect_source(
         if deps.edgar is None:
             return [], ["SEC_USER_AGENT is not set"]
         fts = await collect_edgar_fts(
-            deps.http, deps.edgar.headers, source.id, feeds, since.date(), deps.now().date()
+            deps.http,
+            deps.edgar.headers,
+            source.id,
+            feeds,
+            since.date(),
+            deps.now().date(),
+            fts_max_hits,
         )
         await record_filing_hits(pool, fts)
         return fts.items, fts.errors
@@ -1130,6 +1138,7 @@ async def run_news_pipeline(ctx: JobContext, deps: NewsDeps) -> None:
                     freshness_days,
                     config.event_rules,
                     config.sources.google_news_locale,
+                    config.news.edgar_fts_max_hits,
                 )
             except (FetchError, httpx.HTTPError, ValueError) as exc:
                 items, notes, error = [], [], str(exc)[:500]

@@ -20,6 +20,7 @@ import {
 
 const FULL: JobsConfig = {
   schema_version: 1,
+  catch_up_on_start: false,
   portfolio_sync: { enabled: true, cron: "15 23 * * *", timezone: "Europe/Prague" },
   earnings_calendar: { enabled: false, cron: "0 6 * * sun", timezone: "UTC" },
   earnings_calendar_full: { enabled: true, cron: "0 5 1 1,4,7,10 *", timezone: "Europe/Prague" },
@@ -57,6 +58,7 @@ const FULL: JobsConfig = {
     corroboration_rounds: 0,
     recheck_hours: 72,
     max_items_per_run: 1000,
+    edgar_fts_max_hits: 500,
   },
   digest: {
     model: "claude-sonnet-5",
@@ -80,6 +82,7 @@ const FULL: JobsConfig = {
     price_move_news_items: 10,
   },
   macro: {
+    history_years: 15,
     geos: ["CZ", "EA21"],
     eurostat: [{ key: "hicp", label: "HICP", dataset: "prc_hicp_minr", filters: { unit: "RCH_A", coicop18: "TOTAL" }, unit: "%" }],
     fred: [{ key: "fed_funds", label: "Fed funds", series_id: "DFF", units: "chg", unit: "pp", policy_rate: true }],
@@ -115,6 +118,7 @@ const FULL: JobsConfig = {
     enabled: false,
     index_url: "https://www.sec.gov/data-research/sec-markets-data/form-13f-data-sets?x=1",
     datasets_per_run: 4,
+    history_datasets: 12,
     tracked_managers: [
       { cik: "1067983", name: "Berkshire Hathaway Inc" },
       { cik: "0001350694", name: "Bridgewater Associates, LP" },
@@ -141,6 +145,18 @@ describe("jobs form", () => {
     expect(form.schedules.map((s) => s.name)).toContain("quarterly_audit");
     expect(scheduleLabel("quarterly_audit")).toBe("Quarterly audit");
     expect(jobsToBody(form)).toEqual(future);
+  });
+
+  it("edits catching up on worker start, on unless saved off", () => {
+    expect(DEFAULT_JOBS.catch_up_on_start).toBe(true);
+    expect(jobsFromBody(FULL).catchUpOnStart).toBe(false);
+    const older: Record<string, unknown> = { ...FULL };
+    delete older.catch_up_on_start;
+    const form = jobsFromBody(older as JobsConfig);
+    expect(form.catchUpOnStart).toBe(true);
+    expect(form.rest).not.toHaveProperty("catch_up_on_start");
+    form.catchUpOnStart = false;
+    expect(jobsToBody(form).catch_up_on_start).toBe(false);
   });
 
   it("parses edits: list of days, numbers and cron spacing", () => {

@@ -69,7 +69,7 @@ export const SCHEDULES: Record<ScheduleKey, { label: string; description: string
   },
   holiday_refresh: {
     label: "Holiday calendar",
-    description: "Public holidays for this and next year (Nager.Date).",
+    description: "Public holidays for last, this and next year (Nager.Date).",
     cron: "0 4 2 1,7 *",
   },
   macro_collect: {
@@ -115,6 +115,7 @@ export const DEFAULT_TIMEZONE = "Europe/Prague";
 /** The backend's defaults, for when nothing is saved yet (a 404). */
 export const DEFAULT_JOBS: JobsConfig = {
   schema_version: 1,
+  catch_up_on_start: true,
   ...(Object.fromEntries(
     SCHEDULE_KEYS.map((k) => [k, { enabled: true, cron: SCHEDULES[k].cron, timezone: DEFAULT_TIMEZONE }]),
   ) as Record<ScheduleKey, JobSchedule>),
@@ -140,6 +141,7 @@ export const DEFAULT_JOBS: JobsConfig = {
     corroboration_rounds: 3,
     recheck_hours: 48,
     max_items_per_run: 10_000,
+    edgar_fts_max_hits: 100,
   },
   digest: {
     model: "claude-sonnet-5",
@@ -163,6 +165,7 @@ export const DEFAULT_JOBS: JobsConfig = {
     price_move_news_items: 6,
   },
   macro: {
+    history_years: 10,
     geos: ["CZ", "DE", "EA21"],
     eurostat: [
       { key: "hicp", label: "HICP inflation, annual rate", dataset: "prc_hicp_minr", filters: { unit: "RCH_A", coicop18: "TOTAL" }, unit: "%" },
@@ -223,6 +226,7 @@ export const DEFAULT_JOBS: JobsConfig = {
     enabled: true,
     index_url: "https://www.sec.gov/data-research/sec-markets-data/form-13f-data-sets",
     datasets_per_run: 2,
+    history_datasets: 8,
     tracked_managers: [],
     top_holders: 10,
   },
@@ -316,6 +320,7 @@ export const SETTINGS: { [S in SettingsKey]: { title: string; description: strin
       { key: "corroboration_rounds", label: "Corroboration rounds per story", kind: "int", min: 0, max: 20 },
       { key: "recheck_hours", label: "Re-check unconfirmed stories for (hours)", kind: "int", min: 1, max: 168 },
       { key: "max_items_per_run", label: "Classification cap per run", kind: "int", min: 10, max: 100_000, hint: "Cost guard." },
+      { key: "edgar_fts_max_hits", label: "EDGAR full-text hits per query", kind: "int", min: 10, max: 10_000, hint: "Read 100 per request; EDGAR serves at most 10,000. A query with more is noted in the collect step." },
     ],
   },
   digest: {
@@ -351,6 +356,7 @@ export const SETTINGS: { [S in SettingsKey]: { title: string; description: strin
     title: "Macro",
     description: "Macro series collected into the macro store: every macro number in a digest comes from here, with its release date and source.",
     fields: [
+      { key: "history_years", label: "Years of history on a series' first run", kind: "int", min: 1, max: 30, hint: "Later runs fetch only the recent observations, and fill any gap since the last stored one." },
       { key: "geos", label: "Eurostat areas", kind: "codes", hint: "Countries and the euro area, e.g. CZ, DE, EA21 (the euro area from 2026)." },
     ],
   },
@@ -432,6 +438,7 @@ export const SETTINGS: { [S in SettingsKey]: { title: string; description: strin
       { key: "enabled", label: "Load 13F data sets", kind: "bool", hint: "Off: the scheduled run does nothing." },
       { key: "index_url", label: "Data set index page", kind: "text", hint: "The SEC page listing the quarterly zip files." },
       { key: "datasets_per_run", label: "Data sets per run", kind: "int", min: 1, max: 8, hint: "About 100 MB each." },
+      { key: "history_datasets", label: "Data sets kept (history)", kind: "int", min: 1, max: 60, hint: "The newest this many quarterly sets (8 = two years). An empty database fills over successive runs." },
       { key: "top_holders", label: "Largest holders shown", kind: "int", min: 1, max: 50 },
     ],
   },
@@ -478,6 +485,8 @@ export type ClosureForm = { key: string; mic: string; date: string; name: string
 /** One tracked 13F manager (`ownership.tracked_managers`), edited as a row. */
 export type ManagerForm = { key: string; cik: string; name: string; rest: Record<string, unknown> };
 export type JobsForm = {
+  /** On worker start, run the data jobs that never succeeded or missed their last run. */
+  catchUpOnStart: boolean;
   schedules: ScheduleForm[];
   settings: Record<SettingsKey, SettingsForm>;
   closures: ClosureForm[];
@@ -632,9 +641,10 @@ export function jobsFromBody(body: JobsConfig | null): JobsForm {
       return [value, rows];
     }),
   ) as Record<MacroSource, MacroSeriesForm[]>;
-  const known = new Set<string>(["schema_version", ...names, ...SETTINGS_KEYS]);
+  const known = new Set<string>(["schema_version", "catch_up_on_start", ...names, ...SETTINGS_KEYS]);
   const rest = Object.fromEntries(Object.entries(b).filter(([k]) => !known.has(k)));
-  return { schedules, settings, closures, managers, macroSeries, rest };
+  const catchUpOnStart = b.catch_up_on_start !== false;
+  return { catchUpOnStart, schedules, settings, closures, managers, macroSeries, rest };
 }
 
 function list(text: string, separator: RegExp): string[] {
@@ -645,7 +655,7 @@ function list(text: string, separator: RegExp): string[] {
 }
 
 export function jobsToBody(form: JobsForm): JobsConfig {
-  const body: Record<string, unknown> = { ...form.rest, schema_version: 1 };
+  const body: Record<string, unknown> = { ...form.rest, schema_version: 1, catch_up_on_start: form.catchUpOnStart };
   for (const s of form.schedules) {
     body[s.name] = { ...s.rest, enabled: s.enabled, cron: s.cron.trim().replace(/\s+/g, " "), timezone: s.timezone.trim() };
   }

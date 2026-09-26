@@ -4489,6 +4489,12 @@ export interface components {
              * @constant
              */
             schema_version: 1;
+            /**
+             * Catch Up On Start
+             * @description On worker start, run the data jobs that never succeeded or missed their last scheduled run, one at a time in dependency order.
+             * @default true
+             */
+            catch_up_on_start: boolean;
             /** @description Trading212 sync, FX rates and drift. Default: daily at 22:30 Prague time. */
             portfolio_sync?: components["schemas"]["JobSchedule"];
             /** @description Refresh the report date of holdings reporting soon (see earnings_calendar_settings.refresh_within_days). Default: Sundays 06:00. */
@@ -4503,7 +4509,7 @@ export interface components {
             reference_data?: components["schemas"]["JobSchedule"];
             /** @description Daily prices (Stooq) and FX history after the close. Default: weekdays 23:15. */
             price_history?: components["schemas"]["JobSchedule"];
-            /** @description Public holidays for this and next year. Default: 2 January and 2 July. */
+            /** @description Public holidays for last, this and next year. Default: 2 January and 2 July. */
             holiday_refresh?: components["schemas"]["JobSchedule"];
             /** @description FRED, ECB and Eurostat macro series; macro surprises on release days. Default: daily 11:30 (after Eurostat's 11:00 releases). */
             macro_collect?: components["schemas"]["JobSchedule"];
@@ -4674,6 +4680,12 @@ export interface components {
          * @description Macro series collected into `macro_series` (numbers in digests come only from here).
          */
         MacroSettings: {
+            /**
+             * History Years
+             * @description Years of history loaded the first time a series is collected (later runs fetch only the recent observations, and fill any gap since the last stored one).
+             * @default 10
+             */
+            history_years: number;
             /**
              * Geos
              * @description Eurostat areas: countries and the euro area (EA21 from 2026).
@@ -4942,6 +4954,12 @@ export interface components {
              * @default 10000
              */
             max_items_per_run: number;
+            /**
+             * Edgar Fts Max Hits
+             * @description Most EDGAR full-text search hits read per query (100 per request; EDGAR serves at most 10,000). A query with more is noted in the collect step.
+             * @default 100
+             */
+            edgar_fts_max_hits: number;
         };
         /** NewsSource */
         NewsSource: {
@@ -5202,6 +5220,12 @@ export interface components {
              * @default 2
              */
             datasets_per_run: number;
+            /**
+             * History Datasets
+             * @description How far back to load: the newest this many data sets (one per quarter, so 8 is two years). An empty database is backfilled over successive runs, datasets_per_run at a time; the datasets step shows how many remain.
+             * @default 8
+             */
+            history_datasets: number;
             /**
              * Tracked Managers
              * @description Managers whose new and exited positions in the portfolio's holdings appear in the next digest.

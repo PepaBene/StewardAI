@@ -400,6 +400,8 @@ async def collect_finnhub(
 # ---------------------------------------------------------------------------
 
 GOOGLE_NEWS_URL = "https://news.google.com/rss/search?q={query}&{locale}"
+# A Google News RSS search returns at most 100 items (unofficial endpoint, observed cap).
+GOOGLE_NEWS_MAX_ITEMS = 100
 
 
 def google_news_url(
@@ -427,7 +429,14 @@ async def collect_google_news(
         if url is None:
             continue
         try:
-            result.items.extend(await collect_rss(http, source_id, url, (holding.ticker,)))
+            items = await collect_rss(http, source_id, url, (holding.ticker,))
         except FetchError as exc:
             result.errors.append(f"{holding.ticker}: {exc}")
+            continue
+        result.items.extend(items)
+        if len(items) >= GOOGLE_NEWS_MAX_ITEMS:
+            result.errors.append(
+                f"{holding.ticker}: Google News returned {len(items)} items, its cap; older "
+                "items in the window may be missing"
+            )
     return result

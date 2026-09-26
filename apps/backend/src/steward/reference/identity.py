@@ -444,6 +444,10 @@ async def _gleif(
         direct = await deps.gleif.parent(lei, "direct")
         ultimate = await deps.gleif.parent(lei, "ultimate")
         children = await deps.gleif.children(lei)
+        if deps.gleif.children_total > len(children):
+            result.notes.append(
+                f"GLEIF: {len(children)} of {deps.gleif.children_total} direct children read"
+            )
     except GleifError as exc:
         result.problems.append(f"GLEIF: {exc}")
         return None

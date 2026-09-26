@@ -12249,6 +12249,12 @@
             "title": "Schema Version",
             "default": 1
           },
+          "catch_up_on_start": {
+            "type": "boolean",
+            "title": "Catch Up On Start",
+            "description": "On worker start, run the data jobs that never succeeded or missed their last scheduled run, one at a time in dependency order.",
+            "default": true
+          },
           "portfolio_sync": {
             "$ref": "#/components/schemas/JobSchedule",
             "description": "Trading212 sync, FX rates and drift. Default: daily at 22:30 Prague time."
@@ -12279,7 +12285,7 @@
           },
           "holiday_refresh": {
             "$ref": "#/components/schemas/JobSchedule",
-            "description": "Public holidays for this and next year. Default: 2 January and 2 July."
+            "description": "Public holidays for last, this and next year. Default: 2 January and 2 July."
           },
           "macro_collect": {
             "$ref": "#/components/schemas/JobSchedule",
@@ -12849,6 +12855,14 @@
       },
       "MacroSettings": {
         "properties": {
+          "history_years": {
+            "type": "integer",
+            "maximum": 30.0,
+            "minimum": 1.0,
+            "title": "History Years",
+            "description": "Years of history loaded the first time a series is collected (later runs fetch only the recent observations, and fill any gap since the last stored one).",
+            "default": 10
+          },
           "geos": {
             "items": {
               "type": "string",
@@ -13515,6 +13529,14 @@
             "title": "Max Items Per Run",
             "description": "Classification cap per run (cost guard).",
             "default": 10000
+          },
+          "edgar_fts_max_hits": {
+            "type": "integer",
+            "maximum": 10000.0,
+            "minimum": 10.0,
+            "title": "Edgar Fts Max Hits",
+            "description": "Most EDGAR full-text search hits read per query (100 per request; EDGAR serves at most 10,000). A query with more is noted in the collect step.",
+            "default": 100
           }
         },
         "additionalProperties": false,
@@ -14120,6 +14142,14 @@
             "title": "Datasets Per Run",
             "description": "Data sets (about 100 MB each) loaded per run.",
             "default": 2
+          },
+          "history_datasets": {
+            "type": "integer",
+            "maximum": 60.0,
+            "minimum": 1.0,
+            "title": "History Datasets",
+            "description": "How far back to load: the newest this many data sets (one per quarter, so 8 is two years). An empty database is backfilled over successive runs, datasets_per_run at a time; the datasets step shows how many remain.",
+            "default": 8
           },
           "tracked_managers": {
             "items": {

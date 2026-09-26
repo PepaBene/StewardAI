@@ -235,6 +235,13 @@ class NewsSettings(ConfigModel):
     max_items_per_run: int = Field(
         default=10_000, ge=10, le=100_000, description="Classification cap per run (cost guard)."
     )
+    edgar_fts_max_hits: int = Field(
+        default=100,
+        ge=10,
+        le=10_000,
+        description="Most EDGAR full-text search hits read per query (100 per request; EDGAR "
+        "serves at most 10,000). A query with more is noted in the collect step.",
+    )
 
     @model_validator(mode="after")
     def _effort_supported(self) -> Self:
@@ -450,6 +457,14 @@ def _eurostat_defaults() -> list[EurostatSeries]:
 class MacroSettings(ConfigModel):
     """Macro series collected into `macro_series` (numbers in digests come only from here)."""
 
+    history_years: int = Field(
+        default=10,
+        ge=1,
+        le=30,
+        description="Years of history loaded the first time a series is collected (later runs "
+        "fetch only the recent observations, and fill any gap since the last stored one).",
+    )
+
     geos: list[Annotated[str, Field(pattern=r"^[A-Z0-9]{2,5}$")]] = Field(
         default_factory=lambda: ["CZ", "DE", "EA21"],
         description="Eurostat areas: countries and the euro area (EA21 from 2026).",
@@ -584,6 +599,14 @@ class OwnershipSettings(ConfigModel):
     datasets_per_run: int = Field(
         default=2, ge=1, le=8, description="Data sets (about 100 MB each) loaded per run."
     )
+    history_datasets: int = Field(
+        default=8,
+        ge=1,
+        le=60,
+        description="How far back to load: the newest this many data sets (one per quarter, "
+        "so 8 is two years). An empty database is backfilled over successive runs, "
+        "datasets_per_run at a time; the datasets step shows how many remain.",
+    )
     tracked_managers: list[TrackedManager] = Field(
         default_factory=list,
         description="Managers whose new and exited positions in the portfolio's holdings "
@@ -599,6 +622,11 @@ class JobsConfig(ConfigModel):
     """
 
     schema_version: Literal[1] = 1
+    catch_up_on_start: bool = Field(
+        default=True,
+        description="On worker start, run the data jobs that never succeeded or missed their "
+        "last scheduled run, one at a time in dependency order.",
+    )
     portfolio_sync: JobSchedule = Field(
         default_factory=lambda: JobSchedule(cron="30 22 * * *"),
         description="Trading212 sync, FX rates and drift. Default: daily at 22:30 Prague time.",
@@ -634,7 +662,7 @@ class JobsConfig(ConfigModel):
     )
     holiday_refresh: JobSchedule = Field(
         default_factory=lambda: JobSchedule(cron="0 4 2 1,7 *"),
-        description="Public holidays for this and next year. Default: 2 January and 2 July.",
+        description="Public holidays for last, this and next year. Default: 2 January and 2 July.",
     )
     macro_collect: JobSchedule = Field(
         default_factory=lambda: JobSchedule(cron="30 11 * * *"),

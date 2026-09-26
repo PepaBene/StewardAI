@@ -7,15 +7,17 @@
   with its reason for the holding page and the Activity page), never a failed job.
 - Plausibility: on a sync day, the latest close is compared with Trading212's price; a gap
   beyond the configured tolerance is flagged (timing differences are expected intraday).
-- FX history: the ECB's rates for `history_years` from Frankfurter in one request (once), and
-  a daily consistency check of the Data Portal's latest rates against Frankfurter's.
+- FX history: the ECB's rates for `history_years` from Frankfurter in one request (once, and
+  again if `history_years` grows), and a daily consistency check of the Data Portal's latest
+  rates against Frankfurter's.
 
 - Price-move trigger: when a holding's latest close moved beyond the event rules' threshold
   (default +-8 %) against the previous close, an event escalation is queued once for that
   holding and day. Without Stooq data, Trading212's prices on consecutive sync days are used.
 
 `holiday_refresh` (twice a year, and on demand): public holidays of the configured
-countries for this and next year from Nager.Date.
+countries for last, this and next year from Nager.Date (last year's so a rate gap reaching
+back over New Year is still judged against its holidays).
 """
 
 import datetime as dt
@@ -37,6 +39,7 @@ from steward.jobs.runner import JobContext
 from steward.news.escalation import queue_escalation
 from steward.portfolio.sync import store_rates
 from steward.reference.identity import holding_tickers
+from steward.settings import get_settings
 from steward.sources.market import (
     MarketDataError,
     PriceBar,
@@ -50,6 +53,7 @@ GAPS_KEY = "price_gaps"
 CHECKS_KEY = "price_checks"
 FX_BACKFILL_KEY = "fx_history_backfill"
 RECENT_DAYS = 10
+BACKFILL_KEY = "price_backfill"
 # A re-fetched close this far from the stored one means Stooq restated its history (a split
 # or similar adjustment): the whole history is fetched again.
 RESTATEMENT_PCT = Decimal(5)
@@ -61,6 +65,8 @@ SPLIT_TOLERANCE = 0.02
 @dataclass
 class PriceDeps:
     http: httpx.AsyncClient
+    # Stooq's download key (STOOQ_API_KEY); without one Stooq refuses daily downloads.
+    api_key: str | None = None
     today: dt.date = field(default_factory=lambda: dt.datetime.now(dt.UTC).date())
 
 
@@ -125,16 +131,29 @@ async def collect_symbol(
         "select max(date) from public.price_bar where symbol = $1 and source = 'stooq'", symbol
     )
     full_start = deps.today - dt.timedelta(days=365 * years + 5)
-    start = last - dt.timedelta(days=RECENT_DAYS) if last else full_start
+    # How far back the stored history was requested. History stored before this was
+    # recorded was requested for the history_years of its time: taken as the current one.
+    state_key = f"{BACKFILL_KEY}:{symbol}"
+    recorded = (await _state(pool, state_key)).get("from")
+    if last and not recorded:
+        await _save_state(pool, state_key, {"from": full_start})
+    covered_from = dt.date.fromisoformat(recorded) if recorded else full_start
+    # A first run, or a longer history_years than the stored history was fetched for.
+    backfill = last is None or covered_from > full_start
+    start = last - dt.timedelta(days=RECENT_DAYS) if last and not backfill else full_start
     try:
-        bars = await stooq_daily(deps.http, symbol, start, deps.today)
+        bars = await stooq_daily(deps.http, symbol, start, deps.today, api_key=deps.api_key)
     except (MarketDataError, httpx.HTTPError) as exc:
         return 0, f"Stooq unreachable: {type(exc).__name__}: {exc}"[:300]
     if not bars:
         return 0, None if last else f"Stooq has no data for {symbol}"
-    if last and await _restated(pool, bars):
+    if backfill:
+        await _save_state(pool, state_key, {"from": full_start})
+    elif await _restated(pool, bars):
         try:
-            bars = await stooq_daily(deps.http, symbol, full_start, deps.today)
+            bars = await stooq_daily(
+                deps.http, symbol, full_start, deps.today, api_key=deps.api_key
+            )
         except (MarketDataError, httpx.HTTPError) as exc:
             # Storing only the restated recent bars would put a false jump in the series.
             return 0, f"Stooq restated history; refetch failed: {type(exc).__name__}: {exc}"[:300]
@@ -202,8 +221,11 @@ async def fx_history(
     pool: asyncpg.Pool, deps: PriceDeps, years: int, detail: dict[str, Any]
 ) -> None:
     state = await _state(pool, FX_BACKFILL_KEY)
-    if not state.get("done"):
-        start = deps.today - dt.timedelta(days=365 * years + 5)
+    start = deps.today - dt.timedelta(days=365 * years + 5)
+    # Once, and again when history_years grows past the range fetched before. Frankfurter
+    # returns a whole multi-year range in one response (no range cap).
+    done_from = dt.date.fromisoformat(state["from"]) if state.get("from") else None
+    if not state.get("done") or (done_from is not None and done_from > start):
         try:
             rates = await frankfurter_series(deps.http, start, deps.today)
         except (MarketDataError, httpx.HTTPError, ValueError) as exc:
@@ -376,7 +398,9 @@ async def price_history_handler(ctx: JobContext) -> None:
     async with httpx.AsyncClient(
         timeout=60.0, headers={"User-Agent": f"StewardAI/{__version__}"}
     ) as http:
-        await run_price_history(ctx, PriceDeps(http=http))
+        key = get_settings().stooq_api_key
+        deps = PriceDeps(http=http, api_key=key.get_secret_value() if key else None)
+        await run_price_history(ctx, deps)
 
 
 async def run_holiday_refresh(ctx: JobContext, http: httpx.AsyncClient, today: dt.date) -> None:
@@ -389,7 +413,7 @@ async def run_holiday_refresh(ctx: JobContext, http: httpx.AsyncClient, today: d
     for country in countries:
         async with ctx.step(f"holidays:{country}") as step:
             stored = 0
-            for year in (today.year, today.year + 1):
+            for year in range(today.year - 1, today.year + 2):  # last, this and next year
                 try:
                     holidays = await public_holidays(http, country, year)
                 except (MarketDataError, httpx.HTTPError) as exc:

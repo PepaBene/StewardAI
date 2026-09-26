@@ -120,6 +120,12 @@ export function JobsEditor() {
             <h2 id="schedules-heading" className="text-lg font-semibold">
               Schedules
             </h2>
+            <CheckboxField
+              label="Catch up when the worker starts"
+              checked={form.catchUpOnStart}
+              onChange={(v) => setForm((f) => (f ? { ...f, catchUpOnStart: v } : f))}
+              hint="On start, the worker runs the data jobs (sync, reference data, prices, holidays, macro, earnings calendar, 13F, news, reconciliation) that never succeeded or missed their last scheduled run, one at a time in that order, so a new or long-stopped install fills itself without waiting for each schedule. Disabled schedules are skipped."
+            />
             {form.schedules.map((s) => (
               <ScheduleCard key={s.name} schedule={s} errors={editor.errors} onChange={(change) => setSchedule(s.name, change)} />
             ))}

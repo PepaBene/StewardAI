@@ -14,7 +14,9 @@ from typing import Any
 import httpx
 
 BASE_URL = "https://api.gleif.org/api/v1"
-MAX_CHILDREN = 200
+PAGE_SIZE = 200  # GLEIF's maximum page[size]
+# A safety bound only: large groups have hundreds of direct children (Siemens AG ~460).
+MAX_CHILDREN = 5000
 
 
 class GleifError(Exception):
@@ -88,6 +90,7 @@ def parse_record(data: dict[str, Any]) -> LegalEntity:
 class GleifClient:
     def __init__(self, http: httpx.AsyncClient) -> None:
         self._http = http
+        self.children_total = 0  # GLEIF's count for the last children() call
 
     async def _get(self, path: str, params: dict[str, str] | None = None) -> dict[str, Any] | None:
         """The JSON body, or None for a 404 (no such record or relationship)."""
@@ -129,18 +132,23 @@ class GleifClient:
         return None
 
     async def children(self, lei: str, kind: str = "direct") -> list[LegalEntity]:
+        """Every child, paging until the last page (up to MAX_CHILDREN; `children_total`
+        then tells how many GLEIF has)."""
         found: list[LegalEntity] = []
         page = 1
+        self.children_total = 0
         while len(found) < MAX_CHILDREN:
             body = await self._get(
                 f"/lei-records/{lei}/{kind}-children",
-                {"page[size]": "100", "page[number]": str(page)},
+                {"page[size]": str(PAGE_SIZE), "page[number]": str(page)},
             )
             if not body:
                 break
-            found.extend(parse_record(d) for d in body.get("data", []))
+            data = body.get("data", [])
+            found.extend(parse_record(d) for d in data)
             pagination = body.get("meta", {}).get("pagination", {})
-            if page >= int(pagination.get("lastPage", page)):
+            self.children_total = int(pagination.get("total", len(found)))
+            if not data or page >= int(pagination.get("lastPage", page)):
                 break
             page += 1
         return found[:MAX_CHILDREN]

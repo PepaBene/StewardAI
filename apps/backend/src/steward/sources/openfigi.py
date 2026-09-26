@@ -6,6 +6,7 @@ them, so a company listed on several exchanges is one holding. No key is needed;
 (OPENFIGI_API_KEY) raises the rate limit.
 """
 
+import asyncio
 from collections import Counter
 from dataclasses import dataclass
 from typing import Any
@@ -13,6 +14,14 @@ from typing import Any
 import httpx
 
 MAPPING_URL = "https://api.openfigi.com/v3/mapping"
+# Rate limits (https://www.openfigi.com/api/documentation): 25 mapping requests a minute
+# without a key, 25 per 6 seconds with one. Each request here is one job (the cap is 10 jobs
+# per request without a key, 100 with one) and a mapping job returns all its FIGIs, with no
+# pagination. A 429 is waited out (the `ratelimit-reset` header, in seconds) and retried,
+# so a first run over many holdings resolves them all rather than failing past the 25th.
+RATE_LIMIT_RETRIES = 3
+MAX_RESET_WAIT = 65.0
+_sleep = asyncio.sleep
 
 
 class OpenFigiError(Exception):
@@ -69,9 +78,13 @@ async def map_isin(
     headers = {"Content-Type": "application/json"}
     if api_key:
         headers["X-OPENFIGI-APIKEY"] = api_key
-    response = await http.post(
-        MAPPING_URL, json=[{"idType": "ID_ISIN", "idValue": isin}], headers=headers
-    )
+    for attempt in range(RATE_LIMIT_RETRIES + 1):
+        response = await http.post(
+            MAPPING_URL, json=[{"idType": "ID_ISIN", "idValue": isin}], headers=headers
+        )
+        if response.status_code != 429 or attempt == RATE_LIMIT_RETRIES:
+            break
+        await _sleep(_reset_wait(response, api_key))
     if response.status_code == 429:
         raise OpenFigiError("OpenFIGI rate limit reached; retried on the next run")
     if response.status_code != 200:
@@ -80,6 +93,14 @@ async def map_isin(
     if not isinstance(body, list) or not body:
         raise OpenFigiError("OpenFIGI returned an unexpected body")
     return parse_mapping(body[0])
+
+
+def _reset_wait(response: httpx.Response, api_key: str | None) -> float:
+    try:
+        wait = float(response.headers.get("ratelimit-reset") or "")
+    except ValueError:
+        wait = 6.0 if api_key else 60.0
+    return min(max(wait, 1.0), MAX_RESET_WAIT)
 
 
 # The composite (country-level) exchange code of an ISIN's home country.

@@ -4,6 +4,8 @@ Runs until SIGINT or SIGTERM:
 - the in-process scheduler for timed jobs, registered from the Jobs config;
 - a config refresher that re-applies the Jobs config every few minutes;
 - the pgmq consumer for on-demand jobs the API enqueues;
+- at start, a catch-up that runs the data jobs a fresh or stale database is missing
+  (worker.catchup), in the background and one job at a time;
 - the alert dispatcher, which sends due alerts (new ones, and ones held for quiet hours)
   every few seconds;
 - a heartbeat (a `sync_state` row the API's `/health/ready` reads, plus an optional ping to
@@ -18,6 +20,7 @@ import contextlib
 import datetime as dt
 import logging
 import signal
+from typing import Any
 
 import asyncpg
 import httpx
@@ -35,6 +38,7 @@ from steward.logging import configure_logging
 from steward.notify.alerts import dispatch_due
 from steward.notify.channels import channels_from_settings
 from steward.settings import get_settings
+from worker.catchup import catch_up, close_interrupted_catch_up
 from worker.scheduler import apply_jobs_config, build_scheduler
 
 logger = logging.getLogger("worker")
@@ -66,7 +70,13 @@ class Worker:
         await self._run(job_type, "schedule", None)
 
     async def _run(
-        self, job_type: str, trigger: JobTrigger, job_id: int | None, *, wait: bool = True
+        self,
+        job_type: str,
+        trigger: JobTrigger,
+        job_id: int | None,
+        *,
+        wait: bool = True,
+        params: dict[str, Any] | None = None,
     ) -> str | None:
         handler = JOB_HANDLERS.get(job_type)
         if handler is None:
@@ -79,15 +89,28 @@ class Worker:
                 )
             return None
         return await run_job(
-            self.pool, job_type, handler, trigger=trigger, job_id=job_id, wait=wait
+            self.pool, job_type, handler, trigger=trigger, job_id=job_id, params=params, wait=wait
         )
 
     async def recover(self) -> None:
-        """At start: close scheduled runs a killed worker left `running`."""
+        """At start: close scheduled and catch-up runs a killed worker left `running`."""
         try:
             await fail_interrupted_scheduled_runs(self.pool)
+            await close_interrupted_catch_up(self.pool)
         except (OSError, asyncpg.PostgresError, TimeoutError):
             logger.exception("closing interrupted scheduled runs failed")
+
+    async def catch_up(self, stop: asyncio.Event) -> None:
+        """Run the data jobs that never succeeded or missed their last slot (in the
+        background: the heartbeat, alerts and queue go on meanwhile)."""
+
+        async def run_one(job_type: str, params: dict[str, Any]) -> str | None:
+            return await self._run(job_type, "manual", None, params=params)
+
+        try:
+            await catch_up(self.pool, run_one, stop)
+        except Exception:
+            logger.exception("catch-up on start failed")
 
     async def refresh_schedule(self, scheduler: AsyncIOScheduler) -> None:
         stored = await load_active(self.pool, "jobs", JobsConfig)
@@ -221,6 +244,7 @@ async def run() -> None:
     scheduler = build_scheduler()
     worker: Worker | None = None
     consumer: asyncio.Task[None] | None = None
+    catching_up: asyncio.Task[None] | None = None
     http = httpx.AsyncClient(timeout=30.0)
 
     if settings.database_url is None:
@@ -258,6 +282,8 @@ async def run() -> None:
         consumer = asyncio.create_task(worker.consume(stop))
 
     scheduler.start()
+    if worker is not None:
+        catching_up = asyncio.create_task(worker.catch_up(stop))
     config_jobs = [j for j in scheduler.get_jobs() if not j.id.startswith("internal:")]
     logger.info(
         "scheduler started (version %s, %d jobs registered, tz %s)",
@@ -269,6 +295,11 @@ async def run() -> None:
         await stop.wait()
     finally:
         scheduler.shutdown(wait=False)
+        if catching_up is not None and not catching_up.done():
+            # A run cut off here is failed at the next start and caught up again then.
+            catching_up.cancel()
+            with contextlib.suppress(asyncio.CancelledError):
+                await catching_up
         if consumer is not None:
             await consumer
         if worker is not None:
