@@ -5,7 +5,7 @@ owner's strategy and per-holding theses, and uses Claude to monitor, explain and
 The full design is in
 [AI_Portfolio_Copilot_Technical_Product_Description.md](AI_Portfolio_Copilot_Technical_Product_Description.md).
 
-**Status: phases 0-3 built, including the gap-review tasks (phase 1b, phase 2 follow-ups,
+**Status: phases 0-4 built, including the gap-review tasks (phase 1b, phase 2 follow-ups,
 phase 2b).** Phase 1 syncs Trading212 daily with ČNB/ECB FX and shows drift, Overview and
 Holdings. Phase 1b adds the strategy and jobs editors, config version history with diff,
 rollback and JSON export/import, the transactions view, deployment packaging (`deploy/`)
@@ -20,13 +20,22 @@ EDGAR filings and full-text search, RNS/EQS (off by default), Finnhub and macro 
 ingested, clustered, linked, classified by Claude Haiku and corroborated; confirmed events
 alert through Telegram or email under the notification rules, get a Sonnet impact note
 when severe, and daily and weekly digests cite every claim. Rule breaches, price moves,
-macro surprises, failed jobs, missed runs and coverage gaps alert once each.
+macro surprises, failed jobs, missed runs and coverage gaps alert once each. Phase 4
+hardens verification: every fact, verdict, alert, news item, story and report sentence has
+wrong / irrelevant / useful feedback (a wrong fact is quarantined and its verdicts
+re-judged; sources lose trust and drop a tier), a claim verifier checks each written
+sentence against its cited snippets, rule edits show a 7-day replay preview before saving,
+the Activity page shows coverage gaps and the job log, and a CI gate re-runs the live evals
+whenever a prompt, model, schema or eval set changes.
 
 Not yet verified: the acceptance criteria that need live data or time (consecutive
 scheduled runs on an always-on host, the Realtime 2-second update, the uptime alert,
 Overview totals against the Trading212 app, 48-hour ingest runs, source figures matched
-by hand). Run `uv run python -m steward.signoff` on the host for the phase 1 checks.
-Phases 4-6 are not started.
+by hand), and the live-model evals (golden extraction 98 %, classification 85 %, claim
+verifier 20/20), which need an API key: add the `ANTHROPIC_API_KEY` repository secret and
+run `uv run python -m steward.verify.evals_gate --write-baseline` once. Run
+`uv run python -m steward.signoff` on the host for the phase 1 checks. Phases 5-6 are not
+started.
 
 ## Repository layout
 

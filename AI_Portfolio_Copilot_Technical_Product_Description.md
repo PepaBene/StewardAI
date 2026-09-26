@@ -960,6 +960,8 @@ Added 2026-09-25 for the sources in "Additional data sources". It sits between p
 
 ### Phase 4 — Verification hardening (weeks 7–8)
 
+*Status (2026-09-26): built. Covered by automated tests: fact quarantine and verdict recompute from feedback, trust drop and tier demotion, the replay preview (1,500 stored stories well under 5 s), Wikidata-only never confirmed and GLEIF-vs-Wikidata disputes, the sanity band from config, eval candidates exported into the golden and labelled sets, and the evals gate failing a changed prompt and passing its revert (with a stub scorer). Open: the claim verifier's 100 % on the 20 injected cases and the 98 %/85 % eval targets need live model runs (the code check alone catches the 12 numeric cases); the gate blocks merges only once the `ANTHROPIC_API_KEY` secret is set and the job is marked required; the screens are verified by types, unit tests and the build, not yet by a pass in a browser.*
+
 **Backend tasks**
 
 - [ ] Claim verifier: a separate Haiku call checking every factual sentence in a report/digest/alert against its cited snippet before publishing. **AC:** a deliberately injected unsupported sentence in a test report is flagged or stripped, per config, on 100% of 20 injected-error test cases.
