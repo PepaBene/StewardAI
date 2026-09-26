@@ -330,21 +330,31 @@ async def seed_story(pool: asyncpg.Pool, items: list[tuple[str, int]]) -> int:
 async def test_wrong_marks_lower_trust_until_the_source_is_demoted(
     api: httpx.AsyncClient, backend_pool: asyncpg.Pool
 ) -> None:
-    story = await seed_story(backend_pool, [("https://investor.apple.com/pr/1", 1)])
-    item = await backend_pool.fetchval("select id from news_item where cluster_id = $1", story)
+    story = await seed_story(
+        backend_pool, [(f"https://investor.apple.com/pr/{n}", 1) for n in range(3)]
+    )
+    items = [
+        r["id"]
+        for r in await backend_pool.fetch(
+            "select id from news_item where cluster_id = $1 order by id", story
+        )
+    ]
     before = await load_story(
         backend_pool, story, EventRulesConfig(), await trust_now(backend_pool)
     )
     assert before is not None and before.best_tier == 1
 
-    for expected in (0.8, 0.6, 0.4):
+    # Marking the same item wrong twice moves trust once.
+    for item, expected in ((items[0], 0.8), (items[0], 0.8), (items[1], 0.6), (items[2], 0.4)):
         response = await api.post(
             "/feedback", json={"target_kind": "news_item", "target_id": item, "rating": "wrong"}
         )
         assert response.status_code == 201, response.text
-        assert response.json()["effects"]["trust"] == {
-            "investor.apple.com": pytest.approx(expected)
-        }
+        score = await backend_pool.fetchval(
+            "select score from source_trust where host = 'investor.apple.com'"
+        )
+        assert float(score) == pytest.approx(expected)
+    assert response.json()["effects"]["trust"] == {"investor.apple.com": pytest.approx(0.4)}
     after = await load_story(backend_pool, story, EventRulesConfig(), await trust_now(backend_pool))
     assert after is not None and after.best_tier == 2  # a tier-1 source no longer confirms alone
 

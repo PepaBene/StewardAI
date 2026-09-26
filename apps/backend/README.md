@@ -38,6 +38,11 @@ src/
     monitor.py       alerts for failed jobs, missed runs and news coverage gaps
     heartbeat.py     worker heartbeat row + external ping (`python -m steward.heartbeat_check`)
     signoff.py       Phase 1 live-data sign-off report (`python -m steward.signoff`)
+    activity.py      per-holding coverage for the Activity page
+    verify/          Phase 4: source trust, owner feedback, claim verifier (+ its eval,
+                     `python -m steward.verify.eval`), replay preview, eval export from
+                     feedback (`python -m steward.verify.export_evals`), CI evals gate
+                     (`python -m steward.verify.evals_gate`)
     storage.py       evidence archive (Supabase Storage REST)
     db.py            asyncpg pool as app_backend
     logging.py       logging with secret scrubbing
@@ -45,7 +50,10 @@ src/
   api/               FastAPI app, routes, JWT verification, OpenAPI export
   worker/            scheduler + queue consumer entrypoint
 tests/               pytest (DB tests need STEWARD_TEST_DATABASE_URL)
-tests/golden/        golden set of real earnings releases with labelled figures
+tests/golden/        golden set of real earnings releases with labelled figures (plus
+                     `fb-*` cases added from feedback)
+tests/verify/        20 claim-verifier cases, each with one injected unsupported claim
+evals/baseline.json  live eval results per model-facing component (written by the gate)
 tests/news/          100 labelled news items (classification) and 10 syndication cases
 openapi.json         committed API contract; the frontend generates its types from it
 ```
@@ -116,11 +124,17 @@ extension; CI runs against a Postgres image that has it.
 | `GET /news` | News items, newest first, with their story's severity and confidence; filters `ticker`, `severity`, `confidence`, `tier`, `story` (repeat a parameter for "any of") |
 | `GET /news/event-types` | The event taxonomy |
 | `GET /stories/disputed`, `POST /stories/{id}/resolve` | Disputed stories with each conflicting source; resolve one (unfreezes verdicts) |
-| `GET /alerts` | Recent alert decisions: sent, held, suppressed (with why), failed |
+| `GET /alerts` | Recent alert decisions: sent, held, suppressed (with why), failed; filter `kind` |
 | `POST /alerts/test` | Route a test alert through the saved notification rules; the worker sends it |
 | `GET /reports`, `GET /reports/{id}` | Digests, each sentence with its cited news items and facts |
-| `GET /escalations`, `GET /escalations/{id}` | Event escalation reports (impact notes) |
+| `GET /escalations`, `GET /escalations/{id}` | Event escalation reports (impact notes), with the run's status, cost and models |
+| `GET /jobs` | The job log, newest first: filters `job_type`, `status`, `ticker`; cost and failed step per run |
 | `GET /jobs/{id}` | One job with its steps, details, tokens and cost |
+| `GET /activity/coverage` | Per open holding: last news run, earnings check and price bar covering it, and gaps |
+| `POST /feedback`, `GET /feedback` | Wrong / irrelevant / useful on facts, verdicts, alerts, news items, stories, report sentences; `effects` says what it did |
+| `GET /sources/trust` | Trust per source host that feedback has moved, and whether it is demoted a tier |
+| `GET /eval-candidates` | Items marked wrong and added to an eval set, and whether they are exported |
+| `POST /config/{event-rules,notifications}/preview` | Replay the last 7 days of stored stories and alerts under a draft; the changed outcomes |
 | `POST /jobs/{portfolio-sync,earnings-check,thesis-verdicts,fact-reconcile,earnings-calendar,news-ingest,digest,macro-collect,reference-data,price-history,holiday-refresh}` | Queue a run now (202); the worker runs it |
 | `GET`/`PUT /config/{strategy,theses,jobs,holding-profiles,verification,budget,news-sources,event-rules,notifications}` | Active config version / save a new one |
 | `POST /config/{domain}/validate` | Validate a body without saving |
@@ -249,6 +263,39 @@ All but the two health routes need the owner's MFA-verified Supabase JWT.
   not start (market holidays excepted), or a holding with no news coverage for the window
   raises one `system` alert each (dedupe keys). The worker's heartbeat row and optional
   `HEARTBEAT_PING_URL` cover the case where the worker itself is down.
+- **Verification (Phase 4).** The Verification config holds every defence threshold: sanity
+  bands and tolerances, the corroboration rules per tier (tier 1 confirms alone, how many
+  independent tier-2 outlets confirm), source trust steps, and the claim verifier.
+  *Trust* is per outlet host, 1 until judged: the owner's *wrong* lowers it, *useful*
+  raises it; below `demote_below` the host counts one tier lower in corroboration.
+  *Feedback* on a fact marked wrong quarantines it and re-queues its holding's verdicts;
+  on news, stories and alerts it moves the outlets' trust; verdicts and report sentences
+  are recorded for the error report. A wrong fact or item can be added to an eval set with
+  its correction; `export_evals` writes it into `tests/golden/earnings/fb-*` or the
+  labelled news set after checking it the way CI will.
+- **Claim verifier.** Every model-written sentence of a digest or impact note is checked
+  before the report is stored: first in code (each number must appear in a cited snippet,
+  at any scale: "$94.0 billion" matches "94,036" millions), then by a Haiku call with only
+  the sentences and their snippets. Unsupported sentences are removed (`strip`) or kept and
+  marked (`mark`); sentences the model could not check, or whose only source is a
+  web-search result with no stored text, are marked `unchecked`, never passed as supported.
+  Alerts are composed in code from the source's own headline and have nothing to check.
+  `python -m steward.verify.eval` scores the 20 injected-error cases: the code check alone
+  catches the 12 numeric ones; `--live` measures the model (target: all 20, no false alarm).
+- **Replay preview.** A draft Event rules or Notifications config is run twice against the
+  last 7 days of stored stories and non-news alerts (active vs draft, in time order, each
+  run counting its own daily cap and throttle); the response lists the events whose outcome
+  changes. Only stored results are read.
+- **Reference trust tiers.** GLEIF (tier 1) confirms structure; Wikidata (tier 3) only
+  suggests. A Wikidata parent that GLEIF contradicts is `disputed`, with GLEIF's version in
+  `conflict`, until the owner decides.
+- **Evals gate** (`evals` CI job). Extraction, classification and the claim verifier each
+  have a fingerprint (prompt code, schema, default model, eval set). Unchanged since
+  `evals/baseline.json`: no API call. Changed: with the `ANTHROPIC_API_KEY` repository
+  secret the live eval runs and fails below its target (98 %, 85 %, 100 %) or one point
+  below the recorded score; without the secret the change fails as unmeasured, until a
+  live run is recorded with `--write-baseline`. Before a baseline exists, a run without the
+  secret only warns. To make it block merges, add the secret and mark the job required.
 - **Config is validated here.** `steward.config` holds the Pydantic model per config domain.
   `POST /config/{domain}/validate` exposes them, which also puts `StrategyConfig`,
   `ThesesConfig` and `ThesisConfig` into `openapi.json` for the frontend's generated types.

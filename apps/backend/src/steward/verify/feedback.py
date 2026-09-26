@@ -205,6 +205,18 @@ async def record_feedback(
                 )
 
         hosts = hosts_of(urls) if body.rating in ("wrong", "useful") else []
+        # One item moves trust once per rating: marking it wrong again changes nothing.
+        repeat = await conn.fetchval(
+            "select exists (select 1 from public.feedback where target_kind = $1"
+            " and target_id = $2 and rating = $3 and sentence_path is not distinct from $4)",
+            kind,
+            target,
+            body.rating,
+            body.sentence_path,
+        )
+        if repeat:
+            hosts = []
+            effects["repeat"] = True
         if hosts:
             effects["trust"] = await apply_rating(conn, hosts, body.rating, verification.trust)
         row = await conn.fetchrow(
