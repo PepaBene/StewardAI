@@ -400,6 +400,11 @@ async def fact_reconcile_handler(ctx: JobContext) -> None:
                 step.detail.update(summary.as_detail())
                 if summary.quarantined and config.theses_version_id is not None:
                     verdicts = await run_verdicts(
-                        pool, config.theses, config.theses_version_id, ctx.job_id, [ticker]
+                        pool,
+                        config.theses,
+                        config.theses_version_id,
+                        ctx.job_id,
+                        [ticker],
+                        config.jobs.earnings_check.kpi_history_periods,
                     )
                     step.detail["verdicts"] = verdicts.as_detail()

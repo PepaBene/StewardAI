@@ -431,6 +431,29 @@ function TargetsSection({
         </AlertMessage>
       ) : null}
 
+      <div className="flex flex-wrap gap-3">
+        <SelectField
+          className="w-72"
+          label="Above a hard limit"
+          path="hard_limit_severity"
+          errors={errors}
+          value={form.hard_limit_severity}
+          options={ON_BREACH}
+          onChange={(v) => set({ hard_limit_severity: v })}
+          hint="Alerted when it opens, routed by Config: Notifications."
+        />
+        <SelectField
+          className="w-72"
+          label="Outside a band"
+          path="band_breach_severity"
+          errors={errors}
+          value={form.band_breach_severity}
+          options={ON_BREACH}
+          onChange={(v) => set({ band_breach_severity: v })}
+          hint="Severity 1 is listed in the digest only; 2 or 3 also alert when it opens."
+        />
+      </div>
+
       <div className="space-y-2">
         <h3 className="font-medium">Cash</h3>
         <CheckboxField label="Set a cash target" checked={form.cash_enabled} onChange={(v) => set({ cash_enabled: v })} />

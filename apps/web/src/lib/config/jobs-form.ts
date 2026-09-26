@@ -122,23 +122,46 @@ export const DEFAULT_JOBS: JobsConfig = {
     extraction_model: "claude-sonnet-5",
     locate_model: "claude-sonnet-5",
     effort: "high",
+    locate_effort: null,
     max_steps: 8,
     max_searches: 3,
     check_days_after_report: [1, 2, 4],
     max_document_mb: 20,
+    kpi_history_periods: 8,
   },
-  earnings_calendar_settings: { model: "claude-haiku-4-5", lookahead_days: 120, refresh_within_days: 14 },
+  earnings_calendar_settings: { model: "claude-haiku-4-5", effort: null, lookahead_days: 120, refresh_within_days: 14 },
   news: {
     classification_model: "claude-haiku-4-5",
+    classification_effort: null,
     classification_batch_size: 50,
     corroboration_model: "claude-haiku-4-5",
+    corroboration_effort: null,
     corroboration_max_searches: 3,
     corroboration_rounds: 2,
     recheck_hours: 48,
     max_items_per_run: 500,
   },
-  digest: { model: "claude-sonnet-5", use_batch: true, batch_wait_minutes: 60, min_severity_summarised: 2 },
-  escalation: { enabled: true, model: "claude-sonnet-5", max_steps: 5, max_searches: 3, min_severity: 2 },
+  digest: {
+    model: "claude-sonnet-5",
+    effort: null,
+    use_batch: true,
+    batch_wait_minutes: 60,
+    min_severity_summarised: 2,
+    min_severity_listed: 1,
+    daily_window_hours: 24,
+    weekly_window_days: 7,
+  },
+  escalation: {
+    enabled: true,
+    model: "claude-sonnet-5",
+    effort: null,
+    max_steps: 5,
+    max_searches: 3,
+    min_severity: 2,
+    source_tiers: [1, 2],
+    price_move_news_days: 3,
+    price_move_news_items: 6,
+  },
   macro: {
     geos: ["CZ", "DE", "EA21"],
     eurostat: [
@@ -177,11 +200,25 @@ export const DEFAULT_JOBS: JobsConfig = {
     missed_run_grace_minutes: 90,
     news_coverage_hours: 48,
   },
-  reference: { openfigi_refresh_days: 30, wikidata_enabled: true, wikidata_refresh_days: 30, max_subsidiary_aliases: 50 },
+  reference: {
+    openfigi_refresh_days: 30,
+    wikidata_enabled: true,
+    wikidata_refresh_days: 30,
+    max_subsidiary_aliases: 50,
+    wikidata_languages: ["en", "de", "cs"],
+  },
   prices: { benchmark_symbols: ["^spx"], history_years: 2, plausibility_tolerance_pct: 1 },
   calendar: { holiday_countries: ["CZ", "US", "DE", "GB"], exchange_closures: [] },
-  chat: { model: "claude-sonnet-5", max_steps: 6, max_searches: 3, history_messages: 12 },
-  review: { model: "claude-opus-5-5", effort: "high", max_steps: 3, liquidity_days: 1 },
+  chat: { model: "claude-sonnet-5", effort: null, max_steps: 6, max_searches: 3, history_messages: 12, source_tiers: [1, 2] },
+  review: {
+    model: "claude-opus-5-5",
+    effort: "high",
+    max_steps: 3,
+    use_batch: true,
+    batch_wait_minutes: 60,
+    liquidity_days: 1,
+    holder_drop_flag_pct: 10,
+  },
   ownership: {
     enabled: true,
     index_url: "https://www.sec.gov/data-research/sec-markets-data/form-13f-data-sets",
@@ -194,6 +231,14 @@ export const DEFAULT_JOBS: JobsConfig = {
 /** Model ids offered as suggestions; any `claude-…` id is accepted. */
 export const MODEL_SUGGESTIONS = ["claude-opus-5-5", "claude-sonnet-5", "claude-haiku-4-5"];
 export const EFFORTS = ["low", "medium", "high", "xhigh", "max"] as const;
+export const EFFORT_OPTIONAL_HINT = "Model default: effort is not sent. Haiku 4 models take no effort.";
+export const TIERS = [1, 2, 3] as const;
+
+/** "2, 1, 2" -> [1, 2]: outlet tiers, ascending and unique; anything else is dropped. */
+export function parseTiers(text: string): number[] {
+  const picked = new Set(text.split(/[\s,;]+/).map(Number));
+  return TIERS.filter((t) => picked.has(t));
+}
 
 export type SettingField<S extends SettingsKey> = {
   key: keyof Settings<S> & string;
@@ -201,9 +246,23 @@ export type SettingField<S extends SettingsKey> = {
   /**
    * `lines`: a string list, one per line. `codes`: a list of upper-case codes, separated by
    * commas or spaces. `words`: a list of identifiers as typed, separated by commas or spaces.
-   * `number`: a decimal.
+   * `number`: a decimal. `effort-optional`: an effort or "" for unset (null: not sent, the
+   * model's default). `tiers`: outlet tiers 1-3, edited as checkboxes.
    */
-  kind: "model" | "text" | "int" | "number" | "bool" | "effort" | "int-list" | "severity" | "lines" | "codes" | "words";
+  kind:
+    | "model"
+    | "text"
+    | "int"
+    | "number"
+    | "bool"
+    | "effort"
+    | "effort-optional"
+    | "int-list"
+    | "severity"
+    | "lines"
+    | "codes"
+    | "words"
+    | "tiers";
   hint?: string;
   min?: number;
   max?: number;
@@ -216,11 +275,13 @@ export const SETTINGS: { [S in SettingsKey]: { title: string; description: strin
     fields: [
       { key: "extraction_model", label: "Extraction model", kind: "model" },
       { key: "locate_model", label: "Locate model", kind: "model", hint: "Searches for the release when EDGAR has none." },
-      { key: "effort", label: "Effort", kind: "effort" },
+      { key: "effort", label: "Extraction effort", kind: "effort" },
+      { key: "locate_effort", label: "Locate effort", kind: "effort-optional", hint: EFFORT_OPTIONAL_HINT },
       { key: "max_steps", label: "Step cap per run", kind: "int", min: 2, max: 50, hint: "Claude calls plus document fetches." },
       { key: "max_searches", label: "Web searches per run", kind: "int", min: 0, max: 20 },
       { key: "check_days_after_report", label: "Days after the report date to check", kind: "int-list", hint: "Comma separated, e.g. 1, 2, 4 (retries until the release is found)." },
       { key: "max_document_mb", label: "Largest document (MB)", kind: "int", min: 1, max: 32 },
+      { key: "kpi_history_periods", label: "KPI history (periods)", kind: "int", min: 1, max: 40, hint: "Past quarters (or years, for annual KPIs) judged for each KPI." },
     ],
   },
   earnings_calendar_settings: {
@@ -228,6 +289,7 @@ export const SETTINGS: { [S in SettingsKey]: { title: string; description: strin
     description: "Next report dates: Finnhub for US issuers, the IR calendar page otherwise.",
     fields: [
       { key: "model", label: "Model", kind: "model", hint: "Reads report dates off IR calendar pages." },
+      { key: "effort", label: "Effort", kind: "effort-optional", hint: EFFORT_OPTIONAL_HINT },
       { key: "lookahead_days", label: "Look ahead (days)", kind: "int", min: 7, max: 400 },
       { key: "refresh_within_days", label: "Weekly run: holdings reporting within (days)", kind: "int", min: 1, max: 120, hint: "The quarterly run refreshes every holding." },
     ],
@@ -237,8 +299,10 @@ export const SETTINGS: { [S in SettingsKey]: { title: string; description: strin
     description: "Classification and corroboration after each news check.",
     fields: [
       { key: "classification_model", label: "Classification model", kind: "model" },
+      { key: "classification_effort", label: "Classification effort", kind: "effort-optional", hint: EFFORT_OPTIONAL_HINT },
       { key: "classification_batch_size", label: "Items per classification call", kind: "int", min: 5, max: 100 },
       { key: "corroboration_model", label: "Corroboration model", kind: "model" },
+      { key: "corroboration_effort", label: "Corroboration effort", kind: "effort-optional", hint: EFFORT_OPTIONAL_HINT },
       { key: "corroboration_max_searches", label: "Searches per corroboration call", kind: "int", min: 0, max: 10 },
       { key: "corroboration_rounds", label: "Corroboration rounds per story", kind: "int", min: 0, max: 5 },
       { key: "recheck_hours", label: "Re-check unconfirmed stories for (hours)", kind: "int", min: 1, max: 168 },
@@ -250,9 +314,13 @@ export const SETTINGS: { [S in SettingsKey]: { title: string; description: strin
     description: "How the daily and weekly digests are written.",
     fields: [
       { key: "model", label: "Model", kind: "model" },
+      { key: "effort", label: "Effort", kind: "effort-optional", hint: EFFORT_OPTIONAL_HINT },
       { key: "use_batch", label: "Write through the Batch API (half price)", kind: "bool" },
       { key: "batch_wait_minutes", label: "Wait for the batch (minutes)", kind: "int", min: 1, max: 720, hint: "Then the summary is written directly." },
       { key: "min_severity_summarised", label: "Summarise stories from severity", kind: "severity", hint: "Lower-severity stories are listed by headline." },
+      { key: "min_severity_listed", label: "List stories from severity", kind: "severity", hint: "Lower-severity stories are left out. At most the summarised severity." },
+      { key: "daily_window_hours", label: "Daily digest covers (hours)", kind: "int", min: 1, max: 168 },
+      { key: "weekly_window_days", label: "Weekly digest covers (days)", kind: "int", min: 1, max: 31 },
     ],
   },
   escalation: {
@@ -261,9 +329,13 @@ export const SETTINGS: { [S in SettingsKey]: { title: string; description: strin
     fields: [
       { key: "enabled", label: "Write impact notes", kind: "bool", hint: "Off: no escalation is queued." },
       { key: "model", label: "Model", kind: "model" },
+      { key: "effort", label: "Effort", kind: "effort-optional", hint: EFFORT_OPTIONAL_HINT },
       { key: "max_steps", label: "Step cap per note", kind: "int", min: 1, max: 20, hint: "Claude calls plus web searches." },
-      { key: "max_searches", label: "Web searches per note", kind: "int", min: 0, max: 10, hint: "Restricted to tier-1 and tier-2 outlets." },
+      { key: "max_searches", label: "Web searches per note", kind: "int", min: 0, max: 10, hint: "Restricted to the outlet tiers below." },
+      { key: "source_tiers", label: "Outlet tiers web search may use", kind: "tiers", hint: "Tiers are set per domain in Config: News sources." },
       { key: "min_severity", label: "Escalate stories from severity", kind: "severity" },
+      { key: "price_move_news_days", label: "Price-move note: news from (days before)", kind: "int", min: 0, max: 30 },
+      { key: "price_move_news_items", label: "Price-move note: most recent stories read", kind: "int", min: 0, max: 30 },
     ],
   },
   macro: {
@@ -290,6 +362,7 @@ export const SETTINGS: { [S in SettingsKey]: { title: string; description: strin
       { key: "wikidata_enabled", label: "Read aliases and suggested relationships from Wikidata", kind: "bool", hint: "Tier 3: its relationships stay suggestions until you confirm them." },
       { key: "wikidata_refresh_days", label: "Refresh Wikidata every (days)", kind: "int", min: 1, max: 365 },
       { key: "max_subsidiary_aliases", label: "Most subsidiary names added to news aliases", kind: "int", min: 0, max: 500, hint: "From GLEIF Level 2." },
+      { key: "wikidata_languages", label: "Wikidata alias languages", kind: "words", hint: "Two- or three-letter lower-case codes separated by commas, e.g. en, de, cs." },
     ],
   },
   prices: {
@@ -310,12 +383,14 @@ export const SETTINGS: { [S in SettingsKey]: { title: string; description: strin
   },
   chat: {
     title: "Chat",
-    description: "The chat panel's assistant: reads the app's records, searches tier-1 and tier-2 outlets, and cites every sentence.",
+    description: "The chat panel's assistant: reads the app's records, searches the outlet tiers below, and cites every sentence.",
     fields: [
       { key: "model", label: "Model", kind: "model" },
+      { key: "effort", label: "Effort", kind: "effort-optional", hint: EFFORT_OPTIONAL_HINT },
       { key: "max_steps", label: "Step cap per answer", kind: "int", min: 1, max: 20, hint: "Claude calls plus tool rounds." },
       { key: "max_searches", label: "Web searches per answer", kind: "int", min: 0, max: 10 },
       { key: "history_messages", label: "Earlier messages sent along", kind: "int", min: 2, max: 50 },
+      { key: "source_tiers", label: "Outlet tiers web search may use and answers may cite", kind: "tiers", hint: "Tiers are set per domain in Config: News sources." },
     ],
   },
   review: {
@@ -325,11 +400,19 @@ export const SETTINGS: { [S in SettingsKey]: { title: string; description: strin
       { key: "model", label: "Model", kind: "model" },
       { key: "effort", label: "Effort", kind: "effort" },
       { key: "max_steps", label: "Claude calls per review", kind: "int", min: 1, max: 10 },
+      { key: "use_batch", label: "Propose through the Batch API (half price)", kind: "bool" },
+      { key: "batch_wait_minutes", label: "Wait for the batch (minutes)", kind: "int", min: 1, max: 720, hint: "Then the actions are proposed directly." },
       {
         key: "liquidity_days",
         label: "Flag positions larger than (days of turnover)",
         kind: "number",
         hint: "A position above this many days of its home market's average daily turnover is flagged as hard to exit. Above 0, up to 100.",
+      },
+      {
+        key: "holder_drop_flag_pct",
+        label: "Flag a fall in 13F holders of (%)",
+        kind: "number",
+        hint: "Quarter on quarter. Above 0, up to 100.",
       },
     ],
   },
@@ -568,6 +651,8 @@ export function jobsToBody(form: JobsForm): JobsConfig {
       else if (field.kind === "lines") out[field.key] = list(String(v), /\n/);
       else if (field.kind === "codes") out[field.key] = list(String(v), /[\s,;]+/).map((c) => c.toUpperCase());
       else if (field.kind === "words") out[field.key] = list(String(v), /[\s,;]+/);
+      else if (field.kind === "effort-optional") out[field.key] = String(v).trim() || null;
+      else if (field.kind === "tiers") out[field.key] = parseTiers(String(v));
       else if (field.kind === "int-list")
         out[field.key] = String(v)
           .split(/[\s,;]+/)

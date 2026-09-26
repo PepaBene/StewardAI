@@ -1,11 +1,11 @@
 """Jobs config: when each scheduled job runs, and whether it runs at all."""
 
 import datetime as dt
-from typing import Annotated, Literal, Self
+from typing import Annotated, Any, Literal, Self
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from apscheduler.triggers.cron import CronTrigger
-from pydantic import Field, model_validator
+from pydantic import Field, field_validator, model_validator
 
 from steward.config.common import ConfigModel
 
@@ -82,6 +82,40 @@ def cron_trigger(expression: str, tz: ZoneInfo) -> CronTrigger:
 
 ModelId = Annotated[str, Field(pattern=r"^claude-[a-z0-9.-]{1,64}$", examples=["claude-sonnet-5"])]
 
+Effort = Literal["low", "medium", "high", "xhigh", "max"]
+EFFORT_HELP = "Unset: effort is not sent and the model's default applies. Not on Haiku 4."
+# Web-search tiers: 1 the company, regulators and statistics offices; 2 established outlets;
+# 3 everything else on the allow-list.
+SourceTier = Literal[1, 2, 3]
+DEFAULT_SOURCE_TIERS: tuple[SourceTier, ...] = (1, 2)
+
+
+def supports_effort(model: str) -> bool:
+    """Haiku 4 models reject the effort parameter."""
+    return not model.startswith("claude-haiku-4")
+
+
+def effort_kwargs(model: str, effort: str | None) -> dict[str, Any]:
+    """`output_config` carrying `effort` for a Messages call, or nothing when effort is
+    unset (the model's default) or `model` does not take it."""
+    if effort is None or not supports_effort(model):
+        return {}
+    return {"output_config": {"effort": effort}}
+
+
+def check_effort(model: str, effort: str | None, field: str) -> None:
+    if effort is not None and not supports_effort(model):
+        raise ValueError(
+            f"{field}: {model} does not support the effort parameter; leave effort unset "
+            "or pick another model"
+        )
+
+
+def _unique_tiers(tiers: list[int]) -> list[int]:
+    if not tiers:
+        raise ValueError("at least one source tier is needed")
+    return sorted(set(tiers))
+
 
 class EarningsCheckSettings(ConfigModel):
     """The earnings thesis check: find the release, extract figures, validate, judge KPIs."""
@@ -91,7 +125,8 @@ class EarningsCheckSettings(ConfigModel):
         default="claude-sonnet-5",
         description="Searches for the release when EDGAR has none (non-US issuers).",
     )
-    effort: Literal["low", "medium", "high", "xhigh", "max"] = "high"
+    effort: Effort = "high"
+    locate_effort: Effort | None = Field(default=None, description=EFFORT_HELP)
     max_steps: int = Field(
         default=8, ge=2, le=50, description="Claude calls plus document fetches per run."
     )
@@ -102,6 +137,17 @@ class EarningsCheckSettings(ConfigModel):
         "release (the spec's +1, retry at +2 and +4).",
     )
     max_document_mb: int = Field(default=20, ge=1, le=32)
+    kpi_history_periods: int = Field(
+        default=8,
+        ge=1,
+        le=40,
+        description="Past periods (quarters or years) judged for each KPI's history.",
+    )
+
+    @model_validator(mode="after")
+    def _effort_supported(self) -> Self:
+        check_effort(self.locate_model, self.locate_effort, "locate_effort")
+        return self
 
 
 class EarningsCalendarSettings(ConfigModel):
@@ -110,6 +156,7 @@ class EarningsCalendarSettings(ConfigModel):
     model: ModelId = Field(
         default="claude-haiku-4-5", description="Reads report dates off IR calendar pages."
     )
+    effort: Effort | None = Field(default=None, description=EFFORT_HELP)
     lookahead_days: int = Field(default=120, ge=7, le=400)
     refresh_within_days: int = Field(
         default=14,
@@ -119,15 +166,22 @@ class EarningsCalendarSettings(ConfigModel):
         "those with no date); the quarterly run refreshes every holding.",
     )
 
+    @model_validator(mode="after")
+    def _effort_supported(self) -> Self:
+        check_effort(self.model, self.effort, "effort")
+        return self
+
 
 class NewsSettings(ConfigModel):
     """The news pipeline after ingest: classification, corroboration."""
 
     classification_model: ModelId = "claude-haiku-4-5"
+    classification_effort: Effort | None = Field(default=None, description=EFFORT_HELP)
     classification_batch_size: int = Field(
         default=50, ge=5, le=100, description="Items per classification call."
     )
     corroboration_model: ModelId = "claude-haiku-4-5"
+    corroboration_effort: Effort | None = Field(default=None, description=EFFORT_HELP)
     corroboration_max_searches: int = Field(
         default=3, ge=0, le=10, description="Web searches per corroboration call."
     )
@@ -145,9 +199,16 @@ class NewsSettings(ConfigModel):
         default=500, ge=10, le=5000, description="Classification cap per run (cost guard)."
     )
 
+    @model_validator(mode="after")
+    def _effort_supported(self) -> Self:
+        check_effort(self.classification_model, self.classification_effort, "classification_effort")
+        check_effort(self.corroboration_model, self.corroboration_effort, "corroboration_effort")
+        return self
+
 
 class DigestSettings(ConfigModel):
     model: ModelId = "claude-sonnet-5"
+    effort: Effort | None = Field(default=None, description=EFFORT_HELP)
     use_batch: bool = Field(
         default=True, description="Write the summary through the Batch API (half price)."
     )
@@ -164,6 +225,34 @@ class DigestSettings(ConfigModel):
         description="Stories at or above this severity get a written summary; the rest are "
         "listed by headline.",
     )
+    min_severity_listed: int = Field(
+        default=1,
+        ge=1,
+        le=3,
+        description="Stories below this severity are left out of the digest entirely (at most "
+        "min_severity_summarised).",
+    )
+    daily_window_hours: int = Field(
+        default=24, ge=1, le=168, description="The daily digest covers this many past hours."
+    )
+    weekly_window_days: int = Field(
+        default=7, ge=1, le=31, description="The weekly digest covers this many past days."
+    )
+
+    @model_validator(mode="after")
+    def _consistent(self) -> Self:
+        check_effort(self.model, self.effort, "effort")
+        if self.min_severity_listed > self.min_severity_summarised:
+            raise ValueError(
+                "min_severity_listed must be at most min_severity_summarised (a summarised "
+                "story must also be listed)"
+            )
+        return self
+
+    def window(self, kind: str) -> dt.timedelta:
+        if kind == "daily":
+            return dt.timedelta(hours=self.daily_window_hours)
+        return dt.timedelta(days=self.weekly_window_days)
 
 
 class ReferenceSettings(ConfigModel):
@@ -181,6 +270,12 @@ class ReferenceSettings(ConfigModel):
         ge=0,
         le=500,
         description="Most GLEIF subsidiary names added to a holding's news aliases.",
+    )
+    wikidata_languages: list[Annotated[str, Field(pattern=r"^[a-z]{2,3}$")]] = Field(
+        default_factory=lambda: ["en", "de", "cs"],
+        min_length=1,
+        max_length=10,
+        description="Languages (ISO 639 codes) whose Wikidata labels and aliases are read.",
     )
 
 
@@ -237,11 +332,32 @@ class EscalationSettings(ConfigModel):
 
     enabled: bool = True
     model: ModelId = "claude-sonnet-5"
+    effort: Effort | None = Field(default=None, description=EFFORT_HELP)
     max_steps: int = Field(
         default=5, ge=1, le=20, description="Claude calls plus web searches per escalation."
     )
     max_searches: int = Field(default=3, ge=0, le=10)
     min_severity: int = Field(default=2, ge=1, le=3)
+    source_tiers: list[SourceTier] = Field(
+        default_factory=lambda: list(DEFAULT_SOURCE_TIERS),
+        min_length=1,
+        description="Outlet tiers web search may use (News sources config).",
+    )
+    price_move_news_days: int = Field(
+        default=3,
+        ge=0,
+        le=30,
+        description="A price-move note reads the holding's news from this many days before "
+        "the move.",
+    )
+    price_move_news_items: int = Field(default=6, ge=0, le=30)
+
+    _tiers = field_validator("source_tiers")(_unique_tiers)
+
+    @model_validator(mode="after")
+    def _effort_supported(self) -> Self:
+        check_effort(self.model, self.effort, "effort")
+        return self
 
 
 class EurostatSeries(ConfigModel):
@@ -362,6 +478,7 @@ class ChatSettings(ConfigModel):
     """The chat panel's assistant: DB tools, web search on tiered outlets, cited answers."""
 
     model: ModelId = "claude-sonnet-5"
+    effort: Effort | None = Field(default=None, description=EFFORT_HELP)
     max_steps: int = Field(
         default=6, ge=1, le=20, description="Claude calls plus tool rounds per answer."
     )
@@ -369,20 +486,48 @@ class ChatSettings(ConfigModel):
     history_messages: int = Field(
         default=12, ge=2, le=50, description="Earlier messages of the conversation sent along."
     )
+    source_tiers: list[SourceTier] = Field(
+        default_factory=lambda: list(DEFAULT_SOURCE_TIERS),
+        min_length=1,
+        description="Outlet tiers web search may use and an answer may cite (News sources config).",
+    )
+
+    _tiers = field_validator("source_tiers")(_unique_tiers)
+
+    @model_validator(mode="after")
+    def _effort_supported(self) -> Self:
+        check_effort(self.model, self.effort, "effort")
+        return self
 
 
 class ReviewSettings(ConfigModel):
     """The monthly review: compliance and figures in code, proposed actions by the model."""
 
     model: ModelId = "claude-opus-5-5"
-    effort: Literal["low", "medium", "high", "xhigh", "max"] = "high"
+    effort: Effort = "high"
     max_steps: int = Field(default=3, ge=1, le=10, description="Claude calls per review.")
+    use_batch: bool = Field(
+        default=True, description="Propose the actions through the Batch API (half price)."
+    )
+    batch_wait_minutes: int = Field(
+        default=60,
+        ge=1,
+        le=720,
+        description="How long to wait for the batch before proposing the actions directly.",
+    )
     liquidity_days: float = Field(
         default=1.0,
         gt=0,
         le=100,
         description="A position larger than this many days of its home market's average "
         "daily turnover is flagged as hard to exit.",
+    )
+    holder_drop_flag_pct: float = Field(
+        default=10.0,
+        gt=0,
+        le=100,
+        description="A fall in a holding's 13F holder count of at least this percentage "
+        "quarter on quarter is flagged.",
     )
 
 

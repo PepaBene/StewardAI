@@ -16,7 +16,8 @@ import json
 import logging
 from collections.abc import AsyncIterator, Awaitable, Callable
 from contextlib import asynccontextmanager
-from dataclasses import dataclass, field
+from contextvars import ContextVar
+from dataclasses import dataclass, field, replace
 from decimal import Decimal
 from typing import Any, Literal
 
@@ -74,6 +75,9 @@ class JobContext:
     _prices: PriceTable | None = None
     # A job the queue redelivered after the worker died mid-run (see run_job).
     resumed: bool = False
+    # The Budget guard's state for this run (steward.budget_guard), made on the first AI
+    # request.
+    budget: Any = None
 
     async def checkpoint(self, key: str, compute: Callable[[], Awaitable[Any]]) -> Any:
         """The stored output of step `key` if an earlier attempt of this job completed it;
@@ -142,6 +146,12 @@ class JobContext:
         usage = handle.usage
         prices: dict[str, Any] | None = None
         cost: Decimal | None = None
+        downgraded: dict[str, str] = getattr(self.budget, "downgraded", None) or {}
+        if usage is not None and usage.model in downgraded:
+            # The budget guard sent this run's requests of the step's model to a cheaper one
+            # (monthly cap reached): the step is recorded and priced as that model.
+            handle.detail["budget_downgrade"] = {"from": usage.model, "to": downgraded[usage.model]}
+            usage = replace(usage, model=downgraded[usage.model])
         if usage is not None:
             table = await self.price_table()
             prices = table.prices_for(usage.model)
@@ -186,6 +196,10 @@ class JobContext:
 
 
 JobHandler = Callable[[JobContext], Awaitable[None]]
+
+# The job whose handler is running in this task (and the tasks it starts): the Anthropic
+# client in steward.ai reads it to apply the Budget config's caps to every request of a job.
+current_job: ContextVar[JobContext | None] = ContextVar("current_job", default=None)
 
 
 async def create_job(
@@ -355,6 +369,7 @@ async def _run_locked(
         job_id,
     )
     logger.info("job %s (%s, %s) started", job_id, job_type, trigger)
+    token = current_job.set(ctx)
     try:
         await handler(ctx)
     except Exception as exc:
@@ -364,6 +379,8 @@ async def _run_locked(
             logger.exception("job %s (%s) failed", job_id, job_type)
         await _finish(pool, job_id, "failed", _error_text(exc))
         return "failed"
+    finally:
+        current_job.reset(token)
     await _finish(pool, job_id, "succeeded", None)
     logger.info("job %s (%s) succeeded", job_id, job_type)
     return "succeeded"

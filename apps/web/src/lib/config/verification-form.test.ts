@@ -21,7 +21,7 @@ const FULL = {
   max_report_lag_days: 120,
   corroboration: { tier1_confirms_alone: false, independent_sources_to_confirm: 3 },
   trust: { wrong_penalty: 0.25, useful_reward: 0.1, demote_below: 0.5 },
-  claim_verifier: { enabled: false, model: "claude-sonnet-5", mode: "mark", numeric_check: false, applies_to: ["weekly_digest", "escalation"] },
+  claim_verifier: { enabled: false, model: "claude-sonnet-5", effort: "low", mode: "mark", numeric_check: false, applies_to: ["weekly_digest", "escalation"] },
   future_field: { kept: true },
 } as unknown as VerificationConfig;
 
@@ -92,5 +92,18 @@ describe("verification form", () => {
   it("sends a value it cannot read as typed, for the backend to reject", () => {
     const form = { ...verificationFromBody(null), maxReportLagDays: "soon" };
     expect(verificationToBody(form).max_report_lag_days).toBe("soon");
+  });
+});
+
+describe("verification form: claim verifier effort", () => {
+  it("sends an unset effort as null and rejects one on Haiku 4", () => {
+    const form = verificationFromBody(null);
+    expect(form.claimEffort).toBe("");
+    expect(verificationToBody(form).claim_verifier!.effort).toBeNull();
+    form.claimEffort = "low";
+    expect(validateVerificationForm(form)["claim_verifier.effort"]).toEqual([expect.stringMatching(/Haiku 4/)]);
+    form.claimModel = "claude-sonnet-5";
+    expect(validateVerificationForm(form)["claim_verifier.effort"]).toBeUndefined();
+    expect(verificationToBody(form).claim_verifier!.effort).toBe("low");
   });
 });

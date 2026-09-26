@@ -45,6 +45,7 @@ ConfigDomainSlug = Literal[
     "notifications",
     "budget",
     "research-profiles",
+    "prompts",
 ]
 DOMAIN_BY_SLUG: dict[str, str] = {s: s.replace("-", "_") for s in get_args(ConfigDomainSlug)}
 assert set(DOMAIN_BY_SLUG.values()) == set(CONFIG_MODELS), "ConfigDomainSlug is out of date"

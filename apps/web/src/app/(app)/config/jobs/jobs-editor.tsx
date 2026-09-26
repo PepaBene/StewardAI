@@ -6,7 +6,7 @@ import { useId, useMemo, useState, type ReactNode } from "react";
 
 import { AlertMessage } from "@/components/alert-message";
 import { ConfigHeader } from "@/components/config/config-header";
-import { CheckboxField, SelectField, TextAreaField, TextField } from "@/components/config/fields";
+import { CheckboxField, CheckboxGroup, SelectField, TextAreaField, TextField } from "@/components/config/fields";
 import { SaveBar } from "@/components/config/save-bar";
 import { Button } from "@/components/ui/button";
 import { getBrowserApiClient, type JobsConfig } from "@/lib/api/client";
@@ -22,6 +22,7 @@ import {
   newClosure,
   newMacroSeries,
   newManager,
+  parseTiers,
   SCHEDULES,
   scheduleLabel,
   SETTINGS,
@@ -41,6 +42,12 @@ import { SEVERITY } from "@/lib/news/labels";
 
 const api = () => getBrowserApiClient();
 const EFFORT_OPTIONS = EFFORTS.map((e) => ({ value: e, label: e }));
+const OPTIONAL_EFFORT_OPTIONS = [{ value: "", label: "Model default" }, ...EFFORT_OPTIONS];
+const TIER_OPTIONS = [
+  { value: 1, label: "Tier 1" },
+  { value: 2, label: "Tier 2" },
+  { value: 3, label: "Tier 3" },
+];
 const SEVERITY_OPTIONS = (["1", "2", "3"] as const).map((s) => ({
   value: s,
   label: `${s} · ${SEVERITY[Number(s) as 1 | 2 | 3].label} and above`,
@@ -269,6 +276,23 @@ function SettingsCard({
           }
           if (field.kind === "effort") {
             return <SelectField key={field.key} label={field.label} path={path} errors={errors} value={String(value)} options={EFFORT_OPTIONS} onChange={(v) => onChange(field.key, v)} hint={field.hint} />;
+          }
+          if (field.kind === "effort-optional") {
+            return <SelectField key={field.key} label={field.label} path={path} errors={errors} value={String(value)} options={OPTIONAL_EFFORT_OPTIONS} onChange={(v) => onChange(field.key, v)} hint={field.hint} />;
+          }
+          if (field.kind === "tiers") {
+            return (
+              <CheckboxGroup
+                key={field.key}
+                label={field.label}
+                path={path}
+                errors={errors}
+                values={parseTiers(String(value))}
+                options={TIER_OPTIONS}
+                onChange={(v) => onChange(field.key, [...v].sort((a, b) => a - b).join(", "))}
+                hint={field.hint}
+              />
+            );
           }
           if (field.kind === "lines") {
             return <TextAreaField key={field.key} label={field.label} path={path} errors={errors} value={String(value)} rows={3} onChange={(v) => onChange(field.key, v)} hint={hint} />;

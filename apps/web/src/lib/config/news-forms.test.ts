@@ -71,6 +71,7 @@ describe("news sources form", () => {
     unknown_outlet_tier: 3 as const,
     freshness_hours: 72,
     include_tier3: false,
+    google_news_locale: { language: "en-US", country: "US" },
   };
 
   it("round-trips", () => {
@@ -157,5 +158,22 @@ describe("event rules form: price moves, macro surprises and announcement types"
   it("parses surprise bands line by line", () => {
     expect(parseSurpriseBands("hicp 0.3\nfed_funds 0\n")).toEqual({ hicp: 0.3, fed_funds: 0 });
     expect(parseSurpriseBands("gdp")).toEqual({ gdp: "" });
+  });
+});
+
+describe("news forms: Google News edition and earnings check cooldown", () => {
+  it("edits the Google News edition and defaults an old body to en-US / US", () => {
+    const form = sourcesFromBody({ ...DEFAULT_SOURCES, google_news_locale: undefined }, DEFAULT_SOURCES);
+    expect([form.google_news_language, form.google_news_country]).toEqual(["en-US", "US"]);
+    form.google_news_language = " cs ";
+    form.google_news_country = "cz";
+    expect(sourcesToBody(form).google_news_locale).toEqual({ language: "cs", country: "CZ" });
+  });
+
+  it("edits the earnings check cooldown, 10 days by default", () => {
+    const form = eventRulesFromBody(null);
+    expect(form.earnings_check_cooldown_days).toBe("10");
+    form.earnings_check_cooldown_days = "5";
+    expect(eventRulesToBody(form).earnings_check_cooldown_days).toBe(5);
   });
 });

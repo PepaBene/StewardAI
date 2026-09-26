@@ -1,9 +1,11 @@
 """Drift, hard-limit and strategy-rule checks after each sync.
 
 Every sync evaluates the strategy against the new snapshot:
-- a position, category or cash weight outside its target band is a `band` flag: listed in
-  the next digest, never alerted;
-- a position above its hard limit is a `hard_limit` breach (severity 3);
+- a position, category or cash weight outside its target band is a `band` flag at the
+  strategy's `band_breach_severity` (default 1: listed in the next digest, never alerted;
+  2 or 3 alert like a breach);
+- a position above its hard limit is a `hard_limit` breach at `hard_limit_severity`
+  (default 3);
 - a structured rule that does not hold (position or category weight, cash weight, position
   count) is a `rule` breach at the rule's `on_breach` severity.
 
@@ -63,6 +65,8 @@ def _pct(x: float) -> str:
 
 def evaluate(report: DriftReport, strategy: StrategyConfig) -> list[Finding]:
     findings: list[Finding] = []
+    hard_severity = int(strategy.hard_limit_severity[-1])
+    band_severity = int(strategy.band_breach_severity[-1])
     for p in report.positions:
         if p.status == "above_hard_limit" and p.hard_limit is not None:
             findings.append(
@@ -70,7 +74,7 @@ def evaluate(report: DriftReport, strategy: StrategyConfig) -> list[Finding]:
                     f"hard_limit:{p.ticker}",
                     "hard_limit",
                     p.ticker,
-                    3,
+                    hard_severity,
                     f"{p.ticker} weighs {_pct(p.weight)}, above its hard limit of "
                     f"{_pct(p.hard_limit)}",
                     p.weight,
@@ -83,7 +87,7 @@ def evaluate(report: DriftReport, strategy: StrategyConfig) -> list[Finding]:
                     f"band:position:{p.ticker}",
                     "band",
                     p.ticker,
-                    1,
+                    band_severity,
                     f"{p.ticker} weighs {_pct(p.weight)}, outside its band "
                     f"{_pct(p.lower or 0)}-{_pct(p.upper)}",
                     p.weight,
@@ -98,7 +102,7 @@ def evaluate(report: DriftReport, strategy: StrategyConfig) -> list[Finding]:
                         f"band:category:{dim.dimension}:{b.bucket}",
                         "band",
                         None,
-                        1,
+                        band_severity,
                         f"{dim.dimension} {b.bucket} weighs {_pct(b.weight)}, outside its band "
                         f"{_pct(b.lower or 0)}-{_pct(b.upper)}",
                         b.weight,
@@ -112,7 +116,7 @@ def evaluate(report: DriftReport, strategy: StrategyConfig) -> list[Finding]:
                 "band:cash",
                 "band",
                 None,
-                1,
+                band_severity,
                 f"Cash weighs {_pct(c.weight)}, outside its band "
                 f"{_pct(c.lower or 0)}-{_pct(c.upper)}",
                 c.weight,
@@ -222,9 +226,10 @@ async def record_breaches(
             config_version_id,
         )
         summary.opened.append(f.key)
-        if f.kind == "band" or f.severity < 1:
+        # A band flag at severity 1 is for the digest only; at 2 or 3 it alerts.
+        if f.severity < 1 or (f.kind == "band" and f.severity < 2):
             continue
-        what = "hard limit" if f.kind == "hard_limit" else "strategy rule"
+        what = {"hard_limit": "hard limit", "band": "target band"}.get(f.kind, "strategy rule")
         lines = [f"[Severity {f.severity}] Portfolio: {what} breached", f.detail]
         if app_url:
             lines.append(f"{app_url.rstrip('/')}/")

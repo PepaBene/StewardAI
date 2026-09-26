@@ -209,7 +209,14 @@ class EventRulesConfig(ConfigModel):
     earnings_check_on: list[EventType] = Field(
         default_factory=lambda: cast(list[EventType], ["earnings_release"]),
         description="Confirmed stories of these types queue an earnings thesis check for "
-        "the holding, unless one ran in the last 10 days.",
+        "the holding, unless one ran within earnings_check_cooldown_days.",
+    )
+    earnings_check_cooldown_days: int = Field(
+        default=10,
+        ge=1,
+        le=60,
+        description="A story does not queue an earnings check when one was queued or ran for "
+        "the holding within this many days.",
     )
 
     @model_validator(mode="after")

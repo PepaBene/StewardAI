@@ -10,7 +10,7 @@
 
 import datetime as dt
 from dataclasses import dataclass
-from typing import Any, Protocol
+from typing import Any, Protocol, cast
 from urllib.parse import urlsplit
 
 import anthropic
@@ -18,7 +18,9 @@ import pydantic
 from pydantic import BaseModel, Field
 
 from steward.ai import Usage
+from steward.config.jobs import effort_kwargs
 from steward.earnings.periods import period_label
+from steward.research.writer import web_search_tool
 
 
 class LocateError(Exception):
@@ -83,10 +85,19 @@ def _result_urls(content: list[Any]) -> set[str]:
 
 
 class ClaudeSearchLocator:
-    def __init__(self, client: anthropic.AsyncAnthropic, model: str, max_searches: int) -> None:
+    def __init__(
+        self,
+        client: anthropic.AsyncAnthropic,
+        model: str,
+        max_searches: int,
+        system: str = SEARCH_SYSTEM,
+        effort: str | None = None,
+    ) -> None:
         self._client = client
         self._model = model
+        self._effort = effort
         self._max_searches = max_searches
+        self._system = system
 
     async def locate(self, request: SearchRequest) -> tuple[Located | None, Usage]:
         usage = Usage(model=self._model)
@@ -108,17 +119,15 @@ class ClaudeSearchLocator:
                 response = await self._client.messages.parse(
                     model=self._model,
                     max_tokens=8000,
-                    system=SEARCH_SYSTEM,
+                    system=self._system,
                     messages=messages,  # type: ignore[arg-type]
-                    tools=[
-                        {
-                            "type": "web_search_20260209",
-                            "name": "web_search",
-                            "max_uses": self._max_searches,
-                            "allowed_domains": request.domains,
-                        }
-                    ],
+                    # Haiku 4 models take only the older web search tool version.
+                    tools=cast(
+                        Any,
+                        [web_search_tool(self._model, self._max_searches, tuple(request.domains))],
+                    ),
                     output_format=LocatedDocument,
+                    **effort_kwargs(self._model, self._effort),
                 )
             except anthropic.APIError as exc:
                 raise LocateError(f"search call failed: {exc}", usage) from exc

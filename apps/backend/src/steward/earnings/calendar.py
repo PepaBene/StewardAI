@@ -31,8 +31,10 @@ from pydantic import BaseModel, Field
 
 from steward import __version__
 from steward.ai import AINotConfigured, Usage, create_client
+from steward.budget_guard import BudgetExceeded
 from steward.config.holding_profiles import HoldingProfile
-from steward.config.jobs import EarningsCalendarSettings
+from steward.config.jobs import EarningsCalendarSettings, effort_kwargs
+from steward.config.prompts import load_prompts
 from steward.documents.fetch import FetchError, default_headers, fetch_document
 from steward.documents.text import contains
 from steward.earnings.check import load_config, local_today
@@ -91,6 +93,7 @@ async def dates_from_ir_page(
     profile: HoldingProfile,
     settings: EarningsCalendarSettings,
     today: dt.date,
+    system: str = CALENDAR_SYSTEM,
 ) -> tuple[dt.date | None, str, Usage]:
     usage = Usage(model=settings.model)
     url = str(profile.financial_calendar_url)
@@ -99,7 +102,7 @@ async def dates_from_ir_page(
     response = await client.messages.parse(
         model=settings.model,
         max_tokens=4000,
-        system=CALENDAR_SYSTEM,
+        system=system,
         messages=[
             {
                 "role": "user",
@@ -114,6 +117,7 @@ async def dates_from_ir_page(
             }
         ],
         output_format=CalendarPage,
+        **effort_kwargs(settings.model, settings.effort),
     )
     usage.add(response.usage)
     page = response.parsed_output
@@ -229,6 +233,7 @@ async def refresh_calendar(ctx: JobContext, *, full: bool) -> None:
     async with ctx.step("load_config") as step:
         config = await load_config(ctx)
         cal_settings = config.jobs.earnings_calendar_settings
+        system = (await load_prompts(pool)).text("earnings_calendar", CALENDAR_SYSTEM)
         tickers = await _holding_tickers(pool, [t.ticker for t in config.theses.theses])
         if not full and not ctx.params.get("all"):
             tickers = await due_for_refresh(pool, tickers, today, cal_settings.refresh_within_days)
@@ -251,12 +256,15 @@ async def refresh_calendar(ctx: JobContext, *, full: bool) -> None:
             try:
                 async with ctx.step(f"report_date:{ticker}") as step:
                     found, source = await _find_date(
-                        http, client, finnhub_key, profile, cal_settings, today, end, step
+                        http, client, finnhub_key, profile, cal_settings, today, end, step, system
                     )
                     step.detail.update(next_report_date=found, source=source)
                     pending = await set_report_date(pool, ticker, found, source, today, retry_days)
                     if pending is not None:
                         step.detail["pending_report_date"] = pending
+            except BudgetExceeded:
+                # A budget cap stops the run: the other holdings would be refused too.
+                raise
             except Exception:
                 # The step is recorded as failed; one holding must not stop the others.
                 logger.exception("report date refresh failed for %s", ticker)
@@ -271,6 +279,7 @@ async def _find_date(
     today: dt.date,
     end: dt.date,
     step: Any,
+    system: str = CALENDAR_SYSTEM,
 ) -> tuple[dt.date | None, str]:
     notes: list[str] = []
     if finnhub_key:
@@ -286,7 +295,9 @@ async def _find_date(
         notes.append("finnhub: FINNHUB_API_KEY not set")
     if profile.financial_calendar_url and client is not None:
         try:
-            date, source, usage = await dates_from_ir_page(client, http, profile, settings, today)
+            date, source, usage = await dates_from_ir_page(
+                client, http, profile, settings, today, system
+            )
         except (
             FetchError,
             anthropic.APIError,

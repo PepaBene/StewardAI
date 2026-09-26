@@ -24,13 +24,16 @@ from steward import __version__
 from steward.ai import AINotConfigured, Usage, create_client
 from steward.config.holding_profiles import HoldingProfile, HoldingProfilesConfig
 from steward.config.jobs import EarningsCheckSettings, JobsConfig
+from steward.config.prompts import load_prompts
 from steward.config.store import load_active
 from steward.config.thesis import ThesesConfig
 from steward.config.verification import VerificationConfig
 from steward.documents.fetch import FetchError, default_headers, fetch_document
 from steward.earnings import metrics as metric_names
+from steward.earnings.extract import SYSTEM_PROMPT as EXTRACTION_SYSTEM
 from steward.earnings.extract import ClaudeExtractor, ExtractionError, ExtractionRequest, Extractor
 from steward.earnings.locate import (
+    SEARCH_SYSTEM,
     ClaudeSearchLocator,
     Located,
     LocateError,
@@ -111,6 +114,7 @@ async def earnings_check_handler(ctx: JobContext) -> None:
         raise JobFailed(str(exc)) from exc
     stored_jobs = await load_active(ctx.pool, "jobs", JobsConfig)
     cfg = (stored_jobs.body if stored_jobs else JobsConfig()).earnings_check
+    prompts = await load_prompts(ctx.pool)
     async with httpx.AsyncClient(
         timeout=60.0, headers={"User-Agent": f"StewardAI/{__version__}"}
     ) as http:
@@ -120,9 +124,20 @@ async def earnings_check_handler(ctx: JobContext) -> None:
             storage=SupabaseStorage(
                 http, settings.supabase_url, settings.supabase_secret_key.get_secret_value()
             ),
-            extractor=ClaudeExtractor(client, cfg.extraction_model, cfg.effort),
+            extractor=ClaudeExtractor(
+                client,
+                cfg.extraction_model,
+                cfg.effort,
+                prompts.text("earnings_extraction", EXTRACTION_SYSTEM),
+            ),
             edgar=edgar,
-            locator=ClaudeSearchLocator(client, cfg.locate_model, cfg.max_searches),
+            locator=ClaudeSearchLocator(
+                client,
+                cfg.locate_model,
+                cfg.max_searches,
+                prompts.text("earnings_locate", SEARCH_SYSTEM),
+                effort=cfg.locate_effort,
+            ),
         )
         await earnings_check(ctx, deps)
 
@@ -142,6 +157,7 @@ async def thesis_verdicts_handler(ctx: JobContext) -> None:
             config.theses_version_id,
             ctx.job_id,
             [ticker] if isinstance(ticker, str) and ticker else None,
+            config.jobs.earnings_check.kpi_history_periods,
         )
         step.detail.update(summary.as_detail())
 
@@ -349,7 +365,12 @@ async def earnings_check(ctx: JobContext, deps: EarningsDeps) -> None:
             step.detail["skipped"] = "no theses config saved"
         else:
             verdicts = await run_verdicts(
-                pool, config.theses, config.theses_version_id, ctx.job_id, [ticker]
+                pool,
+                config.theses,
+                config.theses_version_id,
+                ctx.job_id,
+                [ticker],
+                config.jobs.earnings_check.kpi_history_periods,
             )
             step.detail.update(verdicts.as_detail())
             breaches = await alert_breaches(

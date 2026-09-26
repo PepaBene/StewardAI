@@ -22,6 +22,7 @@ from pydantic import BaseModel, Field
 from steward.ai import AINotConfigured, create_client
 from steward.config.holding_profiles import HoldingProfilesConfig
 from steward.config.news_sources import NewsSourcesConfig
+from steward.config.prompts import load_prompts
 from steward.config.research import MODEL_SECTIONS, SENTENCES_BY_DEPTH, ResearchProfilesConfig
 from steward.config.store import load_active
 from steward.config.strategy import StrategyConfig
@@ -37,7 +38,9 @@ from steward.research.writer import (
     ResearchWriter,
     SectionRequest,
 )
+from steward.research.writer import SYSTEM as WRITER_SYSTEM
 from steward.settings import get_settings
+from steward.verify.claims import SYSTEM as VERIFIER_SYSTEM
 from steward.verify.claims import (
     Claim,
     ClaimCheckSummary,
@@ -85,18 +88,27 @@ class ResearchDeps:
     app_url: str | None = None
 
 
+def _source_line(s: Source) -> str:
+    text = (s.snippet or "")[:600]
+    return f"[{s.id}] ({s.kind}, tier {s.tier or '?'}, {s.as_of or ''}) {s.title}: {text}"
+
+
 def material_text(g: Gathered, reg: Registry) -> str:
     lines = [f"Company context: {g.context}", "", "Sources:"]
-    for s in reg.sources:
-        text = (s.snippet or "")[:600]
-        lines.append(
-            f"[{s.id}] ({s.kind}, tier {s.tier or '?'}, {s.as_of or ''}) {s.title}: {text}"
-        )
+    lines += [_source_line(s) for s in reg.sources]
     lines += ["", "Already written from stored records (cite the same ids if you use them):"]
     for section in g.sections.values():
         for sentence in section.sentences:
             lines.append(f"- {sentence.text} [{', '.join(sentence.source_ids)}]")
     return "\n".join(lines)
+
+
+def added_material_text(reg: Registry, start: int) -> str:
+    """Sources earlier sections found by web search (registry entries from `start` on)."""
+    added = reg.sources[start:]
+    if not added:
+        return ""
+    return "\n".join(["More sources, found by web search:", *(_source_line(s) for s in added)])
 
 
 def search_domains(
@@ -169,6 +181,10 @@ async def run_research(ctx: JobContext, deps: ResearchDeps) -> int:
     )
     budget = {"steps": 0, "searches": 0}
     written: dict[str, dict[str, Any]] = {}
+    # The gathered material is identical for every section (the writer caches it); sources
+    # added by search go in a separate, per-section part.
+    material = material_text(gathered, reg)
+    gathered_count = len(reg.sources)
 
     for index, section in enumerate(model_sections):
 
@@ -196,7 +212,8 @@ async def run_research(ctx: JobContext, deps: ResearchDeps) -> int:
                         section=section,
                         name=gathered.name,
                         ticker=ticker,
-                        material=material_text(gathered, reg),
+                        material=material,
+                        added_material=added_material_text(reg, gathered_count),
                         language=profile.language,
                         max_sentences=SENTENCES_BY_DEPTH[profile.depth],
                         domains=domains,
@@ -391,6 +408,7 @@ def render_md(body: ResearchBody) -> str:
 
 async def research_handler(ctx: JobContext) -> None:
     settings = get_settings()
+    prompts = await load_prompts(ctx.pool)
     research = await load_active(ctx.pool, "research_profiles", ResearchProfilesConfig)
     verification = await load_active(ctx.pool, "verification", VerificationConfig)
     profile = (research.body if research else ResearchProfilesConfig()).get(
@@ -403,11 +421,25 @@ async def research_handler(ctx: JobContext) -> None:
     except AINotConfigured:
         writer = verifier = None
     else:
-        writer = ClaudeResearchWriter(client, profile.model, profile.effort) if profile else None
-        claim_model = (
+        writer = (
+            ClaudeResearchWriter(
+                client,
+                profile.model,
+                profile.effort,
+                prompts.text("research_writer", WRITER_SYSTEM),
+            )
+            if profile
+            else None
+        )
+        claim_settings = (
             verification.body if verification else VerificationConfig()
-        ).claim_verifier.model
-        verifier = ClaudeClaimVerifier(client, claim_model)
+        ).claim_verifier
+        verifier = ClaudeClaimVerifier(
+            client,
+            claim_settings.model,
+            prompts.text("claim_verifier", VERIFIER_SYSTEM),
+            effort=claim_settings.effort,
+        )
     await run_research(
         ctx,
         ResearchDeps(

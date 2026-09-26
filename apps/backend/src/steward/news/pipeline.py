@@ -33,16 +33,19 @@ from steward.config.jobs import EscalationSettings, JobsConfig, NewsSettings
 from steward.config.news_sources import (
     AGGREGATOR_TYPES,
     REGULATORY_COUNTRY,
+    GoogleNewsLocale,
     NewsSource,
     NewsSourcesConfig,
 )
 from steward.config.notifications import NotificationsConfig
+from steward.config.prompts import load_prompts
 from steward.config.store import load_active
 from steward.config.thesis import ThesesConfig
 from steward.config.verification import TrustSettings, VerificationConfig
 from steward.documents.fetch import FetchError
 from steward.jobs import queue
 from steward.jobs.runner import JobContext, create_job
+from steward.news.classify import SYSTEM_PROMPT as CLASSIFICATION_PROMPT
 from steward.news.classify import (
     Candidate,
     ClassificationError,
@@ -54,6 +57,7 @@ from steward.news.classify import (
 )
 from steward.news.cluster import ClusterMember, Fingerprint, best_cluster
 from steward.news.corroborate import (
+    SEARCH_SYSTEM,
     ClaudeCorroborator,
     Corroborator,
     OtherStory,
@@ -83,8 +87,6 @@ from steward.sources.edgar import EdgarClient
 from steward.verify.trust import TrustTable, load_trust
 
 logger = logging.getLogger(__name__)
-
-EARNINGS_CHECK_COOLDOWN = dt.timedelta(days=10)
 
 
 @dataclass
@@ -308,6 +310,7 @@ async def collect_source(
     pool: asyncpg.Pool,
     freshness_days: int,
     rules: EventRulesConfig | None = None,
+    google_news_locale: GoogleNewsLocale | None = None,
 ) -> tuple[list[RawItem], list[str]]:
     rules = rules or EventRulesConfig()
     scoped = tuple(source.tickers)
@@ -359,7 +362,9 @@ async def collect_source(
         )
         await record_filing_hits(pool, fts)
         return fts.items, fts.errors
-    result = await collect_google_news(deps.http, source.id, feeds, freshness_days)
+    result = await collect_google_news(
+        deps.http, source.id, feeds, freshness_days, google_news_locale
+    )
     return result.items, result.errors
 
 
@@ -635,6 +640,8 @@ async def classify_pending(
             except ClassificationError as exc:
                 detail["errors"].append(str(exc))
                 step.detail["error"] = str(exc)
+                if exc.usage is not None:
+                    step.usage = exc.usage.step_usage()
                 continue
             step.usage = usage.step_usage()
             step.detail.update(items=len(items), missing=len(result.missing))
@@ -1074,7 +1081,7 @@ async def queue_earnings_check(
         " and params ->> 'ticker' = $1 and created_at >= $2"
         " and status in ('succeeded', 'queued', 'waiting', 'running'))",
         story.ticker,
-        now - EARNINGS_CHECK_COOLDOWN,
+        now - dt.timedelta(days=config.event_rules.earnings_check_cooldown_days),
     )
     if recent:
         return None
@@ -1115,7 +1122,14 @@ async def run_news_pipeline(ctx: JobContext, deps: NewsDeps) -> None:
             error: str | None = None
             try:
                 items, notes = await collect_source(
-                    source, deps, holdings, since, pool, freshness_days, config.event_rules
+                    source,
+                    deps,
+                    holdings,
+                    since,
+                    pool,
+                    freshness_days,
+                    config.event_rules,
+                    config.sources.google_news_locale,
                 )
             except (FetchError, httpx.HTTPError, ValueError) as exc:
                 items, notes, error = [], [], str(exc)[:500]
@@ -1232,9 +1246,19 @@ async def news_ingest_handler(ctx: JobContext) -> None:
     except AINotConfigured:
         client = None
     if client is not None:
-        classifier = ClaudeClassifier(client, news.classification_model)
+        prompts = await load_prompts(ctx.pool)
+        classifier = ClaudeClassifier(
+            client,
+            news.classification_model,
+            prompts.text("news_classification", CLASSIFICATION_PROMPT),
+            effort=news.classification_effort,
+        )
         corroborator = ClaudeCorroborator(
-            client, news.corroboration_model, news.corroboration_max_searches
+            client,
+            news.corroboration_model,
+            news.corroboration_max_searches,
+            prompts.text("news_corroboration", SEARCH_SYSTEM),
+            effort=news.corroboration_effort,
         )
     async with httpx.AsyncClient(
         timeout=30.0, headers={"User-Agent": f"StewardAI/{__version__}"}

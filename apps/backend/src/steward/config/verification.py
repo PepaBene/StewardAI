@@ -2,12 +2,12 @@
 information): sanity bounds and tolerances for extracted figures, the corroboration rules
 per tier, source trust from owner feedback, and the claim verifier's strictness."""
 
-from typing import Annotated, Literal
+from typing import Annotated, Literal, Self
 
-from pydantic import Field
+from pydantic import Field, model_validator
 
 from steward.config.common import ConfigModel
-from steward.config.jobs import ModelId
+from steward.config.jobs import EFFORT_HELP, Effort, ModelId, check_effort
 
 Metric = Annotated[str, Field(pattern=r"^[a-z][a-z0-9_]{0,63}$")]
 
@@ -56,6 +56,7 @@ class ClaimVerifierSettings(ConfigModel):
 
     enabled: bool = True
     model: ModelId = "claude-haiku-4-5"
+    effort: Effort | None = Field(default=None, description=EFFORT_HELP)
     mode: Literal["strip", "mark"] = Field(
         default="strip",
         description="strip: remove an unsupported sentence; mark: keep it, marked unsupported.",
@@ -70,6 +71,11 @@ class ClaimVerifierSettings(ConfigModel):
         description="Reports whose sentences are checked. Alerts are composed in code from "
         "the source's own headline, so they have no model-written sentences to check.",
     )
+
+    @model_validator(mode="after")
+    def _effort_supported(self) -> Self:
+        check_effort(self.model, self.effort, "effort")
+        return self
 
 
 class VerificationConfig(ConfigModel):

@@ -135,6 +135,15 @@ export function EventRulesEditor() {
               <TextField label="Insider cluster: transactions" inputMode="numeric" path="insider_cluster_count" errors={editor.errors} value={form.insider_cluster_count} onChange={(v) => set({ insider_cluster_count: v })} />
               <TextField label="Insider cluster: within days" inputMode="numeric" path="insider_cluster_days" errors={editor.errors} value={form.insider_cluster_days} onChange={(v) => set({ insider_cluster_days: v })} />
               <TextField label="Recycled story after (days)" inputMode="numeric" path="recycled_after_days" errors={editor.errors} value={form.recycled_after_days} onChange={(v) => set({ recycled_after_days: v })} />
+              <TextField
+                label="Earnings check cooldown (days)"
+                inputMode="numeric"
+                path="earnings_check_cooldown_days"
+                errors={editor.errors}
+                value={form.earnings_check_cooldown_days}
+                onChange={(v) => set({ earnings_check_cooldown_days: v })}
+                hint="No new check is queued while one was queued or ran for the holding within this many days. 1 to 60."
+              />
             </div>
           </section>
 

@@ -67,6 +67,12 @@ class ResearchProfile(ConfigModel):
         default_factory=lambda: list(ALL_VALUATION_METHODS)
     )
     language: Literal["en", "cs"] = "en"
+    top_holders: int = Field(
+        default=3,
+        ge=1,
+        le=20,
+        description="Largest 13F holders named in the ownership section.",
+    )
 
     @model_validator(mode="after")
     def _unique_sections(self) -> Self:

@@ -143,6 +143,24 @@ export function SourcesEditor() {
                 <SelectField label="Tier of an unlisted outlet (Finnhub, Google News)" path="unknown_outlet_tier" errors={editor.errors} value={form.unknown_outlet_tier} options={TIER_OPTIONS} onChange={(v) => set({ unknown_outlet_tier: v })} />
                 <TextField label="Freshness window (hours)" inputMode="numeric" path="freshness_hours" errors={editor.errors} value={form.freshness_hours} onChange={(v) => set({ freshness_hours: v })} hint="Older items are dropped." />
                 <CheckboxField label="Keep tier-3 items (labelled sentiment)" checked={form.include_tier3} onChange={(v) => set({ include_tier3: v })} />
+                <TextField
+                  label="Google News language"
+                  path="google_news_locale.language"
+                  errors={editor.errors}
+                  value={form.google_news_language}
+                  spellCheck={false}
+                  onChange={(v) => set({ google_news_language: v })}
+                  hint="The edition searched by Google News sources, e.g. en-US, en-GB, de, cs."
+                />
+                <TextField
+                  label="Google News country"
+                  path="google_news_locale.country"
+                  errors={editor.errors}
+                  value={form.google_news_country}
+                  spellCheck={false}
+                  onChange={(v) => set({ google_news_country: v })}
+                  hint="Two-letter code, e.g. US, GB, DE, CZ."
+                />
               </div>
             </div>
           </section>

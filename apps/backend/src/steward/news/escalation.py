@@ -5,8 +5,9 @@ The job is queued by the news pipeline (once per confirmed story at or above the
 severity) and by the price-history job (a close-to-close move beyond the event rules'
 threshold). One Claude call (Sonnet 5 by default) gets the story's stored sources (or the
 price move and the holding's recent stories), the thesis (why it is owned, its KPIs and
-exit conditions) and a web search restricted to tier-1/2 outlets, capped by the Jobs config's
-step and search budget. It returns a structured note; code then checks it:
+exit conditions) and a web search restricted to the outlet tiers in the Jobs config (1 and
+2 by default), capped by its step and search budget. It returns a structured note; code
+then checks it:
 
 - every sentence must cite URLs that were given to it or were in its search results
   (anything else is dropped), and the note always lists the story's sources;
@@ -29,15 +30,17 @@ from pydantic import BaseModel, Field
 from steward.ai import AINotConfigured, Usage, create_client
 from steward.config.event_rules import EVENT_DESCRIPTIONS
 from steward.config.holding_profiles import HoldingProfilesConfig
-from steward.config.jobs import EscalationSettings, JobsConfig
+from steward.config.jobs import EscalationSettings, JobsConfig, effort_kwargs
 from steward.config.news_sources import NewsSourcesConfig
+from steward.config.prompts import load_prompts
 from steward.config.store import load_active
 from steward.config.thesis import ThesesConfig, ThesisConfig
 from steward.config.verification import ClaimVerifierSettings, VerificationConfig
 from steward.jobs import queue
 from steward.jobs.runner import JobContext, JobFailed, create_job
-from steward.news.corroborate import _result_urls
+from steward.news.corroborate import AUTO_CACHE, _result_urls
 from steward.settings import get_settings
+from steward.verify.claims import SYSTEM as CLAIM_SYSTEM
 from steward.verify.claims import (
     CheckStatus,
     Claim,
@@ -146,9 +149,15 @@ class DraftResult:
 class ClaudeEscalator:
     TOOL_BY_MODEL_PREFIX = (("claude-haiku-4", "web_search_20250305"),)
 
-    def __init__(self, client: anthropic.AsyncAnthropic, settings: EscalationSettings) -> None:
+    def __init__(
+        self,
+        client: anthropic.AsyncAnthropic,
+        settings: EscalationSettings,
+        system: str = SYSTEM,
+    ) -> None:
         self._client = client
         self._settings = settings
+        self._system = system
 
     def _tool(self, domains: tuple[str, ...]) -> dict[str, Any]:
         tool_type = next(
@@ -180,10 +189,15 @@ class ClaudeEscalator:
                 response = await self._client.messages.parse(
                     model=self._settings.model,
                     max_tokens=4000,
-                    system=SYSTEM,
+                    system=self._system,
                     messages=cast(Any, messages),
                     tools=cast(Any, tools if tools else anthropic.omit),
                     output_format=ImpactDraft,
+                    **effort_kwargs(self._settings.model, self._settings.effort),
+                    # With web search, later sampling steps and pause_turn continuations
+                    # re-read the prefix cached; one call without tools would only pay the
+                    # cache write premium.
+                    extra_body=AUTO_CACHE if tools else None,
                 )
             except anthropic.APIError as exc:
                 return DraftResult(None, usage, seen, f"escalation call failed: {exc}")
@@ -390,7 +404,12 @@ async def story_input(
 
 
 async def price_move_input(
-    pool: asyncpg.Pool, params: dict[str, Any], theses: ThesesConfig, domains: tuple[str, ...]
+    pool: asyncpg.Pool,
+    params: dict[str, Any],
+    theses: ThesesConfig,
+    domains: tuple[str, ...],
+    news_days: int = 3,
+    news_items: int = 6,
 ) -> EscalationInput:
     ticker = str(params["ticker"])
     name = await pool.fetchval("select name from public.instrument where t212_ticker = $1", ticker)
@@ -401,9 +420,11 @@ async def price_move_input(
     recent = await pool.fetch(
         "select i.url, i.outlet, i.tier, i.headline from public.news_item i"
         " join public.story_cluster c on c.id = i.cluster_id where c.ticker = $1"
-        " and i.published_at >= $2::date - 3 order by i.published_at desc limit 6",
+        " and i.published_at >= $2::date - $3::int order by i.published_at desc limit $4",
         ticker,
         dt.date.fromisoformat(day),
+        news_days,
+        news_items,
     )
     thesis = next((t for t in theses.theses if t.ticker == ticker), None)
     sources = [EscalationSource(url=price_url, outlet="stooq.com", tier=2, kind="price",
@@ -477,6 +498,7 @@ class EscalationDeps:
     now: dt.datetime
     app_url: str | None = None
     claim_verifier: ClaimVerifier | None = None
+    settings: EscalationSettings = field(default_factory=EscalationSettings)
 
 
 def note_evidence(sentence: NoteSentence, sources: dict[str, EscalationSource]) -> tuple[str, ...]:
@@ -525,13 +547,29 @@ async def run_escalation(ctx: JobContext, deps: EscalationDeps) -> int:
         registry = sources.body if sources else NewsSourcesConfig()
         ir = [d for p in (profiles.body.profiles if profiles else []) for d in p.allowed_domains()]
         domains = tuple(
-            dict.fromkeys([*ir, *(d.domain for d in registry.domain_tiers if d.tier <= 2)])
+            dict.fromkeys(
+                [
+                    *ir,
+                    *(
+                        d.domain
+                        for d in registry.domain_tiers
+                        if d.tier in deps.settings.source_tiers
+                    ),
+                ]
+            )
         )[:60]
         theses_body = theses.body if theses else ThesesConfig()
         if "cluster_id" in ctx.params:
             request = await story_input(pool, int(ctx.params["cluster_id"]), theses_body, domains)
         elif ctx.params.get("trigger") == "price_move":
-            request = await price_move_input(pool, ctx.params, theses_body, domains)
+            request = await price_move_input(
+                pool,
+                ctx.params,
+                theses_body,
+                domains,
+                deps.settings.price_move_news_days,
+                deps.settings.price_move_news_items,
+            )
         else:
             raise JobFailed("needs a cluster_id, or a price move (ticker, date, move_pct)")
         step.detail.update(ticker=request.ticker, trigger=request.trigger)
@@ -583,9 +621,9 @@ async def event_escalation_handler(ctx: JobContext) -> None:
     jobs = await load_active(ctx.pool, "jobs", JobsConfig)
     escalation = (jobs.body if jobs else JobsConfig()).escalation
     stored_verification = await load_active(ctx.pool, "verification", VerificationConfig)
-    claim_model = (
+    claim_settings = (
         stored_verification.body if stored_verification else VerificationConfig()
-    ).claim_verifier.model
+    ).claim_verifier
     writer: ClaudeEscalator | None
     verifier: ClaimVerifier | None
     try:
@@ -593,8 +631,14 @@ async def event_escalation_handler(ctx: JobContext) -> None:
     except AINotConfigured:
         writer = verifier = None
     else:
-        writer = ClaudeEscalator(client, escalation)
-        verifier = ClaudeClaimVerifier(client, claim_model)
+        prompts = await load_prompts(ctx.pool)
+        writer = ClaudeEscalator(client, escalation, prompts.text("news_escalation", SYSTEM))
+        verifier = ClaudeClaimVerifier(
+            client,
+            claim_settings.model,
+            prompts.text("claim_verifier", CLAIM_SYSTEM),
+            effort=claim_settings.effort,
+        )
     await run_escalation(
         ctx,
         EscalationDeps(
@@ -602,6 +646,7 @@ async def event_escalation_handler(ctx: JobContext) -> None:
             now=dt.datetime.now(dt.UTC),
             app_url=settings.app_url,
             claim_verifier=verifier,
+            settings=escalation,
         ),
     )
 

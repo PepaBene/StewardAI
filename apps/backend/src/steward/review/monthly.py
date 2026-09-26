@@ -13,18 +13,23 @@ strategy rule id or a thesis KPI ("TICKER:kpi_id") that exists; code drops any a
 cites neither, so no action is published without a citation.
 """
 
+import asyncio
 import datetime as dt
 import json
+import logging
 from dataclasses import dataclass
-from typing import Literal, Protocol, cast
+from typing import Any, Literal, Protocol, cast
 
 import anthropic
 import asyncpg
+import pydantic
+from anthropic import transform_schema
 from anthropic.types import MessageParam, OutputConfigParam
 from pydantic import BaseModel, Field
 
 from steward.ai import AINotConfigured, Usage, create_client
 from steward.config.jobs import JobsConfig, ReviewSettings
+from steward.config.prompts import load_prompts
 from steward.config.store import load_active
 from steward.config.strategy import (
     CashWeightRule,
@@ -41,6 +46,8 @@ from steward.portfolio.drift import DriftReport
 from steward.portfolio.read import portfolio_overview
 from steward.research.sources import CitedSentence, Registry, Source
 from steward.settings import get_settings
+
+logger = logging.getLogger(__name__)
 
 Status = Literal["pass", "breach", "unknown"]
 
@@ -119,11 +126,89 @@ state figures that are not in the material. If nothing needs doing, return no ac
 
 
 class ClaudeReviewWriter:
-    def __init__(self, client: anthropic.AsyncAnthropic, settings: ReviewSettings) -> None:
+    """Proposes the actions: through the Batch API when `use_batch` is set (the review is not
+    time-sensitive; half price), falling back to direct calls when the batch does not finish
+    within `batch_wait_minutes` or fails. No cache breakpoint: one call a month, and a retry
+    only after a failure, so a cache write would almost never be read back."""
+
+    def __init__(
+        self,
+        client: anthropic.AsyncAnthropic,
+        settings: ReviewSettings,
+        system: str = SYSTEM,
+        poll_seconds: float = 30.0,
+    ) -> None:
         self._client = client
         self._settings = settings
+        self._system = system
+        self._poll = poll_seconds
+
+    def _messages(self, material: str, today: dt.date) -> list[MessageParam]:
+        return [cast(MessageParam, {"role": "user", "content": f"Today is {today}.\n\n{material}"})]
 
     async def propose(
+        self, material: str, today: dt.date
+    ) -> tuple[ReviewDraft | None, Usage, str | None]:
+        if self._settings.use_batch:
+            batched = await self._propose_batch(material, today)
+            if batched is not None:
+                return batched
+        return await self._propose_direct(material, today)
+
+    async def _propose_batch(
+        self, material: str, today: dt.date
+    ) -> tuple[ReviewDraft | None, Usage, str | None] | None:
+        """The draft through the Batch API, or None to fall back to direct calls (the batch
+        did not finish in time or failed before a message came back). A message that came
+        back is final, parseable or not, so its batch-priced tokens are recorded exactly."""
+        usage = Usage(model=self._settings.model, batch=True)
+        params = {
+            "model": self._settings.model,
+            "max_tokens": 16000,
+            "system": self._system,
+            "messages": self._messages(material, today),
+            "output_config": {
+                "effort": self._settings.effort,
+                "format": {
+                    "type": "json_schema",
+                    "schema": transform_schema(ReviewDraft.model_json_schema()),
+                },
+            },
+        }
+        try:
+            batch = await self._client.messages.batches.create(
+                requests=[{"custom_id": "review", "params": cast(Any, params)}]
+            )
+            loop = asyncio.get_running_loop()
+            deadline = loop.time() + self._settings.batch_wait_minutes * 60
+            while batch.processing_status != "ended":
+                if loop.time() > deadline:
+                    await self._client.messages.batches.cancel(batch.id)
+                    logger.warning("review batch %s not done in time; calling directly", batch.id)
+                    return None
+                await asyncio.sleep(self._poll)
+                batch = await self._client.messages.batches.retrieve(batch.id)
+            async for result in await self._client.messages.batches.results(batch.id):
+                if result.custom_id != "review":
+                    continue
+                if result.result.type != "succeeded":
+                    logger.warning("review batch request %s", result.result.type)
+                    return None
+                message = result.result.message
+                usage.add(message.usage)
+                if message.stop_reason == "refusal":
+                    return None, usage, "the model declined"
+                text = "".join(getattr(b, "text", "") for b in message.content if b.type == "text")
+                try:
+                    return ReviewDraft.model_validate_json(text), usage, None
+                except pydantic.ValidationError:
+                    return None, usage, f"no parseable answer ({message.stop_reason})"
+        except anthropic.APIError as exc:
+            logger.warning("review batch failed (%s); calling directly", exc)
+            return None
+        return None
+
+    async def _propose_direct(
         self, material: str, today: dt.date
     ) -> tuple[ReviewDraft | None, Usage, str | None]:
         usage = Usage(model=self._settings.model)
@@ -133,18 +218,18 @@ class ClaudeReviewWriter:
                 response = await self._client.messages.parse(
                     model=self._settings.model,
                     max_tokens=16000,
-                    system=SYSTEM,
-                    messages=[
-                        cast(
-                            MessageParam,
-                            {"role": "user", "content": f"Today is {today}.\n\n{material}"},
-                        )
-                    ],
+                    system=self._system,
+                    messages=self._messages(material, today),
                     output_config=cast(OutputConfigParam, {"effort": self._settings.effort}),
                     output_format=ReviewDraft,
                 )
             except anthropic.APIError as exc:
                 note = f"the call failed: {exc}"[:300]
+                continue
+            except (pydantic.ValidationError, ValueError):
+                # `parse` validates the output before returning: malformed or truncated JSON
+                # surfaces here (and that response's usage with it).
+                note = "no parseable answer"
                 continue
             usage.add(response.usage)
             if response.stop_reason == "refusal":
@@ -400,7 +485,7 @@ async def flags(pool: asyncpg.Pool, reg: Registry, settings: ReviewSettings) -> 
         if len(own.periods) == 2 and own.periods[1].holders:
             now, before = own.periods
             change = now.holders / before.holders - 1
-            if change <= -0.1:
+            if change <= -settings.holder_drop_flag_pct / 100:
                 sid = reg.add(
                     "filing13f",
                     f"13F:{now.period}:{','.join(own.cusips)}",
@@ -602,8 +687,9 @@ async def monthly_review_handler(ctx: JobContext) -> None:
     settings = get_settings()
     jobs = await load_active(ctx.pool, "jobs", JobsConfig)
     review = (jobs.body if jobs else JobsConfig()).review
+    system = (await load_prompts(ctx.pool)).text("monthly_review", SYSTEM)
     try:
-        writer: ReviewWriter | None = ClaudeReviewWriter(create_client(settings), review)
+        writer: ReviewWriter | None = ClaudeReviewWriter(create_client(settings), review, system)
     except AINotConfigured:
         writer = None
     await run_review(ctx, ReviewDeps(writer=writer, now=dt.datetime.now(dt.UTC)))

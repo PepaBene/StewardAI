@@ -180,7 +180,8 @@
                 "event-rules",
                 "notifications",
                 "budget",
-                "research-profiles"
+                "research-profiles",
+                "prompts"
               ],
               "type": "string",
               "description": "Config domain, as in /config/<domain>.",
@@ -257,7 +258,8 @@
                 "event-rules",
                 "notifications",
                 "budget",
-                "research-profiles"
+                "research-profiles",
+                "prompts"
               ],
               "type": "string",
               "description": "Config domain, as in /config/<domain>.",
@@ -330,7 +332,8 @@
                 "event-rules",
                 "notifications",
                 "budget",
-                "research-profiles"
+                "research-profiles",
+                "prompts"
               ],
               "type": "string",
               "description": "Config domain, as in /config/<domain>.",
@@ -414,7 +417,8 @@
                 "event-rules",
                 "notifications",
                 "budget",
-                "research-profiles"
+                "research-profiles",
+                "prompts"
               ],
               "type": "string",
               "description": "Config domain, as in /config/<domain>.",
@@ -2257,6 +2261,258 @@
             "HTTPBearer": []
           }
         ]
+      }
+    },
+    "/config/prompts": {
+      "get": {
+        "tags": [
+          "config"
+        ],
+        "summary": "Get Prompts Config",
+        "description": "The saved prompt overrides. 404 means every AI step uses its built-in prompt.",
+        "operationId": "get_prompts_config",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PromptsConfigVersion"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "config"
+        ],
+        "summary": "Save Prompts Config",
+        "description": "Save prompt overrides. The next run of each AI step uses them; an overridden prompt is\nnot covered by the CI evals.",
+        "operationId": "save_prompts_config",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "note",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "maxLength": 500
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Why this change was made.",
+              "title": "Note"
+            },
+            "description": "Why this change was made."
+          },
+          {
+            "name": "base_version_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer",
+                  "maximum": 9223372036854775807,
+                  "minimum": 1
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "The version the edit started from. If another save has happened since, nothing is saved and the answer is 409.",
+              "title": "Base Version Id"
+            },
+            "description": "The version the edit started from. If another save has happened since, nothing is saved and the answer is 409."
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PromptsConfig"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PromptsConfigVersion"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/config/prompts/validate": {
+      "post": {
+        "tags": [
+          "config"
+        ],
+        "summary": "Validate Prompts",
+        "description": "Validate prompt overrides without saving. 422 lists every error.",
+        "operationId": "validate_prompts",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PromptsConfig"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PromptsConfig"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/config/prompts/defaults": {
+      "get": {
+        "tags": [
+          "config"
+        ],
+        "summary": "Get Prompt Defaults",
+        "description": "Every overridable prompt with its built-in text, in pipeline order.",
+        "operationId": "get_prompt_defaults",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/PromptDefault"
+                  },
+                  "type": "array",
+                  "title": "Response Get Prompt Defaults"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/costs/summary": {
+      "get": {
+        "tags": [
+          "costs"
+        ],
+        "summary": "Cost Summary",
+        "description": "A month's AI spend against the Budget config's monthly cap, by job type and by\nmodel.",
+        "operationId": "cost_summary",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "month",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "pattern": "^\\d{4}-(0[1-9]|1[0-2])$"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Budget month YYYY-MM (Europe/Prague); default the current one.",
+              "examples": [
+                "2026-09"
+              ],
+              "title": "Month"
+            },
+            "description": "Budget month YYYY-MM (Europe/Prague); default the current one."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CostSummary"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
       }
     },
     "/jobs/research": {
@@ -5999,6 +6255,123 @@
             "title": "Batch Multiplier",
             "description": "Batch API requests cost this times the token price (searches excluded).",
             "default": 0.5
+          },
+          "monthly_cap_usd": {
+            "anyOf": [
+              {
+                "type": "number",
+                "exclusiveMinimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Monthly Cap Usd",
+            "description": "Most AI spend per calendar month (Europe/Prague), in USD. Null: no cap."
+          },
+          "warn_at_fraction": {
+            "type": "number",
+            "maximum": 1.0,
+            "exclusiveMinimum": 0.0,
+            "title": "Warn At Fraction",
+            "description": "One alert per month when spend passes this fraction of the monthly cap.",
+            "default": 0.8
+          },
+          "at_cap": {
+            "type": "string",
+            "enum": [
+              "alert_only",
+              "pause_noncritical",
+              "downgrade_noncritical"
+            ],
+            "title": "At Cap",
+            "description": "At the monthly cap: only alert; fail non-critical jobs before their next AI request; or run their requests on `downgrade_model`.",
+            "default": "pause_noncritical"
+          },
+          "downgrade_model": {
+            "type": "string",
+            "pattern": "^claude-[a-z0-9.-]{1,64}$",
+            "title": "Downgrade Model",
+            "description": "The model non-critical requests use at the cap (`downgrade_noncritical`).",
+            "default": "claude-haiku-4-5",
+            "examples": [
+              "claude-sonnet-5"
+            ]
+          },
+          "critical_job_types": {
+            "items": {
+              "type": "string",
+              "enum": [
+                "portfolio_sync",
+                "earnings_check",
+                "thesis_verdicts",
+                "earnings_calendar",
+                "earnings_calendar_full",
+                "earnings_due",
+                "fact_reconcile",
+                "reference_data",
+                "price_history",
+                "holiday_refresh",
+                "macro_collect",
+                "event_escalation",
+                "monitor",
+                "news_ingest",
+                "daily_digest",
+                "weekly_digest",
+                "research",
+                "ownership_13f",
+                "monthly_review",
+                "chat"
+              ]
+            },
+            "type": "array",
+            "title": "Critical Job Types",
+            "description": "Job types that run normally at the monthly cap."
+          },
+          "per_job_cap_usd": {
+            "additionalProperties": {
+              "type": "number"
+            },
+            "propertyNames": {
+              "enum": [
+                "portfolio_sync",
+                "earnings_check",
+                "thesis_verdicts",
+                "earnings_calendar",
+                "earnings_calendar_full",
+                "earnings_due",
+                "fact_reconcile",
+                "reference_data",
+                "price_history",
+                "holiday_refresh",
+                "macro_collect",
+                "event_escalation",
+                "monitor",
+                "news_ingest",
+                "daily_digest",
+                "weekly_digest",
+                "research",
+                "ownership_13f",
+                "monthly_review",
+                "chat"
+              ]
+            },
+            "type": "object",
+            "title": "Per Job Cap Usd",
+            "description": "Most AI spend of one run of a job type, in USD. A run over it fails."
+          },
+          "default_job_cap_usd": {
+            "anyOf": [
+              {
+                "type": "number",
+                "exclusiveMinimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Default Job Cap Usd",
+            "description": "Most AI spend of one run of a job type not in `per_job_cap_usd`. Null: no cap."
           }
         },
         "additionalProperties": false,
@@ -6467,6 +6840,25 @@
               "claude-sonnet-5"
             ]
           },
+          "effort": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "low",
+                  "medium",
+                  "high",
+                  "xhigh",
+                  "max"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Effort",
+            "description": "Unset: effort is not sent and the model's default applies. Not on Haiku 4."
+          },
           "max_steps": {
             "type": "integer",
             "maximum": 20.0,
@@ -6490,6 +6882,20 @@
             "title": "History Messages",
             "description": "Earlier messages of the conversation sent along.",
             "default": 12
+          },
+          "source_tiers": {
+            "items": {
+              "type": "integer",
+              "enum": [
+                1,
+                2,
+                3
+              ]
+            },
+            "type": "array",
+            "minItems": 1,
+            "title": "Source Tiers",
+            "description": "Outlet tiers web search may use and an answer may cite (News sources config)."
           }
         },
         "additionalProperties": false,
@@ -6682,6 +7088,25 @@
             "examples": [
               "claude-sonnet-5"
             ]
+          },
+          "effort": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "low",
+                  "medium",
+                  "high",
+                  "xhigh",
+                  "max"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Effort",
+            "description": "Unset: effort is not sent and the model's default applies. Not on Haiku 4."
           },
           "mode": {
             "type": "string",
@@ -7194,6 +7619,81 @@
         "title": "CorroborationRules",
         "description": "When a news story counts as confirmed (layer 2)."
       },
+      "CostSummary": {
+        "properties": {
+          "month": {
+            "type": "string",
+            "title": "Month"
+          },
+          "total_usd": {
+            "type": "number",
+            "title": "Total Usd",
+            "description": "Sum of `job_step.cost_usd` of steps started in month."
+          },
+          "cap_usd": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cap Usd"
+          },
+          "fraction": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fraction",
+            "description": "total / cap; null without a cap."
+          },
+          "warn_at_fraction": {
+            "type": "number",
+            "title": "Warn At Fraction"
+          },
+          "at_cap": {
+            "type": "string",
+            "enum": [
+              "alert_only",
+              "pause_noncritical",
+              "downgrade_noncritical"
+            ],
+            "title": "At Cap"
+          },
+          "by_job_type": {
+            "items": {
+              "$ref": "#/components/schemas/JobTypeCost"
+            },
+            "type": "array",
+            "title": "By Job Type"
+          },
+          "by_model": {
+            "items": {
+              "$ref": "#/components/schemas/ModelCost"
+            },
+            "type": "array",
+            "title": "By Model"
+          }
+        },
+        "type": "object",
+        "required": [
+          "month",
+          "total_usd",
+          "cap_usd",
+          "fraction",
+          "warn_at_fraction",
+          "at_cap",
+          "by_job_type",
+          "by_model"
+        ],
+        "title": "CostSummary"
+      },
       "DiffChange": {
         "properties": {
           "path": {
@@ -7493,6 +7993,25 @@
               "claude-sonnet-5"
             ]
           },
+          "effort": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "low",
+                  "medium",
+                  "high",
+                  "xhigh",
+                  "max"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Effort",
+            "description": "Unset: effort is not sent and the model's default applies. Not on Haiku 4."
+          },
           "use_batch": {
             "type": "boolean",
             "title": "Use Batch",
@@ -7514,6 +8033,30 @@
             "title": "Min Severity Summarised",
             "description": "Stories at or above this severity get a written summary; the rest are listed by headline.",
             "default": 2
+          },
+          "min_severity_listed": {
+            "type": "integer",
+            "maximum": 3.0,
+            "minimum": 1.0,
+            "title": "Min Severity Listed",
+            "description": "Stories below this severity are left out of the digest entirely (at most min_severity_summarised).",
+            "default": 1
+          },
+          "daily_window_hours": {
+            "type": "integer",
+            "maximum": 168.0,
+            "minimum": 1.0,
+            "title": "Daily Window Hours",
+            "description": "The daily digest covers this many past hours.",
+            "default": 24
+          },
+          "weekly_window_days": {
+            "type": "integer",
+            "maximum": 31.0,
+            "minimum": 1.0,
+            "title": "Weekly Window Days",
+            "description": "The weekly digest covers this many past days.",
+            "default": 7
           }
         },
         "additionalProperties": false,
@@ -7965,6 +8508,25 @@
               "claude-sonnet-5"
             ]
           },
+          "effort": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "low",
+                  "medium",
+                  "high",
+                  "xhigh",
+                  "max"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Effort",
+            "description": "Unset: effort is not sent and the model's default applies. Not on Haiku 4."
+          },
           "lookahead_days": {
             "type": "integer",
             "maximum": 400.0,
@@ -8063,6 +8625,25 @@
             "title": "Effort",
             "default": "high"
           },
+          "locate_effort": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "low",
+                  "medium",
+                  "high",
+                  "xhigh",
+                  "max"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Locate Effort",
+            "description": "Unset: effort is not sent and the model's default applies. Not on Haiku 4."
+          },
           "max_steps": {
             "type": "integer",
             "maximum": 50.0,
@@ -8095,6 +8676,14 @@
             "minimum": 1.0,
             "title": "Max Document Mb",
             "default": 20
+          },
+          "kpi_history_periods": {
+            "type": "integer",
+            "maximum": 40.0,
+            "minimum": 1.0,
+            "title": "Kpi History Periods",
+            "description": "Past periods (quarters or years) judged for each KPI's history.",
+            "default": 8
           }
         },
         "additionalProperties": false,
@@ -8410,6 +8999,25 @@
               "claude-sonnet-5"
             ]
           },
+          "effort": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "low",
+                  "medium",
+                  "high",
+                  "xhigh",
+                  "max"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Effort",
+            "description": "Unset: effort is not sent and the model's default applies. Not on Haiku 4."
+          },
           "max_steps": {
             "type": "integer",
             "maximum": 20.0,
@@ -8431,6 +9039,35 @@
             "minimum": 1.0,
             "title": "Min Severity",
             "default": 2
+          },
+          "source_tiers": {
+            "items": {
+              "type": "integer",
+              "enum": [
+                1,
+                2,
+                3
+              ]
+            },
+            "type": "array",
+            "minItems": 1,
+            "title": "Source Tiers",
+            "description": "Outlet tiers web search may use (News sources config)."
+          },
+          "price_move_news_days": {
+            "type": "integer",
+            "maximum": 30.0,
+            "minimum": 0.0,
+            "title": "Price Move News Days",
+            "description": "A price-move note reads the holding's news from this many days before the move.",
+            "default": 3
+          },
+          "price_move_news_items": {
+            "type": "integer",
+            "maximum": 30.0,
+            "minimum": 0.0,
+            "title": "Price Move News Items",
+            "default": 6
           }
         },
         "additionalProperties": false,
@@ -8803,7 +9440,15 @@
             },
             "type": "array",
             "title": "Earnings Check On",
-            "description": "Confirmed stories of these types queue an earnings thesis check for the holding, unless one ran in the last 10 days."
+            "description": "Confirmed stories of these types queue an earnings thesis check for the holding, unless one ran within earnings_check_cooldown_days."
+          },
+          "earnings_check_cooldown_days": {
+            "type": "integer",
+            "maximum": 60.0,
+            "minimum": 1.0,
+            "title": "Earnings Check Cooldown Days",
+            "description": "A story does not queue an earnings check when one was queued or ran for the holding within this many days.",
+            "default": 10
           }
         },
         "additionalProperties": false,
@@ -9798,6 +10443,31 @@
           "rate_date"
         ],
         "title": "FxRateUsed"
+      },
+      "GoogleNewsLocale": {
+        "properties": {
+          "language": {
+            "type": "string",
+            "pattern": "^[a-z]{2,3}(-[A-Z]{2})?$",
+            "title": "Language",
+            "description": "Interface language, e.g. en-US, en-GB, de, cs.",
+            "default": "en-US",
+            "examples": [
+              "en-US"
+            ]
+          },
+          "country": {
+            "type": "string",
+            "pattern": "^[A-Z]{2}$",
+            "title": "Country",
+            "description": "Edition country, e.g. US, GB, DE, CZ.",
+            "default": "US"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "GoogleNewsLocale",
+        "description": "The edition a Google News query searches (its hl, gl and ceid parameters)."
       },
       "HTTPValidationError": {
         "properties": {
@@ -11528,6 +12198,49 @@
         ],
         "title": "JobSummary"
       },
+      "JobTypeCost": {
+        "properties": {
+          "job_type": {
+            "type": "string",
+            "title": "Job Type"
+          },
+          "runs": {
+            "type": "integer",
+            "title": "Runs",
+            "description": "Runs with at least one costed step in the month."
+          },
+          "cost_usd": {
+            "type": "number",
+            "title": "Cost Usd"
+          },
+          "job_cap_usd": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Job Cap Usd",
+            "description": "The cap of one run of this type, if any."
+          },
+          "critical": {
+            "type": "boolean",
+            "title": "Critical",
+            "description": "Keeps running at the monthly cap."
+          }
+        },
+        "type": "object",
+        "required": [
+          "job_type",
+          "runs",
+          "cost_usd",
+          "job_cap_usd",
+          "critical"
+        ],
+        "title": "JobTypeCost"
+      },
       "JobsConfig": {
         "properties": {
           "schema_version": {
@@ -12333,6 +13046,29 @@
         ],
         "title": "MessageOut"
       },
+      "ModelCost": {
+        "properties": {
+          "model": {
+            "type": "string",
+            "title": "Model"
+          },
+          "steps": {
+            "type": "integer",
+            "title": "Steps"
+          },
+          "cost_usd": {
+            "type": "number",
+            "title": "Cost Usd"
+          }
+        },
+        "type": "object",
+        "required": [
+          "model",
+          "steps",
+          "cost_usd"
+        ],
+        "title": "ModelCost"
+      },
       "ModelPrice": {
         "properties": {
           "model": {
@@ -12693,6 +13429,25 @@
               "claude-sonnet-5"
             ]
           },
+          "classification_effort": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "low",
+                  "medium",
+                  "high",
+                  "xhigh",
+                  "max"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Classification Effort",
+            "description": "Unset: effort is not sent and the model's default applies. Not on Haiku 4."
+          },
           "classification_batch_size": {
             "type": "integer",
             "maximum": 100.0,
@@ -12709,6 +13464,25 @@
             "examples": [
               "claude-sonnet-5"
             ]
+          },
+          "corroboration_effort": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "low",
+                  "medium",
+                  "high",
+                  "xhigh",
+                  "max"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Corroboration Effort",
+            "description": "Unset: effort is not sent and the model's default applies. Not on Haiku 4."
           },
           "corroboration_max_searches": {
             "type": "integer",
@@ -12911,6 +13685,10 @@
             "title": "Include Tier3",
             "description": "Keep tier-3 items (labelled sentiment; they never alert on their own).",
             "default": false
+          },
+          "google_news_locale": {
+            "$ref": "#/components/schemas/GoogleNewsLocale",
+            "description": "The Google News edition searched by google_news sources."
           }
         },
         "additionalProperties": false,
@@ -14092,6 +14870,122 @@
         "title": "PriceSettings",
         "description": "Daily price history (Stooq) and the risk figures computed from it."
       },
+      "PromptDefault": {
+        "properties": {
+          "key": {
+            "type": "string",
+            "enum": [
+              "earnings_extraction",
+              "earnings_locate",
+              "earnings_calendar",
+              "news_classification",
+              "news_corroboration",
+              "news_escalation",
+              "news_digest",
+              "research_writer",
+              "monthly_review",
+              "chat_assistant",
+              "claim_verifier"
+            ],
+            "title": "Key"
+          },
+          "title": {
+            "type": "string",
+            "title": "Title"
+          },
+          "description": {
+            "type": "string",
+            "title": "Description"
+          },
+          "default_text": {
+            "type": "string",
+            "title": "Default Text",
+            "description": "The built-in prompt, used while no override is set."
+          }
+        },
+        "type": "object",
+        "required": [
+          "key",
+          "title",
+          "description",
+          "default_text"
+        ],
+        "title": "PromptDefault"
+      },
+      "PromptsConfig": {
+        "properties": {
+          "schema_version": {
+            "type": "integer",
+            "const": 1,
+            "title": "Schema Version",
+            "default": 1
+          },
+          "overrides": {
+            "additionalProperties": {
+              "type": "string",
+              "maxLength": 50000,
+              "minLength": 20
+            },
+            "propertyNames": {
+              "enum": [
+                "earnings_extraction",
+                "earnings_locate",
+                "earnings_calendar",
+                "news_classification",
+                "news_corroboration",
+                "news_escalation",
+                "news_digest",
+                "research_writer",
+                "monthly_review",
+                "chat_assistant",
+                "claim_verifier"
+              ]
+            },
+            "type": "object",
+            "title": "Overrides",
+            "description": "System prompt text per AI step, replacing the built-in default."
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "PromptsConfig",
+        "description": "Stored as `config_version` rows, domain `prompts`. No override: the default is used."
+      },
+      "PromptsConfigVersion": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note"
+          },
+          "body": {
+            "$ref": "#/components/schemas/PromptsConfig"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "created_at",
+          "note",
+          "body"
+        ],
+        "title": "PromptsConfigVersion"
+      },
       "ProposedAction": {
         "properties": {
           "action": {
@@ -14465,6 +15359,17 @@
             "title": "Max Subsidiary Aliases",
             "description": "Most GLEIF subsidiary names added to a holding's news aliases.",
             "default": 50
+          },
+          "wikidata_languages": {
+            "items": {
+              "type": "string",
+              "pattern": "^[a-z]{2,3}$"
+            },
+            "type": "array",
+            "maxItems": 10,
+            "minItems": 1,
+            "title": "Wikidata Languages",
+            "description": "Languages (ISO 639 codes) whose Wikidata labels and aliases are read."
           }
         },
         "additionalProperties": false,
@@ -15322,6 +16227,14 @@
             ],
             "title": "Language",
             "default": "en"
+          },
+          "top_holders": {
+            "type": "integer",
+            "maximum": 20.0,
+            "minimum": 1.0,
+            "title": "Top Holders",
+            "description": "Largest 13F holders named in the ownership section.",
+            "default": 3
           }
         },
         "additionalProperties": false,
@@ -15896,6 +16809,20 @@
             "description": "Claude calls per review.",
             "default": 3
           },
+          "use_batch": {
+            "type": "boolean",
+            "title": "Use Batch",
+            "description": "Propose the actions through the Batch API (half price).",
+            "default": true
+          },
+          "batch_wait_minutes": {
+            "type": "integer",
+            "maximum": 720.0,
+            "minimum": 1.0,
+            "title": "Batch Wait Minutes",
+            "description": "How long to wait for the batch before proposing the actions directly.",
+            "default": 60
+          },
           "liquidity_days": {
             "type": "number",
             "maximum": 100.0,
@@ -15903,6 +16830,14 @@
             "title": "Liquidity Days",
             "description": "A position larger than this many days of its home market's average daily turnover is flagged as hard to exit.",
             "default": 1.0
+          },
+          "holder_drop_flag_pct": {
+            "type": "number",
+            "maximum": 100.0,
+            "exclusiveMinimum": 0.0,
+            "title": "Holder Drop Flag Pct",
+            "description": "A fall in a holding's 13F holder count of at least this percentage quarter on quarter is flagged.",
+            "default": 10.0
           }
         },
         "additionalProperties": false,
@@ -16613,6 +17548,28 @@
             },
             "type": "array",
             "title": "Rules"
+          },
+          "hard_limit_severity": {
+            "type": "string",
+            "enum": [
+              "severity_1",
+              "severity_2",
+              "severity_3"
+            ],
+            "title": "Hard Limit Severity",
+            "description": "Severity of a position above its hard limit (alerted when it opens, routed by the notification rules).",
+            "default": "severity_3"
+          },
+          "band_breach_severity": {
+            "type": "string",
+            "enum": [
+              "severity_1",
+              "severity_2",
+              "severity_3"
+            ],
+            "title": "Band Breach Severity",
+            "description": "Severity of a position, category or cash weight outside its target band. Severity 1 is listed in the next digest only; 2 or 3 also alert when it opens.",
+            "default": "severity_1"
           }
         },
         "additionalProperties": false,

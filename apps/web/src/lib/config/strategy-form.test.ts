@@ -50,6 +50,8 @@ const FULL: StrategyConfig = {
     { id: "cash-floor", type: "cash_weight", operator: ">", value: 0.01, on_breach: "severity_2", description: "" },
     { id: "diversified", type: "position_count", operator: ">=", value: 12, on_breach: "severity_1", description: "" },
   ],
+  hard_limit_severity: "severity_2",
+  band_breach_severity: "severity_2",
 };
 
 describe("percent conversion", () => {
@@ -180,5 +182,16 @@ describe("strategy errors", () => {
     });
     expect(normalized).toEqual({ "rules.2.dimension": ["bad"], "rules.0": ["missing"], "": ["sum above 1"] });
     expect(mergeErrors({ a: ["x"] }, { a: ["x", "y"], b: ["z"] })).toEqual({ a: ["x", "y"], b: ["z"] });
+  });
+});
+
+describe("strategy form: breach severities", () => {
+  it("defaults a body saved before them to today's severities", () => {
+    const { hard_limit_severity: _h, band_breach_severity: _b, ...old } = FULL;
+    void _h;
+    void _b;
+    const body = strategyToBody(strategyFromBody(old as StrategyConfig));
+    expect(body.hard_limit_severity).toBe("severity_3");
+    expect(body.band_breach_severity).toBe("severity_1");
   });
 });

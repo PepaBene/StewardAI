@@ -283,6 +283,15 @@ function ProfileCard({
           onChange={(v) => onChange({ max_searches: v })}
           hint={`${BOUNDS.max_searches.min} to ${BOUNDS.max_searches.max}.`}
         />
+        <TextField
+          label="Largest 13F holders named"
+          path={`${path}.top_holders`}
+          errors={errors}
+          value={p.top_holders}
+          inputMode="numeric"
+          onChange={(v) => onChange({ top_holders: v })}
+          hint={`In the ownership section. ${BOUNDS.top_holders.min} to ${BOUNDS.top_holders.max}.`}
+        />
         <CheckboxField
           label="Compare with peers"
           checked={p.include_peers}

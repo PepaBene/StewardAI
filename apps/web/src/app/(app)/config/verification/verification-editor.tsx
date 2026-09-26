@@ -11,7 +11,7 @@ import { SaveBar } from "@/components/config/save-bar";
 import { Button } from "@/components/ui/button";
 import { getBrowserApiClient, type VerificationConfig } from "@/lib/api/client";
 import { errorsAt, type FieldErrors } from "@/lib/api/validation-errors";
-import { MODEL_SUGGESTIONS } from "@/lib/config/jobs-form";
+import { EFFORT_OPTIONAL_HINT, EFFORTS, MODEL_SUGGESTIONS } from "@/lib/config/jobs-form";
 import { mergeErrors } from "@/lib/config/strategy-form";
 import {
   CLAIM_MODES,
@@ -29,6 +29,7 @@ import { configSaveQuery, useConfigEditor } from "@/lib/hooks/use-config-editor"
 
 const api = () => getBrowserApiClient();
 const TARGET_OPTIONS = CLAIM_TARGETS.map((t) => ({ value: t, label: CLAIM_TARGET_LABELS[t] }));
+const EFFORT_OPTIONS = [{ value: "", label: "Model default" }, ...EFFORTS.map((e) => ({ value: e, label: e }))];
 const SECTION = "space-y-3 rounded-lg border border-border bg-surface-raised p-4";
 
 /**
@@ -262,6 +263,15 @@ export function VerificationEditor() {
                 spellCheck={false}
                 onChange={(v) => set({ claimModel: v })}
                 hint="A Claude model id."
+              />
+              <SelectField
+                label="Effort"
+                path="claim_verifier.effort"
+                errors={errors}
+                value={form.claimEffort}
+                options={EFFORT_OPTIONS}
+                onChange={(v) => set({ claimEffort: v })}
+                hint={EFFORT_OPTIONAL_HINT}
               />
               <SelectField
                 label="An unsupported sentence is"

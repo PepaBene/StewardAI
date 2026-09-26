@@ -306,9 +306,9 @@ async def valuation(
     return section, out
 
 
-async def ownership(pool: asyncpg.Pool, reg: Registry, ticker: str) -> CodeSection:
+async def ownership(pool: asyncpg.Pool, reg: Registry, ticker: str, top: int = 3) -> CodeSection:
     section = CodeSection(id="ownership")
-    data = await holding_ownership(pool, ticker, periods=2, top=3)
+    data = await holding_ownership(pool, ticker, periods=2, top=top)
     if data.periods:
         p = data.periods[0]
         sid = reg.add(
@@ -329,7 +329,7 @@ async def ownership(pool: asyncpg.Pool, reg: Registry, ticker: str) -> CodeSecti
         if p.holders_change is not None:
             text += f" ({p.holders_change:+,} holders on the previous period)"
         section.sentences.append(CitedSentence(text=text + ".", source_ids=[sid]))
-        for h in data.top_holders[:3]:
+        for h in data.top_holders[:top]:
             hid = reg.add(
                 "filing13f",
                 h.accession,
@@ -583,7 +583,7 @@ async def gather(
             inst["currency"] if inst else None,
         )
     if "ownership" in wanted:
-        sections["ownership"] = await ownership(pool, reg, ticker)
+        sections["ownership"] = await ownership(pool, reg, ticker, profile.top_holders)
     peers: list[str] = []
     if "relationships" in wanted or profile.include_peers:
         rel_section, peers = await relationships(pool, reg, ticker)

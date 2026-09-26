@@ -2,7 +2,9 @@
 
 The document arrives as a document content block that code fetched and archived; the
 model cannot fetch anything else, and its output is only a claim until the validator has
-checked it. The system prompt is stable so it can be cached across runs.
+checked it. The system prompt carries a cache breakpoint, but at ~600 tokens it is below
+the minimum cacheable prefix, and each document is read once, so nothing is cached in
+practice (and nothing is charged for the breakpoint).
 """
 
 import base64
@@ -126,10 +128,18 @@ def document_blocks(document: Document, text: str) -> list[dict[str, Any]]:
 
 
 class ClaudeExtractor:
-    def __init__(self, client: anthropic.AsyncAnthropic, model: str, effort: str) -> None:
+    def __init__(
+        self,
+        client: anthropic.AsyncAnthropic,
+        model: str,
+        effort: str,
+        system: str = SYSTEM_PROMPT,
+    ) -> None:
         self._client = client
         self._model = model
         self._effort = effort
+        # The owner's override from the Prompts config, else the built-in default.
+        self._system = system
 
     async def extract(
         self, document: Document, text: str, request: ExtractionRequest
@@ -144,7 +154,7 @@ class ClaudeExtractor:
                 model=self._model,
                 max_tokens=32000,
                 system=[
-                    {"type": "text", "text": SYSTEM_PROMPT, "cache_control": {"type": "ephemeral"}}
+                    {"type": "text", "text": self._system, "cache_control": {"type": "ephemeral"}}
                 ],
                 messages=[cast(MessageParam, {"role": "user", "content": content})],
                 output_config=cast(OutputConfigParam, {"effort": self._effort}),

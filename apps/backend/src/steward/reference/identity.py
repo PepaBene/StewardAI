@@ -27,7 +27,7 @@ import datetime as dt
 import json
 import logging
 from collections import Counter
-from collections.abc import Callable
+from collections.abc import Callable, Sequence
 from dataclasses import dataclass, field
 from typing import Any
 
@@ -46,7 +46,7 @@ from steward.sources import esma, openfigi
 from steward.sources.edgar import EXCHANGE_MIC, EdgarClient, EdgarError
 from steward.sources.esma import home_country
 from steward.sources.gleif import GleifClient, GleifError, LegalEntity, ReportingException
-from steward.sources.wikidata import WikidataClient, WikidataError, WikidataLink
+from steward.sources.wikidata import LANGUAGES, WikidataClient, WikidataError, WikidataLink
 
 logger = logging.getLogger(__name__)
 
@@ -526,6 +526,7 @@ async def _wikidata(
     known_qid: str | None,
     subject_name: str | None,
     result: HoldingResult,
+    languages: Sequence[str] = LANGUAGES,
 ) -> None:
     assert deps.wikidata is not None
     try:
@@ -534,7 +535,7 @@ async def _wikidata(
             result.notes.append("Wikidata: no item for this LEI or ISIN")
             return
         props = await deps.wikidata.properties(qid)
-        aliases = await deps.wikidata.aliases(qid)
+        aliases = await deps.wikidata.aliases(qid, languages)
         competitors = await deps.wikidata.competitors(qid)
     except (WikidataError, httpx.HTTPError, ValueError) as exc:
         result.notes.append(f"Wikidata: {exc}")
@@ -672,6 +673,7 @@ async def resolve_holding(
             inst["wikidata_qid"],
             entity.legal_name if entity else name,
             result,
+            settings.wikidata_languages,
         )
     disputed = await reconcile_structure(pool, ticker)
     if disputed:

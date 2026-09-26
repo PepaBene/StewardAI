@@ -5,6 +5,12 @@ text), the code sections already written, and, when the profile allows it, web s
 outlets of the allowed tiers. It returns sentences that each cite source ids or search
 result URLs; the code keeps only citations it can check (a registry id, or a URL that was
 among the search results and whose outlet has an allowed tier).
+
+Every section of a report gets the same gathered material, so it is sent first, as its own
+block with a cache breakpoint after it: section 1 writes the cache and sections 2..N (and
+any pause_turn continuation) read it at a tenth of the input price. Anything that differs per
+section (the date, the task, sources earlier sections found by search) comes after it, so
+the cached prefix stays byte-identical.
 """
 
 import datetime as dt
@@ -72,6 +78,9 @@ class SectionRequest:
     max_searches: int
     peers: list[str]
     today: dt.date
+    # Sources earlier sections found by web search: after the cached material, since they
+    # grow from section to section.
+    added_material: str = ""
 
 
 @dataclass
@@ -111,33 +120,45 @@ def result_titles(content: list[Any]) -> dict[str, str]:
 
 
 def section_prompt(request: SectionRequest) -> str:
+    """The per-section part of the request, sent after the (cached) shared material."""
     language = "Czech" if request.language == "cs" else "English"
     peers = (
         f"\nPeers to compare with, where the sources allow: {', '.join(request.peers)}."
         if request.peers
         else ""
     )
+    added = f"{request.added_material}\n\n" if request.added_material else ""
     return (
-        f"Today is {request.today.isoformat()}.\n"
+        f"{added}Today is {request.today.isoformat()}.\n"
         f"Company: {request.name} ({request.ticker}).\n"
         f"Section: {SECTION_TITLES[request.section]}. Task: {SECTION_TASKS[request.section]}"
-        f"{peers}\nWrite at most {request.max_sentences} sentences, in {language}.\n\n"
-        f"{request.material}"
+        f"{peers}\nWrite at most {request.max_sentences} sentences, in {language}."
     )
 
 
+def section_content(request: SectionRequest) -> list[dict[str, Any]]:
+    """The user message: the shared material with a cache breakpoint, then the section."""
+    return [
+        {"type": "text", "text": request.material, "cache_control": {"type": "ephemeral"}},
+        {"type": "text", "text": section_prompt(request)},
+    ]
+
+
 class ClaudeResearchWriter:
-    def __init__(self, client: anthropic.AsyncAnthropic, model: str, effort: str) -> None:
+    def __init__(
+        self, client: anthropic.AsyncAnthropic, model: str, effort: str, system: str = SYSTEM
+    ) -> None:
         self._client = client
         self._model = model
         self._effort = effort
+        self._system = system
 
     async def write(self, request: SectionRequest) -> SectionResult:
         usage = Usage(model=self._model)
         tools: list[Any] = []
         if request.max_searches > 0 and request.domains:
             tools = [web_search_tool(self._model, request.max_searches, request.domains)]
-        messages: list[dict[str, Any]] = [{"role": "user", "content": section_prompt(request)}]
+        messages: list[dict[str, Any]] = [{"role": "user", "content": section_content(request)}]
         titles: dict[str, str] = {}
         response = None
         for _ in range(4):  # pause_turn continuations of the server-side search loop
@@ -146,7 +167,11 @@ class ClaudeResearchWriter:
                     model=self._model,
                     max_tokens=16000,
                     system=[
-                        {"type": "text", "text": SYSTEM, "cache_control": {"type": "ephemeral"}}
+                        {
+                            "type": "text",
+                            "text": self._system,
+                            "cache_control": {"type": "ephemeral"},
+                        }
                     ],
                     messages=cast(list[MessageParam], messages),
                     tools=cast(Any, tools if tools else anthropic.omit),
