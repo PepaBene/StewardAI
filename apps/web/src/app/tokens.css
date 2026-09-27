@@ -69,7 +69,9 @@
   --verified-subtle: oklch(0.955 0.046 261.4);
   --corroborated: oklch(0.6 0.118 166.1);
   --corroborated-subtle: oklch(0.955 0.0295 166.1);
-  --unconfirmed: oklch(0.67 0.143 73.2);
+  /* L lowered from the raw #c98500 conversion (0.67) to 0.60: at 0.67 it read 2.86:1
+     against Page, short of the WCAG AA 3:1 UI-element floor (WCAG audit, phase 10). */
+  --unconfirmed: oklch(0.6 0.143 73.2);
   --unconfirmed-subtle: oklch(0.955 0.036 73.2);
   --disputed: oklch(0.509 0.164 18.9);
   --disputed-subtle: oklch(0.955 0.041 18.9);
@@ -77,7 +79,7 @@
   /* Severity / drift (muted; never gain/loss, never the confidence hues above) */
   --neutral-signal: oklch(0.5 0.012 166.4);
   --neutral-signal-subtle: oklch(0.955 0.004 166.4);
-  --warning-signal: oklch(0.67 0.143 73.2);
+  --warning-signal: oklch(0.6 0.143 73.2);
   --warning-signal-subtle: oklch(0.955 0.036 73.2);
   --info-signal: oklch(0.537 0.184 261.4);
   --info-signal-subtle: oklch(0.955 0.046 261.4);
