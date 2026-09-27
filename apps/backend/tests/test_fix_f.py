@@ -404,3 +404,38 @@ async def test_a_redelivered_chat_cancels_the_first_attempts_actions(
         == 1
     )
     assert await backend_pool.fetchval("select count(*) from chat_action") == 2
+
+
+def test_13f_parses_a_dataset_that_nests_its_tsvs_in_a_folder() -> None:
+    # Some SEC quarterly archives put the TSVs under "<name>/SUBMISSION.tsv" instead of at
+    # the zip root (e.g. 01jun2025-31aug2025_form13f.zip); parse_dataset must find them
+    # either way.
+    buffer = io.BytesIO()
+    subs = [
+        {"ACCESSION_NUMBER": "0000000001-25-000001", "FILING_DATE": "14-AUG-2025",
+         "SUBMISSIONTYPE": "13F-HR", "CIK": "1", "PERIODOFREPORT": "30-JUN-2025"},
+    ]  # fmt: skip
+    info = [
+        {"ACCESSION_NUMBER": "0000000001-25-000001", "INFOTABLE_SK": "1", "CUSIP": "037833100",
+         "VALUE": "150", "SSHPRNAMT": "10", "SSHPRNAMTTYPE": "SH"}
+    ]  # fmt: skip
+    prefix = "01JUN2025-31AUG2025_form13f/"
+    with zipfile.ZipFile(buffer, "w") as z:
+        z.writestr(prefix, "")
+        z.writestr(prefix + "SUBMISSION.tsv", _tsv(subs))
+        z.writestr(prefix + "COVERPAGE.tsv", "ACCESSION_NUMBER\tAMENDMENTTYPE\n")
+        z.writestr(prefix + "INFOTABLE.tsv", _tsv(info))
+    buffer.seek(0)
+    data = parse_dataset(buffer, {"037833100"})
+    assert [p.cusip for p in data.positions] == ["037833100"]
+    assert [f.accession for f in data.filings] == ["0000000001-25-000001"]
+
+
+def test_13f_missing_tsv_raises_a_clear_error() -> None:
+    buffer = io.BytesIO()
+    with zipfile.ZipFile(buffer, "w") as z:
+        z.writestr("COVERPAGE.tsv", "ACCESSION_NUMBER\tAMENDMENTTYPE\n")
+        z.writestr("INFOTABLE.tsv", "ACCESSION_NUMBER\n")
+    buffer.seek(0)
+    with pytest.raises(KeyError, match=r"SUBMISSION\.tsv"):
+        parse_dataset(buffer, {"037833100"})

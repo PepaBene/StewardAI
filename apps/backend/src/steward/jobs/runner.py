@@ -386,20 +386,29 @@ async def _run_locked(
     return "succeeded"
 
 
-async def fail_interrupted_scheduled_runs(
-    pool: asyncpg.Pool, *, stale_after: dt.timedelta = DEFAULT_LOCK_TIMEOUT
+async def close_interrupted_runs(
+    pool: asyncpg.Pool,
+    *,
+    trigger: str,
+    tag: dict[str, Any] | None = None,
+    stale_after: dt.timedelta = DEFAULT_LOCK_TIMEOUT,
+    reason: str = "interrupted (the process that started it stopped)",
 ) -> list[int]:
-    """At worker start: fail scheduled runs a killed worker left open, so they don't show as
-    running forever (a scheduled run is not redelivered by any queue). A `running` one
-    counts only when nobody holds its lock (no live run of that key anywhere); a `queued`
-    or `waiting` one only when older than `stale_after`, by which time a live one would have
-    started or given up. Returns the job ids failed."""
+    """Fail runs of `trigger` (optionally narrowed to ones whose `params` contain `tag`) that
+    a killed process left open, so they don't show as running forever — nothing else
+    redelivers or resumes a `manual`/`schedule` run the way pgmq redelivers a queued one. A
+    `running` one counts only when nobody holds its lock (no live run of that key anywhere);
+    a `queued` or `waiting` one only when older than `stale_after`, by which time a live one
+    would have started or given up. Returns the job ids failed."""
     rows = await pool.fetch(
-        "select id, job_type, params, status from public.job where trigger = 'schedule'"
+        "select id, job_type, params, status from public.job where trigger = $2"
+        " and ($3::jsonb is null or params @> $3::jsonb)"
         " and (status = 'running' or (status in ('queued', 'waiting')"
         " and created_at < now() - $1::interval))"
         " order by id",
         stale_after,
+        trigger,
+        json.dumps(tag) if tag is not None else None,
     )
     failed: list[int] = []
     if not rows:
@@ -413,33 +422,45 @@ async def fail_interrupted_scheduled_runs(
                 if not await try_lock(conn, key):
                     continue  # a live run holds the key; this one may be it
                 try:
-                    done = await _fail_open(pool, r["id"])
+                    done = await _fail_open(pool, r["id"], reason)
                 finally:
                     await unlock(conn, key)
             else:
-                done = await _fail_open(pool, r["id"])
+                done = await _fail_open(pool, r["id"], reason)
             if done:
                 failed.append(r["id"])
-                logger.warning("job %s (%s) was left open by a stopped worker; marked failed",
-                               r["id"], r["job_type"])  # fmt: skip
+                logger.warning("job %s (%s) was left open; marked failed", r["id"], r["job_type"])
     finally:
         await conn.close()
     return failed
 
 
-async def _fail_open(pool: asyncpg.Pool, job_id: int) -> bool:
+async def fail_interrupted_scheduled_runs(
+    pool: asyncpg.Pool, *, stale_after: dt.timedelta = DEFAULT_LOCK_TIMEOUT
+) -> list[int]:
+    """At worker start: fail scheduled runs a killed worker left open (a scheduled run is not
+    redelivered by any queue). Returns the job ids failed."""
+    return await close_interrupted_runs(
+        pool,
+        trigger="schedule",
+        stale_after=stale_after,
+        reason="interrupted (worker restarted)",
+    )
+
+
+async def _fail_open(pool: asyncpg.Pool, job_id: int, reason: str) -> bool:
     async with pool.acquire() as conn, conn.transaction():
         await conn.execute(
             "update public.job_step set status = 'failed', finished_at = clock_timestamp(),"
-            " error = 'interrupted: the worker stopped during this step' where job_id = $1"
+            " error = 'interrupted: the process stopped during this step' where job_id = $1"
             " and status = 'running'",
             job_id,
         )
         result: str = await conn.execute(
             "update public.job set status = 'failed', finished_at = clock_timestamp(),"
-            " error = 'interrupted (worker restarted)' where id = $1"
-            " and status in ('queued', 'waiting', 'running')",
+            " error = $2 where id = $1 and status in ('queued', 'waiting', 'running')",
             job_id,
+            reason,
         )
     return result != "UPDATE 0"
 

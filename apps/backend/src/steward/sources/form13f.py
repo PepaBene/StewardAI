@@ -114,20 +114,33 @@ class Dataset:
     positions: list[Position13F]
 
 
+def _member(archive: zipfile.ZipFile, name: str) -> str:
+    """The archive entry named `name`, wherever it sits.
+
+    Most quarters put the TSVs flat at the zip root; some (e.g. 01jun2025-31aug2025) nest
+    them under a folder named after the archive instead, e.g.
+    "01JUN2025-31AUG2025_form13f/SUBMISSION.tsv". Match by file name only, case-insensitive.
+    """
+    for entry in archive.namelist():
+        if entry.strip("/").rsplit("/", 1)[-1].upper() == name.upper():
+            return entry
+    raise KeyError(f"no {name} in the archive (has: {archive.namelist()})")
+
+
 def parse_dataset(source: Path | IO[bytes], cusips: set[str]) -> Dataset:
     """Every holdings filing, and the positions in the wanted CUSIPs."""
     wanted = {c.upper() for c in cusips}
     with zipfile.ZipFile(source) as archive:
-        with archive.open("SUBMISSION.tsv") as f:
+        with archive.open(_member(archive, "SUBMISSION.tsv")) as f:
             submissions = {
                 r["ACCESSION_NUMBER"]: r
                 for r in _rows(f)
                 if r.get("SUBMISSIONTYPE", "").strip() in HOLDINGS_TYPES
             }
-        with archive.open("COVERPAGE.tsv") as f:
+        with archive.open(_member(archive, "COVERPAGE.tsv")) as f:
             covers = {r["ACCESSION_NUMBER"]: r for r in _rows(f)}
         positions: list[Position13F] = []
-        with archive.open("INFOTABLE.tsv") as f:
+        with archive.open(_member(archive, "INFOTABLE.tsv")) as f:
             for r in _rows(f):
                 cusip = r.get("CUSIP", "").strip().upper()
                 if cusip not in wanted or r["ACCESSION_NUMBER"] not in submissions:

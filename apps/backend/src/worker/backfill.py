@@ -11,6 +11,7 @@ Run it where the database is reachable (the worker's host), with the same enviro
 
 import argparse
 import asyncio
+import datetime as dt
 import json
 import sys
 import time
@@ -19,9 +20,17 @@ import asyncpg
 
 from steward.db import create_pool
 from steward.jobs.registry import JOB_HANDLERS
-from steward.jobs.runner import run_job
+from steward.jobs.runner import close_interrupted_runs, create_job, run_job
 from steward.logging import configure_logging
 from steward.settings import get_settings
+
+# Tags every job this command creates, so a run this process left open (Ctrl+C, a closed
+# terminal, a crash) can be told apart from a job started some other way and closed safely
+# the next time this command runs — see `close_interrupted_runs`.
+BACKFILL_TAG = {"backfill": True}
+# How often to print the job's current step while it's still running, so a slow request
+# (a flaky connection, an AI call taking a while) does not look like the command hung.
+PROGRESS_SECONDS = 15.0
 
 # Portfolio first (the other jobs work on its holdings), then identity (price symbols,
 # CUSIPs for 13F), then market data, calendars, macro, ownership and news. The worker's
@@ -58,6 +67,28 @@ async def ownership_remaining(pool: asyncpg.Pool) -> int:
     return value if isinstance(value, int) else 0
 
 
+async def _run_with_progress(pool: asyncpg.Pool, job_type: str, job_id: int) -> str:
+    """`run_job` for an already-created job, printing its current step every
+    `PROGRESS_SECONDS` while it runs, so a slow step is visible rather than looking stuck."""
+    task = asyncio.ensure_future(
+        run_job(pool, job_type, JOB_HANDLERS[job_type], trigger="manual", job_id=job_id)
+    )
+    last: tuple[str, str] | None = None
+    while not task.done():
+        await asyncio.wait({task}, timeout=PROGRESS_SECONDS)
+        if task.done():
+            break
+        step = await pool.fetchrow(
+            "select name, status from public.job_step where job_id = $1 order by id desc limit 1",
+            job_id,
+        )
+        current = (step["name"], step["status"]) if step else None
+        if current is not None and current != last:
+            last = current
+            print(f"  ...  {job_type}: {current[0]} ({current[1]})")
+    return await task
+
+
 async def backfill(job_types: list[str], ownership_runs: int) -> int:
     settings = get_settings()
     if settings.database_url is None:
@@ -70,6 +101,15 @@ async def backfill(job_types: list[str], ownership_runs: int) -> int:
     pool = await create_pool(settings, max_size=4)
     failed = 0
     try:
+        closed = await close_interrupted_runs(
+            pool,
+            trigger="manual",
+            tag=BACKFILL_TAG,
+            stale_after=dt.timedelta(0),
+            reason="interrupted (a previous run of this command was stopped)",
+        )
+        if closed:
+            print(f"closed {len(closed)} run(s) a previous, stopped backfill left open")
         for job_type in job_types:
             if job_type in NEEDS_CLAUDE and settings.anthropic_api_key is None:
                 print(f"skip     {job_type}: ANTHROPIC_API_KEY is not set")
@@ -78,13 +118,11 @@ async def backfill(job_types: list[str], ownership_runs: int) -> int:
             for run in range(runs):
                 label = f"{job_type} (run {run + 1})" if runs > 1 else job_type
                 started = time.monotonic()
-                outcome = await run_job(pool, job_type, JOB_HANDLERS[job_type], trigger="manual")
-                job = await pool.fetchrow(
-                    "select id, error from public.job where job_type = $1 order by id desc limit 1",
-                    job_type,
-                )
+                job_id = await create_job(pool, job_type, "manual", params=BACKFILL_TAG)
+                outcome = await _run_with_progress(pool, job_type, job_id)
+                job = await pool.fetchrow("select id, error from public.job where id = $1", job_id)
                 took = time.monotonic() - started
-                detail = f"job #{job['id']}" if job else ""
+                detail = f"job #{job_id}" if job else ""
                 if outcome != "succeeded":
                     failed += 1
                     detail += f": {(job['error'] or '') if job else ''}"[:300]
