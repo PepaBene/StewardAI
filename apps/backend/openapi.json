@@ -680,6 +680,57 @@
         }
       }
     },
+    "/portfolio/contribution": {
+      "get": {
+        "tags": [
+          "portfolio"
+        ],
+        "summary": "Get Portfolio Contribution",
+        "description": "Every holding's contribution to the portfolio's return over the window, in base\ncurrency: its own trading (buying or selling more of it) netted out, so a holding is\nranked by what the market actually did to it, not by how much was bought or sold.\nEmpty (with `gap` set) before the first sync, or with no position snapshot in the\nwindow.",
+        "operationId": "get_portfolio_contribution",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "days",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 3700,
+              "minimum": 7,
+              "default": 365,
+              "title": "Days"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ContributionReport"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/portfolio/transactions": {
       "get": {
         "tags": [
@@ -7564,6 +7615,75 @@
         ],
         "title": "ConfigVersionMeta"
       },
+      "ContributionReport": {
+        "properties": {
+          "as_of": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "As Of",
+            "description": "Date of the latest position snapshot included."
+          },
+          "period_start": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Period Start"
+          },
+          "base_currency": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Base Currency"
+          },
+          "holdings": {
+            "items": {
+              "$ref": "#/components/schemas/HoldingContribution"
+            },
+            "type": "array",
+            "title": "Holdings",
+            "description": "Every holding with at least two snapshots in the window, ranked by contribution: largest positive first, largest negative last."
+          },
+          "gap": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Gap",
+            "description": "Why there is no contribution report, when there is none."
+          }
+        },
+        "type": "object",
+        "required": [
+          "as_of",
+          "period_start",
+          "base_currency",
+          "holdings",
+          "gap"
+        ],
+        "title": "ContributionReport"
+      },
       "ConversationDetail": {
         "properties": {
           "conversation": {
@@ -10771,6 +10891,50 @@
           "drift_status"
         ],
         "title": "Holding"
+      },
+      "HoldingContribution": {
+        "properties": {
+          "ticker": {
+            "type": "string",
+            "title": "Ticker"
+          },
+          "name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
+          },
+          "contribution_base": {
+            "type": "number",
+            "title": "Contribution Base",
+            "description": "The holding's organic gain over the period, in base currency — its value change with its own trading netted out."
+          },
+          "contribution_pct": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Contribution Pct",
+            "description": "contribution_base as a fraction of the portfolio's total value at the start of the period; null when that value was zero."
+          }
+        },
+        "type": "object",
+        "required": [
+          "ticker",
+          "name",
+          "contribution_base",
+          "contribution_pct"
+        ],
+        "title": "HoldingContribution"
       },
       "HoldingCoverage": {
         "properties": {

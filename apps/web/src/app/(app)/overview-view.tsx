@@ -9,6 +9,7 @@ import { AllocationBars, type AllocationItem } from "@/components/portfolio/allo
 import { AllocationDonut } from "@/components/portfolio/allocation-donut";
 import { AllocationStackedBar } from "@/components/portfolio/allocation-stacked-bar";
 import { ConcentrationScale } from "@/components/portfolio/concentration-scale";
+import { ContributionCard } from "@/components/portfolio/contribution-card";
 import { DriftBar } from "@/components/portfolio/drift-bar";
 import { DriftChart, type DriftChartRow } from "@/components/portfolio/drift-chart";
 import { DriftStatusBadge, isOutOfBand } from "@/components/portfolio/drift-status-badge";
@@ -151,6 +152,7 @@ function Overview({ data }: { data: PortfolioOverview }) {
       ) : null}
 
       <PerformanceCard />
+      <ContributionCard />
 
       <section aria-label="Totals" className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-5">
         <StatCard

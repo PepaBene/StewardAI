@@ -9,6 +9,7 @@ import { EmptyState } from "@/components/empty-state";
 import { DriftStatusBadge } from "@/components/portfolio/drift-status-badge";
 import { HoldingsTabs } from "@/components/portfolio/holdings-tabs";
 import { FreshnessLabel } from "@/components/portfolio/freshness-label";
+import { PortfolioTreemap } from "@/components/portfolio/portfolio-treemap";
 import { Button } from "@/components/ui/button";
 import { getBrowserApiClient, type HoldingsResponse } from "@/lib/api/client";
 import {
@@ -91,8 +92,15 @@ const COLUMNS: { key: HoldingsSortKey | null; label: string; numeric: boolean }[
   { key: "ppl", label: "Unrealised P/L", numeric: true },
 ];
 
+const VIEWS = [
+  { key: "table", label: "Table" },
+  { key: "treemap", label: "Treemap" },
+] as const;
+type HoldingsViewKind = (typeof VIEWS)[number]["key"];
+
 function HoldingsTable({ data }: { data: HoldingsResponse }) {
   const [sort, setSort] = useState<HoldingsSort>(DEFAULT_HOLDINGS_SORT);
+  const [view, setView] = useState<HoldingsViewKind>("table");
   const rows = useMemo(() => sortHoldings(data.holdings, sort), [data.holdings, sort]);
 
   if (!data.freshness) {
@@ -113,99 +121,122 @@ function HoldingsTable({ data }: { data: HoldingsResponse }) {
 
   const baseCcy = data.base_currency ?? "";
   return (
-    <div className="overflow-x-auto rounded-lg border border-border bg-surface-raised">
-      <table className="w-full min-w-[56rem] text-sm">
-        <caption className="sr-only">
-          Open positions, sorted by {sort.key} {sort.direction === "asc" ? "ascending" : "descending"}
-        </caption>
-        <thead className="bg-surface-muted">
-          <tr className="border-b border-border text-text-muted">
-            {COLUMNS.map((column) => {
-              const active = column.key !== null && sort.key === column.key;
-              const ariaSort = active ? (sort.direction === "asc" ? "ascending" : "descending") : undefined;
-              const SortIcon = !active ? ArrowUpDownIcon : sort.direction === "asc" ? ArrowUpIcon : ArrowDownIcon;
-              return (
-                <th
-                  key={column.label}
-                  scope="col"
-                  aria-sort={ariaSort}
-                  className={cn("px-3 py-2 font-medium", column.numeric ? "text-right" : "text-left")}
-                >
-                  {column.key ? (
-                    <button
-                      type="button"
-                      onClick={() => setSort((s) => nextSort(s, column.key!))}
-                      className={cn(
-                        "inline-flex items-center gap-1 rounded-sm hover:text-text",
-                        active && "text-text",
-                      )}
+    <div className="space-y-3">
+      <div className="flex gap-1" role="tablist" aria-label="Holdings view">
+        {VIEWS.map((v) => (
+          <button
+            key={v.key}
+            type="button"
+            role="tab"
+            aria-selected={view === v.key}
+            onClick={() => setView(v.key)}
+            className={cn(
+              "rounded-md px-2.5 py-1 text-sm",
+              view === v.key ? "bg-surface-muted font-medium text-text" : "text-text-muted hover:text-text",
+            )}
+          >
+            {v.label}
+          </button>
+        ))}
+      </div>
+      {view === "treemap" ? (
+        <PortfolioTreemap holdings={rows} currency={baseCcy} />
+      ) : (
+        <div className="overflow-x-auto rounded-lg border border-border bg-surface-raised">
+          <table className="w-full min-w-[56rem] text-sm">
+            <caption className="sr-only">
+              Open positions, sorted by {sort.key} {sort.direction === "asc" ? "ascending" : "descending"}
+            </caption>
+            <thead className="bg-surface-muted">
+              <tr className="border-b border-border text-text-muted">
+                {COLUMNS.map((column) => {
+                  const active = column.key !== null && sort.key === column.key;
+                  const ariaSort = active ? (sort.direction === "asc" ? "ascending" : "descending") : undefined;
+                  const SortIcon = !active ? ArrowUpDownIcon : sort.direction === "asc" ? ArrowUpIcon : ArrowDownIcon;
+                  return (
+                    <th
+                      key={column.label}
+                      scope="col"
+                      aria-sort={ariaSort}
+                      className={cn("px-3 py-2 font-medium", column.numeric ? "text-right" : "text-left")}
                     >
-                      {column.label}
-                      {column.key === "value" ? ` (${baseCcy})` : null}
-                      <SortIcon aria-hidden="true" className="size-3.5" />
-                    </button>
-                  ) : (
-                    column.label
-                  )}
-                </th>
-              );
-            })}
-          </tr>
-        </thead>
-        <tbody>
-          {rows.map((h) => {
-            const tone = gainLossTone(h.ppl);
-            return (
-              <tr key={h.ticker} className="border-b border-border last:border-0">
-                <th scope="row" className="px-3 py-2 text-left font-normal">
-                  <Link
-                    href={`/holdings/${encodeURIComponent(h.ticker)}`}
-                    className="group block rounded-sm"
-                  >
-                    <span className="block font-medium text-text group-hover:text-accent group-hover:underline">
-                      {h.name ?? h.ticker}
-                    </span>
-                    <span className="block font-mono text-xs text-text-muted">{h.ticker}</span>
-                  </Link>
-                </th>
-                <td className="num px-3 py-2 text-right">{formatQuantity(h.quantity)}</td>
-                <td className="num px-3 py-2 text-right text-text-muted">
-                  {formatPrice(h.avg_price, h.instrument_currency)}
-                </td>
-                <td className="num px-3 py-2 text-right">{formatPrice(h.current_price, h.instrument_currency)}</td>
-                <td className="num px-3 py-2 text-right">
-                  {formatMoney(h.value_base, baseCcy)}
-                  {h.account_currency !== baseCcy || h.instrument_currency !== baseCcy ? (
-                    <span className="block text-xs text-text-muted" title="Trading212's own conversion">
-                      T212 {formatMoney(h.value_account, h.account_currency)}
-                    </span>
-                  ) : null}
-                </td>
-                <td className="num px-3 py-2 text-right">
-                  {formatPercent(h.weight)}
-                  {h.target_weight !== null ? (
-                    <span className="block text-xs text-text-muted">target {formatPercent(h.target_weight)}</span>
-                  ) : null}
-                </td>
-                <td className="px-3 py-2 text-right">
-                  {h.drift_status === "no_target" ? (
-                    <DriftStatusBadge status="no_target" />
-                  ) : (
-                    <span className="inline-flex flex-col items-end gap-1">
-                      <span className="num">{formatPp(h.drift)}</span>
-                      <DriftStatusBadge status={h.drift_status} />
-                    </span>
-                  )}
-                </td>
-                <td className={cn("num px-3 py-2 text-right", TONE_CLASS[tone])}>
-                  {formatMoney(h.ppl, h.account_currency, { signed: true })}
-                  <span className="block text-xs">{formatPercent(h.ppl_pct, { signed: true })}</span>
-                </td>
+                      {column.key ? (
+                        <button
+                          type="button"
+                          onClick={() => setSort((s) => nextSort(s, column.key!))}
+                          className={cn(
+                            "inline-flex items-center gap-1 rounded-sm hover:text-text",
+                            active && "text-text",
+                          )}
+                        >
+                          {column.label}
+                          {column.key === "value" ? ` (${baseCcy})` : null}
+                          <SortIcon aria-hidden="true" className="size-3.5" />
+                        </button>
+                      ) : (
+                        column.label
+                      )}
+                    </th>
+                  );
+                })}
               </tr>
-            );
-          })}
-        </tbody>
-      </table>
+            </thead>
+            <tbody>
+              {rows.map((h) => {
+                const tone = gainLossTone(h.ppl);
+                return (
+                  <tr key={h.ticker} className="border-b border-border last:border-0">
+                    <th scope="row" className="px-3 py-2 text-left font-normal">
+                      <Link
+                        href={`/holdings/${encodeURIComponent(h.ticker)}`}
+                        className="group block rounded-sm"
+                      >
+                        <span className="block font-medium text-text group-hover:text-accent group-hover:underline">
+                          {h.name ?? h.ticker}
+                        </span>
+                        <span className="block font-mono text-xs text-text-muted">{h.ticker}</span>
+                      </Link>
+                    </th>
+                    <td className="num px-3 py-2 text-right">{formatQuantity(h.quantity)}</td>
+                    <td className="num px-3 py-2 text-right text-text-muted">
+                      {formatPrice(h.avg_price, h.instrument_currency)}
+                    </td>
+                    <td className="num px-3 py-2 text-right">{formatPrice(h.current_price, h.instrument_currency)}</td>
+                    <td className="num px-3 py-2 text-right">
+                      {formatMoney(h.value_base, baseCcy)}
+                      {h.account_currency !== baseCcy || h.instrument_currency !== baseCcy ? (
+                        <span className="block text-xs text-text-muted" title="Trading212's own conversion">
+                          T212 {formatMoney(h.value_account, h.account_currency)}
+                        </span>
+                      ) : null}
+                    </td>
+                    <td className="num px-3 py-2 text-right">
+                      {formatPercent(h.weight)}
+                      {h.target_weight !== null ? (
+                        <span className="block text-xs text-text-muted">target {formatPercent(h.target_weight)}</span>
+                      ) : null}
+                    </td>
+                    <td className="px-3 py-2 text-right">
+                      {h.drift_status === "no_target" ? (
+                        <DriftStatusBadge status="no_target" />
+                      ) : (
+                        <span className="inline-flex flex-col items-end gap-1">
+                          <span className="num">{formatPp(h.drift)}</span>
+                          <DriftStatusBadge status={h.drift_status} />
+                        </span>
+                      )}
+                    </td>
+                    <td className={cn("num px-3 py-2 text-right", TONE_CLASS[tone])}>
+                      {formatMoney(h.ppl, h.account_currency, { signed: true })}
+                      <span className="block text-xs">{formatPercent(h.ppl_pct, { signed: true })}</span>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      )}
     </div>
   );
 }

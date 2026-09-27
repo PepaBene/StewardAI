@@ -274,6 +274,30 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/portfolio/contribution": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Portfolio Contribution
+         * @description Every holding's contribution to the portfolio's return over the window, in base
+         *     currency: its own trading (buying or selling more of it) netted out, so a holding is
+         *     ranked by what the market actually did to it, not by how much was bought or sold.
+         *     Empty (with `gap` set) before the first sync, or with no position snapshot in the
+         *     window.
+         */
+        get: operations["get_portfolio_contribution"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/portfolio/transactions": {
         parameters: {
             query?: never;
@@ -2665,6 +2689,28 @@ export interface components {
              */
             changes: number | null;
         };
+        /** ContributionReport */
+        ContributionReport: {
+            /**
+             * As Of
+             * @description Date of the latest position snapshot included.
+             */
+            as_of: string | null;
+            /** Period Start */
+            period_start: string | null;
+            /** Base Currency */
+            base_currency: string | null;
+            /**
+             * Holdings
+             * @description Every holding with at least two snapshots in the window, ranked by contribution: largest positive first, largest negative last.
+             */
+            holdings: components["schemas"]["HoldingContribution"][];
+            /**
+             * Gap
+             * @description Why there is no contribution report, when there is none.
+             */
+            gap: string | null;
+        };
         /** ConversationDetail */
         ConversationDetail: {
             conversation: components["schemas"]["ConversationOut"];
@@ -4020,6 +4066,23 @@ export interface components {
              * @enum {string}
              */
             drift_status: "in_band" | "above_band" | "below_band" | "above_hard_limit" | "no_target";
+        };
+        /** HoldingContribution */
+        HoldingContribution: {
+            /** Ticker */
+            ticker: string;
+            /** Name */
+            name: string | null;
+            /**
+             * Contribution Base
+             * @description The holding's organic gain over the period, in base currency — its value change with its own trading netted out.
+             */
+            contribution_base: number;
+            /**
+             * Contribution Pct
+             * @description contribution_base as a fraction of the portfolio's total value at the start of the period; null when that value was zero.
+             */
+            contribution_pct: number | null;
         };
         /** HoldingCoverage */
         HoldingCoverage: {
@@ -7506,6 +7569,37 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["PortfolioHistory"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_portfolio_contribution: {
+        parameters: {
+            query?: {
+                days?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ContributionReport"];
                 };
             };
             /** @description Validation Error */

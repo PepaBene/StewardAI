@@ -21,8 +21,13 @@ import pytest
 from api.auth import AuthenticatedUser, require_owner
 from api.db import get_pool
 from api.main import create_app
-from steward.portfolio.history import DailyValue, flow_adjusted_index
-from steward.portfolio.read import portfolio_history
+from steward.portfolio.history import (
+    DailyValue,
+    PositionDailyValue,
+    flow_adjusted_index,
+    position_organic_gain,
+)
+from steward.portfolio.read import contribution_to_return, portfolio_history
 
 pytestmark_db = pytest.mark.db
 
@@ -95,6 +100,48 @@ def test_zero_prior_base_carries_the_index_forward_without_dividing_by_zero() ->
 
 def test_empty_series_is_empty() -> None:
     assert flow_adjusted_index([]) == []
+
+
+# ---------------------------------------------------------------------------
+# Per-position organic gain (contribution to return)
+# ---------------------------------------------------------------------------
+
+
+def test_buying_more_of_a_position_does_not_read_as_a_gain() -> None:
+    # Day 1: value rises from 100 to 160, but only 50 of that is a purchase (cost_base
+    # +50); the rest (10) is organic. Day 2: the resulting 160 grows organically to 176
+    # (+16), with no further trade. Total organic gain: 10 + 16 = 26.
+    days = [
+        PositionDailyValue(day(0), Decimal(100), Decimal(100)),
+        PositionDailyValue(day(1), Decimal(160), Decimal(150)),
+        PositionDailyValue(day(2), Decimal(176), Decimal(150)),
+    ]
+    assert position_organic_gain(days) == Decimal(26)
+
+
+def test_selling_some_of_a_position_does_not_read_as_a_loss() -> None:
+    # Day 1: value drops from 100 to 40 purely because 60 (at cost) was sold.
+    # Day 2: the resulting 40 grows organically to 44.
+    days = [
+        PositionDailyValue(day(0), Decimal(100), Decimal(100)),
+        PositionDailyValue(day(1), Decimal(40), Decimal(40)),
+        PositionDailyValue(day(2), Decimal(44), Decimal(40)),
+    ]
+    assert position_organic_gain(days) == Decimal(4)
+
+
+def test_a_real_gain_with_no_trading_is_the_full_value_change() -> None:
+    days = [
+        PositionDailyValue(day(0), Decimal(100), Decimal(80)),
+        PositionDailyValue(day(1), Decimal(110), Decimal(80)),
+    ]
+    assert position_organic_gain(days) == Decimal(10)
+
+
+def test_fewer_than_two_days_has_no_organic_gain() -> None:
+    assert position_organic_gain([]) == Decimal(0)
+    one_day = [PositionDailyValue(day(0), Decimal(100), Decimal(80))]
+    assert position_organic_gain(one_day) == Decimal(0)
 
 
 # ---------------------------------------------------------------------------
@@ -266,3 +313,151 @@ async def test_history_route_returns_the_flow_adjusted_index(
     body = response.json()
     assert body["gap"] is None
     assert [round(p["close"], 4) for p in body["points"]] == [100.0, 110.0]
+
+
+# ---------------------------------------------------------------------------
+# Per-holding contribution to a period's return, DB-backed
+# ---------------------------------------------------------------------------
+
+
+async def _position(
+    pool: asyncpg.Pool,
+    job_id: int,
+    snapshot_date: dt.date,
+    ticker: str,
+    *,
+    quantity: Decimal,
+    avg_price: Decimal,
+    value_base: Decimal,
+    fx_rate: Decimal = Decimal(1),
+) -> None:
+    await pool.execute(
+        "insert into public.instrument (t212_ticker, currency) values ($1, 'USD')"
+        " on conflict do nothing",
+        ticker,
+    )
+    await pool.execute(
+        "insert into public.position_snapshot (snapshot_date, ticker, job_id, captured_at,"
+        " quantity, avg_price, current_price, instrument_currency, value, account_currency,"
+        " value_account, cost_account, ppl, base_currency, fx_source, fx_rate, value_base)"
+        " values ($1, $2, $3, now(), $4, $5, $5, 'USD', $4::numeric * $5::numeric, 'EUR', $6,"
+        " $6, 0, 'EUR', 'ecb', $7, $6)",
+        snapshot_date,
+        ticker,
+        job_id,
+        quantity,
+        avg_price,
+        value_base,
+        fx_rate,
+    )
+
+
+@pytestmark_db
+async def test_no_position_snapshot_yet_reports_a_gap(backend_pool: asyncpg.Pool) -> None:
+    result = await contribution_to_return(backend_pool, 365)
+    assert result.gap == "no position snapshot yet"
+    assert result.holdings == [] and result.as_of is None
+
+
+@pytestmark_db
+async def test_buying_more_of_a_holding_does_not_inflate_its_contribution(
+    backend_pool: asyncpg.Pool,
+) -> None:
+    job_id = await _job(backend_pool)
+    await _snapshot(backend_pool, job_id, day(0), Decimal(1000))
+    await _position(
+        backend_pool, job_id, day(0), "AAPL_US_EQ",
+        quantity=Decimal(10), avg_price=Decimal(10), value_base=Decimal(100),
+    )  # fmt: skip
+    await _snapshot(backend_pool, job_id, day(1), Decimal(1060))
+    # Bought 5 more at 10 (cost +50): value_base rises from 100 to 160, only 10 of that
+    # (160 - 100 - 50) is organic.
+    await _position(
+        backend_pool, job_id, day(1), "AAPL_US_EQ",
+        quantity=Decimal(15), avg_price=Decimal(10), value_base=Decimal(160),
+    )  # fmt: skip
+
+    result = await contribution_to_return(backend_pool, 365)
+    assert result.gap is None
+    assert result.period_start == day(0)
+    [holding] = result.holdings
+    assert holding.ticker == "AAPL_US_EQ"
+    assert round(holding.contribution_base, 4) == 10.0
+    assert round(holding.contribution_pct or 0, 4) == round(10 / 1000, 4)
+
+
+@pytestmark_db
+async def test_holdings_are_ranked_by_contribution_largest_first(
+    backend_pool: asyncpg.Pool,
+) -> None:
+    job_id = await _job(backend_pool)
+    await _snapshot(backend_pool, job_id, day(0), Decimal(300))
+    await _position(
+        backend_pool, job_id, day(0), "UP_US_EQ",
+        quantity=Decimal(10), avg_price=Decimal(10), value_base=Decimal(100),
+    )  # fmt: skip
+    await _position(
+        backend_pool, job_id, day(0), "DOWN_US_EQ",
+        quantity=Decimal(10), avg_price=Decimal(10), value_base=Decimal(100),
+    )  # fmt: skip
+    await _snapshot(backend_pool, job_id, day(1), Decimal(330))
+    await _position(
+        backend_pool, job_id, day(1), "UP_US_EQ",
+        quantity=Decimal(10), avg_price=Decimal(10), value_base=Decimal(120),
+    )  # fmt: skip
+    await _position(
+        backend_pool, job_id, day(1), "DOWN_US_EQ",
+        quantity=Decimal(10), avg_price=Decimal(10), value_base=Decimal(90),
+    )  # fmt: skip
+
+    result = await contribution_to_return(backend_pool, 365)
+    assert [h.ticker for h in result.holdings] == ["UP_US_EQ", "DOWN_US_EQ"]
+    assert result.holdings[0].contribution_base > 0
+    assert result.holdings[1].contribution_base < 0
+
+
+@pytestmark_db
+async def test_a_holding_with_one_snapshot_in_window_has_no_measurable_contribution(
+    backend_pool: asyncpg.Pool,
+) -> None:
+    job_id = await _job(backend_pool)
+    await _snapshot(backend_pool, job_id, day(0), Decimal(200))
+    await _position(
+        backend_pool, job_id, day(0), "NEW_US_EQ",
+        quantity=Decimal(1), avg_price=Decimal(100), value_base=Decimal(100),
+    )  # fmt: skip
+
+    result = await contribution_to_return(backend_pool, 365)
+    [holding] = result.holdings
+    assert holding.contribution_base == 0.0
+
+
+@pytestmark_db
+async def test_contribution_route_before_the_first_sync(api: httpx.AsyncClient) -> None:
+    body = (await api.get("/portfolio/contribution")).json()
+    assert body["gap"] == "no position snapshot yet"
+    assert body["holdings"] == []
+
+
+@pytestmark_db
+async def test_contribution_route_ranks_holdings(
+    api: httpx.AsyncClient, backend_pool: asyncpg.Pool
+) -> None:
+    job_id = await _job(backend_pool)
+    await _snapshot(backend_pool, job_id, day(0), Decimal(200))
+    await _position(
+        backend_pool, job_id, day(0), "AAPL_US_EQ",
+        quantity=Decimal(10), avg_price=Decimal(10), value_base=Decimal(100),
+    )  # fmt: skip
+    await _snapshot(backend_pool, job_id, day(1), Decimal(210))
+    await _position(
+        backend_pool, job_id, day(1), "AAPL_US_EQ",
+        quantity=Decimal(10), avg_price=Decimal(10), value_base=Decimal(110),
+    )  # fmt: skip
+
+    response = await api.get("/portfolio/contribution", params={"days": 30})
+    assert response.status_code == 200
+    body = response.json()
+    assert body["gap"] is None
+    assert body["holdings"][0]["ticker"] == "AAPL_US_EQ"
+    assert round(body["holdings"][0]["contribution_base"], 4) == 10.0

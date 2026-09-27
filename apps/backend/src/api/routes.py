@@ -42,11 +42,13 @@ from steward.earnings.review import review_fact as review_fact_in_db
 from steward.jobs import queue
 from steward.jobs.runner import create_job
 from steward.portfolio.read import (
+    ContributionReport,
     HoldingsResponse,
     JobStatus,
     JobSummary,
     PortfolioHistory,
     PortfolioOverview,
+    contribution_to_return,
     portfolio_history,
     portfolio_holdings,
     portfolio_overview,
@@ -94,6 +96,20 @@ async def get_portfolio_history(
     or loss from money moving in or out. Empty (with `gap` set) before the first sync or
     with fewer than two snapshots in the window."""
     return await portfolio_history(pool, days)
+
+
+@router.get("/portfolio/contribution", tags=["portfolio"])
+async def get_portfolio_contribution(
+    pool: Pool,
+    _owner: Owner,
+    days: Annotated[int, Query(ge=7, le=3700)] = 365,
+) -> ContributionReport:
+    """Every holding's contribution to the portfolio's return over the window, in base
+    currency: its own trading (buying or selling more of it) netted out, so a holding is
+    ranked by what the market actually did to it, not by how much was bought or sold.
+    Empty (with `gap` set) before the first sync, or with no position snapshot in the
+    window."""
+    return await contribution_to_return(pool, days)
 
 
 @router.get("/portfolio/transactions", tags=["portfolio"])
