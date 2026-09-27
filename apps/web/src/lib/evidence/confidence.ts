@@ -40,6 +40,21 @@ export function confidenceLabel(confidence: Confidence): string {
   return CONFIDENCE[confidence].label;
 }
 
+/** Counts of each confidence state across a list — feeds ConfidenceBar. */
+export function tallyConfidence(values: readonly Confidence[]): Record<Confidence, number> {
+  const counts: Record<Confidence, number> = { verified: 0, corroborated: 0, unconfirmed: 0, disputed: 0 };
+  for (const v of values) counts[v] += 1;
+  return counts;
+}
+
+/** "5 verified · 2 corroborated" — omits states with nothing in them, for a ConfidenceBar's label. */
+export function tallyConfidenceLabel(counts: Record<Confidence, number>): string {
+  return (["verified", "corroborated", "unconfirmed", "disputed"] as const satisfies readonly Confidence[])
+    .filter((k) => counts[k] > 0)
+    .map((k) => `${counts[k]} ${CONFIDENCE[k].label.toLowerCase()}`)
+    .join(" · ");
+}
+
 const ACRONYMS: Record<string, string> = {
   eps: "EPS",
   yoy: "YoY",

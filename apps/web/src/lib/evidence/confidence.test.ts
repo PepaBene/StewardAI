@@ -7,6 +7,8 @@ import {
   formatObserved,
   formatTarget,
   humanizeMetric,
+  tallyConfidence,
+  tallyConfidenceLabel,
   VERDICT_STATUS,
 } from "./confidence";
 
@@ -28,6 +30,14 @@ describe("confidence labels", () => {
     expect(VERDICT_STATUS.pass.tone).toBe("gain");
     expect(VERDICT_STATUS.breach.tone).toBe("loss");
     expect(VERDICT_STATUS.unknown.tone).toBe("unknown");
+  });
+
+  it("tallies a list of confidence values and labels it in fixed order, omitting empty states", () => {
+    const counts = tallyConfidence(["verified", "verified", "disputed", "verified"]);
+    expect(counts).toEqual({ verified: 3, corroborated: 0, unconfirmed: 0, disputed: 1 });
+    expect(tallyConfidenceLabel(counts)).toBe("3 verified · 1 disputed");
+    expect(tallyConfidence([])).toEqual({ verified: 0, corroborated: 0, unconfirmed: 0, disputed: 0 });
+    expect(tallyConfidenceLabel(tallyConfidence([]))).toBe("");
   });
 });
 

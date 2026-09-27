@@ -36,7 +36,7 @@ import {
   statusCounts,
   type OverallStatus,
 } from "@/lib/evidence/board";
-import { CONFIDENCE, formatTarget } from "@/lib/evidence/confidence";
+import { formatTarget, tallyConfidenceLabel } from "@/lib/evidence/confidence";
 import { reviewQueueHref } from "@/lib/evidence/review";
 import { formatDate, formatDateTime, formatPercent, formatRelative } from "@/lib/format";
 import { useApiResource } from "@/lib/hooks/use-api-resource";
@@ -224,10 +224,7 @@ function BoardRowView({
 }) {
   const counts = statusCounts(row);
   const confidence = confidenceCounts(row);
-  const confidenceLabel = (["verified", "corroborated", "unconfirmed", "disputed"] as const)
-    .filter((k) => confidence[k] > 0)
-    .map((k) => `${confidence[k]} ${CONFIDENCE[k].label.toLowerCase()}`)
-    .join(" · ");
+  const confidenceLabel = tallyConfidenceLabel(confidence);
   return (
     <tr className="border-b border-border align-top last:border-0">
       <th scope="row" className="px-3 py-2 text-left font-normal">
