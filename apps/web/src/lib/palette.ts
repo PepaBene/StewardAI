@@ -1,6 +1,6 @@
 import { CONFIG_DOMAINS, DOMAIN_SLUGS, historyHref } from "@/lib/config/domains";
 import { reviewQueueHref } from "@/lib/evidence/review";
-import { SECTIONS, sectionHref } from "@/lib/nav";
+import { CLUSTERS, isClusterActive } from "@/lib/nav";
 
 /*
  * Command palette entries: every primary destination, the config editors, each holding,
@@ -22,16 +22,42 @@ export type PaletteAction =
   | { kind: "ownership-13f" }
   | { kind: "research"; ticker: string };
 
+export type PaletteGroup = (typeof CLUSTERS)[number]["label"] | "Copilot" | "Holdings" | "Actions";
+
 export type PaletteCommand = {
   id: string;
   label: string;
-  group: "Go to" | "Holdings" | "Actions";
+  group: PaletteGroup;
   keywords?: string;
   href?: string;
   action?: PaletteAction;
   /** Opens a panel on the current page instead of navigating. */
   ui?: "open-chat";
 };
+
+/**
+ * Which of the five-cluster IA's groups a destination belongs to (Ledger_Design_System_
+ * Redesign_Proposal.md section 3), so the palette's trailing label says "Oversight" or
+ * "Research & Verification" instead of a blanket "Go to". Chat has no cluster: it is
+ * ambient, so its entries are labelled "Copilot" directly by their own definition.
+ */
+function clusterOf(href: string): PaletteGroup {
+  const path = href.split(/[?#]/)[0];
+  if (path === "/chat") return "Copilot";
+  const cluster = CLUSTERS.find((c) => isClusterActive(c, path));
+  return cluster?.label ?? "Config";
+}
+
+/** Primary destinations that aren't already a richly-keyworded entry below. */
+const PRIMARY_PAGES = [
+  { href: "/", label: "Overview", keywords: "portfolio value allocation drift alerts" },
+  { href: "/holdings", label: "Holdings", keywords: "positions ticker thesis verdicts news evidence" },
+  { href: "/news", label: "News", keywords: "feed severity confidence source tier" },
+  { href: "/research", label: "Research", keywords: "reports research this ticker" },
+  { href: "/reports", label: "Reports", keywords: "digest archive monthly reviews impact notes full text" },
+  { href: "/activity", label: "Activity", keywords: "job log coverage gaps cost budget" },
+  { href: "/config", label: "Config", keywords: "strategy theses sources notifications research profiles schedules budget" },
+] as const;
 
 export const CONFIG_PAGES = [
   { href: "/config/strategy", label: "Strategy", keywords: "targets allocation bands rules categories classifications currency drift" },
@@ -64,6 +90,9 @@ export const OTHER_PAGES = [
   { href: "/activity#source-trust", label: "Source trust", keywords: "activity feedback trust score demoted outlets" },
   { href: "/activity#eval-candidates", label: "Eval candidates", keywords: "activity evaluation golden labelled set feedback export evals" },
   { href: "/status", label: "API status", keywords: "health backend version" },
+  // Chat's full page: the header's slide-over links here, and it stays reachable by typing
+  // "chat" even though it has no nav cluster of its own.
+  { href: "/chat", label: "Chat (full page)", keywords: "assistant copilot conversation ask question" },
 ] as const;
 
 /** A job number, with or without a leading "#" or "job": open that job run (the list is on Activity). */
@@ -77,35 +106,35 @@ export function jobCommands(query: string): PaletteCommand[] {
 
 export function baseCommands(): PaletteCommand[] {
   return [
-    ...SECTIONS.map((s) => ({
-      id: `nav:${s.slug || "overview"}`,
-      label: s.label,
-      group: "Go to" as const,
-      keywords: s.description,
-      href: sectionHref(s),
+    ...PRIMARY_PAGES.map((p) => ({
+      id: `nav:${p.href}`,
+      label: p.label,
+      group: clusterOf(p.href),
+      keywords: p.keywords,
+      href: p.href,
     })),
     ...CONFIG_PAGES.map((p) => ({
       id: `nav:${p.href}`,
       label: `Config: ${p.label}`,
-      group: "Go to" as const,
+      group: clusterOf(p.href),
       keywords: p.keywords,
       href: p.href,
     })),
     ...OTHER_PAGES.map((p) => ({
       id: `nav:${p.href}`,
       label: p.label,
-      group: "Go to" as const,
+      group: clusterOf(p.href),
       keywords: p.keywords,
       href: p.href,
     })),
     ...DOMAIN_SLUGS.map((slug) => ({
       id: `nav:${historyHref(slug)}`,
       label: `History: ${CONFIG_DOMAINS[slug].label}`,
-      group: "Go to" as const,
+      group: clusterOf(historyHref(slug)),
       keywords: "config versions diff rollback undo",
       href: historyHref(slug),
     })),
-    { id: "ui:chat", label: "Open chat", group: "Actions", keywords: "ask question assistant copilot conversation panel", ui: "open-chat" },
+    { id: "ui:chat", label: "Open chat", group: "Copilot", keywords: "ask question assistant copilot conversation panel", ui: "open-chat" },
     { id: "act:sync", label: "Sync portfolio now", group: "Actions", keywords: "trading212 refresh", action: { kind: "portfolio-sync" } },
     { id: "act:news", label: "Check news now", group: "Actions", keywords: "ingest feeds run", action: { kind: "news-ingest" } },
     { id: "act:verdicts", label: "Re-run thesis verdicts", group: "Actions", keywords: "kpi judge", action: { kind: "thesis-verdicts" } },

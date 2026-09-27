@@ -17,6 +17,7 @@ import { AlertMessage } from "@/components/alert-message";
 import { EmptyState } from "@/components/empty-state";
 import { FeedbackControl } from "@/components/feedback/feedback-control";
 import { SeverityBadge, TierBadge } from "@/components/news/severity-badge";
+import { SeverityDot } from "@/components/news/severity-timeline";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import {
@@ -165,7 +166,8 @@ function StoryCard({ story, onResolved }: { story: DisputedStory; onResolved: (u
     >
       <div className="flex flex-wrap items-start justify-between gap-2">
         <div className="min-w-0 flex-1 space-y-1">
-          <h3 id={headingId} className="font-medium">
+          <h3 id={headingId} className="flex items-start gap-2 font-medium">
+            <SeverityDot severity={story.severity} className="mt-1.5" />
             {story.headline}
           </h3>
           <p className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-text-muted">

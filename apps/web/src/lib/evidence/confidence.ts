@@ -1,24 +1,25 @@
 import type { Confidence, VerdictStatus } from "@/lib/api/client";
 
 /*
- * The four confidence labels of the Design and UI section. Grey / blue / amber / red from
- * the muted severity palette, never gain or loss, and each with a text label and an icon
- * so meaning never rests on colour alone.
+ * The four confidence labels of the Ledger design system (section 4.2 of the redesign
+ * proposal): a dedicated hue per state — blue / teal / amber / red, validated against the
+ * OKLab colourblindness simulator — never gain or loss, and always with a text label and
+ * an icon so meaning never rests on colour alone. Ordinal, in this fixed order.
  */
 export const CONFIDENCE = {
   verified: {
     label: "Verified",
-    tone: "neutral",
+    tone: "verified",
     description: "Primary source, and every validator check passed.",
   },
   corroborated: {
     label: "Corroborated",
-    tone: "info",
+    tone: "corroborated",
     description: "Confirmed by independent sources.",
   },
   unconfirmed: {
     label: "Unconfirmed",
-    tone: "warning",
+    tone: "unconfirmed",
     description: "Held for review or not yet backed by a verified figure.",
   },
   disputed: {
@@ -37,6 +38,21 @@ export const VERDICT_STATUS = {
 
 export function confidenceLabel(confidence: Confidence): string {
   return CONFIDENCE[confidence].label;
+}
+
+/** Counts of each confidence state across a list — feeds ConfidenceBar. */
+export function tallyConfidence(values: readonly Confidence[]): Record<Confidence, number> {
+  const counts: Record<Confidence, number> = { verified: 0, corroborated: 0, unconfirmed: 0, disputed: 0 };
+  for (const v of values) counts[v] += 1;
+  return counts;
+}
+
+/** "5 verified · 2 corroborated" — omits states with nothing in them, for a ConfidenceBar's label. */
+export function tallyConfidenceLabel(counts: Record<Confidence, number>): string {
+  return (["verified", "corroborated", "unconfirmed", "disputed"] as const satisfies readonly Confidence[])
+    .filter((k) => counts[k] > 0)
+    .map((k) => `${counts[k]} ${CONFIDENCE[k].label.toLowerCase()}`)
+    .join(" · ");
 }
 
 const ACRONYMS: Record<string, string> = {

@@ -6,8 +6,13 @@ import Link from "next/link";
 import { AlertMessage } from "@/components/alert-message";
 import { EmptyState } from "@/components/empty-state";
 import { AllocationBars, type AllocationItem } from "@/components/portfolio/allocation-bars";
+import { AllocationStackedBar } from "@/components/portfolio/allocation-stacked-bar";
+import { DriftBar } from "@/components/portfolio/drift-bar";
+import { DriftChart, type DriftChartRow } from "@/components/portfolio/drift-chart";
 import { DriftStatusBadge, isOutOfBand } from "@/components/portfolio/drift-status-badge";
 import { FreshnessLabel } from "@/components/portfolio/freshness-label";
+import { PerformanceCard } from "@/components/portfolio/performance-card";
+import { PerformanceStatCard } from "@/components/portfolio/performance-stat-card";
 import { StatCard } from "@/components/portfolio/stat-card";
 import { useSyncStatus } from "@/components/sync/sync-status-provider";
 import { Button } from "@/components/ui/button";
@@ -142,7 +147,7 @@ function Overview({ data }: { data: PortfolioOverview }) {
         </AlertMessage>
       ) : null}
 
-      <section aria-label="Totals" className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      <section aria-label="Totals" className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-5">
         <StatCard
           label={`Total value (${baseCcy})`}
           value={formatMoney(base.total, baseCcy)}
@@ -166,9 +171,13 @@ function Overview({ data }: { data: PortfolioOverview }) {
           label={`Unrealised P/L (${account.account_currency})`}
           value={formatMoney(account.unrealized_ppl, account.account_currency, { signed: true })}
           valueClassName={TONE_CLASS[pplTone]}
+          trend={pplTone}
           sub={<>{formatPercent(pplPct, { signed: true })} on cost · Trading212 figure</>}
         />
+        <PerformanceStatCard />
       </section>
+
+      <PerformanceCard />
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
         <Card>
@@ -199,6 +208,10 @@ function DriftCard({ data }: { data: PortfolioOverview }) {
   const untargeted = drift?.positions.filter((p) => p.status === "no_target") ?? [];
   const cash = drift?.cash;
   const cashRow = cash && cash.status !== "no_target" ? cash : null;
+  const chartRows: DriftChartRow[] = [
+    ...targeted.filter((p) => p.drift !== null).map((p) => ({ key: p.ticker, label: p.ticker, drift: p.drift! })),
+    ...(cashRow?.drift !== null && cashRow ? [{ key: "cash", label: "Cash", drift: cashRow.drift }] : []),
+  ];
 
   return (
     <Card>
@@ -225,58 +238,69 @@ function DriftCard({ data }: { data: PortfolioOverview }) {
         ) : targeted.length === 0 && !cashRow ? (
           <p className="text-sm text-text-muted">The strategy sets no position or cash targets.</p>
         ) : (
-          <div className="-mx-6 overflow-x-auto px-6">
-            <table className="w-full text-sm">
-              <caption className="sr-only">Drift from target weights</caption>
-              <thead>
-                <tr className="border-b border-border text-left text-text-muted">
-                  <th scope="col" className="py-2 pr-3 font-medium">Holding</th>
-                  <th scope="col" className="py-2 px-3 text-right font-medium">Weight</th>
-                  <th scope="col" className="py-2 px-3 text-right font-medium">Target</th>
-                  <th scope="col" className="py-2 px-3 text-right font-medium">Drift</th>
-                  <th scope="col" className="py-2 pl-3 font-medium">Status</th>
-                </tr>
-              </thead>
-              <tbody>
-                {targeted.map((p) => (
-                  <tr key={p.ticker} className="border-b border-border last:border-0">
-                    <th scope="row" className="py-2 pr-3 text-left font-mono text-xs font-normal">
-                      {p.ticker}
-                      {p.held ? null : <span className="ml-1 font-sans text-text-muted">(not held)</span>}
-                    </th>
-                    <td className="num whitespace-nowrap py-2 px-3 text-right">{formatPercent(p.weight)}</td>
-                    <td className="num whitespace-nowrap py-2 px-3 text-right text-text-muted">
-                      {formatPercent(p.target_weight)}
-                      <span className="block text-xs">
-                        {formatPercent(p.lower)}–{formatPercent(p.upper)}
-                      </span>
-                    </td>
-                    <td className={cn("num whitespace-nowrap py-2 px-3 text-right", isOutOfBand(p.status) && "font-semibold")}>
-                      {formatPp(p.drift)}
-                    </td>
-                    <td className="py-2 pl-3">
-                      <DriftStatusBadge status={p.status} />
-                    </td>
+          <div className="space-y-4">
+            <DriftChart rows={chartRows} label="Drift from target, by holding" />
+            <div className="-mx-6 overflow-x-auto px-6">
+              <table className="w-full text-sm">
+                <caption className="sr-only">Drift from target weights</caption>
+                <thead>
+                  <tr className="border-b border-border text-left text-text-muted">
+                    <th scope="col" className="py-2 pr-3 font-medium">Holding</th>
+                    <th scope="col" className="py-2 px-3 text-right font-medium">Weight</th>
+                    <th scope="col" className="py-2 px-3 text-right font-medium">Target</th>
+                    <th scope="col" className="py-2 px-3 text-right font-medium">Drift</th>
+                    <th scope="col" className="py-2 pl-3 font-medium">Status</th>
                   </tr>
-                ))}
-                {cashRow ? (
-                  <tr>
-                    <th scope="row" className="py-2 pr-3 text-left font-normal">Cash</th>
-                    <td className="num whitespace-nowrap py-2 px-3 text-right">{formatPercent(cashRow.weight)}</td>
-                    <td className="num whitespace-nowrap py-2 px-3 text-right text-text-muted">
-                      {formatPercent(cashRow.target_weight)}
-                      <span className="block text-xs">
-                        {formatPercent(cashRow.lower)}–{formatPercent(cashRow.upper)}
-                      </span>
-                    </td>
-                    <td className="num whitespace-nowrap py-2 px-3 text-right">{formatPp(cashRow.drift)}</td>
-                    <td className="py-2 pl-3">
-                      <DriftStatusBadge status={cashRow.status} />
-                    </td>
-                  </tr>
-                ) : null}
-              </tbody>
-            </table>
+                </thead>
+                <tbody>
+                  {targeted.map((p) => (
+                    <tr key={p.ticker} className="border-b border-border last:border-0">
+                      <th scope="row" className="py-2 pr-3 text-left font-mono text-xs font-normal">
+                        {p.ticker}
+                        {p.held ? null : <span className="ml-1 font-sans text-text-muted">(not held)</span>}
+                      </th>
+                      <td className="num whitespace-nowrap py-2 px-3 text-right">{formatPercent(p.weight)}</td>
+                      <td className="num whitespace-nowrap py-2 px-3 text-right text-text-muted">
+                        {formatPercent(p.target_weight)}
+                        <span className="block text-xs">
+                          {formatPercent(p.lower)}–{formatPercent(p.upper)}
+                        </span>
+                      </td>
+                      <td className={cn("num whitespace-nowrap py-2 px-3 text-right", isOutOfBand(p.status) && "font-semibold")}>
+                        <span className="inline-flex items-center gap-2">
+                          <DriftBar drift={p.drift} />
+                          {formatPp(p.drift)}
+                        </span>
+                      </td>
+                      <td className="py-2 pl-3">
+                        <DriftStatusBadge status={p.status} />
+                      </td>
+                    </tr>
+                  ))}
+                  {cashRow ? (
+                    <tr>
+                      <th scope="row" className="py-2 pr-3 text-left font-normal">Cash</th>
+                      <td className="num whitespace-nowrap py-2 px-3 text-right">{formatPercent(cashRow.weight)}</td>
+                      <td className="num whitespace-nowrap py-2 px-3 text-right text-text-muted">
+                        {formatPercent(cashRow.target_weight)}
+                        <span className="block text-xs">
+                          {formatPercent(cashRow.lower)}–{formatPercent(cashRow.upper)}
+                        </span>
+                      </td>
+                      <td className="num whitespace-nowrap py-2 px-3 text-right">
+                        <span className="inline-flex items-center gap-2">
+                          <DriftBar drift={cashRow.drift} />
+                          {formatPp(cashRow.drift)}
+                        </span>
+                      </td>
+                      <td className="py-2 pl-3">
+                        <DriftStatusBadge status={cashRow.status} />
+                      </td>
+                    </tr>
+                  ) : null}
+                </tbody>
+              </table>
+            </div>
           </div>
         )}
         {untargeted.length > 0 && data.strategy_config_version_id !== null ? (
@@ -300,44 +324,45 @@ function CategoryCards({ data }: { data: PortfolioOverview }) {
   if (dimensions.length === 0) return null;
   return (
     <section aria-label="Allocation by category" className="grid grid-cols-1 gap-6 md:grid-cols-2 xl:grid-cols-3">
-      {dimensions.map((dimension) => (
-        <Card key={dimension.dimension}>
-          <CardHeader>
-            <CardTitle className="capitalize">{dimension.dimension.replaceAll("_", " ")}</CardTitle>
-            {dimension.dimension === "currency" ? (
-              <CardDescription>From each instrument&apos;s trading currency.</CardDescription>
-            ) : null}
-          </CardHeader>
-          <CardContent className="space-y-3">
-            <AllocationBars
-              currency={baseCcy}
-              label={`Allocation by ${dimension.dimension}`}
-              items={dimension.buckets.map((b) => ({
-                key: b.bucket,
-                label: b.bucket,
-                value: b.value_base,
-                weight: b.weight,
-                muted: b.bucket === "Unclassified",
-              }))}
-            />
-            {dimension.buckets.some((b) => b.status !== "no_target") ? (
-              <ul className="space-y-1 text-xs">
-                {dimension.buckets
-                  .filter((b) => b.status !== "no_target")
-                  .map((b) => (
-                    <li key={b.bucket} className="flex items-center justify-between gap-2">
-                      <span>
-                        {b.bucket}: target {formatPercent(b.target_weight)}, drift{" "}
-                        <span className="num">{formatPp(b.drift)}</span>
-                      </span>
-                      <DriftStatusBadge status={b.status} />
-                    </li>
-                  ))}
-              </ul>
-            ) : null}
-          </CardContent>
-        </Card>
-      ))}
+      {dimensions.map((dimension) => {
+        const items: AllocationItem[] = dimension.buckets.map((b) => ({
+          key: b.bucket,
+          label: b.bucket,
+          value: b.value_base,
+          weight: b.weight,
+          muted: b.bucket === "Unclassified",
+        }));
+        return (
+          <Card key={dimension.dimension}>
+            <CardHeader>
+              <CardTitle className="capitalize">{dimension.dimension.replaceAll("_", " ")}</CardTitle>
+              {dimension.dimension === "currency" ? (
+                <CardDescription>From each instrument&apos;s trading currency.</CardDescription>
+              ) : null}
+            </CardHeader>
+            <CardContent className="space-y-3">
+              <AllocationStackedBar items={items} label={`Allocation by ${dimension.dimension}, as a single bar`} />
+              <AllocationBars currency={baseCcy} label={`Allocation by ${dimension.dimension}`} items={items} />
+              {dimension.buckets.some((b) => b.status !== "no_target") ? (
+                <ul className="space-y-1 text-xs">
+                  {dimension.buckets
+                    .filter((b) => b.status !== "no_target")
+                    .map((b) => (
+                      <li key={b.bucket} className="flex items-center justify-between gap-2">
+                        <span className="inline-flex items-center gap-2">
+                          <DriftBar drift={b.drift} scale={0.05} />
+                          {b.bucket}: target {formatPercent(b.target_weight)}, drift{" "}
+                          <span className="num">{formatPp(b.drift)}</span>
+                        </span>
+                        <DriftStatusBadge status={b.status} />
+                      </li>
+                    ))}
+                </ul>
+              ) : null}
+            </CardContent>
+          </Card>
+        );
+      })}
     </section>
   );
 }

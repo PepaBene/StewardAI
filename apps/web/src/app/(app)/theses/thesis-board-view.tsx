@@ -18,6 +18,7 @@ import { Fragment, useState } from "react";
 import { AlertMessage } from "@/components/alert-message";
 import { EmptyState } from "@/components/empty-state";
 import { ConfidenceBadge } from "@/components/evidence/confidence-badge";
+import { ConfidenceBar } from "@/components/evidence/confidence-bar";
 import { VerdictStatusBadge } from "@/components/evidence/verdict-status-badge";
 import { FeedbackControl } from "@/components/feedback/feedback-control";
 import { HoldingsTabs } from "@/components/portfolio/holdings-tabs";
@@ -25,6 +26,7 @@ import { Button } from "@/components/ui/button";
 import { getBrowserApiClient, type BoardKpi, type BoardRow, type ThesisBoard } from "@/lib/api/client";
 import {
   boardSummary,
+  confidenceCounts,
   kpiCellLabel,
   kpiLabel,
   kpiPanelId,
@@ -34,7 +36,7 @@ import {
   statusCounts,
   type OverallStatus,
 } from "@/lib/evidence/board";
-import { formatTarget } from "@/lib/evidence/confidence";
+import { formatTarget, tallyConfidenceLabel } from "@/lib/evidence/confidence";
 import { reviewQueueHref } from "@/lib/evidence/review";
 import { formatDate, formatDateTime, formatPercent, formatRelative } from "@/lib/format";
 import { useApiResource } from "@/lib/hooks/use-api-resource";
@@ -177,6 +179,7 @@ function Board({ board }: { board: ThesisBoard }) {
               <th scope="col" className="px-3 py-2 text-right font-medium">Breach</th>
               <th scope="col" className="px-3 py-2 text-right font-medium">Unknown</th>
               <th scope="col" className="px-3 py-2 text-right font-medium">Pass</th>
+              <th scope="col" className="px-3 py-2 text-left font-medium">Confidence</th>
               <th scope="col" className="px-3 py-2 text-left font-medium">KPIs</th>
               <th scope="col" className="px-3 py-2 text-left font-medium">Review</th>
             </tr>
@@ -195,7 +198,7 @@ function Board({ board }: { board: ThesisBoard }) {
                   />
                   {openCell ? (
                     <tr className="border-b border-border bg-surface-muted/60">
-                      <td colSpan={7} id={kpiPanelId(row.ticker, openCell.kpi.id)} className="px-4 py-3">
+                      <td colSpan={8} id={kpiPanelId(row.ticker, openCell.kpi.id)} className="px-4 py-3">
                         <VerdictPanel row={row} cell={openCell} />
                       </td>
                     </tr>
@@ -220,6 +223,8 @@ function BoardRowView({
   onToggle: (kpiId: string) => void;
 }) {
   const counts = statusCounts(row);
+  const confidence = confidenceCounts(row);
+  const confidenceLabel = tallyConfidenceLabel(confidence);
   return (
     <tr className="border-b border-border align-top last:border-0">
       <th scope="row" className="px-3 py-2 text-left font-normal">
@@ -244,6 +249,9 @@ function BoardRowView({
       <td className="num px-3 py-2 text-right">{counts.breach}</td>
       <td className="num px-3 py-2 text-right">{counts.unknown}</td>
       <td className="num px-3 py-2 text-right">{counts.pass}</td>
+      <td className="px-3 py-2">
+        <ConfidenceBar counts={confidence} label={confidenceLabel || "No judged KPIs yet"} />
+      </td>
       <td className="px-3 py-2">
         {row.kpis.length === 0 ? (
           <span className="text-text-muted">No KPIs in this thesis</span>

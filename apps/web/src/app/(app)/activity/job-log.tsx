@@ -7,7 +7,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { AlertMessage } from "@/components/alert-message";
 import { EmptyState } from "@/components/empty-state";
-import { JobStatusBadge } from "@/components/jobs/job-status-badge";
+import { JobStatusBadge, JobStatusDot } from "@/components/jobs/job-status-badge";
 import { Button } from "@/components/ui/button";
 import { getBrowserApiClient, type Holding, type JobList, type JobListItem } from "@/lib/api/client";
 import {
@@ -214,7 +214,8 @@ export function JobLog() {
                 return (
                   <tr key={j.id} className="border-b border-border align-top last:border-0">
                     <th scope="row" className="px-3 py-2 text-left font-normal">
-                      <Link href={jobHref(j.id)} className="font-medium hover:text-accent hover:underline">
+                      <Link href={jobHref(j.id)} className="flex items-center gap-2 font-medium hover:text-accent hover:underline">
+                        <JobStatusDot status={j.status} />
                         {jobTypeLabel(j.job_type)} <span className="num text-text-muted">#{j.id}</span>
                       </Link>
                       <span className="block text-xs text-text-muted">

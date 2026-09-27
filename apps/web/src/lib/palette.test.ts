@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { DOMAIN_SLUGS, historyHref } from "@/lib/config/domains";
-import { SECTIONS } from "@/lib/nav";
+import { CLUSTER_PAGES } from "@/lib/nav";
 
 import { baseCommands, CONFIG_PAGES, filterCommands, holdingCommands, jobCommands, OTHER_PAGES } from "./palette";
 
@@ -10,7 +10,7 @@ const commands = [...baseCommands(), ...holdingCommands([{ ticker: "AAPL_US_EQ",
 describe("command palette", () => {
   it("reaches every primary destination and config editor", () => {
     const hrefs = new Set(commands.map((c) => c.href).filter(Boolean));
-    for (const s of SECTIONS) expect(hrefs).toContain(`/${s.slug}`);
+    for (const p of CLUSTER_PAGES) expect(hrefs).toContain(p.href);
     for (const p of CONFIG_PAGES) expect(hrefs).toContain(p.href);
     for (const p of OTHER_PAGES) expect(hrefs).toContain(p.href);
     for (const slug of DOMAIN_SLUGS) expect(hrefs).toContain(historyHref(slug));
@@ -122,5 +122,28 @@ describe("command palette: phase 5", () => {
     expect(filterCommands(commands, "13f")[0].action).toEqual({ kind: "ownership-13f" });
     expect(filterCommands(commands, "research apple")[0].action).toEqual({ kind: "research", ticker: "AAPL_US_EQ" });
     expect(filterCommands(commands, "", 100).some((c) => c.id.startsWith("research:"))).toBe(false);
+  });
+});
+
+describe("command palette: five-cluster IA", () => {
+  const byHref = new Map(commands.map((c) => [c.href, c]));
+
+  it("labels each destination with its Ledger cluster instead of a blanket \"Go to\"", () => {
+    expect(byHref.get("/")?.group).toBe("Portfolio");
+    expect(byHref.get("/transactions")?.group).toBe("Portfolio");
+    expect(byHref.get("/theses")?.group).toBe("Research & Verification");
+    expect(byHref.get("/review")?.group).toBe("Research & Verification");
+    expect(byHref.get("/news")?.group).toBe("Research & Verification");
+    expect(byHref.get("/escalations")?.group).toBe("Oversight");
+    expect(byHref.get("/reports")?.group).toBe("Oversight");
+    expect(byHref.get("/reviews")?.group).toBe("Oversight");
+    expect(byHref.get("/activity")?.group).toBe("Oversight");
+    expect(byHref.get("/config/strategy")?.group).toBe("Config");
+    expect(commands.find((c) => c.id === "ui:chat")?.group).toBe("Copilot");
+    expect(byHref.get("/chat")?.group).toBe("Copilot");
+  });
+
+  it("never lists Chat's full page as belonging to a cluster", () => {
+    expect(commands.some((c) => c.href === "/chat" && c.group !== "Copilot")).toBe(false);
   });
 });

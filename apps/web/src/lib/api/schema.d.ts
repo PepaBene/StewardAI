@@ -250,6 +250,30 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/portfolio/history": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Portfolio History
+         * @description Daily flow-adjusted portfolio value, indexed to 100 at the start of the window,
+         *     against the first configured benchmark symbol. Deposits and withdrawals are excluded
+         *     from the index so day-over-day change is investment return only, never a false gain
+         *     or loss from money moving in or out. Empty (with `gap` set) before the first sync or
+         *     with fewer than two snapshots in the window.
+         */
+        get: operations["get_portfolio_history"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/portfolio/transactions": {
         parameters: {
             query?: never;
@@ -5279,6 +5303,30 @@ export interface components {
             /** Cleared At */
             cleared_at: string | null;
         };
+        /** PortfolioHistory */
+        PortfolioHistory: {
+            /**
+             * As Of
+             * @description Date of the latest snapshot included.
+             */
+            as_of: string | null;
+            /** Base Currency */
+            base_currency: string | null;
+            /**
+             * Points
+             * @description Daily flow-adjusted portfolio value index, 100 on the first day. Not a price: deposits and withdrawals are excluded, so day-over-day change is investment return only. Only meaningful rebased (against itself or the benchmark), never read as an absolute figure.
+             */
+            points: components["schemas"]["PricePoint"][];
+            /** Benchmark Symbol */
+            benchmark_symbol: string | null;
+            /** Benchmark */
+            benchmark: components["schemas"]["PricePoint"][];
+            /**
+             * Gap
+             * @description Why there is no portfolio history, when there is none.
+             */
+            gap: string | null;
+        };
         /** PortfolioOverview */
         PortfolioOverview: {
             /** @description Null until the first successful sync. */
@@ -7405,6 +7453,37 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HoldingsResponse"];
+                };
+            };
+        };
+    };
+    get_portfolio_history: {
+        parameters: {
+            query?: {
+                days?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PortfolioHistory"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };

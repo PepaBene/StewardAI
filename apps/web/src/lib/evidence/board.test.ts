@@ -4,6 +4,7 @@ import type { BoardKpi, BoardRow, ThesisKPI, VerdictOut } from "@/lib/api/client
 
 import {
   boardSummary,
+  confidenceCounts,
   countsText,
   kpiCellLabel,
   kpiLabel,
@@ -105,5 +106,18 @@ describe("thesis board", () => {
   it("marks adjusted KPIs and makes safe panel ids", () => {
     expect(kpiLabel({ ...kpi, basis: "adjusted" })).toBe("Revenue growth YoY (adjusted)");
     expect(kpiPanelId("BRK.B_US_EQ", "max single")).toBe("verdict-BRK-B_US_EQ-max-single");
+  });
+
+  it("counts judged KPIs' verdict confidence, leaving never-judged KPIs uncounted", () => {
+    const neverJudged: BoardKpi = { kpi, status: "unknown", verdict: null };
+    const judged: BoardKpi = { kpi, status: "breach", verdict };
+    const disputedJudged: BoardKpi = { kpi, status: "pass", verdict: { ...verdict, confidence: "disputed" } };
+    expect(confidenceCounts({ kpis: [] })).toEqual({ verified: 0, corroborated: 0, unconfirmed: 0, disputed: 0 });
+    expect(confidenceCounts({ kpis: [neverJudged, judged, disputedJudged] })).toEqual({
+      verified: 1,
+      corroborated: 0,
+      unconfirmed: 0,
+      disputed: 1,
+    });
   });
 });

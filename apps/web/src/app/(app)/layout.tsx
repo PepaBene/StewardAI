@@ -5,6 +5,7 @@ import { connection } from "next/server";
 
 import { AppNav } from "@/components/app-nav";
 import { ChatPanel } from "@/components/chat/chat-panel";
+import { ColorModeToggle } from "@/components/color-mode-toggle";
 import { CommandPalette } from "@/components/command-palette";
 import { SignOutButton } from "@/components/sign-out-button";
 import { SyncErrorBanner } from "@/components/sync/sync-error-banner";
@@ -65,6 +66,7 @@ export default async function AppLayout({ children }: LayoutProps<"/">) {
                 <span>API status</span>
               </Link>
             </Button>
+            <ColorModeToggle />
             <ThemeToggle />
             <SignOutButton />
           </div>

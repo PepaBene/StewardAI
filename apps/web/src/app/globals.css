@@ -3,13 +3,28 @@
 
 /* next-themes puts `.dark` on <html>; lets copy-pasted shadcn/Tremor code use `dark:`. */
 @custom-variant dark (&:where(.dark, .dark *));
+/* The colourblind-alternate mode toggle puts `.cvd` on <html>; see color-mode-toggle.tsx. */
+@custom-variant cvd (&:where(.cvd, .cvd *));
 
 @theme {
   --font-sans:
-    ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial,
-    sans-serif;
+    "IBM Plex Sans", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto,
+    "Helvetica Neue", Arial, sans-serif;
+  --font-serif:
+    "IBM Plex Serif", ui-serif, Georgia, "Times New Roman", serif;
   --font-mono:
-    ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+    "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas,
+    "Liberation Mono", monospace;
+}
+
+/*
+ * Ledger motion spec: 120-180ms ease for hover/press (Tailwind's default transition
+ * duration, 150ms, already sits inside that band), 200-260ms for panel transitions. No
+ * springs. `prefers-reduced-motion` turns all of it off below.
+ */
+:root {
+  --ease-panel: cubic-bezier(0.16, 1, 0.3, 1);
+  --duration-panel: 220ms;
 }
 
 /*
@@ -52,4 +67,77 @@
     background-color: var(--color-accent);
     color: var(--color-accent-foreground);
   }
+
+  /* Panel transitions: the command palette, the chat slide-over, and any <dialog>. */
+  dialog {
+    transition:
+      opacity var(--duration-panel) var(--ease-panel),
+      transform var(--duration-panel) var(--ease-panel),
+      display var(--duration-panel) allow-discrete,
+      overlay var(--duration-panel) allow-discrete;
+    opacity: 1;
+    transform: none;
+  }
+  dialog::backdrop {
+    transition: opacity var(--duration-panel) var(--ease-panel);
+    opacity: 1;
+  }
+  @starting-style {
+    dialog[open] {
+      opacity: 0;
+      transform: translateY(4px) scale(0.99);
+    }
+    dialog[open]::backdrop {
+      opacity: 0;
+    }
+  }
+
+  /* The nav's cluster dropdowns (Radix sets data-state on open/close). */
+  [data-slot="dropdown-menu-content"] {
+    transition:
+      opacity var(--duration-panel) var(--ease-panel),
+      transform var(--duration-panel) var(--ease-panel);
+  }
+  [data-slot="dropdown-menu-content"][data-state="closed"] {
+    opacity: 0;
+    transform: translateY(-2px) scale(0.98);
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    ::before,
+    ::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+      scroll-behavior: auto !important;
+    }
+  }
+}
+
+/*
+ * Colourblind-alternate mode (toggled by ColorMode, next to the theme toggle): gain/loss
+ * already never rely on hue alone (a sign, an arrow and a label always ride along), but
+ * `.cvd` adds a pattern fill too, for viewers who need more than a validated hue pair —
+ * including full monochromacy, where colour is not a signal at all.
+ */
+.cvd .bg-gain-subtle {
+  background-image: repeating-linear-gradient(135deg, var(--color-gain) 0 2px, transparent 2px 7px);
+  background-color: var(--color-gain-subtle);
+  background-blend-mode: overlay;
+}
+.cvd .bg-loss-subtle {
+  background-image: repeating-linear-gradient(45deg, var(--color-loss) 0 2px, transparent 2px 7px);
+  background-color: var(--color-loss-subtle);
+  background-blend-mode: overlay;
+}
+.cvd .text-gain {
+  text-decoration: underline;
+  text-decoration-style: solid;
+  text-underline-offset: 2px;
+}
+.cvd .text-loss {
+  text-decoration: underline;
+  text-decoration-style: dashed;
+  text-underline-offset: 2px;
 }

@@ -17,6 +17,7 @@ import { Fragment, useCallback, useEffect, useMemo, useState } from "react";
 import { AlertMessage } from "@/components/alert-message";
 import { EmptyState } from "@/components/empty-state";
 import { ConfidenceBadge } from "@/components/evidence/confidence-badge";
+import { ConfidenceBar } from "@/components/evidence/confidence-bar";
 import { EvidenceLinks } from "@/components/evidence/evidence-links";
 import { FactReviewForm, type ReviewResolution } from "@/components/evidence/fact-review-form";
 import { VerdictStatusBadge } from "@/components/evidence/verdict-status-badge";
@@ -47,6 +48,8 @@ import {
   formatObserved,
   formatTarget,
   humanizeMetric,
+  tallyConfidence,
+  tallyConfidenceLabel,
 } from "@/lib/evidence/confidence";
 import { allowedReviewActions, isHeld, REVIEW_ACTIONS, reviewQueueHref, scaleHint } from "@/lib/evidence/review";
 import { formatDate, formatMoney, formatPercent, formatPrice, formatQuantity, formatRelative, gainLossTone } from "@/lib/format";
@@ -264,6 +267,7 @@ function PositionCards({ detail }: { detail: HoldingDetail }) {
         label="Unrealised P/L"
         value={position ? formatMoney(position.ppl, position.account_currency, { signed: true }) : "—"}
         valueClassName={tone === "gain" ? "text-gain" : tone === "loss" ? "text-loss" : ""}
+        trend={position ? tone : undefined}
         sub={position ? formatPercent(position.ppl_pct, { signed: true }) : null}
       />
       <StatCard
@@ -610,6 +614,8 @@ function FactsSection({
   const shown = facts.filter((f) => f.status !== "rejected");
   const rejected = facts.filter((f) => f.status === "rejected");
   const held = facts.filter((f) => isHeld(f.status)).length;
+  const confidence = tallyConfidence(shown.map((f) => f.confidence));
+  const confidenceLabel = tallyConfidenceLabel(confidence);
 
   function onResolved(resolution: ReviewResolution) {
     setLastReview(resolution);
@@ -620,9 +626,14 @@ function FactsSection({
   return (
     <section aria-labelledby="facts-heading" className="space-y-3">
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <h2 id="facts-heading" className="text-lg font-semibold">
-          Extracted figures
-        </h2>
+        <span className="flex flex-wrap items-center gap-2">
+          <h2 id="facts-heading" className="text-lg font-semibold">
+            Extracted figures
+          </h2>
+          {shown.length > 0 ? (
+            <ConfidenceBar counts={confidence} label={confidenceLabel || "No figures yet"} />
+          ) : null}
+        </span>
         {held > 0 ? (
           <Button asChild variant="outline" size="sm">
             <Link href={reviewQueueHref(ticker)}>

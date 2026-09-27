@@ -21,9 +21,9 @@ export function ConfidenceBadge({ confidence, className }: { confidence: Confide
       data-confidence={confidence}
       className={cn(
         "inline-flex items-center gap-1 rounded-sm border px-1.5 py-0.5 text-xs font-medium whitespace-nowrap text-text",
-        tone === "neutral" && "border-border bg-neutral-signal-subtle",
-        tone === "info" && "border-info-signal/40 bg-info-signal-subtle",
-        tone === "warning" && "border-warning-signal/40 bg-warning-signal-subtle",
+        tone === "verified" && "border-verified/40 bg-verified-subtle",
+        tone === "corroborated" && "border-corroborated/40 bg-corroborated-subtle",
+        tone === "unconfirmed" && "border-unconfirmed/40 bg-unconfirmed-subtle",
         tone === "disputed" && "border-disputed/40 bg-disputed-subtle",
         className,
       )}
@@ -32,9 +32,9 @@ export function ConfidenceBadge({ confidence, className }: { confidence: Confide
         aria-hidden="true"
         className={cn(
           "size-3.5",
-          tone === "neutral" && "text-neutral-signal",
-          tone === "info" && "text-info-signal",
-          tone === "warning" && "text-warning-signal",
+          tone === "verified" && "text-verified",
+          tone === "corroborated" && "text-corroborated",
+          tone === "unconfirmed" && "text-unconfirmed",
           tone === "disputed" && "text-disputed",
         )}
       />

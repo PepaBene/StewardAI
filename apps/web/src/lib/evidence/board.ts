@@ -1,6 +1,6 @@
-import type { BoardKpi, BoardRow, VerdictStatus } from "@/lib/api/client";
+import type { BoardKpi, BoardRow, Confidence, VerdictStatus } from "@/lib/api/client";
 
-import { formatObserved, formatTarget, humanizeMetric, VERDICT_STATUS } from "./confidence";
+import { formatObserved, formatTarget, humanizeMetric, tallyConfidence, VERDICT_STATUS } from "./confidence";
 
 /*
  * The thesis board: one row per holding with a thesis, one cell per KPI. A KPI that was
@@ -34,6 +34,13 @@ export function statusCounts(row: Pick<BoardRow, "counts">): Record<VerdictStatu
 /** "1 breach · 2 unknown · 3 pass"; each status is named, so the text reads without colour. */
 export function countsText(counts: Record<VerdictStatus, number>): string {
   return STATUS_ORDER.map((s) => `${counts[s]} ${VERDICT_STATUS[s].label.toLowerCase()}`).join(" · ");
+}
+
+/** Confidence of each judged KPI's verdict on this row; a KPI never judged has none to count. */
+export function confidenceCounts(row: Pick<BoardRow, "kpis">): Record<Confidence, number> {
+  return tallyConfidence(
+    row.kpis.map((cell) => cell.verdict?.confidence).filter((c): c is Confidence => c !== undefined),
+  );
 }
 
 /** Holdings per overall status across the board, for the summary line. */

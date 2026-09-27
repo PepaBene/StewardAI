@@ -43,7 +43,9 @@ from steward.portfolio.read import (
     HoldingsResponse,
     JobStatus,
     JobSummary,
+    PortfolioHistory,
     PortfolioOverview,
+    portfolio_history,
     portfolio_holdings,
     portfolio_overview,
 )
@@ -76,6 +78,20 @@ async def get_portfolio_overview(pool: Pool, _owner: Owner) -> PortfolioOverview
 async def get_portfolio_holdings(pool: Pool, _owner: Owner) -> HoldingsResponse:
     """Every open position of the latest snapshot, largest first."""
     return await portfolio_holdings(pool)
+
+
+@router.get("/portfolio/history", tags=["portfolio"])
+async def get_portfolio_history(
+    pool: Pool,
+    _owner: Owner,
+    days: Annotated[int, Query(ge=7, le=3700)] = 365,
+) -> PortfolioHistory:
+    """Daily flow-adjusted portfolio value, indexed to 100 at the start of the window,
+    against the first configured benchmark symbol. Deposits and withdrawals are excluded
+    from the index so day-over-day change is investment return only, never a false gain
+    or loss from money moving in or out. Empty (with `gap` set) before the first sync or
+    with fewer than two snapshots in the window."""
+    return await portfolio_history(pool, days)
 
 
 @router.get("/portfolio/transactions", tags=["portfolio"])
