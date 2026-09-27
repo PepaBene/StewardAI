@@ -15,6 +15,7 @@ from steward.portfolio.read import JobStatus, JobSummary
 
 Confidence = Literal["verified", "corroborated", "unconfirmed", "disputed"]
 StoryStatus = Literal["pending", "confirmed", "unconfirmed", "disputed", "sentiment"]
+EscalationStatus = Literal["open", "acknowledged", "resolved"]
 
 
 class ItemLink(BaseModel):
@@ -237,6 +238,18 @@ class ReportSummary(BaseModel):
         description="When the next report of this kind is scheduled: this one is current "
         "until then. Null for unscheduled kinds or a disabled schedule.",
     )
+    story_count: int | None = Field(
+        default=None,
+        description="Digests: the stories across its sections (sections[].stories). Null for "
+        "report kinds without stories.",
+    )
+    citation_count: int | None = Field(
+        default=None,
+        description="Digests: the distinct sources it cites, counted by URL across its news "
+        "sources (sources[].url) and the filings of its cited facts "
+        "(fact_sources[].source_url); several facts from one filing count once. Null for "
+        "report kinds without a source list.",
+    )
 
 
 class ReportOut(BaseModel):
@@ -267,6 +280,21 @@ def _next_due(
     return (jobs or JobsConfig()).next_run_after(f"{period}_digest", created_at)
 
 
+# Counted in Postgres from the stored body, in the same query as the list (see ReportSummary).
+_DIGEST_STORY_COUNT = (
+    "case when type = 'digest' then (select coalesce(sum(jsonb_array_length("
+    "coalesce(sec -> 'stories', '[]'::jsonb))), 0)::int"
+    " from jsonb_array_elements(coalesce(body -> 'sections', '[]'::jsonb)) sec) end"
+)
+_DIGEST_CITATION_COUNT = (
+    "case when type = 'digest' then (select count(distinct u)::int from ("
+    "select src ->> 'url' as u from jsonb_array_elements(coalesce(body -> 'sources',"
+    " '[]'::jsonb)) src union all select fs ->> 'source_url'"
+    " from jsonb_array_elements(coalesce(body -> 'fact_sources', '[]'::jsonb)) fs) cited"
+    " where u is not null) end"
+)
+
+
 async def list_reports(
     pool: asyncpg.Pool,
     report_type: str,
@@ -275,8 +303,11 @@ async def list_reports(
     jobs: JobsConfig | None = None,
 ) -> list[ReportSummary]:
     rows = await pool.fetch(
-        "select id, type, period, title, created_at, delivery, body ->> 'headline' as headline,"
-        " (body ->> 'nothing_material')::boolean as nothing_material from public.report"
+        "select id, type, period, title, created_at, delivery, body ->> 'headline' as headline,"  # noqa: S608
+        " (body ->> 'nothing_material')::boolean as nothing_material,"
+        f" {_DIGEST_STORY_COUNT} as story_count,"
+        f" {_DIGEST_CITATION_COUNT} as citation_count"
+        " from public.report"
         " where type = $1 and ($2::text is null or period = $2) order by id desc limit $3",
         report_type,
         period,
@@ -446,13 +477,26 @@ class EscalationOut(BaseModel):
         "step recorded a cost."
     )
     models: list[str] = Field(description="Models the run called.")
+    status: EscalationStatus = Field(description="Where the owner is with it.")
+    acknowledged_at: dt.datetime | None = Field(
+        description="When the owner first acknowledged (or directly resolved) it; kept when "
+        "reopened."
+    )
+    resolved_at: dt.datetime | None = Field(
+        description="When the owner resolved it; null unless resolved."
+    )
 
 
 async def list_escalations(
-    pool: asyncpg.Pool, ticker: str | None, limit: int, report_id: int | None = None
+    pool: asyncpg.Pool,
+    ticker: str | None,
+    limit: int,
+    report_id: int | None = None,
+    status: EscalationStatus | None = None,
 ) -> list[EscalationOut]:
     rows = await pool.fetch(
         "select r.id, r.ticker, r.title, r.created_at, r.body, r.body_md, r.job_id,"
+        " r.escalation_status as status, r.acknowledged_at, r.resolved_at,"
         " j.status as job_status, s.cost_usd, coalesce(s.models, '{}') as models"
         " from public.report r left join public.job j on j.id = r.job_id"
         " left join lateral (select sum(cost_usd) as cost_usd,"
@@ -460,10 +504,12 @@ async def list_escalations(
         " from public.job_step where job_id = r.job_id) s on true"
         " where r.type = 'escalation' and ($1::text is null or r.ticker = $1)"
         " and ($3::bigint is null or r.id = $3)"
+        " and ($4::text is null or r.escalation_status = $4)"
         " order by r.id desc limit $2",
         ticker,
         limit,
         report_id,
+        status,
     )
     return [
         EscalationOut(
