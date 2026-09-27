@@ -1506,6 +1506,37 @@
         }
       }
     },
+    "/facts/index": {
+      "get": {
+        "tags": [
+          "holdings"
+        ],
+        "summary": "Get Fact Index",
+        "description": "The newest fact per (ticker, metric), across every holding — small and cheap on\npurpose: it exists to let a search (the command palette) resolve a typed metric and\nticker straight to that figure's evidence page, not to carry a claim's own detail.",
+        "operationId": "get_fact_index",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/FactIndexEntry"
+                  },
+                  "type": "array",
+                  "title": "Response Get Fact Index"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
     "/config/strategy": {
       "get": {
         "tags": [
@@ -10035,6 +10066,47 @@
           "ok"
         ],
         "title": "FactCheck"
+      },
+      "FactIndexEntry": {
+        "properties": {
+          "ticker": {
+            "type": "string",
+            "title": "Ticker"
+          },
+          "name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
+          },
+          "metric": {
+            "type": "string",
+            "title": "Metric"
+          },
+          "fact_id": {
+            "type": "integer",
+            "title": "Fact Id"
+          },
+          "period": {
+            "type": "string",
+            "title": "Period"
+          }
+        },
+        "type": "object",
+        "required": [
+          "ticker",
+          "name",
+          "metric",
+          "fact_id",
+          "period"
+        ],
+        "title": "FactIndexEntry",
+        "description": "One (ticker, metric): the newest fact for it, so a search can resolve a typed metric\nstraight to its evidence page rather than only to the holding page."
       },
       "FactOut": {
         "properties": {

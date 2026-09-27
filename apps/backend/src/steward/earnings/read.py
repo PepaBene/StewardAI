@@ -423,3 +423,37 @@ def snippet_context(text: str, snippet: str, lines_around: int = 4) -> str | Non
 
 def document_text(data: bytes, content_type: str, url: str) -> str:
     return Document(url=url, content_type=content_type, data=data).text()
+
+
+class FactIndexEntry(BaseModel):
+    """One (ticker, metric): the newest fact for it, so a search can resolve a typed metric
+    straight to its evidence page rather than only to the holding page."""
+
+    ticker: str
+    name: str | None
+    metric: str
+    fact_id: int
+    period: str
+
+
+async def fact_index(pool: asyncpg.Pool) -> list[FactIndexEntry]:
+    """The latest fact per (ticker, metric) across every holding — deliberately small (no
+    snippet, no checks, no evidence url) since this only feeds a search index, never a
+    claim surface. Excludes rejected facts: a search shouldn't resolve to a figure the
+    owner or the validator has already thrown out."""
+    rows = await pool.fetch(
+        "select distinct on (f.ticker, f.metric) f.ticker, i.name, f.metric, f.id, f.period"
+        " from public.fact f left join public.instrument i on i.t212_ticker = f.ticker"
+        " where f.status != 'rejected'"
+        " order by f.ticker, f.metric, f.id desc"
+    )
+    return [
+        FactIndexEntry(
+            ticker=r["ticker"],
+            name=r["name"],
+            metric=r["metric"],
+            fact_id=r["id"],
+            period=r["period"],
+        )
+        for r in rows
+    ]

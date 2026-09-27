@@ -569,6 +569,28 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/facts/index": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Fact Index
+         * @description The newest fact per (ticker, metric), across every holding — small and cheap on
+         *     purpose: it exists to let a search (the command palette) resolve a typed metric and
+         *     ticker straight to that figure's evidence page, not to carry a claim's own detail.
+         */
+        get: operations["get_fact_index"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/config/strategy": {
         parameters: {
             query?: never;
@@ -3723,6 +3745,23 @@ export interface components {
              * @default
              */
             detail: string;
+        };
+        /**
+         * FactIndexEntry
+         * @description One (ticker, metric): the newest fact for it, so a search can resolve a typed metric
+         *     straight to its evidence page rather than only to the holding page.
+         */
+        FactIndexEntry: {
+            /** Ticker */
+            ticker: string;
+            /** Name */
+            name: string | null;
+            /** Metric */
+            metric: string;
+            /** Fact Id */
+            fact_id: number;
+            /** Period */
+            period: string;
         };
         /** FactOut */
         FactOut: {
@@ -8003,6 +8042,26 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_fact_index: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FactIndexEntry"][];
                 };
             };
         };

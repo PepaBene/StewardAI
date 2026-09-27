@@ -3,7 +3,16 @@ import { describe, expect, it } from "vitest";
 import { DOMAIN_SLUGS, historyHref } from "@/lib/config/domains";
 import { CLUSTER_PAGES } from "@/lib/nav";
 
-import { baseCommands, CONFIG_PAGES, filterCommands, holdingCommands, jobCommands, kpiCommands, OTHER_PAGES } from "./palette";
+import {
+  baseCommands,
+  CONFIG_PAGES,
+  factCommands,
+  filterCommands,
+  holdingCommands,
+  jobCommands,
+  kpiCommands,
+  OTHER_PAGES,
+} from "./palette";
 
 const BOARD_ROWS = [
   {
@@ -16,10 +25,13 @@ const BOARD_ROWS = [
   },
 ];
 
+const FACT_INDEX = [{ ticker: "AAPL_US_EQ", name: "Apple", metric: "eps_diluted", fact_id: 42, period: "FY2025 Q3" }];
+
 const commands = [
   ...baseCommands(),
   ...holdingCommands([{ ticker: "AAPL_US_EQ", name: "Apple" }]),
   ...kpiCommands(BOARD_ROWS),
+  ...factCommands(FACT_INDEX),
 ];
 
 describe("command palette", () => {
@@ -176,5 +188,24 @@ describe("command palette: KPI depth", () => {
 
   it("still finds the holding itself, distinct from its KPIs", () => {
     expect(filterCommands(commands, "aapl").map((c) => c.id)).toContain("holding:AAPL_US_EQ");
+  });
+});
+
+describe("command palette: fact depth", () => {
+  it("resolves a typed metric and ticker straight to that figure's evidence page", () => {
+    const [first] = filterCommands(commands, "eps diluted aapl");
+    expect(first.id).toBe("fact:AAPL_US_EQ:eps_diluted");
+    expect(first.href).toBe("/evidence/42");
+    expect(first.label).toBe("EPS diluted · Apple (figure)");
+  });
+
+  it("keeps per-fact entries out of the empty-query list, like other per-holding entries", () => {
+    expect(filterCommands(commands, "", 100).some((c) => c.id.startsWith("fact:"))).toBe(false);
+  });
+
+  it("distinguishes a fact result from its KPI counterpart when both match", () => {
+    const results = filterCommands(commands, "aapl", 100);
+    expect(results.some((c) => c.id === "fact:AAPL_US_EQ:eps_diluted")).toBe(true);
+    expect(results.some((c) => c.id.startsWith("kpi:AAPL_US_EQ:"))).toBe(true);
   });
 });

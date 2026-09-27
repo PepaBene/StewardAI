@@ -1,7 +1,19 @@
 """Phase 14: chat graceful degradation — an answer shape distinct from "cited" prose when
-nothing in the draft ends up as a checked, sourced claim."""
+nothing in the draft ends up as a checked, sourced claim.
 
-from steward.chat.assistant import ChatSentence, answer_shape
+This is now a genuine prompt/response-shape change, not just a post-hoc reclassification:
+the model itself can set ChatAnswerDraft.insufficient_evidence instead of writing an
+unsupported-sounding paragraph, per the system prompt in steward.chat.assistant.SYSTEM. The
+post-hoc check (every sentence unsupported or without a source) remains as a backstop for
+when the model doesn't self-report."""
+
+from steward.chat.assistant import (
+    AnswerSentence,
+    ChatAnswerDraft,
+    ChatSentence,
+    answer_shape,
+    draft_note,
+)
 
 
 def s(
@@ -38,3 +50,30 @@ def test_at_least_one_checked_sourced_sentence_keeps_the_answer_cited() -> None:
         s("Analysts expect more.", no_source=True),
     ]
     assert answer_shape(sentences) == "cited"
+
+
+def test_the_models_own_admission_of_insufficient_evidence_is_authoritative() -> None:
+    # Even a sentence that happens to check out doesn't override the model's own call.
+    sentences = [s("Revenue was 94,036.", source_ids=["S1"])]
+    reason = "I could not find a Q3 figure for this ticker."
+    assert answer_shape(sentences, reason) == "low_evidence"
+    assert answer_shape([], "Nothing on record for this holding.") == "low_evidence"
+
+
+def test_no_admission_falls_back_to_the_checked_draft() -> None:
+    sentences = [s("Revenue was 94,036.", source_ids=["S1"])]
+    assert answer_shape(sentences, None) == "cited"
+
+
+def test_draft_note_is_the_models_own_reason_when_it_gives_one() -> None:
+    draft = ChatAnswerDraft(sentences=[], insufficient_evidence="No filing found for this period.")
+    assert draft_note(draft) == "No filing found for this period."
+
+
+def test_draft_note_is_none_for_an_ordinary_answer() -> None:
+    sentence = AnswerSentence(text="Revenue was 94,036.", source_ids=["S1"])
+    assert draft_note(ChatAnswerDraft(sentences=[sentence])) is None
+
+
+def test_draft_note_reports_no_parseable_answer_when_there_is_no_draft() -> None:
+    assert draft_note(None) == "no parseable answer"

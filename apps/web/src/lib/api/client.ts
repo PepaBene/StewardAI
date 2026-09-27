@@ -38,6 +38,7 @@ export type FactStatus = FactOut["status"];
 export type ThesisBoard = Schemas["ThesisBoard"];
 export type BoardRow = Schemas["BoardRow"];
 export type BoardKpi = Schemas["BoardKpi"];
+export type FactIndexEntry = Schemas["FactIndexEntry"];
 export type ReviewItem = Schemas["ReviewItem"];
 export type ReconciliationOut = Schemas["ReconciliationOut"];
 export type FailedCheck = Schemas["FailedCheck"];

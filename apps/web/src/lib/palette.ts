@@ -216,8 +216,30 @@ export function kpiCommands(
   });
 }
 
+/**
+ * One entry per (holding, metric): typing a metric and a ticker also resolves straight to
+ * that figure's evidence page — the other half of §4.7's "KPI cell or fact" ask, alongside
+ * kpiCommands(). `index` is GET /facts/index's own data: the newest fact per (ticker,
+ * metric) across every holding, small and cheap because it exists only to back this
+ * search, never a claim surface of its own.
+ */
+export function factCommands(
+  index: readonly { ticker: string; name: string | null; metric: string; fact_id: number; period: string }[],
+): PaletteCommand[] {
+  return index.map((entry) => {
+    const name = entry.name ?? entry.ticker;
+    return {
+      id: `fact:${entry.ticker}:${entry.metric}`,
+      label: `${humanizeMetric(entry.metric)} · ${name} (figure)`,
+      group: "Holdings" as const,
+      keywords: `${entry.ticker} ${entry.metric.replaceAll("_", " ")} figure fact extracted evidence source`,
+      href: `/evidence/${entry.fact_id}`,
+    };
+  });
+}
+
 /** Per-holding entries, shown only once something is typed. */
-const PER_HOLDING = ["earnings:", "review:", "reference:", "research:", "kpi:"];
+const PER_HOLDING = ["earnings:", "review:", "reference:", "research:", "kpi:", "fact:"];
 
 export function filterCommands(commands: PaletteCommand[], query: string, limit = 12): PaletteCommand[] {
   const words = query.toLowerCase().split(/\s+/).filter(Boolean);

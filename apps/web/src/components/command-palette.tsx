@@ -7,11 +7,12 @@ import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react"
 
 import { openChatPanel } from "@/components/chat/chat-panel";
 import { Button } from "@/components/ui/button";
-import { getBrowserApiClient, type BoardRow, type Holding } from "@/lib/api/client";
+import { getBrowserApiClient, type BoardRow, type FactIndexEntry, type Holding } from "@/lib/api/client";
 import { jobHref } from "@/lib/jobs/job-detail";
 import { confirmLeave } from "@/lib/unsaved-changes";
 import {
   baseCommands,
+  factCommands,
   filterCommands,
   holdingCommands,
   jobCommands,
@@ -74,11 +75,12 @@ export function CommandPalette() {
   const [active, setActive] = useState(0);
   const [holdings, setHoldings] = useState<Holding[]>([]);
   const [boardRows, setBoardRows] = useState<BoardRow[]>([]);
+  const [factIndex, setFactIndex] = useState<FactIndexEntry[]>([]);
   const [status, setStatus] = useState<{ busy: boolean; text: string; jobId?: number | null } | null>(null);
 
   const commands = useMemo(
-    () => [...baseCommands(), ...holdingCommands(holdings), ...kpiCommands(boardRows)],
-    [holdings, boardRows],
+    () => [...baseCommands(), ...holdingCommands(holdings), ...kpiCommands(boardRows), ...factCommands(factIndex)],
+    [holdings, boardRows, factIndex],
   );
   const results = useMemo(() => [...jobCommands(query), ...filterCommands(commands, query)], [commands, query]);
   const selected = Math.min(active, Math.max(0, results.length - 1));
@@ -96,6 +98,10 @@ export function CommandPalette() {
     getBrowserApiClient()
       .GET("/theses/board")
       .then((r) => r.data && setBoardRows(r.data.rows))
+      .catch(() => undefined);
+    getBrowserApiClient()
+      .GET("/facts/index")
+      .then((r) => r.data && setFactIndex(r.data))
       .catch(() => undefined);
   }, []);
 

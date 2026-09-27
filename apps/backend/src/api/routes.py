@@ -29,10 +29,12 @@ from steward.earnings.read import (
     FACT_CONFIDENCE,
     EvidenceLink,
     FactCheck,
+    FactIndexEntry,
     HoldingDetail,
     ThesisBoard,
     document_text,
     evidence_relation,
+    fact_index,
     holding_detail,
     snippet_context,
     thesis_board,
@@ -470,6 +472,14 @@ async def get_review_queue(
     """Facts waiting for the owner: held by the validator or quarantined by reconciliation,
     each with its snippet, source, the checks it broke and the reconciliation behind it."""
     return await review_queue(pool, ticker)
+
+
+@router.get("/facts/index", tags=["holdings"])
+async def get_fact_index(pool: Pool, _owner: Owner) -> list[FactIndexEntry]:
+    """The newest fact per (ticker, metric), across every holding — small and cheap on
+    purpose: it exists to let a search (the command palette) resolve a typed metric and
+    ticker straight to that figure's evidence page, not to carry a claim's own detail."""
+    return await fact_index(pool)
 
 
 # ---------------------------------------------------------------------------
