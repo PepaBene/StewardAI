@@ -2,9 +2,10 @@
 
 `price_history` (weekdays after the close):
 - Stooq daily bars for every holding's symbol (the holding profile's `price_symbol`, else the
-  one derived from OpenFIGI) and the configured benchmarks: a backfill of `history_years` the
-  first time, the recent days after that. A symbol Stooq does not know is a visible gap (kept
-  with its reason for the holding page and the Activity page), never a failed job.
+  one derived from OpenFIGI), the configured benchmarks and the market strip's indices: a
+  backfill of `history_years` the first time, the recent days after that. A symbol Stooq
+  does not know is a visible gap (kept with its reason for the holding page and the
+  Activity page), never a failed job.
 - Plausibility: on a sync day, the latest close is compared with Trading212's price; a gap
   beyond the configured tolerance is flagged (timing differences are expected intraday).
 - FX history: the ECB's rates for `history_years` from Frankfurter in one request (once, and
@@ -325,6 +326,11 @@ async def run_price_history(ctx: JobContext, deps: PriceDeps) -> None:
             pool, tickers, profiles.body if profiles else HoldingProfilesConfig()
         )
         step.detail.update(symbols=symbols, benchmarks=settings.benchmark_symbols)
+        # Benchmarks and the market strip's indices, each symbol once.
+        indices = list(
+            dict.fromkeys(settings.benchmark_symbols + [i.symbol for i in settings.market_strip])
+        )
+        step.detail["market_strip"] = [i.symbol for i in settings.market_strip]
 
     gaps: dict[str, dict[str, Any]] = {}
     checks: dict[str, Any] = {}
@@ -332,9 +338,7 @@ async def run_price_history(ctx: JobContext, deps: PriceDeps) -> None:
         counts: dict[str, int] = {}
         restated: dict[str, str] = {}
         unchecked: dict[str, str] = {}
-        wanted = [(t, s) for t, s in symbols.items()] + [
-            (None, b) for b in settings.benchmark_symbols
-        ]
+        wanted = [(t, s) for t, s in symbols.items()] + [(None, b) for b in indices]
         for ticker, symbol in wanted:
             key = ticker or symbol
             assert key is not None
