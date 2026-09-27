@@ -11,6 +11,7 @@ import { FreshnessText } from "@/components/freshness/as-of-label";
 import { ConfidenceBadge } from "@/components/evidence/confidence-badge";
 import { FeedbackControl } from "@/components/feedback/feedback-control";
 import { SeverityBadge, TierBadge } from "@/components/news/severity-badge";
+import { SeverityDot } from "@/components/news/severity-timeline";
 import { Button } from "@/components/ui/button";
 import {
   getBrowserApiClient,
@@ -368,19 +369,22 @@ function StoryRow({ items: group, onStory }: { items: NewsItemOut[]; onStory: (i
     <li className="space-y-2 p-4">
       <div className="flex flex-wrap items-start justify-between gap-2">
         <div className="min-w-0 flex-1 space-y-1">
-          {isExternalUrl(lead.url) ? (
-            <a
-              href={lead.url}
-              target="_blank"
-              rel="noreferrer"
-              className="inline-flex items-start gap-1 font-medium text-text hover:text-accent hover:underline"
-            >
-              <span>{lead.headline}</span>
-              <ExternalLinkIcon aria-hidden="true" className="mt-1 size-3.5 shrink-0 text-text-muted" />
-            </a>
-          ) : (
-            <span className="font-medium text-text">{lead.headline}</span>
-          )}
+          <span className="flex items-start gap-2">
+            <SeverityDot severity={story.severity} className="mt-1.5" />
+            {isExternalUrl(lead.url) ? (
+              <a
+                href={lead.url}
+                target="_blank"
+                rel="noreferrer"
+                className="inline-flex items-start gap-1 font-medium text-text hover:text-accent hover:underline"
+              >
+                <span>{lead.headline}</span>
+                <ExternalLinkIcon aria-hidden="true" className="mt-1 size-3.5 shrink-0 text-text-muted" />
+              </a>
+            ) : (
+              <span className="font-medium text-text">{lead.headline}</span>
+            )}
+          </span>
           <p className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-text-muted">
             <span>{lead.outlet_name ?? lead.outlet ?? lead.source_id}</span>
             <TierBadge tier={lead.tier} />

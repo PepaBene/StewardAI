@@ -7,6 +7,7 @@ import { useEffect, useState } from "react";
 import { ConfidenceBadge } from "@/components/evidence/confidence-badge";
 import { FeedbackControl } from "@/components/feedback/feedback-control";
 import { SeverityBadge, TierBadge } from "@/components/news/severity-badge";
+import { SeverityDot } from "@/components/news/severity-timeline";
 import { FreshnessText } from "@/components/freshness/as-of-label";
 import { getBrowserApiClient, type JobSummary, type NewsItemOut } from "@/lib/api/client";
 import { byLead, groupByStory } from "@/lib/news/feed-filters";
@@ -78,14 +79,17 @@ export function HoldingNews({ ticker }: { ticker: string }) {
             return (
               <li key={lead.story.id} className="flex flex-wrap items-start justify-between gap-2 p-3 text-sm">
                 <div className="min-w-0 flex-1">
-                  {isExternalUrl(lead.url) ? (
-                    <a href={lead.url} target="_blank" rel="noreferrer" className="inline-flex items-start gap-1 font-medium hover:text-accent hover:underline">
-                      {lead.headline}
-                      <ExternalLinkIcon aria-hidden="true" className="mt-0.5 size-3 shrink-0 text-text-muted" />
-                    </a>
-                  ) : (
-                    <span className="font-medium">{lead.headline}</span>
-                  )}
+                  <span className="flex items-start gap-1.5">
+                    <SeverityDot severity={lead.story.severity} className="mt-1" />
+                    {isExternalUrl(lead.url) ? (
+                      <a href={lead.url} target="_blank" rel="noreferrer" className="inline-flex items-start gap-1 font-medium hover:text-accent hover:underline">
+                        {lead.headline}
+                        <ExternalLinkIcon aria-hidden="true" className="mt-0.5 size-3 shrink-0 text-text-muted" />
+                      </a>
+                    ) : (
+                      <span className="font-medium">{lead.headline}</span>
+                    )}
+                  </span>
                   <p className="flex flex-wrap items-center gap-x-2 text-text-muted">
                     <span>{lead.outlet_name ?? lead.outlet}</span>
                     <TierBadge tier={lead.tier} />
