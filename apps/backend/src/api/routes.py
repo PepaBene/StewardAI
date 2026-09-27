@@ -28,9 +28,11 @@ from steward.earnings.check import local_today
 from steward.earnings.read import (
     FACT_CONFIDENCE,
     EvidenceLink,
+    FactCheck,
     HoldingDetail,
     ThesisBoard,
     document_text,
+    evidence_relation,
     holding_detail,
     snippet_context,
     thesis_board,
@@ -362,7 +364,7 @@ async def get_fact_evidence(
     the text around the fact's snippet."""
     row = await pool.fetchrow(
         "select f.id, f.ticker, f.metric, f.period, f.value_as_written, f.snippet,"
-        " f.unit_snippet, f.status, e.source_url, e.storage_path, e.content_type,"
+        " f.unit_snippet, f.status, f.checks, e.source_url, e.storage_path, e.content_type,"
         " e.fetched_at, e.sha256 from public.fact f"
         " join public.evidence e on e.sha256 = f.evidence_sha256 where f.id = $1",
         fact_id,
@@ -377,6 +379,7 @@ async def get_fact_evidence(
     context = snippet_context(
         document_text(data, row["content_type"], row["source_url"]), row["snippet"]
     )
+    checks = [FactCheck(**c) for c in json.loads(row["checks"] or "[]")]
     return EvidenceLink(
         fact_id=row["id"],
         ticker=row["ticker"],
@@ -386,6 +389,7 @@ async def get_fact_evidence(
         snippet=row["snippet"],
         unit_snippet=row["unit_snippet"],
         confidence=FACT_CONFIDENCE[row["status"]],
+        relation=evidence_relation(row["status"], checks),
         source_url=row["source_url"],
         evidence_url=url,
         content_type=row["content_type"],

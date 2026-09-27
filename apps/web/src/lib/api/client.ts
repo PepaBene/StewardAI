@@ -29,6 +29,7 @@ export type VerdictOut = Schemas["VerdictOut"];
 export type FactOut = Schemas["FactOut"];
 export type EvidenceLink = Schemas["EvidenceLink"];
 export type Confidence = FactOut["confidence"];
+export type EvidenceRelation = EvidenceLink["relation"];
 export type VerdictStatus = VerdictOut["status"];
 export type FactStatus = FactOut["status"];
 export type ThesisBoard = Schemas["ThesisBoard"];

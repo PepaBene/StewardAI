@@ -2848,6 +2848,12 @@ export interface components {
             source_url: string;
             /** Status */
             status: string;
+            /**
+             * Relation
+             * @description Whether this figure supports, contradicts, or merely mentions the claim it backs — distinct from its own confidence.
+             * @enum {string}
+             */
+            relation: "supports" | "contradicts" | "mentions";
         };
         /** DigestRequest */
         DigestRequest: {
@@ -3545,6 +3551,12 @@ export interface components {
              * @enum {string}
              */
             confidence: "verified" | "corroborated" | "unconfirmed" | "disputed";
+            /**
+             * Relation
+             * @description Whether this source supports, contradicts, or merely mentions the claim — distinct from confidence, which is how sure we are the value itself is right.
+             * @enum {string}
+             */
+            relation: "supports" | "contradicts" | "mentions";
             /** Source Url */
             source_url: string;
             /**

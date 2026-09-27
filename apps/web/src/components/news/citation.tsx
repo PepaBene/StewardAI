@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useId, useRef, useState, type KeyboardEvent } from "react";
 import { createPortal } from "react-dom";
 
+import { EvidenceRelationBadge } from "@/components/evidence/evidence-relation-badge";
 import type { CitationPreview } from "@/lib/news/digest";
 import { TIERS } from "@/lib/news/labels";
 import { useAnchoredPosition } from "@/lib/hooks/use-anchored-position";
@@ -106,7 +107,10 @@ export function PreviewBody({ preview }: { preview: CitationPreview }) {
           {tierInfo ? <span className="font-normal text-text-muted"> · {tierInfo.description.split(":")[0]}</span> : null}
         </span>
       </p>
-      <p className="font-medium">{preview.title}</p>
+      <p className="flex flex-wrap items-center gap-1.5 font-medium">
+        {preview.title}
+        {preview.relation ? <EvidenceRelationBadge relation={preview.relation} /> : null}
+      </p>
       {preview.snippet ? (
         <blockquote className="border-l-2 border-border pl-2 text-xs break-words whitespace-pre-line text-text-muted">
           {preview.snippet}

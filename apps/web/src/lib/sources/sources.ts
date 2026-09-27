@@ -97,6 +97,10 @@ export function sourcePreview(source: Source): CitationPreview {
     tierLabel: tierText(source.tier),
     source: source.url && isExternalUrl(source.url) ? `${sourceKindLabel(source.kind)} · ${hostOf(source.url)}` : sourceKindLabel(source.kind),
     url: link?.href ?? "",
+    // This registry spans many source kinds (verdicts, 13F filings, prices, ...) with no
+    // single "does it back the claim" question in common; only a fact's own EvidenceLink
+    // and digest fact citations carry a relation today.
+    relation: null,
   };
 }
 

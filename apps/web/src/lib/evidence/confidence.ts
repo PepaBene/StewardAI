@@ -1,4 +1,4 @@
-import type { Confidence, VerdictStatus } from "@/lib/api/client";
+import type { Confidence, EvidenceRelation, VerdictStatus } from "@/lib/api/client";
 
 /*
  * The four confidence labels of the Ledger design system (section 4.2 of the redesign
@@ -28,6 +28,34 @@ export const CONFIDENCE = {
     description: "Contradicted by its own source, or marked wrong.",
   },
 } as const satisfies Record<Confidence, { label: string; tone: string; description: string }>;
+
+/*
+ * How a piece of evidence relates to the claim it backs — a different question from
+ * confidence (how sure we are the value is right). Reuses the diverging pair's cool/warm/
+ * neutral logic rather than a new hue: supports is the "as expected" cool side, contradicts
+ * is the "look here" warm side, mentions sits at the neutral centre.
+ */
+export const EVIDENCE_RELATION = {
+  supports: {
+    label: "Supports",
+    tone: "diverging-under",
+    description: "This source backs the claim: the fact is verified and every check passed.",
+  },
+  mentions: {
+    label: "Mentions",
+    tone: "diverging-neutral",
+    description: "This source is on record but hasn't yet been corroborated enough to count as support.",
+  },
+  contradicts: {
+    label: "Contradicts",
+    tone: "diverging-over",
+    description: "This source conflicts with the claim: it failed a check, or was rejected.",
+  },
+} as const satisfies Record<EvidenceRelation, { label: string; tone: string; description: string }>;
+
+export function evidenceRelationLabel(relation: EvidenceRelation): string {
+  return EVIDENCE_RELATION[relation].label;
+}
 
 /* Pass and breach are financial state and use gain and loss; unknown is styled apart. */
 export const VERDICT_STATUS = {

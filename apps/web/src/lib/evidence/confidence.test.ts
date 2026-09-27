@@ -3,6 +3,8 @@ import { describe, expect, it } from "vitest";
 import {
   CONFIDENCE,
   confidenceLabel,
+  EVIDENCE_RELATION,
+  evidenceRelationLabel,
   formatFactValue,
   formatObserved,
   formatTarget,
@@ -24,6 +26,14 @@ describe("confidence labels", () => {
       expect(["gain", "loss"]).not.toContain(c.tone);
     }
     expect(confidenceLabel("unconfirmed")).toBe("Unconfirmed");
+  });
+
+  it("gives evidence relation its own diverging cool/neutral/warm tones, never confidence hues", () => {
+    expect(Object.values(EVIDENCE_RELATION).map((r) => r.label)).toEqual(["Supports", "Mentions", "Contradicts"]);
+    expect(EVIDENCE_RELATION.supports.tone).toBe("diverging-under");
+    expect(EVIDENCE_RELATION.mentions.tone).toBe("diverging-neutral");
+    expect(EVIDENCE_RELATION.contradicts.tone).toBe("diverging-over");
+    expect(evidenceRelationLabel("contradicts")).toBe("Contradicts");
   });
 
   it("styles unknown apart from pass and breach", () => {

@@ -7955,6 +7955,16 @@
           "status": {
             "type": "string",
             "title": "Status"
+          },
+          "relation": {
+            "type": "string",
+            "enum": [
+              "supports",
+              "contradicts",
+              "mentions"
+            ],
+            "title": "Relation",
+            "description": "Whether this figure supports, contradicts, or merely mentions the claim it backs — distinct from its own confidence."
           }
         },
         "type": "object",
@@ -7966,7 +7976,8 @@
           "value_as_written",
           "snippet",
           "source_url",
-          "status"
+          "status",
+          "relation"
         ],
         "title": "DigestFactSource",
         "description": "A fact a digest sentence or verdict cites, with the snippet it was read from."
@@ -9627,6 +9638,16 @@
             ],
             "title": "Confidence"
           },
+          "relation": {
+            "type": "string",
+            "enum": [
+              "supports",
+              "contradicts",
+              "mentions"
+            ],
+            "title": "Relation",
+            "description": "Whether this source supports, contradicts, or merely mentions the claim — distinct from confidence, which is how sure we are the value itself is right."
+          },
           "source_url": {
             "type": "string",
             "title": "Source Url"
@@ -9672,6 +9693,7 @@
           "snippet",
           "unit_snippet",
           "confidence",
+          "relation",
           "source_url",
           "evidence_url",
           "content_type",

@@ -158,6 +158,7 @@ describe("citation hover preview", () => {
         snippet: "Services net sales were $24,213 million.",
         source_url: "https://www.sec.gov/x.htm",
         status: "verified",
+        relation: "supports",
       },
     ],
   };
@@ -177,6 +178,7 @@ describe("citation hover preview", () => {
       tierLabel: "Tier 1",
       source: "apple.com",
       url: "https://ir.apple.com/a",
+      relation: null,
     });
     expect(digestCitationPreview(withText, { kind: "news", id: 12 })).toMatchObject({ snippet: null, tierLabel: "Tier 2" });
     expect(digestCitationPreview(withText, { kind: "fact", id: 7 })).toEqual({
@@ -187,6 +189,7 @@ describe("citation hover preview", () => {
       tierLabel: "Figure status: verified",
       source: "sec.gov",
       url: "https://www.sec.gov/x.htm",
+      relation: "supports",
     });
   });
 

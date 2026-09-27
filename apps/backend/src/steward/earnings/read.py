@@ -27,11 +27,31 @@ FACT_CONFIDENCE: dict[str, Confidence] = {
     "quarantined": "disputed",
 }
 
+# How a piece of evidence relates to the claim it's attached to — a different question
+# from confidence (how sure we are). Derived from the same validator/reconciliation
+# checks that already decide a fact's status, never a separately-modeled judgement.
+EvidenceRelation = Literal["supports", "contradicts", "mentions"]
+
 
 class FactCheck(BaseModel):
     check: str
     ok: bool
     detail: str = ""
+
+
+def evidence_relation(status: FactStatus, checks: list[FactCheck]) -> EvidenceRelation:
+    """Does this evidence support, contradict, or merely mention the claim it backs?
+
+    A failed check (a bound the validator or reconciliation broke) means the source
+    itself conflicts with the claim: contradicts. A verified fact with no failed check
+    actively backs the value: supports. Anything still awaiting review (unverified) only
+    mentions it, not yet corroborated enough to count as support.
+    """
+    if status == "rejected" or any(not c.ok for c in checks):
+        return "contradicts"
+    if status == "verified":
+        return "supports"
+    return "mentions"
 
 
 class FactOut(BaseModel):
@@ -126,6 +146,10 @@ class EvidenceLink(BaseModel):
     snippet: str
     unit_snippet: str | None
     confidence: Confidence
+    relation: EvidenceRelation = Field(
+        description="Whether this source supports, contradicts, or merely mentions the claim —"
+        " distinct from confidence, which is how sure we are the value itself is right."
+    )
     source_url: str
     evidence_url: str = Field(description="Signed URL of the archived copy, valid 10 minutes.")
     content_type: str

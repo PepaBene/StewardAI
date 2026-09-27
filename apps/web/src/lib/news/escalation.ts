@@ -71,6 +71,7 @@ export function noteCitationPreview(sources: EscalationSource[], url: string): C
     tierLabel: typeof source.tier === "number" ? `Tier ${source.tier}` : "Tier unknown",
     source: source.outlet ?? hostOf(url),
     url,
+    relation: null,
   };
 }
 

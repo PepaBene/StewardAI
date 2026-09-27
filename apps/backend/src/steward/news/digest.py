@@ -35,6 +35,7 @@ from steward.config.prompts import load_prompts
 from steward.config.store import load_active
 from steward.config.thesis import ThesesConfig
 from steward.config.verification import ClaimVerifierSettings, VerificationConfig
+from steward.earnings.read import EvidenceRelation, FactCheck, evidence_relation
 from steward.jobs.runner import JobContext, JobHandler
 from steward.news.link import short_name
 from steward.notify.channels import (
@@ -107,6 +108,10 @@ class DigestFactSource(BaseModel):
     snippet: str
     source_url: str
     status: str
+    relation: EvidenceRelation = Field(
+        description="Whether this figure supports, contradicts, or merely mentions the claim it"
+        " backs — distinct from its own confidence."
+    )
 
 
 class DigestStory(BaseModel):
@@ -815,13 +820,17 @@ async def build_digest(
 
 async def load_fact_sources(pool: asyncpg.Pool, fact_ids: set[int]) -> list[DigestFactSource]:
     rows = await pool.fetch(
-        "select id, ticker, metric, period, value_as_written, snippet, source_url, status"
+        "select id, ticker, metric, period, value_as_written, snippet, source_url, status, checks"
         " from public.fact where id = any($1::bigint[]) order by id",
         sorted(fact_ids),
     )
-    return [
-        DigestFactSource(fact_id=r["id"], **{k: r[k] for k in r.keys() if k != "id"}) for r in rows
-    ]
+    sources = []
+    for r in rows:
+        data = {k: r[k] for k in r.keys() if k not in ("id", "checks")}
+        checks = [FactCheck(**c) for c in json.loads(r["checks"] or "[]")]
+        relation = evidence_relation(r["status"], checks)
+        sources.append(DigestFactSource(fact_id=r["id"], relation=relation, **data))
+    return sources
 
 
 def cited_fact_ids(body: DigestBody) -> set[int]:

@@ -16,8 +16,12 @@
  * - categorical-1..8 are for identity (sectors, sources, account types) —
  *   "which one," never "what state" — and are never mixed with the semantic
  *   hues above inside one chart.
- * - diverging-under/over/neutral are for delta-to-target (drift) charts only:
- *   cool = underweight ("as expected"), warm = overweight ("look here").
+ * - diverging-under/over/neutral are for any cool/neutral/warm three-way split
+ *   around a centre with no inherent "good"/"bad" charge: delta-to-target
+ *   (drift) charts (cool = underweight, warm = overweight) and evidence
+ *   relation badges (cool = supports, neutral = mentions, warm = contradicts).
+ *   A confidence tier is never implied by this pair — that's what
+ *   verified/corroborated/unconfirmed/disputed is for.
  * - One accent colour (Verdigris) for primary actions, links and focus.
  *
  * Every gain/loss and confidence pair has been run through the data-viz
@@ -95,10 +99,14 @@
   --categorical-7: oklch(0.433 0.167 283.6);
   --categorical-8: oklch(0.623 0.191 24.9);
 
-  /* Diverging pair (drift / delta-to-target charts): cool = underweight,
-     warm = overweight, neutral grey at zero. */
+  /* Diverging pair (drift / delta-to-target charts, evidence relation badges): cool =
+     underweight or supports, warm = overweight or contradicts, neutral grey at zero or
+     mentions. -subtle badge backgrounds follow the same 0.25x-chroma formula as the
+     confidence pair above. */
   --diverging-under: oklch(0.575 0.163 255.5);
+  --diverging-under-subtle: oklch(0.955 0.041 255.5);
   --diverging-over: oklch(0.67 0.143 73.2);
+  --diverging-over-subtle: oklch(0.955 0.036 73.2);
   --diverging-neutral: oklch(0.946 0.007 124.5);
 
   /* Charts: price lines. The holding in the accent hue, its benchmark in neutral grey
@@ -160,7 +168,9 @@
   --categorical-8: oklch(0.669 0.159 22.3);
 
   --diverging-under: oklch(0.622 0.161 255.1);
+  --diverging-under-subtle: oklch(0.27 0.056 255.1);
   --diverging-over: oklch(0.635 0.128 74);
+  --diverging-over-subtle: oklch(0.28 0.045 74);
   --diverging-neutral: oklch(0.272 0.015 141.2);
 
   --chart-line: var(--accent);
@@ -222,7 +232,9 @@
   --color-categorical-8: var(--categorical-8);
 
   --color-diverging-under: var(--diverging-under);
+  --color-diverging-under-subtle: var(--diverging-under-subtle);
   --color-diverging-over: var(--diverging-over);
+  --color-diverging-over-subtle: var(--diverging-over-subtle);
   --color-diverging-neutral: var(--diverging-neutral);
 
   --color-chart-line: var(--chart-line);
