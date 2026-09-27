@@ -15,6 +15,7 @@ import Link from "next/link";
 import { Fragment, useCallback, useEffect, useMemo, useState } from "react";
 
 import { AlertMessage } from "@/components/alert-message";
+import { AskAboutSelection } from "@/components/chat/ask-about-selection";
 import { EmptyState } from "@/components/empty-state";
 import { ConfidenceBadge } from "@/components/evidence/confidence-badge";
 import { ConfidenceBar } from "@/components/evidence/confidence-bar";
@@ -398,7 +399,7 @@ function KpiTable({ kpis, facts, onFeedback }: { kpis: KpiStatus[]; facts: Map<n
       <h2 id="kpi-heading" className="text-lg font-semibold">
         Thesis KPIs
       </h2>
-      <div className="overflow-x-auto rounded-lg border border-border bg-surface-raised">
+      <AskAboutSelection className="overflow-x-auto rounded-lg border border-border bg-surface-raised">
         <table className="w-full min-w-[48rem] text-sm">
           <caption className="sr-only">Latest verdict per KPI; open a row for its evidence and history</caption>
           <thead className="bg-surface-muted">
@@ -433,7 +434,7 @@ function KpiTable({ kpis, facts, onFeedback }: { kpis: KpiStatus[]; facts: Map<n
             })}
           </tbody>
         </table>
-      </div>
+      </AskAboutSelection>
     </section>
   );
 }
@@ -679,7 +680,9 @@ function FactsSection({
           Run an earnings check to read this company&rsquo;s latest results release.
         </EmptyState>
       ) : (
-        <FactTable facts={shown} onResolved={onResolved} onFeedback={onFeedback} />
+        <AskAboutSelection>
+          <FactTable facts={shown} onResolved={onResolved} onFeedback={onFeedback} />
+        </AskAboutSelection>
       )}
       {rejected.length > 0 ? (
         <details className="rounded-lg border border-border bg-surface-raised p-3 text-sm">

@@ -9,9 +9,13 @@ import { Button } from "@/components/ui/button";
 import { getBrowserApiClient, type ConversationOut } from "@/lib/api/client";
 import { chatHref, OPEN_CHAT_EVENT } from "@/lib/chat/chat";
 
-/** Open the slide-over chat panel from anywhere (the command palette uses this). */
-export function openChatPanel() {
-  window.dispatchEvent(new Event(OPEN_CHAT_EVENT));
+/**
+ * Open the slide-over chat panel from anywhere (the command palette uses this). `seed`
+ * pre-fills the composer — e.g. a question about a figure the owner just selected — so
+ * asking about something in place never needs the global chat box as a second step.
+ */
+export function openChatPanel(seed?: string) {
+  window.dispatchEvent(new CustomEvent<{ seed?: string }>(OPEN_CHAT_EVENT, { detail: { seed } }));
 }
 
 /**
@@ -27,6 +31,7 @@ export function ChatPanel() {
   const [opened, setOpened] = useState(false);
   const [conversationId, setConversationId] = useState<number | null>(null);
   const [conversations, setConversations] = useState<ConversationOut[]>([]);
+  const [seed, setSeed] = useState<string | null>(null);
 
   const loadConversations = useCallback(() => {
     getBrowserApiClient()
@@ -35,11 +40,15 @@ export function ChatPanel() {
       .catch(() => undefined);
   }, []);
 
-  const open = useCallback(() => {
-    setOpened(true);
-    if (!dialog.current?.open) dialog.current?.showModal();
-    loadConversations();
-  }, [loadConversations]);
+  const open = useCallback(
+    (event?: Event) => {
+      setOpened(true);
+      setSeed((event as CustomEvent<{ seed?: string }> | undefined)?.detail?.seed ?? null);
+      if (!dialog.current?.open) dialog.current?.showModal();
+      loadConversations();
+    },
+    [loadConversations],
+  );
 
   useEffect(() => {
     window.addEventListener(OPEN_CHAT_EVENT, open);
@@ -58,7 +67,7 @@ export function ChatPanel() {
 
   return (
     <>
-      <Button variant="ghost" size="sm" onClick={open} aria-haspopup="dialog">
+      <Button variant="ghost" size="sm" onClick={() => open()} aria-haspopup="dialog">
         <MessageSquareIcon aria-hidden="true" />
         <span className="hidden sm:inline">Chat</span>
       </Button>
@@ -114,6 +123,8 @@ export function ChatPanel() {
             <ChatThread
               className="min-h-0 flex-1"
               conversationId={conversationId}
+              seed={seed}
+              onSeedConsumed={() => setSeed(null)}
               onCreated={(id) => {
                 setConversationId(id);
                 loadConversations();

@@ -14,7 +14,7 @@ import datetime as dt
 import json
 from collections.abc import Sequence
 from dataclasses import dataclass, field
-from typing import Any, Protocol, cast
+from typing import Any, Literal, Protocol, cast
 
 import anthropic
 from anthropic.types import MessageParam, ToolUseBlock
@@ -73,6 +73,13 @@ class ChatAnswer(BaseModel):
     actions: list[int] = Field(description="Proposed actions waiting for confirmation.")
     model: str | None
     note: str | None = None
+    shape: Literal["cited", "low_evidence"] = Field(
+        default="cited",
+        description="'low_evidence': nothing in the draft ended up as a checked, sourced"
+        " claim — the panel should show the raw sources found instead of prose that reads"
+        " confident despite having no backing, rather than a fluent answer marked unsupported"
+        " sentence by sentence after the fact.",
+    )
 
 
 @dataclass
@@ -225,6 +232,18 @@ def finish_answer(
     return out
 
 
+def answer_shape(sentences: list[ChatSentence]) -> Literal["cited", "low_evidence"]:
+    """"low_evidence" when nothing in the draft holds up as a checked, sourced claim: every
+    sentence is either without a source or flagged unsupported once its figures were
+    checked. The chat panel then shows the raw sources found instead of the prose, rather
+    than a fluent-sounding answer marked unsupported sentence by sentence after the fact."""
+    if not sentences:
+        return "low_evidence"
+    if all(s.no_source or s.unsupported for s in sentences):
+        return "low_evidence"
+    return "cited"
+
+
 async def mark_unsupported_figures(sentences: list[ChatSentence], registry: Registry) -> None:
     claims = [
         Claim(i, s.text, registry.evidence(s.source_ids))
@@ -321,6 +340,7 @@ async def run_chat(ctx: JobContext, deps: ChatDeps) -> int:
             actions=tools.actions,
             model=result.usage.model if deps.assistant else None,
             note=result.note,
+            shape=answer_shape(sentences),
         )
         text = (
             " ".join(s.text for s in sentences)

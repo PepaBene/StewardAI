@@ -15,6 +15,7 @@ import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
 import { AlertMessage } from "@/components/alert-message";
+import { AskAboutSelection } from "@/components/chat/ask-about-selection";
 import { ConfidenceBadge } from "@/components/evidence/confidence-badge";
 import { FeedbackControl } from "@/components/feedback/feedback-control";
 import { CitationLink } from "@/components/news/citation";
@@ -204,6 +205,7 @@ function Digest({ report }: { report: ReportOut }) {
       </div>
 
       <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_20rem]">
+        <AskAboutSelection>
         <article className="space-y-6">
           <section
             aria-label="Summary"
@@ -294,6 +296,7 @@ function Digest({ report }: { report: ReportOut }) {
 
           {hasStatusSections(body) ? <StatusSections body={body} facts={facts} /> : null}
         </article>
+        </AskAboutSelection>
 
         <aside aria-label="Sources" className="space-y-4">
           <div className="space-y-2">

@@ -164,7 +164,11 @@ describe("chat: actions and messages", () => {
   });
 
   it("attaches proposed actions to their message and keeps unattached ones", () => {
-    const reply = message({ id: 3, role: "assistant", answer: { sentences: [], sources: [], tools_used: [], actions: [2], model: null } });
+    const reply = message({
+      id: 3,
+      role: "assistant",
+      answer: { sentences: [], sources: [], tools_used: [], actions: [2], model: null, shape: "cited" },
+    });
     const actions = [action({}), action({ id: 2, message_id: null }), action({ id: 4, message_id: 99 })];
     expect(actionsFor(reply, actions).map((a) => a.id)).toEqual([1, 2]);
     expect(orphanActions([reply], actions).map((a) => a.id)).toEqual([4]);

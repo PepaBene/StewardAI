@@ -2352,6 +2352,13 @@ export interface components {
             model: string | null;
             /** Note */
             note?: string | null;
+            /**
+             * Shape
+             * @description 'low_evidence': nothing in the draft ended up as a checked, sourced claim — the panel should show the raw sources found instead of prose that reads confident despite having no backing, rather than a fluent answer marked unsupported sentence by sentence after the fact.
+             * @default cited
+             * @enum {string}
+             */
+            shape: "cited" | "low_evidence";
         };
         /** ChatSentence */
         ChatSentence: {
