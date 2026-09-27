@@ -15,10 +15,11 @@ leaving on the table?*
 2. [Research](#2-research)
 3. [Design principles, extended](#3-design-principles-extended)
 4. [Proposals](#4-proposals)
-5. [Explicitly rejected](#5-explicitly-rejected)
-6. [Roadmap](#6-roadmap)
-7. [Success criteria](#7-success-criteria)
-8. [Sources](#8-sources)
+5. [Visualization expansion](#5-visualization-expansion)
+6. [Explicitly rejected](#6-explicitly-rejected)
+7. [Roadmap](#7-roadmap)
+8. [Success criteria](#8-success-criteria)
+9. [Sources](#9-sources)
 
 ---
 
@@ -271,7 +272,100 @@ must be marked non-removable in the layout model from day one, not retrofitted.
 
 ---
 
-## 5. Explicitly rejected
+## 5. Visualization expansion
+
+Direct feedback on the implemented Overview: it still doesn't have enough chart-shaped
+answers on the page a user looks at most. Two of the asks below already exist; the rest is
+a real gap. Same discipline as §4: named real products, and an explicit data-needed flag.
+
+### 5.1 What's already there vs. what's still missing
+
+- **Portfolio value over time (line chart):** already implemented — `PerformanceCard`,
+  flow-adjusted, with a benchmark overlay (§1, Phase 7). The gap isn't the chart, it's
+  prominence: it currently renders as one card among several stat tiles rather than the
+  page's hero element. **Promote it**: full-width, above the stat-tile row, on Overview.
+- **Allocation (bars):** implemented as a single-row stacked bar plus a bar list — no
+  pie/donut yet. Add one (§5.2).
+- **Diversification/concentration:** not represented at all today. Add (§5.3).
+- **Per-holding contribution to a period's return** ("why did my portfolio move"): not
+  represented. Add (§5.4).
+- **Portfolio as a size/color map** ("at a glance winners and losers"): not represented.
+  Add (§5.5).
+- **Correlation between holdings as a matrix:** not represented on Overview (a pairwise
+  correlation callout already exists per-holding, from Ledger I). Flagged, lower priority
+  (§5.6).
+
+### 5.2 Allocation donut/pie chart (Empower, Vanguard)
+
+**Data needed:** none — the same `data.allocation` the stacked bar already consumes.
+
+**UI:** a Recharts donut, center label = total portfolio value in `baseCcy`, one ring per
+the same dimension toggle `CategoryCards` already has (by holding, sector, currency, …).
+Reuses `categoricalClasses()` verbatim so a slice is the exact same hue in the donut, the
+stacked bar and the bar list — Copilot Money's "color literacy" principle (already Ledger's
+own design principle) means the same category can never get a second color just because
+it's drawn a different way. Clicking a slice isolates it (dims the rest), following
+Empower's click-to-drill allocation view. Sits *beside* the stacked bar, not instead of
+it — a stacked bar reads exact adjacent weights better in a line; a donut reads the overall
+shape faster at a glance. Both stay, each doing the job it's actually good at.
+
+### 5.3 Diversification / concentration score
+
+**Data needed:** none new — computed client-side from weights already on the page
+(Herfindahl-Hirschman Index, `HHI = Σ weight²`; effective number of holdings `= 1 / HHI`,
+the standard finance concentration metric).
+
+**UI:** a stat tile ("Effective holdings: 6.2 of 14 positions") plus a small diverging-scale
+visual reusing `DriftChart`'s own visual language — a horizontal scale from "concentrated"
+to "diversified" with a marker at the current value. This is stated as a *fact*, not an
+alarm (no red/green framing): a concentrated portfolio isn't wrong, it's a fact the owner
+should be able to see without computing it by hand. Sits next to the existing
+sector/category allocation cards, one level up from them (they show *what* the exposure is;
+this shows *how concentrated* it is as a single number). A strategy-config concentration
+threshold that turns this into an actual breach is real, new backend work — flagged, not
+committed in this phase.
+
+### 5.4 Contribution-to-return waterfall (Sharesight, Morningstar Direct)
+
+**Data needed:** new. `steward/portfolio/history.py`'s `flow_adjusted_index` already does
+the hard part (netting external flows out of a return series) for the *portfolio total*;
+this needs the same calculation run **per holding** over the selected period, then ranked.
+Real backend work: a new per-ticker daily-value series and an aggregation endpoint, not a
+frontend-only change.
+
+**UI:** a horizontal bar list, holdings ranked by their contribution to the period's total
+return (largest positive to largest negative), using the same diverging gain/loss pair as
+`DriftChart`. This is the one visualization in this section that answers a question none of
+Ledger's existing charts answer: *why* did the portfolio move, not just *that* it moved or
+*how it's split*.
+
+### 5.5 Portfolio treemap (Sharesight, Trading212)
+
+**Data needed:** none — `data.allocation`/holdings already carry value and P/L per position.
+
+**UI:** tile area = position value, tile color = period gain/loss (the existing `gain`/
+`loss` tokens, shading by magnitude of the move). Placed as an alternate view (a tab) next
+to the existing Holdings table, never replacing it — a treemap trades exact figures for
+at-a-glance shape, and losing "what exactly is this position worth" would be a regression.
+Worth calling out: **Trading212 itself — the same brokerage this app syncs from — replaced
+its own allocation chart with exactly this pattern**, which is about as strong a
+familiarity signal as this research turned up.
+
+### 5.6 Correlation heatmap between holdings — flagged, lower priority
+
+**Data needed:** partial, and genuinely heavier. A full pairwise correlation matrix across
+every holding is an O(n²) computation needing aligned price history per pair; Ledger
+already stores a per-holding correlation callout (against other holdings, one at a time,
+from Ledger I's Phase 7 risk card) but not the full matrix. The research found this pattern
+almost entirely in prosumer/niche tools (Informed Portfolio, Pineify, MarketXLS), not in any
+mainstream consumer app surveyed for this document — plausibly because most retail
+portfolios (10-20 holdings) don't reward an n×n grid enough to earn the pixels and the
+compute. Recommendation: keep the existing per-holding callout, don't build the full matrix
+unless a future user specifically asks for it.
+
+---
+
+## 6. Explicitly rejected
 
 - **3D glass charts, haptic/social micro-interactions on price moves** (Robinhood) —
   engagement-bait; rewards reacting to noise, the opposite of evidence discipline.
@@ -294,7 +388,7 @@ must be marked non-removable in the layout model from day one, not retrofitted.
 
 ---
 
-## 6. Roadmap
+## 7. Roadmap
 
 Continuing the codebase's phase numbering (Ledger's first proposal used 6–10):
 
@@ -305,14 +399,17 @@ Continuing the codebase's phase numbering (Ledger's first proposal used 6–10):
 | **13** | Provenance tags | A small mono-font provenance tag (verbatim/computed/AI-inferred) wherever a figure renders, derived from existing `FactOut.origin`/verdict rationale. | New `ProvenanceTag` component; wired into Facts tables, KPI cells, digest sentences. |
 | **14** | Chat: graceful degradation & in-place questions | A distinct low-evidence response shape in chat; selection-triggered "ask about this" reusing `openChatPanel()`. | `chat/tools.py` (or wherever answer shaping lives), `chat-panel.tsx`, holding/thesis views. |
 | **15** | Command palette depth | Resolve a typed metric/ticker directly to its KPI cell or fact, not just its holding page. | `lib/palette.ts`, `command-palette.tsx`. |
+| **16** | Visualization expansion, part one | Promote `PerformanceCard` to Overview's hero position; allocation donut (§5.2); diversification/concentration stat + scale (§5.3, client-side HHI, no backend change). | `overview-view.tsx`; new `AllocationDonut`, `ConcentrationScale` components. |
+| **17** | Visualization expansion, part two | Portfolio treemap as an alternate Holdings view (§5.5, no backend change); per-holding contribution-to-return waterfall (§5.4, needs a new per-ticker flow-adjusted series and endpoint). | Backend: `steward/portfolio/history.py` (per-ticker series), a new route. Frontend: `holdings-view.tsx`, new `PortfolioTreemap`/`ContributionWaterfall` components. |
 
-Phase 16 (the Oversight workbench, §4.8) is intentionally not scheduled — it needs a
-separate scoping pass (layout persistence model, non-removable-card rule) before it becomes
-phase work.
+Phase 18 (the Oversight workbench, §4.8) and the full correlation-matrix heatmap (§5.6) are
+intentionally not scheduled — the workbench needs a separate scoping pass (layout
+persistence model, non-removable-card rule), and the correlation matrix is judged not worth
+its own compute and pixels yet (§5.6).
 
 ---
 
-## 7. Success criteria
+## 8. Success criteria
 
 **Measurable:** every new relationship/provenance/reasoning surface reuses an existing
 Ledger token and component pattern — no new ad hoc color, no new chip shape. Time-to-"why
@@ -326,9 +423,14 @@ own work" before anyone reads a single figure. A low-confidence chat answer shou
 this document should make a screen feel busier — the goal is more truth per pixel already
 on screen, not more pixels.
 
+For §5 specifically: after Phase 16-17, a first-time viewer of Overview should be able to
+answer, without clicking anything, "what's it worth, how is it split, how concentrated is
+it, and which holding is driving this period's move" — the four questions a portfolio app
+exists to answer, each now a chart, not a number a user has to interpret themselves.
+
 ---
 
-## 8. Sources
+## 9. Sources
 
 - [Design Compass — Robinhood 2026 redesign](https://designcompass.org/en/archive/robinhood-2026/)
 - [Google Design — Robinhood investing, Material](https://design.google/library/robinhood-investing-material)
@@ -364,6 +466,23 @@ on screen, not more pixels.
 - [Codecov — Line-by-line coverage via GitHub Checks](https://about.codecov.io/blog/announcing-line-by-line-coverage-via-github-checks/)
 - [Chalmers research — Community Notes helpfulness scoring](https://research.chalmers.se/publication/548591/file/548591_Fulltext.pdf)
 - [Harvard Misinformation Review — Fact-checking at a crossroads](https://misinforeview.hks.harvard.edu/article/fact-checking-at-a-crossroads-fact-checkers-perspectives-on-community-notes-ai-integration-and-design-recommendations/)
+- [Empower — Portfolio Analysis (allocation donut)](https://www.empower.com/tools/portfolio-analysis)
+- [RobBerger — Empower review](https://robberger.com/empower-review/)
+- [Vanguard — Portfolio Analysis, current asset mix](https://www.vanguard.com/en/investor/portfolio/portfolio-analysis/asset-mix)
+- [Sharesight community — Treemap in the Performance Report](https://community.sharesight.com/t/treemap-in-performance-report/1536)
+- [Sharesight — Performance Report help](https://help.sharesight.com/performance_report/)
+- [Trading212 community — Asset allocation update, now a treemap](https://community.trading212.com/t/asset-allocation-update-now-a-treemap/76707)
+- [WalletHacks — Personal Capital (Empower) review](https://wallethacks.com/personal-capital-review/)
+- [Morningstar — Instant X-Ray FAQ](https://portfolio.morningstar.com/RtPort/free/XRayFAQ.html)
+- [Morningstar — X-Ray help center](https://www.morningstar.com/help-center/portfolio/xray)
+- [fffinstill — Herfindahl-Hirschman Index & effective positions](https://fffinstill.com/learning/concepts/herfindahl-hirschman-index-hhi-effective-positions)
+- [Breaking Down Finance — Effective number of stocks](https://breakingdownfinance.com/finance-topics/finance-basics/effective-number-of-stocks/)
+- [Sharesight blog — Contribution Analysis report](https://www.sharesight.com/blog/explore-your-portfolio-performance-with-the-contribution-analysis-report/)
+- [Morningstar Direct — Equity Attribution methodology](https://morningstardirect.morningstar.com/clientcomm/EquityAttribution2012.pdf)
+- [Morningstar Direct — Using Equity Attribution to understand performance](https://morningstardirect.morningstar.com/clientcomm/UsingEquityAttributionToUnderstandPerformance_Desktop_EMEA.pdf)
+- [Informed Portfolio — Asset correlations tool](https://informedportfolio.com/tools/correlations)
+- [Pineify — Portfolio returns correlation matrix](https://pineify.app/portfolio-returns-correlation-matrix)
+- [Morningstar community — How asset class and world region differ in X-Ray](https://community.morningstar.com/s/article/How-Asset-Class-and-World-Region-Differ-in-X-Ray-Morningstar-Investor-US)
 
 Plus a direct read of the StewardAI repository as it stands after Ledger I's Phases 6–10 —
 `tokens.css`, `steward/portfolio/history.py`, `confidence-badge.tsx`, `chat-thread.tsx`,
