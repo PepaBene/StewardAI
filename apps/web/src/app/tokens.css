@@ -99,8 +99,6 @@
   --diverging-over: oklch(0.67 0.143 73.2);
   --diverging-neutral: oklch(0.946 0.007 124.5);
 
-  /* Charts: allocation bars (a lighter step of the accent hue; never gain/loss) */
-  --chart-bar: var(--accent-ramp-3);
   /* Charts: price lines. The holding in the accent hue, its benchmark in neutral grey
      (also dashed, so the two never differ by colour alone). */
   --chart-line: var(--accent);
@@ -163,7 +161,6 @@
   --diverging-over: oklch(0.635 0.128 74);
   --diverging-neutral: oklch(0.272 0.015 141.2);
 
-  --chart-bar: var(--accent-ramp-3);
   --chart-line: var(--accent);
   --chart-benchmark: oklch(0.68 0.012 166.4);
 }
@@ -226,7 +223,6 @@
   --color-diverging-over: var(--diverging-over);
   --color-diverging-neutral: var(--diverging-neutral);
 
-  --color-chart-bar: var(--chart-bar);
   --color-chart-line: var(--chart-line);
   --color-chart-benchmark: var(--chart-benchmark);
 }

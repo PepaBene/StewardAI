@@ -264,6 +264,7 @@ function PositionCards({ detail }: { detail: HoldingDetail }) {
         label="Unrealised P/L"
         value={position ? formatMoney(position.ppl, position.account_currency, { signed: true }) : "—"}
         valueClassName={tone === "gain" ? "text-gain" : tone === "loss" ? "text-loss" : ""}
+        trend={position ? tone : undefined}
         sub={position ? formatPercent(position.ppl_pct, { signed: true }) : null}
       />
       <StatCard

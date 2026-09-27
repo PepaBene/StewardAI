@@ -6,6 +6,7 @@ import Link from "next/link";
 import { AlertMessage } from "@/components/alert-message";
 import { EmptyState } from "@/components/empty-state";
 import { AllocationBars, type AllocationItem } from "@/components/portfolio/allocation-bars";
+import { DriftBar } from "@/components/portfolio/drift-bar";
 import { DriftStatusBadge, isOutOfBand } from "@/components/portfolio/drift-status-badge";
 import { FreshnessLabel } from "@/components/portfolio/freshness-label";
 import { StatCard } from "@/components/portfolio/stat-card";
@@ -166,6 +167,7 @@ function Overview({ data }: { data: PortfolioOverview }) {
           label={`Unrealised P/L (${account.account_currency})`}
           value={formatMoney(account.unrealized_ppl, account.account_currency, { signed: true })}
           valueClassName={TONE_CLASS[pplTone]}
+          trend={pplTone}
           sub={<>{formatPercent(pplPct, { signed: true })} on cost · Trading212 figure</>}
         />
       </section>
@@ -252,7 +254,10 @@ function DriftCard({ data }: { data: PortfolioOverview }) {
                       </span>
                     </td>
                     <td className={cn("num whitespace-nowrap py-2 px-3 text-right", isOutOfBand(p.status) && "font-semibold")}>
-                      {formatPp(p.drift)}
+                      <span className="inline-flex items-center gap-2">
+                        <DriftBar drift={p.drift} />
+                        {formatPp(p.drift)}
+                      </span>
                     </td>
                     <td className="py-2 pl-3">
                       <DriftStatusBadge status={p.status} />
@@ -269,7 +274,12 @@ function DriftCard({ data }: { data: PortfolioOverview }) {
                         {formatPercent(cashRow.lower)}–{formatPercent(cashRow.upper)}
                       </span>
                     </td>
-                    <td className="num whitespace-nowrap py-2 px-3 text-right">{formatPp(cashRow.drift)}</td>
+                    <td className="num whitespace-nowrap py-2 px-3 text-right">
+                      <span className="inline-flex items-center gap-2">
+                        <DriftBar drift={cashRow.drift} />
+                        {formatPp(cashRow.drift)}
+                      </span>
+                    </td>
                     <td className="py-2 pl-3">
                       <DriftStatusBadge status={cashRow.status} />
                     </td>
@@ -326,7 +336,8 @@ function CategoryCards({ data }: { data: PortfolioOverview }) {
                   .filter((b) => b.status !== "no_target")
                   .map((b) => (
                     <li key={b.bucket} className="flex items-center justify-between gap-2">
-                      <span>
+                      <span className="inline-flex items-center gap-2">
+                        <DriftBar drift={b.drift} scale={0.05} />
                         {b.bucket}: target {formatPercent(b.target_weight)}, drift{" "}
                         <span className="num">{formatPp(b.drift)}</span>
                       </span>
