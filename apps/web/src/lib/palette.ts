@@ -1,6 +1,8 @@
 import { CONFIG_DOMAINS, DOMAIN_SLUGS, historyHref } from "@/lib/config/domains";
+import { humanizeMetric } from "@/lib/evidence/confidence";
 import { reviewQueueHref } from "@/lib/evidence/review";
 import { CLUSTERS, isClusterActive } from "@/lib/nav";
+import { kpiHref } from "@/lib/portfolio/kpi-anchor";
 
 /*
  * Command palette entries: every primary destination, the config editors, each holding,
@@ -192,8 +194,30 @@ export function holdingCommands(holdings: { ticker: string; name?: string | null
   });
 }
 
+/**
+ * One entry per (holding, KPI): typing a metric and a ticker ("revenue growth AAPL") jumps
+ * straight to that KPI's verdict row on the holding page, not just the holding itself — the
+ * open opportunity Linear's Cmd+K research flagged (§2.2 of the Ledger II proposal): depth,
+ * not existence. `rows` is theses/board's own data, already the one place that lists every
+ * holding's KPIs; this adds no new fetch of its own.
+ */
+export function kpiCommands(
+  rows: readonly { ticker: string; name: string | null; kpis: readonly { kpi: { id: string; metric: string } }[] }[],
+): PaletteCommand[] {
+  return rows.flatMap((row) => {
+    const name = row.name ?? row.ticker;
+    return row.kpis.map(({ kpi }) => ({
+      id: `kpi:${row.ticker}:${kpi.id}`,
+      label: `${humanizeMetric(kpi.metric)} · ${name}`,
+      group: "Holdings" as const,
+      keywords: `${row.ticker} ${kpi.metric.replaceAll("_", " ")} kpi verdict pass breach unknown`,
+      href: kpiHref(row.ticker, kpi.id),
+    }));
+  });
+}
+
 /** Per-holding entries, shown only once something is typed. */
-const PER_HOLDING = ["earnings:", "review:", "reference:", "research:"];
+const PER_HOLDING = ["earnings:", "review:", "reference:", "research:", "kpi:"];
 
 export function filterCommands(commands: PaletteCommand[], query: string, limit = 12): PaletteCommand[] {
   const words = query.toLowerCase().split(/\s+/).filter(Boolean);

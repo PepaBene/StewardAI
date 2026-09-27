@@ -3,9 +3,24 @@ import { describe, expect, it } from "vitest";
 import { DOMAIN_SLUGS, historyHref } from "@/lib/config/domains";
 import { CLUSTER_PAGES } from "@/lib/nav";
 
-import { baseCommands, CONFIG_PAGES, filterCommands, holdingCommands, jobCommands, OTHER_PAGES } from "./palette";
+import { baseCommands, CONFIG_PAGES, filterCommands, holdingCommands, jobCommands, kpiCommands, OTHER_PAGES } from "./palette";
 
-const commands = [...baseCommands(), ...holdingCommands([{ ticker: "AAPL_US_EQ", name: "Apple" }])];
+const BOARD_ROWS = [
+  {
+    ticker: "AAPL_US_EQ",
+    name: "Apple",
+    kpis: [
+      { kpi: { id: "revenue-growth", metric: "revenue_growth_yoy" } },
+      { kpi: { id: "max-position", metric: "position_weight" } },
+    ],
+  },
+];
+
+const commands = [
+  ...baseCommands(),
+  ...holdingCommands([{ ticker: "AAPL_US_EQ", name: "Apple" }]),
+  ...kpiCommands(BOARD_ROWS),
+];
 
 describe("command palette", () => {
   it("reaches every primary destination and config editor", () => {
@@ -145,5 +160,21 @@ describe("command palette: five-cluster IA", () => {
 
   it("never lists Chat's full page as belonging to a cluster", () => {
     expect(commands.some((c) => c.href === "/chat" && c.group !== "Copilot")).toBe(false);
+  });
+});
+
+describe("command palette: KPI depth", () => {
+  it("resolves a typed metric and ticker straight to that KPI's row, not just the holding", () => {
+    const [first] = filterCommands(commands, "revenue growth aapl");
+    expect(first.href).toBe("/holdings/AAPL_US_EQ#kpi-row-revenue-growth");
+    expect(first.label).toBe("Revenue growth YoY · Apple");
+  });
+
+  it("keeps per-KPI entries out of the empty-query list, like other per-holding entries", () => {
+    expect(filterCommands(commands, "", 100).some((c) => c.id.startsWith("kpi:"))).toBe(false);
+  });
+
+  it("still finds the holding itself, distinct from its KPIs", () => {
+    expect(filterCommands(commands, "aapl").map((c) => c.id)).toContain("holding:AAPL_US_EQ");
   });
 });

@@ -60,6 +60,7 @@ import { allowedReviewActions, isHeld, REVIEW_ACTIONS, reviewQueueHref, scaleHin
 import { formatDate, formatMoney, formatPercent, formatPrice, formatQuantity, formatRelative, gainLossTone } from "@/lib/format";
 import { useApiResource } from "@/lib/hooks/use-api-resource";
 import { jobHref } from "@/lib/jobs/job-detail";
+import { kpiAnchorId } from "@/lib/portfolio/kpi-anchor";
 
 const POLL_MS = 3000;
 const POLL_LIMIT_MS = 10 * 60 * 1000;
@@ -394,6 +395,18 @@ type OnFeedback = (mark: FeedbackOut) => void;
 
 function KpiTable({ kpis, facts, onFeedback }: { kpis: KpiStatus[]; facts: Map<number, FactOut>; onFeedback: OnFeedback }) {
   const [open, setOpen] = useState<string | null>(null);
+  // A command-palette KPI result ("revenue growth AAPL") links to #kpi-<id>: open that row
+  // and scroll to it once, on arrival — not just the holding page, the KPI itself. Done
+  // after mount (never in the initial render) so server and client markup still agree.
+  useEffect(() => {
+    const hash = window.location.hash.slice(1);
+    const match = kpis.find((k) => kpiAnchorId(k.kpi.id) === hash);
+    if (!match) return;
+    queueMicrotask(() => setOpen(match.kpi.id));
+    document.getElementById(hash)?.scrollIntoView({ block: "center" });
+    // Only once, for the link that brought us here.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   return (
     <section aria-labelledby="kpi-heading" className="space-y-3">
       <h2 id="kpi-heading" className="text-lg font-semibold">
@@ -467,7 +480,7 @@ function KpiRows({
   const panelId = `kpi-${kpiId}`;
   return (
     <>
-      <tr className="border-b border-border last:border-0">
+      <tr id={kpiAnchorId(kpiId)} className="border-b border-border last:border-0">
         <th scope="row" className="px-3 py-2 text-left font-normal">
           <button
             type="button"
