@@ -1,4 +1,5 @@
 import { formatMoney, formatPercent } from "@/lib/format";
+import { categoricalClasses } from "@/lib/portfolio/categorical";
 import { cn } from "@/lib/utils";
 
 export type AllocationItem = {
@@ -10,18 +11,6 @@ export type AllocationItem = {
   /** Cash and "Unclassified" are drawn in the neutral colour. */
   muted?: boolean;
 };
-
-/** Ledger's 8-hue categorical palette, fixed order, never cycled within one chart. */
-const CATEGORICAL_SLOTS = [
-  "bg-categorical-1",
-  "bg-categorical-2",
-  "bg-categorical-3",
-  "bg-categorical-4",
-  "bg-categorical-5",
-  "bg-categorical-6",
-  "bg-categorical-7",
-  "bg-categorical-8",
-] as const;
 
 /**
  * Horizontal bar list in the style of Tremor's BarList: one row per item, bar length is
@@ -39,12 +28,12 @@ export function AllocationBars({
   currency: string;
   label: string;
 }) {
-  let nextSlot = 0;
+  const classes = categoricalClasses(items);
   return (
     <ul aria-label={label} className="space-y-2.5">
-      {items.map((item) => {
+      {items.map((item, i) => {
         const width = Math.max(0, Math.min(1, item.weight ?? 0)) * 100;
-        const barClass = item.muted ? "bg-neutral-signal" : CATEGORICAL_SLOTS[nextSlot++ % CATEGORICAL_SLOTS.length];
+        const barClass = classes[i];
         return (
           <li key={item.key} className="space-y-1">
             <div className="flex items-baseline justify-between gap-3 text-sm">
