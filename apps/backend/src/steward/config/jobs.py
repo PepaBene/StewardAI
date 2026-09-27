@@ -7,7 +7,7 @@ from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 from apscheduler.triggers.cron import CronTrigger
 from pydantic import Field, field_validator, model_validator
 
-from steward.config.common import ConfigModel
+from steward.config.common import ConfigModel, require_unique
 
 
 class JobSchedule(ConfigModel):
@@ -326,6 +326,19 @@ class ReferenceSettings(ConfigModel):
 StooqSymbol = Annotated[str, Field(pattern=r"^\^?[a-z0-9._-]{1,24}$", examples=["^spx"])]
 
 
+class MarketStripItem(ConfigModel):
+    symbol: StooqSymbol
+    label: str = Field(min_length=1, max_length=40, examples=["S&P 500"])
+
+
+def _default_market_strip() -> list[MarketStripItem]:
+    return [
+        MarketStripItem(symbol="^spx", label="S&P 500"),
+        MarketStripItem(symbol="^stoxx", label="STOXX Europe 600"),
+        MarketStripItem(symbol="^px", label="PX"),
+    ]
+
+
 class PriceSettings(ConfigModel):
     """Daily price history (Stooq) and the risk figures computed from it."""
 
@@ -342,6 +355,17 @@ class PriceSettings(ConfigModel):
         description="Largest gap between Stooq's close and Trading212's price on a sync day "
         "before it is flagged.",
     )
+    market_strip: list[MarketStripItem] = Field(
+        default_factory=_default_market_strip,
+        max_length=12,
+        description="Index quotes on the market strip: Stooq symbols (collected with the "
+        "benchmarks) and the label shown. A symbol Stooq has no data for shows as empty.",
+    )
+
+    @model_validator(mode="after")
+    def _unique_strip(self) -> Self:
+        require_unique("market strip symbols", (i.symbol for i in self.market_strip))
+        return self
 
 
 CountryCode = Annotated[str, Field(pattern=r"^[A-Z]{2}$", examples=["CZ"])]
