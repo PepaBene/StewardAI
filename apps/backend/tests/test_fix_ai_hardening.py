@@ -5,9 +5,12 @@
 - every AI request now has a hard wall-clock deadline, so a connection stalled at a level
   httpx's own timeout does not catch (a VPN, a TLS-inspecting antivirus) still ends instead
   of running forever.
+- classification caps its own retries, so a genuinely slow (not hung) connection fails in
+  roughly REQUEST_TIMEOUT * 2, not REQUEST_TIMEOUT * (the client's own default retry count).
 """
 
 import asyncio
+import datetime as dt
 import json
 from typing import Any
 
@@ -16,6 +19,12 @@ import httpx2
 import pytest
 
 from steward.ai import BudgetedAnthropic, _seconds, create_client
+from steward.news.classify import (
+    REQUEST_MAX_RETRIES,
+    ClassificationError,
+    ClassifyItem,
+    ClaudeClassifier,
+)
 from steward.settings import Settings
 
 
@@ -88,6 +97,39 @@ async def test_a_workspace_scoping_error_is_a_normal_api_error() -> None:
         await client.messages.create(
             model="claude-haiku-4-5", max_tokens=10, messages=[{"role": "user", "content": "hi"}]
         )
+
+
+async def test_classify_retries_once_not_the_clients_default_three_times() -> None:
+    """A connection that is genuinely slow or erroring on every attempt (not hung) used to
+    cost REQUEST_TIMEOUT * 4 (the client's default max_retries=3) before classify gave up —
+    several minutes that looked exactly like a freeze from the CLI. It now costs at most
+    REQUEST_TIMEOUT * (REQUEST_MAX_RETRIES + 1)."""
+    attempts = 0
+
+    def handler(_request: httpx2.Request) -> httpx2.Response:
+        nonlocal attempts
+        attempts += 1
+        return httpx2.Response(529, json={"type": "error", "error": {"message": "overloaded"}})
+
+    client = BudgetedAnthropic(
+        api_key="test",
+        max_retries=3,  # the app-wide default classify must override, not inherit
+        http_client=httpx2.AsyncClient(transport=httpx2.MockTransport(handler)),
+    )
+    item = ClassifyItem(
+        index=0,
+        headline="Example",
+        summary=None,
+        outlet="example.com",
+        tier=2,
+        published_at=dt.datetime(2026, 1, 1, tzinfo=dt.UTC),
+        candidates=(),
+    )
+    with pytest.raises(ClassificationError):
+        await ClaudeClassifier(client, "claude-haiku-4-5").classify(
+            items=[item], holdings=[], today=dt.date(2026, 1, 1)
+        )
+    assert attempts == REQUEST_MAX_RETRIES + 1 == 2
 
 
 async def test_a_stalled_connection_is_cancelled_instead_of_hanging_forever(

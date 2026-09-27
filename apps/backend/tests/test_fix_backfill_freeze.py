@@ -38,6 +38,9 @@ class _FakeClient:
     def __init__(self) -> None:
         self.messages = _FakeMessages()
 
+    def with_options(self, **_kwargs: Any) -> "_FakeClient":
+        return self
+
 
 async def test_classification_requests_use_the_short_timeout() -> None:
     import datetime as dt
