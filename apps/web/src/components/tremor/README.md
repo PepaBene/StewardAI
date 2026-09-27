@@ -2,8 +2,16 @@
 
 This folder holds [Tremor Raw](https://tremor.so) components (charts, KPI cards,
 trackers, data bars). Tremor Raw is copy-paste: the component source lives in the
-repo, not behind an npm package. Phase 0 needs none; they are added here starting
-in Phase 1.
+repo, not behind an npm package.
+
+Copied in so far:
+
+- `spark-chart.tsx` (`SparkAreaChart`/`SparkLineChart`/`SparkBarChart`) — a stat
+  tile's 12-point sparkline (Ledger phase 7, visualization E).
+- `chart-colors.ts` — adapted per step 2 below: StewardAI token names
+  (`neutral`, `accent`, `gain`, `loss`, `categorical-1`..`8`) in place of
+  upstream's Tailwind palette keys.
+- `get-y-axis-domain.ts` — copied verbatim (no colour content).
 
 Already in place, so copied components work without extra setup:
 

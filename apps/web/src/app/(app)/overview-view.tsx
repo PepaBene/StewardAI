@@ -12,6 +12,7 @@ import { DriftChart, type DriftChartRow } from "@/components/portfolio/drift-cha
 import { DriftStatusBadge, isOutOfBand } from "@/components/portfolio/drift-status-badge";
 import { FreshnessLabel } from "@/components/portfolio/freshness-label";
 import { PerformanceCard } from "@/components/portfolio/performance-card";
+import { PerformanceStatCard } from "@/components/portfolio/performance-stat-card";
 import { StatCard } from "@/components/portfolio/stat-card";
 import { useSyncStatus } from "@/components/sync/sync-status-provider";
 import { Button } from "@/components/ui/button";
@@ -146,7 +147,7 @@ function Overview({ data }: { data: PortfolioOverview }) {
         </AlertMessage>
       ) : null}
 
-      <section aria-label="Totals" className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      <section aria-label="Totals" className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-5">
         <StatCard
           label={`Total value (${baseCcy})`}
           value={formatMoney(base.total, baseCcy)}
@@ -173,6 +174,7 @@ function Overview({ data }: { data: PortfolioOverview }) {
           trend={pplTone}
           sub={<>{formatPercent(pplPct, { signed: true })} on cost · Trading212 figure</>}
         />
+        <PerformanceStatCard />
       </section>
 
       <PerformanceCard />
