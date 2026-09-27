@@ -110,7 +110,7 @@ export function BudgetEditor() {
       {form ? (
         <>
           <section aria-labelledby="cap-heading" className={SECTION}>
-            <h2 id="cap-heading" className="text-lg font-semibold">
+            <h2 id="cap-heading" className="text-[22px] leading-tight font-semibold">
               Monthly cap
             </h2>
             <p className="max-w-prose text-sm text-text-muted">
@@ -168,7 +168,7 @@ export function BudgetEditor() {
           </section>
 
           <section aria-labelledby="run-caps-heading" className={SECTION}>
-            <h2 id="run-caps-heading" className="text-lg font-semibold">
+            <h2 id="run-caps-heading" className="text-[22px] leading-tight font-semibold">
               Caps per run
             </h2>
             <p className="max-w-prose text-sm text-text-muted">
@@ -211,7 +211,7 @@ export function BudgetEditor() {
           </section>
 
           <section aria-labelledby="prices-heading" className={SECTION}>
-            <h2 id="prices-heading" className="text-lg font-semibold">
+            <h2 id="prices-heading" className="text-[22px] leading-tight font-semibold">
               Prices
             </h2>
             <p className="max-w-prose text-sm text-text-muted">

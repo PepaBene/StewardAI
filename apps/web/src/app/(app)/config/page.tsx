@@ -83,7 +83,7 @@ export default function ConfigPage() {
     <div className="space-y-6">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-semibold tracking-tight">Config</h1>
+          <h1 className="page-title">Config</h1>
           <p className="mt-1 max-w-prose text-sm text-text-muted">
             Every preference is versioned config: each save is a new version, validated by the
             backend before it is stored, and used from the next run with no deploy. Any version

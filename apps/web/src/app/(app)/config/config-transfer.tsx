@@ -113,7 +113,7 @@ export function ConfigTransfer() {
   return (
     <section aria-labelledby="transfer-heading" className="space-y-4 rounded-lg border border-border bg-surface-raised p-4">
       <div>
-        <h2 id="transfer-heading" className="text-lg font-semibold">
+        <h2 id="transfer-heading" className="text-[22px] leading-tight font-semibold">
           Export and import
         </h2>
         <p className="max-w-prose text-sm text-text-muted">

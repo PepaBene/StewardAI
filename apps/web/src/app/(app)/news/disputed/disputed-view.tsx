@@ -87,7 +87,7 @@ export function DisputedView() {
             </Link>{" "}
             / Disputed
           </p>
-          <h1 className="text-2xl font-semibold tracking-tight">Disputed stories</h1>
+          <h1 className="page-title">Disputed stories</h1>
           <p className="mt-1 max-w-prose text-sm text-text-muted">
             Stories whose sources contradict each other: the claim and its sources beside the verified sources that
             dispute it, each with its tier. A disputed story never alerts, and the holding&rsquo;s thesis verdicts do not
@@ -134,7 +134,7 @@ export function DisputedView() {
 
       {includeResolved && resolved.length > 0 ? (
         <section aria-labelledby="resolved-heading" className="space-y-3">
-          <h2 id="resolved-heading" className="text-lg font-semibold">
+          <h2 id="resolved-heading" className="text-[22px] leading-tight font-semibold">
             Resolved <span className="num text-sm font-normal text-text-muted">({resolved.length})</span>
           </h2>
           <ol className="space-y-4">

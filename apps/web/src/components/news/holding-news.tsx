@@ -49,7 +49,7 @@ export function HoldingNews({ ticker }: { ticker: string }) {
   return (
     <section aria-labelledby="news-heading" className="space-y-3">
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <h2 id="news-heading" className="text-lg font-semibold">
+        <h2 id="news-heading" className="text-[22px] leading-tight font-semibold">
           News
         </h2>
         <span className="flex flex-wrap gap-3">

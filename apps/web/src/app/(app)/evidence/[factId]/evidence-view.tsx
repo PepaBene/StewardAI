@@ -61,7 +61,7 @@ function Evidence({ link }: { link: EvidenceLink }) {
           </Link>{" "}
           / evidence #{link.fact_id}
         </p>
-        <h1 className="flex flex-wrap items-center gap-2 text-2xl font-semibold tracking-tight">
+        <h1 className="flex flex-wrap items-center gap-2 page-title">
           {humanizeMetric(link.metric)} {link.period}
           <span className="num font-mono text-xl">{link.value_as_written}</span>
           <ConfidenceBadge confidence={link.confidence} />

@@ -102,7 +102,7 @@ export function JobLog() {
     <section id="job-log" aria-labelledby="job-log-heading" className="scroll-mt-24 space-y-3">
       <div className="flex flex-wrap items-end justify-between gap-2">
         <div>
-          <h2 id="job-log-heading" className="text-lg font-semibold">
+          <h2 id="job-log-heading" className="text-[22px] leading-tight font-semibold">
             Job log
           </h2>
           <p className="text-sm text-text-muted">

@@ -23,7 +23,7 @@ export function JobLookup() {
 
   return (
     <section aria-labelledby={`${id}-heading`} className="max-w-xl space-y-2">
-      <h2 id={`${id}-heading`} className="text-lg font-semibold">
+      <h2 id={`${id}-heading`} className="text-[22px] leading-tight font-semibold">
         Job runs
       </h2>
       <p className="text-sm text-text-muted">

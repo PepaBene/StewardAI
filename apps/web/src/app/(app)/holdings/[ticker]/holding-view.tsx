@@ -168,7 +168,7 @@ export function HoldingContent({
             </Link>{" "}
             / <span className="font-mono">{detail.ticker}</span>
           </p>
-          <h1 className="text-2xl font-semibold tracking-tight">{name}</h1>
+          <h1 className="page-title">{name}</h1>
         </div>
         {detail.freshness ? (
           <FreshnessLabel syncedAt={detail.freshness.synced_at} snapshotDate={detail.freshness.snapshot_date} />
@@ -181,7 +181,7 @@ export function HoldingContent({
 
       <section aria-labelledby="thesis-heading" className="space-y-3">
         <div className="flex flex-wrap items-center justify-between gap-2">
-          <h2 id="thesis-heading" className="text-lg font-semibold">
+          <h2 id="thesis-heading" className="text-[22px] leading-tight font-semibold">
             Thesis
           </h2>
           <span className="flex flex-wrap gap-1">
@@ -409,7 +409,7 @@ function KpiTable({ kpis, facts, onFeedback }: { kpis: KpiStatus[]; facts: Map<n
   }, []);
   return (
     <section aria-labelledby="kpi-heading" className="space-y-3">
-      <h2 id="kpi-heading" className="text-lg font-semibold">
+      <h2 id="kpi-heading" className="text-[22px] leading-tight font-semibold">
         Thesis KPIs
       </h2>
       <AskAboutSelection className="overflow-x-auto rounded-lg border border-border bg-surface-raised">
@@ -656,7 +656,7 @@ function FactsSection({
     <section aria-labelledby="facts-heading" className="space-y-3">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <span className="flex flex-wrap items-center gap-2">
-          <h2 id="facts-heading" className="text-lg font-semibold">
+          <h2 id="facts-heading" className="text-[22px] leading-tight font-semibold">
             Extracted figures
           </h2>
           {shown.length > 0 ? (

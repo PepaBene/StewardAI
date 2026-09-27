@@ -117,7 +117,7 @@ export function JobsEditor() {
       {form ? (
         <>
           <section aria-labelledby="schedules-heading" className="space-y-3">
-            <h2 id="schedules-heading" className="text-lg font-semibold">
+            <h2 id="schedules-heading" className="text-[22px] leading-tight font-semibold">
               Schedules
             </h2>
             <CheckboxField
@@ -261,7 +261,7 @@ function SettingsCard({
   return (
     <section aria-labelledby={headingId} className="space-y-3 rounded-lg border border-border bg-surface-raised p-4">
       <div>
-        <h2 id={headingId} className="text-lg font-semibold">
+        <h2 id={headingId} className="text-[22px] leading-tight font-semibold">
           {info.title}
         </h2>
         <p className="text-sm text-text-muted">{info.description}</p>

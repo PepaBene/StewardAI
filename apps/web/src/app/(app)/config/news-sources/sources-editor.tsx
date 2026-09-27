@@ -72,7 +72,7 @@ export function SourcesEditor() {
       {form ? (
         <>
           <section aria-labelledby="sources-heading" className="space-y-3">
-            <h2 id="sources-heading" className="text-lg font-semibold">
+            <h2 id="sources-heading" className="text-[22px] leading-tight font-semibold">
               Sources
             </h2>
             {form.sources.map((s, i) => {
@@ -116,7 +116,7 @@ export function SourcesEditor() {
           </section>
 
           <section aria-labelledby="trust-heading" className="space-y-3 rounded-lg border border-border bg-surface-raised p-4">
-            <h2 id="trust-heading" className="text-lg font-semibold">
+            <h2 id="trust-heading" className="text-[22px] leading-tight font-semibold">
               Outlet trust and freshness
             </h2>
             <div className="grid gap-3 lg:grid-cols-2">

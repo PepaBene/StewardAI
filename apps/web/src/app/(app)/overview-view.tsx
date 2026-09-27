@@ -69,7 +69,7 @@ function PageHeader({ data }: { data: PortfolioOverview }) {
   return (
     <div className="flex flex-wrap items-end justify-between gap-2">
       <div>
-        <h1 className="text-2xl font-semibold tracking-tight">Overview</h1>
+        <h1 className="page-title">Overview</h1>
         <p className="mt-1 text-sm text-text-muted">
           Portfolio value, allocation and drift from target weights.
         </p>

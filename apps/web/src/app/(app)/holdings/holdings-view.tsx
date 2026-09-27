@@ -41,7 +41,7 @@ export function HoldingsView() {
     <div className="space-y-6">
       <div className="flex flex-wrap items-end justify-between gap-2">
         <div>
-          <h1 className="text-2xl font-semibold tracking-tight">Holdings</h1>
+          <h1 className="page-title">Holdings</h1>
           <p className="mt-1 text-sm text-text-muted">
             Every open Trading212 position. Open one for its thesis, verdicts and evidence.
           </p>

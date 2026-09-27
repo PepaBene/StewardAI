@@ -85,7 +85,7 @@ export function EventRulesEditor() {
       {form ? (
         <>
           <section aria-labelledby="severity-heading" className="space-y-3 rounded-lg border border-border bg-surface-raised p-4">
-            <h2 id="severity-heading" className="text-lg font-semibold">
+            <h2 id="severity-heading" className="text-[22px] leading-tight font-semibold">
               Severity per event type
             </h2>
             <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
@@ -105,7 +105,7 @@ export function EventRulesEditor() {
           </section>
 
           <section aria-labelledby="overrides-heading" className="space-y-3">
-            <h2 id="overrides-heading" className="text-lg font-semibold">
+            <h2 id="overrides-heading" className="text-[22px] leading-tight font-semibold">
               Per-holding overrides
             </h2>
             {form.overrides.map((o, i) => (
@@ -125,7 +125,7 @@ export function EventRulesEditor() {
           </section>
 
           <section aria-labelledby="adjust-heading" className="space-y-3 rounded-lg border border-border bg-surface-raised p-4">
-            <h2 id="adjust-heading" className="text-lg font-semibold">
+            <h2 id="adjust-heading" className="text-[22px] leading-tight font-semibold">
               Adjustments
             </h2>
             <CheckboxGroup label="Raise one level when the item touches a thesis KPI or exit condition" path="escalate_when_thesis_linked" errors={editor.errors} values={form.escalate_when_thesis_linked} options={EVENT_OPTIONS} onChange={(v) => set({ escalate_when_thesis_linked: v as EventType[] })} />
@@ -148,7 +148,7 @@ export function EventRulesEditor() {
           </section>
 
           <section aria-labelledby="triggers-heading" className="space-y-3 rounded-lg border border-border bg-surface-raised p-4">
-            <h2 id="triggers-heading" className="text-lg font-semibold">
+            <h2 id="triggers-heading" className="text-[22px] leading-tight font-semibold">
               Price moves and macro surprises
             </h2>
             <div className="grid gap-3 lg:grid-cols-[1fr_2fr]">
@@ -217,7 +217,7 @@ function AnnouncementRules({
   return (
     <section aria-labelledby="announcements-heading" className="space-y-3">
       <div>
-        <h2 id="announcements-heading" className="text-lg font-semibold">
+        <h2 id="announcements-heading" className="text-[22px] leading-tight font-semibold">
           Regulatory announcement types
         </h2>
         <p className="max-w-prose text-sm text-text-muted">

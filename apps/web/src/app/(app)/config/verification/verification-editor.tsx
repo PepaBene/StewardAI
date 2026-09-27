@@ -92,7 +92,7 @@ export function VerificationEditor() {
       {form ? (
         <>
           <section aria-labelledby="figures-heading" className={SECTION}>
-            <h2 id="figures-heading" className="text-lg font-semibold">
+            <h2 id="figures-heading" className="text-[22px] leading-tight font-semibold">
               Extracted figures
             </h2>
             <p className="max-w-prose text-sm text-text-muted">
@@ -181,7 +181,7 @@ export function VerificationEditor() {
           </section>
 
           <section aria-labelledby="corroboration-heading" className={SECTION}>
-            <h2 id="corroboration-heading" className="text-lg font-semibold">
+            <h2 id="corroboration-heading" className="text-[22px] leading-tight font-semibold">
               Corroboration of news
             </h2>
             <div className="grid gap-3 sm:grid-cols-2">
@@ -204,7 +204,7 @@ export function VerificationEditor() {
           </section>
 
           <section aria-labelledby="trust-heading" className={SECTION}>
-            <h2 id="trust-heading" className="scroll-mt-24 text-lg font-semibold">
+            <h2 id="trust-heading" className="scroll-mt-24 text-[22px] leading-tight font-semibold">
               Source trust from your feedback
             </h2>
             <p className="max-w-prose text-sm text-text-muted">
@@ -246,7 +246,7 @@ export function VerificationEditor() {
           </section>
 
           <section aria-labelledby="claims-heading" className={SECTION}>
-            <h2 id="claims-heading" className="text-lg font-semibold">
+            <h2 id="claims-heading" className="text-[22px] leading-tight font-semibold">
               Claim verifier
             </h2>
             <p className="max-w-prose text-sm text-text-muted">

@@ -27,7 +27,7 @@ export function ActivityView() {
     <div className="space-y-8">
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-semibold tracking-tight">Activity</h1>
+          <h1 className="page-title">Activity</h1>
           <p className="mt-1 max-w-prose text-sm text-text-muted">
             Per-holding coverage gaps, missed runs and failed jobs, the job log with cost, how far each source is trusted
             after your feedback, and the items you added to the evaluation sets.

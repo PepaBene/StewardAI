@@ -147,7 +147,7 @@ function PromptCard({
     <section aria-labelledby={headingId} className="space-y-3 rounded-lg border border-border bg-surface-raised p-4">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="max-w-prose space-y-1">
-          <h2 id={headingId} className="flex flex-wrap items-center gap-2 text-lg font-semibold">
+          <h2 id={headingId} className="flex flex-wrap items-center gap-2 text-[22px] leading-tight font-semibold">
             {prompt.title}
             {overridden ? (
               <span className="inline-flex items-center gap-1 rounded-full border border-warning-signal/40 px-2 py-0.5 text-xs font-medium text-text">

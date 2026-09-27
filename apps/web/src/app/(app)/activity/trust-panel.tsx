@@ -18,7 +18,7 @@ export function TrustPanel() {
   return (
     <section id="source-trust" aria-labelledby="trust-heading" className="scroll-mt-24 space-y-3">
       <div>
-        <h2 id="trust-heading" className="text-lg font-semibold">
+        <h2 id="trust-heading" className="text-[22px] leading-tight font-semibold">
           Source trust
         </h2>
         <p className="max-w-prose text-sm text-text-muted">

@@ -46,7 +46,7 @@ export function ResearchListView() {
     <div className="space-y-6">
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-semibold tracking-tight">Research</h1>
+          <h1 className="page-title">Research</h1>
           <p className="mt-1 max-w-prose text-sm text-text-muted">
             Deep research on any ticker under a research profile. Figures come from stored records and are computed in
             code; the model writes only the narrative sections, and every sentence cites its sources.
@@ -76,7 +76,7 @@ export function ResearchListView() {
       </section>
 
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <h2 className="text-lg font-semibold">
+        <h2 className="text-[22px] leading-tight font-semibold">
           {ticker ? (
             <>
               Reports on <span className="font-mono">{ticker}</span>

@@ -25,7 +25,7 @@ export function ReferenceGapsPanel() {
     <section id="reference-gaps" aria-labelledby="reference-gaps-heading" className="max-w-3xl scroll-mt-24 space-y-3">
       <div className="flex flex-wrap items-start justify-between gap-2">
         <div>
-          <h2 id="reference-gaps-heading" className="text-lg font-semibold">
+          <h2 id="reference-gaps-heading" className="text-[22px] leading-tight font-semibold">
             Reference data gaps
           </h2>
           <p className="text-sm text-text-muted">

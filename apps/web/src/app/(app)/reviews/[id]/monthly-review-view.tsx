@@ -125,7 +125,7 @@ function Review({ report }: { report: ReviewReportOut }) {
             </Link>{" "}
             / {monthLabel(body.month)}
           </p>
-          <h1 className="text-2xl font-semibold tracking-tight">{body.headline || report.title}</h1>
+          <h1 className="page-title">{body.headline || report.title}</h1>
           <p className="num mt-1 text-sm text-text-muted">
             {body.as_of ? <>Judged on the snapshot of {formatDate(body.as_of)}</> : "No portfolio snapshot"}
             {body.total_base !== null && body.base_currency ? <> · portfolio {formatMoney(body.total_base, body.base_currency, { decimals: 0 })}</> : null}
@@ -157,7 +157,7 @@ function Review({ report }: { report: ReviewReportOut }) {
       <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_20rem]">
         <article className="space-y-6">
           <section aria-labelledby="compliance-heading" className={SECTION}>
-            <h2 id="compliance-heading" className="flex items-center gap-1.5 text-lg font-semibold">
+            <h2 id="compliance-heading" className="flex items-center gap-1.5 text-[22px] leading-tight font-semibold">
               <ShieldCheckIcon aria-hidden="true" className="size-4 text-text-muted" />
               Strategy compliance
             </h2>
@@ -208,7 +208,7 @@ function Review({ report }: { report: ReviewReportOut }) {
           </section>
 
           <section aria-labelledby="review-kpis-heading" className={SECTION}>
-            <h2 id="review-kpis-heading" className="text-lg font-semibold">
+            <h2 id="review-kpis-heading" className="text-[22px] leading-tight font-semibold">
               Thesis KPIs
             </h2>
             {body.kpis.length === 0 ? (
@@ -265,7 +265,7 @@ function Review({ report }: { report: ReviewReportOut }) {
           </section>
 
           <section aria-labelledby="review-flags-heading" className={SECTION}>
-            <h2 id="review-flags-heading" className="flex items-center gap-1.5 text-lg font-semibold">
+            <h2 id="review-flags-heading" className="flex items-center gap-1.5 text-[22px] leading-tight font-semibold">
               <FlagIcon aria-hidden="true" className="size-4 text-text-muted" />
               Flags
             </h2>
@@ -331,7 +331,7 @@ function ActionsSection({ report }: { report: ReviewReportOut }) {
   const { body } = report;
   return (
     <section aria-labelledby="review-actions-heading" className={SECTION}>
-      <h2 id="review-actions-heading" className="flex items-center gap-1.5 text-lg font-semibold">
+      <h2 id="review-actions-heading" className="flex items-center gap-1.5 text-[22px] leading-tight font-semibold">
         <LightbulbIcon aria-hidden="true" className="size-4 text-text-muted" />
         Proposed actions
       </h2>

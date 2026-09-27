@@ -145,7 +145,7 @@ export function VersionHistory({ domain }: { domain: ConfigDomainSlug }) {
             )}{" "}
             / History
           </p>
-          <h1 className="text-2xl font-semibold tracking-tight">{info.label}: version history</h1>
+          <h1 className="page-title">{info.label}: version history</h1>
           <p className="mt-1 max-w-prose text-sm text-text-muted">
             Every save is a new version; nothing is overwritten. Compare any two versions, or roll
             back: the old version&rsquo;s body is saved again as a new active version, and every job
@@ -196,7 +196,7 @@ export function VersionHistory({ domain }: { domain: ConfigDomainSlug }) {
           {current ? (
             <div className="space-y-4">
               <div className="flex flex-wrap items-center justify-between gap-2">
-                <h2 className="text-lg font-semibold">
+                <h2 className="text-[22px] leading-tight font-semibold">
                   Version <span className="num">#{current.id}</span>
                   {current.active ? <ActiveBadge className="ml-2 align-middle" /> : null}
                 </h2>

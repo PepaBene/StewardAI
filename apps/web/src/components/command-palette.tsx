@@ -6,7 +6,6 @@ import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
 
 import { openChatPanel } from "@/components/chat/chat-panel";
-import { Button } from "@/components/ui/button";
 import { getBrowserApiClient, type BoardRow, type FactIndexEntry, type Holding } from "@/lib/api/client";
 import { jobHref } from "@/lib/jobs/job-detail";
 import { confirmLeave } from "@/lib/unsaved-changes";
@@ -157,17 +156,23 @@ export function CommandPalette() {
 
   return (
     <>
-      <Button variant="ghost" size="sm" onClick={open} aria-keyshortcuts="Control+K Meta+K">
-        <SearchIcon aria-hidden="true" />
-        <span className="hidden sm:inline">Search</span>
-        <kbd className="hidden rounded-sm border border-border px-1 font-mono text-xs text-text-muted sm:inline-flex sm:items-center">
+      <button
+        type="button"
+        onClick={open}
+        aria-keyshortcuts="Control+K Meta+K"
+        className="flex h-[34px] items-center gap-2.5 border border-border px-2.5 text-[13px] text-text-muted transition-colors hover:bg-border-soft md:w-[340px]"
+      >
+        <SearchIcon aria-hidden="true" className="size-[15px] shrink-0" />
+        <span className="hidden flex-1 text-left md:inline">Search holdings, reports, jobs…</span>
+        <span className="sr-only md:hidden">Search</span>
+        <kbd className="hidden items-center border border-border px-1.5 font-mono text-[11px] md:inline-flex">
           <CommandIcon aria-hidden="true" className="size-3" />K
         </kbd>
-      </Button>
+      </button>
       <dialog
         ref={dialog}
         aria-label="Command palette"
-        className="m-auto mt-[15vh] w-[min(36rem,calc(100vw-2rem))] rounded-lg border border-border bg-surface-raised p-0 text-text shadow-lg backdrop:bg-text/30"
+        className="m-auto mt-[15vh] w-[min(36rem,calc(100vw-2rem))] border border-border bg-surface-raised p-0 text-text shadow-lg backdrop:bg-text/30"
         onClick={(e) => {
           if (e.target === dialog.current) dialog.current.close();
         }}

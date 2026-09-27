@@ -42,7 +42,7 @@ export function ChatView() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-semibold tracking-tight">Chat</h1>
+        <h1 className="page-title">Chat</h1>
         <p className="mt-1 max-w-prose text-sm text-text-muted">
           Ask about the portfolio, a holding, the news or any report. Answers read the app&rsquo;s own records (and
           tier-1/2 outlets when needed); every sentence links to the same evidence and holding pages as the rest of the app.

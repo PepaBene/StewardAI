@@ -26,7 +26,7 @@ export function HoldingResearch({ ticker }: { ticker: string }) {
   return (
     <section aria-labelledby="research-heading" className="space-y-3">
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <h2 id="research-heading" className="flex items-center gap-1.5 text-lg font-semibold">
+        <h2 id="research-heading" className="flex items-center gap-1.5 text-[22px] leading-tight font-semibold">
           <FlaskConicalIcon aria-hidden="true" className="size-4 text-text-muted" />
           Research
         </h2>

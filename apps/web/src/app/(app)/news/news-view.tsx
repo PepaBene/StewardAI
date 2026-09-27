@@ -166,7 +166,7 @@ export function NewsView() {
     <div className="space-y-6">
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-semibold tracking-tight">News</h1>
+          <h1 className="page-title">News</h1>
           <p className="mt-1 max-w-prose text-sm text-text-muted">
             Items matched to your holdings, grouped by story. Severity comes from the event rules;
             the confidence label from the corroboration rules. Only confirmed severity-3 stories alert.

@@ -56,7 +56,7 @@ export function PriceRiskSection({ ticker, currency }: { ticker: string; currenc
   return (
     <section aria-labelledby="prices-heading" className="space-y-3">
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <h2 id="prices-heading" className="text-lg font-semibold">
+        <h2 id="prices-heading" className="text-[22px] leading-tight font-semibold">
           Price and risk
         </h2>
         <RangeSelector value={range} onChange={setRange} />

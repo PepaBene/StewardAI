@@ -161,7 +161,7 @@ type SectionProps = {
 function BasicsSection({ form, errors, set }: SectionProps) {
   return (
     <section aria-labelledby="basics-heading" className={SECTION}>
-      <h2 id="basics-heading" className="text-lg font-semibold">
+      <h2 id="basics-heading" className="text-[22px] leading-tight font-semibold">
         Basics
       </h2>
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
@@ -236,7 +236,7 @@ function CategoriesSection({ form, errors, set, holdings }: SectionProps & { hol
 
   return (
     <section aria-labelledby="categories-heading" className={SECTION}>
-      <h2 id="categories-heading" className="text-lg font-semibold">
+      <h2 id="categories-heading" className="text-[22px] leading-tight font-semibold">
         Categories and classifications
       </h2>
       <p className="max-w-prose text-sm text-text-muted">
@@ -413,7 +413,7 @@ function TargetsSection({
 
   return (
     <section aria-labelledby="targets-heading" className={SECTION}>
-      <h2 id="targets-heading" className="text-lg font-semibold">
+      <h2 id="targets-heading" className="text-[22px] leading-tight font-semibold">
         Targets
       </h2>
       <p className="max-w-prose text-sm text-text-muted">
@@ -554,7 +554,7 @@ function RulesSection({ form, errors, set }: SectionProps) {
   return (
     <section aria-labelledby="rules-heading" className="space-y-3">
       <div>
-        <h2 id="rules-heading" className="text-lg font-semibold">
+        <h2 id="rules-heading" className="text-[22px] leading-tight font-semibold">
           Rules
         </h2>
         <p className="max-w-prose text-sm text-text-muted">

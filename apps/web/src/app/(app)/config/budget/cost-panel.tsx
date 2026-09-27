@@ -66,7 +66,7 @@ export function CostPanel() {
     >
       <div className="flex flex-wrap items-end justify-between gap-2">
         <div>
-          <h2 id="costs-heading" className="text-lg font-semibold">
+          <h2 id="costs-heading" className="text-[22px] leading-tight font-semibold">
             Spend by month
           </h2>
           <p className="max-w-prose text-sm text-text-muted">

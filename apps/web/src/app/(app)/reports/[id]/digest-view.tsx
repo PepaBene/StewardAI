@@ -186,7 +186,7 @@ function Digest({ report }: { report: ReportOut }) {
           </Link>{" "}
           / {body.kind} digest
         </p>
-        <h1 className="text-2xl font-semibold tracking-tight">{report.title}</h1>
+        <h1 className="page-title">{report.title}</h1>
         <AsOfLabel
           className="mt-1"
           at={body.window_end}
@@ -224,7 +224,7 @@ function Digest({ report }: { report: ReportOut }) {
 
           {(body.sections ?? []).map((section, sectionIndex) => (
             <section key={section.ticker ?? "macro"} aria-labelledby={`sec-${section.ticker ?? "macro"}`} className="space-y-3">
-              <h2 id={`sec-${section.ticker ?? "macro"}`} className="text-lg font-semibold">
+              <h2 id={`sec-${section.ticker ?? "macro"}`} className="text-[22px] leading-tight font-semibold">
                 {section.ticker ? (
                   <Link href={`/holdings/${encodeURIComponent(section.ticker)}`} className="hover:underline">
                     {section.name}
@@ -402,7 +402,7 @@ function StatusSections({ body, facts }: { body: DigestBody; facts: Map<number, 
     <div className="space-y-4">
       {flags.length > 0 ? (
         <section aria-labelledby="digest-portfolio" className={SECTION}>
-          <h2 id="digest-portfolio" className="flex items-center gap-1.5 text-lg font-semibold">
+          <h2 id="digest-portfolio" className="flex items-center gap-1.5 text-[22px] leading-tight font-semibold">
             <TriangleAlertIcon aria-hidden="true" className="size-4 text-warning-signal" />
             Portfolio flags
           </h2>
@@ -434,7 +434,7 @@ function StatusSections({ body, facts }: { body: DigestBody; facts: Map<number, 
 
       {changes.length > 0 ? (
         <section aria-labelledby="digest-thesis" className={SECTION}>
-          <h2 id="digest-thesis" className="flex items-center gap-1.5 text-lg font-semibold">
+          <h2 id="digest-thesis" className="flex items-center gap-1.5 text-[22px] leading-tight font-semibold">
             <ScaleIcon aria-hidden="true" className="size-4 text-text-muted" />
             Thesis status changes
           </h2>
@@ -460,7 +460,7 @@ function StatusSections({ body, facts }: { body: DigestBody; facts: Map<number, 
 
       {reviews.length > 0 ? (
         <section aria-labelledby="digest-reviews" className={SECTION}>
-          <h2 id="digest-reviews" className="flex items-center gap-1.5 text-lg font-semibold">
+          <h2 id="digest-reviews" className="flex items-center gap-1.5 text-[22px] leading-tight font-semibold">
             <ClipboardCheckIcon aria-hidden="true" className="size-4 text-text-muted" />
             Theses due for review
           </h2>
@@ -479,7 +479,7 @@ function StatusSections({ body, facts }: { body: DigestBody; facts: Map<number, 
 
       {macro.length > 0 ? (
         <section aria-labelledby="digest-macro" className={SECTION}>
-          <h2 id="digest-macro" className="flex items-center gap-1.5 text-lg font-semibold">
+          <h2 id="digest-macro" className="flex items-center gap-1.5 text-[22px] leading-tight font-semibold">
             <LandmarkIcon aria-hidden="true" className="size-4 text-text-muted" />
             Macro figures
           </h2>
@@ -523,7 +523,7 @@ function StatusSections({ body, facts }: { body: DigestBody; facts: Map<number, 
 
       {managers.length > 0 ? (
         <section aria-labelledby="digest-managers" className={SECTION}>
-          <h2 id="digest-managers" className="flex items-center gap-1.5 text-lg font-semibold">
+          <h2 id="digest-managers" className="flex items-center gap-1.5 text-[22px] leading-tight font-semibold">
             <UsersIcon aria-hidden="true" className="size-4 text-text-muted" />
             Tracked managers (13F)
           </h2>
@@ -569,7 +569,7 @@ function StatusSections({ body, facts }: { body: DigestBody; facts: Map<number, 
 
       {holidays.length > 0 ? (
         <section aria-labelledby="digest-holidays" className={SECTION}>
-          <h2 id="digest-holidays" className="flex items-center gap-1.5 text-lg font-semibold">
+          <h2 id="digest-holidays" className="flex items-center gap-1.5 text-[22px] leading-tight font-semibold">
             <CalendarOffIcon aria-hidden="true" className="size-4 text-text-muted" />
             Market holidays
           </h2>

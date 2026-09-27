@@ -15,7 +15,7 @@ export default function ConfigHistoryIndex() {
           </Link>{" "}
           / History
         </p>
-        <h1 className="text-2xl font-semibold tracking-tight">Version history</h1>
+        <h1 className="page-title">Version history</h1>
         <p className="mt-1 max-w-prose text-sm text-text-muted">
           Pick a config domain to see its saved versions, compare any two, and roll back.
         </p>

@@ -85,7 +85,7 @@ export function ReviewView() {
     <div className="space-y-6">
       <div className="flex flex-wrap items-end justify-between gap-2">
         <div>
-          <h1 className="text-2xl font-semibold tracking-tight">Review queue</h1>
+          <h1 className="page-title">Review queue</h1>
           <p className="mt-1 max-w-prose text-sm text-text-muted">
             Figures the validator held or reconciliation quarantined. None of them is used in a verdict until you
             accept or correct it. Every decision needs a reason and re-judges the holding&rsquo;s verdicts.
@@ -100,7 +100,7 @@ export function ReviewView() {
 
       {resolved.length > 0 ? (
         <section aria-labelledby="resolved-heading" className="space-y-3">
-          <h2 id="resolved-heading" className="text-lg font-semibold">
+          <h2 id="resolved-heading" className="text-[22px] leading-tight font-semibold">
             Resolved just now
           </h2>
           <ul className="space-y-3">
@@ -242,7 +242,7 @@ function QueueGroups({
         const headingId = `review-${ticker}`.replace(/[^A-Za-z0-9_-]/g, "-");
         return (
           <section key={ticker} aria-labelledby={headingId} className="space-y-3">
-            <h2 id={headingId} className="flex flex-wrap items-baseline gap-2 text-lg font-semibold">
+            <h2 id={headingId} className="flex flex-wrap items-baseline gap-2 text-[22px] leading-tight font-semibold">
               <Link href={`/holdings/${encodeURIComponent(ticker)}`} className="hover:text-accent hover:underline">
                 {group[0].name ?? ticker}
               </Link>

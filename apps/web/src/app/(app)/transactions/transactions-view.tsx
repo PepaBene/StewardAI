@@ -151,7 +151,7 @@ export function TransactionsView() {
     <div className="space-y-6">
       <div className="flex flex-wrap items-end justify-between gap-2">
         <div>
-          <h1 className="text-2xl font-semibold tracking-tight">Transactions and dividends</h1>
+          <h1 className="page-title">Transactions and dividends</h1>
           <p className="mt-1 max-w-prose text-sm text-text-muted">
             Orders, dividends and cash movements from Trading212, newest first. Totals cover every
             matching row, not just the ones loaded below. Dates are UTC days, both ends included.
@@ -187,7 +187,7 @@ export function TransactionsView() {
           <Dividends filters={filters} dividends={load.page.dividends} />
           <Totals totals={load.page.totals} count={load.page.total_count} />
           <section aria-labelledby="rows-heading" className="space-y-3">
-            <h2 id="rows-heading" className="text-lg font-semibold">
+            <h2 id="rows-heading" className="text-[22px] leading-tight font-semibold">
               Transactions
             </h2>
             {load.items.length === 0 ? (
@@ -333,7 +333,7 @@ function Dividends({ filters, dividends }: { filters: TransactionFilters; divide
   const excluded = filters.types.length > 0 && !filters.types.includes("dividend");
   return (
     <section aria-labelledby="dividends-heading" className="space-y-3">
-      <h2 id="dividends-heading" className="text-lg font-semibold">
+      <h2 id="dividends-heading" className="text-[22px] leading-tight font-semibold">
         Dividends, {periodLabel(filters)}
         {filters.ticker ? <span className="font-normal text-text-muted"> · {filters.ticker}</span> : null}
       </h2>
@@ -361,7 +361,7 @@ function Totals({ totals, count }: { totals: TotalByCurrency[]; count: number })
   if (totals.length === 0) return null;
   return (
     <section aria-labelledby="totals-heading" className="space-y-3">
-      <h2 id="totals-heading" className="text-lg font-semibold">
+      <h2 id="totals-heading" className="text-[22px] leading-tight font-semibold">
         Totals <span className="num text-sm font-normal text-text-muted">({count} transactions)</span>
       </h2>
       <div className="overflow-x-auto rounded-lg border border-border bg-surface-raised">

@@ -54,7 +54,7 @@ export function ThesisBoardView() {
     <div className="space-y-6">
       <div className="flex flex-wrap items-end justify-between gap-2">
         <div>
-          <h1 className="text-2xl font-semibold tracking-tight">Thesis board</h1>
+          <h1 className="page-title">Thesis board</h1>
           <p className="mt-1 max-w-prose text-sm text-text-muted">
             Every holding with a thesis, worst first. Open any KPI status for its verdict and the evidence behind it.
             Unknown means no verified figure yet; it is never left out.

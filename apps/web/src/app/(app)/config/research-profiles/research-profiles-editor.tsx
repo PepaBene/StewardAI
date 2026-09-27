@@ -205,7 +205,7 @@ function ProfileCard({
   return (
     <section aria-labelledby={headingId} className="space-y-4 rounded-lg border border-border bg-surface-raised p-4">
       <div className="flex flex-wrap items-start justify-between gap-2">
-        <h2 id={headingId} className="flex flex-wrap items-center gap-2 text-lg font-semibold">
+        <h2 id={headingId} className="flex flex-wrap items-center gap-2 text-[22px] leading-tight font-semibold">
           <FlaskConicalIcon aria-hidden="true" className="size-4 text-text-muted" />
           {p.name || "(no name)"} <span className="font-mono text-sm font-normal text-text-muted">{p.id}</span>
           {isDefault ? (

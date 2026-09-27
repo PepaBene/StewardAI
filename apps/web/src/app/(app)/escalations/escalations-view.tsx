@@ -62,7 +62,7 @@ export function EscalationsView() {
     <div className="space-y-6">
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-semibold tracking-tight">Reports</h1>
+          <h1 className="page-title">Reports</h1>
           <p className="mt-1 max-w-prose text-sm text-text-muted">
             Impact notes: for each confirmed severity-2+ story and each large price move, what happened and which thesis
             KPIs or exit conditions it touches, or that none applies. Every sentence cites its sources.

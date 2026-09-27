@@ -12,7 +12,7 @@ export default function StatusPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-semibold tracking-tight">API status</h1>
+        <h1 className="page-title">API status</h1>
         <p className="mt-1 text-sm text-text-muted">
           Calls <code className="font-mono">GET /health</code> on the StewardAI Python API
           through the generated, typed client, opens a job run by its number, and lists the reference data gaps

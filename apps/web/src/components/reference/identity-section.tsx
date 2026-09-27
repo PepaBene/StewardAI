@@ -88,7 +88,7 @@ export function IdentitySection({ ticker }: { ticker: string }) {
     <section aria-labelledby="identity-heading" className="space-y-3">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div>
-          <h2 id="identity-heading" className="text-lg font-semibold">
+          <h2 id="identity-heading" className="text-[22px] leading-tight font-semibold">
             Identity and structure
           </h2>
           {resolvedAt ? (

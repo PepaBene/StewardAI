@@ -93,7 +93,7 @@ function Report({ report }: { report: ResearchReportOut }) {
             </Link>{" "}
             / <span className="num">#{report.id}</span>
           </p>
-          <h1 className="text-2xl font-semibold tracking-tight">{body.headline || report.title}</h1>
+          <h1 className="page-title">{body.headline || report.title}</h1>
           <p className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-text-muted">
             <span className="font-medium text-text">{body.name}</span>
             {body.owned ? (
@@ -153,7 +153,7 @@ function Report({ report }: { report: ResearchReportOut }) {
         <article className="space-y-6">
           {body.sections.map((section, s) => (
             <section key={`${section.id}-${s}`} aria-labelledby={`research-${section.id}`} className="space-y-2">
-              <h2 id={`research-${section.id}`} className="flex flex-wrap items-center gap-2 text-lg font-semibold">
+              <h2 id={`research-${section.id}`} className="flex flex-wrap items-center gap-2 text-[22px] leading-tight font-semibold">
                 {section.title}
                 <WriterTag by={writtenBy(section.written_by)} />
               </h2>
@@ -174,7 +174,7 @@ function Report({ report }: { report: ResearchReportOut }) {
           ))}
           {body.valuation.length > 0 && !body.sections.some((s) => s.id === "valuation") ? (
             <section aria-labelledby="research-valuation-table" className="space-y-2">
-              <h2 id="research-valuation-table" className="text-lg font-semibold">
+              <h2 id="research-valuation-table" className="text-[22px] leading-tight font-semibold">
                 Valuation
               </h2>
               <ValuationTable report={report} index={index} />

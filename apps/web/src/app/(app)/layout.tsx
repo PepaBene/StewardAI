@@ -5,6 +5,7 @@ import { connection } from "next/server";
 
 import { AppNav } from "@/components/app-nav";
 import { ChatPanel } from "@/components/chat/chat-panel";
+import { MarketStrip } from "@/components/market-strip";
 import { ColorModeToggle } from "@/components/color-mode-toggle";
 import { CommandPalette } from "@/components/command-palette";
 import { SignOutButton } from "@/components/sign-out-button";
@@ -46,36 +47,51 @@ export default async function AppLayout({ children }: LayoutProps<"/">) {
       >
         Skip to content
       </a>
-      <header className="border-b border-border bg-surface-raised">
-        <div className="mx-auto flex h-14 max-w-7xl items-center gap-3 px-4">
-          <Link href="/" className="rounded-sm text-base font-semibold tracking-tight">
-            StewardAI
+      <header className="border-b border-border bg-surface">
+        <div className="mx-auto flex h-[60px] max-w-[1440px] items-center gap-3 px-4 md:px-8">
+          <Link href="/" className="flex shrink-0 items-center gap-2.5">
+            <span
+              aria-hidden="true"
+              className="grid size-[26px] place-items-center bg-accent font-heading text-lg leading-none font-bold text-accent-foreground"
+            >
+              S
+            </span>
+            <span className="font-heading text-[22px] font-semibold tracking-[-0.01em]">StewardAI</span>
           </Link>
-          <div className="ml-auto flex items-center gap-1">
+          <div className="ml-2 lg:ml-7">
             <CommandPalette />
-            <ChatPanel />
+          </div>
+          <div className="ml-auto flex items-center gap-2 whitespace-nowrap">
             <SyncIndicator />
+            <ChatPanel />
+            <span aria-hidden="true" className="mx-1.5 hidden h-[22px] w-px bg-border lg:block" />
             {state.user?.email ? (
-              <span className="hidden truncate text-sm text-text-muted lg:inline">
+              <span className="hidden truncate text-[13px] text-text-muted xl:inline">
                 {state.user.email}
               </span>
             ) : null}
-            <Button asChild variant="ghost" size="sm">
-              <Link href="/status">
-                <ActivityIcon aria-hidden="true" />
-                <span>API status</span>
-              </Link>
-            </Button>
-            <ColorModeToggle />
-            <ThemeToggle />
-            <SignOutButton />
+            <div className="flex items-center text-text-muted">
+              <Button asChild variant="ghost" size="icon" className="text-text-muted">
+                <Link href="/status" aria-label="API status" title="API status">
+                  <ActivityIcon aria-hidden="true" />
+                </Link>
+              </Button>
+              <ColorModeToggle />
+              <ThemeToggle />
+              <SignOutButton iconOnly />
+            </div>
           </div>
         </div>
-        <div className="mx-auto max-w-7xl px-4">
+        <div className="mx-auto flex max-w-[1440px] items-stretch gap-6 px-4 md:px-8">
           <AppNav />
+          <MarketStrip />
         </div>
       </header>
-      <main id="main" tabIndex={-1} className="mx-auto w-full max-w-7xl flex-1 px-4 py-8 outline-none">
+      <main
+        id="main"
+        tabIndex={-1}
+        className="mx-auto w-full max-w-[1440px] flex-1 px-4 pt-7 pb-11 outline-none md:px-8"
+      >
         <SyncErrorBanner />
         {children}
       </main>

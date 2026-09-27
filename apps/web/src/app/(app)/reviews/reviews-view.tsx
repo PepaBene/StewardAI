@@ -64,7 +64,7 @@ export function ReviewsView() {
     <div className="space-y-6">
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-semibold tracking-tight">Reports</h1>
+          <h1 className="page-title">Reports</h1>
           <p className="mt-1 max-w-prose text-sm text-text-muted">
             Monthly reviews: every strategy rule, hard limit and band with pass, breach or unknown; each holding&rsquo;s
             thesis KPIs; flags; and proposed actions, each citing the rules or KPIs it rests on. Written on the first weekday

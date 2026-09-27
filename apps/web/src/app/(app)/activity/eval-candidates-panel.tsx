@@ -19,7 +19,7 @@ export function EvalCandidatesPanel() {
   return (
     <section id="eval-candidates" aria-labelledby="eval-heading" className="scroll-mt-24 space-y-3">
       <div>
-        <h2 id="eval-heading" className="text-lg font-semibold">
+        <h2 id="eval-heading" className="text-[22px] leading-tight font-semibold">
           Evaluation candidates
         </h2>
         <p className="max-w-prose text-sm text-text-muted">

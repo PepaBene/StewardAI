@@ -45,7 +45,7 @@ export function OwnershipSection({ ticker }: { ticker: string }) {
   return (
     <section aria-labelledby="ownership-heading" className="space-y-3">
       <div>
-        <h2 id="ownership-heading" className="flex items-center gap-1.5 text-lg font-semibold">
+        <h2 id="ownership-heading" className="flex items-center gap-1.5 text-[22px] leading-tight font-semibold">
           <LandmarkIcon aria-hidden="true" className="size-4 text-text-muted" />
           Institutional ownership
         </h2>

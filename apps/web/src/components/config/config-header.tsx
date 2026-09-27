@@ -25,7 +25,7 @@ export function ConfigHeader({
           </Link>{" "}
           / {title}
         </p>
-        <h1 className="text-2xl font-semibold tracking-tight">{title}</h1>
+        <h1 className="page-title">{title}</h1>
         {children ? <div className="mt-1 max-w-prose space-y-1 text-sm text-text-muted">{children}</div> : null}
       </div>
       <Button asChild variant="outline" size="sm">

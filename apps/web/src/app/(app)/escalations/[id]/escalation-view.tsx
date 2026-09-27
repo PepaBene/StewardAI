@@ -83,7 +83,7 @@ function Escalation({ escalation: e }: { escalation: EscalationOut }) {
             </Link>{" "}
             / <span className="num">#{e.id}</span>
           </p>
-          <h1 className="text-2xl font-semibold tracking-tight">{body.headline || e.title}</h1>
+          <h1 className="page-title">{body.headline || e.title}</h1>
           <p className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-text-muted">
             {e.ticker ? (
               <Link href={`/holdings/${encodeURIComponent(e.ticker)}`} className="font-mono text-xs text-accent hover:underline">
@@ -141,7 +141,7 @@ function Escalation({ escalation: e }: { escalation: EscalationOut }) {
 
           {body.sentences.length > 0 ? (
             <section aria-labelledby="note-heading" className="space-y-2">
-              <h2 id="note-heading" className="text-lg font-semibold">
+              <h2 id="note-heading" className="text-[22px] leading-tight font-semibold">
                 What happened
               </h2>
               <ClaimsSummaryLine claims={body.claims} />
@@ -178,7 +178,7 @@ function Escalation({ escalation: e }: { escalation: EscalationOut }) {
           ) : null}
 
           <section aria-labelledby="thesis-link-heading" className="space-y-2 rounded-lg border border-border bg-surface-raised p-4 text-sm">
-            <h2 id="thesis-link-heading" className="text-lg font-semibold">
+            <h2 id="thesis-link-heading" className="text-[22px] leading-tight font-semibold">
               Thesis link
             </h2>
             {link.kind === "none" ? (

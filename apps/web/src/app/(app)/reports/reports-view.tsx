@@ -75,7 +75,7 @@ export function ReportsView() {
     <div className="space-y-6">
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-semibold tracking-tight">Reports</h1>
+          <h1 className="page-title">Reports</h1>
           <p className="mt-1 max-w-prose text-sm text-text-muted">
             The archive: daily and weekly digests, monthly reviews, impact notes on confirmed events and research
             reports, searchable in full text. Every sentence links to the items or figures it was written from; a

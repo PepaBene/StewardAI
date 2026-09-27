@@ -106,7 +106,7 @@ function CalendarContent({ data, reload }: { data: ExchangeCalendar; reload: () 
   return (
     <>
       <section aria-labelledby="exchanges-heading" className="space-y-2">
-        <h2 id="exchanges-heading" className="text-lg font-semibold">
+        <h2 id="exchanges-heading" className="text-[22px] leading-tight font-semibold">
           Holding exchanges
         </h2>
         {exchanges.length === 0 ? (
@@ -174,7 +174,7 @@ function Suggestions({ data, reload }: { data: ExchangeCalendar; reload: () => v
     <section aria-labelledby="suggested-heading" className="space-y-3">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div>
-          <h2 id="suggested-heading" className="text-lg font-semibold">
+          <h2 id="suggested-heading" className="text-[22px] leading-tight font-semibold">
             Suggested closures
           </h2>
           <p className="text-sm text-text-muted">
@@ -267,7 +267,7 @@ function Confirmed({ data }: { data: ExchangeCalendar }) {
     <section aria-labelledby="confirmed-heading" className="space-y-3">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div>
-          <h2 id="confirmed-heading" className="text-lg font-semibold">
+          <h2 id="confirmed-heading" className="text-[22px] leading-tight font-semibold">
             Confirmed closures
           </h2>
           <p className="text-sm text-text-muted">In the Jobs config (Holiday calendar); edit or remove them there.</p>

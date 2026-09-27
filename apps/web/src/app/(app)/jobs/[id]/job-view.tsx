@@ -86,7 +86,7 @@ function Job({ job, running, onReload }: { job: JobDetail; running: boolean; onR
     <>
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
-          <h1 className="flex flex-wrap items-center gap-2 text-2xl font-semibold tracking-tight">
+          <h1 className="flex flex-wrap items-center gap-2 page-title">
             {jobTypeLabel(job.job_type)} <span className="num font-normal text-text-muted">#{job.id}</span>
             <JobStatusBadge status={job.status} />
           </h1>
@@ -126,7 +126,7 @@ function Job({ job, running, onReload }: { job: JobDetail; running: boolean; onR
 
       {params ? (
         <section aria-labelledby="params-heading" className="space-y-2">
-          <h2 id="params-heading" className="text-lg font-semibold">
+          <h2 id="params-heading" className="text-[22px] leading-tight font-semibold">
             Parameters
           </h2>
           <pre className="max-w-3xl overflow-x-auto rounded-md border border-border bg-surface-muted p-3 font-mono text-xs">{params}</pre>
@@ -134,7 +134,7 @@ function Job({ job, running, onReload }: { job: JobDetail; running: boolean; onR
       ) : null}
 
       <section aria-labelledby="steps-heading" className="space-y-2">
-        <h2 id="steps-heading" className="text-lg font-semibold">
+        <h2 id="steps-heading" className="text-[22px] leading-tight font-semibold">
           Steps <span className="num text-sm font-normal text-text-muted">({job.steps.length})</span>
         </h2>
         {job.steps.length === 0 ? (

@@ -1,6 +1,6 @@
 "use client";
 
-import { MaximizeIcon, MessageSquareIcon, PlusIcon, XIcon } from "lucide-react";
+import { MaximizeIcon, MessageSquareIcon, PlusIcon, SparklesIcon, XIcon } from "lucide-react";
 import Link from "next/link";
 import { useCallback, useEffect, useId, useRef, useState, type MouseEvent } from "react";
 
@@ -55,6 +55,18 @@ export function ChatPanel() {
     return () => window.removeEventListener(OPEN_CHAT_EVENT, open);
   }, [open]);
 
+  // ⌘J / Ctrl+J opens the panel from anywhere, the way ⌘K opens the command palette.
+  useEffect(() => {
+    function onKey(event: KeyboardEvent) {
+      if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "j") {
+        event.preventDefault();
+        open();
+      }
+    }
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [open]);
+
   function onClickCapture(event: MouseEvent<HTMLDialogElement>) {
     if (event.target === dialog.current) {
       dialog.current.close();
@@ -67,9 +79,10 @@ export function ChatPanel() {
 
   return (
     <>
-      <Button variant="ghost" size="sm" onClick={() => open()} aria-haspopup="dialog">
-        <MessageSquareIcon aria-hidden="true" />
-        <span className="hidden sm:inline">Chat</span>
+      <Button size="sm" onClick={() => open()} aria-haspopup="dialog" aria-keyshortcuts="Control+J Meta+J">
+        <SparklesIcon aria-hidden="true" />
+        <span className="hidden sm:inline">Ask Steward</span>
+        <span className="sr-only sm:hidden">Ask Steward</span>
       </Button>
       <dialog
         ref={dialog}
@@ -79,7 +92,7 @@ export function ChatPanel() {
       >
         <div className="flex h-full flex-col gap-3 p-4">
           <div className="flex items-center justify-between gap-2">
-            <h2 id={headingId} className="flex items-center gap-1.5 text-lg font-semibold">
+            <h2 id={headingId} className="flex items-center gap-1.5 text-[22px] leading-tight font-semibold">
               <MessageSquareIcon aria-hidden="true" className="size-4 text-text-muted" />
               Chat
             </h2>

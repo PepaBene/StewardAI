@@ -107,7 +107,7 @@ export function NotificationsEditor() {
       {form ? (
         <>
           <section aria-labelledby="rules-heading" className="space-y-3">
-            <h2 id="rules-heading" className="text-lg font-semibold">
+            <h2 id="rules-heading" className="text-[22px] leading-tight font-semibold">
               Rules
             </h2>
             {form.rules.map((rule, index) => (
@@ -129,7 +129,7 @@ export function NotificationsEditor() {
           </section>
 
           <section aria-labelledby="quiet-heading" className="space-y-3 rounded-lg border border-border bg-surface-raised p-4">
-            <h2 id="quiet-heading" className="text-lg font-semibold">
+            <h2 id="quiet-heading" className="text-[22px] leading-tight font-semibold">
               Quiet hours and limits
             </h2>
             <CheckboxField label="Quiet hours" checked={form.quiet_enabled} onChange={(v) => set({ quiet_enabled: v })} />
@@ -308,7 +308,7 @@ function TestAlertPanel({ dirty }: { dirty: boolean }) {
 
   return (
     <section aria-labelledby="test-heading" className="space-y-3 rounded-lg border border-border bg-surface-raised p-4">
-      <h2 id="test-heading" className="text-lg font-semibold">
+      <h2 id="test-heading" className="text-[22px] leading-tight font-semibold">
         Send a test alert
       </h2>
       <p className="max-w-prose text-sm text-text-muted">
