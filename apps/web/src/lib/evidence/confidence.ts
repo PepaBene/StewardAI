@@ -1,24 +1,25 @@
 import type { Confidence, VerdictStatus } from "@/lib/api/client";
 
 /*
- * The four confidence labels of the Design and UI section. Grey / blue / amber / red from
- * the muted severity palette, never gain or loss, and each with a text label and an icon
- * so meaning never rests on colour alone.
+ * The four confidence labels of the Ledger design system (section 4.2 of the redesign
+ * proposal): a dedicated hue per state — blue / teal / amber / red, validated against the
+ * OKLab colourblindness simulator — never gain or loss, and always with a text label and
+ * an icon so meaning never rests on colour alone. Ordinal, in this fixed order.
  */
 export const CONFIDENCE = {
   verified: {
     label: "Verified",
-    tone: "neutral",
+    tone: "verified",
     description: "Primary source, and every validator check passed.",
   },
   corroborated: {
     label: "Corroborated",
-    tone: "info",
+    tone: "corroborated",
     description: "Confirmed by independent sources.",
   },
   unconfirmed: {
     label: "Unconfirmed",
-    tone: "warning",
+    tone: "unconfirmed",
     description: "Held for review or not yet backed by a verified figure.",
   },
   disputed: {

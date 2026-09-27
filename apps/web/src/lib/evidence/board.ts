@@ -1,4 +1,4 @@
-import type { BoardKpi, BoardRow, VerdictStatus } from "@/lib/api/client";
+import type { BoardKpi, BoardRow, Confidence, VerdictStatus } from "@/lib/api/client";
 
 import { formatObserved, formatTarget, humanizeMetric, VERDICT_STATUS } from "./confidence";
 
@@ -34,6 +34,15 @@ export function statusCounts(row: Pick<BoardRow, "counts">): Record<VerdictStatu
 /** "1 breach · 2 unknown · 3 pass"; each status is named, so the text reads without colour. */
 export function countsText(counts: Record<VerdictStatus, number>): string {
   return STATUS_ORDER.map((s) => `${counts[s]} ${VERDICT_STATUS[s].label.toLowerCase()}`).join(" · ");
+}
+
+/** Confidence of each judged KPI's verdict on this row; a KPI never judged has none to count. */
+export function confidenceCounts(row: Pick<BoardRow, "kpis">): Record<Confidence, number> {
+  const counts: Record<Confidence, number> = { verified: 0, corroborated: 0, unconfirmed: 0, disputed: 0 };
+  for (const cell of row.kpis) {
+    if (cell.verdict) counts[cell.verdict.confidence] += 1;
+  }
+  return counts;
 }
 
 /** Holdings per overall status across the board, for the summary line. */
