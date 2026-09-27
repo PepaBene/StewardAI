@@ -9,14 +9,19 @@ cheaper model at the monthly cap (see `steward.budget_guard`). Every call site g
 client here, so the caps hold without any call site knowing about them.
 """
 
+import asyncio
+import logging
 from dataclasses import dataclass
 from typing import Any
 
 import anthropic
+import httpx2
 
 from steward import budget_guard
 from steward.jobs.runner import StepUsage, current_job
 from steward.settings import Settings
+
+logger = logging.getLogger(__name__)
 
 
 class AINotConfigured(Exception):
@@ -25,6 +30,22 @@ class AINotConfigured(Exception):
 
 _MESSAGES = "/v1/messages"
 _BATCHES = "/v1/messages/batches"
+# The client's own per-request timeout (SDK default, or a call's own `timeout=`) already
+# bounds one attempt, and the SDK retries a failed one up to `max_retries` times on its own.
+# Some networks (a VPN, TLS-inspecting antivirus, a flaky proxy) hang a connection at a level
+# httpx's own timeout does not reliably catch, so this call is also given a hard wall-clock
+# deadline, generous enough to let the client's own timeout and retries run their course
+# normally, that forcibly cancels it if nothing has surfaced by then.
+_DEADLINE_MARGIN = 60.0
+
+
+def _seconds(timeout: Any, default: float) -> float:
+    if isinstance(timeout, int | float):
+        return float(timeout)
+    if isinstance(timeout, httpx2.Timeout):
+        values = [v for v in (timeout.connect, timeout.read, timeout.write, timeout.pool) if v]
+        return max(values) if values else default
+    return default
 
 
 # Server tool versions Claude Haiku 4.5 accepts in place of the dynamic-filtering ones.
@@ -61,11 +82,36 @@ class BudgetedAnthropic(anthropic.AsyncAnthropic):
     """The Anthropic client with the Budget config's caps applied to the requests of the job
     running in the current task (`current_job`). Outside a job it is the plain client."""
 
+    async def _guarded_post(self, path: str, *, body: Any, **kwargs: Any) -> Any:
+        """`super().post`, plus the hard deadline described at `_DEADLINE_MARGIN`.
+
+        A per-call `timeout=`/`max_retries=` override (as classification sends) is not a
+        top-level kwarg here: `messages.create`/`.parse` package it into `options=`
+        (`RequestOptions`), which is what actually reaches `.post`."""
+        options = kwargs.get("options") or {}
+        per_attempt = _seconds(options.get("timeout"), _seconds(self.timeout, 300.0))
+        retries = options.get("max_retries")
+        retries = retries if isinstance(retries, int) else self.max_retries
+        deadline = per_attempt * (retries + 1) + _DEADLINE_MARGIN
+        try:
+            async with asyncio.timeout(deadline):
+                return await super().post(path, body=body, **kwargs)
+        except TimeoutError:
+            logger.warning(
+                "%s did not answer within %.0fs (a hung connection, not the API); giving up",
+                path,
+                deadline,
+            )
+            raise anthropic.APIConnectionError(
+                message=f"no response from {path} within {deadline:.0f}s (network stalled)",
+                request=httpx2.Request("POST", path),
+            ) from None
+
     async def post(self, path: str, *, body: Any = None, **kwargs: Any) -> Any:
         ctx = current_job.get()
         route = path.split("?", 1)[0]
         if ctx is None or not isinstance(body, dict) or route not in (_MESSAGES, _BATCHES):
-            return await super().post(path, body=body, **kwargs)
+            return await self._guarded_post(path, body=body, **kwargs)
         if route == _BATCHES:
             requests = body.get("requests") or []
             first = requests[0].get("params", {}).get("model") if requests else None
@@ -79,14 +125,14 @@ class BudgetedAnthropic(anthropic.AsyncAnthropic):
                         ],
                     }
             # A batch's cost reaches the budget when its step records it.
-            return await super().post(path, body=body, **kwargs)
+            return await self._guarded_post(path, body=body, **kwargs)
         requested = body.get("model")
         if not isinstance(requested, str):
-            return await super().post(path, body=body, **kwargs)
+            return await self._guarded_post(path, body=body, **kwargs)
         model = await budget_guard.before_request(ctx, requested)
         if model != requested:
             body = _downgrade(body, model)
-        result = await super().post(path, body=body, **kwargs)
+        result = await self._guarded_post(path, body=body, **kwargs)
         # A streamed response has no usage block yet; its cost counts when its step ends.
         if getattr(result, "type", None) == "message":
             budget_guard.after_response(ctx, model, getattr(result, "usage", None))
@@ -96,8 +142,14 @@ class BudgetedAnthropic(anthropic.AsyncAnthropic):
 def create_client(settings: Settings) -> anthropic.AsyncAnthropic:
     if settings.anthropic_api_key is None:
         raise AINotConfigured("ANTHROPIC_API_KEY is not set")
+    headers = {}
+    if settings.anthropic_workspace_id:
+        headers["anthropic-workspace-id"] = settings.anthropic_workspace_id
     return BudgetedAnthropic(
-        api_key=settings.anthropic_api_key.get_secret_value(), max_retries=3, timeout=300.0
+        api_key=settings.anthropic_api_key.get_secret_value(),
+        max_retries=3,
+        timeout=300.0,
+        default_headers=headers,
     )
 
 

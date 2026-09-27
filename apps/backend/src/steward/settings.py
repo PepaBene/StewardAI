@@ -55,6 +55,10 @@ class Settings(BaseSettings):
 
     # Claude API (extraction, report-date extraction). Read by the Anthropic SDK client.
     anthropic_api_key: SecretStr | None = None
+    # Only needed for an organization-level key not scoped to one workspace: every request
+    # is sent with this workspace's id, otherwise the API refuses with "This API key is not
+    # scoped to a workspace" (visible in the Console next to the workspace's name).
+    anthropic_workspace_id: str | None = None
     # Supabase Storage writes to the `evidence` bucket (secret or legacy service_role key).
     supabase_secret_key: SecretStr | None = None
     # SEC EDGAR asks for a descriptive User-Agent with a contact address.
