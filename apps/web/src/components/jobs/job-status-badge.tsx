@@ -1,8 +1,14 @@
 import { CircleCheckIcon, CircleDashedIcon, CircleXIcon, LoaderCircleIcon } from "lucide-react";
 
+import { StatusDot } from "@/components/ui/status-dot";
 import type { JobStatus, JobStepOut } from "@/lib/api/client";
 import { JOB_STATUS } from "@/lib/jobs/job-detail";
 import { cn } from "@/lib/utils";
+
+/** A job or step's status as a list/timeline marker — the same tone as JobStatusBadge. */
+export function JobStatusDot({ status, className }: { status: JobStatus | JobStepOut["status"]; className?: string }) {
+  return <StatusDot tone={JOB_STATUS[status].tone} className={className} />;
+}
 
 const ICONS = {
   queued: CircleDashedIcon,

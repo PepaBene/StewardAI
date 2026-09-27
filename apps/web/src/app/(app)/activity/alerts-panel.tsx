@@ -9,6 +9,7 @@ import { AlertMessage } from "@/components/alert-message";
 import { EmptyState } from "@/components/empty-state";
 import { FeedbackControl } from "@/components/feedback/feedback-control";
 import { SeverityBadge } from "@/components/news/severity-badge";
+import { SeverityDot } from "@/components/news/severity-timeline";
 import { Button } from "@/components/ui/button";
 import { getBrowserApiClient, type AlertOut } from "@/lib/api/client";
 import { ALERT_KIND_LABELS, alertEventLabel, alertHeadline, alertOutcome } from "@/lib/activity/activity";
@@ -112,6 +113,7 @@ export function AlertsPanel() {
             <li key={a.id} className="flex flex-wrap items-start justify-between gap-3 p-3 text-sm">
               <div className="min-w-0 flex-1 space-y-1">
                 <p className="flex flex-wrap items-center gap-2">
+                  <SeverityDot severity={a.severity} />
                   <SeverityBadge severity={a.severity} />
                   <span className="font-medium">{alertEventLabel(a)}</span>
                   {a.kind !== "system" ? <span className="text-xs text-text-muted">{ALERT_KIND_LABELS[a.kind]}</span> : null}
