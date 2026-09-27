@@ -239,6 +239,13 @@ def check_label(raw: ItemLabel, item: ClassifyItem, holdings: dict[str, HoldingC
     )
 
 
+# A batch is small (no tools, no web search): a request that has not finished in this long
+# is very unlikely to still succeed, so it is worth failing fast and letting the SDK's own
+# retry (client max_retries=3) try again instead of waiting out the client's default 300s
+# timeout on every attempt, which turned one slow or flaky connection into a very long stall.
+REQUEST_TIMEOUT = 90.0
+
+
 class ClaudeClassifier:
     def __init__(
         self,
@@ -279,6 +286,7 @@ class ClaudeClassifier:
                 ],
                 messages=[cast(MessageParam, {"role": "user", "content": user})],
                 output_format=ClassificationOutput,
+                timeout=REQUEST_TIMEOUT,
                 **effort_kwargs(self._model, self._effort, 12000),
             )
         except anthropic.APIError as exc:
