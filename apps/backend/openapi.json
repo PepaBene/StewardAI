@@ -7956,6 +7956,15 @@
             "type": "string",
             "title": "Status"
           },
+          "origin": {
+            "type": "string",
+            "enum": [
+              "extraction",
+              "owner"
+            ],
+            "title": "Origin",
+            "description": "Provenance: read straight from the document, or an owner correction — a different question from confidence or relation."
+          },
           "relation": {
             "type": "string",
             "enum": [
@@ -7977,6 +7986,7 @@
           "snippet",
           "source_url",
           "status",
+          "origin",
           "relation"
         ],
         "title": "DigestFactSource",
@@ -9648,6 +9658,15 @@
             "title": "Relation",
             "description": "Whether this source supports, contradicts, or merely mentions the claim — distinct from confidence, which is how sure we are the value itself is right."
           },
+          "origin": {
+            "type": "string",
+            "enum": [
+              "extraction",
+              "owner"
+            ],
+            "title": "Origin",
+            "description": "Provenance, a different question from confidence: read straight from the document, or a correction the owner entered."
+          },
           "source_url": {
             "type": "string",
             "title": "Source Url"
@@ -9694,6 +9713,7 @@
           "unit_snippet",
           "confidence",
           "relation",
+          "origin",
           "source_url",
           "evidence_url",
           "content_type",

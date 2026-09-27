@@ -98,9 +98,10 @@ export function sourcePreview(source: Source): CitationPreview {
     source: source.url && isExternalUrl(source.url) ? `${sourceKindLabel(source.kind)} · ${hostOf(source.url)}` : sourceKindLabel(source.kind),
     url: link?.href ?? "",
     // This registry spans many source kinds (verdicts, 13F filings, prices, ...) with no
-    // single "does it back the claim" question in common; only a fact's own EvidenceLink
-    // and digest fact citations carry a relation today.
+    // single "does it back the claim" or "how was it produced" question in common; only a
+    // fact's own EvidenceLink and digest fact citations carry these today.
     relation: null,
+    provenance: null,
   };
 }
 

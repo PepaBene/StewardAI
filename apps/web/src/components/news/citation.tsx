@@ -6,6 +6,7 @@ import { useId, useRef, useState, type KeyboardEvent } from "react";
 import { createPortal } from "react-dom";
 
 import { EvidenceRelationBadge } from "@/components/evidence/evidence-relation-badge";
+import { ProvenanceTag } from "@/components/evidence/provenance-tag";
 import type { CitationPreview } from "@/lib/news/digest";
 import { TIERS } from "@/lib/news/labels";
 import { useAnchoredPosition } from "@/lib/hooks/use-anchored-position";
@@ -110,6 +111,7 @@ export function PreviewBody({ preview }: { preview: CitationPreview }) {
       <p className="flex flex-wrap items-center gap-1.5 font-medium">
         {preview.title}
         {preview.relation ? <EvidenceRelationBadge relation={preview.relation} /> : null}
+        {preview.provenance ? <ProvenanceTag provenance={preview.provenance} /> : null}
       </p>
       {preview.snippet ? (
         <blockquote className="border-l-2 border-border pl-2 text-xs break-words whitespace-pre-line text-text-muted">

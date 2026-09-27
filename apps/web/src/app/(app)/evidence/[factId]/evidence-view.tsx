@@ -7,10 +7,12 @@ import { useCallback } from "react";
 import { AlertMessage } from "@/components/alert-message";
 import { ConfidenceBadge } from "@/components/evidence/confidence-badge";
 import { EvidenceRelationBadge } from "@/components/evidence/evidence-relation-badge";
+import { ProvenanceTag } from "@/components/evidence/provenance-tag";
 import { FeedbackControl } from "@/components/feedback/feedback-control";
 import { Button } from "@/components/ui/button";
 import { getBrowserApiClient, type EvidenceLink } from "@/lib/api/client";
 import { humanizeMetric } from "@/lib/evidence/confidence";
+import { factProvenance } from "@/lib/evidence/provenance";
 import { formatDate } from "@/lib/format";
 import { useApiResource } from "@/lib/hooks/use-api-resource";
 import { isExternalUrl } from "@/lib/sources/sources";
@@ -64,6 +66,7 @@ function Evidence({ link }: { link: EvidenceLink }) {
           <span className="num font-mono text-xl">{link.value_as_written}</span>
           <ConfidenceBadge confidence={link.confidence} />
           <EvidenceRelationBadge relation={link.relation} />
+          <ProvenanceTag provenance={factProvenance(link)} />
         </h1>
         <p className="mt-2 flex flex-wrap items-center gap-2 text-sm text-text-muted">
           Is this figure right?

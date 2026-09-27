@@ -364,8 +364,8 @@ async def get_fact_evidence(
     the text around the fact's snippet."""
     row = await pool.fetchrow(
         "select f.id, f.ticker, f.metric, f.period, f.value_as_written, f.snippet,"
-        " f.unit_snippet, f.status, f.checks, e.source_url, e.storage_path, e.content_type,"
-        " e.fetched_at, e.sha256 from public.fact f"
+        " f.unit_snippet, f.status, f.checks, f.origin, e.source_url, e.storage_path,"
+        " e.content_type, e.fetched_at, e.sha256 from public.fact f"
         " join public.evidence e on e.sha256 = f.evidence_sha256 where f.id = $1",
         fact_id,
     )
@@ -390,6 +390,7 @@ async def get_fact_evidence(
         unit_snippet=row["unit_snippet"],
         confidence=FACT_CONFIDENCE[row["status"]],
         relation=evidence_relation(row["status"], checks),
+        origin=row["origin"],
         source_url=row["source_url"],
         evidence_url=url,
         content_type=row["content_type"],

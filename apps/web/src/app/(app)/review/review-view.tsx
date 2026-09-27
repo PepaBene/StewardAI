@@ -21,6 +21,7 @@ import { EmptyState } from "@/components/empty-state";
 import { ConfidenceBadge } from "@/components/evidence/confidence-badge";
 import { EvidenceLinks } from "@/components/evidence/evidence-links";
 import { FactReviewForm, type ReviewResolution } from "@/components/evidence/fact-review-form";
+import { ProvenanceTag } from "@/components/evidence/provenance-tag";
 import { FeedbackControl } from "@/components/feedback/feedback-control";
 import { VerdictStatusBadge } from "@/components/evidence/verdict-status-badge";
 import { HoldingsTabs } from "@/components/portfolio/holdings-tabs";
@@ -36,6 +37,7 @@ import {
 } from "@/lib/api/client";
 import { NEVER_JUDGED } from "@/lib/evidence/board";
 import { formatFactValue, formatObserved, formatTarget, humanizeMetric } from "@/lib/evidence/confidence";
+import { factProvenance } from "@/lib/evidence/provenance";
 import {
   affectedKpis,
   formatInFactScale,
@@ -295,6 +297,7 @@ function ReviewItemCard({ item, onResolved }: { item: ReviewItem; onResolved: (r
           <span className="flex items-center gap-2">
             <span className="num text-lg font-semibold">{formatFactValue(fact)}</span>
             <ConfidenceBadge confidence={fact.confidence} />
+            <ProvenanceTag provenance={factProvenance(fact)} />
           </span>
           <span className="text-xs text-text-muted">
             as printed <span className="num font-mono text-text">{fact.value_as_written}</span>
@@ -375,6 +378,7 @@ function FactColumn({ title, fact }: { title: string; fact: FactOut }) {
       <p className="flex flex-wrap items-center gap-2">
         <span className="num font-semibold">{formatFactValue(fact)}</span>
         <ConfidenceBadge confidence={fact.confidence} />
+        <ProvenanceTag provenance={factProvenance(fact)} />
       </p>
       <p className="text-xs text-text-muted">
         {fact.period} · extracted {formatDate(new Date(fact.extracted_at))}

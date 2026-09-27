@@ -108,6 +108,10 @@ class DigestFactSource(BaseModel):
     snippet: str
     source_url: str
     status: str
+    origin: Literal["extraction", "owner"] = Field(
+        description="Provenance: read straight from the document, or an owner correction —"
+        " a different question from confidence or relation."
+    )
     relation: EvidenceRelation = Field(
         description="Whether this figure supports, contradicts, or merely mentions the claim it"
         " backs — distinct from its own confidence."
@@ -820,8 +824,8 @@ async def build_digest(
 
 async def load_fact_sources(pool: asyncpg.Pool, fact_ids: set[int]) -> list[DigestFactSource]:
     rows = await pool.fetch(
-        "select id, ticker, metric, period, value_as_written, snippet, source_url, status, checks"
-        " from public.fact where id = any($1::bigint[]) order by id",
+        "select id, ticker, metric, period, value_as_written, snippet, source_url, status,"
+        " origin, checks from public.fact where id = any($1::bigint[]) order by id",
         sorted(fact_ids),
     )
     sources = []

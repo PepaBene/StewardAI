@@ -2849,6 +2849,12 @@ export interface components {
             /** Status */
             status: string;
             /**
+             * Origin
+             * @description Provenance: read straight from the document, or an owner correction — a different question from confidence or relation.
+             * @enum {string}
+             */
+            origin: "extraction" | "owner";
+            /**
              * Relation
              * @description Whether this figure supports, contradicts, or merely mentions the claim it backs — distinct from its own confidence.
              * @enum {string}
@@ -3557,6 +3563,12 @@ export interface components {
              * @enum {string}
              */
             relation: "supports" | "contradicts" | "mentions";
+            /**
+             * Origin
+             * @description Provenance, a different question from confidence: read straight from the document, or a correction the owner entered.
+             * @enum {string}
+             */
+            origin: "extraction" | "owner";
             /** Source Url */
             source_url: string;
             /**

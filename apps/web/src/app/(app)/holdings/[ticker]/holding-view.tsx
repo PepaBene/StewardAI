@@ -20,6 +20,7 @@ import { ConfidenceBadge } from "@/components/evidence/confidence-badge";
 import { ConfidenceBar } from "@/components/evidence/confidence-bar";
 import { EvidenceLinks } from "@/components/evidence/evidence-links";
 import { FactReviewForm, type ReviewResolution } from "@/components/evidence/fact-review-form";
+import { ProvenanceTag } from "@/components/evidence/provenance-tag";
 import { VerdictStatusBadge } from "@/components/evidence/verdict-status-badge";
 import { FeedbackControl } from "@/components/feedback/feedback-control";
 import { DriftStatusBadge } from "@/components/portfolio/drift-status-badge";
@@ -53,6 +54,7 @@ import {
   tallyConfidence,
   tallyConfidenceLabel,
 } from "@/lib/evidence/confidence";
+import { factProvenance } from "@/lib/evidence/provenance";
 import { allowedReviewActions, isHeld, REVIEW_ACTIONS, reviewQueueHref, scaleHint } from "@/lib/evidence/review";
 import { formatDate, formatMoney, formatPercent, formatPrice, formatQuantity, formatRelative, gainLossTone } from "@/lib/format";
 import { useApiResource } from "@/lib/hooks/use-api-resource";
@@ -553,7 +555,10 @@ function VerdictEvidence({
   const used = verdict.fact_ids.map((id) => facts.get(id)).filter((f): f is FactOut => Boolean(f));
   return (
     <div className="space-y-2 text-sm">
-      <p>{verdict.rationale}</p>
+      <p className="flex flex-wrap items-center gap-1.5">
+        {verdict.rationale}
+        <ProvenanceTag provenance="computed" />
+      </p>
       {used.length === 0 ? (
         <p className="text-text-muted">No verified figure behind this verdict.</p>
       ) : (
@@ -583,6 +588,7 @@ function FactEvidence({ fact, onFeedback }: { fact: FactOut; onFeedback: OnFeedb
           nextAction={confidenceNextAction(fact.status)}
           since={fact.reviewed_at ?? fact.extracted_at}
         />
+        <ProvenanceTag provenance={factProvenance(fact)} />
         <EvidenceLinks fact={fact} />
         <FactFeedback fact={fact} onFeedback={onFeedback} />
       </div>
@@ -707,6 +713,7 @@ function FactTable({
             <th scope="col" className="px-3 py-2 text-left font-medium">Metric</th>
             <th scope="col" className="px-3 py-2 text-right font-medium">Value</th>
             <th scope="col" className="px-3 py-2 text-left font-medium">Confidence</th>
+            <th scope="col" className="px-3 py-2 text-left font-medium">Provenance</th>
             <th scope="col" className="px-3 py-2 text-left font-medium">Source</th>
             <th scope="col" className="px-3 py-2 text-left font-medium">Feedback</th>
           </tr>
@@ -723,7 +730,6 @@ function FactTable({
                   <th scope="row" className="px-3 py-2 text-left font-normal">
                     {humanizeMetric(f.metric)}
                     {f.basis === "adjusted" ? <span className="ml-1 text-xs text-text-muted">(adjusted)</span> : null}
-                    {f.origin === "owner" ? <span className="ml-1 text-xs text-text-muted">(your correction)</span> : null}
                   </th>
                   <td className="num px-3 py-2 text-right whitespace-nowrap">{formatFactValue(f)}</td>
                   <td className="px-3 py-2">
@@ -752,6 +758,9 @@ function FactTable({
                     ) : null}
                   </td>
                   <td className="px-3 py-2">
+                    <ProvenanceTag provenance={factProvenance(f)} />
+                  </td>
+                  <td className="px-3 py-2">
                     <EvidenceLinks fact={f} />
                   </td>
                   <td className="px-3 py-2">
@@ -760,7 +769,7 @@ function FactTable({
                 </tr>
                 {expanded ? (
                   <tr className="border-b border-border bg-surface-muted/60">
-                    <td colSpan={6} id={panelId} className="px-4 py-3">
+                    <td colSpan={7} id={panelId} className="px-4 py-3">
                       <blockquote className="mb-3 border-l-2 border-border pl-3 font-mono text-xs break-words text-text-muted">
                         {f.snippet}
                       </blockquote>

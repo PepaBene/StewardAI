@@ -150,6 +150,10 @@ class EvidenceLink(BaseModel):
         description="Whether this source supports, contradicts, or merely mentions the claim —"
         " distinct from confidence, which is how sure we are the value itself is right."
     )
+    origin: Literal["extraction", "owner"] = Field(
+        description="Provenance, a different question from confidence: read straight from the"
+        " document, or a correction the owner entered."
+    )
     source_url: str
     evidence_url: str = Field(description="Signed URL of the archived copy, valid 10 minutes.")
     content_type: str

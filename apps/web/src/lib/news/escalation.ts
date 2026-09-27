@@ -72,6 +72,7 @@ export function noteCitationPreview(sources: EscalationSource[], url: string): C
     source: source.outlet ?? hostOf(url),
     url,
     relation: null,
+    provenance: null,
   };
 }
 
