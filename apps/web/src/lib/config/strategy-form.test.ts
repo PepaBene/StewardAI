@@ -43,12 +43,12 @@ const FULL: StrategyConfig = {
     { dimension: "geography", bucket: "US", target_weight: 0.4, band: 0.1 },
   ],
   rules: [
-    { id: "max-single-position", type: "position_weight", operator: "<=", value: 0.1, ticker: null, on_breach: "severity_2", description: "" },
-    { id: "asml-cap", type: "position_weight", operator: "<", value: 0.2, ticker: "ASML_EQ", on_breach: "severity_3", description: "Hard cap" },
-    { id: "max-sector", type: "category_weight", operator: "<=", value: 0.35, dimension: "sector", bucket: null, on_breach: "severity_1", description: "" },
-    { id: "europe-min", type: "category_weight", operator: ">=", value: 0.2, dimension: "geography", bucket: "Europe", on_breach: "severity_2", description: "At least a fifth in Europe" },
-    { id: "cash-floor", type: "cash_weight", operator: ">", value: 0.01, on_breach: "severity_2", description: "" },
-    { id: "diversified", type: "position_count", operator: ">=", value: 12, on_breach: "severity_1", description: "" },
+    { id: "max-single-position", type: "position_weight", operator: "<=", value: 0.1, ticker: null, on_breach: "severity_2", description: "", enabled: true },
+    { id: "asml-cap", type: "position_weight", operator: "<", value: 0.2, ticker: "ASML_EQ", on_breach: "severity_3", description: "Hard cap", enabled: true },
+    { id: "max-sector", type: "category_weight", operator: "<=", value: 0.35, dimension: "sector", bucket: null, on_breach: "severity_1", description: "", enabled: true },
+    { id: "europe-min", type: "category_weight", operator: ">=", value: 0.2, dimension: "geography", bucket: "Europe", on_breach: "severity_2", description: "At least a fifth in Europe", enabled: true },
+    { id: "cash-floor", type: "cash_weight", operator: ">", value: 0.01, on_breach: "severity_2", description: "", enabled: true },
+    { id: "diversified", type: "position_count", operator: ">=", value: 12, on_breach: "severity_1", description: "", enabled: true },
   ],
   hard_limit_severity: "severity_2",
   band_breach_severity: "severity_2",
@@ -133,7 +133,7 @@ describe("strategy form", () => {
     form.rules[1].type = "cash_weight";
     form.rules[5].value = "abc";
     const body = strategyToBody(form);
-    expect(body.rules![1]).toEqual({ id: "asml-cap", type: "cash_weight", operator: "<", value: 0.2, on_breach: "severity_3", description: "Hard cap" });
+    expect(body.rules![1]).toEqual({ id: "asml-cap", type: "cash_weight", operator: "<", value: 0.2, on_breach: "severity_3", description: "Hard cap", enabled: true });
     expect(body.rules![5].value).toBe("abc");
   });
 });

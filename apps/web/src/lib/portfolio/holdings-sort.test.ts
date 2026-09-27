@@ -9,6 +9,7 @@ function holding(ticker: string, value_base: number, extra: Partial<Holding> = {
     ticker,
     name: ticker,
     isin: null,
+    security_type: null,
     quantity: 1,
     avg_price: 1,
     current_price: 1,

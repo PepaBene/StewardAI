@@ -96,7 +96,7 @@ const FULL: JobsConfig = {
     max_subsidiary_aliases: 120,
     wikidata_languages: ["en", "fr"],
   },
-  prices: { benchmark_symbols: ["^spx", "^dax", "^ukx"], history_years: 5, plausibility_tolerance_pct: 1.5 },
+  prices: { benchmark_symbols: ["^spx", "^dax", "^ukx"], history_years: 5, plausibility_tolerance_pct: 1.5, market_strip: [{ symbol: "^spx", label: "S&P 500" }, { symbol: "^ndx", label: "Nasdaq 100" }] },
   calendar: {
     holiday_countries: ["CZ", "US", "DE"],
     exchange_closures: [
@@ -352,5 +352,18 @@ describe("jobs form: optional effort, tiers and the other preferences", () => {
     expect(body.review).toMatchObject({ use_batch: true, batch_wait_minutes: 60, holder_drop_flag_pct: 10 });
     expect(body.chat).toMatchObject({ effort: null, source_tiers: [1, 2] });
     expect(body.digest!.min_severity_listed).toBe(1);
+  });
+});
+
+describe("jobs form: market strip", () => {
+  it("round-trips the market strip as symbol + label lines", () => {
+    const form = jobsFromBody(null);
+    expect(form.settings.prices.values.market_strip).toBe("^spx S&P 500\n^stoxx STOXX Europe 600\n^px PX");
+    form.settings.prices.values.market_strip = "^dax DAX 40\n^px";
+    const body = jobsToBody(form) as unknown as { prices: { market_strip: unknown } };
+    expect(body.prices.market_strip).toEqual([
+      { symbol: "^dax", label: "DAX 40" },
+      { symbol: "^px", label: "^px" },
+    ]);
   });
 });

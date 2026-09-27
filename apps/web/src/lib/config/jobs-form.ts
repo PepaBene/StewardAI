@@ -210,7 +210,16 @@ export const DEFAULT_JOBS: JobsConfig = {
     max_subsidiary_aliases: 50,
     wikidata_languages: ["en", "de", "cs"],
   },
-  prices: { benchmark_symbols: ["^spx"], history_years: 2, plausibility_tolerance_pct: 1 },
+  prices: {
+    benchmark_symbols: ["^spx"],
+    history_years: 2,
+    plausibility_tolerance_pct: 1,
+    market_strip: [
+      { symbol: "^spx", label: "S&P 500" },
+      { symbol: "^stoxx", label: "STOXX Europe 600" },
+      { symbol: "^px", label: "PX" },
+    ],
+  },
   calendar: { holiday_countries: ["CZ", "US", "DE", "GB"], exchange_closures: [] },
   chat: { model: "claude-sonnet-5", effort: null, max_steps: 30, max_searches: 15, history_messages: 100, source_tiers: [1, 2] },
   review: {
@@ -273,6 +282,7 @@ export type SettingField<S extends SettingsKey> = {
     | "int-list"
     | "severity"
     | "lines"
+    | "symbol-lines"
     | "codes"
     | "words"
     | "tiers";
@@ -387,6 +397,7 @@ export const SETTINGS: { [S in SettingsKey]: { title: string; description: strin
       { key: "benchmark_symbols", label: "Benchmark symbols", kind: "lines", hint: "Stooq symbols, one per line: ^spx S&P 500, ^dax DAX, ^ukx FTSE 100. The first is used for beta and the holding charts." },
       { key: "history_years", label: "Years of history", kind: "int", min: 1, max: 10 },
       { key: "plausibility_tolerance_pct", label: "Plausibility tolerance (%)", kind: "number", hint: "Largest gap between Stooq's close and Trading212's price on a sync day before it is flagged. Above 0, up to 20." },
+      { key: "market_strip", label: "Market strip indices", kind: "symbol-lines", hint: "One per line: the Stooq symbol, a space, then the label shown in the header, e.g. ^spx S&P 500. Collected with the benchmarks; a symbol Stooq has no data for shows as empty." },
     ],
   },
   calendar: {
@@ -610,6 +621,8 @@ export function jobsFromBody(body: JobsConfig | null): JobsForm {
         values[field.key] =
           field.kind === "bool"
             ? Boolean(v)
+            : field.kind === "symbol-lines"
+              ? symbolLinesText(v)
             : Array.isArray(v)
               ? v.join(field.kind === "lines" ? "\n" : ", ")
               : v == null
@@ -647,6 +660,22 @@ export function jobsFromBody(body: JobsConfig | null): JobsForm {
   return { catchUpOnStart, schedules, settings, closures, managers, macroSeries, rest };
 }
 
+/** `[{symbol, label}]` as editable lines: "^spx S&P 500". */
+function symbolLinesText(value: unknown): string {
+  if (!Array.isArray(value)) return "";
+  return value
+    .map((item: { symbol?: unknown; label?: unknown }) => `${String(item.symbol ?? "")} ${String(item.label ?? "")}`.trim())
+    .join("\n");
+}
+
+/** Lines of "symbol label" back to `[{symbol, label}]`; a bare symbol is its own label. */
+export function parseSymbolLines(text: string): { symbol: string; label: string }[] {
+  return list(text, /\n/).map((line) => {
+    const [symbol, ...label] = line.split(/\s+/);
+    return { symbol, label: label.join(" ") || symbol };
+  });
+}
+
 function list(text: string, separator: RegExp): string[] {
   return text
     .split(separator)
@@ -668,6 +697,7 @@ export function jobsToBody(form: JobsForm): JobsConfig {
       else if (field.kind === "int" || field.kind === "severity") out[field.key] = numberOrText(String(v));
       else if (field.kind === "number") out[field.key] = numberOrText(String(v).replace(",", "."));
       else if (field.kind === "lines") out[field.key] = list(String(v), /\n/);
+      else if (field.kind === "symbol-lines") out[field.key] = parseSymbolLines(String(v));
       else if (field.kind === "codes") out[field.key] = list(String(v), /[\s,;]+/).map((c) => c.toUpperCase());
       else if (field.kind === "words") out[field.key] = list(String(v), /[\s,;]+/);
       else if (field.kind === "effort-optional") out[field.key] = String(v).trim() || null;

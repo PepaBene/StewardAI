@@ -575,6 +575,84 @@
         }
       }
     },
+    "/portfolio/holdings/prices": {
+      "get": {
+        "tags": [
+          "portfolio"
+        ],
+        "summary": "Get Holdings Prices",
+        "description": "Every current holding's daily closes over the last `days` (from Stooq's stored bars,\nresolved as for the holding page) with the latest close-to-close change. A holding with\nno stored prices is listed with no bars and null figures.",
+        "operationId": "get_holdings_prices",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "days",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 400,
+              "minimum": 7,
+              "default": 30,
+              "title": "Days"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HoldingsPrices"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/market/strip": {
+      "get": {
+        "tags": [
+          "market"
+        ],
+        "summary": "Get Market Strip",
+        "description": "The reference rate of each held currency against the base currency and the\nconfigured index quotes, each with its previous value and change. Anything without\nstored data is null, never estimated.",
+        "operationId": "get_market_strip",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MarketStrip"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
     "/portfolio/overview": {
       "get": {
         "tags": [
@@ -701,7 +779,7 @@
             "schema": {
               "type": "integer",
               "maximum": 3700,
-              "minimum": 7,
+              "minimum": 1,
               "default": 365,
               "title": "Days"
             }
@@ -737,7 +815,7 @@
           "portfolio"
         ],
         "summary": "Get Portfolio Transactions",
-        "description": "Orders, dividends and cash movements, newest first, with totals per type and\ncurrency over every row matching the filters (dates are UTC days, both inclusive).",
+        "description": "Orders, dividends and cash movements, newest first, with totals per type and\ncurrency over every row matching the filters (dates are UTC days, both inclusive).\n`subtype` narrows server-side (e.g. BUY or SELL orders), so counts, totals and paging\nall follow it.",
         "operationId": "get_portfolio_transactions",
         "security": [
           {
@@ -770,6 +848,28 @@
               "title": "Type"
             },
             "description": "Any of these."
+          },
+          {
+            "name": "subtype",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "pattern": "^[A-Za-z_]{1,32}$"
+                  }
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Any of these, as Trading212 names them (BUY, SELL, DEPOSIT, ...).",
+              "title": "Subtype"
+            },
+            "description": "Any of these, as Trading212 names them (BUY, SELL, DEPOSIT, ...)."
           },
           {
             "name": "ticker",
@@ -1266,7 +1366,7 @@
           "holdings"
         ],
         "summary": "Get Thesis Board",
-        "description": "Every holding with a thesis, once: each KPI's current pass / breach / unknown with the\nverdict behind it. A KPI never judged is listed as unknown, never left out.",
+        "description": "Every holding with a thesis, once: each KPI's current pass / breach / unknown with the\nverdict behind it. A KPI never judged is listed as unknown, never left out. Each row has\na 0-100 thesis score computed from those verdicts, its history and a state; the board\nhas the weight-weighted portfolio score and verdict activity. `score_method` states the\nformula.",
         "operationId": "get_thesis_board",
         "responses": {
           "200": {
@@ -1489,6 +1589,57 @@
                     "$ref": "#/components/schemas/ReviewItem"
                   },
                   "title": "Response Get Review Queue"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/facts/review-stats": {
+      "get": {
+        "tags": [
+          "holdings"
+        ],
+        "summary": "Get Review Stats",
+        "description": "Review counts over the last `days` UTC days (today included): facts pending now and\nhow many of them a thesis KPI waits on, owner decisions per day, facts marked wrong, and\nthe last recorded golden-set extraction accuracy (null when none is recorded).",
+        "operationId": "get_review_stats",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "days",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 365,
+              "minimum": 1,
+              "default": 30,
+              "title": "Days"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReviewStats"
                 }
               }
             }
@@ -3225,6 +3376,166 @@
         ]
       }
     },
+    "/escalations/stats": {
+      "get": {
+        "tags": [
+          "reports"
+        ],
+        "summary": "Get Escalation Stats",
+        "description": "How escalations are being handled: how many are open, acknowledged and resolved now,\nthe median time to the first acknowledgement, and per day of the window how many were\nwritten and acknowledged (days in Europe/Prague).",
+        "operationId": "get_escalation_stats",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "days",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 365,
+              "minimum": 1,
+              "description": "Window length, today included.",
+              "default": 30,
+              "title": "Days"
+            },
+            "description": "Window length, today included."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EscalationStats"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/escalations/{report_id}": {
+      "patch": {
+        "tags": [
+          "reports"
+        ],
+        "summary": "Update Escalation",
+        "description": "Acknowledge, resolve or reopen an escalation. Acknowledging (or resolving one never\nacknowledged) records when; reopening clears the resolution but keeps the first\nacknowledgement. Setting the current status again changes nothing.",
+        "operationId": "update_escalation",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "report_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "maximum": 9223372036854775807,
+              "minimum": 1,
+              "title": "Report Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EscalationStatusUpdate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EscalationOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "tags": [
+          "reports"
+        ],
+        "summary": "Get Escalation",
+        "operationId": "get_escalation",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "report_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "maximum": 9223372036854775807,
+              "minimum": 1,
+              "title": "Report Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EscalationOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/news": {
       "get": {
         "tags": [
@@ -3400,6 +3711,84 @@
             }
           }
         }
+      }
+    },
+    "/news/stats": {
+      "get": {
+        "tags": [
+          "news"
+        ],
+        "summary": "Get News Stats",
+        "description": "Stories over the last `days` UTC days (today included), each dated by its earliest\nitem's publication: per day by severity, per event type, and how many are disputed.\nRepeats of an earlier story are left out; unclassified stories are counted apart.",
+        "operationId": "get_news_stats",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "days",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 90,
+              "minimum": 1,
+              "default": 14,
+              "title": "Days"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NewsStats"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/news/sources/health": {
+      "get": {
+        "tags": [
+          "news"
+        ],
+        "summary": "Get News Sources Health",
+        "description": "Every configured news source with its last fetch time, item count and error, and\nwhether it is healthy (`rule` states how that is decided).",
+        "operationId": "get_news_sources_health",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SourcesHealth"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
       }
     },
     "/stories/disputed": {
@@ -3826,7 +4215,7 @@
           "reports"
         ],
         "summary": "Get Escalations",
-        "description": "Impact notes on confirmed severity-2+ stories and large price moves, newest first:\neach cites its sources and names the thesis KPIs or exit conditions it touches, or\nstates that none applies.",
+        "description": "Impact notes on confirmed severity-2+ stories and large price moves, newest first:\neach cites its sources and names the thesis KPIs or exit conditions it touches, or\nstates that none applies. `status` keeps only open, acknowledged or resolved ones.",
         "operationId": "get_escalations",
         "security": [
           {
@@ -3862,6 +4251,27 @@
               "default": 50,
               "title": "Limit"
             }
+          },
+          {
+            "name": "status",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "enum": [
+                    "open",
+                    "acknowledged",
+                    "resolved"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Status"
+            }
           }
         ],
         "responses": {
@@ -3875,55 +4285,6 @@
                     "$ref": "#/components/schemas/EscalationOut"
                   },
                   "title": "Response Get Escalations"
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/escalations/{report_id}": {
-      "get": {
-        "tags": [
-          "reports"
-        ],
-        "summary": "Get Escalation",
-        "operationId": "get_escalation",
-        "security": [
-          {
-            "HTTPBearer": []
-          }
-        ],
-        "parameters": [
-          {
-            "name": "report_id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "integer",
-              "maximum": 9223372036854775807,
-              "minimum": 1,
-              "title": "Report Id"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/EscalationOut"
                 }
               }
             }
@@ -6232,6 +6593,37 @@
             "type": "integer",
             "title": "Open Review Items",
             "description": "Held or quarantined facts for this holding."
+          },
+          "score": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Score",
+            "description": "0-100: 100 x mean s_k over KPIs with a verdict, rounded half up; s_k = 1 pass, 0.5 unknown or stale, 0 breach. Null when no KPI has been judged. See score_method."
+          },
+          "score_history": {
+            "items": {
+              "$ref": "#/components/schemas/ScorePoint"
+            },
+            "type": "array",
+            "title": "Score History",
+            "description": "The score as of the end of each UTC day a verdict for one of this holding's KPIs was recorded (latest 12 such days, oldest first)."
+          },
+          "state": {
+            "type": "string",
+            "enum": [
+              "intact",
+              "watch",
+              "at_risk",
+              "unjudged"
+            ],
+            "title": "State",
+            "description": "unjudged: no score. Else by breaching KPIs (current verdict breach): intact none, watch one, at_risk two or more."
           }
         },
         "type": "object",
@@ -6246,7 +6638,10 @@
           "overall",
           "counts",
           "kpis",
-          "open_review_items"
+          "open_review_items",
+          "score",
+          "score_history",
+          "state"
         ],
         "title": "BoardRow"
       },
@@ -6709,6 +7104,12 @@
             "title": "Description",
             "default": ""
           },
+          "enabled": {
+            "type": "boolean",
+            "title": "Enabled",
+            "description": "A disabled rule is kept in the config (and still validated) but never evaluated: no breach, no review compliance row, not offered to the AI.",
+            "default": true
+          },
           "type": {
             "type": "string",
             "const": "cash_weight",
@@ -6810,6 +7211,12 @@
             "type": "string",
             "title": "Description",
             "default": ""
+          },
+          "enabled": {
+            "type": "boolean",
+            "title": "Enabled",
+            "description": "A disabled rule is kept in the config (and still validated) but never evaluated: no breach, no review compliance row, not offered to the AI.",
+            "default": true
           },
           "type": {
             "type": "string",
@@ -7837,6 +8244,18 @@
             "type": "string",
             "title": "Month"
           },
+          "period_start": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Period Start",
+            "description": "Start of the budget month (midnight on the 1st, Europe/Prague), inclusive."
+          },
+          "period_end": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Period End",
+            "description": "End of the budget month (midnight on the 1st of the next), exclusive."
+          },
           "total_usd": {
             "type": "number",
             "title": "Total Usd",
@@ -7896,6 +8315,8 @@
         "type": "object",
         "required": [
           "month",
+          "period_start",
+          "period_end",
           "total_usd",
           "cap_usd",
           "fraction",
@@ -7905,6 +8326,25 @@
           "by_model"
         ],
         "title": "CostSummary"
+      },
+      "DayCount": {
+        "properties": {
+          "date": {
+            "type": "string",
+            "format": "date",
+            "title": "Date"
+          },
+          "count": {
+            "type": "integer",
+            "title": "Count"
+          }
+        },
+        "type": "object",
+        "required": [
+          "date",
+          "count"
+        ],
+        "title": "DayCount"
       },
       "DiffChange": {
         "properties": {
@@ -9117,6 +9557,32 @@
         ],
         "title": "EscalationBody"
       },
+      "EscalationDay": {
+        "properties": {
+          "date": {
+            "type": "string",
+            "format": "date",
+            "title": "Date"
+          },
+          "opened": {
+            "type": "integer",
+            "title": "Opened",
+            "description": "Escalations written that day."
+          },
+          "acknowledged": {
+            "type": "integer",
+            "title": "Acknowledged",
+            "description": "Escalations first acknowledged that day."
+          }
+        },
+        "type": "object",
+        "required": [
+          "date",
+          "opened",
+          "acknowledged"
+        ],
+        "title": "EscalationDay"
+      },
       "EscalationOut": {
         "properties": {
           "id": {
@@ -9199,6 +9665,42 @@
             "type": "array",
             "title": "Models",
             "description": "Models the run called."
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "open",
+              "acknowledged",
+              "resolved"
+            ],
+            "title": "Status",
+            "description": "Where the owner is with it."
+          },
+          "acknowledged_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Acknowledged At",
+            "description": "When the owner first acknowledged (or directly resolved) it; kept when reopened."
+          },
+          "resolved_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Resolved At",
+            "description": "When the owner resolved it; null unless resolved."
           }
         },
         "type": "object",
@@ -9212,7 +9714,10 @@
           "job_id",
           "job_status",
           "cost_usd",
-          "models"
+          "models",
+          "status",
+          "acknowledged_at",
+          "resolved_at"
         ],
         "title": "EscalationOut"
       },
@@ -9375,6 +9880,84 @@
           "url"
         ],
         "title": "EscalationSource"
+      },
+      "EscalationStats": {
+        "properties": {
+          "open": {
+            "type": "integer",
+            "title": "Open",
+            "description": "Escalations open now (any age)."
+          },
+          "acknowledged": {
+            "type": "integer",
+            "title": "Acknowledged",
+            "description": "Escalations acknowledged and not resolved now."
+          },
+          "resolved": {
+            "type": "integer",
+            "title": "Resolved",
+            "description": "Escalations resolved now."
+          },
+          "median_minutes_to_ack": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Median Minutes To Ack",
+            "description": "Median minutes from an escalation being written to its first acknowledgement, over those acknowledged in the window. Null when none was."
+          },
+          "per_day": {
+            "items": {
+              "$ref": "#/components/schemas/EscalationDay"
+            },
+            "type": "array",
+            "title": "Per Day",
+            "description": "Every day of the window, oldest first, today last (zeros included)."
+          },
+          "days": {
+            "type": "integer",
+            "title": "Days",
+            "description": "Length of the window in days, today included."
+          },
+          "timezone": {
+            "type": "string",
+            "title": "Timezone",
+            "description": "Time zone the days are counted in."
+          }
+        },
+        "type": "object",
+        "required": [
+          "open",
+          "acknowledged",
+          "resolved",
+          "median_minutes_to_ack",
+          "per_day",
+          "days",
+          "timezone"
+        ],
+        "title": "EscalationStats"
+      },
+      "EscalationStatusUpdate": {
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "open",
+              "acknowledged",
+              "resolved"
+            ],
+            "title": "Status"
+          }
+        },
+        "type": "object",
+        "required": [
+          "status"
+        ],
+        "title": "EscalationStatusUpdate"
       },
       "EurostatSeries": {
         "properties": {
@@ -9723,6 +10306,24 @@
           "body"
         ],
         "title": "EventRulesConfigVersion"
+      },
+      "EventTypeCount": {
+        "properties": {
+          "event_type": {
+            "type": "string",
+            "title": "Event Type"
+          },
+          "count": {
+            "type": "integer",
+            "title": "Count"
+          }
+        },
+        "type": "object",
+        "required": [
+          "event_type",
+          "count"
+        ],
+        "title": "EventTypeCount"
       },
       "EventTypeInfo": {
         "properties": {
@@ -10293,6 +10894,30 @@
               "disputed"
             ],
             "title": "Confidence"
+          },
+          "check_score": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Check Score",
+            "description": "Passed checks / all checks stored with the figure (0..1): the share of the validator's checks it passed (`checks`). Null when no check ran."
+          },
+          "source_tier": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Tier",
+            "description": "Trust tier (1 best, 3 weakest) of the host the figure was read from: 1 for the holding's own IR or results domains, else the news_sources config's domain tier; one tier lower while the owner's feedback has the host's trust below the verification config's demote_below. Null when the host has no configured tier."
           }
         },
         "type": "object",
@@ -10321,7 +10946,9 @@
           "extracted_at",
           "reviewed_at",
           "origin",
-          "confidence"
+          "confidence",
+          "check_score",
+          "source_tier"
         ],
         "title": "FactOut"
       },
@@ -10707,6 +11334,99 @@
         ],
         "title": "Freshness"
       },
+      "FxQuote": {
+        "properties": {
+          "currency": {
+            "type": "string",
+            "title": "Currency"
+          },
+          "base_currency": {
+            "type": "string",
+            "title": "Base Currency"
+          },
+          "source": {
+            "type": "string",
+            "enum": [
+              "cnb",
+              "ecb"
+            ],
+            "title": "Source",
+            "description": "Whose reference rates: ČNB or the ECB."
+          },
+          "rate": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Rate",
+            "description": "Base-currency units per one unit of `currency`."
+          },
+          "rate_date": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Rate Date"
+          },
+          "previous_rate": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Previous Rate",
+            "description": "The published rate before `rate_date`."
+          },
+          "previous_rate_date": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Previous Rate Date"
+          },
+          "change_pct": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Change Pct",
+            "description": "Fraction (0.012 = +1.2 %) of the latest against the previous value."
+          }
+        },
+        "type": "object",
+        "required": [
+          "currency",
+          "base_currency",
+          "source",
+          "rate",
+          "rate_date",
+          "previous_rate",
+          "previous_rate_date",
+          "change_pct"
+        ],
+        "title": "FxQuote"
+      },
       "FxRateUsed": {
         "properties": {
           "currency": {
@@ -10738,6 +11458,53 @@
           "rate_date"
         ],
         "title": "FxRateUsed"
+      },
+      "GoldenAccuracy": {
+        "properties": {
+          "value": {
+            "type": "number",
+            "title": "Value",
+            "description": "Matched labelled figures / all labelled figures (0..1)."
+          },
+          "target": {
+            "type": "number",
+            "title": "Target",
+            "description": "The evals gate's target for the component (0..1)."
+          },
+          "evaluated_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Evaluated At",
+            "description": "When the baseline file was last written by a passing live run."
+          },
+          "model": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Model",
+            "description": "The extraction model the run measured."
+          }
+        },
+        "type": "object",
+        "required": [
+          "value",
+          "target",
+          "evaluated_at",
+          "model"
+        ],
+        "title": "GoldenAccuracy"
       },
       "GoogleNewsLocale": {
         "properties": {
@@ -10823,6 +11590,18 @@
               }
             ],
             "title": "Isin"
+          },
+          "security_type": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Security Type",
+            "description": "OpenFIGI's security type (e.g. 'Common Stock', 'ETP'); null until the reference-data job has resolved the instrument."
           },
           "quantity": {
             "type": "number",
@@ -10944,6 +11723,7 @@
           "ticker",
           "name",
           "isin",
+          "security_type",
           "quantity",
           "avg_price",
           "current_price",
@@ -11516,6 +12296,19 @@
             "title": "Top Holders",
             "description": "Largest positions, latest period."
           },
+          "top_holders_previous_period": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Top Holders Previous Period",
+            "description": "The period each top holder's prev_shares is from."
+          },
           "source": {
             "type": "string",
             "title": "Source",
@@ -11530,6 +12323,105 @@
           "top_holders"
         ],
         "title": "HoldingOwnership"
+      },
+      "HoldingPrices": {
+        "properties": {
+          "ticker": {
+            "type": "string",
+            "title": "Ticker"
+          },
+          "name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
+          },
+          "symbol": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Symbol",
+            "description": "Stooq symbol; null when none is known."
+          },
+          "as_of": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "As Of",
+            "description": "Date of the latest stored close."
+          },
+          "last_close": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Close"
+          },
+          "previous_close": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Previous Close",
+            "description": "The stored close before `as_of`."
+          },
+          "day_change_pct": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Day Change Pct",
+            "description": "Fraction (0.012 = +1.2 %) of the latest against the previous value."
+          },
+          "bars": {
+            "items": {
+              "$ref": "#/components/schemas/PricePoint"
+            },
+            "type": "array",
+            "title": "Bars",
+            "description": "Daily closes from `days` before `as_of` to `as_of`, oldest first; empty when no prices are stored."
+          }
+        },
+        "type": "object",
+        "required": [
+          "ticker",
+          "name",
+          "symbol",
+          "as_of",
+          "last_close",
+          "previous_close",
+          "day_change_pct",
+          "bars"
+        ],
+        "title": "HoldingPrices"
       },
       "HoldingProfile": {
         "properties": {
@@ -11787,6 +12679,28 @@
         ],
         "title": "HoldingProfilesConfigVersion"
       },
+      "HoldingsPrices": {
+        "properties": {
+          "days": {
+            "type": "integer",
+            "title": "Days"
+          },
+          "holdings": {
+            "items": {
+              "$ref": "#/components/schemas/HoldingPrices"
+            },
+            "type": "array",
+            "title": "Holdings",
+            "description": "Every open position of the latest snapshot, by value descending."
+          }
+        },
+        "type": "object",
+        "required": [
+          "days",
+          "holdings"
+        ],
+        "title": "HoldingsPrices"
+      },
       "HoldingsResponse": {
         "properties": {
           "freshness": {
@@ -11967,6 +12881,88 @@
           "unchanged"
         ],
         "title": "ImportResult"
+      },
+      "IndexQuote": {
+        "properties": {
+          "symbol": {
+            "type": "string",
+            "title": "Symbol"
+          },
+          "label": {
+            "type": "string",
+            "title": "Label"
+          },
+          "last_close": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Close"
+          },
+          "as_of": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "As Of",
+            "description": "Date of the latest stored close."
+          },
+          "previous_close": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Previous Close"
+          },
+          "previous_date": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Previous Date"
+          },
+          "change_pct": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Change Pct",
+            "description": "Fraction (0.012 = +1.2 %) of the latest against the previous value."
+          }
+        },
+        "type": "object",
+        "required": [
+          "symbol",
+          "label",
+          "last_close",
+          "as_of",
+          "previous_close",
+          "previous_date",
+          "change_pct"
+        ],
+        "title": "IndexQuote"
       },
       "InstrumentInfo": {
         "properties": {
@@ -12168,6 +13164,11 @@
             "type": "object",
             "title": "Params"
           },
+          "attempts": {
+            "type": "integer",
+            "title": "Attempts",
+            "description": "Times the runner started this job, a resumed run included; above 1 means it was retried. 0 = never started."
+          },
           "steps": {
             "items": {
               "$ref": "#/components/schemas/JobStepOut"
@@ -12187,6 +13188,7 @@
           "started_at",
           "finished_at",
           "params",
+          "attempts",
           "steps"
         ],
         "title": "JobDetail"
@@ -12290,6 +13292,11 @@
             "type": "object",
             "title": "Params"
           },
+          "attempts": {
+            "type": "integer",
+            "title": "Attempts",
+            "description": "Times the runner started this job, a resumed run included; above 1 means it was retried. 0 = never started."
+          },
           "cost_usd": {
             "anyOf": [
               {
@@ -12326,6 +13333,7 @@
           "started_at",
           "finished_at",
           "params",
+          "attempts",
           "cost_usd",
           "failed_step"
         ],
@@ -13332,6 +14340,73 @@
         ],
         "title": "MarketHoliday"
       },
+      "MarketStrip": {
+        "properties": {
+          "base_currency": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Base Currency",
+            "description": "The latest snapshot's base currency (the active strategy's before the first sync)."
+          },
+          "fx": {
+            "items": {
+              "$ref": "#/components/schemas/FxQuote"
+            },
+            "type": "array",
+            "title": "Fx",
+            "description": "Each currency held in the latest snapshot (positions and the account) other than the base currency, by code."
+          },
+          "indices": {
+            "items": {
+              "$ref": "#/components/schemas/IndexQuote"
+            },
+            "type": "array",
+            "title": "Indices",
+            "description": "The Jobs config's `prices.market_strip`, in its order."
+          }
+        },
+        "type": "object",
+        "required": [
+          "base_currency",
+          "fx",
+          "indices"
+        ],
+        "title": "MarketStrip"
+      },
+      "MarketStripItem": {
+        "properties": {
+          "symbol": {
+            "type": "string",
+            "pattern": "^\\^?[a-z0-9._-]{1,24}$",
+            "title": "Symbol",
+            "examples": [
+              "^spx"
+            ]
+          },
+          "label": {
+            "type": "string",
+            "maxLength": 40,
+            "minLength": 1,
+            "title": "Label",
+            "examples": [
+              "S&P 500"
+            ]
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "symbol",
+          "label"
+        ],
+        "title": "MarketStripItem"
+      },
       "MessageOut": {
         "properties": {
           "id": {
@@ -14092,6 +15167,55 @@
         ],
         "title": "NewsSourcesConfigVersion"
       },
+      "NewsStats": {
+        "properties": {
+          "days": {
+            "type": "integer",
+            "title": "Days"
+          },
+          "total": {
+            "type": "integer",
+            "title": "Total",
+            "description": "Stories first published in the window (repeats excluded)."
+          },
+          "unclassified": {
+            "type": "integer",
+            "title": "Unclassified",
+            "description": "Of those, stories not yet classified."
+          },
+          "per_day": {
+            "items": {
+              "$ref": "#/components/schemas/SeverityDay"
+            },
+            "type": "array",
+            "title": "Per Day",
+            "description": "Every UTC day of the window, oldest first."
+          },
+          "by_event_type": {
+            "items": {
+              "$ref": "#/components/schemas/EventTypeCount"
+            },
+            "type": "array",
+            "title": "By Event Type",
+            "description": "Classified stories per event type, most first."
+          },
+          "disputed_count": {
+            "type": "integer",
+            "title": "Disputed Count",
+            "description": "Stories in the window whose sources contradict each other (status disputed, including ones the owner has since marked false)."
+          }
+        },
+        "type": "object",
+        "required": [
+          "days",
+          "total",
+          "unclassified",
+          "per_day",
+          "by_event_type",
+          "disputed_count"
+        ],
+        "title": "NewsStats"
+      },
       "NoteSentence": {
         "properties": {
           "text": {
@@ -14673,6 +15797,26 @@
             ],
             "title": "Gap",
             "description": "Why there is no portfolio history, when there is none."
+          },
+          "values_currency": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Values Currency",
+            "description": "Currency of `values`: the latest snapshot's base currency; null before the first sync."
+          },
+          "values": {
+            "items": {
+              "$ref": "#/components/schemas/SnapshotValues"
+            },
+            "type": "array",
+            "title": "Values",
+            "description": "Absolute figures of every day snapshot in the window, oldest first, in `values_currency` (snapshots taken in another base currency are left out). Unlike `points` these include deposits and withdrawals."
           }
         },
         "type": "object",
@@ -14682,7 +15826,9 @@
           "points",
           "benchmark_symbol",
           "benchmark",
-          "gap"
+          "gap",
+          "values_currency",
+          "values"
         ],
         "title": "PortfolioHistory"
       },
@@ -14821,6 +15967,12 @@
             "type": "string",
             "title": "Description",
             "default": ""
+          },
+          "enabled": {
+            "type": "boolean",
+            "title": "Enabled",
+            "description": "A disabled rule is kept in the config (and still validated) but never evaluated: no breach, no review compliance row, not offered to the AI.",
+            "default": true
           },
           "type": {
             "type": "string",
@@ -15034,6 +16186,12 @@
             "title": "Description",
             "default": ""
           },
+          "enabled": {
+            "type": "boolean",
+            "title": "Enabled",
+            "description": "A disabled rule is kept in the config (and still validated) but never evaluated: no breach, no review compliance row, not offered to the AI.",
+            "default": true
+          },
           "type": {
             "type": "string",
             "const": "position_weight",
@@ -15088,6 +16246,74 @@
           "job_id"
         ],
         "title": "PostedMessage"
+      },
+      "PriceBarOut": {
+        "properties": {
+          "date": {
+            "type": "string",
+            "format": "date",
+            "title": "Date"
+          },
+          "close": {
+            "type": "number",
+            "title": "Close"
+          },
+          "open": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Open"
+          },
+          "high": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "High"
+          },
+          "low": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Low"
+          },
+          "volume": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Volume"
+          }
+        },
+        "type": "object",
+        "required": [
+          "date",
+          "close",
+          "open",
+          "high",
+          "low",
+          "volume"
+        ],
+        "title": "PriceBarOut",
+        "description": "A stored daily bar. Stooq's open, high, low and volume are null when it gave none."
       },
       "PriceGap": {
         "properties": {
@@ -15179,7 +16405,7 @@
           },
           "bars": {
             "items": {
-              "$ref": "#/components/schemas/PricePoint"
+              "$ref": "#/components/schemas/PriceBarOut"
             },
             "type": "array",
             "title": "Bars"
@@ -15307,6 +16533,15 @@
             "title": "Plausibility Tolerance Pct",
             "description": "Largest gap between Stooq's close and Trading212's price on a sync day before it is flagged.",
             "default": 1.0
+          },
+          "market_strip": {
+            "items": {
+              "$ref": "#/components/schemas/MarketStripItem"
+            },
+            "type": "array",
+            "maxItems": 12,
+            "title": "Market Strip",
+            "description": "Index quotes on the market strip: Stooq symbols (collected with the benchmarks) and the label shown. A symbol Stooq has no data for shows as empty."
           }
         },
         "additionalProperties": false,
@@ -16407,6 +17642,30 @@
             ],
             "title": "Next Due At",
             "description": "When the next report of this kind is scheduled: this one is current until then. Null for unscheduled kinds or a disabled schedule."
+          },
+          "story_count": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Story Count",
+            "description": "Digests: the stories across its sections (sections[].stories). Null for report kinds without stories."
+          },
+          "citation_count": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Citation Count",
+            "description": "Digests: the distinct sources it cites, counted by URL across its news sources (sources[].url) and the filings of its cited facts (fact_sources[].source_url); several facts from one filing count once. Null for report kinds without a source list."
           }
         },
         "type": "object",
@@ -17289,6 +18548,64 @@
         "title": "ReviewSettings",
         "description": "The monthly review: compliance and figures in code, proposed actions by the model."
       },
+      "ReviewStats": {
+        "properties": {
+          "days": {
+            "type": "integer",
+            "title": "Days"
+          },
+          "pending": {
+            "type": "integer",
+            "title": "Pending",
+            "description": "Facts held or quarantined now, waiting for the owner."
+          },
+          "blocking_verdict": {
+            "type": "integer",
+            "title": "Blocking Verdict",
+            "description": "Pending facts whose metric feeds a configured thesis KPI of the same holding (the KPI's metric or a component it is derived from, same basis)."
+          },
+          "reviewed_count": {
+            "type": "integer",
+            "title": "Reviewed Count",
+            "description": "Owner decisions (accept, correct, reject) in window."
+          },
+          "reviewed_per_day": {
+            "items": {
+              "$ref": "#/components/schemas/DayCount"
+            },
+            "type": "array",
+            "title": "Reviewed Per Day",
+            "description": "Every UTC day, oldest first."
+          },
+          "marked_wrong": {
+            "type": "integer",
+            "title": "Marked Wrong",
+            "description": "Distinct facts the owner marked wrong in the window."
+          },
+          "golden_accuracy": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/GoldenAccuracy"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The last recorded live golden-set run of the earnings extraction; null when none is recorded."
+          }
+        },
+        "type": "object",
+        "required": [
+          "days",
+          "pending",
+          "blocking_verdict",
+          "reviewed_count",
+          "reviewed_per_day",
+          "marked_wrong",
+          "golden_accuracy"
+        ],
+        "title": "ReviewStats"
+      },
       "RiskCard": {
         "properties": {
           "returns": {
@@ -17425,6 +18742,25 @@
         ],
         "title": "RuleMatch"
       },
+      "ScorePoint": {
+        "properties": {
+          "date": {
+            "type": "string",
+            "format": "date",
+            "title": "Date"
+          },
+          "score": {
+            "type": "integer",
+            "title": "Score"
+          }
+        },
+        "type": "object",
+        "required": [
+          "date",
+          "score"
+        ],
+        "title": "ScorePoint"
+      },
       "Sentence": {
         "properties": {
           "text": {
@@ -17480,6 +18816,35 @@
         ],
         "title": "Sentence"
       },
+      "SeverityDay": {
+        "properties": {
+          "date": {
+            "type": "string",
+            "format": "date",
+            "title": "Date"
+          },
+          "by_severity": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "type": "object",
+            "title": "By Severity",
+            "description": "Stories first published that UTC day, per severity; keys '0'-'3', always all four."
+          },
+          "unclassified": {
+            "type": "integer",
+            "title": "Unclassified",
+            "description": "Stories that day with no severity yet."
+          }
+        },
+        "type": "object",
+        "required": [
+          "date",
+          "by_severity",
+          "unclassified"
+        ],
+        "title": "SeverityDay"
+      },
       "SeverityOverride": {
         "properties": {
           "ticker": {
@@ -17529,6 +18894,43 @@
           "severity"
         ],
         "title": "SeverityOverride"
+      },
+      "SnapshotValues": {
+        "properties": {
+          "date": {
+            "type": "string",
+            "format": "date",
+            "title": "Date"
+          },
+          "total": {
+            "type": "number",
+            "title": "Total",
+            "description": "Invested plus cash."
+          },
+          "invested": {
+            "type": "number",
+            "title": "Invested",
+            "description": "Market value of the open positions."
+          },
+          "cash": {
+            "type": "number",
+            "title": "Cash"
+          },
+          "unrealised": {
+            "type": "number",
+            "title": "Unrealised",
+            "description": "Trading212's unrealised P/L, converted from the account currency at the snapshot's own account-to-base rate."
+          }
+        },
+        "type": "object",
+        "required": [
+          "date",
+          "total",
+          "invested",
+          "cash",
+          "unrealised"
+        ],
+        "title": "SnapshotValues"
       },
       "Source": {
         "properties": {
@@ -17632,6 +19034,113 @@
         ],
         "title": "Source"
       },
+      "SourceHealth": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "rss",
+              "page",
+              "edgar",
+              "finnhub",
+              "google_news",
+              "rns",
+              "eqs",
+              "edgar_fts"
+            ],
+            "title": "Type"
+          },
+          "host": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Host",
+            "description": "The feed's host; null for per-holding sources (EDGAR, Finnhub, ...)."
+          },
+          "tier": {
+            "type": "integer",
+            "enum": [
+              1,
+              2,
+              3
+            ],
+            "title": "Tier"
+          },
+          "enabled": {
+            "type": "boolean",
+            "title": "Enabled"
+          },
+          "last_fetched_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Fetched At",
+            "description": "Null: never fetched."
+          },
+          "last_item_count": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Item Count",
+            "description": "Items the last fetch returned."
+          },
+          "last_error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Error",
+            "description": "The last fetch's error, or its note when empty."
+          },
+          "healthy": {
+            "type": "boolean",
+            "title": "Healthy",
+            "description": "healthy = enabled, last fetched within the Jobs config's monitoring.news_coverage_hours, and that fetch recorded no error or note"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "name",
+          "type",
+          "host",
+          "tier",
+          "enabled",
+          "last_fetched_at",
+          "last_item_count",
+          "last_error",
+          "healthy"
+        ],
+        "title": "SourceHealth"
+      },
       "SourceTrustOut": {
         "properties": {
           "host": {
@@ -17671,6 +19180,34 @@
           "updated_at"
         ],
         "title": "SourceTrustOut"
+      },
+      "SourcesHealth": {
+        "properties": {
+          "rule": {
+            "type": "string",
+            "title": "Rule",
+            "description": "How `healthy` is decided.",
+            "default": "healthy = enabled, last fetched within the Jobs config's monitoring.news_coverage_hours, and that fetch recorded no error or note"
+          },
+          "window_hours": {
+            "type": "integer",
+            "title": "Window Hours"
+          },
+          "sources": {
+            "items": {
+              "$ref": "#/components/schemas/SourceHealth"
+            },
+            "type": "array",
+            "title": "Sources",
+            "description": "Every configured source, in config order."
+          }
+        },
+        "type": "object",
+        "required": [
+          "window_hours",
+          "sources"
+        ],
+        "title": "SourcesHealth"
       },
       "StoryOut": {
         "properties": {
@@ -18283,13 +19820,44 @@
             },
             "type": "array",
             "title": "Rows"
+          },
+          "score_method": {
+            "type": "string",
+            "title": "Score Method",
+            "description": "How score and portfolio_score are computed.",
+            "default": "score = round_half_up(100 x mean of s_k over the holding's KPIs that have a verdict); s_k = 1.0 pass, 0.5 unknown or stale (judged under an older theses config), 0.0 breach; KPIs never judged are left out, and a holding with none judged has no score. History: the score as of the end of each UTC day a verdict was recorded. Portfolio score: mean of held holdings' scores weighted by current position weight, rounded half up. State: unjudged (no score), intact (no KPI breaching), watch (one), at_risk (two or more)."
+          },
+          "portfolio_score": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Portfolio Score",
+            "description": "Mean of held rows' scores weighted by current position weight, over held rows with a score and a weight. Null when there is none."
+          },
+          "portfolio_score_history": {
+            "items": {
+              "$ref": "#/components/schemas/ScorePoint"
+            },
+            "type": "array",
+            "title": "Portfolio Score History",
+            "description": "portfolio_score recomputed as of the end of each UTC day any held row had a verdict recorded (latest 12 such days, oldest first), with today's weights."
+          },
+          "verdicts_30d": {
+            "$ref": "#/components/schemas/VerdictActivity",
+            "description": "Verdict records over the last 30 UTC days, today included."
           }
         },
         "type": "object",
         "required": [
           "theses_config_version_id",
           "as_of",
-          "rows"
+          "rows",
+          "verdicts_30d"
         ],
         "title": "ThesisBoard"
       },
@@ -18567,6 +20135,34 @@
             "type": "string",
             "title": "Accession",
             "description": "The filing the position is read from."
+          },
+          "prev_shares": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Prev Shares",
+            "description": "The same manager's shares in the previous report period loaded (`top_holders_previous_period`); null when it held none then or no earlier period is loaded."
+          },
+          "shares_change_pct": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Shares Change Pct",
+            "description": "(shares - prev_shares) / prev_shares, as a fraction (0.125 = +12.5 %); null when prev_shares is null or zero."
           }
         },
         "type": "object",
@@ -18939,6 +20535,35 @@
           "source_ids"
         ],
         "title": "Valuation"
+      },
+      "VerdictActivity": {
+        "properties": {
+          "count": {
+            "type": "integer",
+            "title": "Count",
+            "description": "Verdict records created in the window (a verdict is recorded only when its outcome, figures or config changed)."
+          },
+          "fact_count": {
+            "type": "integer",
+            "title": "Fact Count",
+            "description": "Distinct facts those verdicts cite."
+          },
+          "per_day": {
+            "items": {
+              "$ref": "#/components/schemas/DayCount"
+            },
+            "type": "array",
+            "title": "Per Day",
+            "description": "Every UTC day of the window, oldest first."
+          }
+        },
+        "type": "object",
+        "required": [
+          "count",
+          "fact_count",
+          "per_day"
+        ],
+        "title": "VerdictActivity"
       },
       "VerdictOut": {
         "properties": {

@@ -209,6 +209,50 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/portfolio/holdings/prices": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Holdings Prices
+         * @description Every current holding's daily closes over the last `days` (from Stooq's stored bars,
+         *     resolved as for the holding page) with the latest close-to-close change. A holding with
+         *     no stored prices is listed with no bars and null figures.
+         */
+        get: operations["get_holdings_prices"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/market/strip": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Market Strip
+         * @description The reference rate of each held currency against the base currency and the
+         *     configured index quotes, each with its previous value and change. Anything without
+         *     stored data is null, never estimated.
+         */
+        get: operations["get_market_strip"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/portfolio/overview": {
         parameters: {
             query?: never;
@@ -309,6 +353,8 @@ export interface paths {
          * Get Portfolio Transactions
          * @description Orders, dividends and cash movements, newest first, with totals per type and
          *     currency over every row matching the filters (dates are UTC days, both inclusive).
+         *     `subtype` narrows server-side (e.g. BUY or SELL orders), so counts, totals and paging
+         *     all follow it.
          */
         get: operations["get_portfolio_transactions"];
         put?: never;
@@ -473,7 +519,10 @@ export interface paths {
         /**
          * Get Thesis Board
          * @description Every holding with a thesis, once: each KPI's current pass / breach / unknown with the
-         *     verdict behind it. A KPI never judged is listed as unknown, never left out.
+         *     verdict behind it. A KPI never judged is listed as unknown, never left out. Each row has
+         *     a 0-100 thesis score computed from those verdicts, its history and a state; the board
+         *     has the weight-weighted portfolio score and verdict activity. `score_method` states the
+         *     formula.
          */
         get: operations["get_thesis_board"];
         put?: never;
@@ -561,6 +610,28 @@ export interface paths {
          *     each with its snippet, source, the checks it broke and the reconciliation behind it.
          */
         get: operations["get_review_queue"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/facts/review-stats": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Review Stats
+         * @description Review counts over the last `days` UTC days (today included): facts pending now and
+         *     how many of them a thesis KPI waits on, owner decisions per day, facts marked wrong, and
+         *     the last recorded golden-set extraction accuracy (null when none is recorded).
+         */
+        get: operations["get_review_stats"];
         put?: never;
         post?: never;
         delete?: never;
@@ -1074,6 +1145,51 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/escalations/stats": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Escalation Stats
+         * @description How escalations are being handled: how many are open, acknowledged and resolved now,
+         *     the median time to the first acknowledgement, and per day of the window how many were
+         *     written and acknowledged (days in Europe/Prague).
+         */
+        get: operations["get_escalation_stats"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/escalations/{report_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Escalation */
+        get: operations["get_escalation"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /**
+         * Update Escalation
+         * @description Acknowledge, resolve or reopen an escalation. Acknowledging (or resolving one never
+         *     acknowledged) records when; reopening clears the resolution but keeps the first
+         *     acknowledgement. Setting the current status again changes nothing.
+         */
+        patch: operations["update_escalation"];
+        trace?: never;
+    };
     "/news": {
         parameters: {
             query?: never;
@@ -1087,6 +1203,49 @@ export interface paths {
          *     combine (AND); a repeated parameter matches any of its values.
          */
         get: operations["get_news"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/news/stats": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get News Stats
+         * @description Stories over the last `days` UTC days (today included), each dated by its earliest
+         *     item's publication: per day by severity, per event type, and how many are disputed.
+         *     Repeats of an earlier story are left out; unclassified stories are counted apart.
+         */
+        get: operations["get_news_stats"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/news/sources/health": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get News Sources Health
+         * @description Every configured news source with its last fetch time, item count and error, and
+         *     whether it is healthy (`rule` states how that is decided).
+         */
+        get: operations["get_news_sources_health"];
         put?: never;
         post?: never;
         delete?: never;
@@ -1247,26 +1406,9 @@ export interface paths {
          * Get Escalations
          * @description Impact notes on confirmed severity-2+ stories and large price moves, newest first:
          *     each cites its sources and names the thesis KPIs or exit conditions it touches, or
-         *     states that none applies.
+         *     states that none applies. `status` keeps only open, acknowledged or resolved ones.
          */
         get: operations["get_escalations"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/escalations/{report_id}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** Get Escalation */
-        get: operations["get_escalation"];
         put?: never;
         post?: never;
         delete?: never;
@@ -2132,6 +2274,22 @@ export interface components {
              * @description Held or quarantined facts for this holding.
              */
             open_review_items: number;
+            /**
+             * Score
+             * @description 0-100: 100 x mean s_k over KPIs with a verdict, rounded half up; s_k = 1 pass, 0.5 unknown or stale, 0 breach. Null when no KPI has been judged. See score_method.
+             */
+            score: number | null;
+            /**
+             * Score History
+             * @description The score as of the end of each UTC day a verdict for one of this holding's KPIs was recorded (latest 12 such days, oldest first).
+             */
+            score_history: components["schemas"]["ScorePoint"][];
+            /**
+             * State
+             * @description unjudged: no score. Else by breaching KPIs (current verdict breach): intact none, watch one, at_risk two or more.
+             * @enum {string}
+             */
+            state: "intact" | "watch" | "at_risk" | "unjudged";
         };
         /** BucketDrift */
         BucketDrift: {
@@ -2312,6 +2470,12 @@ export interface components {
              */
             description: string;
             /**
+             * Enabled
+             * @description A disabled rule is kept in the config (and still validated) but never evaluated: no breach, no review compliance row, not offered to the AI.
+             * @default true
+             */
+            enabled: boolean;
+            /**
              * @description discriminator enum property added by openapi-typescript
              * @enum {string}
              */
@@ -2366,6 +2530,12 @@ export interface components {
              * @default
              */
             description: string;
+            /**
+             * Enabled
+             * @description A disabled rule is kept in the config (and still validated) but never evaluated: no breach, no review compliance row, not offered to the AI.
+             * @default true
+             */
+            enabled: boolean;
             /**
              * @description discriminator enum property added by openapi-typescript
              * @enum {string}
@@ -2790,6 +2960,18 @@ export interface components {
             /** Month */
             month: string;
             /**
+             * Period Start
+             * Format: date-time
+             * @description Start of the budget month (midnight on the 1st, Europe/Prague), inclusive.
+             */
+            period_start: string;
+            /**
+             * Period End
+             * Format: date-time
+             * @description End of the budget month (midnight on the 1st of the next), exclusive.
+             */
+            period_end: string;
+            /**
              * Total Usd
              * @description Sum of `job_step.cost_usd` of steps started in month.
              */
@@ -2812,6 +2994,16 @@ export interface components {
             by_job_type: components["schemas"]["JobTypeCost"][];
             /** By Model */
             by_model: components["schemas"]["ModelCost"][];
+        };
+        /** DayCount */
+        DayCount: {
+            /**
+             * Date
+             * Format: date
+             */
+            date: string;
+            /** Count */
+            count: number;
         };
         /** DiffChange */
         DiffChange: {
@@ -3347,6 +3539,24 @@ export interface components {
             } | null;
             claims?: components["schemas"]["ClaimCheckSummary"] | null;
         };
+        /** EscalationDay */
+        EscalationDay: {
+            /**
+             * Date
+             * Format: date
+             */
+            date: string;
+            /**
+             * Opened
+             * @description Escalations written that day.
+             */
+            opened: number;
+            /**
+             * Acknowledged
+             * @description Escalations first acknowledged that day.
+             */
+            acknowledged: number;
+        };
         /** EscalationOut */
         EscalationOut: {
             /** Id */
@@ -3380,6 +3590,22 @@ export interface components {
              * @description Models the run called.
              */
             models: string[];
+            /**
+             * Status
+             * @description Where the owner is with it.
+             * @enum {string}
+             */
+            status: "open" | "acknowledged" | "resolved";
+            /**
+             * Acknowledged At
+             * @description When the owner first acknowledged (or directly resolved) it; kept when reopened.
+             */
+            acknowledged_at: string | null;
+            /**
+             * Resolved At
+             * @description When the owner resolved it; null unless resolved.
+             */
+            resolved_at: string | null;
         };
         /**
          * EscalationSettings
@@ -3456,6 +3682,52 @@ export interface components {
              * @description The stored text the note's sentences are checked against.
              */
             snippet?: string | null;
+        };
+        /** EscalationStats */
+        EscalationStats: {
+            /**
+             * Open
+             * @description Escalations open now (any age).
+             */
+            open: number;
+            /**
+             * Acknowledged
+             * @description Escalations acknowledged and not resolved now.
+             */
+            acknowledged: number;
+            /**
+             * Resolved
+             * @description Escalations resolved now.
+             */
+            resolved: number;
+            /**
+             * Median Minutes To Ack
+             * @description Median minutes from an escalation being written to its first acknowledgement, over those acknowledged in the window. Null when none was.
+             */
+            median_minutes_to_ack: number | null;
+            /**
+             * Per Day
+             * @description Every day of the window, oldest first, today last (zeros included).
+             */
+            per_day: components["schemas"]["EscalationDay"][];
+            /**
+             * Days
+             * @description Length of the window in days, today included.
+             */
+            days: number;
+            /**
+             * Timezone
+             * @description Time zone the days are counted in.
+             */
+            timezone: string;
+        };
+        /** EscalationStatusUpdate */
+        EscalationStatusUpdate: {
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "open" | "acknowledged" | "resolved";
         };
         /** EurostatSeries */
         EurostatSeries: {
@@ -3600,6 +3872,13 @@ export interface components {
             /** Note */
             note: string | null;
             body: components["schemas"]["EventRulesConfig"];
+        };
+        /** EventTypeCount */
+        EventTypeCount: {
+            /** Event Type */
+            event_type: string;
+            /** Count */
+            count: number;
         };
         /** EventTypeInfo */
         EventTypeInfo: {
@@ -3843,6 +4122,16 @@ export interface components {
              * @enum {string}
              */
             confidence: "verified" | "corroborated" | "unconfirmed" | "disputed";
+            /**
+             * Check Score
+             * @description Passed checks / all checks stored with the figure (0..1): the share of the validator's checks it passed (`checks`). Null when no check ran.
+             */
+            check_score: number | null;
+            /**
+             * Source Tier
+             * @description Trust tier (1 best, 3 weakest) of the host the figure was read from: 1 for the holding's own IR or results domains, else the news_sources config's domain tier; one tier lower while the owner's feedback has the host's trust below the verification config's demote_below. Null when the host has no configured tier.
+             */
+            source_tier: number | null;
         };
         /** FactReview */
         FactReview: {
@@ -4005,6 +4294,38 @@ export interface components {
             /** Job Id */
             job_id: number;
         };
+        /** FxQuote */
+        FxQuote: {
+            /** Currency */
+            currency: string;
+            /** Base Currency */
+            base_currency: string;
+            /**
+             * Source
+             * @description Whose reference rates: ČNB or the ECB.
+             * @enum {string}
+             */
+            source: "cnb" | "ecb";
+            /**
+             * Rate
+             * @description Base-currency units per one unit of `currency`.
+             */
+            rate: number | null;
+            /** Rate Date */
+            rate_date: string | null;
+            /**
+             * Previous Rate
+             * @description The published rate before `rate_date`.
+             */
+            previous_rate: number | null;
+            /** Previous Rate Date */
+            previous_rate_date: string | null;
+            /**
+             * Change Pct
+             * @description Fraction (0.012 = +1.2 %) of the latest against the previous value.
+             */
+            change_pct: number | null;
+        };
         /** FxRateUsed */
         FxRateUsed: {
             /** Currency */
@@ -4016,6 +4337,29 @@ export interface components {
             rate: number;
             /** Rate Date */
             rate_date: string | null;
+        };
+        /** GoldenAccuracy */
+        GoldenAccuracy: {
+            /**
+             * Value
+             * @description Matched labelled figures / all labelled figures (0..1).
+             */
+            value: number;
+            /**
+             * Target
+             * @description The evals gate's target for the component (0..1).
+             */
+            target: number;
+            /**
+             * Evaluated At
+             * @description When the baseline file was last written by a passing live run.
+             */
+            evaluated_at: string | null;
+            /**
+             * Model
+             * @description The extraction model the run measured.
+             */
+            model: string | null;
         };
         /**
          * GoogleNewsLocale
@@ -4059,6 +4403,11 @@ export interface components {
             name: string | null;
             /** Isin */
             isin: string | null;
+            /**
+             * Security Type
+             * @description OpenFIGI's security type (e.g. 'Common Stock', 'ETP'); null until the reference-data job has resolved the instrument.
+             */
+            security_type: string | null;
             /** Quantity */
             quantity: number;
             /** Avg Price */
@@ -4269,10 +4618,49 @@ export interface components {
              */
             top_holders: components["schemas"]["TopHolder"][];
             /**
+             * Top Holders Previous Period
+             * @description The period each top holder's prev_shares is from.
+             */
+            top_holders_previous_period?: string | null;
+            /**
              * Source
              * @default SEC Form 13F data sets
              */
             source: string;
+        };
+        /** HoldingPrices */
+        HoldingPrices: {
+            /** Ticker */
+            ticker: string;
+            /** Name */
+            name: string | null;
+            /**
+             * Symbol
+             * @description Stooq symbol; null when none is known.
+             */
+            symbol: string | null;
+            /**
+             * As Of
+             * @description Date of the latest stored close.
+             */
+            as_of: string | null;
+            /** Last Close */
+            last_close: number | null;
+            /**
+             * Previous Close
+             * @description The stored close before `as_of`.
+             */
+            previous_close: number | null;
+            /**
+             * Day Change Pct
+             * @description Fraction (0.012 = +1.2 %) of the latest against the previous value.
+             */
+            day_change_pct: number | null;
+            /**
+             * Bars
+             * @description Daily closes from `days` before `as_of` to `as_of`, oldest first; empty when no prices are stored.
+             */
+            bars: components["schemas"]["PricePoint"][];
         };
         /** HoldingProfile */
         HoldingProfile: {
@@ -4377,6 +4765,16 @@ export interface components {
             note: string | null;
             body: components["schemas"]["HoldingProfilesConfig"];
         };
+        /** HoldingsPrices */
+        HoldingsPrices: {
+            /** Days */
+            days: number;
+            /**
+             * Holdings
+             * @description Every open position of the latest snapshot, by value descending.
+             */
+            holdings: components["schemas"]["HoldingPrices"][];
+        };
         /** HoldingsResponse */
         HoldingsResponse: {
             freshness: components["schemas"]["Freshness"] | null;
@@ -4428,6 +4826,29 @@ export interface components {
              * @description Domains whose body equalled the active version.
              */
             unchanged: string[];
+        };
+        /** IndexQuote */
+        IndexQuote: {
+            /** Symbol */
+            symbol: string;
+            /** Label */
+            label: string;
+            /** Last Close */
+            last_close: number | null;
+            /**
+             * As Of
+             * @description Date of the latest stored close.
+             */
+            as_of: string | null;
+            /** Previous Close */
+            previous_close: number | null;
+            /** Previous Date */
+            previous_date: string | null;
+            /**
+             * Change Pct
+             * @description Fraction (0.012 = +1.2 %) of the latest against the previous value.
+             */
+            change_pct: number | null;
         };
         /** InstrumentInfo */
         InstrumentInfo: {
@@ -4485,6 +4906,11 @@ export interface components {
             params: {
                 [key: string]: unknown;
             };
+            /**
+             * Attempts
+             * @description Times the runner started this job, a resumed run included; above 1 means it was retried. 0 = never started.
+             */
+            attempts: number;
             /** Steps */
             steps: components["schemas"]["JobStepOut"][];
         };
@@ -4526,6 +4952,11 @@ export interface components {
             params: {
                 [key: string]: unknown;
             };
+            /**
+             * Attempts
+             * @description Times the runner started this job, a resumed run included; above 1 means it was retried. 0 = never started.
+             */
+            attempts: number;
             /**
              * Cost Usd
              * @description Sum of the run's step costs; null if none.
@@ -4898,6 +5329,37 @@ export interface components {
             /** Name */
             name: string;
         };
+        /** MarketStrip */
+        MarketStrip: {
+            /**
+             * Base Currency
+             * @description The latest snapshot's base currency (the active strategy's before the first sync).
+             */
+            base_currency: string | null;
+            /**
+             * Fx
+             * @description Each currency held in the latest snapshot (positions and the account) other than the base currency, by code.
+             */
+            fx: components["schemas"]["FxQuote"][];
+            /**
+             * Indices
+             * @description The Jobs config's `prices.market_strip`, in its order.
+             */
+            indices: components["schemas"]["IndexQuote"][];
+        };
+        /** MarketStripItem */
+        MarketStripItem: {
+            /**
+             * Symbol
+             * @example ^spx
+             */
+            symbol: string;
+            /**
+             * Label
+             * @example S&P 500
+             */
+            label: string;
+        };
         /** MessageOut */
         MessageOut: {
             /** Id */
@@ -5224,6 +5686,36 @@ export interface components {
             note: string | null;
             body: components["schemas"]["NewsSourcesConfig"];
         };
+        /** NewsStats */
+        NewsStats: {
+            /** Days */
+            days: number;
+            /**
+             * Total
+             * @description Stories first published in the window (repeats excluded).
+             */
+            total: number;
+            /**
+             * Unclassified
+             * @description Of those, stories not yet classified.
+             */
+            unclassified: number;
+            /**
+             * Per Day
+             * @description Every UTC day of the window, oldest first.
+             */
+            per_day: components["schemas"]["SeverityDay"][];
+            /**
+             * By Event Type
+             * @description Classified stories per event type, most first.
+             */
+            by_event_type: components["schemas"]["EventTypeCount"][];
+            /**
+             * Disputed Count
+             * @description Stories in the window whose sources contradict each other (status disputed, including ones the owner has since marked false).
+             */
+            disputed_count: number;
+        };
         /** NoteSentence */
         NoteSentence: {
             /** Text */
@@ -5459,6 +5951,16 @@ export interface components {
              * @description Why there is no portfolio history, when there is none.
              */
             gap: string | null;
+            /**
+             * Values Currency
+             * @description Currency of `values`: the latest snapshot's base currency; null before the first sync.
+             */
+            values_currency: string | null;
+            /**
+             * Values
+             * @description Absolute figures of every day snapshot in the window, oldest first, in `values_currency` (snapshots taken in another base currency are left out). Unlike `points` these include deposits and withdrawals.
+             */
+            values: components["schemas"]["SnapshotValues"][];
         };
         /** PortfolioOverview */
         PortfolioOverview: {
@@ -5504,6 +6006,12 @@ export interface components {
              * @default
              */
             description: string;
+            /**
+             * Enabled
+             * @description A disabled rule is kept in the config (and still validated) but never evaluated: no breach, no review compliance row, not offered to the AI.
+             * @default true
+             */
+            enabled: boolean;
             /**
              * @description discriminator enum property added by openapi-typescript
              * @enum {string}
@@ -5586,6 +6094,12 @@ export interface components {
              */
             description: string;
             /**
+             * Enabled
+             * @description A disabled rule is kept in the config (and still validated) but never evaluated: no breach, no review compliance row, not offered to the AI.
+             * @default true
+             */
+            enabled: boolean;
+            /**
              * @description discriminator enum property added by openapi-typescript
              * @enum {string}
              */
@@ -5600,6 +6114,27 @@ export interface components {
             message: components["schemas"]["MessageOut"];
             /** Job Id */
             job_id: number;
+        };
+        /**
+         * PriceBarOut
+         * @description A stored daily bar. Stooq's open, high, low and volume are null when it gave none.
+         */
+        PriceBarOut: {
+            /**
+             * Date
+             * Format: date
+             */
+            date: string;
+            /** Close */
+            close: number;
+            /** Open */
+            open: number | null;
+            /** High */
+            high: number | null;
+            /** Low */
+            low: number | null;
+            /** Volume */
+            volume: number | null;
         };
         /** PriceGap */
         PriceGap: {
@@ -5638,7 +6173,7 @@ export interface components {
             /** Fetched At */
             fetched_at: string | null;
             /** Bars */
-            bars: components["schemas"]["PricePoint"][];
+            bars: components["schemas"]["PriceBarOut"][];
             /** Benchmark Symbol */
             benchmark_symbol: string | null;
             /** Benchmark */
@@ -5688,6 +6223,11 @@ export interface components {
              * @default 1
              */
             plausibility_tolerance_pct: number;
+            /**
+             * Market Strip
+             * @description Index quotes on the market strip: Stooq symbols (collected with the benchmarks) and the label shown. A symbol Stooq has no data for shows as empty.
+             */
+            market_strip?: components["schemas"]["MarketStripItem"][];
         };
         /** PromptDefault */
         PromptDefault: {
@@ -6123,6 +6663,16 @@ export interface components {
              * @description When the next report of this kind is scheduled: this one is current until then. Null for unscheduled kinds or a disabled schedule.
              */
             next_due_at?: string | null;
+            /**
+             * Story Count
+             * @description Digests: the stories across its sections (sections[].stories). Null for report kinds without stories.
+             */
+            story_count?: number | null;
+            /**
+             * Citation Count
+             * @description Digests: the distinct sources it cites, counted by URL across its news sources (sources[].url) and the filings of its cited facts (fact_sources[].source_url); several facts from one filing count once. Null for report kinds without a source list.
+             */
+            citation_count?: number | null;
         };
         /** ReportingExceptionOut */
         ReportingExceptionOut: {
@@ -6481,6 +7031,38 @@ export interface components {
              */
             holder_drop_flag_pct: number;
         };
+        /** ReviewStats */
+        ReviewStats: {
+            /** Days */
+            days: number;
+            /**
+             * Pending
+             * @description Facts held or quarantined now, waiting for the owner.
+             */
+            pending: number;
+            /**
+             * Blocking Verdict
+             * @description Pending facts whose metric feeds a configured thesis KPI of the same holding (the KPI's metric or a component it is derived from, same basis).
+             */
+            blocking_verdict: number;
+            /**
+             * Reviewed Count
+             * @description Owner decisions (accept, correct, reject) in window.
+             */
+            reviewed_count: number;
+            /**
+             * Reviewed Per Day
+             * @description Every UTC day, oldest first.
+             */
+            reviewed_per_day: components["schemas"]["DayCount"][];
+            /**
+             * Marked Wrong
+             * @description Distinct facts the owner marked wrong in the window.
+             */
+            marked_wrong: number;
+            /** @description The last recorded live golden-set run of the earnings extraction; null when none is recorded. */
+            golden_accuracy: components["schemas"]["GoldenAccuracy"] | null;
+        };
         /** RiskCard */
         RiskCard: {
             /**
@@ -6528,6 +7110,16 @@ export interface components {
              */
             tickers?: string[];
         };
+        /** ScorePoint */
+        ScorePoint: {
+            /**
+             * Date
+             * Format: date
+             */
+            date: string;
+            /** Score */
+            score: number;
+        };
         /** Sentence */
         Sentence: {
             /** Text */
@@ -6544,6 +7136,26 @@ export interface components {
             /** Check Reason */
             check_reason?: string | null;
         };
+        /** SeverityDay */
+        SeverityDay: {
+            /**
+             * Date
+             * Format: date
+             */
+            date: string;
+            /**
+             * By Severity
+             * @description Stories first published that UTC day, per severity; keys '0'-'3', always all four.
+             */
+            by_severity: {
+                [key: string]: number;
+            };
+            /**
+             * Unclassified
+             * @description Stories that day with no severity yet.
+             */
+            unclassified: number;
+        };
         /** SeverityOverride */
         SeverityOverride: {
             /**
@@ -6558,6 +7170,31 @@ export interface components {
             event_type: "guidance_change" | "m_and_a" | "dividend_cut" | "earnings_release" | "management_change" | "regulatory_legal" | "capital_allocation" | "credit_rating" | "central_bank" | "macro_surprise" | "insider_transaction" | "product_business" | "sector_competitor" | "index_change" | "analyst_rating" | "delisting" | "entity_status" | "other";
             /** Severity */
             severity: number;
+        };
+        /** SnapshotValues */
+        SnapshotValues: {
+            /**
+             * Date
+             * Format: date
+             */
+            date: string;
+            /**
+             * Total
+             * @description Invested plus cash.
+             */
+            total: number;
+            /**
+             * Invested
+             * @description Market value of the open positions.
+             */
+            invested: number;
+            /** Cash */
+            cash: number;
+            /**
+             * Unrealised
+             * @description Trading212's unrealised P/L, converted from the account currency at the snapshot's own account-to-base rate.
+             */
+            unrealised: number;
         };
         /** Source */
         Source: {
@@ -6598,6 +7235,50 @@ export interface components {
             /** As Of */
             as_of?: string | null;
         };
+        /** SourceHealth */
+        SourceHealth: {
+            /** Id */
+            id: string;
+            /** Name */
+            name: string;
+            /**
+             * Type
+             * @enum {string}
+             */
+            type: "rss" | "page" | "edgar" | "finnhub" | "google_news" | "rns" | "eqs" | "edgar_fts";
+            /**
+             * Host
+             * @description The feed's host; null for per-holding sources (EDGAR, Finnhub, ...).
+             */
+            host: string | null;
+            /**
+             * Tier
+             * @enum {integer}
+             */
+            tier: 1 | 2 | 3;
+            /** Enabled */
+            enabled: boolean;
+            /**
+             * Last Fetched At
+             * @description Null: never fetched.
+             */
+            last_fetched_at: string | null;
+            /**
+             * Last Item Count
+             * @description Items the last fetch returned.
+             */
+            last_item_count: number | null;
+            /**
+             * Last Error
+             * @description The last fetch's error, or its note when empty.
+             */
+            last_error: string | null;
+            /**
+             * Healthy
+             * @description healthy = enabled, last fetched within the Jobs config's monitoring.news_coverage_hours, and that fetch recorded no error or note
+             */
+            healthy: boolean;
+        };
         /** SourceTrustOut */
         SourceTrustOut: {
             /** Host */
@@ -6618,6 +7299,22 @@ export interface components {
              * Format: date-time
              */
             updated_at: string;
+        };
+        /** SourcesHealth */
+        SourcesHealth: {
+            /**
+             * Rule
+             * @description How `healthy` is decided.
+             * @default healthy = enabled, last fetched within the Jobs config's monitoring.news_coverage_hours, and that fetch recorded no error or note
+             */
+            rule: string;
+            /** Window Hours */
+            window_hours: number;
+            /**
+             * Sources
+             * @description Every configured source, in config order.
+             */
+            sources: components["schemas"]["SourceHealth"][];
         };
         /** StoryOut */
         StoryOut: {
@@ -6852,6 +7549,24 @@ export interface components {
             as_of: string | null;
             /** Rows */
             rows: components["schemas"]["BoardRow"][];
+            /**
+             * Score Method
+             * @description How score and portfolio_score are computed.
+             * @default score = round_half_up(100 x mean of s_k over the holding's KPIs that have a verdict); s_k = 1.0 pass, 0.5 unknown or stale (judged under an older theses config), 0.0 breach; KPIs never judged are left out, and a holding with none judged has no score. History: the score as of the end of each UTC day a verdict was recorded. Portfolio score: mean of held holdings' scores weighted by current position weight, rounded half up. State: unjudged (no score), intact (no KPI breaching), watch (one), at_risk (two or more).
+             */
+            score_method: string;
+            /**
+             * Portfolio Score
+             * @description Mean of held rows' scores weighted by current position weight, over held rows with a score and a weight. Null when there is none.
+             */
+            portfolio_score?: number | null;
+            /**
+             * Portfolio Score History
+             * @description portfolio_score recomputed as of the end of each UTC day any held row had a verdict recorded (latest 12 such days, oldest first), with today's weights.
+             */
+            portfolio_score_history?: components["schemas"]["ScorePoint"][];
+            /** @description Verdict records over the last 30 UTC days, today included. */
+            verdicts_30d: components["schemas"]["VerdictActivity"];
         };
         /** ThesisChange */
         ThesisChange: {
@@ -6963,6 +7678,16 @@ export interface components {
              * @description The filing the position is read from.
              */
             accession: string;
+            /**
+             * Prev Shares
+             * @description The same manager's shares in the previous report period loaded (`top_holders_previous_period`); null when it held none then or no earlier period is loaded.
+             */
+            prev_shares?: number | string | null;
+            /**
+             * Shares Change Pct
+             * @description (shares - prev_shares) / prev_shares, as a fraction (0.125 = +12.5 %); null when prev_shares is null or zero.
+             */
+            shares_change_pct?: number | null;
         };
         /** TotalByCurrency */
         TotalByCurrency: {
@@ -7098,6 +7823,24 @@ export interface components {
             source_ids: string[];
             /** Note */
             note?: string | null;
+        };
+        /** VerdictActivity */
+        VerdictActivity: {
+            /**
+             * Count
+             * @description Verdict records created in the window (a verdict is recorded only when its outcome, figures or config changed).
+             */
+            count: number;
+            /**
+             * Fact Count
+             * @description Distinct facts those verdicts cite.
+             */
+            fact_count: number;
+            /**
+             * Per Day
+             * @description Every UTC day of the window, oldest first.
+             */
+            per_day: components["schemas"]["DayCount"][];
         };
         /** VerdictOut */
         VerdictOut: {
@@ -7550,6 +8293,57 @@ export interface operations {
             };
         };
     };
+    get_holdings_prices: {
+        parameters: {
+            query?: {
+                days?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HoldingsPrices"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_market_strip: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MarketStrip"];
+                };
+            };
+        };
+    };
     get_portfolio_overview: {
         parameters: {
             query?: never;
@@ -7657,6 +8451,8 @@ export interface operations {
             query?: {
                 /** @description Any of these. */
                 type?: ("order" | "dividend" | "cash")[] | null;
+                /** @description Any of these, as Trading212 names them (BUY, SELL, DEPOSIT, ...). */
+                subtype?: string[] | null;
                 ticker?: string | null;
                 /** @description On or after. */
                 from?: string | null;
@@ -8033,6 +8829,37 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ReviewItem"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_review_stats: {
+        parameters: {
+            query?: {
+                days?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReviewStats"];
                 };
             };
             /** @description Validation Error */
@@ -9012,6 +9839,104 @@ export interface operations {
             };
         };
     };
+    get_escalation_stats: {
+        parameters: {
+            query?: {
+                /** @description Window length, today included. */
+                days?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EscalationStats"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_escalation: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                report_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EscalationOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_escalation: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                report_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["EscalationStatusUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EscalationOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     get_news: {
         parameters: {
             query?: {
@@ -9048,6 +9973,57 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_news_stats: {
+        parameters: {
+            query?: {
+                days?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NewsStats"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_news_sources_health: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SourcesHealth"];
                 };
             };
         };
@@ -9273,6 +10249,7 @@ export interface operations {
             query?: {
                 ticker?: string | null;
                 limit?: number;
+                status?: ("open" | "acknowledged" | "resolved") | null;
             };
             header?: never;
             path?: never;
@@ -9287,37 +10264,6 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["EscalationOut"][];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    get_escalation: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                report_id: number;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["EscalationOut"];
                 };
             };
             /** @description Validation Error */

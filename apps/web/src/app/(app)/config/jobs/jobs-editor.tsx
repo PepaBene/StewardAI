@@ -300,7 +300,7 @@ function SettingsCard({
               />
             );
           }
-          if (field.kind === "lines") {
+          if (field.kind === "lines" || field.kind === "symbol-lines") {
             return <TextAreaField key={field.key} label={field.label} path={path} errors={errors} value={String(value)} rows={3} onChange={(v) => onChange(field.key, v)} hint={hint} />;
           }
           if (field.kind === "severity") {

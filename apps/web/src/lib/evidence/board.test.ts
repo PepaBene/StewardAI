@@ -58,6 +58,9 @@ function row(overall: BoardRow["overall"], extra: Partial<BoardRow> = {}): Board
     counts: { pass: 0, breach: 0, unknown: 0 },
     kpis: [],
     open_review_items: 0,
+    score: null,
+    score_history: [],
+    state: "unjudged",
     ...extra,
   };
 }
