@@ -41,6 +41,7 @@ from steward.earnings.read import (
 )
 from steward.earnings.review import ReviewError, ReviewItem, review_queue
 from steward.earnings.review import review_fact as review_fact_in_db
+from steward.earnings.review_stats import ReviewStats, review_stats
 from steward.jobs import queue
 from steward.jobs.runner import create_job
 from steward.portfolio.read import (
@@ -360,7 +361,10 @@ Storage = Annotated[EvidenceStore, Depends(get_storage)]
 @router.get("/theses/board", tags=["holdings"])
 async def get_thesis_board(pool: Pool, _owner: Owner) -> ThesisBoard:
     """Every holding with a thesis, once: each KPI's current pass / breach / unknown with the
-    verdict behind it. A KPI never judged is listed as unknown, never left out."""
+    verdict behind it. A KPI never judged is listed as unknown, never left out. Each row has
+    a 0-100 thesis score computed from those verdicts, its history and a state; the board
+    has the weight-weighted portfolio score and verdict activity. `score_method` states the
+    formula."""
     return await thesis_board(pool, local_today())
 
 
@@ -472,6 +476,16 @@ async def get_review_queue(
     """Facts waiting for the owner: held by the validator or quarantined by reconciliation,
     each with its snippet, source, the checks it broke and the reconciliation behind it."""
     return await review_queue(pool, ticker)
+
+
+@router.get("/facts/review-stats", tags=["holdings"])
+async def get_review_stats(
+    pool: Pool, _owner: Owner, days: Annotated[int, Query(ge=1, le=365)] = 30
+) -> ReviewStats:
+    """Review counts over the last `days` UTC days (today included): facts pending now and
+    how many of them a thesis KPI waits on, owner decisions per day, facts marked wrong, and
+    the last recorded golden-set extraction accuracy (null when none is recorded)."""
+    return await review_stats(pool, days, dt.datetime.now(dt.UTC))
 
 
 @router.get("/facts/index", tags=["holdings"])
