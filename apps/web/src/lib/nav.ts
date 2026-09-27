@@ -1,35 +1,86 @@
-/** Top-level sections from the spec's information architecture. */
-export const SECTIONS = [
-  { slug: "", label: "Overview", description: "Portfolio value, allocation, drift and today's alerts at a glance." },
-  { slug: "holdings", label: "Holdings", description: "One row per position, each opening to a holding page with its thesis, verdicts, news and evidence." },
-  { slug: "news", label: "News", description: "Filterable feed by holding, severity, confidence and source tier." },
-  { slug: "research", label: "Research", description: "Past research reports and a \"research this ticker\" action." },
-  { slug: "reports", label: "Reports", description: "Digest archive, monthly reviews, impact notes and research, searchable in full text." },
-  { slug: "chat", label: "Chat", description: "Persistent chat with the copilot." },
-  { slug: "config", label: "Config", description: "Strategy, theses, sources, notifications, research profiles, schedules and budget." },
-  { slug: "activity", label: "Activity", description: "Job log, coverage gaps and cost against budget." },
-] as const;
+/**
+ * The Ledger information architecture: pages grouped by job, not by feature (see
+ * Ledger_Design_System_Redesign_Proposal.md section 3). Chat is deliberately not a cluster —
+ * it stays a global Cmd/Ctrl+K + slide-over, reachable from anywhere, never a nav destination.
+ */
 
-export type Section = (typeof SECTIONS)[number];
+export type ClusterPage = { readonly href: string; readonly label: string };
 
-/** Sections with a real page of their own; the rest render the [section] placeholder. */
-export const BUILT_SLUGS: readonly string[] = ["", "holdings", "news", "research", "reports", "chat", "config", "activity"];
-
-export const PLACEHOLDER_SECTIONS = SECTIONS.filter((s) => !BUILT_SLUGS.includes(s.slug));
-
-export function sectionHref(section: Pick<Section, "slug">) {
-  return `/${section.slug}`;
-}
-
-/** Pages outside a section's own path that belong to it (highlighted as that section). */
-export const SECTION_ALIASES: Record<string, readonly string[]> = {
-  "/holdings": ["/transactions", "/theses", "/review"],
-  "/reports": ["/escalations", "/reviews"],
-  // A job run's page belongs to the job log; API health and reference gaps sit beside it.
-  "/activity": ["/jobs", "/status"],
+export type Cluster = {
+  readonly id: "portfolio" | "research" | "oversight" | "config";
+  readonly label: string;
+  readonly description: string;
+  /** Primary landing page: what clicking the cluster's own label opens. */
+  readonly href: string;
+  /** Pages shown in the cluster's menu. */
+  readonly pages: readonly ClusterPage[];
+  /** Detail-only routes that belong to this cluster but aren't a page of their own. */
+  readonly extra?: readonly string[];
 };
 
-export function isSectionActive(href: string, pathname: string): boolean {
+export const CLUSTERS: readonly Cluster[] = [
+  {
+    id: "portfolio",
+    label: "Portfolio",
+    description: "What do I hold and how has it done.",
+    href: "/",
+    pages: [
+      { href: "/", label: "Overview" },
+      { href: "/holdings", label: "Holdings" },
+      { href: "/transactions", label: "Transactions" },
+    ],
+  },
+  {
+    id: "research",
+    label: "Research & Verification",
+    description: "Is my thesis still true.",
+    href: "/theses",
+    pages: [
+      { href: "/theses", label: "Theses" },
+      { href: "/review", label: "Review queue" },
+      { href: "/research", label: "Research" },
+      { href: "/news", label: "News" },
+    ],
+    extra: ["/evidence"],
+  },
+  {
+    id: "oversight",
+    label: "Oversight",
+    description: "What needs my attention and what happened.",
+    href: "/reports",
+    pages: [
+      { href: "/escalations", label: "Escalations" },
+      { href: "/reports", label: "Reports" },
+      { href: "/reviews", label: "Reviews" },
+      { href: "/activity", label: "Activity" },
+    ],
+    extra: ["/jobs", "/status"],
+  },
+  {
+    id: "config",
+    label: "Config",
+    description: "Strategy, theses, sources, notifications, research profiles, schedules and budget.",
+    href: "/config",
+    pages: [{ href: "/config", label: "Config" }],
+  },
+] as const;
+
+/** Every page across every cluster, in cluster order — the flat list a "Go to" list needs. */
+export const CLUSTER_PAGES: readonly (ClusterPage & { cluster: Cluster["label"] })[] = CLUSTERS.flatMap((c) =>
+  c.pages.map((p) => ({ ...p, cluster: c.label })),
+);
+
+function hrefMatches(href: string, pathname: string): boolean {
   if (href === "/") return pathname === "/";
-  return [href, ...(SECTION_ALIASES[href] ?? [])].some((p) => pathname === p || pathname.startsWith(`${p}/`));
+  return pathname === href || pathname.startsWith(`${href}/`);
+}
+
+/** Is `pathname` this exact page (or one of its sub-paths, e.g. a ticker or id detail page)? */
+export function isPageActive(pageHref: string, pathname: string): boolean {
+  return hrefMatches(pageHref, pathname);
+}
+
+/** Is `pathname` anywhere in this cluster — one of its pages, or a detail-only extra route? */
+export function isClusterActive(cluster: Pick<Cluster, "pages" | "extra">, pathname: string): boolean {
+  return cluster.pages.some((p) => hrefMatches(p.href, pathname)) || (cluster.extra ?? []).some((p) => hrefMatches(p, pathname));
 }
