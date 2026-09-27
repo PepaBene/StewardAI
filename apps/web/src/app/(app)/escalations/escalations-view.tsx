@@ -12,6 +12,7 @@ import { JobStatusBadge } from "@/components/jobs/job-status-badge";
 import { EscalationStatusBadge } from "@/components/news/escalation-status-badge";
 import { ReportsTabs } from "@/components/news/reports-tabs";
 import { SeverityBadge } from "@/components/news/severity-badge";
+import { SeverityDot } from "@/components/news/severity-timeline";
 import { Button } from "@/components/ui/button";
 import { getBrowserApiClient, type EscalationOut, type Holding } from "@/lib/api/client";
 import { formatCost } from "@/lib/jobs/job-detail";
@@ -136,7 +137,10 @@ function EscalationRow({ escalation: e }: { escalation: EscalationOut }) {
     <li>
       <Link href={escalationHref(e.id)} className="block space-y-1.5 p-4 hover:bg-surface-muted">
         <span className="flex flex-wrap items-start justify-between gap-2">
-          <span className="min-w-0 flex-1 font-medium">{e.body.headline || e.title}</span>
+          <span className="flex min-w-0 flex-1 items-start gap-2">
+            <SeverityDot severity={e.body.severity} className="mt-1.5" />
+            <span className="min-w-0 flex-1 font-medium">{e.body.headline || e.title}</span>
+          </span>
           <span className="flex items-center gap-1.5">
             {e.body.severity !== null ? <SeverityBadge severity={e.body.severity} /> : null}
             <EscalationStatusBadge body={e.body} />
