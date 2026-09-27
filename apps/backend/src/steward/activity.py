@@ -37,7 +37,8 @@ async def held_since(pool: asyncpg.Pool) -> dict[str, dt.datetime]:
     rows = await pool.fetch(
         "select p.ticker, min(p.captured_at) as since from public.position_snapshot p"
         " where p.ticker in (select ticker from public.position_snapshot"
-        " where snapshot_date = (select max(snapshot_date) from public.position_snapshot))"
+        " where snapshot_date = coalesce((select max(snapshot_date) from public.account_snapshot),"
+        " (select max(snapshot_date) from public.position_snapshot)))"
         " group by p.ticker"
     )
     return {r["ticker"]: r["since"] for r in rows}

@@ -13,27 +13,41 @@ strategy rule id or a thesis KPI ("TICKER:kpi_id") that exists; code drops any a
 cites neither, so no action is published without a citation.
 """
 
+import asyncio
 import datetime as dt
 import json
+import logging
 from dataclasses import dataclass
-from typing import Literal, Protocol, cast
+from typing import Any, Literal, Protocol, cast
 
 import anthropic
 import asyncpg
-from anthropic.types import MessageParam, OutputConfigParam
+import pydantic
+from anthropic import transform_schema
+from anthropic.types import MessageParam
 from pydantic import BaseModel, Field
 
 from steward.ai import AINotConfigured, Usage, create_client
-from steward.config.jobs import JobsConfig, ReviewSettings
+from steward.config.jobs import JobsConfig, ReviewSettings, effort_kwargs, reasoning_kwargs
+from steward.config.prompts import load_prompts
 from steward.config.store import load_active
-from steward.config.strategy import StrategyConfig
+from steward.config.strategy import (
+    CashWeightRule,
+    CategoryWeightRule,
+    PositionWeightRule,
+    StrategyConfig,
+    StrategyRule,
+)
 from steward.config.thesis import ThesesConfig
 from steward.jobs.runner import JobContext
 from steward.ownership.read import holding_ownership
-from steward.portfolio.breaches import evaluate
+from steward.portfolio.breaches import _holds, evaluate
+from steward.portfolio.drift import DriftReport
 from steward.portfolio.read import portfolio_overview
 from steward.research.sources import CitedSentence, Registry, Source
 from steward.settings import get_settings
+
+logger = logging.getLogger(__name__)
 
 Status = Literal["pass", "breach", "unknown"]
 
@@ -112,11 +126,92 @@ state figures that are not in the material. If nothing needs doing, return no ac
 
 
 class ClaudeReviewWriter:
-    def __init__(self, client: anthropic.AsyncAnthropic, settings: ReviewSettings) -> None:
+    """Proposes the actions: through the Batch API when `use_batch` is set (the review is not
+    time-sensitive; half price), falling back to direct calls when the batch does not finish
+    within `batch_wait_minutes` or fails. No cache breakpoint: one call a month, and a retry
+    only after a failure, so a cache write would almost never be read back."""
+
+    def __init__(
+        self,
+        client: anthropic.AsyncAnthropic,
+        settings: ReviewSettings,
+        system: str = SYSTEM,
+        poll_seconds: float = 30.0,
+    ) -> None:
         self._client = client
         self._settings = settings
+        self._system = system
+        self._poll = poll_seconds
+
+    def _messages(self, material: str, today: dt.date) -> list[MessageParam]:
+        return [cast(MessageParam, {"role": "user", "content": f"Today is {today}.\n\n{material}"})]
 
     async def propose(
+        self, material: str, today: dt.date
+    ) -> tuple[ReviewDraft | None, Usage, str | None]:
+        if self._settings.use_batch:
+            batched = await self._propose_batch(material, today)
+            if batched is not None:
+                return batched
+        return await self._propose_direct(material, today)
+
+    async def _propose_batch(
+        self, material: str, today: dt.date
+    ) -> tuple[ReviewDraft | None, Usage, str | None] | None:
+        """The draft through the Batch API, or None to fall back to direct calls (the batch
+        did not finish in time or failed before a message came back). A message that came
+        back is final, parseable or not, so its batch-priced tokens are recorded exactly."""
+        usage = Usage(model=self._settings.model, batch=True)
+        params = {
+            "model": self._settings.model,
+            "system": self._system,
+            "messages": self._messages(material, today),
+            **reasoning_kwargs(
+                self._settings.model,
+                self._settings.effort,
+                16000,
+                {
+                    "format": {
+                        "type": "json_schema",
+                        "schema": transform_schema(ReviewDraft.model_json_schema()),
+                    }
+                },
+            ),
+        }
+        try:
+            batch = await self._client.messages.batches.create(
+                requests=[{"custom_id": "review", "params": cast(Any, params)}]
+            )
+            loop = asyncio.get_running_loop()
+            deadline = loop.time() + self._settings.batch_wait_minutes * 60
+            while batch.processing_status != "ended":
+                if loop.time() > deadline:
+                    await self._client.messages.batches.cancel(batch.id)
+                    logger.warning("review batch %s not done in time; calling directly", batch.id)
+                    return None
+                await asyncio.sleep(self._poll)
+                batch = await self._client.messages.batches.retrieve(batch.id)
+            async for result in await self._client.messages.batches.results(batch.id):
+                if result.custom_id != "review":
+                    continue
+                if result.result.type != "succeeded":
+                    logger.warning("review batch request %s", result.result.type)
+                    return None
+                message = result.result.message
+                usage.add(message.usage)
+                if message.stop_reason == "refusal":
+                    return None, usage, "the model declined"
+                text = "".join(getattr(b, "text", "") for b in message.content if b.type == "text")
+                try:
+                    return ReviewDraft.model_validate_json(text), usage, None
+                except pydantic.ValidationError:
+                    return None, usage, f"no parseable answer ({message.stop_reason})"
+        except anthropic.APIError as exc:
+            logger.warning("review batch failed (%s); calling directly", exc)
+            return None
+        return None
+
+    async def _propose_direct(
         self, material: str, today: dt.date
     ) -> tuple[ReviewDraft | None, Usage, str | None]:
         usage = Usage(model=self._settings.model)
@@ -125,19 +220,18 @@ class ClaudeReviewWriter:
             try:
                 response = await self._client.messages.parse(
                     model=self._settings.model,
-                    max_tokens=16000,
-                    system=SYSTEM,
-                    messages=[
-                        cast(
-                            MessageParam,
-                            {"role": "user", "content": f"Today is {today}.\n\n{material}"},
-                        )
-                    ],
-                    output_config=cast(OutputConfigParam, {"effort": self._settings.effort}),
+                    system=self._system,
+                    messages=self._messages(material, today),
+                    **effort_kwargs(self._settings.model, self._settings.effort, 16000),
                     output_format=ReviewDraft,
                 )
             except anthropic.APIError as exc:
                 note = f"the call failed: {exc}"[:300]
+                continue
+            except (pydantic.ValidationError, ValueError):
+                # `parse` validates the output before returning: malformed or truncated JSON
+                # surfaces here (and that response's usage with it).
+                note = "no parseable answer"
                 continue
             usage.add(response.usage)
             if response.stop_reason == "refusal":
@@ -157,6 +251,43 @@ def first_weekday(day: dt.date) -> dt.date:
 
 def _pct(x: float | None) -> str:
     return "n/a" if x is None else f"{x * 100:.2f}%"
+
+
+def _not_checked(rule: StrategyRule, drift: DriftReport) -> tuple[Status, str] | None:
+    """The status of a rule `evaluate` ran no check for, or None when it ran one.
+
+    `evaluate` checks held positions, existing buckets and a known cash weight only. A rule
+    on a position or bucket the portfolio does not hold is judged at a weight of 0 (so a
+    minimum is a breach); a cash rule with no cash weight, or a rule over every position of
+    an empty portfolio, is unknown.
+    """
+    limit = float(getattr(rule, "value", 0))
+    target: str | None = None
+    if isinstance(rule, PositionWeightRule):
+        held = [p for p in drift.positions if p.held]
+        if rule.ticker is None:
+            return None if held else ("unknown", "no positions held to check")
+        if any(p.ticker == rule.ticker for p in held):
+            return None
+        target = f"{rule.ticker} is not held"
+    elif isinstance(rule, CategoryWeightRule):
+        found = next((d for d in drift.categories if d.dimension == rule.dimension), None)
+        buckets = found.buckets if found else []
+        if rule.bucket is None:
+            return None if buckets else ("unknown", f"no {rule.dimension} buckets to check")
+        if any(b.bucket == rule.bucket for b in buckets):
+            return None
+        target = f"no holding is in {rule.dimension} {rule.bucket}"
+    elif isinstance(rule, CashWeightRule):
+        if drift.cash.weight is None:
+            return "unknown", "cash weight unknown in the latest snapshot"
+        return None
+    else:
+        return None
+    if _holds(0.0, rule.operator, limit):
+        return "pass", f"{target} (0.00%); holds ({rule.operator} {_pct(limit)})"
+    requires = f"the rule requires {rule.operator} {_pct(limit)}"
+    return "breach", f"Rule {rule.id}: {target} (0.00%); {requires}"
 
 
 async def compliance(
@@ -193,11 +324,14 @@ async def compliance(
         hits = [f for f in findings if f.key.startswith(f"rule:{rule.id}:")]
         limit = f"{rule.operator} {getattr(rule, 'value', '')}"
         description = rule.description or f"{rule.type} {limit}"
+        unchecked = _not_checked(rule, drift) if drift is not None else None
         if drift is None:
             status: Status = "unknown"
             detail = "no portfolio snapshot yet"
         elif hits:
             status, detail = "breach", "; ".join(f.detail for f in hits)
+        elif unchecked is not None:
+            status, detail = unchecked
         else:
             status, detail = "pass", f"holds ({rule.type} {limit})"
         rows.append(
@@ -299,7 +433,9 @@ async def flags(pool: asyncpg.Pool, reg: Registry, settings: ReviewSettings) -> 
         " l.avg_daily_turnover, l.turnover_currency, l.liquid from public.position_snapshot p"
         " join public.instrument i on i.t212_ticker = p.ticker"
         " left join public.listing_liquidity l on l.isin = i.isin"
-        " where p.snapshot_date = (select max(snapshot_date) from public.position_snapshot)"
+        " where p.snapshot_date = coalesce("
+        " (select max(snapshot_date) from public.account_snapshot),"
+        " (select max(snapshot_date) from public.position_snapshot))"
     )
     for p in positions:
         if p["avg_daily_turnover"] and p["turnover_currency"] == p["instrument_currency"]:
@@ -351,7 +487,7 @@ async def flags(pool: asyncpg.Pool, reg: Registry, settings: ReviewSettings) -> 
         if len(own.periods) == 2 and own.periods[1].holders:
             now, before = own.periods
             change = now.holders / before.holders - 1
-            if change <= -0.1:
+            if change <= -settings.holder_drop_flag_pct / 100:
                 sid = reg.add(
                     "filing13f",
                     f"13F:{now.period}:{','.join(own.cusips)}",
@@ -513,6 +649,13 @@ async def run_review(ctx: JobContext, deps: ReviewDeps) -> int | None:
             step.detail["skipped"] = f"{today} is not the first weekday of the month"
             return None
     async with ctx.step("review") as step:
+        # A redelivered job keeps the report its first attempt stored, without a second call.
+        existing = await pool.fetchval(
+            "select id from public.report where job_id = $1 and type = 'review'", ctx.job_id
+        )
+        if existing is not None:
+            step.detail["report_id"] = existing
+            return int(existing)
         body, usage = await build_review(
             pool,
             deps.now,
@@ -546,8 +689,9 @@ async def monthly_review_handler(ctx: JobContext) -> None:
     settings = get_settings()
     jobs = await load_active(ctx.pool, "jobs", JobsConfig)
     review = (jobs.body if jobs else JobsConfig()).review
+    system = (await load_prompts(ctx.pool)).text("monthly_review", SYSTEM)
     try:
-        writer: ReviewWriter | None = ClaudeReviewWriter(create_client(settings), review)
+        writer: ReviewWriter | None = ClaudeReviewWriter(create_client(settings), review, system)
     except AINotConfigured:
         writer = None
     await run_review(ctx, ReviewDeps(writer=writer, now=dt.datetime.now(dt.UTC)))

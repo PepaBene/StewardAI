@@ -98,7 +98,7 @@ export const DEFAULT_NOTIFICATIONS: NotificationsConfig = {
     },
   ],
   quiet_hours: { enabled: true, start: "22:00", end: "07:00", timezone: "Europe/Prague" },
-  daily_alert_cap: 5,
+  daily_alert_cap: null,
   muted_tickers: [],
   muted_event_types: [],
   repeat_throttle_hours: 24,
@@ -222,6 +222,9 @@ export type SourcesForm = {
   unknown_outlet_tier: 1 | 2 | 3;
   freshness_hours: string;
   include_tier3: boolean;
+  /** The Google News edition: interface language (en-US) and country (US). */
+  google_news_language: string;
+  google_news_country: string;
 };
 
 /** The backend's defaults (news_sources.py), shown when nothing is saved yet (it fills in the same values). */
@@ -248,6 +251,7 @@ export const DEFAULT_SOURCES: NewsSourcesConfig = {
   unknown_outlet_tier: 3,
   freshness_hours: 72,
   include_tier3: false,
+  google_news_locale: { language: "en-US", country: "US" },
 };
 
 export function newSource(): SourceForm {
@@ -282,6 +286,8 @@ export function sourcesFromBody(body: NewsSourcesConfig | null, defaults: NewsSo
     unknown_outlet_tier: b.unknown_outlet_tier ?? 3,
     freshness_hours: String(b.freshness_hours ?? 72),
     include_tier3: b.include_tier3 ?? false,
+    google_news_language: b.google_news_locale?.language ?? "en-US",
+    google_news_country: b.google_news_locale?.country ?? "US",
   };
 }
 
@@ -304,6 +310,10 @@ export function sourcesToBody(form: SourcesForm): NewsSourcesConfig {
     unknown_outlet_tier: form.unknown_outlet_tier,
     freshness_hours: numberOrText(form.freshness_hours) as number,
     include_tier3: form.include_tier3,
+    google_news_locale: {
+      language: form.google_news_language.trim(),
+      country: form.google_news_country.trim().toUpperCase(),
+    },
   };
 }
 
@@ -411,6 +421,7 @@ export type EventRulesForm = {
   overrides: OverrideForm[];
   escalate_when_thesis_linked: EventType[];
   earnings_check_on: EventType[];
+  earnings_check_cooldown_days: string;
   thesis_breach_severity: number;
   insider_cluster_count: string;
   insider_cluster_days: string;
@@ -451,6 +462,7 @@ export function eventRulesFromBody(body: EventRulesConfig | null): EventRulesFor
     overrides: (body?.overrides ?? []).map((o) => ({ key: nextKey(), ...o })),
     escalate_when_thesis_linked: [...(body?.escalate_when_thesis_linked ?? ["regulatory_legal"])],
     earnings_check_on: [...(body?.earnings_check_on ?? ["earnings_release"])],
+    earnings_check_cooldown_days: String(body?.earnings_check_cooldown_days ?? 10),
     thesis_breach_severity: body?.thesis_breach_severity ?? 3,
     insider_cluster_count: String(body?.insider_cluster_count ?? 3),
     insider_cluster_days: String(body?.insider_cluster_days ?? 14),
@@ -474,6 +486,7 @@ export function eventRulesToBody(form: EventRulesForm): EventRulesConfig {
     overrides: form.overrides.map((o) => ({ ticker: o.ticker.trim(), event_type: o.event_type, severity: o.severity })),
     escalate_when_thesis_linked: inOrder(form.escalate_when_thesis_linked),
     earnings_check_on: inOrder(form.earnings_check_on),
+    earnings_check_cooldown_days: numberOrText(form.earnings_check_cooldown_days) as number,
     thesis_breach_severity: form.thesis_breach_severity,
     insider_cluster_count: numberOrText(form.insider_cluster_count) as number,
     insider_cluster_days: numberOrText(form.insider_cluster_days) as number,

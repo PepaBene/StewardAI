@@ -130,6 +130,16 @@ class StrategyConfig(ConfigModel):
     target_positions: list[PositionTarget] = Field(default_factory=list)
     target_categories: list[CategoryTarget] = Field(default_factory=list)
     rules: list[StrategyRule] = Field(default_factory=list)
+    hard_limit_severity: Severity = Field(
+        default="severity_3",
+        description="Severity of a position above its hard limit (alerted when it opens, "
+        "routed by the notification rules).",
+    )
+    band_breach_severity: Severity = Field(
+        default="severity_1",
+        description="Severity of a position, category or cash weight outside its target band. "
+        "Severity 1 is listed in the next digest only; 2 or 3 also alert when it opens.",
+    )
 
     @model_validator(mode="after")
     def _default_fx_source(self) -> Self:
@@ -162,6 +172,12 @@ class StrategyConfig(ConfigModel):
         for rule in self.rules:
             if isinstance(rule, CategoryWeightRule) and rule.dimension not in known:
                 raise ValueError(f"rule {rule.id!r} uses undeclared dimension {rule.dimension!r}")
+            if isinstance(rule, CashWeightRule) and self.weight_basis == "invested":
+                # Cash has no weight against positions only: the rule could never be checked.
+                raise ValueError(
+                    f"rule {rule.id!r} is a cash_weight rule, which needs weight_basis 'total'"
+                    " (with 'invested' weights exclude cash)"
+                )
 
         position_total = sum(p.target_weight for p in self.target_positions)
         if self.cash_target is not None:

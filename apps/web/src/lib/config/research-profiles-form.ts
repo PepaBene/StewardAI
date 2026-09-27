@@ -32,8 +32,9 @@ export const TIER_OPTIONS: readonly { value: Tier; label: string }[] = [
 ];
 
 export const BOUNDS = {
-  max_steps: { min: 1, max: 60 },
-  max_searches: { min: 0, max: 40 },
+  max_steps: { min: 1, max: 200 },
+  max_searches: { min: 0, max: 100 },
+  top_holders: { min: 1, max: 20 },
   name: { max: 80 },
   id: { max: 40 },
 } as const;
@@ -62,12 +63,13 @@ export const DEFAULT_RESEARCH_PROFILES: ResearchProfilesConfig = {
       depth: "standard",
       model: "claude-opus-5-5",
       effort: "high",
-      max_steps: 20,
-      max_searches: 15,
+      max_steps: 60,
+      max_searches: 40,
       source_tiers: [1, 2],
       include_peers: true,
       valuation_methods: ["pe_ttm", "earnings_yield", "dividend_yield_ttm"],
       language: "en",
+      top_holders: 3,
     },
     {
       id: "quick",
@@ -76,12 +78,13 @@ export const DEFAULT_RESEARCH_PROFILES: ResearchProfilesConfig = {
       depth: "brief",
       model: "claude-sonnet-5",
       effort: "medium",
-      max_steps: 6,
-      max_searches: 3,
+      max_steps: 20,
+      max_searches: 10,
       source_tiers: [1, 2],
       include_peers: false,
       valuation_methods: ["pe_ttm"],
       language: "en",
+      top_holders: 3,
     },
   ],
   default_profile: "standard",
@@ -103,6 +106,8 @@ export type ProfileForm = {
   include_peers: boolean;
   valuation_methods: ValuationMethod[];
   language: Language;
+  /** Largest 13F holders named in the ownership section. */
+  top_holders: string;
   rest: Record<string, unknown>;
 };
 
@@ -130,6 +135,7 @@ export function newProfile(existingIds: readonly string[] = []): ProfileForm {
     include_peers: true,
     valuation_methods: ["pe_ttm", "earnings_yield", "dividend_yield_ttm"],
     language: "en",
+    top_holders: "3",
     rest: {},
   };
 }
@@ -171,6 +177,7 @@ function profileFromBody(p: ResearchProfile): ProfileForm {
     include_peers,
     valuation_methods,
     language,
+    top_holders,
     ...rest
   } = p;
   return {
@@ -187,6 +194,7 @@ function profileFromBody(p: ResearchProfile): ProfileForm {
     include_peers: include_peers ?? true,
     valuation_methods: [...(valuation_methods ?? ["pe_ttm", "earnings_yield", "dividend_yield_ttm"])],
     language: language ?? "en",
+    top_holders: String(top_holders ?? 3),
     rest,
   };
 }
@@ -227,6 +235,7 @@ export function researchProfilesToBody(form: ResearchProfilesForm): ResearchProf
       include_peers: p.include_peers,
       valuation_methods: [...p.valuation_methods],
       language: p.language,
+      top_holders: intOrText(p.top_holders) as number,
     })),
     default_profile: form.default_profile.trim(),
   } as ResearchProfilesConfig;
@@ -281,6 +290,8 @@ export function validateResearchProfiles(form: ResearchProfilesForm): FieldError
     if (steps) add(`profiles.${i}.max_steps`, steps);
     const searches = intIn(p.max_searches, BOUNDS.max_searches.min, BOUNDS.max_searches.max);
     if (searches) add(`profiles.${i}.max_searches`, searches);
+    const holders = intIn(p.top_holders, BOUNDS.top_holders.min, BOUNDS.top_holders.max);
+    if (holders) add(`profiles.${i}.top_holders`, holders);
     if (p.source_tiers.length === 0) add(`profiles.${i}.source_tiers`, "Allow at least one tier.");
   });
   if (!form.profiles.some((p) => p.id.trim() === form.default_profile.trim())) {

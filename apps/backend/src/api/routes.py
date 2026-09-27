@@ -7,12 +7,13 @@ from collections.abc import AsyncIterator
 from decimal import Decimal
 from typing import Annotated, Any, Literal
 
+import asyncpg
 import httpx
 from fastapi import APIRouter, Depends, HTTPException, Path, Query, status
 from pydantic import BaseModel, Field
 
 from api.auth import Owner
-from api.db import Pool
+from api.db import DB_ID_MAX, IdPath, IdQuery, Pool
 from steward.config import (
     BudgetConfig,
     HoldingProfilesConfig,
@@ -22,7 +23,7 @@ from steward.config import (
     VerificationConfig,
 )
 from steward.config.common import Ticker
-from steward.config.store import StoredConfig, load_active, save_config
+from steward.config.store import ConfigConflictError, StoredConfig, load_active, save_config
 from steward.earnings.check import local_today
 from steward.earnings.read import (
     FACT_CONFIDENCE,
@@ -176,7 +177,7 @@ async def list_jobs(
     ticker: Annotated[
         str | None, Query(pattern=r"^[A-Za-z0-9._-]{1,32}$", description="Runs for this holding.")
     ] = None,
-    before_id: Annotated[int | None, Query()] = None,
+    before_id: IdQuery = None,
     limit: Annotated[int, Query(ge=1, le=200)] = 50,
 ) -> JobList:
     """The job log, newest first: every scheduled, manual and event-triggered run with its
@@ -213,7 +214,7 @@ async def list_jobs(
 
 
 @router.get("/jobs/{job_id}", tags=["jobs"])
-async def get_job(job_id: int, pool: Pool, _owner: Owner) -> JobDetail:
+async def get_job(job_id: IdPath, pool: Pool, _owner: Owner) -> JobDetail:
     """One job run with its steps, to follow an on-demand run to completion."""
     row = await pool.fetchrow(
         "select id, job_type, trigger, status, error, created_at, started_at, finished_at,"
@@ -339,7 +340,7 @@ async def get_holding(ticker: TickerPath, pool: Pool, _owner: Owner) -> HoldingD
 
 @router.get("/facts/{fact_id}/evidence", tags=["holdings"])
 async def get_fact_evidence(
-    fact_id: int, pool: Pool, storage: Storage, _owner: Owner
+    fact_id: IdPath, pool: Pool, storage: Storage, _owner: Owner
 ) -> EvidenceLink:
     """The archived copy of the page a fact was read from: a short-lived signed URL and
     the text around the fact's snippet."""
@@ -396,7 +397,9 @@ class FactReviewResult(BaseModel):
 
 
 @router.post("/facts/{fact_id}/review", tags=["holdings"])
-async def review_fact(fact_id: int, body: FactReview, pool: Pool, owner: Owner) -> FactReviewResult:
+async def review_fact(
+    fact_id: IdPath, body: FactReview, pool: Pool, owner: Owner
+) -> FactReviewResult:
     """Decide on a fact: accept a held or quarantined one, correct any fact (the owner's
     value is stored as a new fact that wins), or reject it. The decision and its reason are
     logged, and the holding's verdicts are re-judged by the worker."""
@@ -480,6 +483,50 @@ class VerificationConfigVersion(BaseModel):
 
 
 NoteParam = Annotated[str | None, Query(max_length=500, description="Why this change was made.")]
+BaseVersionParam = Annotated[
+    int | None,
+    Query(
+        ge=1,
+        le=DB_ID_MAX,
+        description="The version the edit started from. If another save has happened since, "
+        "nothing is saved and the answer is 409.",
+    ),
+]
+
+
+def config_conflict(exc: ConfigConflictError | asyncpg.UniqueViolationError) -> HTTPException:
+    """409 for a config save that lost a race with another save."""
+    if isinstance(exc, ConfigConflictError):
+        return HTTPException(status.HTTP_409_CONFLICT, str(exc))
+    return HTTPException(
+        status.HTTP_409_CONFLICT,
+        "the config changed since you loaded it; reload it and apply the change again",
+    )
+
+
+async def save_versioned[M: BaseModel](
+    pool: asyncpg.Pool,
+    domain: str,
+    body: M,
+    *,
+    created_by: str,
+    note: str | None,
+    base_version_id: int | None,
+) -> StoredConfig[M]:
+    """save_config for a PUT route: 409 when the active version is no longer
+    `base_version_id` (or a concurrent save collided)."""
+    try:
+        async with pool.acquire() as conn:
+            return await save_config(
+                conn,
+                domain,
+                body,
+                created_by=created_by,
+                note=note,
+                expected_active_id=base_version_id,
+            )
+    except (ConfigConflictError, asyncpg.UniqueViolationError) as exc:
+        raise config_conflict(exc) from exc
 
 
 def _not_found(domain: str) -> HTTPException:
@@ -505,11 +552,21 @@ async def get_strategy_config(pool: Pool, _owner: Owner) -> StrategyConfigVersio
 
 @router.put("/config/strategy", tags=["config"])
 async def save_strategy_config(
-    body: StrategyConfig, pool: Pool, owner: Owner, note: NoteParam = None
+    body: StrategyConfig,
+    pool: Pool,
+    owner: Owner,
+    note: NoteParam = None,
+    base_version_id: BaseVersionParam = None,
 ) -> StrategyConfigVersion:
     """Validate and save as the new active strategy. Drift uses it immediately."""
-    async with pool.acquire() as conn:
-        stored = await save_config(conn, "strategy", body, created_by=owner.user_id, note=note)
+    stored = await save_versioned(
+        pool,
+        "strategy",
+        body,
+        created_by=owner.user_id,
+        note=note,
+        base_version_id=base_version_id,
+    )
     return StrategyConfigVersion(**_as_dict(stored))
 
 
@@ -523,10 +580,20 @@ async def get_theses_config(pool: Pool, _owner: Owner) -> ThesesConfigVersion:
 
 @router.put("/config/theses", tags=["config"])
 async def save_theses_config(
-    body: ThesesConfig, pool: Pool, owner: Owner, note: NoteParam = None
+    body: ThesesConfig,
+    pool: Pool,
+    owner: Owner,
+    note: NoteParam = None,
+    base_version_id: BaseVersionParam = None,
 ) -> ThesesConfigVersion:
-    async with pool.acquire() as conn:
-        stored = await save_config(conn, "theses", body, created_by=owner.user_id, note=note)
+    stored = await save_versioned(
+        pool,
+        "theses",
+        body,
+        created_by=owner.user_id,
+        note=note,
+        base_version_id=base_version_id,
+    )
     return ThesesConfigVersion(**_as_dict(stored))
 
 
@@ -541,11 +608,21 @@ async def get_jobs_config(pool: Pool, _owner: Owner) -> JobsConfigVersion:
 
 @router.put("/config/jobs", tags=["config"])
 async def save_jobs_config(
-    body: JobsConfig, pool: Pool, owner: Owner, note: NoteParam = None
+    body: JobsConfig,
+    pool: Pool,
+    owner: Owner,
+    note: NoteParam = None,
+    base_version_id: BaseVersionParam = None,
 ) -> JobsConfigVersion:
     """Save job schedules. The worker picks them up within a few minutes, no restart."""
-    async with pool.acquire() as conn:
-        stored = await save_config(conn, "jobs", body, created_by=owner.user_id, note=note)
+    stored = await save_versioned(
+        pool,
+        "jobs",
+        body,
+        created_by=owner.user_id,
+        note=note,
+        base_version_id=base_version_id,
+    )
     return JobsConfigVersion(**_as_dict(stored))
 
 
@@ -565,13 +642,21 @@ async def get_holding_profiles_config(pool: Pool, _owner: Owner) -> HoldingProfi
 
 @router.put("/config/holding-profiles", tags=["config"])
 async def save_holding_profiles_config(
-    body: HoldingProfilesConfig, pool: Pool, owner: Owner, note: NoteParam = None
+    body: HoldingProfilesConfig,
+    pool: Pool,
+    owner: Owner,
+    note: NoteParam = None,
+    base_version_id: BaseVersionParam = None,
 ) -> HoldingProfilesConfigVersion:
     """Save holding profiles. The next earnings check and calendar refresh use them."""
-    async with pool.acquire() as conn:
-        stored = await save_config(
-            conn, "holding_profiles", body, created_by=owner.user_id, note=note
-        )
+    stored = await save_versioned(
+        pool,
+        "holding_profiles",
+        body,
+        created_by=owner.user_id,
+        note=note,
+        base_version_id=base_version_id,
+    )
     return HoldingProfilesConfigVersion(**_as_dict(stored))
 
 
@@ -594,10 +679,20 @@ async def get_verification_config(pool: Pool, _owner: Owner) -> VerificationConf
 
 @router.put("/config/verification", tags=["config"])
 async def save_verification_config(
-    body: VerificationConfig, pool: Pool, owner: Owner, note: NoteParam = None
+    body: VerificationConfig,
+    pool: Pool,
+    owner: Owner,
+    note: NoteParam = None,
+    base_version_id: BaseVersionParam = None,
 ) -> VerificationConfigVersion:
-    async with pool.acquire() as conn:
-        stored = await save_config(conn, "verification", body, created_by=owner.user_id, note=note)
+    stored = await save_versioned(
+        pool,
+        "verification",
+        body,
+        created_by=owner.user_id,
+        note=note,
+        base_version_id=base_version_id,
+    )
     return VerificationConfigVersion(**_as_dict(stored))
 
 
@@ -617,11 +712,21 @@ async def get_budget_config(pool: Pool, _owner: Owner) -> BudgetConfigVersion:
 
 @router.put("/config/budget", tags=["config"])
 async def save_budget_config(
-    body: BudgetConfig, pool: Pool, owner: Owner, note: NoteParam = None
+    body: BudgetConfig,
+    pool: Pool,
+    owner: Owner,
+    note: NoteParam = None,
+    base_version_id: BaseVersionParam = None,
 ) -> BudgetConfigVersion:
     """Save the price table. Every AI step from the next job on is costed with it."""
-    async with pool.acquire() as conn:
-        stored = await save_config(conn, "budget", body, created_by=owner.user_id, note=note)
+    stored = await save_versioned(
+        pool,
+        "budget",
+        body,
+        created_by=owner.user_id,
+        note=note,
+        base_version_id=base_version_id,
+    )
     return BudgetConfigVersion(**_as_dict(stored))
 
 

@@ -2,15 +2,17 @@
 answer.
 
 The assistant (Sonnet 5 by default, `jobs.chat`) gets the conversation so far and the
-question, calls the read-only tools and web search (tier-1 and tier-2 outlets only) within
-its step cap, and answers in sentences that each cite registry ids or search-result URLs.
-Code keeps a citation only if it can check it; a sentence left without one is kept but
-marked "no source", never shown as a sourced claim, and a number in a sentence that none of
-its sources contains marks it unsupported.
+question, calls the read-only tools and web search (outlets of the tiers in
+`jobs.chat.source_tiers`, 1 and 2 by default) within its step cap, and answers in sentences
+that each cite registry ids or search-result URLs. Code keeps a citation only if it can
+check it; a sentence left without one is kept but marked "no source", never shown as a
+sourced claim, and a number in a sentence that none of its sources contains marks it
+unsupported.
 """
 
 import datetime as dt
 import json
+from collections.abc import Sequence
 from dataclasses import dataclass, field
 from typing import Any, Protocol, cast
 
@@ -20,11 +22,13 @@ from pydantic import BaseModel, Field
 
 from steward.ai import AINotConfigured, Usage, create_client
 from steward.chat.tools import TOOL_DEFINITIONS, ChatTools
-from steward.config.jobs import ChatSettings, JobsConfig
+from steward.config.jobs import ChatSettings, JobsConfig, effort_kwargs
 from steward.config.news_sources import NewsSourcesConfig
+from steward.config.prompts import load_prompts
 from steward.config.store import load_active
 from steward.config.verification import ClaimVerifierSettings
 from steward.jobs.runner import JobContext, JobFailed
+from steward.news.corroborate import AUTO_CACHE
 from steward.news.normalize import host_of
 from steward.research.sources import Registry, Source
 from steward.research.writer import result_titles, web_search_tool
@@ -87,39 +91,57 @@ class ChatAssistant(Protocol):
 
 class ClaudeChatAssistant:
     def __init__(
-        self, client: anthropic.AsyncAnthropic, settings: ChatSettings, domains: tuple[str, ...]
+        self,
+        client: anthropic.AsyncAnthropic,
+        settings: ChatSettings,
+        domains: tuple[str, ...],
+        system: str = SYSTEM,
     ) -> None:
         self._client = client
         self._settings = settings
         self._domains = domains
+        self._system = system
 
     async def answer(
         self, history: list[dict[str, str]], question: str, tools: ChatTools, today: dt.date
     ) -> AssistantResult:
         usage = Usage(model=self._settings.model)
-        definitions: list[Any] = list(TOOL_DEFINITIONS)
-        if self._settings.max_searches > 0 and self._domains:
-            definitions.append(
-                web_search_tool(self._settings.model, self._settings.max_searches, self._domains)
-            )
+        # `max_uses` caps one API request, and an answer takes several: pass what is left of
+        # the per-answer budget each time, and drop web search once it is spent.
+        searches_left = self._settings.max_searches if self._domains else 0
+        paused = False
         messages: list[dict[str, Any]] = [
-            *history,
+            *cached_history(history),
             {"role": "user", "content": f"Today is {today.isoformat()}.\n\n{question}"},
         ]
         titles: dict[str, str] = {}
         for _ in range(self._settings.max_steps):
+            definitions: list[Any] = list(TOOL_DEFINITIONS)
+            # A paused turn resumes a search in flight, so it keeps the tool (at least one use).
+            if searches_left > 0 or paused:
+                definitions.append(
+                    web_search_tool(self._settings.model, max(searches_left, 1), self._domains)
+                )
             try:
                 response = await self._client.messages.parse(
                     model=self._settings.model,
-                    max_tokens=8000,
-                    system=SYSTEM,
+                    system=self._system,
                     messages=cast(list[MessageParam], messages),
                     tools=cast(Any, definitions),
                     output_format=ChatAnswerDraft,
+                    **effort_kwargs(self._settings.model, self._settings.effort, 8000),
+                    # Each step resends the whole growing transcript (tool results, search
+                    # pages): automatic caching lets it read the previous step's prefix at a
+                    # tenth of the input price. Messages are only appended, never edited, so
+                    # the prefix stays byte-stable; the web search tool's max_uses changing
+                    # after a search is the one thing that rewrites it.
+                    extra_body=AUTO_CACHE,
                 )
             except anthropic.APIError as exc:
                 return AssistantResult(None, usage, titles, f"the call failed: {exc}"[:300])
             usage.add(response.usage)
+            searches_left = max(0, searches_left - searches_used(response))
+            paused = response.stop_reason == "pause_turn"
             titles |= result_titles(response.content)
             if response.stop_reason == "refusal":
                 return AssistantResult(None, usage, titles, "the model declined")
@@ -136,7 +158,7 @@ class ClaudeChatAssistant:
                             {
                                 "type": "tool_result",
                                 "tool_use_id": block.id,
-                                "content": json.dumps(output, default=str)[:30000],
+                                "content": json.dumps(output, default=str)[:200_000],
                             }
                         )
                 messages.append({"role": "user", "content": results})
@@ -150,11 +172,39 @@ class ClaudeChatAssistant:
         return AssistantResult(None, usage, titles, "the step cap was reached before an answer")
 
 
+def cached_history(history: list[dict[str, str]]) -> list[dict[str, Any]]:
+    """The earlier messages of the conversation as text blocks, with a cache breakpoint on the
+    last one: a follow-up question within the cache lifetime (5 minutes) reads the history
+    the previous answer's request wrote instead of paying for it again. Every message has the
+    same block form whether or not it carries the marker, so the prefix matches."""
+    out: list[dict[str, Any]] = [
+        {"role": m["role"], "content": [{"type": "text", "text": m["content"]}]} for m in history
+    ]
+    if out:
+        out[-1]["content"][0]["cache_control"] = {"type": "ephemeral"}
+    return out
+
+
+def searches_used(response: Any) -> int:
+    """Web searches one response ran: the usage count, else its web search call blocks."""
+    server = getattr(getattr(response, "usage", None), "server_tool_use", None)
+    count = getattr(server, "web_search_requests", None)
+    if isinstance(count, int):
+        return count
+    return sum(
+        1
+        for block in getattr(response, "content", None) or []
+        if getattr(block, "type", None) == "server_tool_use"
+        and getattr(block, "name", None) == "web_search"
+    )
+
+
 def finish_answer(
     draft: ChatAnswerDraft,
     registry: Registry,
     titles: dict[str, str],
     tier_of: Any,
+    tiers: Sequence[int] = (1, 2),
 ) -> list[ChatSentence]:
     """Keep checkable citations; a sentence without one is marked no source."""
     known = registry.ids()
@@ -165,7 +215,7 @@ def finish_answer(
         ids = [i for i in dict.fromkeys(s.source_ids) if i in known]
         for url in s.urls:
             tier = tier_of(host_of(url))
-            if url in titles and tier is not None and tier <= 2:
+            if url in titles and tier is not None and tier in tiers:
                 ids.append(
                     registry.add(
                         "search", url, titles[url], url=url, tier=tier, snippet=titles[url]
@@ -214,6 +264,23 @@ async def run_chat(ctx: JobContext, deps: ChatDeps) -> int:
         )
         if question is None:
             raise JobFailed(f"no user message {message_id} in conversation {conversation_id}")
+        # A redelivered job: keep the answer the first attempt stored; if it stored none,
+        # cancel what that attempt proposed (still linked to the question) before answering
+        # again, so only the new answer's actions can be confirmed.
+        done = await pool.fetchval(
+            "select id from public.chat_message where job_id = $1 and role = 'assistant'",
+            ctx.job_id,
+        )
+        if done is not None:
+            step.detail["reply_id"] = done
+            return int(done)
+        stale = await pool.fetch(
+            "update public.chat_action set status = 'cancelled', decided_at = now()"
+            " where message_id = $1 and status = 'proposed' returning id",
+            message_id,
+        )
+        if stale:
+            step.detail["cancelled_actions"] = [r["id"] for r in stale]
         earlier = await pool.fetch(
             "select role, content from public.chat_message where conversation_id = $1"
             " and id < $2 and status = 'done' order by id desc limit $3",
@@ -240,7 +307,11 @@ async def run_chat(ctx: JobContext, deps: ChatDeps) -> int:
         sentences: list[ChatSentence] = []
         if result.draft is not None:
             sentences = finish_answer(
-                result.draft, registry, result.titles, registry_config.domain_tier
+                result.draft,
+                registry,
+                result.titles,
+                registry_config.domain_tier,
+                settings.source_tiers,
             )
             await mark_unsupported_figures(sentences, registry)
         answer = ChatAnswer(
@@ -261,7 +332,7 @@ async def run_chat(ctx: JobContext, deps: ChatDeps) -> int:
                 "insert into public.chat_message (conversation_id, role, content, body, job_id,"
                 " status) values ($1, 'assistant', $2, $3::jsonb, $4, $5) returning id",
                 conversation_id,
-                text[:20000],
+                text[:100_000],
                 answer.model_dump_json(),
                 ctx.job_id,
                 "done" if sentences else "failed",
@@ -293,13 +364,18 @@ async def chat_handler(ctx: JobContext) -> None:
     sources = await load_active(ctx.pool, "news_sources", NewsSourcesConfig)
     chat_settings = (jobs.body if jobs else JobsConfig()).chat
     registry = sources.body if sources else NewsSourcesConfig()
-    domains = tuple(d.domain for d in registry.domain_tiers if d.tier <= 2)[:60]
+    domains = tuple(
+        d.domain for d in registry.domain_tiers if d.tier in chat_settings.source_tiers
+    )[:60]
     try:
-        assistant: ChatAssistant | None = ClaudeChatAssistant(
-            create_client(settings), chat_settings, domains
-        )
+        client = create_client(settings)
     except AINotConfigured:
-        assistant = None
+        assistant: ChatAssistant | None = None
+    else:
+        prompts = await load_prompts(ctx.pool)
+        assistant = ClaudeChatAssistant(
+            client, chat_settings, domains, prompts.text("chat_assistant", SYSTEM)
+        )
     try:
         await run_chat(ctx, ChatDeps(assistant=assistant, now=dt.datetime.now(dt.UTC)))
     except Exception:

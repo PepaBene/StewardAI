@@ -7,6 +7,18 @@ import { fieldErrors, type FieldErrors } from "@/lib/api/validation-errors";
 type Result<T> = { data?: T; error?: unknown; response: Response };
 type Version<B> = { id: number; created_at: string; note: string | null; body: B };
 
+export const CONFLICT_MESSAGE =
+  "This config changed elsewhere since you opened it. Reload to see the latest; your edits will be lost.";
+
+/**
+ * The query of a config PUT: the note, plus the version the edits started from so the API
+ * answers 409 when another save got in first. Typed as the note-only query so it fits the
+ * generated schema whether or not it lists `base_version_id` yet.
+ */
+export function configSaveQuery(note: string | null, baseVersionId: number | null): { note: string | null } {
+  return (baseVersionId === null ? { note } : { note, base_version_id: baseVersionId }) as { note: string | null };
+}
+
 export type EditorStatus =
   | { kind: "loading" }
   | { kind: "error"; message: string }
@@ -15,11 +27,13 @@ export type EditorStatus =
 /**
  * Load, validate and save one versioned config domain. The active version is loaded once
  * (a 404 means none saved yet), so background refreshes never overwrite unsaved edits.
- * Validation errors come from the backend's Pydantic model via the 422 answer.
+ * Validation errors come from the backend's Pydantic model via the 422 answer. A save sends
+ * the loaded version's id; a 409 (someone saved in between) keeps the edits and says so.
  */
 export function useConfigEditor<B>(options: {
   load: () => Promise<Result<Version<B>>>;
-  save: (body: B, note: string | null) => Promise<Result<Version<B>>>;
+  /** `baseVersionId`: the version the edits started from (null when none was saved yet). */
+  save: (body: B, note: string | null, baseVersionId: number | null) => Promise<Result<Version<B>>>;
   validate: (body: B) => Promise<Result<B>>;
   onLoaded: (body: B | null) => void;
 }) {
@@ -62,7 +76,11 @@ export function useConfigEditor<B>(options: {
       setBusy(kind);
       setMessage(null);
       try {
-        const result = kind === "saving" ? await save(body, note) : await validate(body);
+        const result = kind === "saving" ? await save(body, note, version?.id ?? null) : await validate(body);
+        if (result.response.status === 409) {
+          setMessage(CONFLICT_MESSAGE);
+          return null;
+        }
         if (result.response.status === 422 || !result.data) {
           setErrors(fieldErrors(result.error));
           if (result.response.status !== 422) {
@@ -86,7 +104,7 @@ export function useConfigEditor<B>(options: {
         setBusy(null);
       }
     },
-    [save, validate],
+    [save, validate, version],
   );
 
   return {

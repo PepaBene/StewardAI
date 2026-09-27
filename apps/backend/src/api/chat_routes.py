@@ -13,7 +13,7 @@ from fastapi import APIRouter, HTTPException, Query, status
 from pydantic import BaseModel, Field
 
 from api.auth import Owner
-from api.db import Pool
+from api.db import IdPath, Pool
 from steward.chat.assistant import ChatAnswer
 from steward.jobs import queue
 from steward.jobs.runner import create_job
@@ -68,7 +68,7 @@ class NewConversation(BaseModel):
 
 
 class NewMessage(BaseModel):
-    content: str = Field(min_length=1, max_length=4000)
+    content: str = Field(min_length=1, max_length=100_000)
 
 
 class PostedMessage(BaseModel):
@@ -118,7 +118,9 @@ async def list_conversations(
 
 
 @router.get("/chat/conversations/{conversation_id}")
-async def get_conversation(conversation_id: int, pool: Pool, _owner: Owner) -> ConversationDetail:
+async def get_conversation(
+    conversation_id: IdPath, pool: Pool, _owner: Owner
+) -> ConversationDetail:
     conv = await pool.fetchrow(
         "select id, title, created_at, updated_at from public.chat_conversation where id = $1",
         conversation_id,
@@ -144,7 +146,7 @@ async def get_conversation(conversation_id: int, pool: Pool, _owner: Owner) -> C
 
 @router.post("/chat/conversations/{conversation_id}/messages", status_code=status.HTTP_202_ACCEPTED)
 async def post_message(
-    conversation_id: int, body: NewMessage, pool: Pool, owner: Owner
+    conversation_id: IdPath, body: NewMessage, pool: Pool, owner: Owner
 ) -> PostedMessage:
     """Store the owner's message and queue the answer; poll the conversation for it."""
     async with pool.acquire() as conn, conn.transaction():
@@ -182,7 +184,7 @@ async def post_message(
 
 
 @router.post("/chat/actions/{action_id}/confirm")
-async def confirm_action(action_id: int, pool: Pool, owner: Owner) -> ActionOut:
+async def confirm_action(action_id: IdPath, pool: Pool, owner: Owner) -> ActionOut:
     """Start a job the assistant proposed. It appears in the job log with trigger `chat`."""
     async with pool.acquire() as conn, conn.transaction():
         row = await conn.fetchrow(
@@ -208,7 +210,7 @@ async def confirm_action(action_id: int, pool: Pool, owner: Owner) -> ActionOut:
 
 
 @router.post("/chat/actions/{action_id}/cancel")
-async def cancel_action(action_id: int, pool: Pool, owner: Owner) -> ActionOut:
+async def cancel_action(action_id: IdPath, pool: Pool, owner: Owner) -> ActionOut:
     row = await pool.fetchrow(
         "update public.chat_action set status = 'cancelled', decided_at = now(), decided_by ="
         " $2::uuid where id = $1 and status = 'proposed' returning id, message_id, kind, params,"
@@ -217,5 +219,10 @@ async def cancel_action(action_id: int, pool: Pool, owner: Owner) -> ActionOut:
         owner.user_id,
     )
     if row is None:
-        raise HTTPException(status.HTTP_409_CONFLICT, f"Action {action_id} is not proposed")
+        current = await pool.fetchval(
+            "select status from public.chat_action where id = $1", action_id
+        )
+        if current is None:
+            raise HTTPException(status.HTTP_404_NOT_FOUND, f"No action {action_id}")
+        raise HTTPException(status.HTTP_409_CONFLICT, f"Action {action_id} is {current}")
     return _action(row)

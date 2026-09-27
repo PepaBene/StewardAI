@@ -2,8 +2,11 @@
 
 Prices are the provider's list prices, but they change and differ per account (discounts,
 new models), so they are config: a step's cost is its tokens and searches times the prices
-here, recorded next to the step. Spend caps and the behaviour at the cap arrive with the
-Phase 6 budget rules and are added here then (with defaults, so saved versions stay valid).
+here, recorded next to the step.
+
+It also holds the spend limits (enforced by `steward.budget_guard` before every AI request of
+a job): a monthly cap with an early warning, what happens to non-critical jobs at the cap,
+and caps per single run. Every limit has a default that keeps older saved versions valid.
 """
 
 from typing import Literal, Self
@@ -12,6 +15,38 @@ from pydantic import Field, model_validator
 
 from steward.config.common import ConfigModel, require_unique
 from steward.config.jobs import ModelId
+
+# Every job type of `steward.jobs.registry.JOB_HANDLERS` (the registry imports every job
+# module, so config cannot import it; a test keeps the two lists equal).
+BudgetJobType = Literal[
+    "portfolio_sync",
+    "earnings_check",
+    "thesis_verdicts",
+    "earnings_calendar",
+    "earnings_calendar_full",
+    "earnings_due",
+    "fact_reconcile",
+    "reference_data",
+    "price_history",
+    "holiday_refresh",
+    "macro_collect",
+    "event_escalation",
+    "monitor",
+    "news_ingest",
+    "daily_digest",
+    "weekly_digest",
+    "research",
+    "ownership_13f",
+    "monthly_review",
+    "chat",
+]
+
+AtCap = Literal["alert_only", "pause_noncritical", "downgrade_noncritical"]
+
+# Jobs that keep running at the monthly cap: checking a new earnings report against the
+# theses, judging a severe news event, and answering the owner's own chat questions are
+# what the app is for and are time-critical; digests, research and reviews can wait.
+DEFAULT_CRITICAL_JOB_TYPES: list[BudgetJobType] = ["earnings_check", "event_escalation", "chat"]
 
 
 class ModelPrice(ConfigModel):
@@ -22,6 +57,8 @@ class ModelPrice(ConfigModel):
 
 def _default_prices() -> list[ModelPrice]:
     table = {
+        "claude-fable-5-1": (10, 50),
+        "claude-opus-4-8": (5, 25),
         "claude-haiku-4-5": (1, 5),
         "claude-sonnet-5": (2, 10),
         "claude-sonnet-4-6": (3, 15),
@@ -50,7 +87,57 @@ class BudgetConfig(ConfigModel):
         description="Batch API requests cost this times the token price (searches excluded).",
     )
 
+    monthly_cap_usd: float | None = Field(
+        default=None,
+        gt=0,
+        description="Most AI spend per calendar month (Europe/Prague), in USD. Null: no cap.",
+    )
+    warn_at_fraction: float = Field(
+        default=0.8,
+        gt=0,
+        le=1,
+        description="One alert per month when spend passes this fraction of the monthly cap.",
+    )
+    at_cap: AtCap = Field(
+        default="pause_noncritical",
+        description="At the monthly cap: only alert; fail non-critical jobs before their next"
+        " AI request; or run their requests on `downgrade_model`.",
+    )
+    downgrade_model: ModelId = Field(
+        default="claude-haiku-4-5",
+        description="The model non-critical requests use at the cap (`downgrade_noncritical`).",
+    )
+    critical_job_types: list[BudgetJobType] = Field(
+        default_factory=lambda: list(DEFAULT_CRITICAL_JOB_TYPES),
+        description="Job types that run normally at the monthly cap.",
+    )
+    per_job_cap_usd: dict[BudgetJobType, float] = Field(
+        default_factory=dict,
+        description="Most AI spend of one run of a job type, in USD. A run over it fails.",
+    )
+    default_job_cap_usd: float | None = Field(
+        default=None,
+        gt=0,
+        description="Most AI spend of one run of a job type not in `per_job_cap_usd`."
+        " Null: no cap.",
+    )
+
     @model_validator(mode="after")
     def _one_price_per_model(self) -> Self:
         require_unique("price model", [p.model for p in self.prices])
+        require_unique("critical job type", self.critical_job_types)
+        for job_type, cap in self.per_job_cap_usd.items():
+            if cap <= 0:
+                raise ValueError(f"per_job_cap_usd[{job_type}] must be greater than 0")
+        if self.at_cap == "downgrade_noncritical" and not any(
+            p.model == self.downgrade_model for p in self.prices
+        ):
+            raise ValueError(
+                f"downgrade_model {self.downgrade_model} has no price: add it to the price table"
+            )
         return self
+
+    def job_cap(self, job_type: str) -> float | None:
+        """The spend cap of one run of `job_type` (None: none)."""
+        caps = {str(k): v for k, v in self.per_job_cap_usd.items()}
+        return caps.get(job_type, self.default_job_cap_usd)

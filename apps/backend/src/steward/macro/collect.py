@@ -3,8 +3,14 @@
 - Eurostat (dissemination API, JSON-stat 2.0, no key): HICP, unemployment, GDP, industrial
   production and sentiment for the configured areas (CZ, DE, the euro area). The dataset's
   `updated` timestamp is the release date.
-- FRED (key: FRED_API_KEY): US series; an observation's realtime start is its release date.
+- FRED (key: FRED_API_KEY): US series. The request asks for the current vintage only, so
+  FRED's `realtime_start` is the day of the fetch (the vintage's start), not the day the
+  value was first published; it is stored as the release date because the job runs daily and
+  a new period is first seen on (or just after) its release day.
 - ECB Data Portal (no key): the policy rates; a new daily value is dated the day it is seen.
+
+A series' first run backfills `history_years` of history; later runs fetch only the recent
+observations (and the gap since the last stored one after an outage).
 
 A surprise is evaluated only for an observation seen for the first time (its release day),
 never for revisions of old periods: the new value against the previous period's, beyond the
@@ -16,8 +22,10 @@ release date and the source URL; digests take every macro number from `macro_ser
 import csv
 import datetime as dt
 import io
+from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
 from decimal import Decimal, InvalidOperation
+from functools import partial
 from typing import Any
 
 import asyncpg
@@ -35,6 +43,7 @@ EUROSTAT_URL = "https://ec.europa.eu/eurostat/api/dissemination/statistics/1.0/d
 EUROSTAT_PAGE = "https://ec.europa.eu/eurostat/databrowser/view/{dataset}/default/table"
 FRED_URL = "https://api.stlouisfed.org/fred/series/observations"
 FRED_PAGE = "https://fred.stlouisfed.org/series/{series_id}"
+FRED_MAX_LIMIT = 100000  # the documented maximum `limit` of series/observations
 ECB_URL = "https://data-api.ecb.europa.eu/service/data/{flow_key}"
 ECB_PAGE = "https://data.ecb.europa.eu/data/datasets/{flow}/{key}"
 
@@ -121,12 +130,18 @@ def parse_jsonstat(body: dict[str, Any], series: EurostatSeries) -> list[Observa
 
 
 async def fetch_eurostat(
-    http: httpx.AsyncClient, series: EurostatSeries, geos: list[str], last_periods: int = 3
+    http: httpx.AsyncClient,
+    series: EurostatSeries,
+    geos: list[str],
+    last_periods: int = 3,
+    since: dt.date | None = None,
 ) -> list[Observation]:
+    """The last `last_periods` periods, or with `since` every period from that year on
+    (`sinceTimePeriod` takes a bare year for monthly, quarterly and annual datasets alike)."""
     params: list[tuple[str, str | int | float | bool | None]] = [
         *(("geo", g) for g in geos),
         *series.filters.items(),
-        ("lastTimePeriod", last_periods),
+        ("sinceTimePeriod", str(since.year)) if since else ("lastTimePeriod", last_periods),
     ]
     response = await http.get(EUROSTAT_URL.format(dataset=series.dataset), params=params)
     if response.status_code != 200:
@@ -151,6 +166,8 @@ def parse_fred(body: dict[str, Any], series: FredSeries) -> list[Observation]:
                 value=value,
                 label=series.label,
                 unit=series.unit,
+                # The fetch date for a current-vintage request (see the module docstring),
+                # which is the release day only when the job runs on that day.
                 release_date=dt.date.fromisoformat(row["realtime_start"])
                 if row.get("realtime_start")
                 else None,
@@ -162,23 +179,42 @@ def parse_fred(body: dict[str, Any], series: FredSeries) -> list[Observation]:
 
 
 async def fetch_fred(
-    http: httpx.AsyncClient, series: FredSeries, api_key: str, limit: int = 6
+    http: httpx.AsyncClient,
+    series: FredSeries,
+    api_key: str,
+    limit: int = 6,
+    since: dt.date | None = None,
 ) -> list[Observation]:
-    response = await http.get(
-        FRED_URL,
-        params={
-            "series_id": series.series_id,
-            "api_key": api_key,
-            "file_type": "json",
-            "units": series.units,
-            "sort_order": "desc",
-            "limit": str(limit),
-        },
-    )
-    if response.status_code != 200:
-        # Never echo the URL: it carries the API key.
-        raise MacroError(f"FRED {series.series_id} returned HTTP {response.status_code}")
-    return parse_fred(response.json(), series)
+    """The newest `limit` observations, or with `since` every observation from that date,
+    paged by `offset` (FRED returns at most 100000 per request and reports `count`)."""
+    params = {
+        "series_id": series.series_id,
+        "api_key": api_key,
+        "file_type": "json",
+        "units": series.units,
+        "sort_order": "desc",
+        "limit": str(limit),
+    }
+    if since is not None:
+        params.update(
+            observation_start=since.isoformat(), sort_order="asc", limit=str(FRED_MAX_LIMIT)
+        )
+    out: list[Observation] = []
+    offset = 0
+    while True:
+        response = await http.get(FRED_URL, params=params)
+        if response.status_code != 200:
+            # Never echo the URL: it carries the API key.
+            raise MacroError(f"FRED {series.series_id} returned HTTP {response.status_code}")
+        body = response.json()
+        out += parse_fred(body, series)
+        if since is None:
+            return out
+        got = len(body.get("observations") or [])
+        offset += got
+        if got == 0 or offset >= int(body.get("count") or 0):
+            return out
+        params["offset"] = str(offset)
 
 
 def parse_ecb_series(text: str, series: EcbSeries, seen_on: dt.date) -> list[Observation]:
@@ -209,15 +245,59 @@ def parse_ecb_series(text: str, series: EcbSeries, seen_on: dt.date) -> list[Obs
 
 
 async def fetch_ecb_series(
-    http: httpx.AsyncClient, series: EcbSeries, today: dt.date
+    http: httpx.AsyncClient, series: EcbSeries, today: dt.date, since: dt.date | None = None
 ) -> list[Observation]:
+    """The last 5 observations, or with `since` every observation from that date on."""
+    window = {"startPeriod": since.isoformat()} if since else {"lastNObservations": "5"}
     response = await http.get(
-        ECB_URL.format(flow_key=series.flow_key),
-        params={"lastNObservations": "5", "format": "csvdata"},
+        ECB_URL.format(flow_key=series.flow_key), params={**window, "format": "csvdata"}
     )
     if response.status_code != 200:
         raise MacroError(f"ECB {series.flow_key} returned HTTP {response.status_code}")
     return parse_ecb_series(response.text, series, today)
+
+
+# Called with `since=` a date (fetch from there) or None (only the recent observations).
+Fetch = Callable[..., Awaitable[list[Observation]]]
+
+
+async def collect_window(
+    pool: asyncpg.Pool,
+    source: str,
+    series_ids: list[str],
+    fetch: Fetch,
+    today: dt.date,
+    history_years: int,
+    detail: dict[str, Any],
+) -> list[Observation]:
+    """Fetch one configured series (one request may cover several geos' series ids).
+
+    A series with nothing stored yet is backfilled from 1 January `history_years` ago (its
+    history is stored as the baseline, never evaluated). Otherwise only the recent
+    observations are fetched; when even the oldest of those is newer than the newest stored
+    one (the job did not run for a while), the gap is fetched from the last stored period.
+    """
+    rows = await pool.fetch(
+        "select series_id, max(period) as last from public.macro_series where source = $1"
+        " and series_id = any($2::text[]) group by series_id",
+        source,
+        series_ids,
+    )
+    latest: dict[str, dt.date] = {r["series_id"]: r["last"] for r in rows}
+    if any(sid not in latest for sid in series_ids):
+        start = dt.date(today.year - history_years, 1, 1)
+        detail["backfill_from"] = start.isoformat()
+        return await fetch(since=start)
+    obs = await fetch(since=None)
+    gaps = []
+    for sid in series_ids:
+        first = min((o.period for o in obs if o.series_id == sid), default=None)
+        if first is not None and first > latest[sid]:
+            gaps.append(latest[sid])
+    if gaps:
+        detail["gap_from"] = min(gaps).isoformat()
+        obs = await fetch(since=min(gaps))
+    return obs
 
 
 # ---------------------------------------------------------------------------
@@ -271,7 +351,7 @@ async def store_and_evaluate(
     pool: asyncpg.Pool, observations: list[Observation], bands: dict[str, float]
 ) -> tuple[int, list[SyntheticEvent]]:
     """Insert new observations (revisions update the value but are never evaluated) and
-    return (new count, surprise events)."""
+    return (new count, surprise events). A series with nothing stored yet is only stored."""
     events: list[SyntheticEvent] = []
     new_count = 0
     by_series: dict[str, list[Observation]] = {}
@@ -279,6 +359,14 @@ async def store_and_evaluate(
         by_series.setdefault(o.series_id, []).append(o)
     for series_id, obs in by_series.items():
         obs.sort(key=lambda o: o.period)
+        # A series' first run stores the backfilled history as the baseline: comparing
+        # those old observations with each other would raise false surprises.
+        baseline = not await pool.fetchval(
+            "select exists (select 1 from public.macro_series where series_id = $1"
+            " and source = $2)",
+            series_id,
+            obs[0].source,
+        )
         for o in obs:
             inserted = await pool.fetchval(
                 "insert into public.macro_series (series_id, source, period, value, label, unit,"
@@ -297,6 +385,8 @@ async def store_and_evaluate(
             if not inserted:
                 continue
             new_count += 1
+            if baseline:
+                continue
             prev = await pool.fetchrow(
                 "select period, value, unit from public.macro_series where series_id = $1"
                 " and source = $2 and period < $3 order by period desc limit 1",
@@ -363,7 +453,15 @@ async def run_macro_collect(ctx: JobContext, deps: MacroDeps) -> None:
     for series in settings.eurostat:
         async with ctx.step(f"eurostat:{series.key}") as step:
             try:
-                obs = await fetch_eurostat(deps.http, series, settings.geos)
+                obs = await collect_window(
+                    pool,
+                    "eurostat",
+                    [f"{series.key}:{geo}" for geo in settings.geos],
+                    partial(fetch_eurostat, deps.http, series, settings.geos),
+                    today,
+                    settings.history_years,
+                    step.detail,
+                )
             except (MacroError, httpx.HTTPError, KeyError, ValueError) as exc:
                 step.detail["error"] = str(exc)[:300]
                 continue
@@ -376,7 +474,15 @@ async def run_macro_collect(ctx: JobContext, deps: MacroDeps) -> None:
                 step.detail["skipped"] = "FRED_API_KEY is not set"
                 continue
             try:
-                obs = await fetch_fred(deps.http, fred, deps.fred_key)
+                obs = await collect_window(
+                    pool,
+                    "fred",
+                    [fred.key],
+                    partial(fetch_fred, deps.http, fred, deps.fred_key),
+                    today,
+                    settings.history_years,
+                    step.detail,
+                )
             except (MacroError, httpx.HTTPError, KeyError, ValueError) as exc:
                 step.detail["error"] = str(exc)[:300]
                 continue
@@ -386,7 +492,15 @@ async def run_macro_collect(ctx: JobContext, deps: MacroDeps) -> None:
     for ecb in settings.ecb:
         async with ctx.step(f"ecb:{ecb.key}") as step:
             try:
-                obs = await fetch_ecb_series(deps.http, ecb, today)
+                obs = await collect_window(
+                    pool,
+                    "ecb",
+                    [ecb.key],
+                    partial(fetch_ecb_series, deps.http, ecb, today),
+                    today,
+                    settings.history_years,
+                    step.detail,
+                )
             except (MacroError, httpx.HTTPError) as exc:
                 step.detail["error"] = str(exc)[:300]
                 continue

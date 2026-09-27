@@ -28,7 +28,7 @@ import {
   type RuleForm,
 } from "@/lib/config/news-forms";
 import { formatTime } from "@/lib/format";
-import { useConfigEditor } from "@/lib/hooks/use-config-editor";
+import { configSaveQuery, useConfigEditor } from "@/lib/hooks/use-config-editor";
 import { EVENT_LABELS, EVENT_TYPES, SEVERITY } from "@/lib/news/labels";
 
 const api = () => getBrowserApiClient();
@@ -46,7 +46,7 @@ export function NotificationsEditor() {
 
   const editor = useConfigEditor<NotificationsConfig>({
     load: () => api().GET("/config/notifications"),
-    save: (body, note) => api().PUT("/config/notifications", { body, params: { query: { note } } }),
+    save: (body, note, base) => api().PUT("/config/notifications", { body, params: { query: configSaveQuery(note, base) } }),
     validate: (body) => api().POST("/config/notifications/validate", { body }),
     onLoaded: (body) => {
       const loaded = notificationsFromBody(body);
@@ -215,6 +215,7 @@ export function NotificationsEditor() {
 
           <SaveBar
             dirty={dirty}
+            savedVersionId={editor.version?.id ?? null}
             busy={editor.busy ?? (replay.gate.kind === "previewing" ? "previewing" : null)}
             errors={editor.errors}
             message={replay.gate.kind === "previewing" ? "Replaying the last 7 days under your draft…" : editor.message}

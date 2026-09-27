@@ -22,7 +22,8 @@ from steward.earnings.units import KpiUnit, parse_kpi_unit
 VerdictStatus = Literal["pass", "breach", "unknown"]
 ObservedKind = Literal["money", "per_share", "fraction", "ratio", "count"]
 
-# How many past periods a KPI's history covers.
+# How many past periods a KPI's history covers by default (Jobs config:
+# earnings_check.kpi_history_periods).
 MAX_PERIODS = 8
 
 
@@ -247,7 +248,9 @@ def compare(observed: Decimal, operator: str, threshold: Decimal) -> bool:
     return abs(observed - threshold) <= Decimal("1e-9") * max(Decimal(1), abs(threshold))
 
 
-def _candidate_periods(facts: _Facts, kpi: ThesisKPI) -> list[tuple[int, str]]:
+def _candidate_periods(
+    facts: _Facts, kpi: ThesisKPI, max_periods: int = MAX_PERIODS
+) -> list[tuple[int, str]]:
     d = derivation(kpi.metric)
     metrics = {d.base, kpi.metric}
     periods = facts.periods(metrics, kpi.basis)
@@ -256,10 +259,12 @@ def _candidate_periods(facts: _Facts, kpi: ThesisKPI) -> list[tuple[int, str]]:
     else:
         chosen = {p for p in periods if p[1] in QUARTERS}
     ordered = sorted(chosen, key=lambda p: sort_key(*p), reverse=True)
-    return ordered[:MAX_PERIODS]
+    return ordered[:max_periods]
 
 
-def judge_kpi(ticker: str, kpi: ThesisKPI, facts: _Facts) -> list[VerdictDraft]:
+def judge_kpi(
+    ticker: str, kpi: ThesisKPI, facts: _Facts, max_periods: int = MAX_PERIODS
+) -> list[VerdictDraft]:
     threshold = Decimal(repr(kpi.threshold))
 
     def draft(
@@ -289,7 +294,7 @@ def judge_kpi(ticker: str, kpi: ThesisKPI, facts: _Facts) -> list[VerdictDraft]:
 
     target = f"{kpi.operator} {kpi.threshold:g} {kpi.unit}"
     unit = parse_kpi_unit(kpi.unit)
-    periods = _candidate_periods(facts, kpi)
+    periods = _candidate_periods(facts, kpi, max_periods)
     if not periods:
         needed = ", ".join(derivation(kpi.metric).components)
         return [
@@ -330,9 +335,11 @@ def judge_kpi(ticker: str, kpi: ThesisKPI, facts: _Facts) -> list[VerdictDraft]:
     return drafts
 
 
-def judge_thesis(thesis: ThesisConfig, facts: Iterable[FactRow]) -> list[VerdictDraft]:
+def judge_thesis(
+    thesis: ThesisConfig, facts: Iterable[FactRow], max_periods: int = MAX_PERIODS
+) -> list[VerdictDraft]:
     indexed = _Facts(facts)
-    return [d for kpi in thesis.kpis for d in judge_kpi(thesis.ticker, kpi, indexed)]
+    return [d for kpi in thesis.kpis for d in judge_kpi(thesis.ticker, kpi, indexed, max_periods)]
 
 
 # ---------------------------------------------------------------------------
@@ -426,6 +433,7 @@ async def run_verdicts(
     config_version_id: int,
     job_id: int | None,
     tickers: list[str] | None = None,
+    max_periods: int = MAX_PERIODS,
 ) -> VerdictRunSummary:
     counts: dict[str, int] = {"pass": 0, "breach": 0, "unknown": 0}
     total = written = 0
@@ -439,7 +447,7 @@ async def run_verdicts(
             held_back.append(f"{thesis.ticker}: disputed story #{frozen[thesis.ticker]}")
             continue
         facts = await load_verified_facts(pool, thesis.ticker)
-        drafts = judge_thesis(thesis, facts)
+        drafts = judge_thesis(thesis, facts, max_periods)
         written += await write_verdicts(pool, drafts, config_version_id, job_id)
         total += len(drafts)
         for d in drafts:

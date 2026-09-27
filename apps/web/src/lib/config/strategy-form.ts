@@ -55,6 +55,8 @@ export const DEFAULT_STRATEGY: StrategyConfig = {
   target_positions: [],
   target_categories: [],
   rules: [],
+  hard_limit_severity: "severity_3",
+  band_breach_severity: "severity_1",
 };
 
 let counter = 0;
@@ -141,6 +143,10 @@ export type StrategyForm = {
   target_positions: PositionTargetForm[];
   target_categories: CategoryTargetForm[];
   rules: RuleForm[];
+  /** Severity of a position above its hard limit. */
+  hard_limit_severity: OnBreach;
+  /** Severity of a weight outside its band (1: digest only; 2 or 3 also alert). */
+  band_breach_severity: OnBreach;
 };
 
 export const newCategory = (name = ""): CategoryForm => ({ key: nextKey(), name });
@@ -201,6 +207,8 @@ export function strategyFromBody(body: StrategyConfig | null): StrategyForm {
     goals: b.goals ?? "",
     horizon_years: b.horizon_years == null ? "" : String(b.horizon_years),
     notes: b.notes ?? "",
+    hard_limit_severity: b.hard_limit_severity ?? "severity_3",
+    band_breach_severity: b.band_breach_severity ?? "severity_1",
     categories,
     classifications,
     cash_enabled: b.cash_target != null,
@@ -299,6 +307,8 @@ export function strategyToBody(form: StrategyForm): StrategyConfig {
       band: percentToFraction(c.band) as number,
     })),
     rules: form.rules.map(ruleToBody),
+    hard_limit_severity: form.hard_limit_severity,
+    band_breach_severity: form.band_breach_severity,
   };
 }
 

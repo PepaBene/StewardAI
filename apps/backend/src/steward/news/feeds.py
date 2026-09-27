@@ -23,6 +23,7 @@ from urllib.parse import quote_plus, urljoin
 import feedparser
 import httpx
 
+from steward.config.news_sources import GoogleNewsLocale
 from steward.documents.fetch import FetchError, default_headers, fetch_document
 from steward.news.normalize import clean_text, host_of
 from steward.sources.edgar import EdgarClient, EdgarError, Filing
@@ -398,27 +399,44 @@ async def collect_finnhub(
 # Google News query per holding
 # ---------------------------------------------------------------------------
 
-GOOGLE_NEWS_URL = "https://news.google.com/rss/search?q={query}&hl=en-US&gl=US&ceid=US:en"
+GOOGLE_NEWS_URL = "https://news.google.com/rss/search?q={query}&{locale}"
+# A Google News RSS search returns at most 100 items (unofficial endpoint, observed cap).
+GOOGLE_NEWS_MAX_ITEMS = 100
 
 
-def google_news_url(names: Sequence[str], days: int) -> str | None:
+def google_news_url(
+    names: Sequence[str], days: int, locale: GoogleNewsLocale | None = None
+) -> str | None:
     terms = [f'"{n}"' for n in dict.fromkeys(n for n in names if len(n) >= 3)][:5]
     if not terms:
         return None
     query = f"({' OR '.join(terms)}) when:{max(1, days)}d"
-    return GOOGLE_NEWS_URL.format(query=quote_plus(query))
+    return GOOGLE_NEWS_URL.format(
+        query=quote_plus(query), locale=(locale or GoogleNewsLocale()).query_params()
+    )
 
 
 async def collect_google_news(
-    http: httpx.AsyncClient, source_id: str, holdings: Sequence[HoldingFeedInfo], days: int
+    http: httpx.AsyncClient,
+    source_id: str,
+    holdings: Sequence[HoldingFeedInfo],
+    days: int,
+    locale: GoogleNewsLocale | None = None,
 ) -> CollectResult:
     result = CollectResult()
     for holding in holdings:
-        url = google_news_url(holding.names, days)
+        url = google_news_url(holding.names, days, locale)
         if url is None:
             continue
         try:
-            result.items.extend(await collect_rss(http, source_id, url, (holding.ticker,)))
+            items = await collect_rss(http, source_id, url, (holding.ticker,))
         except FetchError as exc:
             result.errors.append(f"{holding.ticker}: {exc}")
+            continue
+        result.items.extend(items)
+        if len(items) >= GOOGLE_NEWS_MAX_ITEMS:
+            result.errors.append(
+                f"{holding.ticker}: Google News returned {len(items)} items, its cap; older "
+                "items in the window may be missing"
+            )
     return result

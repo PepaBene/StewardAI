@@ -26,7 +26,7 @@ from pydantic import BaseModel, Field
 
 from steward.config.event_rules import EventRulesConfig
 from steward.config.notifications import NotificationsConfig
-from steward.notify.route import AlertRequest, RouteContext, day_start, quiet_day_end, route
+from steward.notify.route import AlertRequest, RouteContext, day_start, quiet_until, route
 
 WINDOW = dt.timedelta(days=7)
 
@@ -217,7 +217,7 @@ def simulate(
                 now=event.at,
                 alerts_today=alerts_today,
                 recent_alert_id=recent,
-                quiet_until=quiet_day_end(notify, event.at, holidays),
+                quiet_until=quiet_until(notify, event.at, holidays),
             ),
         )
         pending = [r for r in rows if r.status == "pending"]

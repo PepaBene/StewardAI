@@ -13,7 +13,7 @@ import { primarySourceLink, sourceLinks, type SourceLinks } from "@/lib/sources/
 /** Dispatched on window to open the slide-over chat panel (palette, header button). */
 export const OPEN_CHAT_EVENT = "steward:open-chat";
 
-export const MESSAGE_MAX = 4000;
+export const MESSAGE_MAX = 100_000;
 export const POLL_MS = 2000;
 /** Stop polling a pending answer after this long (its job page says what happened). */
 export const POLL_LIMIT_MS = 5 * 60 * 1000;

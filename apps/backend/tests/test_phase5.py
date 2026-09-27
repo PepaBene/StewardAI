@@ -92,8 +92,8 @@ def test_the_index_page_lists_every_data_set() -> None:
 
 def independent_aggregation(path: Path, cusip: str) -> dict[dt.date, tuple[int, Decimal]]:
     """Holders and shares per period, straight from the data set's files: the latest of
-    each manager's original and restatements, plus its NEW HOLDINGS amendments; share
-    positions only (SH, no puts or calls)."""
+    each manager's original and restatements, plus the NEW HOLDINGS amendments filed after
+    it; share positions only (SH, no puts or calls)."""
 
     def table(name: str) -> list[dict[str, str]]:
         with zipfile.ZipFile(path) as z, z.open(name) as f:
@@ -114,11 +114,15 @@ def independent_aggregation(path: Path, cusip: str) -> dict[dt.date, tuple[int, 
     for (cik, period), accs in by_manager.items():
         adds = [a for a in accs if cover.get(a, {}).get("AMENDMENTTYPE") == "NEW HOLDINGS"]
         bases = [a for a in accs if a not in adds]
+        after = None
         if bases:
             latest = max(bases, key=lambda a: (when(subs[a]), a))
             effective[latest] = (cik, dt.datetime.strptime(period, "%d-%b-%Y").date())
+            after = (when(subs[latest]), latest)
         for a in adds:
-            effective[a] = (cik, dt.datetime.strptime(period, "%d-%b-%Y").date())
+            # A restatement replaces the whole report, earlier NEW HOLDINGS included.
+            if after is None or (when(subs[a]), a) > after:
+                effective[a] = (cik, dt.datetime.strptime(period, "%d-%b-%Y").date())
     holders: dict[dt.date, set[str]] = defaultdict(set)
     shares: dict[dt.date, Decimal] = defaultdict(Decimal)
     for row in table("INFOTABLE.tsv"):

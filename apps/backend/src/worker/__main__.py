@@ -4,6 +4,8 @@ Runs until SIGINT or SIGTERM:
 - the in-process scheduler for timed jobs, registered from the Jobs config;
 - a config refresher that re-applies the Jobs config every few minutes;
 - the pgmq consumer for on-demand jobs the API enqueues;
+- at start, a catch-up that runs the data jobs a fresh or stale database is missing
+  (worker.catchup), in the background and one job at a time;
 - the alert dispatcher, which sends due alerts (new ones, and ones held for quiet hours)
   every few seconds;
 - a heartbeat (a `sync_state` row the API's `/health/ready` reads, plus an optional ping to
@@ -18,6 +20,7 @@ import contextlib
 import datetime as dt
 import logging
 import signal
+from typing import Any
 
 import asyncpg
 import httpx
@@ -30,11 +33,12 @@ from steward.db import create_pool
 from steward.heartbeat import HEARTBEAT_SECONDS, beat
 from steward.jobs import queue
 from steward.jobs.registry import JOB_HANDLERS
-from steward.jobs.runner import JobTrigger, run_job
+from steward.jobs.runner import JobTrigger, fail_interrupted_scheduled_runs, run_job
 from steward.logging import configure_logging
 from steward.notify.alerts import dispatch_due
 from steward.notify.channels import channels_from_settings
 from steward.settings import get_settings
+from worker.catchup import catch_up, close_interrupted_catch_up
 from worker.scheduler import apply_jobs_config, build_scheduler
 
 logger = logging.getLogger("worker")
@@ -42,8 +46,15 @@ logger = logging.getLogger("worker")
 CONFIG_REFRESH_SECONDS = 300
 QUEUE_POLL_SECONDS = 1.0
 # A queued job is hidden from other readers for this long; a crashed worker's message
-# becomes visible again afterwards and is retried.
+# becomes visible again afterwards and is retried. While its job runs, the worker keeps
+# pushing the timeout out every QUEUE_EXTEND_SECONDS, so a long run is not redelivered.
 QUEUE_VISIBILITY_SECONDS = 3600
+QUEUE_EXTEND_SECONDS = 600
+# A job whose lock another run holds goes back to the queue for this long instead of
+# holding one of the consumer's slots while it waits.
+QUEUE_BUSY_DELAY_SECONDS = 30
+# A message whose run hit an error outside the job (the database, say) is retried after this.
+QUEUE_RETRY_SECONDS = 60
 QUEUE_MAX_READS = 3
 MAX_CONCURRENT_QUEUED_JOBS = 4
 DISPATCH_SECONDS = 15
@@ -58,7 +69,15 @@ class Worker:
     async def run_scheduled(self, job_type: str) -> None:
         await self._run(job_type, "schedule", None)
 
-    async def _run(self, job_type: str, trigger: JobTrigger, job_id: int | None) -> None:
+    async def _run(
+        self,
+        job_type: str,
+        trigger: JobTrigger,
+        job_id: int | None,
+        *,
+        wait: bool = True,
+        params: dict[str, Any] | None = None,
+    ) -> str | None:
         handler = JOB_HANDLERS.get(job_type)
         if handler is None:
             logger.error("no handler for job type %r", job_type)
@@ -68,8 +87,30 @@ class Worker:
                     " error = 'unknown job type' where id = $1",
                     job_id,
                 )
-            return
-        await run_job(self.pool, job_type, handler, trigger=trigger, job_id=job_id)
+            return None
+        return await run_job(
+            self.pool, job_type, handler, trigger=trigger, job_id=job_id, params=params, wait=wait
+        )
+
+    async def recover(self) -> None:
+        """At start: close scheduled and catch-up runs a killed worker left `running`."""
+        try:
+            await fail_interrupted_scheduled_runs(self.pool)
+            await close_interrupted_catch_up(self.pool)
+        except (OSError, asyncpg.PostgresError, TimeoutError):
+            logger.exception("closing interrupted scheduled runs failed")
+
+    async def catch_up(self, stop: asyncio.Event) -> None:
+        """Run the data jobs that never succeeded or missed their last slot (in the
+        background: the heartbeat, alerts and queue go on meanwhile)."""
+
+        async def run_one(job_type: str, params: dict[str, Any]) -> str | None:
+            return await self._run(job_type, "manual", None, params=params)
+
+        try:
+            await catch_up(self.pool, run_one, stop)
+        except Exception:
+            logger.exception("catch-up on start failed")
 
     async def refresh_schedule(self, scheduler: AsyncIOScheduler) -> None:
         stored = await load_active(self.pool, "jobs", JobsConfig)
@@ -113,10 +154,40 @@ class Worker:
                         " and status not in ('succeeded', 'failed')",
                         message.job_id,
                     )
-                else:
-                    await self._run(message.job_type, "manual", message.job_id)
-            finally:
+                    await queue.archive(self.pool, message.msg_id)
+                    return
+                extender = asyncio.create_task(self._keep_hidden(message.msg_id))
+                try:
+                    outcome = await self._run(
+                        message.job_type, "manual", message.job_id, wait=False
+                    )
+                finally:
+                    extender.cancel()
+                if outcome == "busy":
+                    # Another run holds the lock: requeue (a fresh message, so waiting is
+                    # not counted as a crash) rather than hold a slot while it finishes.
+                    await queue.enqueue(
+                        self.pool,
+                        message.job_id,
+                        message.job_type,
+                        delay=QUEUE_BUSY_DELAY_SECONDS,
+                    )
                 await queue.archive(self.pool, message.msg_id)
+            except Exception:
+                # Not archived: the message comes back and is retried (the read count stops
+                # a job that keeps failing this way).
+                logger.exception("running queued job %s failed; will retry", message.job_id)
+                with contextlib.suppress(OSError, asyncpg.PostgresError, TimeoutError):
+                    await queue.set_visibility(self.pool, message.msg_id, QUEUE_RETRY_SECONDS)
+
+    async def _keep_hidden(self, msg_id: int) -> None:
+        """Push the message's visibility timeout out while its job runs."""
+        while True:
+            await asyncio.sleep(QUEUE_EXTEND_SECONDS)
+            try:
+                await queue.set_visibility(self.pool, msg_id, QUEUE_VISIBILITY_SECONDS)
+            except (OSError, asyncpg.PostgresError, TimeoutError):
+                logger.warning("extending queue message %s failed; retrying", msg_id)
 
     async def dispatch_alerts(self, http: httpx.AsyncClient) -> None:
         try:
@@ -173,6 +244,7 @@ async def run() -> None:
     scheduler = build_scheduler()
     worker: Worker | None = None
     consumer: asyncio.Task[None] | None = None
+    catching_up: asyncio.Task[None] | None = None
     http = httpx.AsyncClient(timeout=30.0)
 
     if settings.database_url is None:
@@ -180,6 +252,7 @@ async def run() -> None:
     else:
         pool = await create_pool(settings, max_size=10)
         worker = Worker(pool)
+        await worker.recover()
         await worker.refresh_schedule(scheduler)
         scheduler.add_job(
             worker.refresh_schedule,
@@ -209,6 +282,8 @@ async def run() -> None:
         consumer = asyncio.create_task(worker.consume(stop))
 
     scheduler.start()
+    if worker is not None:
+        catching_up = asyncio.create_task(worker.catch_up(stop))
     config_jobs = [j for j in scheduler.get_jobs() if not j.id.startswith("internal:")]
     logger.info(
         "scheduler started (version %s, %d jobs registered, tz %s)",
@@ -220,6 +295,11 @@ async def run() -> None:
         await stop.wait()
     finally:
         scheduler.shutdown(wait=False)
+        if catching_up is not None and not catching_up.done():
+            # A run cut off here is failed at the next start and caught up again then.
+            catching_up.cancel()
+            with contextlib.suppress(asyncio.CancelledError):
+                await catching_up
         if consumer is not None:
             await consumer
         if worker is not None:

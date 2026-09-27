@@ -90,7 +90,7 @@ function SyncFailureNotice({ data }: { data: PortfolioOverview }) {
 }
 
 function Overview({ data }: { data: PortfolioOverview }) {
-  const { startSync, view } = useSyncStatus();
+  const { startSync, starting, view } = useSyncStatus();
 
   if (!data.freshness || !data.account || !data.base) {
     return (
@@ -105,9 +105,9 @@ function Overview({ data }: { data: PortfolioOverview }) {
           <Button
             className="mt-4"
             onClick={() => void startSync()}
-            disabled={view.kind === "active"}
+            disabled={starting || view.kind === "active"}
           >
-            <RefreshCwIcon aria-hidden="true" />
+            <RefreshCwIcon aria-hidden="true" className={cn(starting && "animate-spin")} />
             Sync now
           </Button>
         </EmptyState>
@@ -215,8 +215,11 @@ function DriftCard({ data }: { data: PortfolioOverview }) {
         {data.strategy_config_version_id === null ? (
           <AlertMessage tone="info" title="No strategy saved yet">
             <p>
-              Drift needs target weights from the strategy config. Until the config editor
-              arrives, save one through <code className="font-mono">PUT /config/strategy</code>.
+              Drift needs target weights from the strategy config.{" "}
+              <Link href="/config/strategy" className="text-accent hover:underline">
+                Set targets in the strategy editor
+              </Link>
+              .
             </p>
           </AlertMessage>
         ) : targeted.length === 0 && !cashRow ? (

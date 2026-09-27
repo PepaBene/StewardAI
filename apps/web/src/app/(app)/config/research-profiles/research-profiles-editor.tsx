@@ -27,7 +27,7 @@ import {
   type ResearchProfilesForm,
 } from "@/lib/config/research-profiles-form";
 import { mergeErrors } from "@/lib/config/strategy-form";
-import { useConfigEditor } from "@/lib/hooks/use-config-editor";
+import { configSaveQuery, useConfigEditor } from "@/lib/hooks/use-config-editor";
 import { DEPTHS, RESEARCH_SECTIONS, sectionLabel, VALUATION_METHODS, WRITTEN_BY } from "@/lib/research/report";
 import { cn } from "@/lib/utils";
 
@@ -45,7 +45,7 @@ export function ResearchProfilesEditor() {
   const [baseline, setBaseline] = useState("");
   const editor = useConfigEditor<ResearchProfilesConfig>({
     load: () => api().GET("/config/research-profiles"),
-    save: (body, note) => api().PUT("/config/research-profiles", { body, params: { query: { note } } }),
+    save: (body, note, base) => api().PUT("/config/research-profiles", { body, params: { query: configSaveQuery(note, base) } }),
     validate: (body) => api().POST("/config/research-profiles/validate", { body }),
     onLoaded: (body) => {
       const loaded = researchProfilesFromBody(body);
@@ -164,6 +164,7 @@ export function ResearchProfilesEditor() {
 
           <SaveBar
             dirty={dirty}
+            savedVersionId={editor.version?.id ?? null}
             busy={editor.busy}
             blocked={blocked}
             errors={errors}
@@ -281,6 +282,15 @@ function ProfileCard({
           inputMode="numeric"
           onChange={(v) => onChange({ max_searches: v })}
           hint={`${BOUNDS.max_searches.min} to ${BOUNDS.max_searches.max}.`}
+        />
+        <TextField
+          label="Largest 13F holders named"
+          path={`${path}.top_holders`}
+          errors={errors}
+          value={p.top_holders}
+          inputMode="numeric"
+          onChange={(v) => onChange({ top_holders: v })}
+          hint={`In the ownership section. ${BOUNDS.top_holders.min} to ${BOUNDS.top_holders.max}.`}
         />
         <CheckboxField
           label="Compare with peers"

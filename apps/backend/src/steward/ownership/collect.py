@@ -1,6 +1,7 @@
 """`ownership_13f` (monthly by default): load the SEC Form 13F data sets not yet loaded.
 
-For each new data set (newest first, `ownership.datasets_per_run` per run), the zip is
+For each new data set among the newest `ownership.history_datasets` (newest first,
+`ownership.datasets_per_run` per run; the rest follow on later runs), the zip is
 downloaded to a temporary file and streamed: every holdings filing is stored (a few
 thousand small rows) but positions only for the portfolio's CUSIPs. A holding's CUSIP comes
 from its ISIN (US and Canadian ISINs embed it) or from OpenFIGI. Loading is idempotent:
@@ -112,8 +113,18 @@ async def collect(ctx: JobContext, http: httpx.AsyncClient, settings: OwnershipS
         response.raise_for_status()
         links = dataset_links(response.text, settings.index_url)
         loaded = {r["url"] for r in await pool.fetch("select url from public.form13f_dataset")}
-        todo = [u for u in links if u not in loaded][: settings.datasets_per_run]
-        step.detail.update(listed=len(links), to_load=todo)
+        # The newest `history_datasets` are wanted; older ones are deliberately not loaded.
+        wanted = links[: settings.history_datasets]
+        missing = [u for u in wanted if u not in loaded]
+        todo = missing[: settings.datasets_per_run]
+        step.detail.update(
+            listed=len(links),
+            wanted=len(wanted),
+            to_load=todo,
+            # Still missing after this run (loaded on the next runs, newest first).
+            remaining=len(missing) - len(todo),
+            older_not_loaded=len(links) - len(wanted),
+        )
     tickers = await portfolio_cusips(pool)
     for url in todo:
         async with ctx.step(f"load:{url.rsplit('/', 1)[-1]}") as step:

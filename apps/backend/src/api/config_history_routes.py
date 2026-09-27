@@ -9,14 +9,17 @@ all.
 import datetime as dt
 from typing import Annotated, Any, Literal, get_args
 
+import asyncpg
 from fastapi import APIRouter, HTTPException, Path, Query, status
 from pydantic import BaseModel, Field
 
 from api.auth import Owner
-from api.db import Pool
+from api.db import DB_ID_MAX, IdPath, Pool
+from api.routes import BaseVersionParam, config_conflict
 from steward import __version__
 from steward.config import CONFIG_MODELS
 from steward.config.store import (
+    ConfigConflictError,
     ConfigImportError,
     RollbackError,
     VersionMeta,
@@ -42,6 +45,7 @@ ConfigDomainSlug = Literal[
     "notifications",
     "budget",
     "research-profiles",
+    "prompts",
 ]
 DOMAIN_BY_SLUG: dict[str, str] = {s: s.replace("-", "_") for s in get_args(ConfigDomainSlug)}
 assert set(DOMAIN_BY_SLUG.values()) == set(CONFIG_MODELS), "ConfigDomainSlug is out of date"
@@ -98,7 +102,7 @@ async def get_config_versions(
 
 @router.get("/config/{domain}/versions/{version_id}")
 async def get_config_version(
-    domain: SlugPath, version_id: int, pool: Pool, _owner: Owner
+    domain: SlugPath, version_id: IdPath, pool: Pool, _owner: Owner
 ) -> ConfigVersionBody:
     found = await get_version(pool, DOMAIN_BY_SLUG[domain], version_id)
     if found is None:
@@ -112,8 +116,8 @@ async def get_config_diff(
     domain: SlugPath,
     pool: Pool,
     _owner: Owner,
-    from_id: Annotated[int, Query(alias="from")],
-    to_id: Annotated[int, Query(alias="to")],
+    from_id: Annotated[int, Query(alias="from", ge=1, le=DB_ID_MAX)],
+    to_id: Annotated[int, Query(alias="to", ge=1, le=DB_ID_MAX)],
 ) -> ConfigDiff:
     """What changed from one version to another (any two versions of the domain)."""
     name = DOMAIN_BY_SLUG[domain]
@@ -132,16 +136,29 @@ async def get_config_diff(
 
 @router.post("/config/{domain}/versions/{version_id}/rollback")
 async def rollback_config(
-    domain: SlugPath, version_id: int, pool: Pool, owner: Owner
+    domain: SlugPath,
+    version_id: IdPath,
+    pool: Pool,
+    owner: Owner,
+    base_version_id: BaseVersionParam = None,
 ) -> ConfigVersionBody:
     """Make an old version current again by saving its body as a new active version. The
-    next run of every job uses it. 409 if the old body no longer passes validation."""
+    next run of every job uses it. 409 if the old body no longer passes validation, or if
+    `base_version_id` is given and is no longer the active version."""
     name = DOMAIN_BY_SLUG[domain]
     try:
         async with pool.acquire() as conn:
-            stored = await rollback(conn, name, version_id, created_by=owner.user_id)
+            stored = await rollback(
+                conn,
+                name,
+                version_id,
+                created_by=owner.user_id,
+                expected_active_id=base_version_id,
+            )
     except RollbackError as exc:
         raise HTTPException(status.HTTP_409_CONFLICT, exc.errors) from exc
+    except (ConfigConflictError, asyncpg.UniqueViolationError) as exc:
+        raise config_conflict(exc) from exc
     if stored is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, f"No {domain} version {version_id}")
     found = await get_version(pool, name, stored.id)
@@ -205,6 +222,8 @@ async def import_config(
             saved = await import_all(conn, bodies, created_by=owner.user_id, note=note)
     except ConfigImportError as exc:
         raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, exc.errors) from exc
+    except (ConfigConflictError, asyncpg.UniqueViolationError) as exc:
+        raise config_conflict(exc) from exc
     return ImportResult(
         saved={d: s.id for d, s in saved.items()},
         unchanged=sorted(d for d, s in saved.items() if before.get(d) == s.id),

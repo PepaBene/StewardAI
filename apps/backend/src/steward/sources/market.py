@@ -24,6 +24,16 @@ FRANKFURTER_URL = "https://api.frankfurter.dev/v1"
 NAGER_URL = "https://date.nager.at/api/v3/PublicHolidays/{year}/{country}"
 
 
+# Quote currency of a Stooq symbol by market suffix (London quotes in pence, as Trading212
+# reports its GBX lines). Unknown suffixes give None.
+STOOQ_CURRENCY: dict[str, str] = {"us": "USD", "uk": "GBX", "de": "EUR", "jp": "JPY", "pl": "PLN"}
+
+
+def stooq_currency(symbol: str) -> str | None:
+    _, _, suffix = symbol.rpartition(".")
+    return STOOQ_CURRENCY.get(suffix.lower())
+
+
 class MarketDataError(Exception):
     pass
 
@@ -77,20 +87,29 @@ def parse_stooq(symbol: str, text: str) -> list[PriceBar]:
     return bars
 
 
+# Answers Stooq gives in place of the CSV that are refusals, not "this symbol has no data":
+# the download needs an `apikey` (since 2026) or the daily hit quota is used up.
+STOOQ_REFUSALS = ("get your apikey", "exceeded the daily hits limit")
+
+
 async def stooq_daily(
-    http: httpx.AsyncClient, symbol: str, start: dt.date, end: dt.date
+    http: httpx.AsyncClient,
+    symbol: str,
+    start: dt.date,
+    end: dt.date,
+    api_key: str | None = None,
 ) -> list[PriceBar]:
-    response = await http.get(
-        STOOQ_URL,
-        params={
-            "s": symbol,
-            "i": "d",
-            "d1": start.strftime("%Y%m%d"),
-            "d2": end.strftime("%Y%m%d"),
-        },
-    )
+    """Daily bars in [start, end] (`d1`/`d2`); Stooq returns the whole range in one CSV."""
+    params = {"s": symbol, "i": "d", "d1": start.strftime("%Y%m%d"), "d2": end.strftime("%Y%m%d")}
+    if api_key:
+        params["apikey"] = api_key
+    response = await http.get(STOOQ_URL, params=params)
     if response.status_code != 200:
         raise MarketDataError(f"Stooq returned HTTP {response.status_code}")
+    head = response.text.lstrip()[:200].lower()
+    if not head.startswith("date") and any(r in head for r in STOOQ_REFUSALS):
+        # Not an empty history: storing nothing here would look like "no data" forever.
+        raise MarketDataError(f"Stooq refused the download: {response.text.strip()[:120]}")
     return parse_stooq(symbol, response.text)
 
 

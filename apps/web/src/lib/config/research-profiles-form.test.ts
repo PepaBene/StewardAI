@@ -31,6 +31,7 @@ const FULL: ResearchProfilesConfig = {
       include_peers: true,
       valuation_methods: ["dividend_yield_ttm", "pe_ttm"],
       language: "cs",
+      top_holders: 10,
     },
     {
       id: "screen",
@@ -45,6 +46,7 @@ const FULL: ResearchProfilesConfig = {
       include_peers: false,
       valuation_methods: [],
       language: "en",
+      top_holders: 1,
     },
   ],
   default_profile: "screen",
@@ -106,7 +108,7 @@ describe("research profiles form", () => {
     expect(validateResearchProfiles(form)).toEqual({});
     form.profiles[1].id = "deep-dive";
     form.profiles[0].sections = [];
-    form.profiles[0].max_steps = "61";
+    form.profiles[0].max_steps = "201";
     form.profiles[1].model = "gpt-5";
     form.profiles[1].source_tiers = [];
     form.profiles[1].name = " ";
@@ -126,5 +128,18 @@ describe("research profiles form", () => {
     expect(validateResearchProfiles({ ...form, profiles: [] }).profiles).toEqual(["Keep at least one profile."]);
     form.profiles[0].id = "Bad Id";
     expect(validateResearchProfiles(form)["profiles.0.id"]?.[0]).toMatch(/Lower-case/);
+  });
+});
+
+describe("research profiles form: top holders", () => {
+  it("defaults an old profile to 3 and checks the bounds", () => {
+    const { top_holders: _dropped, ...old } = FULL.profiles![0] as Record<string, unknown>;
+    void _dropped;
+    const form = researchProfilesFromBody({ ...FULL, profiles: [old as never] });
+    expect(form.profiles[0].top_holders).toBe("3");
+    form.profiles[0].top_holders = "21";
+    expect(validateResearchProfiles(form)["profiles.0.top_holders"]).toEqual(["From 1 to 20."]);
+    form.profiles[0].top_holders = "5";
+    expect(researchProfilesToBody(form).profiles![0].top_holders).toBe(5);
   });
 });

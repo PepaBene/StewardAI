@@ -156,7 +156,8 @@ export interface paths {
         /**
          * Rollback Config
          * @description Make an old version current again by saving its body as a new active version. The
-         *     next run of every job uses it. 409 if the old body no longer passes validation.
+         *     next run of every job uses it. 409 if the old body no longer passes validation, or if
+         *     `base_version_id` is given and is no longer the active version.
          */
         post: operations["rollback_config"];
         delete?: never;
@@ -717,6 +718,92 @@ export interface paths {
         put?: never;
         /** Validate Budget */
         post: operations["validate_budget"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/config/prompts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Prompts Config
+         * @description The saved prompt overrides. 404 means every AI step uses its built-in prompt.
+         */
+        get: operations["get_prompts_config"];
+        /**
+         * Save Prompts Config
+         * @description Save prompt overrides. The next run of each AI step uses them; an overridden prompt is
+         *     not covered by the CI evals.
+         */
+        put: operations["save_prompts_config"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/config/prompts/validate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Validate Prompts
+         * @description Validate prompt overrides without saving. 422 lists every error.
+         */
+        post: operations["validate_prompts"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/config/prompts/defaults": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Prompt Defaults
+         * @description Every overridable prompt with its built-in text, in pipeline order.
+         */
+        get: operations["get_prompt_defaults"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/costs/summary": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Cost Summary
+         * @description A month's AI spend against the Budget config's monthly cap, by job type and by
+         *     model.
+         */
+        get: operations["cost_summary"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -2037,6 +2124,48 @@ export interface components {
              * @default 0.5
              */
             batch_multiplier: number;
+            /**
+             * Monthly Cap Usd
+             * @description Most AI spend per calendar month (Europe/Prague), in USD. Null: no cap.
+             */
+            monthly_cap_usd?: number | null;
+            /**
+             * Warn At Fraction
+             * @description One alert per month when spend passes this fraction of the monthly cap.
+             * @default 0.8
+             */
+            warn_at_fraction: number;
+            /**
+             * At Cap
+             * @description At the monthly cap: only alert; fail non-critical jobs before their next AI request; or run their requests on `downgrade_model`.
+             * @default pause_noncritical
+             * @enum {string}
+             */
+            at_cap: "alert_only" | "pause_noncritical" | "downgrade_noncritical";
+            /**
+             * Downgrade Model
+             * @description The model non-critical requests use at the cap (`downgrade_noncritical`).
+             * @default claude-haiku-4-5
+             * @example claude-sonnet-5
+             */
+            downgrade_model: string;
+            /**
+             * Critical Job Types
+             * @description Job types that run normally at the monthly cap.
+             */
+            critical_job_types?: ("portfolio_sync" | "earnings_check" | "thesis_verdicts" | "earnings_calendar" | "earnings_calendar_full" | "earnings_due" | "fact_reconcile" | "reference_data" | "price_history" | "holiday_refresh" | "macro_collect" | "event_escalation" | "monitor" | "news_ingest" | "daily_digest" | "weekly_digest" | "research" | "ownership_13f" | "monthly_review" | "chat")[];
+            /**
+             * Per Job Cap Usd
+             * @description Most AI spend of one run of a job type, in USD. A run over it fails.
+             */
+            per_job_cap_usd?: {
+                [key: string]: number;
+            };
+            /**
+             * Default Job Cap Usd
+             * @description Most AI spend of one run of a job type not in `per_job_cap_usd`. Null: no cap.
+             */
+            default_job_cap_usd?: number | null;
         };
         /** BudgetConfigVersion */
         BudgetConfigVersion: {
@@ -2229,23 +2358,33 @@ export interface components {
              */
             model: string;
             /**
+             * Effort
+             * @description Unset: effort is not sent and the model's default applies. On Haiku 4 models the level sets an extended-thinking budget instead (low 2k to max 32k tokens).
+             */
+            effort?: ("low" | "medium" | "high" | "xhigh" | "max") | null;
+            /**
              * Max Steps
              * @description Claude calls plus tool rounds per answer.
-             * @default 6
+             * @default 30
              */
             max_steps: number;
             /**
              * Max Searches
              * @description Web searches per answer.
-             * @default 3
+             * @default 15
              */
             max_searches: number;
             /**
              * History Messages
              * @description Earlier messages of the conversation sent along.
-             * @default 12
+             * @default 100
              */
             history_messages: number;
+            /**
+             * Source Tiers
+             * @description Outlet tiers web search may use and an answer may cite (News sources config).
+             */
+            source_tiers?: (1 | 2 | 3)[];
         };
         /** CitedSentence */
         CitedSentence: {
@@ -2330,6 +2469,11 @@ export interface components {
              * @example claude-sonnet-5
              */
             model: string;
+            /**
+             * Effort
+             * @description Unset: effort is not sent and the model's default applies. On Haiku 4 models the level sets an extended-thinking budget instead (low 2k to max 32k tokens).
+             */
+            effort?: ("low" | "medium" | "high" | "xhigh" | "max") | null;
             /**
              * Mode
              * @description strip: remove an unsupported sentence; mark: keep it, marked unsupported.
@@ -2542,6 +2686,34 @@ export interface components {
              */
             independent_sources_to_confirm: number;
         };
+        /** CostSummary */
+        CostSummary: {
+            /** Month */
+            month: string;
+            /**
+             * Total Usd
+             * @description Sum of `job_step.cost_usd` of steps started in month.
+             */
+            total_usd: number;
+            /** Cap Usd */
+            cap_usd: number | null;
+            /**
+             * Fraction
+             * @description total / cap; null without a cap.
+             */
+            fraction: number | null;
+            /** Warn At Fraction */
+            warn_at_fraction: number;
+            /**
+             * At Cap
+             * @enum {string}
+             */
+            at_cap: "alert_only" | "pause_noncritical" | "downgrade_noncritical";
+            /** By Job Type */
+            by_job_type: components["schemas"]["JobTypeCost"][];
+            /** By Model */
+            by_model: components["schemas"]["ModelCost"][];
+        };
         /** DiffChange */
         DiffChange: {
             /**
@@ -2687,6 +2859,11 @@ export interface components {
              */
             model: string;
             /**
+             * Effort
+             * @description Unset: effort is not sent and the model's default applies. On Haiku 4 models the level sets an extended-thinking budget instead (low 2k to max 32k tokens).
+             */
+            effort?: ("low" | "medium" | "high" | "xhigh" | "max") | null;
+            /**
              * Use Batch
              * @description Write the summary through the Batch API (half price).
              * @default true
@@ -2704,6 +2881,24 @@ export interface components {
              * @default 2
              */
             min_severity_summarised: number;
+            /**
+             * Min Severity Listed
+             * @description Stories below this severity are left out of the digest entirely (at most min_severity_summarised).
+             * @default 1
+             */
+            min_severity_listed: number;
+            /**
+             * Daily Window Hours
+             * @description The daily digest covers this many past hours.
+             * @default 24
+             */
+            daily_window_hours: number;
+            /**
+             * Weekly Window Days
+             * @description The weekly digest covers this many past days.
+             * @default 7
+             */
+            weekly_window_days: number;
         };
         /** DigestSource */
         DigestSource: {
@@ -2875,6 +3070,11 @@ export interface components {
              */
             model: string;
             /**
+             * Effort
+             * @description Unset: effort is not sent and the model's default applies. On Haiku 4 models the level sets an extended-thinking budget instead (low 2k to max 32k tokens).
+             */
+            effort?: ("low" | "medium" | "high" | "xhigh" | "max") | null;
+            /**
              * Lookahead Days
              * @default 120
              */
@@ -2929,15 +3129,20 @@ export interface components {
              */
             effort: "low" | "medium" | "high" | "xhigh" | "max";
             /**
+             * Locate Effort
+             * @description Unset: effort is not sent and the model's default applies. On Haiku 4 models the level sets an extended-thinking budget instead (low 2k to max 32k tokens).
+             */
+            locate_effort?: ("low" | "medium" | "high" | "xhigh" | "max") | null;
+            /**
              * Max Steps
              * @description Claude calls plus document fetches per run.
-             * @default 8
+             * @default 40
              */
             max_steps: number;
             /**
              * Max Searches
              * @description Web searches per run.
-             * @default 3
+             * @default 20
              */
             max_searches: number;
             /**
@@ -2950,6 +3155,12 @@ export interface components {
              * @default 20
              */
             max_document_mb: number;
+            /**
+             * Kpi History Periods
+             * @description Past periods (quarters or years) judged for each KPI's history.
+             * @default 8
+             */
+            kpi_history_periods: number;
         };
         /** EcbSeries */
         EcbSeries: {
@@ -3076,14 +3287,19 @@ export interface components {
              */
             model: string;
             /**
+             * Effort
+             * @description Unset: effort is not sent and the model's default applies. On Haiku 4 models the level sets an extended-thinking budget instead (low 2k to max 32k tokens).
+             */
+            effort?: ("low" | "medium" | "high" | "xhigh" | "max") | null;
+            /**
              * Max Steps
              * @description Claude calls plus web searches per escalation.
-             * @default 5
+             * @default 30
              */
             max_steps: number;
             /**
              * Max Searches
-             * @default 3
+             * @default 15
              */
             max_searches: number;
             /**
@@ -3091,6 +3307,22 @@ export interface components {
              * @default 2
              */
             min_severity: number;
+            /**
+             * Source Tiers
+             * @description Outlet tiers web search may use (News sources config).
+             */
+            source_tiers?: (1 | 2 | 3)[];
+            /**
+             * Price Move News Days
+             * @description A price-move note reads the holding's news from this many days before the move.
+             * @default 3
+             */
+            price_move_news_days: number;
+            /**
+             * Price Move News Items
+             * @default 6
+             */
+            price_move_news_items: number;
         };
         /** EscalationSource */
         EscalationSource: {
@@ -3223,7 +3455,7 @@ export interface components {
             price_move_threshold_pct: number;
             /**
              * Macro Surprise Bands
-             * @description Per macro series key: a new release that moves more than this against the previous one is a macro surprise (in the series' own unit; 0: any change, e.g. a policy rate). Evaluated only on release days.
+             * @description Per macro series key: a new release that moves more than this against the previous one is a macro surprise (in the series' own unit; 0: any change, e.g. a policy rate set exactly; fed_funds is the daily effective rate, which drifts, so it needs a band). Evaluated only on release days.
              */
             macro_surprise_bands?: {
                 [key: string]: number;
@@ -3235,9 +3467,15 @@ export interface components {
             announcement_types?: components["schemas"]["AnnouncementRule"][];
             /**
              * Earnings Check On
-             * @description Confirmed stories of these types queue an earnings thesis check for the holding, unless one ran in the last 10 days.
+             * @description Confirmed stories of these types queue an earnings thesis check for the holding, unless one ran within earnings_check_cooldown_days.
              */
             earnings_check_on?: ("guidance_change" | "m_and_a" | "dividend_cut" | "earnings_release" | "management_change" | "regulatory_legal" | "capital_allocation" | "credit_rating" | "central_bank" | "macro_surprise" | "insider_transaction" | "product_business" | "sector_competitor" | "index_change" | "analyst_rating" | "delisting" | "entity_status" | "other")[];
+            /**
+             * Earnings Check Cooldown Days
+             * @description A story does not queue an earnings check when one was queued or ran for the holding within this many days.
+             * @default 10
+             */
+            earnings_check_cooldown_days: number;
         };
         /** EventRulesConfigVersion */
         EventRulesConfigVersion: {
@@ -3638,6 +3876,25 @@ export interface components {
             rate: number;
             /** Rate Date */
             rate_date: string | null;
+        };
+        /**
+         * GoogleNewsLocale
+         * @description The edition a Google News query searches (its hl, gl and ceid parameters).
+         */
+        GoogleNewsLocale: {
+            /**
+             * Language
+             * @description Interface language, e.g. en-US, en-GB, de, cs.
+             * @default en-US
+             * @example en-US
+             */
+            language: string;
+            /**
+             * Country
+             * @description Edition country, e.g. US, GB, DE, CZ.
+             * @default US
+             */
+            country: string;
         };
         /** HTTPValidationError */
         HTTPValidationError: {
@@ -4197,6 +4454,28 @@ export interface components {
             /** Finished At */
             finished_at: string | null;
         };
+        /** JobTypeCost */
+        JobTypeCost: {
+            /** Job Type */
+            job_type: string;
+            /**
+             * Runs
+             * @description Runs with at least one costed step in the month.
+             */
+            runs: number;
+            /** Cost Usd */
+            cost_usd: number;
+            /**
+             * Job Cap Usd
+             * @description The cap of one run of this type, if any.
+             */
+            job_cap_usd: number | null;
+            /**
+             * Critical
+             * @description Keeps running at the monthly cap.
+             */
+            critical: boolean;
+        };
         /**
          * JobsConfig
          * @description Schedules for the worker's timed jobs. Stored as `config_version` rows, domain `jobs`.
@@ -4210,6 +4489,12 @@ export interface components {
              * @constant
              */
             schema_version: 1;
+            /**
+             * Catch Up On Start
+             * @description On worker start, run the data jobs that never succeeded or missed their last scheduled run, one at a time in dependency order.
+             * @default true
+             */
+            catch_up_on_start: boolean;
             /** @description Trading212 sync, FX rates and drift. Default: daily at 22:30 Prague time. */
             portfolio_sync?: components["schemas"]["JobSchedule"];
             /** @description Refresh the report date of holdings reporting soon (see earnings_calendar_settings.refresh_within_days). Default: Sundays 06:00. */
@@ -4224,7 +4509,7 @@ export interface components {
             reference_data?: components["schemas"]["JobSchedule"];
             /** @description Daily prices (Stooq) and FX history after the close. Default: weekdays 23:15. */
             price_history?: components["schemas"]["JobSchedule"];
-            /** @description Public holidays for this and next year. Default: 2 January and 2 July. */
+            /** @description Public holidays for last, this and next year. Default: 2 January and 2 July. */
             holiday_refresh?: components["schemas"]["JobSchedule"];
             /** @description FRED, ECB and Eurostat macro series; macro surprises on release days. Default: daily 11:30 (after Eurostat's 11:00 releases). */
             macro_collect?: components["schemas"]["JobSchedule"];
@@ -4396,6 +4681,12 @@ export interface components {
          */
         MacroSettings: {
             /**
+             * History Years
+             * @description Years of history loaded the first time a series is collected (later runs fetch only the recent observations, and fill any gap since the last stored one).
+             * @default 10
+             */
+            history_years: number;
+            /**
              * Geos
              * @description Eurostat areas: countries and the euro area (EA21 from 2026).
              */
@@ -4475,6 +4766,15 @@ export interface components {
              * Format: date-time
              */
             created_at: string;
+        };
+        /** ModelCost */
+        ModelCost: {
+            /** Model */
+            model: string;
+            /** Steps */
+            steps: number;
+            /** Cost Usd */
+            cost_usd: number;
         };
         /** ModelPrice */
         ModelPrice: {
@@ -4609,6 +4909,11 @@ export interface components {
              */
             classification_model: string;
             /**
+             * Classification Effort
+             * @description Unset: effort is not sent and the model's default applies. On Haiku 4 models the level sets an extended-thinking budget instead (low 2k to max 32k tokens).
+             */
+            classification_effort?: ("low" | "medium" | "high" | "xhigh" | "max") | null;
+            /**
              * Classification Batch Size
              * @description Items per classification call.
              * @default 50
@@ -4621,15 +4926,20 @@ export interface components {
              */
             corroboration_model: string;
             /**
+             * Corroboration Effort
+             * @description Unset: effort is not sent and the model's default applies. On Haiku 4 models the level sets an extended-thinking budget instead (low 2k to max 32k tokens).
+             */
+            corroboration_effort?: ("low" | "medium" | "high" | "xhigh" | "max") | null;
+            /**
              * Corroboration Max Searches
              * @description Web searches per corroboration call.
-             * @default 3
+             * @default 10
              */
             corroboration_max_searches: number;
             /**
              * Corroboration Rounds
              * @description Corroboration searches per story: one when it is first seen, the rest spread over the re-check window.
-             * @default 2
+             * @default 3
              */
             corroboration_rounds: number;
             /**
@@ -4641,9 +4951,15 @@ export interface components {
             /**
              * Max Items Per Run
              * @description Classification cap per run (cost guard).
-             * @default 500
+             * @default 10000
              */
             max_items_per_run: number;
+            /**
+             * Edgar Fts Max Hits
+             * @description Most EDGAR full-text search hits read per query (100 per request; EDGAR serves at most 10,000). A query with more is noted in the collect step.
+             * @default 100
+             */
+            edgar_fts_max_hits: number;
         };
         /** NewsSource */
         NewsSource: {
@@ -4735,6 +5051,8 @@ export interface components {
              * @default false
              */
             include_tier3: boolean;
+            /** @description The Google News edition searched by google_news sources. */
+            google_news_locale?: components["schemas"]["GoogleNewsLocale"];
         };
         /** NewsSourcesConfigVersion */
         NewsSourcesConfigVersion: {
@@ -4806,9 +5124,8 @@ export interface components {
             /**
              * Daily Alert Cap
              * @description Most alerts sent per day (in the quiet-hours timezone); the rest wait for the digest. Null: no cap.
-             * @default 5
              */
-            daily_alert_cap: number | null;
+            daily_alert_cap?: number | null;
             /** Muted Tickers */
             muted_tickers?: string[];
             /** Muted Event Types */
@@ -4903,6 +5220,12 @@ export interface components {
              * @default 2
              */
             datasets_per_run: number;
+            /**
+             * History Datasets
+             * @description How far back to load: the newest this many data sets (one per quarter, so 8 is two years). An empty database is backfilled over successive runs, datasets_per_run at a time; the datasets step shows how many remain.
+             * @default 8
+             */
+            history_datasets: number;
             /**
              * Tracked Managers
              * @description Managers whose new and exited positions in the portfolio's holdings appear in the next digest.
@@ -5185,6 +5508,55 @@ export interface components {
              */
             plausibility_tolerance_pct: number;
         };
+        /** PromptDefault */
+        PromptDefault: {
+            /**
+             * Key
+             * @enum {string}
+             */
+            key: "earnings_extraction" | "earnings_locate" | "earnings_calendar" | "news_classification" | "news_corroboration" | "news_escalation" | "news_digest" | "research_writer" | "monthly_review" | "chat_assistant" | "claim_verifier";
+            /** Title */
+            title: string;
+            /** Description */
+            description: string;
+            /**
+             * Default Text
+             * @description The built-in prompt, used while no override is set.
+             */
+            default_text: string;
+        };
+        /**
+         * PromptsConfig
+         * @description Stored as `config_version` rows, domain `prompts`. No override: the default is used.
+         */
+        PromptsConfig: {
+            /**
+             * Schema Version
+             * @default 1
+             * @constant
+             */
+            schema_version: 1;
+            /**
+             * Overrides
+             * @description System prompt text per AI step, replacing the built-in default.
+             */
+            overrides?: {
+                [key: string]: string;
+            };
+        };
+        /** PromptsConfigVersion */
+        PromptsConfigVersion: {
+            /** Id */
+            id: number;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Note */
+            note: string | null;
+            body: components["schemas"]["PromptsConfig"];
+        };
         /** ProposedAction */
         ProposedAction: {
             /** Action */
@@ -5334,6 +5706,11 @@ export interface components {
              * @default 50
              */
             max_subsidiary_aliases: number;
+            /**
+             * Wikidata Languages
+             * @description Languages (ISO 639 codes) whose Wikidata labels and aliases are read.
+             */
+            wikidata_languages?: string[];
         };
         /** RelationshipDecision */
         RelationshipDecision: {
@@ -5649,12 +6026,12 @@ export interface components {
             /**
              * Max Steps
              * @description Claude calls plus web searches per run.
-             * @default 20
+             * @default 60
              */
             max_steps: number;
             /**
              * Max Searches
-             * @default 15
+             * @default 40
              */
             max_searches: number;
             /**
@@ -5676,6 +6053,12 @@ export interface components {
              * @enum {string}
              */
             language: "en" | "cs";
+            /**
+             * Top Holders
+             * @description Largest 13F holders named in the ownership section.
+             * @default 3
+             */
+            top_holders: number;
         };
         /**
          * ResearchProfilesConfig
@@ -5889,15 +6272,33 @@ export interface components {
             /**
              * Max Steps
              * @description Claude calls per review.
-             * @default 3
+             * @default 10
              */
             max_steps: number;
+            /**
+             * Use Batch
+             * @description Propose the actions through the Batch API (half price).
+             * @default true
+             */
+            use_batch: boolean;
+            /**
+             * Batch Wait Minutes
+             * @description How long to wait for the batch before proposing the actions directly.
+             * @default 60
+             */
+            batch_wait_minutes: number;
             /**
              * Liquidity Days
              * @description A position larger than this many days of its home market's average daily turnover is flagged as hard to exit.
              * @default 1
              */
             liquidity_days: number;
+            /**
+             * Holder Drop Flag Pct
+             * @description A fall in a holding's 13F holder count of at least this percentage quarter on quarter is flagged.
+             * @default 10
+             */
+            holder_drop_flag_pct: number;
         };
         /** RiskCard */
         RiskCard: {
@@ -6157,6 +6558,20 @@ export interface components {
             target_categories?: components["schemas"]["CategoryTarget"][];
             /** Rules */
             rules?: (components["schemas"]["PositionWeightRule"] | components["schemas"]["CategoryWeightRule"] | components["schemas"]["CashWeightRule"] | components["schemas"]["PositionCountRule"])[];
+            /**
+             * Hard Limit Severity
+             * @description Severity of a position above its hard limit (alerted when it opens, routed by the notification rules).
+             * @default severity_3
+             * @enum {string}
+             */
+            hard_limit_severity: "severity_1" | "severity_2" | "severity_3";
+            /**
+             * Band Breach Severity
+             * @description Severity of a position, category or cash weight outside its target band. Severity 1 is listed in the next digest only; 2 or 3 also alert when it opens.
+             * @default severity_1
+             * @enum {string}
+             */
+            band_breach_severity: "severity_1" | "severity_2" | "severity_3";
         };
         /** StrategyConfigVersion */
         StrategyConfigVersion: {
@@ -6769,7 +7184,7 @@ export interface operations {
             header?: never;
             path: {
                 /** @description Config domain, as in /config/<domain>. */
-                domain: "strategy" | "theses" | "jobs" | "holding-profiles" | "verification" | "news-sources" | "event-rules" | "notifications" | "budget" | "research-profiles";
+                domain: "strategy" | "theses" | "jobs" | "holding-profiles" | "verification" | "news-sources" | "event-rules" | "notifications" | "budget" | "research-profiles" | "prompts";
             };
             cookie?: never;
         };
@@ -6801,7 +7216,7 @@ export interface operations {
             header?: never;
             path: {
                 /** @description Config domain, as in /config/<domain>. */
-                domain: "strategy" | "theses" | "jobs" | "holding-profiles" | "verification" | "news-sources" | "event-rules" | "notifications" | "budget" | "research-profiles";
+                domain: "strategy" | "theses" | "jobs" | "holding-profiles" | "verification" | "news-sources" | "event-rules" | "notifications" | "budget" | "research-profiles" | "prompts";
                 version_id: number;
             };
             cookie?: never;
@@ -6837,7 +7252,7 @@ export interface operations {
             header?: never;
             path: {
                 /** @description Config domain, as in /config/<domain>. */
-                domain: "strategy" | "theses" | "jobs" | "holding-profiles" | "verification" | "news-sources" | "event-rules" | "notifications" | "budget" | "research-profiles";
+                domain: "strategy" | "theses" | "jobs" | "holding-profiles" | "verification" | "news-sources" | "event-rules" | "notifications" | "budget" | "research-profiles" | "prompts";
             };
             cookie?: never;
         };
@@ -6865,11 +7280,14 @@ export interface operations {
     };
     rollback_config: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description The version the edit started from. If another save has happened since, nothing is saved and the answer is 409. */
+                base_version_id?: number | null;
+            };
             header?: never;
             path: {
                 /** @description Config domain, as in /config/<domain>. */
-                domain: "strategy" | "theses" | "jobs" | "holding-profiles" | "verification" | "news-sources" | "event-rules" | "notifications" | "budget" | "research-profiles";
+                domain: "strategy" | "theses" | "jobs" | "holding-profiles" | "verification" | "news-sources" | "event-rules" | "notifications" | "budget" | "research-profiles" | "prompts";
                 version_id: number;
             };
             cookie?: never;
@@ -7410,6 +7828,8 @@ export interface operations {
             query?: {
                 /** @description Why this change was made. */
                 note?: string | null;
+                /** @description The version the edit started from. If another save has happened since, nothing is saved and the answer is 409. */
+                base_version_id?: number | null;
             };
             header?: never;
             path?: never;
@@ -7466,6 +7886,8 @@ export interface operations {
             query?: {
                 /** @description Why this change was made. */
                 note?: string | null;
+                /** @description The version the edit started from. If another save has happened since, nothing is saved and the answer is 409. */
+                base_version_id?: number | null;
             };
             header?: never;
             path?: never;
@@ -7522,6 +7944,8 @@ export interface operations {
             query?: {
                 /** @description Why this change was made. */
                 note?: string | null;
+                /** @description The version the edit started from. If another save has happened since, nothing is saved and the answer is 409. */
+                base_version_id?: number | null;
             };
             header?: never;
             path?: never;
@@ -7611,6 +8035,8 @@ export interface operations {
             query?: {
                 /** @description Why this change was made. */
                 note?: string | null;
+                /** @description The version the edit started from. If another save has happened since, nothing is saved and the answer is 409. */
+                base_version_id?: number | null;
             };
             header?: never;
             path?: never;
@@ -7700,6 +8126,8 @@ export interface operations {
             query?: {
                 /** @description Why this change was made. */
                 note?: string | null;
+                /** @description The version the edit started from. If another save has happened since, nothing is saved and the answer is 409. */
+                base_version_id?: number | null;
             };
             header?: never;
             path?: never;
@@ -7789,6 +8217,8 @@ export interface operations {
             query?: {
                 /** @description Why this change was made. */
                 note?: string | null;
+                /** @description The version the edit started from. If another save has happened since, nothing is saved and the answer is 409. */
+                base_version_id?: number | null;
             };
             header?: never;
             path?: never;
@@ -7840,6 +8270,149 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["BudgetConfig"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_prompts_config: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PromptsConfigVersion"];
+                };
+            };
+        };
+    };
+    save_prompts_config: {
+        parameters: {
+            query?: {
+                /** @description Why this change was made. */
+                note?: string | null;
+                /** @description The version the edit started from. If another save has happened since, nothing is saved and the answer is 409. */
+                base_version_id?: number | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PromptsConfig"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PromptsConfigVersion"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    validate_prompts: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PromptsConfig"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PromptsConfig"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_prompt_defaults: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PromptDefault"][];
+                };
+            };
+        };
+    };
+    cost_summary: {
+        parameters: {
+            query?: {
+                /** @description Budget month YYYY-MM (Europe/Prague); default the current one. */
+                month?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CostSummary"];
                 };
             };
             /** @description Validation Error */
@@ -8090,6 +8663,8 @@ export interface operations {
             query?: {
                 /** @description Why this change was made. */
                 note?: string | null;
+                /** @description The version the edit started from. If another save has happened since, nothing is saved and the answer is 409. */
+                base_version_id?: number | null;
             };
             header?: never;
             path?: never;
@@ -8591,6 +9166,8 @@ export interface operations {
             query?: {
                 /** @description Why this change was made. */
                 note?: string | null;
+                /** @description The version the edit started from. If another save has happened since, nothing is saved and the answer is 409. */
+                base_version_id?: number | null;
             };
             header?: never;
             path?: never;
@@ -8680,6 +9257,8 @@ export interface operations {
             query?: {
                 /** @description Why this change was made. */
                 note?: string | null;
+                /** @description The version the edit started from. If another save has happened since, nothing is saved and the answer is 409. */
+                base_version_id?: number | null;
             };
             header?: never;
             path?: never;
@@ -8769,6 +9348,8 @@ export interface operations {
             query?: {
                 /** @description Why this change was made. */
                 note?: string | null;
+                /** @description The version the edit started from. If another save has happened since, nothing is saved and the answer is 409. */
+                base_version_id?: number | null;
             };
             header?: never;
             path?: never;

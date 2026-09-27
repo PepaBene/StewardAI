@@ -44,11 +44,14 @@ class SupabaseStorage:
         return f"{BUCKET}/{urllib.parse.quote(path)}"
 
     async def put(self, path: str, data: bytes, content_type: str) -> None:
-        response = await self._http.post(
-            f"{self._base}/object/{self._object(path)}",
-            content=data,
-            headers={**self._headers, "Content-Type": content_type, "x-upsert": "false"},
-        )
+        try:
+            response = await self._http.post(
+                f"{self._base}/object/{self._object(path)}",
+                content=data,
+                headers={**self._headers, "Content-Type": content_type, "x-upsert": "false"},
+            )
+        except httpx.HTTPError as exc:
+            raise StorageError(f"storage upload failed: {type(exc).__name__}") from exc
         if response.status_code in (200, 201):
             return
         # Same bytes, same key: already archived.
@@ -57,22 +60,36 @@ class SupabaseStorage:
         raise StorageError(f"storage upload failed: HTTP {response.status_code} {response.text}")
 
     async def get(self, path: str) -> bytes:
-        response = await self._http.get(
-            f"{self._base}/object/{self._object(path)}", headers=self._headers
-        )
+        try:
+            response = await self._http.get(
+                f"{self._base}/object/{self._object(path)}", headers=self._headers
+            )
+        except httpx.HTTPError as exc:
+            raise StorageError(f"storage download failed: {type(exc).__name__}") from exc
         if response.status_code != 200:
             raise StorageError(f"storage download failed: HTTP {response.status_code}")
         return response.content
 
     async def signed_url(self, path: str, expires_in: int) -> str:
-        response = await self._http.post(
-            f"{self._base}/object/sign/{self._object(path)}",
-            json={"expiresIn": expires_in},
-            headers=self._headers,
-        )
+        try:
+            response = await self._http.post(
+                f"{self._base}/object/sign/{self._object(path)}",
+                json={"expiresIn": expires_in},
+                headers=self._headers,
+            )
+        except httpx.HTTPError as exc:
+            raise StorageError(f"signing failed: {type(exc).__name__}") from exc
         if response.status_code != 200:
             raise StorageError(f"signing failed: HTTP {response.status_code} {response.text}")
-        signed = response.json().get("signedURL") or response.json().get("signedUrl")
+        try:
+            payload = response.json()
+        except ValueError as exc:
+            raise StorageError("signing response is not JSON") from exc
+        signed = (
+            (payload.get("signedURL") or payload.get("signedUrl"))
+            if isinstance(payload, dict)
+            else None
+        )
         if not isinstance(signed, str):
             raise StorageError("signing response has no signedURL")
         return f"{self._base}{signed}" if signed.startswith("/") else signed

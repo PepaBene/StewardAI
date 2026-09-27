@@ -27,13 +27,26 @@ import anthropic
 from pydantic import BaseModel, Field
 
 from steward.ai import Usage
+from steward.config.jobs import effort_kwargs
 from steward.config.verification import ClaimVerifierSettings
 
 CheckStatus = Literal["supported", "unsupported", "unchecked"]
 
-# A number not glued to a letter on its left ("Q3", "H1", "10-K" excluded), with optional
-# thousands separators and decimals.
-_NUMBER = re.compile(r"(?<![A-Za-z0-9.,])(\d{1,3}(?:,\d{3})+|\d+)(?:\.(\d+))?(?![A-Za-z])")
+# A number not glued to a letter on its left ("Q3", "H1"), with optional thousands
+# separators and decimals, matched whole (possessive: "1.5bn" never shrinks to "1"), then
+# what follows it: a magnitude ("bn", "m", " million"), a multiple ("x"), or letters that
+# make it a label ("10-K", "5G", "3rd"), which is not a figure.
+_NUMBER = re.compile(
+    r"(?<![A-Za-z0-9.,])(\d{1,3}(?:,\d{3})++|\d++)(?:\.(\d++))?+(?![\d])"
+    r"(?:\s(?P<word>thousand|million|billion|trillion)\b"
+    r"|(?P<suffix>-?[A-Za-z]+))?"
+)
+_MAGNITUDES = {
+    "k": 3, "thousand": 3,
+    "m": 6, "mn": 6, "mm": 6, "million": 6,
+    "b": 9, "bn": 9, "billion": 9,
+    "t": 12, "tn": 12, "trillion": 12,
+}  # fmt: skip
 _YEAR = re.compile(r"^(19|20)\d\d$")
 BATCH = 40
 
@@ -60,11 +73,18 @@ class Number:
 
 
 def numbers_in(text: str) -> list[Number]:
+    """Figures in the text, magnitudes applied ("$1.5bn" is 1.5e9, precise to 0.1e9)."""
     found = []
     for match in _NUMBER.finditer(text):
         whole = match.group(1).replace(",", "")
         decimals = match.group(2) or ""
-        found.append(Number(match.group(0), Decimal(f"{whole}.{decimals or 0}"), len(decimals)))
+        unit = (match.group("word") or match.group("suffix") or "").lower()
+        if unit and unit != "x" and unit not in _MAGNITUDES:
+            continue  # a label, not a figure
+        exponent = _MAGNITUDES.get(unit, 0)
+        value = Decimal(f"{whole}.{decimals or 0}").scaleb(exponent)
+        text = match.group(1) + (f".{decimals}" if decimals else "")
+        found.append(Number(text, value, len(decimals) - exponent))
     return found
 
 
@@ -134,9 +154,20 @@ def claims_prompt(claims: Sequence[Claim], today: dt.date) -> str:
 
 
 class ClaudeClaimVerifier:
-    def __init__(self, client: anthropic.AsyncAnthropic, model: str) -> None:
+    def __init__(
+        self,
+        client: anthropic.AsyncAnthropic,
+        model: str,
+        system: str = SYSTEM,
+        effort: str | None = None,
+    ) -> None:
         self._client = client
         self._model = model
+        self._effort = effort
+        # The owner's override from the Prompts config, else the built-in default. No cache
+        # breakpoint: the batches share only this ~150-token prompt, far below the minimum
+        # cacheable prefix (4096 tokens on Haiku 4.5), and each batch's claims differ.
+        self._system = system
 
     async def check(
         self, claims: Sequence[Claim], today: dt.date
@@ -147,10 +178,10 @@ class ClaudeClaimVerifier:
             batch = claims[start : start + BATCH]
             response = await self._client.messages.parse(
                 model=self._model,
-                max_tokens=4000,
-                system=SYSTEM,
+                system=self._system,
                 messages=[{"role": "user", "content": claims_prompt(batch, today)}],
                 output_format=ClaimVerdicts,
+                **effort_kwargs(self._model, self._effort, 4000),
             )
             usage.add(response.usage)
             parsed: Any = response.parsed_output

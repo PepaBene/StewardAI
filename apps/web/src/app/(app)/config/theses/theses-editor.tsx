@@ -25,7 +25,7 @@ import {
   type KpiForm,
   type ThesisForm,
 } from "@/lib/config/theses-form";
-import { useConfigEditor } from "@/lib/hooks/use-config-editor";
+import { configSaveQuery, useConfigEditor } from "@/lib/hooks/use-config-editor";
 
 const api = () => getBrowserApiClient();
 
@@ -37,7 +37,7 @@ export function ThesesEditor() {
 
   const editor = useConfigEditor<ThesesConfig>({
     load: () => api().GET("/config/theses"),
-    save: (body, note) => api().PUT("/config/theses", { body, params: { query: { note } } }),
+    save: (body, note, base) => api().PUT("/config/theses", { body, params: { query: configSaveQuery(note, base) } }),
     validate: (body) => api().POST("/config/theses/validate", { body }),
     onLoaded: (body) => {
       const loaded = thesesFromBody(body);
@@ -164,6 +164,7 @@ export function ThesesEditor() {
           {verdictJob ? <AlertMessage tone="info" title="Saved">{verdictJob}</AlertMessage> : null}
           <SaveBar
             dirty={dirty}
+            savedVersionId={editor.version?.id ?? null}
             busy={editor.busy}
             errors={editor.errors}
             message={editor.message}

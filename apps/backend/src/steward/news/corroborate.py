@@ -33,6 +33,7 @@ import anthropic
 from pydantic import BaseModel, Field
 
 from steward.ai import Usage
+from steward.config.jobs import effort_kwargs
 from steward.news.normalize import host_of
 
 Status = Literal["confirmed", "unconfirmed", "disputed", "sentiment"]
@@ -148,6 +149,12 @@ class Corroborator(Protocol):
     ) -> tuple[SearchOutcome, Usage]: ...
 
 
+# Top-level automatic prompt caching: the breakpoint goes on the last block of the request
+# and moves forward as a loop grows it. Below the model's minimum prefix nothing is cached
+# and nothing extra is charged.
+AUTO_CACHE: dict[str, Any] = {"cache_control": {"type": "ephemeral"}}
+
+
 SEARCH_SYSTEM = """\
 You check whether a news claim is reported by other reliable sources. Search the web \
 (restricted to the allowed outlets) for independent reports of the same event. List the \
@@ -196,10 +203,19 @@ class ClaudeCorroborator:
     # Haiku 4.5 takes the basic web search tool; the dynamic-filtering version needs a newer model.
     TOOL_BY_MODEL_PREFIX = (("claude-haiku-4", "web_search_20250305"),)
 
-    def __init__(self, client: anthropic.AsyncAnthropic, model: str, max_searches: int) -> None:
+    def __init__(
+        self,
+        client: anthropic.AsyncAnthropic,
+        model: str,
+        max_searches: int,
+        system: str = SEARCH_SYSTEM,
+        effort: str | None = None,
+    ) -> None:
         self._client = client
         self._model = model
+        self._effort = effort
         self._max_searches = max_searches
+        self._system = system
 
     def _tool_type(self) -> str:
         for prefix, tool in self.TOOL_BY_MODEL_PREFIX:
@@ -233,11 +249,16 @@ class ClaudeCorroborator:
             try:
                 response = await self._client.messages.parse(
                     model=self._model,
-                    max_tokens=4000,
-                    system=SEARCH_SYSTEM,
+                    system=self._system,
                     messages=messages,  # type: ignore[arg-type]
                     tools=cast(Any, [self._tool(request)]),
                     output_format=CorroborationAnswer,
+                    **effort_kwargs(self._model, self._effort, 4000),
+                    # Automatic caching: the server caches after each search result inside
+                    # the request, so later sampling steps and a pause_turn continuation read
+                    # the searched pages at a tenth of the price instead of paying for them
+                    # again. (`parse` has no `cache_control` argument; the API takes it.)
+                    extra_body=AUTO_CACHE,
                 )
             except anthropic.APIError as exc:
                 return SearchOutcome(SearchFinding(note=f"search failed: {exc}")), usage

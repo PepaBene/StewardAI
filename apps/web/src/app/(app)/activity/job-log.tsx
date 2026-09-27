@@ -3,7 +3,7 @@
 import { LoaderCircleIcon, RefreshCwIcon, XIcon } from "lucide-react";
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { AlertMessage } from "@/components/alert-message";
 import { EmptyState } from "@/components/empty-state";
@@ -25,6 +25,8 @@ import {
 import { formatDateTime, formatRelative } from "@/lib/format";
 import { useNow } from "@/lib/hooks/use-now";
 import { formatCost, JOB_STATUS, jobHref, jobTypeLabel } from "@/lib/jobs/job-detail";
+import { latestOnly } from "@/lib/latest-request";
+import { appendUnique } from "@/lib/portfolio/transactions";
 import { cn } from "@/lib/utils";
 
 type Load =
@@ -48,6 +50,8 @@ export function JobLog() {
   const [holdings, setHoldings] = useState<Holding[]>([]);
   const [reloadKey, setReloadKey] = useState(0);
   const now = useNow();
+  // Only the newest load's answers are applied (filters can change while a page loads).
+  const sequence = useRef(0);
 
   const setFilters = useCallback(
     (next: JobLogFilters) =>
@@ -56,12 +60,14 @@ export function JobLog() {
   );
 
   useEffect(() => {
-    let cancelled = false;
+    const mine = ++sequence.current;
     fetchJobs(filters, null)
-      .then((page) => !cancelled && setLoad({ kind: "ok", jobs: page.jobs, next: page.next_before_id, more: "idle" }))
-      .catch((err: unknown) => !cancelled && setLoad({ kind: "error", message: err instanceof Error ? err.message : String(err) }));
+      .then((page) => mine === sequence.current && setLoad({ kind: "ok", jobs: page.jobs, next: page.next_before_id, more: "idle" }))
+      .catch(
+        (err: unknown) => mine === sequence.current && setLoad({ kind: "error", message: err instanceof Error ? err.message : String(err) }),
+      );
     return () => {
-      cancelled = true;
+      sequence.current += 1;
     };
   }, [filters, reloadKey]);
 
@@ -73,14 +79,16 @@ export function JobLog() {
   }, []);
 
   async function loadMore() {
-    if (load.kind !== "ok" || load.next === null) return;
+    if (load.kind !== "ok" || load.next === null || load.more === "loading") return;
+    const beforeId = load.next;
     setLoad({ ...load, more: "loading" });
-    try {
-      const page = await fetchJobs(filters, load.next);
-      setLoad({ kind: "ok", jobs: [...load.jobs, ...page.jobs], next: page.next_before_id, more: "idle" });
-    } catch (err) {
-      setLoad({ ...load, more: err instanceof Error ? err.message : String(err) });
-    }
+    const outcome = await latestOnly(sequence, () => fetchJobs(filters, beforeId));
+    if (outcome.stale) return;
+    setLoad((prev) => {
+      if (prev.kind !== "ok") return prev;
+      if (!outcome.ok) return { ...prev, more: outcome.error };
+      return { kind: "ok", jobs: appendUnique(prev.jobs, outcome.value.jobs), next: outcome.value.next_before_id, more: "idle" };
+    });
   }
 
   const types = jobTypeOptions([...filters.types, ...(load.kind === "ok" ? load.jobs.map((j) => j.job_type) : [])]);

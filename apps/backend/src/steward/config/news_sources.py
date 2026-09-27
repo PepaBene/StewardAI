@@ -75,6 +75,27 @@ class DomainTier(ConfigModel):
     tier: Tier
 
 
+class GoogleNewsLocale(ConfigModel):
+    """The edition a Google News query searches (its hl, gl and ceid parameters)."""
+
+    language: str = Field(
+        default="en-US",
+        pattern=r"^[a-z]{2,3}(-[A-Z]{2})?$",
+        description="Interface language, e.g. en-US, en-GB, de, cs.",
+        examples=["en-US"],
+    )
+    country: str = Field(
+        default="US", pattern=r"^[A-Z]{2}$", description="Edition country, e.g. US, GB, DE, CZ."
+    )
+
+    @property
+    def ceid(self) -> str:
+        return f"{self.country}:{self.language.split('-')[0]}"
+
+    def query_params(self) -> str:
+        return f"hl={self.language}&gl={self.country}&ceid={self.ceid}"
+
+
 def _default_sources() -> list[NewsSource]:
     def central_bank(source_id: str, name: str, url: str) -> NewsSource:
         return NewsSource.model_validate(
@@ -154,6 +175,10 @@ class NewsSourcesConfig(ConfigModel):
     include_tier3: bool = Field(
         default=False,
         description="Keep tier-3 items (labelled sentiment; they never alert on their own).",
+    )
+    google_news_locale: GoogleNewsLocale = Field(
+        default_factory=GoogleNewsLocale,
+        description="The Google News edition searched by google_news sources.",
     )
 
     @model_validator(mode="after")

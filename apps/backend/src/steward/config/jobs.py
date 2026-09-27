@@ -1,11 +1,11 @@
 """Jobs config: when each scheduled job runs, and whether it runs at all."""
 
 import datetime as dt
-from typing import Annotated, Literal, Self
+from typing import Annotated, Any, Literal, Self
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from apscheduler.triggers.cron import CronTrigger
-from pydantic import Field, model_validator
+from pydantic import Field, field_validator, model_validator
 
 from steward.config.common import ConfigModel
 
@@ -82,6 +82,77 @@ def cron_trigger(expression: str, tz: ZoneInfo) -> CronTrigger:
 
 ModelId = Annotated[str, Field(pattern=r"^claude-[a-z0-9.-]{1,64}$", examples=["claude-sonnet-5"])]
 
+Effort = Literal["low", "medium", "high", "xhigh", "max"]
+EFFORT_HELP = (
+    "Unset: effort is not sent and the model's default applies. On Haiku 4 models the level "
+    "sets an extended-thinking budget instead (low 2k to max 32k tokens)."
+)
+# Web-search tiers: 1 the company, regulators and statistics offices; 2 established outlets;
+# 3 everything else on the allow-list.
+SourceTier = Literal[1, 2, 3]
+DEFAULT_SOURCE_TIERS: tuple[SourceTier, ...] = (1, 2)
+
+
+def supports_effort(model: str) -> bool:
+    """Haiku 4 models reject the effort parameter."""
+    return not model.startswith("claude-haiku-4")
+
+
+# Claude Haiku 4 models take no effort parameter; their equivalent is extended thinking with
+# a token budget, sized per effort level.
+THINKING_BUDGET: dict[str, int] = {
+    "low": 2048,
+    "medium": 4096,
+    "high": 8192,
+    "xhigh": 16384,
+    "max": 32000,
+}
+
+
+def reasoning_kwargs(
+    model: str,
+    effort: str | None,
+    max_tokens: int,
+    output_config: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    """`max_tokens`, `output_config` and `thinking` for a Messages call at `effort`.
+
+    Models that take effort get it in `output_config` (merged with `output_config`, e.g. a
+    response format). Haiku 4 models get extended thinking with `THINKING_BUDGET[effort]`
+    tokens instead, and `max_tokens` grows by that budget so the answer keeps its room.
+    No effort: nothing is added (the model's default)."""
+    config = dict(output_config or {})
+    out: dict[str, Any] = {"max_tokens": max_tokens}
+    if effort is not None:
+        if supports_effort(model):
+            # xhigh arrived with Opus 4.7; the 4.6 models top out at high below max.
+            if effort == "xhigh" and model.endswith("-4-6"):
+                effort = "high"
+            config["effort"] = effort
+        else:
+            budget = THINKING_BUDGET[effort]
+            out["thinking"] = {"type": "enabled", "budget_tokens": budget}
+            out["max_tokens"] = max_tokens + budget
+    if config:
+        out["output_config"] = config
+    return out
+
+
+def effort_kwargs(model: str, effort: str | None, max_tokens: int) -> dict[str, Any]:
+    """`reasoning_kwargs` without a response format."""
+    return reasoning_kwargs(model, effort, max_tokens)
+
+
+def check_effort(model: str, effort: str | None, field: str) -> None:
+    """Every effort level is valid for every model (Haiku 4 maps it to a thinking budget)."""
+    del model, effort, field
+
+
+def _unique_tiers(tiers: list[int]) -> list[int]:
+    if not tiers:
+        raise ValueError("at least one source tier is needed")
+    return sorted(set(tiers))
+
 
 class EarningsCheckSettings(ConfigModel):
     """The earnings thesis check: find the release, extract figures, validate, judge KPIs."""
@@ -91,17 +162,29 @@ class EarningsCheckSettings(ConfigModel):
         default="claude-sonnet-5",
         description="Searches for the release when EDGAR has none (non-US issuers).",
     )
-    effort: Literal["low", "medium", "high", "xhigh", "max"] = "high"
+    effort: Effort = "high"
+    locate_effort: Effort | None = Field(default=None, description=EFFORT_HELP)
     max_steps: int = Field(
-        default=8, ge=2, le=50, description="Claude calls plus document fetches per run."
+        default=40, ge=2, le=200, description="Claude calls plus document fetches per run."
     )
-    max_searches: int = Field(default=3, ge=0, le=20, description="Web searches per run.")
+    max_searches: int = Field(default=20, ge=0, le=100, description="Web searches per run.")
     check_days_after_report: list[Annotated[int, Field(ge=0, le=30)]] = Field(
         default_factory=lambda: [1, 2, 4],
         description="Days after the report date on which the check runs until it finds the "
         "release (the spec's +1, retry at +2 and +4).",
     )
     max_document_mb: int = Field(default=20, ge=1, le=32)
+    kpi_history_periods: int = Field(
+        default=8,
+        ge=1,
+        le=40,
+        description="Past periods (quarters or years) judged for each KPI's history.",
+    )
+
+    @model_validator(mode="after")
+    def _effort_supported(self) -> Self:
+        check_effort(self.locate_model, self.locate_effort, "locate_effort")
+        return self
 
 
 class EarningsCalendarSettings(ConfigModel):
@@ -110,6 +193,7 @@ class EarningsCalendarSettings(ConfigModel):
     model: ModelId = Field(
         default="claude-haiku-4-5", description="Reads report dates off IR calendar pages."
     )
+    effort: Effort | None = Field(default=None, description=EFFORT_HELP)
     lookahead_days: int = Field(default=120, ge=7, le=400)
     refresh_within_days: int = Field(
         default=14,
@@ -119,22 +203,29 @@ class EarningsCalendarSettings(ConfigModel):
         "those with no date); the quarterly run refreshes every holding.",
     )
 
+    @model_validator(mode="after")
+    def _effort_supported(self) -> Self:
+        check_effort(self.model, self.effort, "effort")
+        return self
+
 
 class NewsSettings(ConfigModel):
     """The news pipeline after ingest: classification, corroboration."""
 
     classification_model: ModelId = "claude-haiku-4-5"
+    classification_effort: Effort | None = Field(default=None, description=EFFORT_HELP)
     classification_batch_size: int = Field(
         default=50, ge=5, le=100, description="Items per classification call."
     )
     corroboration_model: ModelId = "claude-haiku-4-5"
+    corroboration_effort: Effort | None = Field(default=None, description=EFFORT_HELP)
     corroboration_max_searches: int = Field(
-        default=3, ge=0, le=10, description="Web searches per corroboration call."
+        default=10, ge=0, le=50, description="Web searches per corroboration call."
     )
     corroboration_rounds: int = Field(
-        default=2,
+        default=3,
         ge=0,
-        le=5,
+        le=20,
         description="Corroboration searches per story: one when it is first seen, the rest "
         "spread over the re-check window.",
     )
@@ -142,12 +233,26 @@ class NewsSettings(ConfigModel):
         default=48, ge=1, le=168, description="How long an unconfirmed story is re-checked."
     )
     max_items_per_run: int = Field(
-        default=500, ge=10, le=5000, description="Classification cap per run (cost guard)."
+        default=10_000, ge=10, le=100_000, description="Classification cap per run (cost guard)."
     )
+    edgar_fts_max_hits: int = Field(
+        default=100,
+        ge=10,
+        le=10_000,
+        description="Most EDGAR full-text search hits read per query (100 per request; EDGAR "
+        "serves at most 10,000). A query with more is noted in the collect step.",
+    )
+
+    @model_validator(mode="after")
+    def _effort_supported(self) -> Self:
+        check_effort(self.classification_model, self.classification_effort, "classification_effort")
+        check_effort(self.corroboration_model, self.corroboration_effort, "corroboration_effort")
+        return self
 
 
 class DigestSettings(ConfigModel):
     model: ModelId = "claude-sonnet-5"
+    effort: Effort | None = Field(default=None, description=EFFORT_HELP)
     use_batch: bool = Field(
         default=True, description="Write the summary through the Batch API (half price)."
     )
@@ -164,6 +269,34 @@ class DigestSettings(ConfigModel):
         description="Stories at or above this severity get a written summary; the rest are "
         "listed by headline.",
     )
+    min_severity_listed: int = Field(
+        default=1,
+        ge=1,
+        le=3,
+        description="Stories below this severity are left out of the digest entirely (at most "
+        "min_severity_summarised).",
+    )
+    daily_window_hours: int = Field(
+        default=24, ge=1, le=168, description="The daily digest covers this many past hours."
+    )
+    weekly_window_days: int = Field(
+        default=7, ge=1, le=31, description="The weekly digest covers this many past days."
+    )
+
+    @model_validator(mode="after")
+    def _consistent(self) -> Self:
+        check_effort(self.model, self.effort, "effort")
+        if self.min_severity_listed > self.min_severity_summarised:
+            raise ValueError(
+                "min_severity_listed must be at most min_severity_summarised (a summarised "
+                "story must also be listed)"
+            )
+        return self
+
+    def window(self, kind: str) -> dt.timedelta:
+        if kind == "daily":
+            return dt.timedelta(hours=self.daily_window_hours)
+        return dt.timedelta(days=self.weekly_window_days)
 
 
 class ReferenceSettings(ConfigModel):
@@ -181,6 +314,12 @@ class ReferenceSettings(ConfigModel):
         ge=0,
         le=500,
         description="Most GLEIF subsidiary names added to a holding's news aliases.",
+    )
+    wikidata_languages: list[Annotated[str, Field(pattern=r"^[a-z]{2,3}$")]] = Field(
+        default_factory=lambda: ["en", "de", "cs"],
+        min_length=1,
+        max_length=10,
+        description="Languages (ISO 639 codes) whose Wikidata labels and aliases are read.",
     )
 
 
@@ -237,11 +376,32 @@ class EscalationSettings(ConfigModel):
 
     enabled: bool = True
     model: ModelId = "claude-sonnet-5"
+    effort: Effort | None = Field(default=None, description=EFFORT_HELP)
     max_steps: int = Field(
-        default=5, ge=1, le=20, description="Claude calls plus web searches per escalation."
+        default=30, ge=1, le=100, description="Claude calls plus web searches per escalation."
     )
-    max_searches: int = Field(default=3, ge=0, le=10)
+    max_searches: int = Field(default=15, ge=0, le=50)
     min_severity: int = Field(default=2, ge=1, le=3)
+    source_tiers: list[SourceTier] = Field(
+        default_factory=lambda: list(DEFAULT_SOURCE_TIERS),
+        min_length=1,
+        description="Outlet tiers web search may use (News sources config).",
+    )
+    price_move_news_days: int = Field(
+        default=3,
+        ge=0,
+        le=30,
+        description="A price-move note reads the holding's news from this many days before "
+        "the move.",
+    )
+    price_move_news_items: int = Field(default=6, ge=0, le=30)
+
+    _tiers = field_validator("source_tiers")(_unique_tiers)
+
+    @model_validator(mode="after")
+    def _effort_supported(self) -> Self:
+        check_effort(self.model, self.effort, "effort")
+        return self
 
 
 class EurostatSeries(ConfigModel):
@@ -296,6 +456,14 @@ def _eurostat_defaults() -> list[EurostatSeries]:
 
 class MacroSettings(ConfigModel):
     """Macro series collected into `macro_series` (numbers in digests come only from here)."""
+
+    history_years: int = Field(
+        default=10,
+        ge=1,
+        le=30,
+        description="Years of history loaded the first time a series is collected (later runs "
+        "fetch only the recent observations, and fill any gap since the last stored one).",
+    )
 
     geos: list[Annotated[str, Field(pattern=r"^[A-Z0-9]{2,5}$")]] = Field(
         default_factory=lambda: ["CZ", "DE", "EA21"],
@@ -362,27 +530,56 @@ class ChatSettings(ConfigModel):
     """The chat panel's assistant: DB tools, web search on tiered outlets, cited answers."""
 
     model: ModelId = "claude-sonnet-5"
+    effort: Effort | None = Field(default=None, description=EFFORT_HELP)
     max_steps: int = Field(
-        default=6, ge=1, le=20, description="Claude calls plus tool rounds per answer."
+        default=30, ge=1, le=100, description="Claude calls plus tool rounds per answer."
     )
-    max_searches: int = Field(default=3, ge=0, le=10, description="Web searches per answer.")
+    max_searches: int = Field(default=15, ge=0, le=50, description="Web searches per answer.")
     history_messages: int = Field(
-        default=12, ge=2, le=50, description="Earlier messages of the conversation sent along."
+        default=100, ge=2, le=500, description="Earlier messages of the conversation sent along."
     )
+    source_tiers: list[SourceTier] = Field(
+        default_factory=lambda: list(DEFAULT_SOURCE_TIERS),
+        min_length=1,
+        description="Outlet tiers web search may use and an answer may cite (News sources config).",
+    )
+
+    _tiers = field_validator("source_tiers")(_unique_tiers)
+
+    @model_validator(mode="after")
+    def _effort_supported(self) -> Self:
+        check_effort(self.model, self.effort, "effort")
+        return self
 
 
 class ReviewSettings(ConfigModel):
     """The monthly review: compliance and figures in code, proposed actions by the model."""
 
     model: ModelId = "claude-opus-5-5"
-    effort: Literal["low", "medium", "high", "xhigh", "max"] = "high"
-    max_steps: int = Field(default=3, ge=1, le=10, description="Claude calls per review.")
+    effort: Effort = "high"
+    max_steps: int = Field(default=10, ge=1, le=50, description="Claude calls per review.")
+    use_batch: bool = Field(
+        default=True, description="Propose the actions through the Batch API (half price)."
+    )
+    batch_wait_minutes: int = Field(
+        default=60,
+        ge=1,
+        le=720,
+        description="How long to wait for the batch before proposing the actions directly.",
+    )
     liquidity_days: float = Field(
         default=1.0,
         gt=0,
         le=100,
         description="A position larger than this many days of its home market's average "
         "daily turnover is flagged as hard to exit.",
+    )
+    holder_drop_flag_pct: float = Field(
+        default=10.0,
+        gt=0,
+        le=100,
+        description="A fall in a holding's 13F holder count of at least this percentage "
+        "quarter on quarter is flagged.",
     )
 
 
@@ -402,6 +599,14 @@ class OwnershipSettings(ConfigModel):
     datasets_per_run: int = Field(
         default=2, ge=1, le=8, description="Data sets (about 100 MB each) loaded per run."
     )
+    history_datasets: int = Field(
+        default=8,
+        ge=1,
+        le=60,
+        description="How far back to load: the newest this many data sets (one per quarter, "
+        "so 8 is two years). An empty database is backfilled over successive runs, "
+        "datasets_per_run at a time; the datasets step shows how many remain.",
+    )
     tracked_managers: list[TrackedManager] = Field(
         default_factory=list,
         description="Managers whose new and exited positions in the portfolio's holdings "
@@ -417,6 +622,11 @@ class JobsConfig(ConfigModel):
     """
 
     schema_version: Literal[1] = 1
+    catch_up_on_start: bool = Field(
+        default=True,
+        description="On worker start, run the data jobs that never succeeded or missed their "
+        "last scheduled run, one at a time in dependency order.",
+    )
     portfolio_sync: JobSchedule = Field(
         default_factory=lambda: JobSchedule(cron="30 22 * * *"),
         description="Trading212 sync, FX rates and drift. Default: daily at 22:30 Prague time.",
@@ -452,7 +662,7 @@ class JobsConfig(ConfigModel):
     )
     holiday_refresh: JobSchedule = Field(
         default_factory=lambda: JobSchedule(cron="0 4 2 1,7 *"),
-        description="Public holidays for this and next year. Default: 2 January and 2 July.",
+        description="Public holidays for last, this and next year. Default: 2 January and 2 July.",
     )
     macro_collect: JobSchedule = Field(
         default_factory=lambda: JobSchedule(cron="30 11 * * *"),

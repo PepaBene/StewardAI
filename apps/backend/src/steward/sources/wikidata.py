@@ -7,12 +7,14 @@ corroborates them, and its financial figures are never used. It has no competito
 competitors are inferred (same industry and same stock index) and are suggestions too.
 """
 
+from collections.abc import Sequence
 from dataclasses import dataclass
 from typing import Any
 
 import httpx
 
 SPARQL_URL = "https://query.wikidata.org/sparql"
+# Default alias languages (Jobs config: reference.wikidata_languages).
 LANGUAGES = ("en", "de", "cs")
 
 
@@ -52,7 +54,7 @@ PROPERTIES_QUERY = """SELECT ?p ?value ?valueLabel ?lei WHERE {{
 }}"""
 
 ALIASES_QUERY = """SELECT ?alias WHERE {{
-  wd:{qid} rdfs:label|skos:altLabel ?alias . FILTER(LANG(?alias) IN ("en", "de", "cs"))
+  wd:{qid} rdfs:label|skos:altLabel ?alias . FILTER(LANG(?alias) IN ({languages}))
 }}"""
 
 # Listed companies in the same industry and the same stock index.
@@ -123,8 +125,10 @@ class WikidataClient:
     async def properties(self, qid: str) -> list[WikidataLink]:
         return parse_properties(await self._query(PROPERTIES_QUERY.format(qid=qid)))
 
-    async def aliases(self, qid: str) -> list[str]:
-        return parse_aliases(await self._query(ALIASES_QUERY.format(qid=qid)))
+    async def aliases(self, qid: str, languages: Sequence[str] = LANGUAGES) -> list[str]:
+        # Codes are validated by the config ([a-z]{2,3}), so they are safe to quote here.
+        quoted = ", ".join(f'"{lang}"' for lang in languages if lang.isalpha())
+        return parse_aliases(await self._query(ALIASES_QUERY.format(qid=qid, languages=quoted)))
 
     async def competitors(self, qid: str) -> list[WikidataLink]:
         return parse_competitors(await self._query(COMPETITORS_QUERY.format(qid=qid)))

@@ -3,8 +3,9 @@
 Aggregation rules (the same an independent reader of the data set applies, see the tests):
 
 - per manager (CIK) and period, the effective filing is the latest by filing date of the
-  original 13F-HR and its RESTATEMENT amendments; NEW HOLDINGS amendments add their
-  positions to it;
+  original 13F-HR and its RESTATEMENT amendments; NEW HOLDINGS amendments filed after it
+  add their positions to it (a restatement is the whole report, so it replaces any
+  NEW HOLDINGS amendment filed before it);
 - holders: managers with a share position (type SH, not a put or call) in the CUSIP;
 - shares and value: the sum of those positions (value in US dollars).
 
@@ -23,12 +24,13 @@ EFFECTIVE = """
 with f as (
   select * from public.form13f_filing where period = $1
 ), base as (
-  select distinct on (cik) accession, cik from f
+  select distinct on (cik) accession, cik, filed from f
   where submission_type = '13F-HR' or coalesce(amendment_type, '') <> 'NEW HOLDINGS'
   order by cik, filed desc, accession desc
 ), adds as (
-  select accession, cik from f
-  where submission_type = '13F-HR/A' and amendment_type = 'NEW HOLDINGS'
+  select a.accession, a.cik from f a left join base b on b.cik = a.cik
+  where a.submission_type = '13F-HR/A' and a.amendment_type = 'NEW HOLDINGS'
+    and (b.accession is null or (a.filed, a.accession) > (b.filed, b.accession))
 ), effective as (
   select accession, cik from base union select accession, cik from adds
 )

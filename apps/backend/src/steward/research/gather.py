@@ -119,7 +119,10 @@ def financial_trend(reg: Registry, facts: list[asyncpg.Record]) -> CodeSection:
         section.note = "No verified quarterly figures are stored for this ticker."
         return section
     latest = max(_qi(f) or 0 for f in quarterly)
-    by_key = {(f["metric"], _qi(f)): f for f in quarterly}
+    # Facts come newest first: keep the first (newest) per metric and quarter.
+    by_key: dict[tuple[str, int | None], asyncpg.Record] = {}
+    for f in quarterly:
+        by_key.setdefault((f["metric"], _qi(f)), f)
     for metric in BASE_METRICS:
         now = by_key.get((metric, latest))
         if now is None:
@@ -303,9 +306,9 @@ async def valuation(
     return section, out
 
 
-async def ownership(pool: asyncpg.Pool, reg: Registry, ticker: str) -> CodeSection:
+async def ownership(pool: asyncpg.Pool, reg: Registry, ticker: str, top: int = 3) -> CodeSection:
     section = CodeSection(id="ownership")
-    data = await holding_ownership(pool, ticker, periods=2, top=3)
+    data = await holding_ownership(pool, ticker, periods=2, top=top)
     if data.periods:
         p = data.periods[0]
         sid = reg.add(
@@ -326,7 +329,7 @@ async def ownership(pool: asyncpg.Pool, reg: Registry, ticker: str) -> CodeSecti
         if p.holders_change is not None:
             text += f" ({p.holders_change:+,} holders on the previous period)"
         section.sentences.append(CitedSentence(text=text + ".", source_ids=[sid]))
-        for h in data.top_holders[:3]:
+        for h in data.top_holders[:top]:
             hid = reg.add(
                 "filing13f",
                 h.accession,
@@ -556,8 +559,9 @@ async def gather(
         ticker,
     )
     position = await pool.fetchrow(
-        "select * from public.position_snapshot where ticker = $1 and snapshot_date ="
-        " (select max(snapshot_date) from public.position_snapshot) ",
+        "select * from public.position_snapshot where ticker = $1 and snapshot_date = coalesce("
+        " (select max(snapshot_date) from public.account_snapshot),"
+        " (select max(snapshot_date) from public.position_snapshot))",
         ticker,
     )
     name = (inst["name"] if inst else None) or name_hint or ticker
@@ -579,7 +583,7 @@ async def gather(
             inst["currency"] if inst else None,
         )
     if "ownership" in wanted:
-        sections["ownership"] = await ownership(pool, reg, ticker)
+        sections["ownership"] = await ownership(pool, reg, ticker, profile.top_holders)
     peers: list[str] = []
     if "relationships" in wanted or profile.include_peers:
         rel_section, peers = await relationships(pool, reg, ticker)

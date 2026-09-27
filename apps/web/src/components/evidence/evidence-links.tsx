@@ -2,6 +2,7 @@ import { ExternalLinkIcon, FileSearchIcon } from "lucide-react";
 import Link from "next/link";
 
 import type { FactOut } from "@/lib/api/client";
+import { isExternalUrl } from "@/lib/sources/sources";
 
 function sourceHost(url: string): string | null {
   try {
@@ -24,15 +25,20 @@ export function EvidenceLinks({ fact, showHost = false }: { fact: Pick<FactOut, 
         Evidence
         <span className="sr-only"> for figure #{fact.id}</span>
       </Link>
-      <a
-        href={fact.source_url}
-        target="_blank"
-        rel="noreferrer"
-        className="inline-flex items-center gap-1 text-text-muted hover:text-text hover:underline"
-      >
-        {host ? `Source: ${host}` : "Source"} <ExternalLinkIcon aria-hidden="true" className="size-3" />
-        <span className="sr-only"> (opens in a new tab)</span>
-      </a>
+      {isExternalUrl(fact.source_url) ? (
+        <a
+          href={fact.source_url}
+          target="_blank"
+          rel="noreferrer"
+          className="inline-flex items-center gap-1 text-text-muted hover:text-text hover:underline"
+        >
+          {host ? `Source: ${host}` : "Source"} <ExternalLinkIcon aria-hidden="true" className="size-3" />
+          <span className="sr-only"> (opens in a new tab)</span>
+        </a>
+      ) : (
+        // Not an http(s) link: shown as text, never as a clickable href.
+        <span className="break-all text-text-muted">Source: {fact.source_url}</span>
+      )}
     </span>
   );
 }

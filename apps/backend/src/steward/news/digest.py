@@ -23,15 +23,15 @@ import anthropic
 import asyncpg
 import httpx
 from anthropic import transform_schema
-from anthropic.types import MessageParam
 from pydantic import BaseModel, Field, ValidationError
 
 from steward import __version__
 from steward.ai import AINotConfigured, Usage, create_client
 from steward.config.event_rules import EVENT_DESCRIPTIONS
 from steward.config.holding_profiles import HoldingProfilesConfig
-from steward.config.jobs import DigestSettings, JobsConfig
+from steward.config.jobs import DigestSettings, JobsConfig, reasoning_kwargs
 from steward.config.notifications import NotificationsConfig
+from steward.config.prompts import load_prompts
 from steward.config.store import load_active
 from steward.config.thesis import ThesesConfig
 from steward.config.verification import ClaimVerifierSettings, VerificationConfig
@@ -45,6 +45,7 @@ from steward.notify.channels import (
 )
 from steward.ownership.read import ManagerChange, tracked_manager_changes
 from steward.settings import get_settings
+from steward.verify.claims import SYSTEM as CLAIM_SYSTEM
 from steward.verify.claims import (
     CheckStatus,
     Claim,
@@ -58,7 +59,14 @@ from steward.verify.claims import (
 logger = logging.getLogger(__name__)
 
 DigestKind = Literal["daily", "weekly"]
-WINDOWS: dict[str, dt.timedelta] = {"daily": dt.timedelta(days=1), "weekly": dt.timedelta(days=7)}
+
+
+def period_text(window: dt.timedelta) -> str:
+    """'24 hours', '7 days': how a digest names its window."""
+    hours = int(window.total_seconds() // 3600)
+    if hours % 24 or hours <= 48:
+        return "1 hour" if hours == 1 else f"{hours} hours"
+    return f"{hours // 24} days"
 
 
 # ---------------------------------------------------------------------------
@@ -228,7 +236,8 @@ class DigestWriter(Protocol):
 
 
 class DigestError(Exception):
-    pass
+    # The tokens a direct call was billed for when its draft was unusable.
+    usage: Usage | None = None
 
 
 SYSTEM_PROMPT = """\
@@ -250,6 +259,7 @@ No price predictions, no advice.
 
 
 def _output_config() -> dict[str, Any]:
+    """The response format."""
     return {
         "format": {
             "type": "json_schema",
@@ -264,23 +274,25 @@ class ClaudeDigestWriter:
         client: anthropic.AsyncAnthropic,
         settings: DigestSettings,
         poll_seconds: float = 30.0,
+        system: str = SYSTEM_PROMPT,
     ) -> None:
         self._client = client
         self._settings = settings
         self._poll = poll_seconds
+        self._system = system
 
     def _params(self, material: str, today: dt.date) -> dict[str, Any]:
         return {
             "model": self._settings.model,
-            "max_tokens": 8000,
-            "system": SYSTEM_PROMPT,
+            "system": self._system,
             "messages": [
                 {
                     "role": "user",
                     "content": f"Today is {today.isoformat()}.\n\nMaterial:\n{material}",
                 }
             ],
-            "output_config": _output_config(),
+            # max_tokens, output_config (format and effort) and, on Haiku 4, thinking.
+            **reasoning_kwargs(self._settings.model, self._settings.effort, 8000, _output_config()),
         }
 
     async def write(self, material: str, today: dt.date) -> tuple[DigestDraft, Usage]:
@@ -294,17 +306,15 @@ class ClaudeDigestWriter:
     async def _write_direct(self, params: dict[str, Any]) -> tuple[DigestDraft, Usage]:
         usage = Usage(model=self._settings.model)
         try:
-            response = await self._client.messages.create(
-                model=params["model"],
-                max_tokens=params["max_tokens"],
-                system=params["system"],
-                messages=cast(list[MessageParam], params["messages"]),
-                output_config=cast(Any, params["output_config"]),
-            )
+            response = await self._client.messages.create(**cast(Any, params))
         except anthropic.APIError as exc:
             raise DigestError(f"digest call failed: {exc}") from exc
         usage.add(response.usage)
-        return _parse_draft(response.content, response.stop_reason), usage
+        try:
+            return _parse_draft(response.content, response.stop_reason), usage
+        except DigestError as exc:
+            exc.usage = usage  # billed even though the draft is unusable
+            raise
 
     async def _write_batch(self, params: dict[str, Any]) -> tuple[DigestDraft, Usage] | None:
         """The draft through the Batch API, or None to fall back to a direct call (the batch
@@ -381,14 +391,16 @@ async def gather(
     end: dt.datetime,
     profiles: HoldingProfilesConfig,
     min_material: int,
+    min_listed: int = 1,
 ) -> Material:
     stories = await pool.fetch(
         "select id, ticker, event_type, severity, status, confidence, headline"
         " from public.story_cluster where last_seen >= $1 and last_seen < $2"
-        " and status <> 'pending' and severity >= 1 and not recycled"
+        " and status <> 'pending' and severity >= $3 and not recycled"
         " order by severity desc, first_seen",
         start,
         end,
+        max(1, min_listed),
     )
     ids = [s["id"] for s in stories]
     items = await pool.fetch(
@@ -610,8 +622,10 @@ def keep_cited(
     return kept, dropped
 
 
-def headline_for(kind: DigestKind, material: Material) -> tuple[str, bool]:
-    period = "24 hours" if kind == "daily" else "7 days"
+def headline_for(
+    kind: DigestKind, material: Material, period: str | None = None
+) -> tuple[str, bool]:
+    period = period or ("24 hours" if kind == "daily" else "7 days")
     count = len(material.material_story_ids)
     breaches = sum(
         1 for s in material.sections.values() for v in s.verdicts if v.status == "breach"
@@ -725,18 +739,20 @@ async def build_digest(
     theses: ThesesConfig | None = None,
     tracked_ciks: list[str] | None = None,
 ) -> tuple[DigestBody, Usage | None, str | None]:
-    start = end - WINDOWS[kind]
-    material = await gather(pool, start, end, profiles, settings.min_severity_summarised)
-    headline, nothing = headline_for(kind, material)
+    window = settings.window(kind)
+    start = end - window
+    period = period_text(window)
+    material = await gather(
+        pool, start, end, profiles, settings.min_severity_summarised, settings.min_severity_listed
+    )
+    headline, nothing = headline_for(kind, material, period)
     flags = await portfolio_flags(pool, start, end)
     breaches = [f for f in flags if f.kind != "band" and f.first_seen >= start]
     if breaches:
         count = len(breaches)
         extra = f"{count} portfolio {'breach' if count == 1 else 'breaches'}"
         headline = (
-            f"{extra} in the last {'24 hours' if kind == 'daily' else '7 days'}."
-            if nothing
-            else f"{headline.rstrip('.')}; {extra}."
+            f"{extra} in the last {period}." if nothing else f"{headline.rstrip('.')}; {extra}."
         )
         nothing = False
     alerts = await pool.fetchval(
@@ -777,6 +793,7 @@ async def build_digest(
             draft, usage = await writer.write(material_prompt(material), end.date())
         except DigestError as exc:
             note = f"summary not written: {exc}"
+            usage = exc.usage
         else:
             item_ids, fact_ids = set(material.sources), material.fact_ids
             body.overview, dropped = keep_cited(draft.overview, item_ids, fact_ids)
@@ -979,8 +996,16 @@ def _handler(kind: DigestKind) -> JobHandler:
         except AINotConfigured:
             writer = verifier = None
         else:
-            writer = ClaudeDigestWriter(client, digest_settings)
-            verifier = ClaudeClaimVerifier(client, claim_settings.model)
+            prompts = await load_prompts(ctx.pool)
+            writer = ClaudeDigestWriter(
+                client, digest_settings, system=prompts.text("news_digest", SYSTEM_PROMPT)
+            )
+            verifier = ClaudeClaimVerifier(
+                client,
+                claim_settings.model,
+                prompts.text("claim_verifier", CLAIM_SYSTEM),
+                effort=claim_settings.effort,
+            )
         async with httpx.AsyncClient(
             timeout=30.0, headers={"User-Agent": f"StewardAI/{__version__}"}
         ) as http:

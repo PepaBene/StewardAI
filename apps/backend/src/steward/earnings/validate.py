@@ -6,9 +6,11 @@ Checks, in order (the name is what `fact.checks` records):
   in the archived document's text. Hard.
 - `value_in_snippet` - the number as written occurs in that snippet. Hard.
 - `value_reading` - the model's numeric value equals the printed number read in code
-  (sign from parentheses, a minus, or the word "loss"). Hard. The stored value is the one
-  read in code, never the model's.
-- `unit_scale` - the claimed scale (millions, ...) is stated by the snippet or unit line;
+  (sign from parentheses, an attached minus, or a sign word such as "loss" or "decreased"
+  next to the number). A positive value for a signed metric the snippet states as a loss or
+  a decline fails. Hard. The stored value is the one read in code, never the model's.
+- `unit_scale` - the claimed scale (millions, ...) is stated by the snippet or unit line,
+  and a scale printed right next to the number ("94.0 billion") wins over the unit line;
   percentages carry "%"; per-share figures are unscaled. Hard.
 - `currency` - the currency is stated near the figure or elsewhere in the document; a
   currency other than the profile's reporting currency is held for review.
@@ -35,7 +37,7 @@ from typing import Literal
 
 from steward.config.verification import VerificationConfig
 from steward.documents.text import contains, normalize_for_match
-from steward.earnings.metrics import derivation
+from steward.earnings.metrics import MARGINS, derivation
 from steward.earnings.periods import (
     calendar_period_end,
     period_label,
@@ -49,6 +51,8 @@ from steward.earnings.units import (
     currency_markers_present,
     parse_written_number,
     scale_markers_present,
+    scale_next_to,
+    uses_decimal_comma,
 )
 
 FactStatus = Literal["verified", "unverified", "rejected"]
@@ -74,6 +78,15 @@ class KnownFact:
     status: str
 
 
+@dataclass(frozen=True)
+class RejectedFact:
+    """A fact the owner rejected (or replaced with a correction)."""
+
+    id: int
+    value_units: Decimal
+    unit: str
+
+
 @dataclass
 class Check:
     check: str
@@ -95,6 +108,8 @@ class ValidatedFigure:
     checks: list[Check] = field(default_factory=list)
     restates: int | None = None
     duplicate_of: int | None = None
+    # The owner already rejected this exact value for this key: not stored again.
+    owner_rejected: int | None = None
 
     @property
     def status(self) -> FactStatus:
@@ -129,6 +144,7 @@ class ValidationContext:
     reporting_currency: str | None
     config: VerificationConfig
     known: dict[FactKey, KnownFact] = field(default_factory=dict)
+    owner_rejected: dict[FactKey, list[RejectedFact]] = field(default_factory=dict)
 
 
 def validate(figures: list[ExtractedFigure], ctx: ValidationContext) -> list[ValidatedFigure]:
@@ -146,7 +162,85 @@ def validate(figures: list[ExtractedFigure], ctx: ValidationContext) -> list[Val
 
 
 def _core_number(written: str) -> str:
-    return written.strip().strip("()").lstrip("-\u2212").strip()
+    return written.strip().strip("()").lstrip("-\u2212\u2013").strip()
+
+
+def _number_pattern(number: str) -> str:
+    """`number` as a whole number: no digit, nor a separator followed by a digit, on either
+    side ("4,036" is not in "$94,036")."""
+    return rf"(?<!\d)(?<!\d[.,]){re.escape(number)}(?!\d)(?![.,]\d)"
+
+
+def _number_in(text: str, number: str) -> list[re.Match[str]]:
+    return list(
+        re.finditer(_number_pattern(normalize_for_match(number)), normalize_for_match(text))
+    )
+
+
+# Words that make the number next to them negative. A caption such as "income (loss)",
+# "profit/(loss)" or "increase (decrease)" only names a signed line and does not count.
+_SIGN_WORDS = (
+    r"loss|losses|decrease|decreased|decreases|decline|declined|declines|fell|down|negative"
+    r"|outflow|outflows"
+)
+_SIGN_WORD = re.compile(rf"(?<![a-z/(])(?<!/ )(?<!\( )(?:{_SIGN_WORDS})(?![a-z)])(?! \))")
+# A sign word stated right before the figure: "net loss of $171 million", "revenue
+# decreased 3.2%", "down 4%". Nothing but filler, a currency and spaces in between.
+_SIGN_BEFORE = re.compile(
+    rf"(?<![a-z/(])(?P<word>{_SIGN_WORDS})"
+    r"(?: per (?:diluted |basic )?share)?"
+    r"(?: (?:of|was|were|by|totall?ing|totall?ed|amounting to|amounted to|approximately|about))*"
+    r" ?(?:(?:usd|eur|gbp|chf|jpy|cad|aud|sek|nok|dkk|czk|pln|hkd|sgd|cny|rmb) ?"
+    r"|[a-z]{0,2}[$€£¥] ?)?$"
+)
+# A sign word stated right after the figure: "3.2% decrease", "a 4 percent decline".
+_SIGN_AFTER = re.compile(
+    r"^ ?(?:%|per ?cent|percent)? ?(?P<word>decrease|decline|drop|fall|lower)(?![a-z])"
+)
+_SIGN_WINDOW = 50
+
+
+def _signed_metric(metric: str) -> tuple[bool, bool]:
+    """(a loss makes it negative, a decline makes it negative) for the metric."""
+    kind = derivation(metric).kind
+    if kind.startswith("growth") or "growth" in metric or "change" in metric:
+        return False, True
+    loss = (
+        metric in MARGINS
+        or kind == "margin"
+        or any(w in metric for w in ("income", "profit", "eps", "earnings", "ebit", "cash_flow"))
+    )
+    return loss, False
+
+
+def _sign_word_near(snippet_n: str, core_n: str) -> bool:
+    for m in _number_in(snippet_n, core_n):
+        before = snippet_n[max(0, m.start() - _SIGN_WINDOW) : m.start()]
+        after = snippet_n[m.end() : m.end() + 20]
+        if _SIGN_WORD.search(before) or _SIGN_AFTER.search(after):
+            return True
+    return False
+
+
+def _stated_negative(snippet_n: str, core_n: str, metric: str) -> str | None:
+    """The sign word that states this figure as negative ("loss", "decreased"), for a
+    metric whose sign it decides; None if the snippet does not."""
+    loss_signed, decline_signed = _signed_metric(metric)
+    if not (loss_signed or decline_signed):
+        return None
+    for m in _number_in(snippet_n, core_n):
+        before = snippet_n[max(0, m.start() - _SIGN_WINDOW) : m.start()]
+        after = snippet_n[m.end() : m.end() + 20]
+        found = _SIGN_BEFORE.search(before) or (
+            _SIGN_AFTER.search(after) if decline_signed else None
+        )
+        if found is None:
+            continue
+        word = found.group("word")
+        is_loss = word.startswith("loss") or word.startswith("outflow")
+        if (is_loss and loss_signed) or (not is_loss and decline_signed):
+            return word
+    return None
 
 
 def _validate_one(fig: ExtractedFigure, ctx: ValidationContext) -> ValidatedFigure:
@@ -165,25 +259,32 @@ def _validate_one(fig: ExtractedFigure, ctx: ValidationContext) -> ValidatedFigu
 
     # value_in_snippet
     core = _core_number(fig.value_as_written)
-    if not core or not contains(fig.source_snippet, core):
+    if not core or not _number_in(fig.source_snippet, core):
         result.fail("value_in_snippet", f"{fig.value_as_written!r} is not in the snippet")
         return result
     result.ok("value_in_snippet")
 
     # value_reading
-    printed = parse_written_number(core)
+    decimal_comma = uses_decimal_comma(fig.source_snippet)
+    if decimal_comma is None and fig.unit_snippet:
+        decimal_comma = uses_decimal_comma(fig.unit_snippet)
+    printed = parse_written_number(core, decimal_comma=bool(decimal_comma))
     if printed is None:
         result.fail("value_reading", f"{fig.value_as_written!r} is not a number")
         return result
     snippet_n = normalize_for_match(fig.source_snippet)
     core_n = normalize_for_match(core)
     negative_printed = (
-        fig.value_as_written.strip().startswith(("(", "-", "\u2212"))
+        fig.value_as_written.strip().startswith(("(", "-", "\u2212", "\u2013"))
         or f"({core_n})" in snippet_n
         or f"( {core_n} )" in snippet_n
-        # A minus sign right before the number. Checked on the raw snippet: em and en dashes
-        # mark nil cells in tables ("\u2014 | 33,389") and must not read as a minus.
-        or re.search(rf"(?<![\w.,])[-\u2212]\s?{re.escape(core)}(?![\d])", fig.source_snippet)
+        # A minus sign attached to the number. Checked on the raw snippet: em dashes and
+        # spaced en dashes mark nil cells in tables ("\u2014 | 33,389") and must not read as
+        # a minus, nor may a spaced hyphen ("Revenue - 5,000"); an en dash attached to the
+        # number ("\u2013171") is a minus. A true minus sign (U+2212) may be spaced.
+        or re.search(
+            rf"(?<![\w.,])(?:[-\u2013]|\u2212\s?){_number_pattern(core)}", fig.source_snippet
+        )
         is not None
     )
     model_value = Decimal(repr(fig.value))
@@ -193,9 +294,17 @@ def _validate_one(fig: ExtractedFigure, ctx: ValidationContext) -> ValidatedFigu
             f"model value {fig.value} does not match the printed {fig.value_as_written!r}",
         )
         return result
-    if model_value < 0 and not negative_printed and "loss" not in snippet_n:
+    if model_value < 0 and not negative_printed and not _sign_word_near(snippet_n, core_n):
         result.fail("value_reading", "negative value, but the snippet prints it as positive")
         return result
+    if model_value > 0 and not negative_printed:
+        sign_word = _stated_negative(snippet_n, core_n, fig.metric)
+        if sign_word is not None:
+            result.fail(
+                "value_reading",
+                f"positive value, but the snippet states it as negative ({sign_word!r})",
+            )
+            return result
     signed = -printed if (negative_printed or model_value < 0) else printed
     result.value = signed
     result.value_units = signed * SCALE_FACTOR[fig.scale]
@@ -212,6 +321,10 @@ def _validate_one(fig: ExtractedFigure, ctx: ValidationContext) -> ValidatedFigu
             return result
     elif fig.unit == "per_share" and fig.scale != "units":
         result.fail("unit_scale", "per-share figures are not scaled")
+        return result
+    elif (own := scale_next_to(fig.source_snippet, core)) is not None and own != fig.scale:
+        # The snippet's own "94.0 billion" beats a table header's "(In millions)".
+        result.fail("unit_scale", f"the snippet prints the number in {own}, not {fig.scale}")
         return result
     elif fig.scale != "units" and not scale_markers_present(evidence, fig.scale):
         others = conflicting_scales(evidence, fig.scale)
@@ -382,6 +495,18 @@ def _check_against_known(results: list[ValidatedFigure], ctx: ValidationContext)
         if not r.passed_hard_checks or r.value_units is None:
             continue
         k = r.key
+
+        rejected = next(
+            (
+                x
+                for x in ctx.owner_rejected.get(k, [])
+                if _close(x.value_units, r.value_units) and x.unit == r.figure.unit
+            ),
+            None,
+        )
+        if rejected is not None:
+            r.owner_rejected = rejected.id
+            continue
 
         existing = ctx.known.get(k)
         if existing is not None:

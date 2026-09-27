@@ -65,6 +65,8 @@ class Settings(BaseSettings):
     fred_api_key: SecretStr | None = None
     # OpenFIGI works without a key; a key raises its rate limit.
     openfigi_api_key: SecretStr | None = None
+    # Stooq daily price downloads need a (free) API key since spring 2026.
+    stooq_api_key: SecretStr | None = None
 
     # Notifications: Telegram Bot API and email through Resend (HTTP API).
     telegram_bot_token: SecretStr | None = None
@@ -111,6 +113,7 @@ class Settings(BaseSettings):
             self.finnhub_api_key,
             self.openfigi_api_key,
             self.fred_api_key,
+            self.stooq_api_key,
             self.telegram_bot_token,
             self.resend_api_key,
             self.heartbeat_ping_url,

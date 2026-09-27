@@ -3,7 +3,7 @@
 import { ExternalLinkIcon, LoaderCircleIcon, PlayIcon, RefreshCwIcon, ScaleIcon, XIcon } from "lucide-react";
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { AlertMessage } from "@/components/alert-message";
 import { EmptyState } from "@/components/empty-state";
@@ -36,6 +36,9 @@ import { ingestFreshness, ingestPrefix } from "@/lib/freshness";
 import { jobHref } from "@/lib/jobs/job-detail";
 import { disputedStoryHref } from "@/lib/news/disputed";
 import { useNow } from "@/lib/hooks/use-now";
+import { latestOnly } from "@/lib/latest-request";
+import { appendUnique } from "@/lib/portfolio/transactions";
+import { hostOf, isExternalUrl } from "@/lib/sources/sources";
 import { cn } from "@/lib/utils";
 
 const PAGE = 50;
@@ -50,7 +53,13 @@ type Load =
       lastIngest: JobSummary | null;
       /** When the next scheduled news check is due: the feed is current until then. */
       nextIngestDueAt: string | null;
+      loadingMore: boolean;
+      moreError: string | null;
     };
+
+function message(err: unknown): string {
+  return err instanceof Error ? err.message : String(err);
+}
 
 function query(filters: FeedFilters, beforeId: number | null) {
   return {
@@ -79,8 +88,12 @@ export function NewsView() {
   const filters = useMemo(() => parseFilters(new URLSearchParams(params.toString())), [params]);
   const [load, setLoad] = useState<Load>({ kind: "loading" });
   const [holdings, setHoldings] = useState<Holding[]>([]);
-  const [queued, setQueued] = useState<{ text: string; jobId: number | null } | null>(null);
+  const [queued, setQueued] = useState<{ text: string; jobId: number } | null>(null);
+  const [queueError, setQueueError] = useState<string | null>(null);
+  const [queueing, setQueueing] = useState(false);
   const [reloadKey, setReloadKey] = useState(0);
+  // Only the newest load's answers are applied (filters can change while a page loads).
+  const sequence = useRef(0);
 
   const setFilters = useCallback(
     (next: FeedFilters) => router.replace(`${pathname}${filtersToSearch(next)}`, { scroll: false }),
@@ -88,24 +101,26 @@ export function NewsView() {
   );
 
   useEffect(() => {
-    let cancelled = false;
+    const mine = ++sequence.current;
     fetchFeed(filters, null)
       .then((feed) => {
-        if (!cancelled) {
+        if (mine === sequence.current) {
           setLoad({
             kind: "ok",
             items: feed.items,
             next: feed.next_before_id,
             lastIngest: feed.last_ingest,
             nextIngestDueAt: feed.next_ingest_due_at ?? null,
+            loadingMore: false,
+            moreError: null,
           });
         }
       })
       .catch((err: unknown) => {
-        if (!cancelled) setLoad({ kind: "error", message: err instanceof Error ? err.message : String(err) });
+        if (mine === sequence.current) setLoad({ kind: "error", message: message(err) });
       });
     return () => {
-      cancelled = true;
+      sequence.current += 1;
     };
   }, [filters, reloadKey]);
 
@@ -117,19 +132,31 @@ export function NewsView() {
   }, []);
 
   async function loadMore() {
-    if (load.kind !== "ok" || load.next === null) return;
-    const feed = await fetchFeed(filters, load.next);
-    setLoad({ ...load, items: [...load.items, ...feed.items], next: feed.next_before_id });
+    if (load.kind !== "ok" || load.next === null || load.loadingMore) return;
+    const beforeId = load.next;
+    setLoad({ ...load, loadingMore: true, moreError: null });
+    const outcome = await latestOnly(sequence, () => fetchFeed(filters, beforeId));
+    if (outcome.stale) return;
+    setLoad((prev) => {
+      if (prev.kind !== "ok") return prev;
+      if (!outcome.ok) return { ...prev, loadingMore: false, moreError: outcome.error };
+      return { ...prev, items: appendUnique(prev.items, outcome.value.items), next: outcome.value.next_before_id, loadingMore: false, moreError: null };
+    });
   }
 
   async function runNow() {
+    setQueueing(true);
     setQueued(null);
-    const { data, response } = await getBrowserApiClient().POST("/jobs/news-ingest");
-    setQueued(
-      data
-        ? { text: `News check queued (job #${data.id}). Reload in a minute to see new items.`, jobId: data.id }
-        : { text: `Could not queue: HTTP ${response.status}.`, jobId: null },
-    );
+    setQueueError(null);
+    try {
+      const { data, response } = await getBrowserApiClient().POST("/jobs/news-ingest");
+      if (data) setQueued({ text: `News check queued (job #${data.id}). Reload in a minute to see new items.`, jobId: data.id });
+      else setQueueError(`Could not queue: the API answered HTTP ${response.status}.`);
+    } catch (err) {
+      setQueueError(message(err));
+    } finally {
+      setQueueing(false);
+    }
   }
 
   const groups = load.kind === "ok" ? groupByStory(load.items) : [];
@@ -157,8 +184,8 @@ export function NewsView() {
               <RefreshCwIcon aria-hidden="true" />
               Reload
             </Button>
-            <Button variant="outline" size="sm" onClick={() => void runNow()}>
-              <PlayIcon aria-hidden="true" />
+            <Button variant="outline" size="sm" onClick={() => void runNow()} disabled={queueing}>
+              {queueing ? <LoaderCircleIcon aria-hidden="true" className="animate-spin" /> : <PlayIcon aria-hidden="true" />}
               Check news now
             </Button>
           </div>
@@ -167,13 +194,12 @@ export function NewsView() {
       {queued ? (
         <AlertMessage tone="info" title="Queued">
           {queued.text}{" "}
-          {queued.jobId !== null ? (
-            <Link href={jobHref(queued.jobId)} className="text-accent hover:underline">
-              Follow the job
-            </Link>
-          ) : null}
+          <Link href={jobHref(queued.jobId)} className="text-accent hover:underline">
+            Follow the job
+          </Link>
         </AlertMessage>
       ) : null}
+      {queueError ? <AlertMessage title="Not queued">{queueError}</AlertMessage> : null}
 
       <Filters filters={filters} holdings={holdings} onChange={setFilters} />
 
@@ -199,8 +225,10 @@ export function NewsView() {
           ))}
         </ol>
       ) : null}
+      {load.kind === "ok" && load.moreError ? <AlertMessage title="Could not load older items">{load.moreError}</AlertMessage> : null}
       {load.kind === "ok" && load.next !== null ? (
-        <Button variant="outline" onClick={() => void loadMore()}>
+        <Button variant="outline" onClick={() => void loadMore()} disabled={load.loadingMore}>
+          {load.loadingMore ? <LoaderCircleIcon aria-hidden="true" className="animate-spin" /> : null}
           Load older items
         </Button>
       ) : null}
@@ -340,15 +368,19 @@ function StoryRow({ items: group, onStory }: { items: NewsItemOut[]; onStory: (i
     <li className="space-y-2 p-4">
       <div className="flex flex-wrap items-start justify-between gap-2">
         <div className="min-w-0 flex-1 space-y-1">
-          <a
-            href={lead.url}
-            target="_blank"
-            rel="noreferrer"
-            className="inline-flex items-start gap-1 font-medium text-text hover:text-accent hover:underline"
-          >
-            <span>{lead.headline}</span>
-            <ExternalLinkIcon aria-hidden="true" className="mt-1 size-3.5 shrink-0 text-text-muted" />
-          </a>
+          {isExternalUrl(lead.url) ? (
+            <a
+              href={lead.url}
+              target="_blank"
+              rel="noreferrer"
+              className="inline-flex items-start gap-1 font-medium text-text hover:text-accent hover:underline"
+            >
+              <span>{lead.headline}</span>
+              <ExternalLinkIcon aria-hidden="true" className="mt-1 size-3.5 shrink-0 text-text-muted" />
+            </a>
+          ) : (
+            <span className="font-medium text-text">{lead.headline}</span>
+          )}
           <p className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-text-muted">
             <span>{lead.outlet_name ?? lead.outlet ?? lead.source_id}</span>
             <TierBadge tier={lead.tier} />
@@ -412,9 +444,13 @@ function StoryRow({ items: group, onStory }: { items: NewsItemOut[]; onStory: (i
         <ul className="space-y-0.5 border-l-2 border-border pl-3 text-sm" aria-label="Copies of this story">
           {copies.map((copy) => (
             <li key={copy.id} className="flex flex-wrap items-center gap-2">
-              <a href={copy.url} target="_blank" rel="noreferrer" className="text-text-muted hover:text-accent hover:underline">
-                {copy.outlet_name ?? copy.outlet ?? copy.source_id}
-              </a>
+              {isExternalUrl(copy.url) ? (
+                <a href={copy.url} target="_blank" rel="noreferrer" className="text-text-muted hover:text-accent hover:underline">
+                  {copy.outlet_name ?? copy.outlet ?? copy.source_id}
+                </a>
+              ) : (
+                <span className="text-text-muted">{copy.outlet_name ?? copy.outlet ?? copy.source_id}</span>
+              )}
               <TierBadge tier={copy.tier} />
               <FeedbackControl target={{ kind: "news_item", id: copy.id }} label={`news item “${copy.headline}”`} labelDefaults={labelDefaults(copy)} />
             </li>
@@ -425,22 +461,26 @@ function StoryRow({ items: group, onStory }: { items: NewsItemOut[]; onStory: (i
         <ul className="space-y-0.5 text-sm">
           {corroborating.map((url) => (
             <li key={url}>
-              Corroborated by{" "}
-              <a href={url} target="_blank" rel="noreferrer" className="text-accent hover:underline">
-                {new URL(url).hostname.replace(/^www\./, "")}
-              </a>
+              Corroborated by <SourceLink url={url} />
             </li>
           ))}
           {contradicting.map((url) => (
             <li key={url}>
-              Contradicted by{" "}
-              <a href={url} target="_blank" rel="noreferrer" className="text-accent hover:underline">
-                {new URL(url).hostname.replace(/^www\./, "")}
-              </a>
+              Contradicted by <SourceLink url={url} />
             </li>
           ))}
         </ul>
       ) : null}
     </li>
+  );
+}
+
+/** A corroborating/contradicting source: a link for http(s) URLs, plain text otherwise. */
+function SourceLink({ url }: { url: string }) {
+  if (!isExternalUrl(url)) return <span className="break-all">{url}</span>;
+  return (
+    <a href={url} target="_blank" rel="noreferrer" className="text-accent hover:underline">
+      {hostOf(url)}
+    </a>
   );
 }

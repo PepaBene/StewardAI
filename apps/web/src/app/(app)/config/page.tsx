@@ -64,10 +64,18 @@ const DOMAINS: { slug: ConfigDomainSlug; href: string; title: string; body: stri
     title: "Research profiles",
     body: "The shapes a research run can take: sections and their order, depth, model, effort, step and search caps, source tiers, peers, valuation methods and language.",
   },
-];
-
-const LATER: { title: string; note: string; slug?: ConfigDomainSlug }[] = [
-  { title: "Budget", note: "Monthly and per-job caps and what happens at the cap; editor in phase 6", slug: "budget" },
+  {
+    slug: "prompts",
+    href: "/config/prompts",
+    title: "Prompts",
+    body: "The instructions each AI step sends: extraction, news classification, digests, impact notes, research, the monthly review, chat and the claim verifier. Override any of them or reset to the built-in text.",
+  },
+  {
+    slug: "budget",
+    href: "/config/budget",
+    title: "Budget",
+    body: "Model prices, the monthly AI spend cap, per-job caps and what happens at the cap; this month's spend by job and model.",
+  },
 ];
 
 export default function ConfigPage() {
@@ -117,24 +125,6 @@ export default function ConfigPage() {
           </span>
         </span>
       </Link>
-      <div>
-        <h2 className="text-sm font-medium text-text-muted">Not in the editor yet</h2>
-        <ul className="mt-2 space-y-1 text-sm">
-          {LATER.map((d) => (
-            <li key={d.title}>
-              <span className="font-medium">{d.title}</span> <span className="text-text-muted">— {d.note}</span>
-              {d.slug ? (
-                <>
-                  {" "}
-                  <Link href={historyHref(d.slug)} className="text-accent hover:underline">
-                    history
-                  </Link>
-                </>
-              ) : null}
-            </li>
-          ))}
-        </ul>
-      </div>
       <ConfigTransfer />
     </div>
   );

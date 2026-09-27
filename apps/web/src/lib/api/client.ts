@@ -166,6 +166,10 @@ export type HoldingOwnership = Schemas["HoldingOwnership"];
 export type OwnershipPeriod = Schemas["OwnershipPeriod"];
 export type TopHolder = Schemas["TopHolder"];
 export type ManagerChange = Schemas["ManagerChange"];
+// Prompts config: owner overrides of the AI steps' system prompts.
+export type PromptsConfig = Schemas["PromptsConfig"];
+export type PromptDefault = Schemas["PromptDefault"];
+export type PromptKey = PromptDefault["key"];
 
 export type AccessTokenGetter = () => Promise<string | null | undefined>;
 

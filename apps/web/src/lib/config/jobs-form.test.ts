@@ -11,13 +11,16 @@ import {
   newMacroSeries,
   newManager,
   parseFilters,
+  parseTiers,
   SCHEDULE_KEYS,
   SCHEDULES,
   scheduleLabel,
+  SETTINGS,
 } from "./jobs-form";
 
 const FULL: JobsConfig = {
   schema_version: 1,
+  catch_up_on_start: false,
   portfolio_sync: { enabled: true, cron: "15 23 * * *", timezone: "Europe/Prague" },
   earnings_calendar: { enabled: false, cron: "0 6 * * sun", timezone: "UTC" },
   earnings_calendar_full: { enabled: true, cron: "0 5 1 1,4,7,10 *", timezone: "Europe/Prague" },
@@ -37,31 +40,62 @@ const FULL: JobsConfig = {
     extraction_model: "claude-opus-5-5",
     locate_model: "claude-sonnet-5",
     effort: "xhigh",
+    locate_effort: "medium",
     max_steps: 12,
     max_searches: 0,
     check_days_after_report: [0, 1, 3, 7],
     max_document_mb: 32,
+    kpi_history_periods: 12,
   },
-  earnings_calendar_settings: { model: "claude-haiku-4-5", lookahead_days: 90, refresh_within_days: 21 },
+  earnings_calendar_settings: { model: "claude-haiku-4-5", effort: null, lookahead_days: 90, refresh_within_days: 21 },
   news: {
     classification_model: "claude-haiku-4-5",
+    classification_effort: null,
     classification_batch_size: 25,
     corroboration_model: "claude-sonnet-5",
+    corroboration_effort: "low",
     corroboration_max_searches: 5,
     corroboration_rounds: 0,
     recheck_hours: 72,
     max_items_per_run: 1000,
+    edgar_fts_max_hits: 500,
   },
-  digest: { model: "claude-sonnet-5", use_batch: false, batch_wait_minutes: 30, min_severity_summarised: 3 },
-  escalation: { enabled: false, model: "claude-opus-5-5", max_steps: 9, max_searches: 0, min_severity: 3 },
+  digest: {
+    model: "claude-sonnet-5",
+    effort: "high",
+    use_batch: false,
+    batch_wait_minutes: 30,
+    min_severity_summarised: 3,
+    min_severity_listed: 2,
+    daily_window_hours: 36,
+    weekly_window_days: 14,
+  },
+  escalation: {
+    enabled: false,
+    model: "claude-opus-5-5",
+    effort: "max",
+    max_steps: 9,
+    max_searches: 0,
+    min_severity: 3,
+    source_tiers: [1],
+    price_move_news_days: 5,
+    price_move_news_items: 10,
+  },
   macro: {
+    history_years: 15,
     geos: ["CZ", "EA21"],
     eurostat: [{ key: "hicp", label: "HICP", dataset: "prc_hicp_minr", filters: { unit: "RCH_A", coicop18: "TOTAL" }, unit: "%" }],
     fred: [{ key: "fed_funds", label: "Fed funds", series_id: "DFF", units: "chg", unit: "pp", policy_rate: true }],
     ecb: [{ key: "ecb_deposit_rate", label: "ECB deposit rate", flow_key: "FM/D.U2.EUR.4F.KR.DFR.LEV", unit: "%", policy_rate: false }],
   },
   monitoring: { alert_failed_jobs: ["portfolio_sync", "macro_collect"], missed_run_grace_minutes: 120, news_coverage_hours: 72 },
-  reference: { openfigi_refresh_days: 14, wikidata_enabled: false, wikidata_refresh_days: 60, max_subsidiary_aliases: 120 },
+  reference: {
+    openfigi_refresh_days: 14,
+    wikidata_enabled: false,
+    wikidata_refresh_days: 60,
+    max_subsidiary_aliases: 120,
+    wikidata_languages: ["en", "fr"],
+  },
   prices: { benchmark_symbols: ["^spx", "^dax", "^ukx"], history_years: 5, plausibility_tolerance_pct: 1.5 },
   calendar: {
     holiday_countries: ["CZ", "US", "DE"],
@@ -70,12 +104,21 @@ const FULL: JobsConfig = {
       { mic: "XETR", date: "2026-12-24", name: "Christmas Eve" },
     ],
   },
-  chat: { model: "claude-haiku-4-5", max_steps: 9, max_searches: 0, history_messages: 20 },
-  review: { model: "claude-sonnet-5", effort: "max", max_steps: 5, liquidity_days: 2.5 },
+  chat: { model: "claude-haiku-4-5", effort: null, max_steps: 9, max_searches: 0, history_messages: 20, source_tiers: [1, 2, 3] },
+  review: {
+    model: "claude-sonnet-5",
+    effort: "max",
+    max_steps: 5,
+    use_batch: false,
+    batch_wait_minutes: 90,
+    liquidity_days: 2.5,
+    holder_drop_flag_pct: 20,
+  },
   ownership: {
     enabled: false,
     index_url: "https://www.sec.gov/data-research/sec-markets-data/form-13f-data-sets?x=1",
     datasets_per_run: 4,
+    history_datasets: 12,
     tracked_managers: [
       { cik: "1067983", name: "Berkshire Hathaway Inc" },
       { cik: "0001350694", name: "Bridgewater Associates, LP" },
@@ -102,6 +145,18 @@ describe("jobs form", () => {
     expect(form.schedules.map((s) => s.name)).toContain("quarterly_audit");
     expect(scheduleLabel("quarterly_audit")).toBe("Quarterly audit");
     expect(jobsToBody(form)).toEqual(future);
+  });
+
+  it("edits catching up on worker start, on unless saved off", () => {
+    expect(DEFAULT_JOBS.catch_up_on_start).toBe(true);
+    expect(jobsFromBody(FULL).catchUpOnStart).toBe(false);
+    const older: Record<string, unknown> = { ...FULL };
+    delete older.catch_up_on_start;
+    const form = jobsFromBody(older as JobsConfig);
+    expect(form.catchUpOnStart).toBe(true);
+    expect(form.rest).not.toHaveProperty("catch_up_on_start");
+    form.catchUpOnStart = false;
+    expect(jobsToBody(form).catch_up_on_start).toBe(false);
   });
 
   it("parses edits: list of days, numbers and cron spacing", () => {
@@ -223,7 +278,7 @@ describe("jobs form: escalation, macro and monitoring", () => {
     form.settings.escalation.values.max_steps = "4";
     const body = jobsToBody(form);
     expect(body.monitoring!.alert_failed_jobs).toEqual(["news_ingest", "earnings_check", "macro_collect"]);
-    expect(body.escalation).toEqual({ enabled: true, model: "claude-opus-5-5", max_steps: 4, max_searches: 0, min_severity: 3 });
+    expect(body.escalation).toEqual({ ...FULL.escalation, enabled: true, max_steps: 4 });
   });
 
   it("edits macro series as rows per source", () => {
@@ -250,5 +305,52 @@ describe("jobs form: escalation, macro and monitoring", () => {
 
   it("parses dimension filters", () => {
     expect(parseFilters(" unit = RCH_A \n\ns_adj=SA\nbroken")).toEqual({ unit: "RCH_A", s_adj: "SA", broken: "" });
+  });
+});
+
+describe("jobs form: optional effort, tiers and the other preferences", () => {
+  it("lists every new settings field in the editor", () => {
+    const keys = (s: keyof typeof SETTINGS) => SETTINGS[s].fields.map((f) => f.key as string);
+    expect(keys("earnings_check")).toEqual(expect.arrayContaining(["locate_effort", "kpi_history_periods"]));
+    expect(keys("earnings_calendar_settings")).toContain("effort");
+    expect(keys("news")).toEqual(expect.arrayContaining(["classification_effort", "corroboration_effort"]));
+    expect(keys("digest")).toEqual(expect.arrayContaining(["effort", "min_severity_listed", "daily_window_hours", "weekly_window_days"]));
+    expect(keys("escalation")).toEqual(expect.arrayContaining(["effort", "source_tiers", "price_move_news_days", "price_move_news_items"]));
+    expect(keys("chat")).toEqual(expect.arrayContaining(["effort", "source_tiers"]));
+    expect(keys("review")).toEqual(expect.arrayContaining(["use_batch", "batch_wait_minutes", "holder_drop_flag_pct"]));
+    expect(keys("reference")).toContain("wikidata_languages");
+  });
+
+  it("sends an unset effort as null and a picked one as typed", () => {
+    const form = jobsFromBody(FULL);
+    expect(form.settings.news.values.classification_effort).toBe("");
+    expect(form.settings.news.values.corroboration_effort).toBe("low");
+    form.settings.news.values.corroboration_effort = "";
+    form.settings.chat.values.effort = "medium";
+    const body = jobsToBody(form);
+    expect(body.news!.corroboration_effort).toBeNull();
+    expect(body.chat!.effort).toBe("medium");
+  });
+
+  it("edits outlet tiers as a sorted, unique list", () => {
+    expect(parseTiers("3, 1 ,1;x 4")).toEqual([1, 3]);
+    const form = jobsFromBody(FULL);
+    expect(form.settings.chat.values.source_tiers).toBe("1, 2, 3");
+    form.settings.escalation.values.source_tiers = "2, 1";
+    expect(jobsToBody(form).escalation!.source_tiers).toEqual([1, 2]);
+  });
+
+  it("keeps a saved body without the new fields on today's defaults", () => {
+    const old = structuredClone(FULL) as unknown as Record<string, Record<string, unknown>>;
+    delete old.review.use_batch;
+    delete old.review.batch_wait_minutes;
+    delete old.review.holder_drop_flag_pct;
+    delete old.chat.effort;
+    delete old.chat.source_tiers;
+    delete old.digest.min_severity_listed;
+    const body = jobsToBody(jobsFromBody(old as unknown as JobsConfig));
+    expect(body.review).toMatchObject({ use_batch: true, batch_wait_minutes: 60, holder_drop_flag_pct: 10 });
+    expect(body.chat).toMatchObject({ effort: null, source_tiers: [1, 2] });
+    expect(body.digest!.min_severity_listed).toBe(1);
   });
 });

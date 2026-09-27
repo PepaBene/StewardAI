@@ -407,17 +407,26 @@ async def _sync_history_kind[M: BaseModel](
     """Page through one history endpoint, newest first, storing new items.
 
     Until the first complete pass (the backfill) every page is read. After it, reading
-    stops at the first page that contains an item already stored.
+    stops at the first page that contains an item already stored *and* reaches back to
+    the watermark: the newest item time seen by the last run that finished paging. A run
+    that fails mid-paging does not move the watermark, so the next run keeps reading
+    past pages it had already stored until it is back below the last clean pass.
     """
     state_key = f"trading212_history:{kind}"
     state_raw = await pool.fetchval("select value from public.sync_state where key = $1", state_key)
-    backfilled = bool(json.loads(state_raw).get("backfill_complete")) if state_raw else False
+    state = json.loads(state_raw) if state_raw else {}
+    backfilled = bool(state.get("backfill_complete"))
+    # Absent for state written before the watermark existed: stop at the first known item.
+    watermark = dt.datetime.fromisoformat(state["watermark"]) if state.get("watermark") else None
 
     inserted = pages_read = 0
-    reached_known = False
+    newest: dt.datetime | None = None
     async for page in pages:
         pages_read += 1
         rows = [row for item in page if (row := to_row(item)) is not None]
+        for row in rows:
+            if newest is None or row.occurred_at > newest:
+                newest = row.occurred_at
         new = 0
         for row in rows:
             new += await pool.fetchval(
@@ -438,17 +447,27 @@ async def _sync_history_kind[M: BaseModel](
                 job_id,
             )
         inserted += new
-        if backfilled and new < len(rows):
-            reached_known = True
+        if (
+            backfilled
+            and new < len(rows)
+            and (watermark is None or min(r.occurred_at for r in rows) <= watermark)
+        ):
             break
 
-    if not backfilled and not reached_known:
-        await pool.execute(
-            "insert into public.sync_state (key, value) values ($1, $2::jsonb)"
-            " on conflict (key) do update set value = excluded.value",
-            state_key,
-            json.dumps({"backfill_complete": True}),
-        )
+    # Paging finished cleanly (an exception above leaves the state as it was).
+    if watermark is not None and (newest is None or newest < watermark):
+        newest = watermark
+    await pool.execute(
+        "insert into public.sync_state (key, value) values ($1, $2::jsonb)"
+        " on conflict (key) do update set value = excluded.value",
+        state_key,
+        json.dumps(
+            {
+                "backfill_complete": True,
+                "watermark": newest.isoformat() if newest is not None else None,
+            }
+        ),
+    )
     return {f"{kind}_new": inserted, f"{kind}_pages": pages_read}
 
 

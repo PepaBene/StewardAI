@@ -24,7 +24,7 @@ import {
   type EventRulesForm,
   type OverrideForm,
 } from "@/lib/config/news-forms";
-import { useConfigEditor } from "@/lib/hooks/use-config-editor";
+import { configSaveQuery, useConfigEditor } from "@/lib/hooks/use-config-editor";
 import { EVENT_LABELS, EVENT_TYPES, SEVERITY } from "@/lib/news/labels";
 
 const api = () => getBrowserApiClient();
@@ -41,7 +41,7 @@ export function EventRulesEditor() {
   const [baseline, setBaseline] = useState("");
   const editor = useConfigEditor<EventRulesConfig>({
     load: () => api().GET("/config/event-rules"),
-    save: (body, note) => api().PUT("/config/event-rules", { body, params: { query: { note } } }),
+    save: (body, note, base) => api().PUT("/config/event-rules", { body, params: { query: configSaveQuery(note, base) } }),
     validate: (body) => api().POST("/config/event-rules/validate", { body }),
     onLoaded: (body) => {
       const loaded = eventRulesFromBody(body);
@@ -135,6 +135,15 @@ export function EventRulesEditor() {
               <TextField label="Insider cluster: transactions" inputMode="numeric" path="insider_cluster_count" errors={editor.errors} value={form.insider_cluster_count} onChange={(v) => set({ insider_cluster_count: v })} />
               <TextField label="Insider cluster: within days" inputMode="numeric" path="insider_cluster_days" errors={editor.errors} value={form.insider_cluster_days} onChange={(v) => set({ insider_cluster_days: v })} />
               <TextField label="Recycled story after (days)" inputMode="numeric" path="recycled_after_days" errors={editor.errors} value={form.recycled_after_days} onChange={(v) => set({ recycled_after_days: v })} />
+              <TextField
+                label="Earnings check cooldown (days)"
+                inputMode="numeric"
+                path="earnings_check_cooldown_days"
+                errors={editor.errors}
+                value={form.earnings_check_cooldown_days}
+                onChange={(v) => set({ earnings_check_cooldown_days: v })}
+                hint="No new check is queued while one was queued or ran for the holding within this many days. 1 to 60."
+              />
             </div>
           </section>
 
@@ -172,6 +181,7 @@ export function EventRulesEditor() {
 
           <SaveBar
             dirty={dirty}
+            savedVersionId={editor.version?.id ?? null}
             busy={editor.busy ?? (replay.gate.kind === "previewing" ? "previewing" : null)}
             errors={editor.errors}
             message={replay.gate.kind === "previewing" ? "Replaying the last 7 days under your draft…" : editor.message}

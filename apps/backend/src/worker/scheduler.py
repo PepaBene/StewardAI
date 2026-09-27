@@ -50,7 +50,13 @@ def apply_jobs_config(
         if existing is None:
             scheduler.add_job(run, trigger, args=[job_type], id=job_id, name=job_type)
             logger.info("scheduled %s: %s (%s)", job_type, schedule.cron, schedule.timezone)
-        elif str(existing.trigger) != str(trigger):
+        elif _trigger_key(existing.trigger) != _trigger_key(trigger):
             scheduler.reschedule_job(job_id, trigger=trigger)
             logger.info("rescheduled %s: %s (%s)", job_type, schedule.cron, schedule.timezone)
     return sorted(wanted)
+
+
+def _trigger_key(trigger: object) -> tuple[str, str]:
+    """What identifies a schedule: the cron fields and the timezone. A CronTrigger's str()
+    lists only the fields, so a timezone-only change would otherwise go unnoticed."""
+    return str(trigger), str(getattr(trigger, "timezone", ""))

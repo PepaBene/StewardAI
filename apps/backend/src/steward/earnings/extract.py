@@ -2,7 +2,9 @@
 
 The document arrives as a document content block that code fetched and archived; the
 model cannot fetch anything else, and its output is only a claim until the validator has
-checked it. The system prompt is stable so it can be cached across runs.
+checked it. The system prompt carries a cache breakpoint, but at ~600 tokens it is below
+the minimum cacheable prefix, and each document is read once, so nothing is cached in
+practice (and nothing is charged for the breakpoint).
 """
 
 import base64
@@ -11,16 +13,23 @@ from dataclasses import dataclass
 from typing import Any, Protocol, cast
 
 import anthropic
-from anthropic.types import MessageParam, OutputConfigParam
+import pydantic
+from anthropic.types import MessageParam
 
 from steward.ai import Usage
+from steward.config.jobs import effort_kwargs
 from steward.documents.fetch import PDF, Document
 from steward.earnings.periods import period_label
 from steward.earnings.schema import ExtractionResult
 
 
 class ExtractionError(Exception):
-    pass
+    """The extraction call failed. `usage` holds the tokens already billed, when a response
+    arrived before the failure (so the step still records its cost)."""
+
+    def __init__(self, message: str, usage: Usage | None = None) -> None:
+        super().__init__(message)
+        self.usage = usage
 
 
 @dataclass(frozen=True)
@@ -51,6 +60,10 @@ Rules:
 or recall a figure from memory. If a requested metric is not printed, list it in not_found.
 - value_as_written is the number exactly as printed, with its thousands separators and \
 decimals, and parentheses if it is printed in parentheses. No currency symbol, no unit word.
+- value is the SIGNED numeric reading, in `scale`: negative for a loss, a decline, a \
+decrease or an outflow, and for a number printed in parentheses or with a minus sign. \
+"Net loss of $171 million" is net_income -171; "revenue decreased 3.2%" is a growth of \
+-3.2; "(171)" is -171.
 - source_snippet is the verbatim sentence or table row that contains value_as_written. \
 Copy it character for character from the plain-text version of the document; table \
 cells appear there separated by " | ". Keep it short: one row or one sentence.
@@ -116,10 +129,18 @@ def document_blocks(document: Document, text: str) -> list[dict[str, Any]]:
 
 
 class ClaudeExtractor:
-    def __init__(self, client: anthropic.AsyncAnthropic, model: str, effort: str) -> None:
+    def __init__(
+        self,
+        client: anthropic.AsyncAnthropic,
+        model: str,
+        effort: str,
+        system: str = SYSTEM_PROMPT,
+    ) -> None:
         self._client = client
         self._model = model
         self._effort = effort
+        # The owner's override from the Prompts config, else the built-in default.
+        self._system = system
 
     async def extract(
         self, document: Document, text: str, request: ExtractionRequest
@@ -132,22 +153,25 @@ class ClaudeExtractor:
         try:
             response = await self._client.messages.parse(
                 model=self._model,
-                max_tokens=32000,
                 system=[
-                    {"type": "text", "text": SYSTEM_PROMPT, "cache_control": {"type": "ephemeral"}}
+                    {"type": "text", "text": self._system, "cache_control": {"type": "ephemeral"}}
                 ],
                 messages=[cast(MessageParam, {"role": "user", "content": content})],
-                output_config=cast(OutputConfigParam, {"effort": self._effort}),
+                **effort_kwargs(self._model, self._effort, 32000),
                 output_format=ExtractionResult,
             )
         except anthropic.APIError as exc:
             raise ExtractionError(f"extraction call failed: {exc}") from exc
+        except (pydantic.ValidationError, ValueError) as exc:
+            # The SDK parses the output inside `parse`, before the stop reason can be looked
+            # at: truncated or malformed JSON surfaces here, and the response's usage is lost.
+            raise ExtractionError(f"the extraction returned unparseable JSON: {exc}") from exc
         usage.add(response.usage)
         if response.stop_reason == "refusal":
-            raise ExtractionError("the model declined to extract from this document")
+            raise ExtractionError("the model declined to extract from this document", usage)
         if response.stop_reason == "max_tokens":
-            raise ExtractionError("the extraction hit max_tokens before finishing")
+            raise ExtractionError("the extraction hit max_tokens before finishing", usage)
         parsed = response.parsed_output
         if parsed is None:
-            raise ExtractionError("the extraction returned no parseable JSON")
+            raise ExtractionError("the extraction returned no parseable JSON", usage)
         return parsed, usage

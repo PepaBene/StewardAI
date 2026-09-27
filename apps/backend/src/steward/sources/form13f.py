@@ -8,7 +8,8 @@ sets). Used here:
   report period;
 - COVERPAGE.tsv: manager name, amendment type (RESTATEMENT replaces a filing, NEW HOLDINGS
   adds positions to it);
-- INFOTABLE.tsv: one row per position: issuer, class, CUSIP, value (US dollars since 2023),
+- INFOTABLE.tsv: one row per position: issuer, class, CUSIP, value (US dollars for filings
+  from 2023-01-03, thousands of dollars before; stored here in dollars either way),
   shares or principal amount and its type (SH/PRN), put/call, discretion, voting authority.
 
 The information table is about 400 MB uncompressed, so it is streamed and only rows for
@@ -28,6 +29,8 @@ from typing import IO
 from urllib.parse import urljoin
 
 HOLDINGS_TYPES = {"13F-HR", "13F-HR/A"}
+# Filings before this date report VALUE in thousands of US dollars (SEC 13F FAQ).
+VALUE_IN_DOLLARS_FROM = dt.date(2023, 1, 3)
 _LINK = re.compile(r'href="([^"]+_form13f\.zip)"', re.IGNORECASE)
 
 
@@ -85,6 +88,13 @@ def _num(text: str) -> Decimal | None:
         return None
 
 
+def _value_usd(text: str, filed: dt.date) -> Decimal | None:
+    value = _num(text)
+    if value is not None and filed < VALUE_IN_DOLLARS_FROM:
+        value *= 1000
+    return value
+
+
 def _rows(handle: IO[bytes]) -> Iterator[dict[str, str]]:
     text = io.TextIOWrapper(handle, encoding="utf-8", errors="replace", newline="")
     reader = csv.reader(text, delimiter="\t", quoting=csv.QUOTE_NONE)
@@ -129,7 +139,10 @@ def parse_dataset(source: Path | IO[bytes], cusips: set[str]) -> Dataset:
                         cusip=cusip,
                         issuer_name=r.get("NAMEOFISSUER", "").strip(),
                         title_of_class=r.get("TITLEOFCLASS", "").strip(),
-                        value_usd=_num(r.get("VALUE", "")),
+                        value_usd=_value_usd(
+                            r.get("VALUE", ""),
+                            _date(submissions[r["ACCESSION_NUMBER"]]["FILING_DATE"]),
+                        ),
                         shares=_num(r.get("SSHPRNAMT", "")),
                         shares_type=r.get("SSHPRNAMTTYPE", "").strip(),
                         put_call=r.get("PUTCALL", "").strip() or None,

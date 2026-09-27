@@ -41,6 +41,7 @@ export const DEFAULT_VERIFICATION: VerificationConfig = {
   claim_verifier: {
     enabled: true,
     model: "claude-haiku-4-5",
+    effort: null,
     mode: "strip",
     numeric_check: true,
     applies_to: [...CLAIM_TARGETS],
@@ -73,6 +74,8 @@ export type VerificationForm = {
   demoteBelow: string;
   claimEnabled: boolean;
   claimModel: string;
+  /** "" = not sent (the model's default). */
+  claimEffort: string;
   claimMode: "strip" | "mark";
   numericCheck: boolean;
   appliesTo: ClaimTarget[];
@@ -116,7 +119,7 @@ export function verificationFromBody(body: VerificationConfig | null): Verificat
     ...(corroboration ?? {}),
   };
   const { wrong_penalty, useful_reward, demote_below, ...trustRest } = { ...DEFAULT_VERIFICATION.trust!, ...(trust ?? {}) };
-  const { enabled, model, mode, numeric_check, applies_to, ...claimRest } = {
+  const { enabled, model, effort, mode, numeric_check, applies_to, ...claimRest } = {
     ...DEFAULT_VERIFICATION.claim_verifier!,
     ...(claim_verifier ?? {}),
   };
@@ -137,6 +140,7 @@ export function verificationFromBody(body: VerificationConfig | null): Verificat
     demoteBelow: text(demote_below),
     claimEnabled: enabled,
     claimModel: model,
+    claimEffort: effort ?? "",
     claimMode: mode,
     numericCheck: numeric_check,
     appliesTo: CLAIM_TARGETS.filter((t) => (applies_to ?? []).includes(t)),
@@ -174,6 +178,7 @@ export function verificationToBody(form: VerificationForm): VerificationConfig {
       ...form.rest.claimVerifier,
       enabled: form.claimEnabled,
       model: form.claimModel.trim(),
+      effort: (form.claimEffort || null) as NonNullable<VerificationConfig["claim_verifier"]>["effort"],
       mode: form.claimMode,
       numeric_check: form.numericCheck,
       applies_to: CLAIM_TARGETS.filter((t) => form.appliesTo.includes(t)),

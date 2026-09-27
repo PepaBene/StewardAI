@@ -4,7 +4,8 @@ import asyncio
 from typing import Annotated
 
 import asyncpg
-from fastapi import Depends, HTTPException, status
+from fastapi import Depends, HTTPException, Path, Query, status
+from pydantic import Field
 
 from steward.db import create_pool
 from steward.settings import get_settings
@@ -42,6 +43,13 @@ async def close_pool() -> None:
 
 
 Pool = Annotated[asyncpg.Pool, Depends(get_pool)]
+
+# Row ids are Postgres bigints: bound them so an out-of-range id is a 422, not a 500 from
+# asyncpg failing to encode it.
+DB_ID_MAX = 2**63 - 1
+DbId = Annotated[int, Field(ge=1, le=DB_ID_MAX)]
+IdPath = Annotated[int, Path(ge=1, le=DB_ID_MAX)]
+IdQuery = Annotated[int | None, Query(ge=1, le=DB_ID_MAX)]
 
 
 async def get_pool_or_error() -> asyncpg.Pool | str:

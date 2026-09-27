@@ -20,7 +20,7 @@ import {
   type ExposureForm,
   type ProfileForm,
 } from "@/lib/config/profiles-form";
-import { useConfigEditor } from "@/lib/hooks/use-config-editor";
+import { configSaveQuery, useConfigEditor } from "@/lib/hooks/use-config-editor";
 
 const api = () => getBrowserApiClient();
 
@@ -43,7 +43,7 @@ export function ProfilesEditor() {
 
   const editor = useConfigEditor<HoldingProfilesConfig>({
     load: () => api().GET("/config/holding-profiles"),
-    save: (body, note) => api().PUT("/config/holding-profiles", { body, params: { query: { note } } }),
+    save: (body, note, base) => api().PUT("/config/holding-profiles", { body, params: { query: configSaveQuery(note, base) } }),
     validate: (body) => api().POST("/config/holding-profiles/validate", { body }),
     onLoaded: (body) => {
       const loaded = profilesFromBody(body);
@@ -145,6 +145,7 @@ export function ProfilesEditor() {
           </datalist>
           <SaveBar
             dirty={dirty}
+            savedVersionId={editor.version?.id ?? null}
             busy={editor.busy}
             errors={editor.errors}
             message={editor.message}

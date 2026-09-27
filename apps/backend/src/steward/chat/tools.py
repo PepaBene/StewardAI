@@ -48,13 +48,21 @@ TOOL_DEFINITIONS: list[dict[str, Any]] = [
     },
     {
         "name": "search_news",
-        "description": "Stored news items, newest first, optionally for one holding and/or "
-        "containing words, within the last N days.",
+        "description": "Stored news items within the last N days, optionally for one holding "
+        "and/or matching a text query. Without a query: newest first. With a query: full-text "
+        "search over headline and summary, best matches first (relevance weighted by recency), "
+        "each with an excerpt around the matched words.",
         "input_schema": {
             "type": "object",
             "properties": {
                 "ticker": {"type": "string"},
-                "query": {"type": "string"},
+                "query": {
+                    "type": "string",
+                    "description": "Search-engine syntax. Several words must all appear, in any "
+                    'word form (cuts/cut, rates/rate); "quoted words" must appear as a '
+                    "phrase; OR between words matches either; -word excludes. E.g. "
+                    "'guidance OR outlook -rumour', '\"share buyback\"'.",
+                },
                 "days": {"type": "integer", "minimum": 1, "maximum": 365},
             },
             "additionalProperties": False,
@@ -199,15 +207,28 @@ class ChatTools:
     async def _tool_search_news(
         self, ticker: str | None = None, query: str | None = None, days: int = 30
     ) -> dict[str, Any]:
+        # Full-text search (stemmed, ranked by relevance over recency). A query of stop words
+        # only ("IT", "the") has no lexemes and falls back to a substring match.
         rows = await self.pool.fetch(
-            "select i.id, i.url, i.headline, i.summary, i.outlet, i.tier, i.published_at,"
-            " c.severity, c.confidence from public.news_item i left join public.story_cluster c"
-            " on c.id = i.cluster_id where ($1::text is null or $1 = any(i.tickers))"
-            " and ($2::text is null or i.headline ilike '%' || $2 || '%'"
-            " or i.summary ilike '%' || $2 || '%') and i.published_at >= $3"
-            " order by i.published_at desc limit 15",
+            "with q as (select case when $2::text is null then null"
+            " else websearch_to_tsquery('english', $2::text) end as tsq),"
+            " hits as (select i.id, i.url, i.headline, i.summary, i.outlet, i.tier,"
+            " i.published_at, c.severity, c.confidence, coalesce(numnode(q.tsq), 0) > 0 as fts,"
+            " case when coalesce(numnode(q.tsq), 0) > 0 then ts_rank_cd(i.search, q.tsq)"
+            " / (1 + greatest(0, extract(epoch from now() - i.published_at)) / 86400 / 30)"
+            " else 0 end as score"
+            " from q, public.news_item i left join public.story_cluster c on c.id = i.cluster_id"
+            " where ($1::text is null or $1 = any(i.tickers)) and i.published_at >= $3"
+            " and ($2::text is null or case when coalesce(numnode(q.tsq), 0) > 0"
+            " then i.search @@ q.tsq else i.headline ilike '%' || $2::text || '%'"
+            " or i.summary ilike '%' || $2::text || '%' end)"
+            " order by score desc, i.published_at desc limit 15)"
+            " select hits.*, case when hits.fts then ts_headline('english',"
+            " coalesce(hits.summary, hits.headline), q.tsq,"
+            " 'MaxFragments=2, MaxWords=30, MinWords=8, StartSel=**, StopSel=**') end as excerpt"
+            " from hits, q order by hits.score desc, hits.published_at desc",
             ticker,
-            query,
+            query or None,
             dt.datetime.now(dt.UTC) - dt.timedelta(days=max(1, min(365, days))),
         )
         items = []
@@ -231,6 +252,7 @@ class ChatTools:
                     "severity": r["severity"],
                     "confidence": r["confidence"],
                     "summary": (r["summary"] or "")[:400],
+                    **({"excerpt": r["excerpt"]} if r["excerpt"] else {}),
                 }
             )
         return {"items": items}

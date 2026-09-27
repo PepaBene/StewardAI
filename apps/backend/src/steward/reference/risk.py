@@ -4,9 +4,9 @@
 - Volatility: the sample standard deviation of daily log returns, annualised with sqrt(252),
   over the last `window` trading days.
 - Maximum drawdown: the worst fall from a running peak over all stored closes.
-- Beta: cov(holding, benchmark) / var(benchmark) of daily simple returns on the days both
-  traded, over the last `window` trading days.
-- Correlation: Pearson correlation of daily simple returns on shared days.
+- Beta: cov(holding, benchmark) / var(benchmark) of simple returns between consecutive days
+  both traded, over the last `window` such days.
+- Correlation: Pearson correlation of the same paired returns.
 """
 
 import datetime as dt
@@ -66,9 +66,15 @@ def max_drawdown(series: Series) -> float | None:
 
 
 def _paired(a: Series, b: Series, window: int) -> tuple[list[float], list[float]]:
-    ra, rb = daily_returns(a), daily_returns(b)
-    days = sorted(set(ra) & set(rb))[-window:]
-    return [ra[d] for d in days], [rb[d] for d in days]
+    # Align the closes on the days both traded first, so each pair of returns spans the
+    # same interval (a day missing from one series would otherwise pair a two-day return
+    # with a one-day return).
+    ca, cb = dict(a), dict(b)
+    days = sorted(set(ca) & set(cb))
+    ra = daily_returns([(d, ca[d]) for d in days])
+    rb = daily_returns([(d, cb[d]) for d in days])
+    shared = sorted(ra)[-window:]
+    return [ra[d] for d in shared], [rb[d] for d in shared]
 
 
 def _cov(x: list[float], y: list[float]) -> float:

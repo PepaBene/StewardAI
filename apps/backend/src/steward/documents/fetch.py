@@ -5,13 +5,18 @@ extraction), size-capped, archived as the exact bytes, and handed to the extract
 as a document.
 """
 
+import asyncio
 import hashlib
 import io
+import ipaddress
+import socket
+from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
+from urllib.parse import urljoin, urlsplit
 
 import httpx
 from pypdf import PdfReader
-from pypdf.errors import PdfReadError
+from pypdf.errors import DependencyError, PyPdfError
 
 from steward import __version__
 from steward.documents.text import html_to_text, plain_to_text
@@ -46,6 +51,10 @@ class Document:
         decoded = self.data.decode(_charset(self.data), errors="replace")
         return html_to_text(decoded) if self.content_type == HTML else plain_to_text(decoded)
 
+    async def text_async(self) -> str:
+        """`text()` in a worker thread: PDF parsing is CPU-bound and would block the loop."""
+        return await asyncio.to_thread(self.text)
+
 
 def _charset(data: bytes) -> str:
     head = data[:2048].decode("ascii", errors="ignore").lower()
@@ -66,7 +75,7 @@ def pdf_text(data: bytes) -> str:
     try:
         reader = PdfReader(io.BytesIO(data))
         pages = [page.extract_text() or "" for page in reader.pages]
-    except (PdfReadError, ValueError, KeyError) as exc:
+    except (PyPdfError, DependencyError, ValueError, KeyError, RecursionError) as exc:
         raise FetchError(f"unreadable PDF: {exc}") from exc
     return plain_to_text("\n".join(pages))
 
@@ -89,22 +98,100 @@ def default_headers(user_agent: str | None = None) -> dict[str, str]:
     return {"User-Agent": user_agent or f"StewardAI/{__version__} (personal portfolio tool)"}
 
 
-async def fetch_document(
-    http: httpx.AsyncClient, url: str, *, max_bytes: int, headers: dict[str, str] | None = None
-) -> Document:
+MAX_REDIRECTS = 5
+_REDIRECTS = (301, 302, 303, 307, 308)
+
+Resolver = Callable[[str], Awaitable[list[str]]]
+
+
+async def resolve_host(host: str) -> list[str]:
+    """Every address `host` resolves to."""
+    infos = await asyncio.get_running_loop().getaddrinfo(host, None, type=socket.SOCK_STREAM)
+    return [str(info[4][0]) for info in infos]
+
+
+def _public(address: str) -> bool:
+    ip = ipaddress.ip_address(address.split("%")[0])
+    if isinstance(ip, ipaddress.IPv6Address) and ip.ipv4_mapped is not None:
+        ip = ip.ipv4_mapped
+    return ip.is_global and not ip.is_multicast
+
+
+async def check_public_url(url: str, resolve: Resolver) -> None:
+    """Refuse anything but http(s) to a host whose every address is public: a document URL
+    comes from a web search, a holding profile or a redirect, and must not reach the
+    worker's own network (loopback, private ranges, cloud metadata)."""
+    parts = urlsplit(url)
+    if parts.scheme not in ("http", "https"):
+        raise FetchError(f"{url}: only http and https URLs are fetched")
+    host = parts.hostname
+    if not host:
+        raise FetchError(f"{url} has no host")
     try:
-        async with http.stream("GET", url, headers=headers, follow_redirects=True) as response:
-            if response.status_code != 200:
-                raise FetchError(f"{url} returned HTTP {response.status_code}")
-            chunks: list[bytes] = []
-            size = 0
-            async for chunk in response.aiter_bytes():
-                size += len(chunk)
-                if size > max_bytes:
-                    raise FetchError(f"{url} is larger than {max_bytes // 1_000_000} MB")
-                chunks.append(chunk)
-            data = b"".join(chunks)
-            content_type = sniff_type(data, response.headers.get("content-type"), url)
+        addresses = [host] if _is_ip(host) else await resolve(host)
+    except OSError as exc:
+        raise FetchError(f"{url}: cannot resolve {host}: {exc}") from exc
+    if not addresses:
+        raise FetchError(f"{url}: {host} does not resolve")
+    for address in addresses:
+        try:
+            public = _public(address)
+        except ValueError as exc:
+            raise FetchError(f"{url}: {host} resolves to {address!r}") from exc
+        if not public:
+            raise FetchError(f"{url}: {host} resolves to a non-public address ({address})")
+
+
+def _is_ip(host: str) -> bool:
+    try:
+        ipaddress.ip_address(host.split("%")[0])
+    except ValueError:
+        return False
+    return True
+
+
+def _mocked(http: httpx.AsyncClient) -> bool:
+    # Tests route requests to fake hosts through a MockTransport; nothing leaves the process.
+    return isinstance(getattr(http, "_transport", None), httpx.MockTransport)
+
+
+async def fetch_document(
+    http: httpx.AsyncClient,
+    url: str,
+    *,
+    max_bytes: int,
+    headers: dict[str, str] | None = None,
+    resolve: Resolver | None = None,
+) -> Document:
+    """GET `url` (following at most MAX_REDIRECTS redirects, each hop checked to be a public
+    http(s) address). `resolve` overrides DNS resolution; with a mocked transport and no
+    resolver the address check is skipped."""
+    guard = resolve or (None if _mocked(http) else resolve_host)
+    current = url
+    try:
+        for _ in range(MAX_REDIRECTS + 1):
+            if guard is not None:
+                await check_public_url(current, guard)
+            async with http.stream(
+                "GET", current, headers=headers, follow_redirects=False
+            ) as response:
+                if response.status_code in _REDIRECTS and response.headers.get("location"):
+                    current = urljoin(current, response.headers["location"])
+                    continue
+                if response.status_code != 200:
+                    raise FetchError(f"{url} returned HTTP {response.status_code}")
+                chunks: list[bytes] = []
+                size = 0
+                async for chunk in response.aiter_bytes():
+                    size += len(chunk)
+                    if size > max_bytes:
+                        raise FetchError(f"{url} is larger than {max_bytes // 1_000_000} MB")
+                    chunks.append(chunk)
+                data = b"".join(chunks)
+                content_type = sniff_type(data, response.headers.get("content-type"), current)
+                break
+        else:
+            raise FetchError(f"{url} redirects more than {MAX_REDIRECTS} times")
     except httpx.HTTPError as exc:
         raise FetchError(f"fetching {url} failed: {exc}") from exc
     if not data:

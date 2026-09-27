@@ -193,11 +193,14 @@ class EventRulesConfig(ConfigModel):
             "us_cpi": 0.3,
             "us_unemployment": 0.2,
             "ecb_deposit_rate": 0.0,
-            "fed_funds": 0.0,
+            # The daily effective rate (DFF) drifts by a basis point or two; a Fed decision
+            # moves it by 25 bp, so only moves beyond 0.1 pp count.
+            "fed_funds": 0.1,
         },
         description="Per macro series key: a new release that moves more than this against "
         "the previous one is a macro surprise (in the series' own unit; 0: any change, e.g. "
-        "a policy rate). Evaluated only on release days.",
+        "a policy rate set exactly; fed_funds is the daily effective rate, which drifts, so "
+        "it needs a band). Evaluated only on release days.",
     )
     announcement_types: list[AnnouncementRule] = Field(
         default_factory=_default_announcement_rules,
@@ -206,7 +209,14 @@ class EventRulesConfig(ConfigModel):
     earnings_check_on: list[EventType] = Field(
         default_factory=lambda: cast(list[EventType], ["earnings_release"]),
         description="Confirmed stories of these types queue an earnings thesis check for "
-        "the holding, unless one ran in the last 10 days.",
+        "the holding, unless one ran within earnings_check_cooldown_days.",
+    )
+    earnings_check_cooldown_days: int = Field(
+        default=10,
+        ge=1,
+        le=60,
+        description="A story does not queue an earnings check when one was queued or ran for "
+        "the holding within this many days.",
     )
 
     @model_validator(mode="after")

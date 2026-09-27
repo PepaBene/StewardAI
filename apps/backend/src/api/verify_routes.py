@@ -9,7 +9,7 @@ from fastapi import APIRouter, HTTPException, Query, status
 from pydantic import BaseModel
 
 from api.auth import Owner
-from api.db import Pool
+from api.db import DbId, Pool
 from steward.activity import ActivityCoverage, coverage
 from steward.config import EventRulesConfig, JobsConfig, NotificationsConfig, VerificationConfig
 from steward.config.store import load_active
@@ -51,7 +51,7 @@ async def get_feedback(
     pool: Pool,
     _owner: Owner,
     target_kind: Annotated[TargetKind | None, Query()] = None,
-    target_id: Annotated[list[int] | None, Query(description="Any of these ids.")] = None,
+    target_id: Annotated[list[DbId] | None, Query(description="Any of these ids.")] = None,
     since: Annotated[dt.datetime | None, Query()] = None,
     limit: Annotated[int, Query(ge=1, le=500)] = 100,
 ) -> list[FeedbackOut]:

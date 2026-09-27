@@ -17,6 +17,7 @@ browsers and is listed as a manual step.
 
 import argparse
 import asyncio
+import datetime as dt
 import json
 import sys
 from dataclasses import dataclass, field
@@ -83,12 +84,19 @@ async def signoff(pool: asyncpg.Pool, required_runs: int = 10) -> SignoffReport:
         rows = await pool.fetchval(
             "select count(*) from public.position_snapshot where job_id = $1", run["id"]
         )
-        # A later re-sync of the same day replaces the rows; then the day's newest run wins.
-        replaced = await pool.fetchval(
-            "select exists (select 1 from public.position_snapshot p join public.job j"
-            " on j.id = p.job_id where p.snapshot_date = (select snapshot_date from"
-            " public.account_snapshot where job_id = $1) and p.job_id <> $1)",
+        # A later re-sync of the same day replaces the rows (the account row too); then the
+        # day's newest run wins. The run's own snapshot step records which day it wrote.
+        step = await pool.fetchval(
+            "select detail from public.job_step where job_id = $1 and name = 'snapshot'",
             run["id"],
+        )
+        written = json.loads(step).get("snapshot_date") if step else None
+        replaced = await pool.fetchval(
+            "select exists (select 1 from public.account_snapshot where job_id <> $1"
+            " and snapshot_date = coalesce($2::date, (select snapshot_date from"
+            " public.account_snapshot where job_id = $1)))",
+            run["id"],
+            dt.date.fromisoformat(written) if written else None,
         )
         if not replaced and expected is not None and rows != expected:
             mismatched.append(f"job {run['id']}: {rows} rows for {expected} positions")

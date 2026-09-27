@@ -106,6 +106,13 @@ cd apps/backend && uv run python -m worker                           # scheduler
 cd apps/web && npm install && npm run dev                            # web on :3000
 ```
 
+To fill a new or empty database once, run the data jobs in order (portfolio, reference data,
+two years of prices and FX, holidays, macro, the earnings calendar, 13F ownership, news):
+
+```bash
+cd apps/backend && uv run python -m worker.backfill            # or name the jobs to run
+```
+
 See [apps/backend/README.md](apps/backend/README.md) and [apps/web/README.md](apps/web/README.md).
 
 ## Database access model

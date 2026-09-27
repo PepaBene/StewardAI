@@ -71,7 +71,7 @@ export function transactionQuery(filters: TransactionFilters, cursor: string | n
 }
 
 /** Rows already shown plus a new page, each id once (in case pages overlap). */
-export function appendUnique<T extends { id: string }>(existing: T[], page: T[]): T[] {
+export function appendUnique<T extends { id: string | number }>(existing: T[], page: T[]): T[] {
   const seen = new Set(existing.map((r) => r.id));
   const out = [...existing];
   for (const row of page) {

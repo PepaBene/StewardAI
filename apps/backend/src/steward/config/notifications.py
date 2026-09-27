@@ -106,9 +106,9 @@ class NotificationsConfig(ConfigModel):
     rules: list[NotificationRule] = Field(default_factory=_default_rules)
     quiet_hours: QuietHours = Field(default_factory=QuietHours)
     daily_alert_cap: int | None = Field(
-        default=5,
+        default=None,
         ge=1,
-        le=100,
+        le=10_000,
         description="Most alerts sent per day (in the quiet-hours timezone); the rest wait "
         "for the digest. Null: no cap.",
     )
