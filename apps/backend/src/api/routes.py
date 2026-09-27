@@ -104,7 +104,7 @@ async def get_portfolio_history(
 async def get_portfolio_contribution(
     pool: Pool,
     _owner: Owner,
-    days: Annotated[int, Query(ge=7, le=3700)] = 365,
+    days: Annotated[int, Query(ge=1, le=3700)] = 365,
 ) -> ContributionReport:
     """Every holding's contribution to the portfolio's return over the window, in base
     currency: its own trading (buying or selling more of it) netted out, so a holding is
@@ -119,6 +119,10 @@ async def get_portfolio_transactions(
     pool: Pool,
     _owner: Owner,
     type: Annotated[list[TransactionType] | None, Query(description="Any of these.")] = None,
+    subtype: Annotated[
+        list[Annotated[str, Field(pattern=r"^[A-Za-z_]{1,32}$")]] | None,
+        Query(description="Any of these, as Trading212 names them (BUY, SELL, DEPOSIT, ...)."),
+    ] = None,
     ticker: Annotated[str | None, Query(pattern=r"^[A-Za-z0-9._-]{1,32}$")] = None,
     start: Annotated[dt.date | None, Query(alias="from", description="On or after.")] = None,
     end: Annotated[dt.date | None, Query(alias="to", description="On or before.")] = None,
@@ -126,7 +130,9 @@ async def get_portfolio_transactions(
     limit: Annotated[int, Query(ge=1, le=500)] = 100,
 ) -> TransactionsPage:
     """Orders, dividends and cash movements, newest first, with totals per type and
-    currency over every row matching the filters (dates are UTC days, both inclusive)."""
+    currency over every row matching the filters (dates are UTC days, both inclusive).
+    `subtype` narrows server-side (e.g. BUY or SELL orders), so counts, totals and paging
+    all follow it."""
     try:
         decoded = decode_cursor(cursor) if cursor else None
     except ValueError as exc:
@@ -135,6 +141,7 @@ async def get_portfolio_transactions(
         pool,
         TransactionFilters(
             types=list(type or []),
+            subtypes=list(subtype or []),
             ticker=ticker,
             start=dt.datetime.combine(start, dt.time(0), tzinfo=dt.UTC) if start else None,
             end=(

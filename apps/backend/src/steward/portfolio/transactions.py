@@ -1,5 +1,5 @@
 """Read model for the transactions view: orders, dividends and cash movements, filtered by
-type, ticker and period, with totals over the whole filtered set (not just the page).
+type, subtype, ticker and period, with totals over the whole filtered set (not just the page).
 
 Paging is keyset on (occurred_at, id), newest first, so every row appears exactly once
 across pages even when rows share a timestamp.
@@ -58,6 +58,8 @@ class TransactionFilters:
     end: dt.datetime | None = None
     cursor: tuple[dt.datetime, str] | None = None
     limit: int = 100
+    # Trading212's subtypes as stored (BUY/SELL for orders, DEPOSIT, FEE, ... for cash).
+    subtypes: list[str] = field(default_factory=list)
 
 
 def encode_cursor(occurred_at: dt.datetime, row_id: str) -> str:
@@ -77,8 +79,9 @@ def _where(f: TransactionFilters) -> tuple[str, list[Any]]:
         "($2::text is null or t.ticker = $2)",
         "($3::timestamptz is null or t.occurred_at >= $3)",
         "($4::timestamptz is null or t.occurred_at < $4)",
+        "(cardinality($5::text[]) = 0 or t.subtype = any($5))",
     ]
-    return " and ".join(clauses), [f.types, f.ticker, f.start, f.end]
+    return " and ".join(clauses), [f.types, f.ticker, f.start, f.end, f.subtypes]
 
 
 def _float(value: Any) -> float | None:
@@ -93,8 +96,8 @@ async def list_transactions(pool: asyncpg.Pool, f: TransactionFilters) -> Transa
         " t.currency, t.occurred_at from public.transaction t"
         " left join public.instrument i on i.t212_ticker = t.ticker"
         f" where {where}"
-        " and ($5::timestamptz is null or (t.occurred_at, t.id) < ($5, $6::text))"
-        " order by t.occurred_at desc, t.id desc limit $7",
+        " and ($6::timestamptz is null or (t.occurred_at, t.id) < ($6, $7::text))"
+        " order by t.occurred_at desc, t.id desc limit $8",
         *args,
         cursor_at,
         cursor_id,

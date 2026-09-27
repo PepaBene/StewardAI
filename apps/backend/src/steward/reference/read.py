@@ -331,6 +331,15 @@ class PricePoint(BaseModel):
     close: float
 
 
+class PriceBarOut(PricePoint):
+    """A stored daily bar. Stooq's open, high, low and volume are null when it gave none."""
+
+    open: float | None
+    high: float | None
+    low: float | None
+    volume: float | None
+
+
 class RiskCard(BaseModel):
     returns: dict[str, float | None] = Field(description="1m, 3m, 6m, 1y, 2y (fractions).")
     volatility: float | None = Field(description="Annualised, last 252 trading days.")
@@ -358,7 +367,7 @@ class PriceHistory(BaseModel):
     source: Literal["Stooq"] = "Stooq"
     as_of: dt.date | None = Field(description="Date of the latest stored close.")
     fetched_at: dt.datetime | None
-    bars: list[PricePoint]
+    bars: list[PriceBarOut]
     benchmark_symbol: str | None
     benchmark: list[PricePoint]
     risk: RiskCard | None
@@ -381,6 +390,30 @@ async def load_series(
     return [(r["date"], float(r["close"])) for r in rows]
 
 
+def _opt(value: Any) -> float | None:
+    return None if value is None else float(value)
+
+
+async def load_bars(pool: asyncpg.Pool, symbol: str) -> list[PriceBarOut]:
+    """Every stored Stooq bar of `symbol`, oldest first."""
+    rows = await pool.fetch(
+        "select date, open, high, low, close, volume from public.price_bar"
+        " where symbol = $1 and source = 'stooq' order by date",
+        symbol,
+    )
+    return [
+        PriceBarOut(
+            date=r["date"],
+            close=float(r["close"]),
+            open=_opt(r["open"]),
+            high=_opt(r["high"]),
+            low=_opt(r["low"]),
+            volume=_opt(r["volume"]),
+        )
+        for r in rows
+    ]
+
+
 async def _state(pool: asyncpg.Pool, key: str) -> dict[str, Any]:
     raw = await pool.fetchval("select value from public.sync_state where key = $1", key)
     return dict(json.loads(raw)) if raw else {}
@@ -397,7 +430,8 @@ async def price_history(pool: asyncpg.Pool, ticker: str, days: int) -> PriceHist
     )
     gaps = (await _state(pool, GAPS_KEY)).get("gaps", {})
     checks = (await _state(pool, CHECKS_KEY)).get("checks", {})
-    series = await load_series(pool, symbol) if symbol else []
+    stored_bars = await load_bars(pool, symbol) if symbol else []
+    series = [(b.date, b.close) for b in stored_bars]
     bench = await load_series(pool, benchmark_symbol) if benchmark_symbol else []
     since = (series[-1][0] if series else dt.date.today()) - dt.timedelta(days=days)
     fetched = (
@@ -438,7 +472,7 @@ async def price_history(pool: asyncpg.Pool, ticker: str, days: int) -> PriceHist
         symbol=symbol,
         as_of=series[-1][0] if series else None,
         fetched_at=fetched,
-        bars=[PricePoint(date=d, close=c) for d, c in series if d >= since],
+        bars=[b for b in stored_bars if b.date >= since],
         benchmark_symbol=benchmark_symbol,
         benchmark=[PricePoint(date=d, close=c) for d, c in bench if d >= since],
         risk=RiskCard(**figures.__dict__) if figures else None,
