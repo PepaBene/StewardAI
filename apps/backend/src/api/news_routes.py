@@ -19,6 +19,7 @@ from steward.news.read import (
     Confidence,
     DisputedStory,
     EscalationOut,
+    EscalationStatus,
     FeedFilters,
     NewsFeed,
     ReportOut,
@@ -213,11 +214,12 @@ async def get_escalations(
     _owner: Owner,
     ticker: Annotated[str | None, Query(pattern=r"^[A-Za-z0-9._-]{1,32}$")] = None,
     limit: Annotated[int, Query(ge=1, le=200)] = 50,
+    status_: Annotated[EscalationStatus | None, Query(alias="status")] = None,
 ) -> list[EscalationOut]:
     """Impact notes on confirmed severity-2+ stories and large price moves, newest first:
     each cites its sources and names the thesis KPIs or exit conditions it touches, or
-    states that none applies."""
-    return await list_escalations(pool, ticker, limit)
+    states that none applies. `status` keeps only open, acknowledged or resolved ones."""
+    return await list_escalations(pool, ticker, limit, status=status_)
 
 
 @router.get("/escalations/{report_id}", tags=["reports"])

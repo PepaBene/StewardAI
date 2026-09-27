@@ -188,13 +188,21 @@ class JobStepOut(BaseModel):
     cost_usd: float | None
 
 
+_ATTEMPTS_DESCRIPTION = (
+    "Times the runner started this job, a resumed run included; above 1 means it was retried."
+    " 0 = never started."
+)
+
+
 class JobDetail(JobSummary):
     params: dict[str, Any]
+    attempts: int = Field(description=_ATTEMPTS_DESCRIPTION)
     steps: list[JobStepOut]
 
 
 class JobListItem(JobSummary):
     params: dict[str, Any]
+    attempts: int = Field(description=_ATTEMPTS_DESCRIPTION)
     cost_usd: float | None = Field(description="Sum of the run's step costs; null if none.")
     failed_step: str | None = Field(description="The first failed step's name, if any.")
 
@@ -220,7 +228,7 @@ async def list_jobs(
     outcome and cost. Filters combine (AND)."""
     rows = await pool.fetch(
         "select j.id, j.job_type, j.trigger, j.status, j.error, j.created_at, j.started_at,"
-        " j.finished_at, j.params, s.cost_usd, s.failed_step from public.job j"
+        " j.finished_at, j.params, j.attempts, s.cost_usd, s.failed_step from public.job j"
         " left join lateral (select sum(cost_usd) as cost_usd, (array_agg(name order by"
         " step_index) filter (where status = 'failed'))[1] as failed_step"
         " from public.job_step where job_id = j.id) s on true"
@@ -254,7 +262,7 @@ async def get_job(job_id: IdPath, pool: Pool, _owner: Owner) -> JobDetail:
     """One job run with its steps, to follow an on-demand run to completion."""
     row = await pool.fetchrow(
         "select id, job_type, trigger, status, error, created_at, started_at, finished_at,"
-        " params from public.job where id = $1",
+        " params, attempts from public.job where id = $1",
         job_id,
     )
     if row is None:

@@ -628,7 +628,7 @@ async def gather(
     if strategy is not None:
         rules = "; ".join(
             f"{r.id} ({r.type} {r.operator} {getattr(r, 'value', '')}): {r.description}"
-            for r in strategy.rules
+            for r in strategy.enabled_rules
         )
         strategy_sid = reg.add(
             "strategy",

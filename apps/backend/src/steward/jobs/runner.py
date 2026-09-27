@@ -364,8 +364,10 @@ async def _run_locked(
         config_version_ids=versions,
         resumed=resumed,
     )
+    # Every start counts as an attempt, a resumed (redelivered) run included.
     await pool.execute(
-        "update public.job set status = 'running', started_at = clock_timestamp() where id = $1",
+        "update public.job set status = 'running', started_at = clock_timestamp(),"
+        " attempts = attempts + 1 where id = $1",
         job_id,
     )
     logger.info("job %s (%s, %s) started", job_id, job_type, trigger)

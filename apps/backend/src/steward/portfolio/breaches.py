@@ -125,7 +125,7 @@ def evaluate(report: DriftReport, strategy: StrategyConfig) -> list[Finding]:
         )
 
     held = [p for p in report.positions if p.held]
-    for rule in strategy.rules:
+    for rule in strategy.enabled_rules:
         severity = int(rule.on_breach[-1])
         checks: list[tuple[str, str | None, float, str]] = []  # (key suffix, ticker, value, what)
         if isinstance(rule, PositionWeightRule):
