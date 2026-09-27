@@ -9,6 +9,7 @@ import { AllocationBars, type AllocationItem } from "@/components/portfolio/allo
 import { DriftBar } from "@/components/portfolio/drift-bar";
 import { DriftStatusBadge, isOutOfBand } from "@/components/portfolio/drift-status-badge";
 import { FreshnessLabel } from "@/components/portfolio/freshness-label";
+import { PerformanceCard } from "@/components/portfolio/performance-card";
 import { StatCard } from "@/components/portfolio/stat-card";
 import { useSyncStatus } from "@/components/sync/sync-status-provider";
 import { Button } from "@/components/ui/button";
@@ -171,6 +172,8 @@ function Overview({ data }: { data: PortfolioOverview }) {
           sub={<>{formatPercent(pplPct, { signed: true })} on cost · Trading212 figure</>}
         />
       </section>
+
+      <PerformanceCard />
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
         <Card>
