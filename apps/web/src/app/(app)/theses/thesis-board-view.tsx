@@ -413,7 +413,7 @@ function VerdictPanel({ row, cell }: { row: BoardRow; cell: BoardKpi }) {
             <div>
               <dt className="text-xs text-text-muted">Confidence</dt>
               <dd className="mt-0.5">
-                <ConfidenceBadge confidence={verdict.confidence} />
+                <ConfidenceBadge confidence={verdict.confidence} since={verdict.created_at} />
               </dd>
             </div>
             <div>

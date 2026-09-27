@@ -44,6 +44,8 @@ import {
 } from "@/lib/api/client";
 import { NEVER_JUDGED } from "@/lib/evidence/board";
 import {
+  confidenceNextAction,
+  confidenceReason,
   formatFactValue,
   formatObserved,
   formatTarget,
@@ -508,7 +510,9 @@ function KpiRows({
             </span>
           )}
         </td>
-        <td className="px-3 py-2">{current ? <ConfidenceBadge confidence={current.confidence} /> : null}</td>
+        <td className="px-3 py-2">
+          {current ? <ConfidenceBadge confidence={current.confidence} since={current.created_at} /> : null}
+        </td>
       </tr>
       {expanded ? (
         <tr className="border-b border-border bg-surface-muted/60">
@@ -523,7 +527,7 @@ function KpiRows({
                       <span className="w-24">{v.period ?? "—"}</span>
                       <span className="num w-28 text-right">{formatObserved(v.observed_value, unit)}</span>
                       <VerdictStatusBadge status={v.status} />
-                      <ConfidenceBadge confidence={v.confidence} />
+                      <ConfidenceBadge confidence={v.confidence} since={v.created_at} />
                       <FeedbackControl target={{ kind: "verdict", id: v.id }} label={`verdict on ${label} ${v.period ?? ""}`.trim()} />
                     </li>
                   ))}
@@ -573,7 +577,12 @@ function FactEvidence({ fact, onFeedback }: { fact: FactOut; onFeedback: OnFeedb
           {humanizeMetric(fact.metric)} {fact.period}
         </span>
         <span className="num">{formatFactValue(fact)}</span>
-        <ConfidenceBadge confidence={fact.confidence} />
+        <ConfidenceBadge
+          confidence={fact.confidence}
+          reason={confidenceReason(fact)}
+          nextAction={confidenceNextAction(fact.status)}
+          since={fact.reviewed_at ?? fact.extracted_at}
+        />
         <EvidenceLinks fact={fact} />
         <FactFeedback fact={fact} onFeedback={onFeedback} />
       </div>
@@ -718,8 +727,12 @@ function FactTable({
                   </th>
                   <td className="num px-3 py-2 text-right whitespace-nowrap">{formatFactValue(f)}</td>
                   <td className="px-3 py-2">
-                    <ConfidenceBadge confidence={f.confidence} />
-                    {f.status_reason ? <p className="mt-1 max-w-xs text-xs text-text-muted">{f.status_reason}</p> : null}
+                    <ConfidenceBadge
+                      confidence={f.confidence}
+                      reason={confidenceReason(f)}
+                      nextAction={confidenceNextAction(f.status)}
+                      since={f.reviewed_at ?? f.extracted_at}
+                    />
                     {actions.length > 0 ? (
                       <Button
                         size="sm"

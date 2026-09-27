@@ -27,6 +27,7 @@ export type HoldingDetail = Schemas["HoldingDetail"];
 export type KpiStatus = Schemas["KpiStatus"];
 export type VerdictOut = Schemas["VerdictOut"];
 export type FactOut = Schemas["FactOut"];
+export type FactCheck = Schemas["FactCheck"];
 export type EvidenceLink = Schemas["EvidenceLink"];
 export type Confidence = FactOut["confidence"];
 export type EvidenceRelation = EvidenceLink["relation"];
