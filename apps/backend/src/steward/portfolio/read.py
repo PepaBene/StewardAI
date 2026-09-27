@@ -8,6 +8,7 @@ from typing import Literal
 import asyncpg
 from pydantic import BaseModel, Field
 
+from steward.config.jobs import JobsConfig
 from steward.config.store import load_active
 from steward.config.strategy import StrategyConfig
 from steward.portfolio.drift import (
@@ -17,6 +18,9 @@ from steward.portfolio.drift import (
     compute_drift,
     weight_denominator,
 )
+from steward.portfolio.history import DailyValue, flow_adjusted_index
+from steward.portfolio.snapshot import SNAPSHOT_TIMEZONE
+from steward.reference.read import PricePoint, load_series
 
 JobStatus = Literal["queued", "waiting", "running", "succeeded", "failed"]
 
@@ -299,4 +303,140 @@ async def portfolio_holdings(pool: asyncpg.Pool) -> HoldingsResponse:
         base_currency=account["base_currency"],
         account_currency=account["account_currency"],
         holdings=holdings,
+    )
+
+
+# ---------------------------------------------------------------------------
+# Portfolio value history (vs. benchmark)
+# ---------------------------------------------------------------------------
+
+
+class PortfolioHistory(BaseModel):
+    as_of: dt.date | None = Field(description="Date of the latest snapshot included.")
+    base_currency: str | None
+    points: list[PricePoint] = Field(
+        description="Daily flow-adjusted portfolio value index, 100 on the first day. Not a "
+        "price: deposits and withdrawals are excluded, so day-over-day change is investment "
+        "return only. Only meaningful rebased (against itself or the benchmark), never read "
+        "as an absolute figure."
+    )
+    benchmark_symbol: str | None
+    benchmark: list[PricePoint]
+    gap: str | None = Field(description="Why there is no portfolio history, when there is none.")
+
+
+# Cash movements between the owner and the account: excluded from the index above. A fee
+# or a dividend is not here — both are part of investment return, not external money moving.
+_EXTERNAL_FLOW_SUBTYPES = ("DEPOSIT", "WITHDRAW", "TRANSFER")
+
+
+async def _snapshot_series(pool: asyncpg.Pool, since: dt.date) -> list[asyncpg.Record]:
+    rows: list[asyncpg.Record] = await pool.fetch(
+        "select snapshot_date, total_base, account_currency, fx_rate"
+        " from public.account_snapshot where snapshot_date >= $1 order by snapshot_date",
+        since,
+    )
+    return rows
+
+
+async def _cash_flows(pool: asyncpg.Pool, since: dt.datetime) -> list[asyncpg.Record]:
+    rows: list[asyncpg.Record] = await pool.fetch(
+        "select occurred_at, amount from public.transaction where type = 'cash'"
+        " and subtype = any($1::text[]) and occurred_at >= $2",
+        list(_EXTERNAL_FLOW_SUBTYPES),
+        since,
+    )
+    return rows
+
+
+def _period_start(snapshot_date: dt.date) -> dt.datetime:
+    """Midnight Prague time at the start of `snapshot_date` — the day boundary snapshots
+    already use (steward.portfolio.snapshot.snapshot_date_for)."""
+    return dt.datetime.combine(snapshot_date, dt.time(0), tzinfo=SNAPSHOT_TIMEZONE)
+
+
+def _daily_values(snapshots: list[asyncpg.Record], flows: list[asyncpg.Record]) -> list[DailyValue]:
+    """One row per snapshot day, each carrying the net external flow that landed strictly
+    after the PREVIOUS snapshot day and up to and including this one — robust to a day
+    with no snapshot in between, unlike matching flows to snapshot dates one-for-one.
+    Every flow is assumed to be in that period's account currency (true for every
+    Trading212 cash movement observed so far); its own `currency` field is not re-checked
+    against it, since a mismatch would be a Trading212 account with no clean way to price
+    the flow at that day's single fx_rate."""
+    rows: list[DailyValue] = []
+    for i, row in enumerate(snapshots):
+        if i == 0:
+            # The baseline day always starts the index at 100 regardless of its own
+            # flows (flow_adjusted_index never reads this value); zero is the honest
+            # figure rather than summing flows with no lower bound to net them against.
+            rows.append(
+                DailyValue(
+                    date=row["snapshot_date"], total_base=row["total_base"], flow_base=Decimal(0)
+                )
+            )
+            continue
+        period_end = _period_start(row["snapshot_date"]) + dt.timedelta(days=1)
+        # Exclusive of the previous snapshot's own day: those flows are already the
+        # baseline (day 0 always starts at index 100, whatever its own flows were), never
+        # netted out of the FOLLOWING period too.
+        period_start = _period_start(snapshots[i - 1]["snapshot_date"]) + dt.timedelta(days=1)
+        flow = sum(
+            (f["amount"] for f in flows if period_start <= f["occurred_at"] < period_end),
+            Decimal(0),
+        )
+        rows.append(
+            DailyValue(
+                date=row["snapshot_date"],
+                total_base=row["total_base"],
+                flow_base=flow * row["fx_rate"],
+            )
+        )
+    return rows
+
+
+async def portfolio_history(pool: asyncpg.Pool, days: int) -> PortfolioHistory:
+    jobs = await load_active(pool, "jobs", JobsConfig)
+    benchmarks = (jobs.body if jobs else JobsConfig()).prices.benchmark_symbols
+    benchmark_symbol = benchmarks[0] if benchmarks else None
+
+    latest_date = await pool.fetchval("select max(snapshot_date) from public.account_snapshot")
+    if latest_date is None:
+        return PortfolioHistory(
+            as_of=None,
+            base_currency=None,
+            points=[],
+            benchmark_symbol=benchmark_symbol,
+            benchmark=[],
+            gap="no portfolio snapshot yet",
+        )
+
+    since = latest_date - dt.timedelta(days=days)
+    snapshots = await _snapshot_series(pool, since)
+    if len(snapshots) < 2:
+        return PortfolioHistory(
+            as_of=latest_date,
+            base_currency=snapshots[0]["account_currency"] if snapshots else None,
+            points=[],
+            benchmark_symbol=benchmark_symbol,
+            benchmark=[],
+            gap="fewer than two snapshots in this window",
+        )
+
+    flows = await _cash_flows(pool, _period_start(snapshots[0]["snapshot_date"]))
+    values = _daily_values(snapshots, flows)
+    index = flow_adjusted_index(values)
+    bench = await load_series(pool, benchmark_symbol, since=since) if benchmark_symbol else []
+
+    stored = await load_active(pool, "strategy", StrategyConfig)
+    base_currency = (stored.body.base_currency if stored else None) or snapshots[-1][
+        "account_currency"
+    ]
+
+    return PortfolioHistory(
+        as_of=latest_date,
+        base_currency=base_currency,
+        points=[PricePoint(date=d, close=v) for d, v in index],
+        benchmark_symbol=benchmark_symbol,
+        benchmark=[PricePoint(date=d, close=c) for d, c in bench],
+        gap=None,
     )

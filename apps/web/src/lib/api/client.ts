@@ -15,6 +15,7 @@ export type ApiClient = Client<paths>;
 type Schemas = components["schemas"];
 export type HealthResponse = Schemas["HealthResponse"];
 export type PortfolioOverview = Schemas["PortfolioOverview"];
+export type PortfolioHistory = Schemas["PortfolioHistory"];
 export type HoldingsResponse = Schemas["HoldingsResponse"];
 export type Holding = Schemas["Holding"];
 export type JobSummary = Schemas["JobSummary"];

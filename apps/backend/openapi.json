@@ -629,6 +629,57 @@
         ]
       }
     },
+    "/portfolio/history": {
+      "get": {
+        "tags": [
+          "portfolio"
+        ],
+        "summary": "Get Portfolio History",
+        "description": "Daily flow-adjusted portfolio value, indexed to 100 at the start of the window,\nagainst the first configured benchmark symbol. Deposits and withdrawals are excluded\nfrom the index so day-over-day change is investment return only, never a false gain\nor loss from money moving in or out. Empty (with `gap` set) before the first sync or\nwith fewer than two snapshots in the window.",
+        "operationId": "get_portfolio_history",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "days",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 3700,
+              "minimum": 7,
+              "default": 365,
+              "title": "Days"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PortfolioHistory"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/portfolio/transactions": {
       "get": {
         "tags": [
@@ -14270,6 +14321,82 @@
           "cleared_at"
         ],
         "title": "PortfolioFlag"
+      },
+      "PortfolioHistory": {
+        "properties": {
+          "as_of": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "As Of",
+            "description": "Date of the latest snapshot included."
+          },
+          "base_currency": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Base Currency"
+          },
+          "points": {
+            "items": {
+              "$ref": "#/components/schemas/PricePoint"
+            },
+            "type": "array",
+            "title": "Points",
+            "description": "Daily flow-adjusted portfolio value index, 100 on the first day. Not a price: deposits and withdrawals are excluded, so day-over-day change is investment return only. Only meaningful rebased (against itself or the benchmark), never read as an absolute figure."
+          },
+          "benchmark_symbol": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Benchmark Symbol"
+          },
+          "benchmark": {
+            "items": {
+              "$ref": "#/components/schemas/PricePoint"
+            },
+            "type": "array",
+            "title": "Benchmark"
+          },
+          "gap": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Gap",
+            "description": "Why there is no portfolio history, when there is none."
+          }
+        },
+        "type": "object",
+        "required": [
+          "as_of",
+          "base_currency",
+          "points",
+          "benchmark_symbol",
+          "benchmark",
+          "gap"
+        ],
+        "title": "PortfolioHistory"
       },
       "PortfolioOverview": {
         "properties": {
