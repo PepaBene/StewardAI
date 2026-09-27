@@ -20,3 +20,23 @@ export function categoricalClasses(items: readonly { muted?: boolean }[]): strin
   let next = 0;
   return items.map((item) => (item.muted ? "bg-neutral-signal" : CATEGORICAL_SLOTS[next++ % CATEGORICAL_SLOTS.length]));
 }
+
+/** The same fixed hue order as CSS var() strings, for an SVG chart's `fill` (Recharts'
+ *  `Cell` takes a colour, not a class) — the donut must land on the exact same hue per item
+ *  as the bar-list and stacked bar drawing the same allocation, never a second colour just
+ *  because it's drawn a different way. */
+const CATEGORICAL_VARS = [
+  "var(--categorical-1)",
+  "var(--categorical-2)",
+  "var(--categorical-3)",
+  "var(--categorical-4)",
+  "var(--categorical-5)",
+  "var(--categorical-6)",
+  "var(--categorical-7)",
+  "var(--categorical-8)",
+] as const;
+
+export function categoricalFills(items: readonly { muted?: boolean }[]): string[] {
+  let next = 0;
+  return items.map((item) => (item.muted ? "var(--neutral-signal)" : CATEGORICAL_VARS[next++ % CATEGORICAL_VARS.length]));
+}

@@ -6,7 +6,9 @@ import Link from "next/link";
 import { AlertMessage } from "@/components/alert-message";
 import { EmptyState } from "@/components/empty-state";
 import { AllocationBars, type AllocationItem } from "@/components/portfolio/allocation-bars";
+import { AllocationDonut } from "@/components/portfolio/allocation-donut";
 import { AllocationStackedBar } from "@/components/portfolio/allocation-stacked-bar";
+import { ConcentrationScale } from "@/components/portfolio/concentration-scale";
 import { DriftBar } from "@/components/portfolio/drift-bar";
 import { DriftChart, type DriftChartRow } from "@/components/portfolio/drift-chart";
 import { DriftStatusBadge, isOutOfBand } from "@/components/portfolio/drift-status-badge";
@@ -20,6 +22,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { getBrowserApiClient, type PortfolioOverview } from "@/lib/api/client";
 import { formatDate, formatMoney, formatPercent, formatPp, gainLossTone } from "@/lib/format";
 import { useApiResource } from "@/lib/hooks/use-api-resource";
+import { concentrationScalePosition, effectiveHoldings, herfindahlIndex } from "@/lib/portfolio/concentration";
 import { cn } from "@/lib/utils";
 
 const fetchOverview = () => getBrowserApiClient().GET("/portfolio/overview");
@@ -147,6 +150,8 @@ function Overview({ data }: { data: PortfolioOverview }) {
         </AlertMessage>
       ) : null}
 
+      <PerformanceCard />
+
       <section aria-label="Totals" className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-5">
         <StatCard
           label={`Total value (${baseCcy})`}
@@ -177,8 +182,6 @@ function Overview({ data }: { data: PortfolioOverview }) {
         <PerformanceStatCard />
       </section>
 
-      <PerformanceCard />
-
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
         <Card>
           <CardHeader>
@@ -188,17 +191,58 @@ function Overview({ data }: { data: PortfolioOverview }) {
               rates.
             </CardDescription>
           </CardHeader>
-          <CardContent>
-            <AllocationBars items={allocationItems} currency={baseCcy} label="Allocation by holding" />
+          <CardContent className="flex flex-col gap-4 sm:flex-row sm:items-center">
+            <div className="min-w-0 flex-1">
+              <AllocationBars items={allocationItems} currency={baseCcy} label="Allocation by holding" />
+            </div>
+            <div className="w-full shrink-0 sm:w-48">
+              <AllocationDonut items={allocationItems} currency={baseCcy} label="Allocation by holding, as a donut" />
+            </div>
           </CardContent>
         </Card>
         <DriftCard data={data} />
       </div>
 
+      <ConcentrationCard items={allocationItems} />
+
       {drift ? <CategoryCards data={data} /> : null}
 
       <FxFootnote data={data} />
     </div>
+  );
+}
+
+/**
+ * Diversification/concentration (§5.3): a stat and a marker on a neutral scale, computed
+ * client-side from the same by-holding weights the allocation cards already show — over
+ * invested positions only, cash excluded, matching the standard "effective number of
+ * stocks" concept. One level up from the sector/currency cards below: they show *what* the
+ * exposure is, this shows *how concentrated* it is as a single number.
+ */
+function ConcentrationCard({ items }: { items: AllocationItem[] }) {
+  const positions = items.filter((i) => !i.muted);
+  if (positions.length === 0) return null;
+  const invested = positions.reduce((sum, i) => sum + i.value, 0);
+  const weights = invested > 0 ? positions.map((i) => i.value / invested) : positions.map(() => 0);
+  const hhi = herfindahlIndex(weights);
+  const effective = effectiveHoldings(hhi);
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>Concentration</CardTitle>
+        <CardDescription>How spread out the invested positions are, not whether that&rsquo;s good or bad.</CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-2">
+        <p className="num text-2xl font-semibold text-text">
+          {effective.toFixed(1)} <span className="text-sm font-normal text-text-muted">of {positions.length} positions</span>
+        </p>
+        <ConcentrationScale position={concentrationScalePosition(hhi, positions.length)} />
+        <p className="flex justify-between text-xs text-text-muted">
+          <span>Evenly spread</span>
+          <span>One position</span>
+        </p>
+      </CardContent>
+    </Card>
   );
 }
 
