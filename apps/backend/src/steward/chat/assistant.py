@@ -256,7 +256,7 @@ def finish_answer(
 def answer_shape(
     sentences: list[ChatSentence], insufficient_evidence: str | None = None
 ) -> Literal["cited", "low_evidence"]:
-    """"low_evidence" when nothing in the draft holds up as a checked, sourced claim. The
+    """ "low_evidence" when nothing in the draft holds up as a checked, sourced claim. The
     chat panel then shows the raw sources found instead of the prose, rather than a
     fluent-sounding answer marked unsupported sentence by sentence after the fact.
 

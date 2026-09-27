@@ -43,6 +43,17 @@ class TopHolder(BaseModel):
     shares: Decimal
     value_usd: Decimal | None
     accession: str = Field(description="The filing the position is read from.")
+    prev_shares: Decimal | None = Field(
+        default=None,
+        description="The same manager's shares in the previous report period loaded "
+        "(`top_holders_previous_period`); null when it held none then or no earlier period "
+        "is loaded.",
+    )
+    shares_change_pct: float | None = Field(
+        default=None,
+        description="(shares - prev_shares) / prev_shares, as a fraction (0.125 = +12.5 %); "
+        "null when prev_shares is null or zero.",
+    )
 
 
 class OwnershipPeriod(BaseModel):
@@ -62,6 +73,9 @@ class HoldingOwnership(BaseModel):
     cusips: list[str]
     periods: list[OwnershipPeriod] = Field(description="Newest first.")
     top_holders: list[TopHolder] = Field(description="Largest positions, latest period.")
+    top_holders_previous_period: dt.date | None = Field(
+        default=None, description="The period each top holder's prev_shares is from."
+    )
     source: str = "SEC Form 13F data sets"
 
 
@@ -135,6 +149,22 @@ async def holding_ownership(
             cusips,
             top,
         )
+    previous = found[1] if len(found) > 1 else None
+    prev_shares: dict[str, Decimal] = {}
+    if previous is not None and top_rows:
+        prev_shares = {
+            r["cik"]: r["shares"]
+            for r in await pool.fetch(
+                EFFECTIVE  # noqa: S608 - constant SQL, values bound as parameters
+                + " select e.cik, sum(h.shares) as shares from effective e"
+                " join public.institutional_holding h on h.accession = e.accession"
+                " where h.cusip = any($2::text[]) and h.shares_type = 'SH'"
+                " and h.put_call is null and e.cik = any($3::text[]) group by e.cik",
+                previous,
+                cusips,
+                [r["cik"] for r in top_rows],
+            )
+        }
     return HoldingOwnership(
         ticker=ticker,
         cusips=cusips,
@@ -146,10 +176,20 @@ async def holding_ownership(
                 shares=r["shares"],
                 value_usd=r["value"],
                 accession=r["accession"],
+                prev_shares=prev_shares.get(r["cik"]),
+                shares_change_pct=share_change(r["shares"], prev_shares.get(r["cik"])),
             )
             for r in top_rows
         ],
+        top_holders_previous_period=previous,
     )
+
+
+def share_change(shares: Decimal, prev: Decimal | None) -> float | None:
+    """(shares - prev) / prev as a fraction; None without a positive previous position."""
+    if prev is None or prev <= 0:
+        return None
+    return float((shares - prev) / prev)
 
 
 class ManagerChange(BaseModel):
