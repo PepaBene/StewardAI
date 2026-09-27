@@ -98,6 +98,9 @@ class _Client:
     def __init__(self, parsed: Any = None) -> None:
         self.messages = _Messages(parsed)
 
+    def with_options(self, **_kwargs: Any) -> "_Client":
+        return self
+
 
 # ---------------------------------------------------------------------------
 # Bodies saved before these fields still validate, with today's defaults

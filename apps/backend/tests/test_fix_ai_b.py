@@ -91,6 +91,7 @@ async def test_the_classification_override_reaches_the_request() -> None:
     response = SimpleNamespace(usage=_usage(), stop_reason="end_turn", parsed_output=parsed)
     recorder = _Recorder([response, response])
     client = SimpleNamespace(messages=recorder)
+    client.with_options = lambda **_kwargs: client
     await ClaudeClassifier(client, "claude-haiku-4-5").classify(  # type: ignore[arg-type]
         [_item()], [], dt.date(2026, 9, 1)
     )
@@ -110,6 +111,7 @@ async def test_the_classification_override_reaches_the_request() -> None:
 async def test_a_failed_classification_still_reports_its_usage() -> None:
     response = SimpleNamespace(usage=_usage(), stop_reason="max_tokens", parsed_output=None)
     client = SimpleNamespace(messages=_Recorder([response]))
+    client.with_options = lambda **_kwargs: client
     with pytest.raises(ClassificationError) as caught:
         await ClaudeClassifier(client, "claude-haiku-4-5").classify(  # type: ignore[arg-type]
             [_item()], [], dt.date(2026, 9, 1)

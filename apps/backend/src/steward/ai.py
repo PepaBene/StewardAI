@@ -147,7 +147,10 @@ def create_client(settings: Settings) -> anthropic.AsyncAnthropic:
         headers["anthropic-workspace-id"] = settings.anthropic_workspace_id
     return BudgetedAnthropic(
         api_key=settings.anthropic_api_key.get_secret_value(),
-        max_retries=3,
+        # Bounds the worst case for every call site that does not set its own timeout/retry
+        # override: at most 3 attempts of the 300s default each, well inside the hard
+        # deadline below, instead of quietly retrying a stuck connection 4 times.
+        max_retries=2,
         timeout=300.0,
         default_headers=headers,
     )

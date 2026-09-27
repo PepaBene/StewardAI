@@ -240,10 +240,16 @@ def check_label(raw: ItemLabel, item: ClassifyItem, holdings: dict[str, HoldingC
 
 
 # A batch is small (no tools, no web search): a request that has not finished in this long
-# is very unlikely to still succeed, so it is worth failing fast and letting the SDK's own
-# retry (client max_retries=3) try again instead of waiting out the client's default 300s
-# timeout on every attempt, which turned one slow or flaky connection into a very long stall.
+# is very unlikely to still succeed, so it is worth failing fast instead of waiting out the
+# client's default 300s timeout on every attempt, which turned one slow or flaky connection
+# into a very long stall.
 REQUEST_TIMEOUT = 90.0
+# The client's own default max_retries (see `ai.create_client`) means an uncapped call can
+# retry several times, each up to REQUEST_TIMEOUT, before giving up: a batch that is
+# genuinely slow (not failing) can then take several minutes end to end even though each
+# attempt is bounded, which reads as a freeze from the CLI. One retry is enough for a
+# transient blip on a call this cheap and fast; it halves the worst case instead.
+REQUEST_MAX_RETRIES = 1
 
 
 class ClaudeClassifier:
@@ -274,7 +280,9 @@ class ClaudeClassifier:
             f"label per index.\n\n{items_block(items)}"
         )
         try:
-            response = await self._client.messages.parse(
+            response = await self._client.with_options(
+                max_retries=REQUEST_MAX_RETRIES
+            ).messages.parse(
                 model=self._model,
                 # No cache breakpoint: the prefix (about 600 tokens of instructions and event
                 # types plus the holdings block, which is filtered to each batch's candidates
