@@ -16,6 +16,7 @@ import Link from "next/link";
 import { Fragment, useState } from "react";
 
 import { AlertMessage } from "@/components/alert-message";
+import { AskAboutSelection } from "@/components/chat/ask-about-selection";
 import { EmptyState } from "@/components/empty-state";
 import { ConfidenceBadge } from "@/components/evidence/confidence-badge";
 import { ConfidenceBar } from "@/components/evidence/confidence-bar";
@@ -387,52 +388,54 @@ function VerdictPanel({ row, cell }: { row: BoardRow; cell: BoardKpi }) {
         </div>
       ) : (
         <>
-          <dl className="grid grid-cols-2 gap-x-6 gap-y-2 sm:grid-cols-3 lg:grid-cols-6">
-            <div>
-              <dt className="text-xs text-text-muted">Verdict</dt>
-              <dd className="mt-0.5 flex flex-wrap items-center gap-1">
-                <VerdictStatusBadge status={verdict.status} />
-                <FeedbackControl
-                  target={{ kind: "verdict", id: verdict.id }}
-                  label={`verdict on ${kpiLabel(kpi)} for ${row.name ?? row.ticker}`}
-                />
-              </dd>
-            </div>
-            <div>
-              <dt className="text-xs text-text-muted">Observed</dt>
-              <dd className="num mt-0.5 font-medium">{observed}</dd>
-            </div>
-            <div>
-              <dt className="text-xs text-text-muted">Threshold</dt>
-              <dd className="num mt-0.5">{target}</dd>
-            </div>
-            <div>
-              <dt className="text-xs text-text-muted">Period</dt>
-              <dd className="mt-0.5">{verdict.period ?? "—"}</dd>
-            </div>
-            <div>
-              <dt className="text-xs text-text-muted">Confidence</dt>
-              <dd className="mt-0.5">
-                <ConfidenceBadge confidence={verdict.confidence} />
-              </dd>
-            </div>
-            <div>
-              <dt className="text-xs text-text-muted">Judged</dt>
-              <dd className="num mt-0.5">
-                <time dateTime={verdict.created_at}>{formatDateTime(verdict.created_at)}</time>
-              </dd>
-            </div>
-          </dl>
-          {verdict.stale ? (
-            <p className="flex items-center gap-1.5 text-text-muted">
-              <HistoryIcon aria-hidden="true" className="size-4 text-warning-signal" />
-              <span>
-                <span className="font-medium text-text">Stale:</span> judged under an older theses config. Re-run verdicts
-                from the holding page.
-              </span>
-            </p>
-          ) : null}
-          <p>{verdict.rationale}</p>
+          <AskAboutSelection className="space-y-2">
+            <dl className="grid grid-cols-2 gap-x-6 gap-y-2 sm:grid-cols-3 lg:grid-cols-6">
+              <div>
+                <dt className="text-xs text-text-muted">Verdict</dt>
+                <dd className="mt-0.5 flex flex-wrap items-center gap-1">
+                  <VerdictStatusBadge status={verdict.status} />
+                  <FeedbackControl
+                    target={{ kind: "verdict", id: verdict.id }}
+                    label={`verdict on ${kpiLabel(kpi)} for ${row.name ?? row.ticker}`}
+                  />
+                </dd>
+              </div>
+              <div>
+                <dt className="text-xs text-text-muted">Observed</dt>
+                <dd className="num mt-0.5 font-medium">{observed}</dd>
+              </div>
+              <div>
+                <dt className="text-xs text-text-muted">Threshold</dt>
+                <dd className="num mt-0.5">{target}</dd>
+              </div>
+              <div>
+                <dt className="text-xs text-text-muted">Period</dt>
+                <dd className="mt-0.5">{verdict.period ?? "—"}</dd>
+              </div>
+              <div>
+                <dt className="text-xs text-text-muted">Confidence</dt>
+                <dd className="mt-0.5">
+                  <ConfidenceBadge confidence={verdict.confidence} since={verdict.created_at} />
+                </dd>
+              </div>
+              <div>
+                <dt className="text-xs text-text-muted">Judged</dt>
+                <dd className="num mt-0.5">
+                  <time dateTime={verdict.created_at}>{formatDateTime(verdict.created_at)}</time>
+                </dd>
+              </div>
+            </dl>
+            {verdict.stale ? (
+              <p className="flex items-center gap-1.5 text-text-muted">
+                <HistoryIcon aria-hidden="true" className="size-4 text-warning-signal" />
+                <span>
+                  <span className="font-medium text-text">Stale:</span> judged under an older theses config. Re-run verdicts
+                  from the holding page.
+                </span>
+              </p>
+            ) : null}
+            <p>{verdict.rationale}</p>
+          </AskAboutSelection>
           <div className="space-y-1">
             <p className="text-xs font-medium tracking-wide text-text-muted uppercase">Evidence</p>
             {verdict.fact_ids.length === 0 ? (

@@ -57,11 +57,16 @@ type Load = { kind: "loading" } | { kind: "error"; message: string; status?: num
  */
 export function ChatThread({
   conversationId,
+  seed,
+  onSeedConsumed,
   onCreated,
   onChanged,
   className,
 }: {
   conversationId: number | null;
+  /** Pre-fills the composer once (e.g. "ask about this" from a selection), then is consumed. */
+  seed?: string | null;
+  onSeedConsumed?: () => void;
   onCreated?: (id: number) => void;
   /** A message was sent or answered (the conversation list can refresh). */
   onChanged?: () => void;
@@ -243,16 +248,42 @@ export function ChatThread({
         ) : null}
         <div ref={endRef} />
       </div>
-      <Composer onSend={send} disabled={Boolean(pending && !stopped)} />
+      <Composer onSend={send} disabled={Boolean(pending && !stopped)} seed={seed} onSeedConsumed={onSeedConsumed} />
     </div>
   );
 }
 
-function Composer({ onSend, disabled }: { onSend: (content: string) => Promise<string | null>; disabled: boolean }) {
+function Composer({
+  onSend,
+  disabled,
+  seed,
+  onSeedConsumed,
+}: {
+  onSend: (content: string) => Promise<string | null>;
+  disabled: boolean;
+  seed?: string | null;
+  onSeedConsumed?: () => void;
+}) {
   const id = useId();
   const [text, setText] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [consumedSeed, setConsumedSeed] = useState<string | null>(null);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+  // A new seed pre-fills the composer; adjusting state from a prop change belongs in
+  // render, not an effect (react.dev/learn/you-might-not-need-an-effect).
+  if (seed && seed !== consumedSeed) {
+    setConsumedSeed(seed);
+    setText(seed);
+  }
+
+  useEffect(() => {
+    if (seed && seed === consumedSeed) {
+      textareaRef.current?.focus();
+      onSeedConsumed?.();
+    }
+  }, [seed, consumedSeed, onSeedConsumed]);
 
   async function submit(event?: FormEvent) {
     event?.preventDefault();
@@ -287,6 +318,7 @@ function Composer({ onSend, disabled }: { onSend: (content: string) => Promise<s
         Your question
       </label>
       <textarea
+        ref={textareaRef}
         id={`${id}-q`}
         rows={2}
         value={text}
@@ -336,6 +368,8 @@ function Message({
       </p>
       {m.role === "user" || !m.answer ? (
         <p className="whitespace-pre-line">{m.content}</p>
+      ) : m.answer.shape === "low_evidence" ? (
+        <LowEvidenceAnswer sources={m.answer.sources} note={m.answer.note} />
       ) : (
         <div className="space-y-1.5">
           {m.answer.sentences.length === 0 ? <p className="text-text-muted">{m.content}</p> : null}
@@ -358,7 +392,7 @@ function Message({
           ) : null}
         </p>
       ) : null}
-      {m.answer && m.answer.sources.length > 0 ? <AnswerSources sources={m.answer.sources} /> : null}
+      {m.answer && m.answer.shape !== "low_evidence" && m.answer.sources.length > 0 ? <AnswerSources sources={m.answer.sources} /> : null}
       {m.answer && m.answer.tools_used.length > 0 ? (
         <p className="text-xs text-text-muted">Looked at: {m.answer.tools_used.map((t) => t.replaceAll("_", " ")).join(", ")}</p>
       ) : null}
@@ -411,26 +445,62 @@ function AnswerSentence({ sentence, numbering }: { sentence: ChatSentence; numbe
   );
 }
 
+function SourceCard({ source: s, index }: { source: Source; index: number }) {
+  return (
+    <li className="space-y-0.5 rounded-md border border-border p-2">
+      <p className="flex justify-between gap-2 text-text-muted">
+        <span className="num">
+          [{index + 1}] {sourceKindLabel(s.kind)}
+        </span>
+        <span>{typeof s.tier === "number" ? `Tier ${s.tier}` : "app record"}</span>
+      </p>
+      <p className="font-medium text-text">{s.title}</p>
+      {s.as_of ? <p className="num text-text-muted">As of {s.as_of}</p> : null}
+      <SourceLinksLine source={s} />
+    </li>
+  );
+}
+
 function AnswerSources({ sources }: { sources: Source[] }) {
   return (
     <details className="text-xs">
       <summary className="cursor-pointer text-text-muted">Sources ({sources.length})</summary>
       <ol className="mt-2 space-y-2">
         {sources.map((s, i) => (
-          <li key={s.id} className="space-y-0.5 rounded-md border border-border p-2">
-            <p className="flex justify-between gap-2 text-text-muted">
-              <span className="num">
-                [{i + 1}] {sourceKindLabel(s.kind)}
-              </span>
-              <span>{typeof s.tier === "number" ? `Tier ${s.tier}` : "app record"}</span>
-            </p>
-            <p className="font-medium text-text">{s.title}</p>
-            {s.as_of ? <p className="num text-text-muted">As of {s.as_of}</p> : null}
-            <SourceLinksLine source={s} />
-          </li>
+          <SourceCard key={s.id} source={s} index={i} />
         ))}
       </ol>
     </details>
+  );
+}
+
+/**
+ * Graceful degradation (Ledger II §4.5): shown instead of prose when nothing in the draft
+ * held up as a checked, sourced claim. A fluent-sounding paragraph marked unsupported after
+ * the fact reads as confident despite having no backing; this shows the raw sources found,
+ * unformatted, so the owner sees exactly how little there was to go on.
+ */
+function LowEvidenceAnswer({ sources, note }: { sources: Source[]; note: string | null | undefined }) {
+  return (
+    <div className="space-y-2 rounded-md border border-dashed border-border p-2.5 text-sm">
+      <p className="flex items-center gap-1.5 font-medium">
+        <ShieldAlertIcon aria-hidden="true" className="size-4 shrink-0 text-warning-signal" />
+        Not enough evidence to answer this as a claim.
+      </p>
+      {note ? <p className="text-xs text-text-muted">{note}</p> : null}
+      {sources.length === 0 ? (
+        <p className="text-xs text-text-muted">No sources were found for it either.</p>
+      ) : (
+        <>
+          <p className="text-xs text-text-muted">Here&rsquo;s what was found, as stored — not written up as prose:</p>
+          <ol className="space-y-2 text-xs">
+            {sources.map((s, i) => (
+              <SourceCard key={s.id} source={s} index={i} />
+            ))}
+          </ol>
+        </>
+      )}
+    </div>
   );
 }
 

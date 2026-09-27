@@ -1,6 +1,8 @@
 import { CONFIG_DOMAINS, DOMAIN_SLUGS, historyHref } from "@/lib/config/domains";
+import { humanizeMetric } from "@/lib/evidence/confidence";
 import { reviewQueueHref } from "@/lib/evidence/review";
 import { CLUSTERS, isClusterActive } from "@/lib/nav";
+import { kpiHref } from "@/lib/portfolio/kpi-anchor";
 
 /*
  * Command palette entries: every primary destination, the config editors, each holding,
@@ -192,8 +194,52 @@ export function holdingCommands(holdings: { ticker: string; name?: string | null
   });
 }
 
+/**
+ * One entry per (holding, KPI): typing a metric and a ticker ("revenue growth AAPL") jumps
+ * straight to that KPI's verdict row on the holding page, not just the holding itself — the
+ * open opportunity Linear's Cmd+K research flagged (§2.2 of the Ledger II proposal): depth,
+ * not existence. `rows` is theses/board's own data, already the one place that lists every
+ * holding's KPIs; this adds no new fetch of its own.
+ */
+export function kpiCommands(
+  rows: readonly { ticker: string; name: string | null; kpis: readonly { kpi: { id: string; metric: string } }[] }[],
+): PaletteCommand[] {
+  return rows.flatMap((row) => {
+    const name = row.name ?? row.ticker;
+    return row.kpis.map(({ kpi }) => ({
+      id: `kpi:${row.ticker}:${kpi.id}`,
+      label: `${humanizeMetric(kpi.metric)} · ${name}`,
+      group: "Holdings" as const,
+      keywords: `${row.ticker} ${kpi.metric.replaceAll("_", " ")} kpi verdict pass breach unknown`,
+      href: kpiHref(row.ticker, kpi.id),
+    }));
+  });
+}
+
+/**
+ * One entry per (holding, metric): typing a metric and a ticker also resolves straight to
+ * that figure's evidence page — the other half of §4.7's "KPI cell or fact" ask, alongside
+ * kpiCommands(). `index` is GET /facts/index's own data: the newest fact per (ticker,
+ * metric) across every holding, small and cheap because it exists only to back this
+ * search, never a claim surface of its own.
+ */
+export function factCommands(
+  index: readonly { ticker: string; name: string | null; metric: string; fact_id: number; period: string }[],
+): PaletteCommand[] {
+  return index.map((entry) => {
+    const name = entry.name ?? entry.ticker;
+    return {
+      id: `fact:${entry.ticker}:${entry.metric}`,
+      label: `${humanizeMetric(entry.metric)} · ${name} (figure)`,
+      group: "Holdings" as const,
+      keywords: `${entry.ticker} ${entry.metric.replaceAll("_", " ")} figure fact extracted evidence source`,
+      href: `/evidence/${entry.fact_id}`,
+    };
+  });
+}
+
 /** Per-holding entries, shown only once something is typed. */
-const PER_HOLDING = ["earnings:", "review:", "reference:", "research:"];
+const PER_HOLDING = ["earnings:", "review:", "reference:", "research:", "kpi:", "fact:"];
 
 export function filterCommands(commands: PaletteCommand[], query: string, limit = 12): PaletteCommand[] {
   const words = query.toLowerCase().split(/\s+/).filter(Boolean);

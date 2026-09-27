@@ -28,9 +28,13 @@ from steward.earnings.check import local_today
 from steward.earnings.read import (
     FACT_CONFIDENCE,
     EvidenceLink,
+    FactCheck,
+    FactIndexEntry,
     HoldingDetail,
     ThesisBoard,
     document_text,
+    evidence_relation,
+    fact_index,
     holding_detail,
     snippet_context,
     thesis_board,
@@ -40,11 +44,13 @@ from steward.earnings.review import review_fact as review_fact_in_db
 from steward.jobs import queue
 from steward.jobs.runner import create_job
 from steward.portfolio.read import (
+    ContributionReport,
     HoldingsResponse,
     JobStatus,
     JobSummary,
     PortfolioHistory,
     PortfolioOverview,
+    contribution_to_return,
     portfolio_history,
     portfolio_holdings,
     portfolio_overview,
@@ -92,6 +98,20 @@ async def get_portfolio_history(
     or loss from money moving in or out. Empty (with `gap` set) before the first sync or
     with fewer than two snapshots in the window."""
     return await portfolio_history(pool, days)
+
+
+@router.get("/portfolio/contribution", tags=["portfolio"])
+async def get_portfolio_contribution(
+    pool: Pool,
+    _owner: Owner,
+    days: Annotated[int, Query(ge=7, le=3700)] = 365,
+) -> ContributionReport:
+    """Every holding's contribution to the portfolio's return over the window, in base
+    currency: its own trading (buying or selling more of it) netted out, so a holding is
+    ranked by what the market actually did to it, not by how much was bought or sold.
+    Empty (with `gap` set) before the first sync, or with no position snapshot in the
+    window."""
+    return await contribution_to_return(pool, days)
 
 
 @router.get("/portfolio/transactions", tags=["portfolio"])
@@ -362,8 +382,8 @@ async def get_fact_evidence(
     the text around the fact's snippet."""
     row = await pool.fetchrow(
         "select f.id, f.ticker, f.metric, f.period, f.value_as_written, f.snippet,"
-        " f.unit_snippet, f.status, e.source_url, e.storage_path, e.content_type,"
-        " e.fetched_at, e.sha256 from public.fact f"
+        " f.unit_snippet, f.status, f.checks, f.origin, e.source_url, e.storage_path,"
+        " e.content_type, e.fetched_at, e.sha256 from public.fact f"
         " join public.evidence e on e.sha256 = f.evidence_sha256 where f.id = $1",
         fact_id,
     )
@@ -377,6 +397,7 @@ async def get_fact_evidence(
     context = snippet_context(
         document_text(data, row["content_type"], row["source_url"]), row["snippet"]
     )
+    checks = [FactCheck(**c) for c in json.loads(row["checks"] or "[]")]
     return EvidenceLink(
         fact_id=row["id"],
         ticker=row["ticker"],
@@ -386,6 +407,8 @@ async def get_fact_evidence(
         snippet=row["snippet"],
         unit_snippet=row["unit_snippet"],
         confidence=FACT_CONFIDENCE[row["status"]],
+        relation=evidence_relation(row["status"], checks),
+        origin=row["origin"],
         source_url=row["source_url"],
         evidence_url=url,
         content_type=row["content_type"],
@@ -449,6 +472,14 @@ async def get_review_queue(
     """Facts waiting for the owner: held by the validator or quarantined by reconciliation,
     each with its snippet, source, the checks it broke and the reconciliation behind it."""
     return await review_queue(pool, ticker)
+
+
+@router.get("/facts/index", tags=["holdings"])
+async def get_fact_index(pool: Pool, _owner: Owner) -> list[FactIndexEntry]:
+    """The newest fact per (ticker, metric), across every holding — small and cheap on
+    purpose: it exists to let a search (the command palette) resolve a typed metric and
+    ticker straight to that figure's evidence page, not to carry a claim's own detail."""
+    return await fact_index(pool)
 
 
 # ---------------------------------------------------------------------------

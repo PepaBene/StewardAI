@@ -27,11 +27,31 @@ FACT_CONFIDENCE: dict[str, Confidence] = {
     "quarantined": "disputed",
 }
 
+# How a piece of evidence relates to the claim it's attached to — a different question
+# from confidence (how sure we are). Derived from the same validator/reconciliation
+# checks that already decide a fact's status, never a separately-modeled judgement.
+EvidenceRelation = Literal["supports", "contradicts", "mentions"]
+
 
 class FactCheck(BaseModel):
     check: str
     ok: bool
     detail: str = ""
+
+
+def evidence_relation(status: FactStatus, checks: list[FactCheck]) -> EvidenceRelation:
+    """Does this evidence support, contradict, or merely mention the claim it backs?
+
+    A failed check (a bound the validator or reconciliation broke) means the source
+    itself conflicts with the claim: contradicts. A verified fact with no failed check
+    actively backs the value: supports. Anything still awaiting review (unverified) only
+    mentions it, not yet corroborated enough to count as support.
+    """
+    if status == "rejected" or any(not c.ok for c in checks):
+        return "contradicts"
+    if status == "verified":
+        return "supports"
+    return "mentions"
 
 
 class FactOut(BaseModel):
@@ -126,6 +146,14 @@ class EvidenceLink(BaseModel):
     snippet: str
     unit_snippet: str | None
     confidence: Confidence
+    relation: EvidenceRelation = Field(
+        description="Whether this source supports, contradicts, or merely mentions the claim —"
+        " distinct from confidence, which is how sure we are the value itself is right."
+    )
+    origin: Literal["extraction", "owner"] = Field(
+        description="Provenance, a different question from confidence: read straight from the"
+        " document, or a correction the owner entered."
+    )
     source_url: str
     evidence_url: str = Field(description="Signed URL of the archived copy, valid 10 minutes.")
     content_type: str
@@ -395,3 +423,37 @@ def snippet_context(text: str, snippet: str, lines_around: int = 4) -> str | Non
 
 def document_text(data: bytes, content_type: str, url: str) -> str:
     return Document(url=url, content_type=content_type, data=data).text()
+
+
+class FactIndexEntry(BaseModel):
+    """One (ticker, metric): the newest fact for it, so a search can resolve a typed metric
+    straight to its evidence page rather than only to the holding page."""
+
+    ticker: str
+    name: str | None
+    metric: str
+    fact_id: int
+    period: str
+
+
+async def fact_index(pool: asyncpg.Pool) -> list[FactIndexEntry]:
+    """The latest fact per (ticker, metric) across every holding — deliberately small (no
+    snippet, no checks, no evidence url) since this only feeds a search index, never a
+    claim surface. Excludes rejected facts: a search shouldn't resolve to a figure the
+    owner or the validator has already thrown out."""
+    rows = await pool.fetch(
+        "select distinct on (f.ticker, f.metric) f.ticker, i.name, f.metric, f.id, f.period"
+        " from public.fact f left join public.instrument i on i.t212_ticker = f.ticker"
+        " where f.status != 'rejected'"
+        " order by f.ticker, f.metric, f.id desc"
+    )
+    return [
+        FactIndexEntry(
+            ticker=r["ticker"],
+            name=r["name"],
+            metric=r["metric"],
+            fact_id=r["id"],
+            period=r["period"],
+        )
+        for r in rows
+    ]

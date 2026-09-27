@@ -680,6 +680,57 @@
         }
       }
     },
+    "/portfolio/contribution": {
+      "get": {
+        "tags": [
+          "portfolio"
+        ],
+        "summary": "Get Portfolio Contribution",
+        "description": "Every holding's contribution to the portfolio's return over the window, in base\ncurrency: its own trading (buying or selling more of it) netted out, so a holding is\nranked by what the market actually did to it, not by how much was bought or sold.\nEmpty (with `gap` set) before the first sync, or with no position snapshot in the\nwindow.",
+        "operationId": "get_portfolio_contribution",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "days",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 3700,
+              "minimum": 7,
+              "default": 365,
+              "title": "Days"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ContributionReport"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/portfolio/transactions": {
       "get": {
         "tags": [
@@ -1453,6 +1504,37 @@
             }
           }
         }
+      }
+    },
+    "/facts/index": {
+      "get": {
+        "tags": [
+          "holdings"
+        ],
+        "summary": "Get Fact Index",
+        "description": "The newest fact per (ticker, metric), across every holding — small and cheap on\npurpose: it exists to let a search (the command palette) resolve a typed metric and\nticker straight to that figure's evidence page, not to carry a claim's own detail.",
+        "operationId": "get_fact_index",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/FactIndexEntry"
+                  },
+                  "type": "array",
+                  "title": "Response Get Fact Index"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
       }
     },
     "/config/strategy": {
@@ -6829,6 +6911,16 @@
               }
             ],
             "title": "Note"
+          },
+          "shape": {
+            "type": "string",
+            "enum": [
+              "cited",
+              "low_evidence"
+            ],
+            "title": "Shape",
+            "description": "'low_evidence': nothing in the draft ended up as a checked, sourced claim — the panel should show the raw sources found instead of prose that reads confident despite having no backing, rather than a fluent answer marked unsupported sentence by sentence after the fact.",
+            "default": "cited"
           }
         },
         "type": "object",
@@ -7554,6 +7646,75 @@
         ],
         "title": "ConfigVersionMeta"
       },
+      "ContributionReport": {
+        "properties": {
+          "as_of": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "As Of",
+            "description": "Date of the latest position snapshot included."
+          },
+          "period_start": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Period Start"
+          },
+          "base_currency": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Base Currency"
+          },
+          "holdings": {
+            "items": {
+              "$ref": "#/components/schemas/HoldingContribution"
+            },
+            "type": "array",
+            "title": "Holdings",
+            "description": "Every holding with at least two snapshots in the window, ranked by contribution: largest positive first, largest negative last."
+          },
+          "gap": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Gap",
+            "description": "Why there is no contribution report, when there is none."
+          }
+        },
+        "type": "object",
+        "required": [
+          "as_of",
+          "period_start",
+          "base_currency",
+          "holdings",
+          "gap"
+        ],
+        "title": "ContributionReport"
+      },
       "ConversationDetail": {
         "properties": {
           "conversation": {
@@ -7955,6 +8116,25 @@
           "status": {
             "type": "string",
             "title": "Status"
+          },
+          "origin": {
+            "type": "string",
+            "enum": [
+              "extraction",
+              "owner"
+            ],
+            "title": "Origin",
+            "description": "Provenance: read straight from the document, or an owner correction — a different question from confidence or relation."
+          },
+          "relation": {
+            "type": "string",
+            "enum": [
+              "supports",
+              "contradicts",
+              "mentions"
+            ],
+            "title": "Relation",
+            "description": "Whether this figure supports, contradicts, or merely mentions the claim it backs — distinct from its own confidence."
           }
         },
         "type": "object",
@@ -7966,7 +8146,9 @@
           "value_as_written",
           "snippet",
           "source_url",
-          "status"
+          "status",
+          "origin",
+          "relation"
         ],
         "title": "DigestFactSource",
         "description": "A fact a digest sentence or verdict cites, with the snippet it was read from."
@@ -9627,6 +9809,25 @@
             ],
             "title": "Confidence"
           },
+          "relation": {
+            "type": "string",
+            "enum": [
+              "supports",
+              "contradicts",
+              "mentions"
+            ],
+            "title": "Relation",
+            "description": "Whether this source supports, contradicts, or merely mentions the claim — distinct from confidence, which is how sure we are the value itself is right."
+          },
+          "origin": {
+            "type": "string",
+            "enum": [
+              "extraction",
+              "owner"
+            ],
+            "title": "Origin",
+            "description": "Provenance, a different question from confidence: read straight from the document, or a correction the owner entered."
+          },
           "source_url": {
             "type": "string",
             "title": "Source Url"
@@ -9672,6 +9873,8 @@
           "snippet",
           "unit_snippet",
           "confidence",
+          "relation",
+          "origin",
           "source_url",
           "evidence_url",
           "content_type",
@@ -9863,6 +10066,47 @@
           "ok"
         ],
         "title": "FactCheck"
+      },
+      "FactIndexEntry": {
+        "properties": {
+          "ticker": {
+            "type": "string",
+            "title": "Ticker"
+          },
+          "name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
+          },
+          "metric": {
+            "type": "string",
+            "title": "Metric"
+          },
+          "fact_id": {
+            "type": "integer",
+            "title": "Fact Id"
+          },
+          "period": {
+            "type": "string",
+            "title": "Period"
+          }
+        },
+        "type": "object",
+        "required": [
+          "ticker",
+          "name",
+          "metric",
+          "fact_id",
+          "period"
+        ],
+        "title": "FactIndexEntry",
+        "description": "One (ticker, metric): the newest fact for it, so a search can resolve a typed metric\nstraight to its evidence page rather than only to the holding page."
       },
       "FactOut": {
         "properties": {
@@ -10719,6 +10963,50 @@
           "drift_status"
         ],
         "title": "Holding"
+      },
+      "HoldingContribution": {
+        "properties": {
+          "ticker": {
+            "type": "string",
+            "title": "Ticker"
+          },
+          "name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
+          },
+          "contribution_base": {
+            "type": "number",
+            "title": "Contribution Base",
+            "description": "The holding's organic gain over the period, in base currency — its value change with its own trading netted out."
+          },
+          "contribution_pct": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Contribution Pct",
+            "description": "contribution_base as a fraction of the portfolio's total value at the start of the period; null when that value was zero."
+          }
+        },
+        "type": "object",
+        "required": [
+          "ticker",
+          "name",
+          "contribution_base",
+          "contribution_pct"
+        ],
+        "title": "HoldingContribution"
       },
       "HoldingCoverage": {
         "properties": {

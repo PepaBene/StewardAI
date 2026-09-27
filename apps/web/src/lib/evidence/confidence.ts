@@ -1,4 +1,4 @@
-import type { Confidence, VerdictStatus } from "@/lib/api/client";
+import type { Confidence, EvidenceRelation, FactCheck, FactStatus, VerdictStatus } from "@/lib/api/client";
 
 /*
  * The four confidence labels of the Ledger design system (section 4.2 of the redesign
@@ -29,6 +29,34 @@ export const CONFIDENCE = {
   },
 } as const satisfies Record<Confidence, { label: string; tone: string; description: string }>;
 
+/*
+ * How a piece of evidence relates to the claim it backs — a different question from
+ * confidence (how sure we are the value is right). Reuses the diverging pair's cool/warm/
+ * neutral logic rather than a new hue: supports is the "as expected" cool side, contradicts
+ * is the "look here" warm side, mentions sits at the neutral centre.
+ */
+export const EVIDENCE_RELATION = {
+  supports: {
+    label: "Supports",
+    tone: "diverging-under",
+    description: "This source backs the claim: the fact is verified and every check passed.",
+  },
+  mentions: {
+    label: "Mentions",
+    tone: "diverging-neutral",
+    description: "This source is on record but hasn't yet been corroborated enough to count as support.",
+  },
+  contradicts: {
+    label: "Contradicts",
+    tone: "diverging-over",
+    description: "This source conflicts with the claim: it failed a check, or was rejected.",
+  },
+} as const satisfies Record<EvidenceRelation, { label: string; tone: string; description: string }>;
+
+export function evidenceRelationLabel(relation: EvidenceRelation): string {
+  return EVIDENCE_RELATION[relation].label;
+}
+
 /* Pass and breach are financial state and use gain and loss; unknown is styled apart. */
 export const VERDICT_STATUS = {
   pass: { label: "Pass", tone: "gain" },
@@ -38,6 +66,53 @@ export const VERDICT_STATUS = {
 
 export function confidenceLabel(confidence: Confidence): string {
   return CONFIDENCE[confidence].label;
+}
+
+/**
+ * Why a fact carries the confidence it does, beyond the chip's own generic description:
+ * the validator's or owner's stated reason, plus any check it failed. Null when there's
+ * nothing more specific than the chip already says (a plain Verified fact).
+ */
+export function confidenceReason(fact: {
+  status_reason: string | null;
+  checks: readonly FactCheck[];
+}): string | null {
+  const failed = fact.checks.filter((c) => !c.ok);
+  const parts: string[] = [];
+  if (fact.status_reason) parts.push(fact.status_reason);
+  for (const check of failed) {
+    if (check.detail && check.detail !== fact.status_reason) parts.push(check.detail);
+  }
+  return parts.length > 0 ? parts.join(" — ") : null;
+}
+
+/** A concrete next step for a fact that isn't (yet) settled, from its status alone. */
+export function confidenceNextAction(status: FactStatus): string | null {
+  switch (status) {
+    case "unverified":
+      return "Awaiting a second source or an owner decision — see the review queue.";
+    case "quarantined":
+      return "Held by cross-source reconciliation against the filing — see the review queue.";
+    default:
+      return null;
+  }
+}
+
+/** A Verified fact or verdict stops earning full chrome once it's held that long unchanged
+ *  — long enough to have survived at least one more sync cycle without being revisited. */
+export const VERIFIED_QUIET_AFTER_DAYS = 90;
+
+/** Whether a Verified confidence chip should render quietly (label only, no fill) because
+ *  it's been unchanged for a while and doesn't need to compete with what actually needs
+ *  attention. `since` is the timestamp of its last status change. */
+export function isLongStandingVerified(
+  confidence: Confidence,
+  since: string | Date | null | undefined,
+  now: Date = new Date(),
+): boolean {
+  if (confidence !== "verified" || !since) return false;
+  const days = (now.getTime() - new Date(since).getTime()) / 86_400_000;
+  return Number.isFinite(days) && days >= VERIFIED_QUIET_AFTER_DAYS;
 }
 
 /** Counts of each confidence state across a list — feeds ConfidenceBar. */

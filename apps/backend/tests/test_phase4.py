@@ -543,6 +543,8 @@ def digest_body() -> DigestBody:
                 snippet="Total net sales | 94,036",
                 source_url="https://ir.test/q3",
                 status="verified",
+                origin="extraction",
+                relation="supports",
             )
         ],
     )

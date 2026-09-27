@@ -274,6 +274,30 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/portfolio/contribution": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Portfolio Contribution
+         * @description Every holding's contribution to the portfolio's return over the window, in base
+         *     currency: its own trading (buying or selling more of it) netted out, so a holding is
+         *     ranked by what the market actually did to it, not by how much was bought or sold.
+         *     Empty (with `gap` set) before the first sync, or with no position snapshot in the
+         *     window.
+         */
+        get: operations["get_portfolio_contribution"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/portfolio/transactions": {
         parameters: {
             query?: never;
@@ -537,6 +561,28 @@ export interface paths {
          *     each with its snippet, source, the checks it broke and the reconciliation behind it.
          */
         get: operations["get_review_queue"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/facts/index": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Fact Index
+         * @description The newest fact per (ticker, metric), across every holding — small and cheap on
+         *     purpose: it exists to let a search (the command palette) resolve a typed metric and
+         *     ticker straight to that figure's evidence page, not to carry a claim's own detail.
+         */
+        get: operations["get_fact_index"];
         put?: never;
         post?: never;
         delete?: never;
@@ -2352,6 +2398,13 @@ export interface components {
             model: string | null;
             /** Note */
             note?: string | null;
+            /**
+             * Shape
+             * @description 'low_evidence': nothing in the draft ended up as a checked, sourced claim — the panel should show the raw sources found instead of prose that reads confident despite having no backing, rather than a fluent answer marked unsupported sentence by sentence after the fact.
+             * @default cited
+             * @enum {string}
+             */
+            shape: "cited" | "low_evidence";
         };
         /** ChatSentence */
         ChatSentence: {
@@ -2658,6 +2711,28 @@ export interface components {
              */
             changes: number | null;
         };
+        /** ContributionReport */
+        ContributionReport: {
+            /**
+             * As Of
+             * @description Date of the latest position snapshot included.
+             */
+            as_of: string | null;
+            /** Period Start */
+            period_start: string | null;
+            /** Base Currency */
+            base_currency: string | null;
+            /**
+             * Holdings
+             * @description Every holding with at least two snapshots in the window, ranked by contribution: largest positive first, largest negative last.
+             */
+            holdings: components["schemas"]["HoldingContribution"][];
+            /**
+             * Gap
+             * @description Why there is no contribution report, when there is none.
+             */
+            gap: string | null;
+        };
         /** ConversationDetail */
         ConversationDetail: {
             conversation: components["schemas"]["ConversationOut"];
@@ -2848,6 +2923,18 @@ export interface components {
             source_url: string;
             /** Status */
             status: string;
+            /**
+             * Origin
+             * @description Provenance: read straight from the document, or an owner correction — a different question from confidence or relation.
+             * @enum {string}
+             */
+            origin: "extraction" | "owner";
+            /**
+             * Relation
+             * @description Whether this figure supports, contradicts, or merely mentions the claim it backs — distinct from its own confidence.
+             * @enum {string}
+             */
+            relation: "supports" | "contradicts" | "mentions";
         };
         /** DigestRequest */
         DigestRequest: {
@@ -3545,6 +3632,18 @@ export interface components {
              * @enum {string}
              */
             confidence: "verified" | "corroborated" | "unconfirmed" | "disputed";
+            /**
+             * Relation
+             * @description Whether this source supports, contradicts, or merely mentions the claim — distinct from confidence, which is how sure we are the value itself is right.
+             * @enum {string}
+             */
+            relation: "supports" | "contradicts" | "mentions";
+            /**
+             * Origin
+             * @description Provenance, a different question from confidence: read straight from the document, or a correction the owner entered.
+             * @enum {string}
+             */
+            origin: "extraction" | "owner";
             /** Source Url */
             source_url: string;
             /**
@@ -3646,6 +3745,23 @@ export interface components {
              * @default
              */
             detail: string;
+        };
+        /**
+         * FactIndexEntry
+         * @description One (ticker, metric): the newest fact for it, so a search can resolve a typed metric
+         *     straight to its evidence page rather than only to the holding page.
+         */
+        FactIndexEntry: {
+            /** Ticker */
+            ticker: string;
+            /** Name */
+            name: string | null;
+            /** Metric */
+            metric: string;
+            /** Fact Id */
+            fact_id: number;
+            /** Period */
+            period: string;
         };
         /** FactOut */
         FactOut: {
@@ -3989,6 +4105,23 @@ export interface components {
              * @enum {string}
              */
             drift_status: "in_band" | "above_band" | "below_band" | "above_hard_limit" | "no_target";
+        };
+        /** HoldingContribution */
+        HoldingContribution: {
+            /** Ticker */
+            ticker: string;
+            /** Name */
+            name: string | null;
+            /**
+             * Contribution Base
+             * @description The holding's organic gain over the period, in base currency — its value change with its own trading netted out.
+             */
+            contribution_base: number;
+            /**
+             * Contribution Pct
+             * @description contribution_base as a fraction of the portfolio's total value at the start of the period; null when that value was zero.
+             */
+            contribution_pct: number | null;
         };
         /** HoldingCoverage */
         HoldingCoverage: {
@@ -7488,6 +7621,37 @@ export interface operations {
             };
         };
     };
+    get_portfolio_contribution: {
+        parameters: {
+            query?: {
+                days?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ContributionReport"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     get_portfolio_transactions: {
         parameters: {
             query?: {
@@ -7878,6 +8042,26 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_fact_index: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FactIndexEntry"][];
                 };
             };
         };

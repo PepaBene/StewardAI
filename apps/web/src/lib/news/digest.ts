@@ -3,11 +3,13 @@ import type {
   DigestFactSource,
   DigestSentence,
   DigestSource,
+  EvidenceRelation,
   MacroFigure,
   MarketHoliday,
   PortfolioFlag,
   ThesisChange,
 } from "@/lib/api/client";
+import { factProvenance, type Provenance } from "@/lib/evidence/provenance";
 
 /*
  * Claim-level citations for a digest: each sentence links to the news items and facts it
@@ -40,6 +42,10 @@ export type CitationPreview = {
   /** Outlet, or the host of the source URL. */
   source: string;
   url: string;
+  /** Whether this source supports, contradicts, or merely mentions the claim; null for news. */
+  relation: EvidenceRelation | null;
+  /** How the figure was produced (verbatim, an owner correction); null for a non-fact source. */
+  provenance: Provenance | null;
 };
 
 export function hostOf(url: string): string {
@@ -74,6 +80,8 @@ export function digestCitationPreview(
       tierLabel: tierText(source.tier),
       source: source.outlet ?? hostOf(source.url),
       url: source.url,
+      relation: null,
+      provenance: null,
     };
   }
   const fact = (body.fact_sources ?? []).find((f) => f.fact_id === ref.id);
@@ -90,6 +98,8 @@ export function factPreview(fact: DigestFactSource): CitationPreview {
     tierLabel: `Figure status: ${fact.status}`,
     source: hostOf(fact.source_url),
     url: fact.source_url,
+    relation: fact.relation,
+    provenance: factProvenance(fact),
   };
 }
 

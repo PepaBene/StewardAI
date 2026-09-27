@@ -15,11 +15,13 @@ import Link from "next/link";
 import { Fragment, useCallback, useEffect, useMemo, useState } from "react";
 
 import { AlertMessage } from "@/components/alert-message";
+import { AskAboutSelection } from "@/components/chat/ask-about-selection";
 import { EmptyState } from "@/components/empty-state";
 import { ConfidenceBadge } from "@/components/evidence/confidence-badge";
 import { ConfidenceBar } from "@/components/evidence/confidence-bar";
 import { EvidenceLinks } from "@/components/evidence/evidence-links";
 import { FactReviewForm, type ReviewResolution } from "@/components/evidence/fact-review-form";
+import { ProvenanceTag } from "@/components/evidence/provenance-tag";
 import { VerdictStatusBadge } from "@/components/evidence/verdict-status-badge";
 import { FeedbackControl } from "@/components/feedback/feedback-control";
 import { DriftStatusBadge } from "@/components/portfolio/drift-status-badge";
@@ -44,6 +46,8 @@ import {
 } from "@/lib/api/client";
 import { NEVER_JUDGED } from "@/lib/evidence/board";
 import {
+  confidenceNextAction,
+  confidenceReason,
   formatFactValue,
   formatObserved,
   formatTarget,
@@ -51,10 +55,12 @@ import {
   tallyConfidence,
   tallyConfidenceLabel,
 } from "@/lib/evidence/confidence";
+import { factProvenance } from "@/lib/evidence/provenance";
 import { allowedReviewActions, isHeld, REVIEW_ACTIONS, reviewQueueHref, scaleHint } from "@/lib/evidence/review";
 import { formatDate, formatMoney, formatPercent, formatPrice, formatQuantity, formatRelative, gainLossTone } from "@/lib/format";
 import { useApiResource } from "@/lib/hooks/use-api-resource";
 import { jobHref } from "@/lib/jobs/job-detail";
+import { kpiAnchorId } from "@/lib/portfolio/kpi-anchor";
 
 const POLL_MS = 3000;
 const POLL_LIMIT_MS = 10 * 60 * 1000;
@@ -389,12 +395,24 @@ type OnFeedback = (mark: FeedbackOut) => void;
 
 function KpiTable({ kpis, facts, onFeedback }: { kpis: KpiStatus[]; facts: Map<number, FactOut>; onFeedback: OnFeedback }) {
   const [open, setOpen] = useState<string | null>(null);
+  // A command-palette KPI result ("revenue growth AAPL") links to #kpi-<id>: open that row
+  // and scroll to it once, on arrival — not just the holding page, the KPI itself. Done
+  // after mount (never in the initial render) so server and client markup still agree.
+  useEffect(() => {
+    const hash = window.location.hash.slice(1);
+    const match = kpis.find((k) => kpiAnchorId(k.kpi.id) === hash);
+    if (!match) return;
+    queueMicrotask(() => setOpen(match.kpi.id));
+    document.getElementById(hash)?.scrollIntoView({ block: "center" });
+    // Only once, for the link that brought us here.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   return (
     <section aria-labelledby="kpi-heading" className="space-y-3">
       <h2 id="kpi-heading" className="text-lg font-semibold">
         Thesis KPIs
       </h2>
-      <div className="overflow-x-auto rounded-lg border border-border bg-surface-raised">
+      <AskAboutSelection className="overflow-x-auto rounded-lg border border-border bg-surface-raised">
         <table className="w-full min-w-[48rem] text-sm">
           <caption className="sr-only">Latest verdict per KPI; open a row for its evidence and history</caption>
           <thead className="bg-surface-muted">
@@ -429,7 +447,7 @@ function KpiTable({ kpis, facts, onFeedback }: { kpis: KpiStatus[]; facts: Map<n
             })}
           </tbody>
         </table>
-      </div>
+      </AskAboutSelection>
     </section>
   );
 }
@@ -462,7 +480,7 @@ function KpiRows({
   const panelId = `kpi-${kpiId}`;
   return (
     <>
-      <tr className="border-b border-border last:border-0">
+      <tr id={kpiAnchorId(kpiId)} className="border-b border-border last:border-0">
         <th scope="row" className="px-3 py-2 text-left font-normal">
           <button
             type="button"
@@ -508,7 +526,9 @@ function KpiRows({
             </span>
           )}
         </td>
-        <td className="px-3 py-2">{current ? <ConfidenceBadge confidence={current.confidence} /> : null}</td>
+        <td className="px-3 py-2">
+          {current ? <ConfidenceBadge confidence={current.confidence} since={current.created_at} /> : null}
+        </td>
       </tr>
       {expanded ? (
         <tr className="border-b border-border bg-surface-muted/60">
@@ -523,7 +543,7 @@ function KpiRows({
                       <span className="w-24">{v.period ?? "—"}</span>
                       <span className="num w-28 text-right">{formatObserved(v.observed_value, unit)}</span>
                       <VerdictStatusBadge status={v.status} />
-                      <ConfidenceBadge confidence={v.confidence} />
+                      <ConfidenceBadge confidence={v.confidence} since={v.created_at} />
                       <FeedbackControl target={{ kind: "verdict", id: v.id }} label={`verdict on ${label} ${v.period ?? ""}`.trim()} />
                     </li>
                   ))}
@@ -549,7 +569,10 @@ function VerdictEvidence({
   const used = verdict.fact_ids.map((id) => facts.get(id)).filter((f): f is FactOut => Boolean(f));
   return (
     <div className="space-y-2 text-sm">
-      <p>{verdict.rationale}</p>
+      <p className="flex flex-wrap items-center gap-1.5">
+        {verdict.rationale}
+        <ProvenanceTag provenance="computed" />
+      </p>
       {used.length === 0 ? (
         <p className="text-text-muted">No verified figure behind this verdict.</p>
       ) : (
@@ -573,7 +596,13 @@ function FactEvidence({ fact, onFeedback }: { fact: FactOut; onFeedback: OnFeedb
           {humanizeMetric(fact.metric)} {fact.period}
         </span>
         <span className="num">{formatFactValue(fact)}</span>
-        <ConfidenceBadge confidence={fact.confidence} />
+        <ConfidenceBadge
+          confidence={fact.confidence}
+          reason={confidenceReason(fact)}
+          nextAction={confidenceNextAction(fact.status)}
+          since={fact.reviewed_at ?? fact.extracted_at}
+        />
+        <ProvenanceTag provenance={factProvenance(fact)} />
         <EvidenceLinks fact={fact} />
         <FactFeedback fact={fact} onFeedback={onFeedback} />
       </div>
@@ -664,7 +693,9 @@ function FactsSection({
           Run an earnings check to read this company&rsquo;s latest results release.
         </EmptyState>
       ) : (
-        <FactTable facts={shown} onResolved={onResolved} onFeedback={onFeedback} />
+        <AskAboutSelection>
+          <FactTable facts={shown} onResolved={onResolved} onFeedback={onFeedback} />
+        </AskAboutSelection>
       )}
       {rejected.length > 0 ? (
         <details className="rounded-lg border border-border bg-surface-raised p-3 text-sm">
@@ -698,6 +729,7 @@ function FactTable({
             <th scope="col" className="px-3 py-2 text-left font-medium">Metric</th>
             <th scope="col" className="px-3 py-2 text-right font-medium">Value</th>
             <th scope="col" className="px-3 py-2 text-left font-medium">Confidence</th>
+            <th scope="col" className="px-3 py-2 text-left font-medium">Provenance</th>
             <th scope="col" className="px-3 py-2 text-left font-medium">Source</th>
             <th scope="col" className="px-3 py-2 text-left font-medium">Feedback</th>
           </tr>
@@ -714,12 +746,15 @@ function FactTable({
                   <th scope="row" className="px-3 py-2 text-left font-normal">
                     {humanizeMetric(f.metric)}
                     {f.basis === "adjusted" ? <span className="ml-1 text-xs text-text-muted">(adjusted)</span> : null}
-                    {f.origin === "owner" ? <span className="ml-1 text-xs text-text-muted">(your correction)</span> : null}
                   </th>
                   <td className="num px-3 py-2 text-right whitespace-nowrap">{formatFactValue(f)}</td>
                   <td className="px-3 py-2">
-                    <ConfidenceBadge confidence={f.confidence} />
-                    {f.status_reason ? <p className="mt-1 max-w-xs text-xs text-text-muted">{f.status_reason}</p> : null}
+                    <ConfidenceBadge
+                      confidence={f.confidence}
+                      reason={confidenceReason(f)}
+                      nextAction={confidenceNextAction(f.status)}
+                      since={f.reviewed_at ?? f.extracted_at}
+                    />
                     {actions.length > 0 ? (
                       <Button
                         size="sm"
@@ -739,6 +774,9 @@ function FactTable({
                     ) : null}
                   </td>
                   <td className="px-3 py-2">
+                    <ProvenanceTag provenance={factProvenance(f)} />
+                  </td>
+                  <td className="px-3 py-2">
                     <EvidenceLinks fact={f} />
                   </td>
                   <td className="px-3 py-2">
@@ -747,7 +785,7 @@ function FactTable({
                 </tr>
                 {expanded ? (
                   <tr className="border-b border-border bg-surface-muted/60">
-                    <td colSpan={6} id={panelId} className="px-4 py-3">
+                    <td colSpan={7} id={panelId} className="px-4 py-3">
                       <blockquote className="mb-3 border-l-2 border-border pl-3 font-mono text-xs break-words text-text-muted">
                         {f.snippet}
                       </blockquote>

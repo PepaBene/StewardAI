@@ -18,7 +18,12 @@ from steward.portfolio.drift import (
     compute_drift,
     weight_denominator,
 )
-from steward.portfolio.history import DailyValue, flow_adjusted_index
+from steward.portfolio.history import (
+    DailyValue,
+    PositionDailyValue,
+    flow_adjusted_index,
+    position_organic_gain,
+)
 from steward.portfolio.snapshot import SNAPSHOT_TIMEZONE
 from steward.reference.read import PricePoint, load_series
 
@@ -438,5 +443,98 @@ async def portfolio_history(pool: asyncpg.Pool, days: int) -> PortfolioHistory:
         points=[PricePoint(date=d, close=v) for d, v in index],
         benchmark_symbol=benchmark_symbol,
         benchmark=[PricePoint(date=d, close=c) for d, c in bench],
+        gap=None,
+    )
+
+
+# ---------------------------------------------------------------------------
+# Per-holding contribution to a period's return (visualization §5.4)
+# ---------------------------------------------------------------------------
+
+
+class HoldingContribution(BaseModel):
+    ticker: str
+    name: str | None
+    contribution_base: float = Field(
+        description="The holding's organic gain over the period, in base currency — its"
+        " value change with its own trading netted out."
+    )
+    contribution_pct: float | None = Field(
+        description="contribution_base as a fraction of the portfolio's total value at the"
+        " start of the period; null when that value was zero."
+    )
+
+
+class ContributionReport(BaseModel):
+    as_of: dt.date | None = Field(description="Date of the latest position snapshot included.")
+    period_start: dt.date | None
+    base_currency: str | None
+    holdings: list[HoldingContribution] = Field(
+        description="Every holding with at least two snapshots in the window, ranked by"
+        " contribution: largest positive first, largest negative last."
+    )
+    gap: str | None = Field(description="Why there is no contribution report, when there is none.")
+
+
+async def contribution_to_return(pool: asyncpg.Pool, days: int) -> ContributionReport:
+    latest_date = await pool.fetchval("select max(snapshot_date) from public.position_snapshot")
+    if latest_date is None:
+        return ContributionReport(
+            as_of=None, period_start=None, base_currency=None, holdings=[],
+            gap="no position snapshot yet",
+        )  # fmt: skip
+
+    since = latest_date - dt.timedelta(days=days)
+    rows = await pool.fetch(
+        "select p.snapshot_date, p.ticker, i.name, p.quantity, p.avg_price, p.fx_rate,"
+        " p.value_base from public.position_snapshot p"
+        " left join public.instrument i on i.t212_ticker = p.ticker"
+        " where p.snapshot_date >= $1 order by p.ticker, p.snapshot_date",
+        since,
+    )
+    if not rows:
+        return ContributionReport(
+            as_of=latest_date, period_start=since, base_currency=None, holdings=[],
+            gap="no position snapshots in this window",
+        )  # fmt: skip
+
+    period_start = min(r["snapshot_date"] for r in rows)
+    start_total = await pool.fetchval(
+        "select total_base from public.account_snapshot where snapshot_date = $1", period_start
+    )
+
+    by_ticker: dict[str, list[PositionDailyValue]] = {}
+    names: dict[str, str | None] = {}
+    for r in rows:
+        names[r["ticker"]] = r["name"]
+        by_ticker.setdefault(r["ticker"], []).append(
+            PositionDailyValue(
+                date=r["snapshot_date"],
+                value_base=r["value_base"],
+                cost_base=r["quantity"] * r["avg_price"] * r["fx_rate"],
+            )
+        )
+
+    stored = await load_active(pool, "strategy", StrategyConfig)
+    base_currency = stored.body.base_currency if stored else None
+
+    holdings = []
+    for ticker, values in by_ticker.items():
+        gain = position_organic_gain(values)
+        holdings.append(
+            HoldingContribution(
+                ticker=ticker,
+                name=names[ticker],
+                contribution_base=float(gain),
+                contribution_pct=float(gain / start_total) if start_total else None,
+            )
+        )
+    holdings.sort(key=lambda h: h.contribution_base, reverse=True)
+
+    return ContributionReport(
+        as_of=latest_date,
+        period_start=period_start,
+        base_currency=base_currency,
+        holdings=holdings,
         gap=None,
     )

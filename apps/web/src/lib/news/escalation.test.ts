@@ -99,6 +99,8 @@ describe("impact-note citation preview", () => {
       tierLabel: "Tier 1",
       source: "ec.europa.eu",
       url: "https://ec.europa.eu/a",
+      relation: null,
+      provenance: null,
     });
     expect(noteCitationPreview(sources, "https://reuters.com/b")).toMatchObject({ title: "reuters.com", snippet: null, tierLabel: "Tier 2" });
     expect(noteCitationPreview(sources, "https://elsewhere.org/c")).toBeNull();
