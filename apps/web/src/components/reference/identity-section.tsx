@@ -332,7 +332,7 @@ function CompositeListings({ identity }: { identity: HoldingIdentity }) {
       {rows.length === 0 ? (
         <p className="text-sm text-text-muted">No OpenFIGI listings resolved.</p>
       ) : (
-        <div className="overflow-x-auto">
+        <div className="relative overflow-x-auto">
           <table className="w-full min-w-[40rem] text-sm">
             <thead>
               <tr className="border-b border-border text-text-muted">
@@ -391,7 +391,7 @@ function VenueListings({ listings }: { listings: ListingOut[] }) {
       {rows.length === 0 ? (
         <p className="text-sm text-text-muted">No FIRDS records (not admitted to an EU venue, or not yet resolved).</p>
       ) : (
-        <div className="overflow-x-auto">
+        <div className="relative overflow-x-auto">
           <table className="w-full min-w-[40rem] text-sm">
             <thead>
               <tr className="border-b border-border text-text-muted">

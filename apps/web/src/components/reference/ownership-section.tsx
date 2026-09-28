@@ -69,7 +69,7 @@ export function OwnershipSection({ resource }: { resource: ReturnType<typeof use
             <span className="font-medium">{formatUsdCompact(view.latest.value_usd)}</span>
             <span className="text-text-muted"> · {periodLabel(view.latest, formatDate)}</span>
           </p>
-          <div className="overflow-x-auto rounded-lg border border-border bg-surface-raised">
+          <div className="relative overflow-x-auto border border-border">
             <table className="w-full min-w-[40rem] text-sm">
               <caption className="px-3 pt-2 text-left text-xs text-text-muted">
                 Per quarter, newest first; changes are against the quarter before it.

@@ -30,7 +30,6 @@ import { displayTicker } from "@/lib/portfolio/holdings-view";
 import {
   annualisedVolatility,
   barsInRange,
-  buildTimeline,
   CANDLE_RANGES,
   candleRangeDays,
   DEFAULT_CANDLE_RANGE,

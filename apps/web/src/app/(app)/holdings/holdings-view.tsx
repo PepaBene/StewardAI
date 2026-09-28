@@ -355,7 +355,7 @@ function TreemapPanel({
         title={<span id="treemap-heading">{m.title}</span>}
         action={<TreemapModeSwitch value={mode} onChange={onMode} />}
       />
-      <div className="overflow-x-auto">
+      <div className="relative overflow-x-auto">
         <PortfolioTreemap holdings={holdings} mode={mode} dayChange={dayChange} aspectRatio={aspectRatio} />
       </div>
       <p className="text-xs text-text-muted">
@@ -374,7 +374,7 @@ function DailyMovesPanel({ prices }: { prices: HoldingPrices[] | null }) {
       {grid.rows.length === 0 ? (
         <p className="text-sm text-text-muted">No daily closes are stored for the holdings yet.</p>
       ) : (
-        <div className="overflow-x-auto">
+        <div className="relative overflow-x-auto">
           <Heatmap
             className="min-w-[48rem]"
             rows={grid.rows}
@@ -491,7 +491,7 @@ function HoldingsTable({
 
   return (
     <Blueprint className="overflow-visible">
-      <div className="overflow-x-auto">
+      <div className="relative overflow-x-auto">
         <table className="w-full min-w-[72rem] text-sm">
           <caption className="sr-only">
             Open positions, sorted by {sortLabel} {sort.direction === "asc" ? "ascending" : "descending"}

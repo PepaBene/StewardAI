@@ -441,7 +441,7 @@ function KpiTable({ kpis, facts, onFeedback }: { kpis: KpiStatus[]; facts: Map<n
       <h3 id="kpi-heading" className="font-heading text-lg font-semibold">
         Thesis KPIs: verdicts and evidence
       </h3>
-      <AskAboutSelection className="overflow-x-auto border border-border">
+      <AskAboutSelection className="relative overflow-x-auto border border-border">
         <table className="w-full min-w-[48rem] text-sm">
           <caption className="sr-only">Latest verdict per KPI; open a row for its evidence and history</caption>
           <thead className="bg-surface-muted">
@@ -748,7 +748,7 @@ function FactTable({
   const [open, setOpen] = useState<number | null>(null);
   if (facts.length === 0) return null;
   return (
-    <div className="mt-2 overflow-x-auto border border-border">
+    <div className="relative mt-2 overflow-x-auto border border-border">
       <table className="w-full min-w-[48rem] text-sm">
         <thead className="bg-surface-muted">
           <tr className="border-b border-border text-[11px] tracking-[0.08em] text-text-muted uppercase">
