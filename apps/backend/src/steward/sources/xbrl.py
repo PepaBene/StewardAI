@@ -33,7 +33,7 @@ XLINK = "http://www.w3.org/1999/xlink"
 XML_LANG = "{http://www.w3.org/XML/1998/namespace}lang"
 
 # Bump when the parse changes, so stored filings are parsed again on the next run.
-PARSER_VERSION = 1
+PARSER_VERSION = 2
 
 # Standard taxonomies by namespace URI prefix -> the prefix used in stored names, whatever
 # prefix a filing declares for them.
@@ -526,6 +526,27 @@ def mark_subtotals(members: list[RevenueRow], total: Decimal | None) -> list[Rev
                 break
         if not found:
             break
+    if excess():
+        # Two partitions of the same total side by side (Microsoft: "Product" + "Service
+        # and other" = total = its twelve product lines): the coarser one is flagged.
+        rest = [i for i in range(len(members)) if i not in flagged]
+        if len(rest) <= 16:
+            done = False
+            for size in range(1, len(rest) // 2 + 1):
+                for combo in itertools.combinations(rest, size):
+                    inside = [members[j] for j in combo]
+                    outside = [members[j] for j in rest if j not in combo]
+                    tol_in = _tolerance(inside) + total * Decimal("0.0005")
+                    tol_out = _tolerance(outside) + total * Decimal("0.0005")
+                    if (
+                        abs(sum((m.value for m in inside), Decimal(0)) - total) <= tol_in
+                        and abs(sum((m.value for m in outside), Decimal(0)) - total) <= tol_out
+                    ):
+                        flagged.update(combo)
+                        done = True
+                        break
+                if done:
+                    break
     return [
         RevenueRow(**{**m.__dict__, "subtotal": True}) if i in flagged else m
         for i, m in enumerate(members)

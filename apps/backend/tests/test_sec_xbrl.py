@@ -28,10 +28,12 @@ from steward.ownership.read import ADR_BASIS, US_BASIS, holding_ownership
 from steward.sources.edgar import EdgarClient, Filing, latest_periodic, xbrl_documents
 from steward.sources.xbrl import (
     Labels,
+    RevenueRow,
     XbrlError,
     ads_ratio,
     derived_label,
     instance_shares,
+    mark_subtotals,
     parse_instance,
     parse_labels,
     segment_revenue,
@@ -149,6 +151,51 @@ def test_labels_and_derived_names() -> None:
     assert labels.get("us-gaap:AllOtherSegmentsMember", standard=True) == "Other Operating Segment"
     assert derived_label("country:TW") == "Taiwan"
     assert derived_label("asml:RestOfEuropeAndMiddleEastMember") == "Rest Of Europe And Middle East"
+
+
+def _rev(label: str, value: int) -> RevenueRow:
+    return RevenueRow(
+        kind="product",
+        axis="srt:ProductOrServiceAxis",
+        member=f"x:{label}Member",
+        label=label,
+        label_source="filing",
+        concept="us-gaap:RevenueFromContractWithCustomerExcludingAssessedTax",
+        start=dt.date(2025, 7, 1),
+        end=dt.date(2026, 6, 30),
+        value=Decimal(value) * 1_000_000,
+        unit="USD",
+        decimals="-6",
+        context_id="c",
+        fact_id=None,
+    )
+
+
+def test_two_partitions_of_the_total_flag_the_coarser_one() -> None:
+    # Microsoft's 10-K: "Product" + "Service and other" and, alongside, its product lines.
+    rows = [_rev("Service Other", 267143), _rev("Product", 64696)]
+    rows += [_rev(f"Line {n}", v) for n, v in enumerate([129425, 101997, 21790, 78627])]
+    marked = mark_subtotals(rows, Decimal(331_839_000_000))
+    assert {r.label for r in marked if r.subtotal} == {"Service Other", "Product"}
+    # Nothing to flag when the members add up to the total.
+    assert not any(r.subtotal for r in mark_subtotals(rows[2:], Decimal(331_839_000_000)))
+
+
+def test_labels_embedded_in_the_company_schema() -> None:
+    xsd = b"""<?xml version="1.0"?>
+<xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema" xmlns:link="http://www.xbrl.org/2003/linkbase"
+  xmlns:xlink="http://www.w3.org/1999/xlink"><xs:annotation><xs:appinfo>
+  <link:linkbase><link:labelLink xlink:type="extended" xlink:role="http://www.xbrl.org/2003/role/link">
+    <link:loc xlink:type="locator" xlink:href="msft-20260630.xsd#msft_LinkedInCorporationMember"
+      xlink:label="loc_li"/>
+    <link:label xlink:type="resource" xlink:label="lab_li" xml:lang="en-US"
+      xlink:role="http://www.xbrl.org/2003/role/terseLabel">LinkedIn</link:label>
+    <link:labelArc xlink:type="arc" xlink:from="loc_li" xlink:to="lab_li"/>
+  </link:labelLink></link:linkbase></xs:appinfo></xs:annotation></xs:schema>"""
+    assert parse_labels(xsd).get("msft:LinkedInCorporationMember") == "LinkedIn"
+    f = _filing("10-K", "0001193125-26-323660", "2026-07-29", "msft-20260630.htm")
+    files = ["FilingSummary.xml", "msft-20260630.xsd", "msft-20260630_htm.xml"]
+    assert xbrl_documents(f, files) == ("msft-20260630_htm.xml", "msft-20260630.xsd")
 
 
 def test_a_document_with_a_dtd_is_refused() -> None:

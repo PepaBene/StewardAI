@@ -268,7 +268,8 @@ def _after(a: Filing, b: Filing) -> bool:
 
 def xbrl_documents(filing: Filing, files: list[str]) -> tuple[str | None, str | None]:
     """The filing's XBRL instance and label linkbase names. Inline XBRL filings carry the
-    SEC's extracted instance `<primary document>_htm.xml`; older ones a plain `.xml`."""
+    SEC's extracted instance `<primary document>_htm.xml`; older ones a plain `.xml`. Labels
+    come from `_lab.xml`, or from the company schema (`.xsd`) that embeds the linkbases."""
     names = set(files)
     base = filing.primary_document.rsplit(".", 1)[0]
     instance: str | None = f"{base}_htm.xml" if f"{base}_htm.xml" in names else None
@@ -284,7 +285,10 @@ def xbrl_documents(filing: Filing, files: list[str]) -> tuple[str | None, str | 
             ),
             None,
         )
-    label = next((n for n in files if n.endswith("_lab.xml")), None)
+    # Some filing agents embed the linkbases in the company schema instead of `_lab.xml`.
+    label = next((n for n in files if n.endswith("_lab.xml")), None) or next(
+        (n for n in files if n.endswith(".xsd")), None
+    )
     return instance, label
 
 
