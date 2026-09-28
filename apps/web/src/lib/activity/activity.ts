@@ -48,6 +48,7 @@ export const JOB_TYPES = [
   "ownership_13f",
   "monthly_review",
   "chat",
+  "valuation_refresh",
 ] as const;
 
 export const JOB_STATUSES = ["queued", "waiting", "running", "succeeded", "failed"] as const satisfies readonly JobStatus[];

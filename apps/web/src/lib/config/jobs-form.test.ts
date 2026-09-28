@@ -36,6 +36,7 @@ const FULL: JobsConfig = {
   weekly_digest: { enabled: false, cron: "0 18 * * sun", timezone: "Europe/London" },
   monthly_review: { enabled: true, cron: "0 8 1-3 * *", timezone: "Europe/Prague" },
   ownership_13f: { enabled: false, cron: "0 6 10 * *", timezone: "America/New_York" },
+  valuation_refresh: { enabled: false, cron: "30 7 * * mon", timezone: "UTC" },
   earnings_check: {
     extraction_model: "claude-opus-5-5",
     locate_model: "claude-sonnet-5",
@@ -124,6 +125,25 @@ const FULL: JobsConfig = {
       { cik: "0001350694", name: "Bridgewater Associates, LP" },
     ],
     top_holders: 25,
+  },
+  valuation: {
+    enabled: false,
+    full_refresh_days: 3,
+    esef_max_age_months: 12,
+    finnhub_cross_check: false,
+    funds: [
+      {
+        key: "CSPX",
+        label: "iShares Core S&P 500 UCITS ETF (Acc)",
+        provider: "ishares",
+        url: "https://www.ishares.com/uk/individual/en/products/253743/x",
+        port_id: null,
+        consumer_id: "uk0",
+        tickers: ["CSPXl_EQ"],
+        index_label: "S&P 500",
+        benchmark_symbols: ["^spx"],
+      },
+    ],
   },
 };
 
@@ -214,6 +234,18 @@ describe("jobs form: phase 5 schedules and settings", () => {
     expect(SCHEDULES.ownership_13f.cron).toBe("0 5 5 * *");
     const names = jobsFromBody(null).schedules.map((s) => s.name);
     expect(names).toEqual(expect.arrayContaining(["monthly_review", "ownership_13f"]));
+  });
+
+  it("edits the valuation settings and keeps the funds list", () => {
+    expect(SCHEDULES.valuation_refresh.cron).toBe("45 7 * * *");
+    const form = jobsFromBody(FULL);
+    expect(form.settings.valuation.values.full_refresh_days).toBe("3");
+    form.settings.valuation.values.full_refresh_days = "14";
+    form.settings.valuation.values.finnhub_cross_check = true;
+    const body = jobsToBody(form);
+    expect(body.valuation!.full_refresh_days).toBe(14);
+    expect(body.valuation!.finnhub_cross_check).toBe(true);
+    expect(body.valuation!.funds).toEqual(FULL.valuation!.funds);
   });
 
   it("edits the chat, review and ownership settings", () => {

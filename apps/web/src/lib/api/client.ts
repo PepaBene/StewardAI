@@ -172,6 +172,16 @@ export type HoldingOwnership = Schemas["HoldingOwnership"];
 export type OwnershipPeriod = Schemas["OwnershipPeriod"];
 export type TopHolder = Schemas["TopHolder"];
 export type ManagerChange = Schemas["ManagerChange"];
+// Valuation: P/E, P/B and dividend yield per holding and for the portfolio vs its benchmark.
+export type HoldingValuation = Schemas["HoldingValuation"];
+export type PortfolioValuation = Schemas["PortfolioValuation"];
+export type ValuationRatio = Schemas["ValuationRatio"];
+export type PerShareFigure = Schemas["PerShareFigure"];
+export type FundValuation = Schemas["FundValuation"];
+export type BenchmarkValuation = Schemas["BenchmarkValuation"];
+export type ValuationContribution = Schemas["ValuationContribution"];
+export type PePoint = Schemas["PePoint"];
+export type ManualFundamentals = Schemas["ManualFundamentals"];
 // Prompts config: owner overrides of the AI steps' system prompts.
 export type PromptsConfig = Schemas["PromptsConfig"];
 export type PromptDefault = Schemas["PromptDefault"];

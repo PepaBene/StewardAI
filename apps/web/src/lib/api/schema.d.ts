@@ -253,6 +253,71 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/holdings/{ticker}/valuation": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Holding Valuation
+         * @description P/E, P/B and dividend yield from the latest stored close and the stored fundamentals
+         *     (SEC XBRL, ESEF, or the holding profile's manual figures), each with its source, period,
+         *     basis and staleness; an ETF's are its provider's fund figures. A ratio that cannot be
+         *     computed is null with the reason (e.g. 'n/m: negative earnings').
+         */
+        get: operations["get_holding_valuation"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/portfolio/valuation": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Portfolio Valuation
+         * @description The portfolio's P/E, P/B and dividend yield (value-weighted, iShares' capping and
+         *     exclusion rules; see `method`) with the share of value covered, against the benchmark's
+         *     fund-level figures (the Prices config's first benchmark) and every configured fund.
+         */
+        get: operations["get_portfolio_valuation"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/jobs/valuation-refresh": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Run Valuation Refresh
+         * @description Refresh the fundamentals and fund figures behind the valuation now.
+         */
+        post: operations["run_valuation_refresh"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/portfolio/overview": {
         parameters: {
             query?: never;
@@ -2226,6 +2291,45 @@ export interface components {
             /** Invested */
             invested: number;
         };
+        /** BenchmarkValuation */
+        BenchmarkValuation: {
+            /**
+             * Label
+             * @description What is compared: 'S&P 500', 'FTSE All-World'.
+             */
+            label: string;
+            /**
+             * Symbol
+             * @description The Prices benchmark symbol it stands for.
+             */
+            symbol: string | null;
+            /**
+             * Via
+             * @description Whose figures: 'CSPX fund figures (iShares)'.
+             */
+            via: string;
+            /** Fund Key */
+            fund_key: string;
+            /** Pe */
+            pe: number | null;
+            /** Pb */
+            pb: number | null;
+            /** Dividend Yield */
+            dividend_yield: number | null;
+            /** Dividend Yield Kind */
+            dividend_yield_kind: string | null;
+            /**
+             * As Of
+             * Format: date
+             */
+            as_of: string;
+            /** Source Url */
+            source_url: string;
+            /** Methodology */
+            methodology: string | null;
+            /** Stale */
+            stale: boolean;
+        };
         /** BoardKpi */
         BoardKpi: {
             kpi: components["schemas"]["ThesisKPI"];
@@ -2381,7 +2485,7 @@ export interface components {
              * Critical Job Types
              * @description Job types that run normally at the monthly cap.
              */
-            critical_job_types?: ("portfolio_sync" | "earnings_check" | "thesis_verdicts" | "earnings_calendar" | "earnings_calendar_full" | "earnings_due" | "fact_reconcile" | "reference_data" | "price_history" | "holiday_refresh" | "macro_collect" | "event_escalation" | "monitor" | "news_ingest" | "daily_digest" | "weekly_digest" | "research" | "ownership_13f" | "monthly_review" | "chat")[];
+            critical_job_types?: ("portfolio_sync" | "earnings_check" | "thesis_verdicts" | "earnings_calendar" | "earnings_calendar_full" | "earnings_due" | "fact_reconcile" | "reference_data" | "price_history" | "holiday_refresh" | "macro_collect" | "event_escalation" | "monitor" | "news_ingest" | "daily_digest" | "weekly_digest" | "research" | "ownership_13f" | "monthly_review" | "chat" | "valuation_refresh")[];
             /**
              * Per Job Cap Usd
              * @description Most AI spend of one run of a job type, in USD. A run over it fails.
@@ -4294,6 +4398,168 @@ export interface components {
             /** Job Id */
             job_id: number;
         };
+        /** FundValuation */
+        FundValuation: {
+            /** Key */
+            key: string;
+            /** Label */
+            label: string;
+            /** Provider */
+            provider: string;
+            /** Provider Label */
+            provider_label: string;
+            /**
+             * As Of
+             * Format: date
+             */
+            as_of: string;
+            /** Pe */
+            pe: number | null;
+            /** Pb */
+            pb: number | null;
+            /** Index Label */
+            index_label: string | null;
+            /** Index Pe */
+            index_pe: number | null;
+            /** Index Pb */
+            index_pb: number | null;
+            /**
+             * Dividend Yield
+             * @description Fraction.
+             */
+            dividend_yield: number | null;
+            /** Dividend Yield Kind */
+            dividend_yield_kind: string | null;
+            /** Methodology */
+            methodology: string | null;
+            /** Source Url */
+            source_url: string;
+            /**
+             * Fetched At
+             * Format: date-time
+             */
+            fetched_at: string;
+            /**
+             * Stale
+             * @description As of more than 45 days ago.
+             */
+            stale: boolean;
+        };
+        /**
+         * FundValuationSource
+         * @description Where an ETF's fund-level P/E and P/B are published (they stand in for its index).
+         */
+        FundValuationSource: {
+            /**
+             * Key
+             * @example CSPX
+             */
+            key: string;
+            /** Label */
+            label: string;
+            /**
+             * Provider
+             * @enum {string}
+             */
+            provider: "ishares" | "vanguard";
+            /**
+             * Url
+             * Format: uri
+             * @description iShares: the product page (its embedded JSON carries the figures). Vanguard: the product-data GraphQL endpoint (e.g. https://www.vanguard.co.uk/gpx/graphql).
+             */
+            url: string;
+            /**
+             * Port Id
+             * @description Vanguard only: the fund's port id (9679 = FTSE All-World UCITS ETF Acc).
+             */
+            port_id?: string | null;
+            /**
+             * Consumer Id
+             * @description Vanguard only: the site's x-consumer-id header (uk0 for vanguard.co.uk).
+             * @default uk0
+             */
+            consumer_id: string;
+            /**
+             * Tickers
+             * @description Holdings whose valuation is this fund's.
+             */
+            tickers?: string[];
+            /**
+             * Index Label
+             * @description The index the fund tracks, e.g. 'S&P 500'.
+             * @default
+             */
+            index_label: string;
+            /**
+             * Benchmark Symbols
+             * @description Benchmark symbols (Prices config) this fund's figures stand in for.
+             */
+            benchmark_symbols?: string[];
+        };
+        /**
+         * FundamentalFactRef
+         * @description One input fact, as filed.
+         */
+        FundamentalFactRef: {
+            /** Concept */
+            concept: string;
+            /** Start */
+            start: string | null;
+            /**
+             * End
+             * Format: date
+             */
+            end: string;
+            /** Value */
+            value: number;
+            /** Unit */
+            unit: string;
+            /**
+             * Source
+             * @description sec (companyfacts), sec_instance (the filing's XBRL instance) or esef (filings.xbrl.org).
+             */
+            source: string;
+            /**
+             * Ref
+             * @description Accession number or filings.xbrl.org filing id.
+             */
+            ref: string;
+            /** Form */
+            form: string | null;
+            /** Filed */
+            filed: string | null;
+            /** Url */
+            url: string | null;
+        };
+        /** FundamentalsSource */
+        FundamentalsSource: {
+            /**
+             * Source
+             * @enum {string}
+             */
+            source: "sec" | "esef" | "manual";
+            /** Source Label */
+            source_label: string;
+            /** Basis */
+            basis: string | null;
+            /** Eps Kind */
+            eps_kind: string;
+            /** Document Ref */
+            document_ref: string | null;
+            /** Document Url */
+            document_url: string | null;
+            /** Fetched At */
+            fetched_at: string | null;
+            /**
+             * As Of
+             * @description Manual figures: the date they were entered for.
+             */
+            as_of: string | null;
+            /** Notes */
+            notes: string[];
+            /** Last Error */
+            last_error: string | null;
+        };
         /** FxQuote */
         FxQuote: {
             /** Currency */
@@ -4727,6 +4993,20 @@ export interface components {
              * @description Currency the company reports in; figures in another are held.
              */
             reporting_currency?: string | null;
+            /**
+             * Valuation Source
+             * @description Which fundamentals the valuation uses: 'auto' takes the freshest automatic source (SEC XBRL, then ESEF) and the manual figures only when there is none; 'sec', 'esef' or 'manual' force one.
+             * @default auto
+             * @enum {string}
+             */
+            valuation_source: "auto" | "sec" | "esef" | "manual";
+            /**
+             * Shares Per Listing
+             * @description Ordinary shares one priced unit represents, for depositary receipts (TSMC's ADS = 5 shares). Empty: 1.
+             */
+            shares_per_listing?: number | null;
+            /** @description Hand-entered per-share figures for holdings without an automatic source. */
+            manual_fundamentals?: components["schemas"]["ManualFundamentals"] | null;
             /** Competitors */
             competitors?: string[];
             /** Suppliers */
@@ -4764,6 +5044,60 @@ export interface components {
             /** Note */
             note: string | null;
             body: components["schemas"]["HoldingProfilesConfig"];
+        };
+        /** HoldingValuation */
+        HoldingValuation: {
+            /** Ticker */
+            ticker: string;
+            /** Name */
+            name: string | null;
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "stock" | "fund";
+            price: components["schemas"]["ValuationPrice"] | null;
+            pe: components["schemas"]["ValuationRatio"];
+            pb: components["schemas"]["ValuationRatio"];
+            /** @description Fraction (0.012 = 1.2 %). */
+            dividend_yield: components["schemas"]["ValuationRatio"];
+            eps_ttm: components["schemas"]["PerShareFigure"] | null;
+            book_value_per_share: components["schemas"]["PerShareFigure"] | null;
+            dividend_per_share: components["schemas"]["PerShareFigure"] | null;
+            /**
+             * Shares Per Listing
+             * @description Ordinary shares per priced unit (depositary receipts).
+             */
+            shares_per_listing: number;
+            /** @description The figures the ratios use. */
+            fundamentals: components["schemas"]["FundamentalsSource"] | null;
+            /**
+             * Alternatives
+             * @description Other sources or accounting bases, for comparison (not used).
+             */
+            alternatives: components["schemas"]["ValuationAlternative"][];
+            cross_check: components["schemas"]["ValuationCrossCheck"] | null;
+            /** @description ETFs: the provider's fund figures. */
+            fund: components["schemas"]["FundValuation"] | null;
+            /**
+             * Pe History
+             * @description Weekly P/E over two years: each close over the EPS TTM in force then (from the first filing of each period); empty when it cannot be built.
+             */
+            pe_history: components["schemas"]["PePoint"][];
+            /**
+             * Errors
+             * @description The last refresh's error per source, if any.
+             */
+            errors: {
+                [key: string]: string;
+            };
+            /**
+             * Checked At
+             * @description When the refresh job last ran for it.
+             */
+            checked_at: string | null;
+            /** Method */
+            method: string;
         };
         /** HoldingsPrices */
         HoldingsPrices: {
@@ -5113,6 +5447,8 @@ export interface components {
             monthly_review?: components["schemas"]["JobSchedule"];
             /** @description Load new SEC Form 13F data sets (published quarterly). Default: the 5th of each month, 05:00. */
             ownership_13f?: components["schemas"]["JobSchedule"];
+            /** @description Fundamentals (SEC XBRL, ESEF) of holdings that filed since the last read (all of them weekly) and the ETF providers' fund P/E and P/B. Default: daily 07:45. */
+            valuation_refresh?: components["schemas"]["JobSchedule"];
             earnings_check?: components["schemas"]["EarningsCheckSettings"];
             earnings_calendar_settings?: components["schemas"]["EarningsCalendarSettings"];
             news?: components["schemas"]["NewsSettings"];
@@ -5126,6 +5462,7 @@ export interface components {
             chat?: components["schemas"]["ChatSettings"];
             review?: components["schemas"]["ReviewSettings"];
             ownership?: components["schemas"]["OwnershipSettings"];
+            valuation?: components["schemas"]["ValuationSettings"];
         };
         /** JobsConfigVersion */
         JobsConfigVersion: {
@@ -5316,6 +5653,46 @@ export interface components {
             shares: number | string | null;
             /** Accession */
             accession: string;
+        };
+        /**
+         * ManualFundamentals
+         * @description Per-share figures entered by hand, for a holding no automatic source covers (e.g.
+         *     Prague listings, whose filings are not machine-readable). Shown as "entered manually".
+         */
+        ManualFundamentals: {
+            /**
+             * Eps Ttm
+             * @description Diluted earnings per share over the trailing twelve months (or the latest full year), per ordinary share.
+             */
+            eps_ttm?: number | null;
+            /**
+             * Book Value Per Share
+             * @description Equity attributable to shareholders per ordinary share.
+             */
+            book_value_per_share?: number | null;
+            /**
+             * Dividend Per Share
+             * @description Dividends per ordinary share paid over the last year.
+             */
+            dividend_per_share?: number | null;
+            /**
+             * Currency
+             * @description Currency of the per-share figures.
+             * @example CZK
+             */
+            currency: string;
+            /**
+             * As Of
+             * Format: date
+             * @description Period end (or date) the figures are for.
+             */
+            as_of: string;
+            /**
+             * Source Note
+             * @description Where the figures come from, e.g. 'Annual report 2025, p. 112'.
+             * @default
+             */
+            source_note: string;
         };
         /** MarketHoliday */
         MarketHoliday: {
@@ -5886,6 +6263,40 @@ export interface components {
              */
             top_holders: number;
         };
+        /** PePoint */
+        PePoint: {
+            /**
+             * Date
+             * Format: date
+             */
+            date: string;
+            /** Pe */
+            pe: number;
+            /** Eps */
+            eps: number;
+        };
+        /** PerShareFigure */
+        PerShareFigure: {
+            /** Value */
+            value: number;
+            /** Currency */
+            currency: string;
+            /** Period Start */
+            period_start: string | null;
+            /** Period End */
+            period_end: string | null;
+            /** Method */
+            method: string;
+            /** Annual Only */
+            annual_only: boolean;
+            /**
+             * Stale
+             * @description The period ended more than 200 days ago.
+             */
+            stale: boolean;
+            /** Inputs */
+            inputs?: components["schemas"]["FundamentalFactRef"][];
+        };
         /** PlausibilityCheck */
         PlausibilityCheck: {
             /**
@@ -5982,6 +6393,28 @@ export interface components {
             drift: components["schemas"]["DriftReport"] | null;
             /** Fx Rates */
             fx_rates: components["schemas"]["FxRateUsed"][];
+        };
+        /** PortfolioValuation */
+        PortfolioValuation: {
+            /**
+             * As Of
+             * @description The snapshot the weights come from.
+             */
+            as_of: string | null;
+            /** Base Currency */
+            base_currency: string | null;
+            portfolio: components["schemas"]["ValuationAggregate"];
+            /** @description The Prices config's first benchmark, via the fund configured for it. */
+            benchmark: components["schemas"]["BenchmarkValuation"] | null;
+            /**
+             * Comparisons
+             * @description Every configured fund's (and, where published, its index's) figures.
+             */
+            comparisons: components["schemas"]["BenchmarkValuation"][];
+            /** Holdings */
+            holdings: components["schemas"]["ValuationContribution"][];
+            /** Method */
+            method: string;
         };
         /** PositionCountRule */
         PositionCountRule: {
@@ -7824,6 +8257,203 @@ export interface components {
             /** Note */
             note?: string | null;
         };
+        /** ValuationAggregate */
+        ValuationAggregate: {
+            /** Pe */
+            pe: number | null;
+            /** Pb */
+            pb: number | null;
+            /**
+             * Dividend Yield
+             * @description Fraction.
+             */
+            dividend_yield: number | null;
+            coverage: components["schemas"]["ValuationCoverage"];
+        };
+        /** ValuationAlternative */
+        ValuationAlternative: {
+            /**
+             * Source
+             * @enum {string}
+             */
+            source: "sec" | "esef" | "manual";
+            /** Source Label */
+            source_label: string;
+            /** Basis */
+            basis: string | null;
+            /** Eps Ttm */
+            eps_ttm: number | null;
+            /** Currency */
+            currency: string | null;
+            /** Period End */
+            period_end: string | null;
+            /** Method */
+            method: string | null;
+            /** Pe */
+            pe: number | null;
+        };
+        /** ValuationContribution */
+        ValuationContribution: {
+            /** Ticker */
+            ticker: string;
+            /** Name */
+            name: string | null;
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "stock" | "fund";
+            /**
+             * Weight
+             * @description Share of invested value (cash excluded), 0..1.
+             */
+            weight: number;
+            /**
+             * Pe
+             * @description As used: capped at 60; null when excluded or missing.
+             */
+            pe: number | null;
+            /** Pe Raw */
+            pe_raw: number | null;
+            /** Pe Note */
+            pe_note: string | null;
+            /** Pb */
+            pb: number | null;
+            /** Pb Raw */
+            pb_raw: number | null;
+            /** Pb Note */
+            pb_note: string | null;
+            /** Dividend Yield */
+            dividend_yield: number | null;
+            /** Source Label */
+            source_label: string | null;
+            /** Stale */
+            stale: boolean;
+        };
+        /** ValuationCoverage */
+        ValuationCoverage: {
+            /**
+             * Pe
+             * @description Share of invested value (0..1) with a P/E (incl. excluded n/m).
+             */
+            pe: number;
+            /** Pb */
+            pb: number;
+            /** Dividend Yield */
+            dividend_yield: number;
+        };
+        /** ValuationCrossCheck */
+        ValuationCrossCheck: {
+            /**
+             * Source
+             * @default finnhub
+             */
+            source: string;
+            /**
+             * Source Label
+             * @default Finnhub basic financials (tier 2)
+             */
+            source_label: string;
+            /** Symbol */
+            symbol: string | null;
+            /** Pe */
+            pe: number | null;
+            /** Pb */
+            pb: number | null;
+            /** Eps Ttm */
+            eps_ttm: number | null;
+            /** Dividend Yield */
+            dividend_yield: number | null;
+            /**
+             * Fetched At
+             * Format: date-time
+             */
+            fetched_at: string;
+        };
+        /** ValuationPrice */
+        ValuationPrice: {
+            /** Symbol */
+            symbol: string;
+            /** Close */
+            close: number;
+            /** Currency */
+            currency: string | null;
+            /**
+             * Date
+             * Format: date
+             */
+            date: string;
+            /**
+             * Source
+             * @default Stooq daily close
+             */
+            source: string;
+            /** Stale */
+            stale: boolean;
+        };
+        /** ValuationRatio */
+        ValuationRatio: {
+            /**
+             * Value
+             * @description Null when it cannot be computed (see reason).
+             */
+            value: number | null;
+            /**
+             * Reason
+             * @description Why the value is null, e.g. 'n/m: negative earnings'.
+             */
+            reason: string | null;
+        };
+        /** ValuationRefreshRequest */
+        ValuationRefreshRequest: {
+            /**
+             * Ticker
+             * @description One holding, or all when null.
+             */
+            ticker?: string | null;
+            /**
+             * Force
+             * @description Re-read even when nothing new was filed.
+             * @default false
+             */
+            force: boolean;
+        };
+        /**
+         * ValuationSettings
+         * @description P/E, P/B and dividend yield: fundamentals from SEC XBRL and ESEF, fund figures from
+         *     the ETF providers.
+         */
+        ValuationSettings: {
+            /**
+             * Enabled
+             * @description Off: the scheduled run does nothing.
+             * @default true
+             */
+            enabled: boolean;
+            /**
+             * Full Refresh Days
+             * @description Each run re-reads a holding's fundamentals when the issuer filed a new report since the last read, and in any case after this many days.
+             * @default 7
+             */
+            full_refresh_days: number;
+            /**
+             * Esef Max Age Months
+             * @description ESEF filings (filings.xbrl.org) with an older period end are ignored.
+             * @default 18
+             */
+            esef_max_age_months: number;
+            /**
+             * Finnhub Cross Check
+             * @description Also read Finnhub's basic financials (P/E, P/B, EPS) as a tier-2 cross-check. Needs FINNHUB_API_KEY; never required.
+             * @default true
+             */
+            finnhub_cross_check: boolean;
+            /**
+             * Funds
+             * @description ETFs whose fund-level P/E and P/B are read from the provider.
+             */
+            funds?: components["schemas"]["FundValuationSource"][];
+        };
         /** VerdictActivity */
         VerdictActivity: {
             /**
@@ -8340,6 +8970,90 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["MarketStrip"];
+                };
+            };
+        };
+    };
+    get_holding_valuation: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                ticker: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HoldingValuation"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_portfolio_valuation: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PortfolioValuation"];
+                };
+            };
+        };
+    };
+    run_valuation_refresh: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ValuationRefreshRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["JobSummary"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };

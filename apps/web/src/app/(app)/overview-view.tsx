@@ -18,6 +18,7 @@ import { OverviewHero, type HistoryLoad } from "@/components/portfolio/overview-
 import { ReturnsHeatmap } from "@/components/portfolio/returns-heatmap";
 import { RiskPanel } from "@/components/portfolio/risk-panel";
 import { StatTile } from "@/components/portfolio/stat-tile";
+import { ValuationBenchmarkPanel } from "@/components/portfolio/valuation-benchmark-panel";
 import { useSyncStatus } from "@/components/sync/sync-status-provider";
 import { Button } from "@/components/ui/button";
 import { getBrowserApiClient, type PortfolioHistory, type PortfolioOverview } from "@/lib/api/client";
@@ -273,6 +274,8 @@ function Overview({ data }: { data: PortfolioOverview }) {
         <ContributionCard />
         <DriftTable data={data} />
       </div>
+
+      <ValuationBenchmarkPanel />
 
       <FxFootnote data={data} />
     </div>
