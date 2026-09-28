@@ -138,7 +138,7 @@ export function ReviewView() {
         correct it. Every decision needs a reason and re-judges the holding&rsquo;s verdicts.
       </p>
 
-      <StatTiles stats={stats.state} queue={data ?? []} />
+      <StatTiles stats={stats.state} queue={data ?? []} ticker={ticker} />
 
       {resolved.length > 0 ? (
         <section aria-labelledby="resolved-heading" className="space-y-3">
@@ -232,7 +232,7 @@ function nextAfter(ids: readonly number[], id: number): number | null {
 type ReviewStats = components["schemas"]["ReviewStats"];
 type StatsState = ReturnType<typeof useApiResource<ReviewStats>>["state"];
 
-function StatTiles({ stats, queue }: { stats: StatsState; queue: readonly ReviewItem[] }) {
+function StatTiles({ stats, queue, ticker }: { stats: StatsState; queue: readonly ReviewItem[]; ticker: string | null }) {
   const s = stats.kind === "ok" ? stats.data : stats.kind === "error" ? stats.previous : null;
   const scores = queue.map((i) => i.fact.check_score).filter((v): v is number => v !== null);
   const perDay = s?.reviewed_per_day.map((d) => d.count) ?? [];
@@ -249,7 +249,7 @@ function StatTiles({ stats, queue }: { stats: StatsState; queue: readonly Review
       </div>
       <div className="border-t border-border px-5 py-4 sm:border-t-0 sm:border-l">
         <h2 className="font-sans text-xs font-normal text-text-muted" title="Share of the validator's checks each pending figure passed">
-          Checks passed, pending figures
+          Checks passed, pending figures{ticker ? ` of ${shortTicker(ticker)}` : ""}
         </h2>
         {scores.length > 0 ? (
           <Histogram
@@ -545,11 +545,15 @@ function FactDetail({
             value={fact.check_score}
             max={1}
             formatValue={(v) => `${Math.round(v * 100)}%`}
-            sublabel={fact.checks.length > 0 ? `${passed} of ${fact.checks.length} checks` : "No checks ran"}
             tone={fact.check_score !== null && fact.check_score < 1 ? "warning" : "accent"}
             ariaLabel="Checks passed"
           />
-          <p className="text-[11px] text-text-muted">Checks passed</p>
+          <p className="text-[11px] text-text-muted">
+            Checks passed
+            <span className="num block">
+              {fact.checks.length > 0 ? `${passed} of ${fact.checks.length} validator checks` : "No check ran"}
+            </span>
+          </p>
         </div>
       </header>
 
@@ -611,8 +615,7 @@ function FactDetail({
 
       <ReviewActionBar fact={fact} filed={filed} hotkeys onResolved={onResolved} onFeedback={onFeedback} />
       <p className="text-[11px] text-text-faint">
-        Checked {fact.checks.length > 0 ? `${passed} of ${fact.checks.length} validator checks` : "by no validator check"}
-        {fact.reviewed_at ? ` · last reviewed ${formatDateTime(fact.reviewed_at)}` : ""}. Held figures stay in the{" "}
+        {fact.reviewed_at ? `Last reviewed ${formatDateTime(fact.reviewed_at)}. ` : ""}Held figures stay in the{" "}
         <Link href={reviewQueueHref(item.ticker)} className={LINK}>
           {shortTicker(item.ticker)} queue
         </Link>{" "}
