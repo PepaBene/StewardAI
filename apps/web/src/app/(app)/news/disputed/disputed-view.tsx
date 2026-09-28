@@ -222,7 +222,7 @@ function StoryCard({ story, onResolved }: { story: DisputedStory; onResolved: (u
         </p>
       ) : null}
 
-      <div className="grid gap-4 lg:grid-cols-2">
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
         <SourceColumn title="The claim" description="The story's own sources." sources={story.claim} empty="No source is stored for the claim." />
         <SourceColumn
           title="Contradicted by"
@@ -306,7 +306,7 @@ function SourceColumn({
               ) : null}
             </p>
             <a href={s.url} target="_blank" rel="noreferrer" className="inline-flex items-start gap-1 hover:text-accent-ink hover:underline">
-              <span className="break-words">{s.headline ?? s.url}</span>
+              <span className="[overflow-wrap:anywhere]">{s.headline ?? s.url}</span>
               <ExternalLinkIcon aria-hidden="true" className="mt-0.5 size-3 shrink-0 text-text-muted" />
             </a>
             {typeof s.news_item_id === "number" ? (

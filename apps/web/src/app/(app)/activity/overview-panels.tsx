@@ -213,8 +213,6 @@ export function JobGridPanel() {
       {load.kind === "loading" ? <ChartEmpty label="Loading runs…" minHeight={200} /> : null}
       {load.kind === "error" ? <ChartEmpty label={`Could not load runs: ${load.message}`} minHeight={120} /> : null}
       {load.kind === "ok" ? (
-        // `relative`: GridStatus's visually hidden table is absolutely positioned; without a
-        // positioned ancestor here its full width would widen the whole page.
         <div className="relative overflow-x-auto">
           <GridStatus
             className="min-w-[44rem]"
