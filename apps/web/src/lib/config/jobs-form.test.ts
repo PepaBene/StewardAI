@@ -87,6 +87,7 @@ const FULL: JobsConfig = {
     eurostat: [{ key: "hicp", label: "HICP", dataset: "prc_hicp_minr", filters: { unit: "RCH_A", coicop18: "TOTAL" }, unit: "%" }],
     fred: [{ key: "fed_funds", label: "Fed funds", series_id: "DFF", units: "chg", unit: "pp", policy_rate: true }],
     ecb: [{ key: "ecb_deposit_rate", label: "ECB deposit rate", flow_key: "FM/D.U2.EUR.4F.KR.DFR.LEV", unit: "%", policy_rate: false }],
+    cnb: [{ key: "czeonia", label: "CZEONIA", series: "czeonia", unit: "%", policy_rate: false }],
   },
   monitoring: { alert_failed_jobs: ["portfolio_sync", "macro_collect"], missed_run_grace_minutes: 120, news_coverage_hours: 72 },
   reference: {
@@ -301,6 +302,19 @@ describe("jobs form: escalation, macro and monitoring", () => {
     expect(form.macroSeries.eurostat.map((r) => r.key)).toEqual(["hicp", "unemployment", "gdp", "industrial_production", "sentiment"]);
     expect(form.macroSeries.fred.map((r) => r.ref)).toEqual(["CPIAUCSL", "UNRATE", "DFF"]);
     expect(form.macroSeries.ecb[0].policy_rate).toBe(true);
+  });
+
+  it("edits ČNB rates (CZEONIA for the Sharpe ratio, the repo rate as a policy rate)", () => {
+    const form = jobsFromBody(null);
+    expect(form.macroSeries.cnb.map((r) => [r.key, r.ref, r.policy_rate])).toEqual([
+      ["czeonia", "czeonia", false],
+      ["cnb_repo_2w", "repo_2w", true],
+    ]);
+    form.macroSeries.cnb = form.macroSeries.cnb.slice(0, 1);
+    const body = jobsToBody(form);
+    expect(body.macro!.cnb).toEqual([{ key: "czeonia", label: "CZEONIA (CZK overnight rate)", series: "czeonia", unit: "%", policy_rate: false }]);
+    // A stored config from before the ČNB source keeps the defaults.
+    expect(jobsFromBody({ macro: { ecb: [] } } as never).macroSeries.cnb).toHaveLength(2);
   });
 
   it("parses dimension filters", () => {

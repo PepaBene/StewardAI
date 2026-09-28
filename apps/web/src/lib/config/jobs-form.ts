@@ -74,7 +74,7 @@ export const SCHEDULES: Record<ScheduleKey, { label: string; description: string
   },
   macro_collect: {
     label: "Macro data",
-    description: "FRED, ECB and Eurostat macro series; macro surprises on release days.",
+    description: "FRED, ECB, Eurostat and ČNB macro series (CZEONIA is the Sharpe ratio’s risk-free rate); macro surprises on release days.",
     cron: "30 11 * * *",
   },
   monitor: {
@@ -187,6 +187,10 @@ export const DEFAULT_JOBS: JobsConfig = {
     ],
     ecb: [
       { key: "ecb_deposit_rate", label: "ECB deposit facility rate", flow_key: "FM/D.U2.EUR.4F.KR.DFR.LEV", unit: "%", policy_rate: true },
+    ],
+    cnb: [
+      { key: "czeonia", label: "CZEONIA (CZK overnight rate)", series: "czeonia", unit: "%", policy_rate: false },
+      { key: "cnb_repo_2w", label: "ČNB 2-week repo rate", series: "repo_2w", unit: "%", policy_rate: true },
     ],
   },
   monitoring: {
@@ -456,12 +460,18 @@ export const SETTINGS: { [S in SettingsKey]: { title: string; description: strin
 };
 export const SETTINGS_KEYS = Object.keys(SETTINGS) as SettingsKey[];
 
-/** The macro series lists (`macro.eurostat`, `macro.fred`, `macro.ecb`), edited as rows. */
-export type MacroSource = "eurostat" | "fred" | "ecb";
+/** The macro series lists (`macro.eurostat`, `macro.fred`, `macro.ecb`, `macro.cnb`), edited as rows. */
+export type MacroSource = "eurostat" | "fred" | "ecb" | "cnb";
 export const MACRO_SOURCES: readonly { value: MacroSource; label: string; ref: string; refHint: string }[] = [
   { value: "eurostat", label: "Eurostat", ref: "Dataset", refHint: "Dataset code, e.g. prc_hicp_minr." },
   { value: "fred", label: "FRED (US)", ref: "Series id", refHint: "FRED series id, e.g. CPIAUCSL." },
   { value: "ecb", label: "ECB Data Portal", ref: "Flow/key", refHint: "Flow and key, e.g. FM/D.U2.EUR.4F.KR.DFR.LEV." },
+  {
+    value: "cnb",
+    label: "ČNB (Czech National Bank)",
+    ref: "Series",
+    refHint: "czeonia (CZK overnight rate, daily; key it “czeonia” for the Sharpe ratio) or repo_2w (2-week repo rate changes).",
+  },
 ];
 export type FredUnits = "lin" | "pch" | "pc1" | "chg";
 export const FRED_UNITS: readonly { value: FredUnits; label: string }[] = [
@@ -476,18 +486,18 @@ export type MacroSeriesForm = {
   /** The series key used in digests and surprise bands (e.g. "hicp"). */
   key: string;
   label: string;
-  /** Eurostat dataset, FRED series id or ECB flow/key. */
+  /** Eurostat dataset, FRED series id, ECB flow/key or ČNB series (czeonia | repo_2w). */
   ref: string;
   /** Eurostat only: "dimension=value" per line. */
   filters: string;
   /** FRED only. */
   units: FredUnits;
   unit: string;
-  /** FRED and ECB: a policy rate (any change is a surprise). */
+  /** FRED, ECB and ČNB: a policy rate (any change is a surprise). */
   policy_rate: boolean;
   rest: Record<string, unknown>;
 };
-const MACRO_REF: Record<MacroSource, string> = { eurostat: "dataset", fred: "series_id", ecb: "flow_key" };
+export const MACRO_REF: Record<MacroSource, string> = { eurostat: "dataset", fred: "series_id", ecb: "flow_key", cnb: "series" };
 
 export type ScheduleForm = { name: string; enabled: boolean; cron: string; timezone: string; rest: Record<string, unknown> };
 export type SettingsForm = { values: Record<string, string | boolean>; rest: Record<string, unknown> };
