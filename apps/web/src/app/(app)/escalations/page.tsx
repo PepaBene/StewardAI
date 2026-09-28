@@ -3,7 +3,7 @@ import { Suspense } from "react";
 
 import { EscalationsView } from "./escalations-view";
 
-export const metadata: Metadata = { title: "Impact notes" };
+export const metadata: Metadata = { title: "Escalations" };
 
 export default function EscalationsPage() {
   return (
