@@ -26,6 +26,7 @@ import {
   type ThesisForm,
 } from "@/lib/config/theses-form";
 import { configSaveQuery, useConfigEditor } from "@/lib/hooks/use-config-editor";
+import { BlueprintCorners } from "@/components/ui/blueprint";
 
 const api = () => getBrowserApiClient();
 
@@ -200,8 +201,9 @@ function ThesisCard({
     <section
       id={form.ticker || undefined}
       aria-label={`Thesis ${form.ticker || index + 1}`}
-      className="scroll-mt-24 space-y-4 rounded-lg border border-border bg-surface-raised p-4"
+      className="scroll-mt-24 space-y-4 blueprint p-5"
     >
+      <BlueprintCorners />
       <div className="flex flex-wrap items-start gap-3">
         <TextField
           className="w-56"

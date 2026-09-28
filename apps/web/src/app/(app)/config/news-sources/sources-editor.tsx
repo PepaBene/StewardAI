@@ -22,6 +22,7 @@ import {
 } from "@/lib/config/news-forms";
 import { configSaveQuery, useConfigEditor } from "@/lib/hooks/use-config-editor";
 import { TIERS } from "@/lib/news/labels";
+import { BlueprintCorners } from "@/components/ui/blueprint";
 
 const api = () => getBrowserApiClient();
 const TIER_OPTIONS = ([1, 2, 3] as const).map((t) => ({ value: t, label: `${TIERS[t].label}` }));
@@ -79,7 +80,8 @@ export function SourcesEditor() {
               const perHolding = PER_HOLDING.includes(s.type);
               const path = `sources.${i}`;
               return (
-                <div key={s.key} role="group" aria-label={`Source ${s.name || i + 1}`} className="space-y-3 rounded-lg border border-border bg-surface-raised p-4">
+                <div key={s.key} role="group" aria-label={`Source ${s.name || i + 1}`} className="space-y-3 blueprint p-5">
+                  <BlueprintCorners />
                   <div className="grid items-start gap-3 sm:grid-cols-2 lg:grid-cols-[1fr_1.4fr_0.8fr_1.4fr_auto_auto]">
                     <TextField label="Id" path={`${path}.id`} errors={editor.errors} value={s.id} onChange={(v) => setSource(s.key, { id: v })} placeholder="apple-ir" />
                     <TextField label="Name" path={`${path}.name`} errors={editor.errors} value={s.name} onChange={(v) => setSource(s.key, { name: v })} />
@@ -115,7 +117,8 @@ export function SourcesEditor() {
             </Button>
           </section>
 
-          <section aria-labelledby="trust-heading" className="space-y-3 rounded-lg border border-border bg-surface-raised p-4">
+          <section aria-labelledby="trust-heading" className="space-y-3 blueprint p-5">
+            <BlueprintCorners />
             <h2 id="trust-heading" className="text-[22px] leading-tight font-semibold">
               Outlet trust and freshness
             </h2>

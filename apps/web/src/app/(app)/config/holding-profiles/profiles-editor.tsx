@@ -21,6 +21,7 @@ import {
   type ProfileForm,
 } from "@/lib/config/profiles-form";
 import { configSaveQuery, useConfigEditor } from "@/lib/hooks/use-config-editor";
+import { BlueprintCorners } from "@/components/ui/blueprint";
 
 const api = () => getBrowserApiClient();
 
@@ -185,8 +186,9 @@ function ProfileCard({
     <section
       id={form.ticker || undefined}
       aria-label={`Profile ${form.ticker || index + 1}`}
-      className="scroll-mt-24 space-y-4 rounded-lg border border-border bg-surface-raised p-4"
+      className="scroll-mt-24 space-y-4 blueprint p-5"
     >
+      <BlueprintCorners />
       <div className="flex flex-wrap items-start gap-3">
         <TextField className="w-56" label="Ticker" list="profile-tickers" {...text("ticker")} />
         <TextField className="min-w-56 flex-1" label="Company name" {...text("company_name")} />

@@ -17,7 +17,9 @@ import {
   POLL_LIMIT_MS,
   pollDecision,
   sentenceView,
+  sourceChips,
   sourceNumbering,
+  SUGGESTED_PROMPTS,
   validateMessage,
 } from "./chat";
 
@@ -186,5 +188,29 @@ describe("chat: actions and messages", () => {
     expect(validateMessage("Why?")).toBeNull();
     expect(chatHref(12)).toBe("/chat?c=12");
     expect(chatHref()).toBe("/chat");
+  });
+});
+
+describe("sourceChips", () => {
+  it("numbers the sources in order and links each to its page", () => {
+    const chips = sourceChips(
+      [
+        { id: "S1", kind: "position", ref: "x", title: "Portfolio snapshot", url: null, app_path: "/holdings", tier: 1, snippet: null, as_of: null },
+        { id: "S2", kind: "news", ref: "y", title: "Reuters story", url: "https://example.com/a", app_path: null, tier: 2, snippet: null, as_of: null },
+        { id: "S1", kind: "position", ref: "x", title: "dup", url: null, app_path: "/holdings", tier: 1, snippet: null, as_of: null },
+        { id: "S3", kind: "note", ref: "z", title: "No link", url: null, app_path: null, tier: null, snippet: null, as_of: null },
+      ] as Source[],
+      (k) => k.toUpperCase(),
+    );
+    expect(chips.map((c) => [c.number, c.id, c.href, c.external, c.kindLabel])).toEqual([
+      [1, "S1", "/holdings", false, "POSITION"],
+      [2, "S2", "https://example.com/a", true, "NEWS"],
+      [3, "S3", null, false, "NOTE"],
+    ]);
+  });
+
+  it("offers a few valid starter questions", () => {
+    expect(SUGGESTED_PROMPTS.length).toBeGreaterThanOrEqual(3);
+    expect(SUGGESTED_PROMPTS.every((p) => validateMessage(p) === null)).toBe(true);
   });
 });
