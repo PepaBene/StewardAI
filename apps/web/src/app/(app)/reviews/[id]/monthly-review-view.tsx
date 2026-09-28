@@ -5,9 +5,12 @@ import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
 import { AlertMessage } from "@/components/alert-message";
+import { Ring } from "@/components/charts";
 import { VerdictStatusBadge } from "@/components/evidence/verdict-status-badge";
 import { AsOfLabel } from "@/components/freshness/as-of-label";
 import { SourceChips, SourceSidebar } from "@/components/sources/source-list";
+import { ReviewShell } from "@/components/reports/review-shell";
+import { BlueprintCorners } from "@/components/ui/blueprint";
 import { Button } from "@/components/ui/button";
 import { getBrowserApiClient, type ReviewReportOut, type StrategyConfig } from "@/lib/api/client";
 import { formatDate, formatDateTime, formatMoney } from "@/lib/format";
@@ -22,16 +25,21 @@ import {
   kpiAnchor,
   missingRules,
   monthLabel,
-  REVIEWS_HREF,
   reviewIndex,
   sortCompliance,
   strategyVersionOf,
 } from "@/lib/review/monthly";
 
-const LINK = "text-accent underline-offset-4 hover:underline";
-const SECTION = "space-y-3 rounded-lg border border-border bg-surface-raised p-4";
+const LINK = "text-accent-ink underline-offset-4 hover:underline";
+const SECTION = "blueprint space-y-3 px-6 py-5";
 
+/** /reviews/[id]: the reviews list beside this review. */
 export function MonthlyReviewView({ id }: { id: number }) {
+  return <ReviewShell selectedId={id}>{() => <MonthlyReviewDetail id={id} />}</ReviewShell>;
+}
+
+/** One monthly review by id, without the page frame. */
+export function MonthlyReviewDetail({ id }: { id: number }) {
   const fetcher = useCallback(
     () => getBrowserApiClient().GET("/reviews/{report_id}", { params: { path: { report_id: id } } }),
     [id],
@@ -112,20 +120,12 @@ function Review({ report }: { report: ReviewReportOut }) {
   const ruleCount = strategy.kind === "ok" ? (strategy.strategy?.rules ?? []).length : null;
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-wrap items-end justify-between gap-3">
-        <div>
-          <p className="text-sm text-text-muted">
-            <Link href="/reports" className="hover:text-text hover:underline">
-              Reports
-            </Link>{" "}
-            /{" "}
-            <Link href={REVIEWS_HREF} className="hover:text-text hover:underline">
-              Monthly reviews
-            </Link>{" "}
-            / {monthLabel(body.month)}
-          </p>
-          <h1 className="page-title">{body.headline || report.title}</h1>
+    <div className="flex flex-col gap-5">
+      <section aria-labelledby="review-headline" className="blueprint flex flex-wrap items-end justify-between gap-4 px-6 py-5">
+        <BlueprintCorners />
+        <div className="min-w-0">
+          <p className="kicker">Monthly review · {monthLabel(body.month)}</p>
+          <h2 id="review-headline" className="mt-1 text-[32px] leading-[1.05] font-semibold">{body.headline || report.title}</h2>
           <p className="num mt-1 text-sm text-text-muted">
             {body.as_of ? <>Judged on the snapshot of {formatDate(body.as_of)}</> : "No portfolio snapshot"}
             {body.total_base !== null && body.base_currency ? <> · portfolio {formatMoney(body.total_base, body.base_currency, { decimals: 0 })}</> : null}
@@ -141,8 +141,21 @@ function Review({ report }: { report: ReviewReportOut }) {
             ) : null}
           </p>
         </div>
-        <AsOfLabel at={report.created_at} kind="escalation" prefix="Written" />
-      </div>
+        <div className="flex flex-col items-end gap-3">
+          {body.compliance.length > 0 ? (
+            <div className="flex items-center gap-3">
+              <Ring value={counts.pass} max={body.compliance.length} label="" size={46} thickness={5} ariaLabel="Strategy checks passing" />
+              <p className="text-xs text-text-muted">
+                <span className="num block font-heading text-2xl leading-none font-semibold text-text">
+                  {counts.pass} / {body.compliance.length}
+                </span>
+                checks pass
+              </p>
+            </div>
+          ) : null}
+          <AsOfLabel at={report.created_at} kind="escalation" prefix="Written" />
+        </div>
+      </section>
 
       {(body.notes ?? []).length > 0 ? (
         <AlertMessage tone="info" title="Notes on this review">
@@ -154,9 +167,10 @@ function Review({ report }: { report: ReviewReportOut }) {
         </AlertMessage>
       ) : null}
 
-      <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_20rem]">
-        <article className="space-y-6">
+      <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_18rem]">
+        <article className="flex flex-col gap-5">
           <section aria-labelledby="compliance-heading" className={SECTION}>
+            <BlueprintCorners />
             <h2 id="compliance-heading" className="flex items-center gap-1.5 text-[22px] leading-tight font-semibold">
               <ShieldCheckIcon aria-hidden="true" className="size-4 text-text-muted" />
               Strategy compliance
@@ -208,6 +222,7 @@ function Review({ report }: { report: ReviewReportOut }) {
           </section>
 
           <section aria-labelledby="review-kpis-heading" className={SECTION}>
+            <BlueprintCorners />
             <h2 id="review-kpis-heading" className="text-[22px] leading-tight font-semibold">
               Thesis KPIs
             </h2>
@@ -232,7 +247,7 @@ function Review({ report }: { report: ReviewReportOut }) {
                           <VerdictStatusBadge status={k.status} />
                         </td>
                         <td className="py-1.5 pr-3">
-                          <Link href={`/holdings/${encodeURIComponent(k.ticker)}`} className="font-mono text-xs text-accent hover:underline">
+                          <Link href={`/holdings/${encodeURIComponent(k.ticker)}`} className="font-mono text-xs text-accent-ink hover:underline">
                             {k.ticker}
                           </Link>
                         </td>
@@ -265,6 +280,7 @@ function Review({ report }: { report: ReviewReportOut }) {
           </section>
 
           <section aria-labelledby="review-flags-heading" className={SECTION}>
+            <BlueprintCorners />
             <h2 id="review-flags-heading" className="flex items-center gap-1.5 text-[22px] leading-tight font-semibold">
               <FlagIcon aria-hidden="true" className="size-4 text-text-muted" />
               Flags
@@ -331,6 +347,7 @@ function ActionsSection({ report }: { report: ReviewReportOut }) {
   const { body } = report;
   return (
     <section aria-labelledby="review-actions-heading" className={SECTION}>
+            <BlueprintCorners />
       <h2 id="review-actions-heading" className="flex items-center gap-1.5 text-[22px] leading-tight font-semibold">
         <LightbulbIcon aria-hidden="true" className="size-4 text-text-muted" />
         Proposed actions
@@ -346,13 +363,13 @@ function ActionsSection({ report }: { report: ReviewReportOut }) {
         {body.actions.map((a, i) => {
           const basis = actionBasis(a, body);
           return (
-            <li key={i} className="space-y-1 rounded-md border border-border p-3 text-sm">
+            <li key={i} className="space-y-1 border border-border-soft p-3 text-sm">
               <p className="font-medium">
                 {a.action}
                 {a.ticker ? (
                   <>
                     {" "}
-                    <Link href={`/holdings/${encodeURIComponent(a.ticker)}`} className="font-mono text-xs font-normal text-accent hover:underline">
+                    <Link href={`/holdings/${encodeURIComponent(a.ticker)}`} className="font-mono text-xs font-normal text-accent-ink hover:underline">
                       {a.ticker}
                     </Link>
                   </>
@@ -390,7 +407,7 @@ function ActionsSection({ report }: { report: ReviewReportOut }) {
                         <span className="rounded-sm border border-dashed border-border px-1 font-mono text-text-muted">{k.ref} (not in this review)</span>
                       )}
                       {k.holdingHref ? (
-                        <Link href={k.holdingHref} className="text-accent hover:underline">
+                        <Link href={k.holdingHref} className="text-accent-ink hover:underline">
                           holding
                         </Link>
                       ) : null}
