@@ -63,6 +63,12 @@ export type RiskInputs = {
     fxShare: number | null;
     benchmarkFxShare: number | null;
   } | null;
+  /**
+   * From GET /portfolio/valuation via `valuationAxis()` (lib/portfolio/valuation.ts): the
+   * portfolio's and the benchmark's P/E, already normalised 0..1 on the valuation scale.
+   * The portfolio value is null when too little of the portfolio has a P/E.
+   */
+  valuation?: { portfolio: number | null; benchmark: number | null; rim: string } | null;
 };
 
 export type RiskAxisDef = {
@@ -134,8 +140,24 @@ const fxAxis: RiskAxisDef = {
   },
 };
 
+const valuationRadarAxis: RiskAxisDef = {
+  key: "valuation",
+  label: "Valuation",
+  compute: (i) =>
+    i.valuation?.portfolio == null
+      ? null
+      : { portfolio: i.valuation.portfolio, benchmark: i.valuation.benchmark, rim: i.valuation.rim },
+};
+
 /** The radar's axes, clockwise from 12 o'clock. Append to add an axis. */
-export const RISK_AXIS_DEFS: readonly RiskAxisDef[] = [volatilityAxis, betaAxis, drawdownAxis, concentrationAxis, fxAxis];
+export const RISK_AXIS_DEFS: readonly RiskAxisDef[] = [
+  volatilityAxis,
+  betaAxis,
+  drawdownAxis,
+  concentrationAxis,
+  fxAxis,
+  valuationRadarAxis,
+];
 
 /** The axes that have a portfolio value, in radar order (clockwise from 12 o'clock). */
 export function riskAxes(input: RiskInputs, defs: readonly RiskAxisDef[] = RISK_AXIS_DEFS): RiskAxis[] {

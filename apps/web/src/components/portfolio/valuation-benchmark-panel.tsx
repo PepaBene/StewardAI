@@ -7,11 +7,12 @@ import { Blueprint, PanelHeading } from "@/components/ui/blueprint";
 import { getBrowserApiClient, type PortfolioValuation } from "@/lib/api/client";
 import { formatPct } from "@/lib/charts/format";
 import { formatDate } from "@/lib/format";
-import { useApiResource } from "@/lib/hooks/use-api-resource";
+import type { ResourceState } from "@/lib/hooks/use-api-resource";
 import { displayTicker } from "@/lib/portfolio/holdings-view";
 import { formatMultiple, formatYield, relativeTo } from "@/lib/portfolio/valuation";
 
-const fetchValuation = () => getBrowserApiClient().GET("/portfolio/valuation");
+/** The Overview fetches this once and shares it with the risk radar's Valuation axis. */
+export const fetchValuation = () => getBrowserApiClient().GET("/portfolio/valuation");
 
 type Row = {
   key: "pe" | "pb" | "dividend_yield";
@@ -63,8 +64,7 @@ function Compare({ row, benchLabel }: { row: Row; benchLabel: string }) {
  * with the share of invested value each figure covers. Other configured fund and index
  * figures, the method and the per-holding inputs are below.
  */
-export function ValuationBenchmarkPanel() {
-  const { state } = useApiResource(fetchValuation);
+export function ValuationBenchmarkPanel({ state }: { state: ResourceState<PortfolioValuation> }) {
   const data: PortfolioValuation | null = state.kind === "ok" ? state.data : state.kind === "error" ? state.previous : null;
 
   return (

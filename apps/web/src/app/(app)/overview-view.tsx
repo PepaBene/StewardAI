@@ -20,12 +20,13 @@ import { ReturnsHeatmap } from "@/components/portfolio/returns-heatmap";
 import { RiskPanel } from "@/components/portfolio/risk-panel";
 import { RiskStatTile } from "@/components/portfolio/risk-stat-tile";
 import { StatTile } from "@/components/portfolio/stat-tile";
-import { ValuationBenchmarkPanel } from "@/components/portfolio/valuation-benchmark-panel";
+import { fetchValuation, ValuationBenchmarkPanel } from "@/components/portfolio/valuation-benchmark-panel";
 import { useSyncStatus } from "@/components/sync/sync-status-provider";
 import { Button } from "@/components/ui/button";
 import { getBrowserApiClient, type PortfolioHistory, type PortfolioOverview } from "@/lib/api/client";
 import { formatDate, formatMoney, formatPercent, gainLossTone } from "@/lib/format";
 import { useApiResource } from "@/lib/hooks/use-api-resource";
+import { VALUATION_SCALE, valuationAxis } from "@/lib/portfolio/valuation";
 import { herfindahlIndex } from "@/lib/portfolio/concentration";
 import { lookThroughRisk } from "@/lib/portfolio/look-through";
 import { formatCompactMoney, formatSignedPct } from "@/lib/portfolio/money";
@@ -118,6 +119,9 @@ function Overview({ data }: { data: PortfolioOverview }) {
   const h = history.kind === "ok" && !history.data.gap ? history.data : null;
   const risk = useMemo(() => (h ? trailingRisk(h.points, h.benchmark) : null), [h]);
   const lookThrough = useLookThrough().report;
+  const valuation = useApiResource(fetchValuation).state;
+  const valuationData = valuation.kind === "ok" ? valuation.data : valuation.kind === "error" ? valuation.previous : null;
+  const valuationRadar = valuationAxis(valuationData);
 
   if (!data.freshness || !data.account || !data.base) {
     return (
@@ -162,6 +166,7 @@ function Overview({ data }: { data: PortfolioOverview }) {
     benchmarkVolatility: risk?.benchmarkVolatility,
     benchmarkMaxDrawdown: risk?.benchmarkMaxDrawdown,
     lookThrough: lookThroughRisk(lookThrough),
+    valuation: { portfolio: valuationRadar.portfolio, benchmark: valuationRadar.benchmark, rim: `P/E ${VALUATION_SCALE.pe}` },
   });
 
   // Tile sparklines follow the hero's range (absolute values in the history's currency).
@@ -267,7 +272,7 @@ function Overview({ data }: { data: PortfolioOverview }) {
         <DriftTable data={data} />
       </div>
 
-      <ValuationBenchmarkPanel />
+      <ValuationBenchmarkPanel state={valuation} />
 
       <FxFootnote data={data} />
     </div>

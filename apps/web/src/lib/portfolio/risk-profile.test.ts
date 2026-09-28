@@ -78,3 +78,19 @@ describe("risk axes", () => {
     expect(foreignCurrencyShare(undefined, "CZK", 100)).toBeNull();
   });
 });
+
+describe("risk axes: valuation", () => {
+  const base = { volatility: 0.15, beta: 1, maxDrawdown: -0.1, hhi: 0.25, positions: 4, fxShare: 0.6 };
+
+  it("adds the Valuation axis last, with the benchmark's P/E on the same scale", () => {
+    const axes = riskAxes({ ...base, valuation: { portfolio: 0.52, benchmark: 0.76, rim: "P/E 40" } });
+    expect(axes.map((a) => a.key)).toEqual(["volatility", "beta", "drawdown", "concentration", "fx", "valuation"]);
+    expect(axes.at(-1)).toMatchObject({ portfolio: 0.52, benchmark: 0.76, rim: "P/E 40" });
+    expect(riskScaleNote(axes)).toContain("P/E 40");
+  });
+
+  it("leaves the axis out when the portfolio has too little P/E coverage", () => {
+    const axes = riskAxes({ ...base, valuation: { portfolio: null, benchmark: 0.76, rim: "P/E 40" } });
+    expect(axes.map((a) => a.key)).not.toContain("valuation");
+  });
+});
