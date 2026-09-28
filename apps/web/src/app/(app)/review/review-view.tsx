@@ -295,7 +295,7 @@ function StatTiles({ stats, queue, ticker }: { stats: StatsState; queue: readonl
               <p className="num font-heading text-[28px] leading-tight font-semibold">{formatNumber(golden.value * 100, 1)}%</p>
               <p className="text-xs text-text-muted">
                 Golden set · {formatNumber(golden.target * 100, 0)}% target
-                {golden.evaluated_at ? ` · ${formatDate(golden.evaluated_at)}` : ""}
+                {golden.evaluated_at ? ` · ${formatDate(new Date(golden.evaluated_at))}` : ""}
               </p>
             </>
           ) : (
