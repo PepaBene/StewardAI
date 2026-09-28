@@ -1,21 +1,31 @@
 import { describe, expect, it } from "vitest";
 
-import type { JobSummary, KpiStatus, ThesisKPI, VerdictOut } from "@/lib/api/client";
+import type { FactOut, JobSummary, KpiStatus, ThesisKPI, VerdictOut } from "@/lib/api/client";
 
 import {
   affectedKpis,
   allowedReviewActions,
   apiErrorDetail,
   describeReviewFailure,
+  feedsKpis,
+  filedCorrection,
   formatInFactScale,
+  highlightValue,
+  historyAgainstClaim,
   isHeld,
   kpiStatusSnapshot,
+  matchesTier,
   metricsRelated,
+  moveSelection,
   parseCorrectedValue,
   parseReviewTicker,
+  parseTierFilter,
   REASON_MAX,
   reviewQueueHref,
   scaleHint,
+  sortOldestFirst,
+  tierFilterLabel,
+  tierFilterOptions,
   unitsToPrinted,
   validateReview,
   verdictRunOutcome,
@@ -205,5 +215,103 @@ describe("review errors", () => {
     );
     expect(describeReviewFailure(404, { detail: "No fact 3" })).toBe("This figure no longer exists (No fact 3).");
     expect(describeReviewFailure(500, undefined)).toBe("The API answered HTTP 500.");
+  });
+});
+
+describe("review queue master / detail", () => {
+  const item = (id: number, extracted_at: string, source_tier: number | null) => ({
+    ticker: "X",
+    fact: { id, extracted_at, source_tier },
+  });
+
+  it("lists the oldest extraction first and filters by source tier", () => {
+    const items = [item(3, "2026-09-02T00:00:00Z", 1), item(1, "2026-09-03T00:00:00Z", 3), item(2, "2026-09-02T00:00:00Z", null)];
+    expect(sortOldestFirst(items).map((i) => i.fact.id)).toEqual([2, 3, 1]);
+    expect(tierFilterOptions(items)).toEqual([
+      { filter: "all", count: 3 },
+      { filter: 1, count: 1 },
+      { filter: 3, count: 1 },
+      { filter: "none", count: 1 },
+    ]);
+    expect(items.filter((i) => matchesTier(i, "none")).map((i) => i.fact.id)).toEqual([2]);
+    expect(parseTierFilter("2")).toBe(2);
+    expect(parseTierFilter("none")).toBe("none");
+    expect(parseTierFilter("7")).toBe("all");
+    expect(tierFilterLabel(3)).toBe("Tier 3");
+  });
+
+  it("moves the selection with J/K inside the list", () => {
+    expect(moveSelection([], null, 1)).toBeNull();
+    expect(moveSelection([5, 6, 7], null, 1)).toBe(5);
+    expect(moveSelection([5, 6, 7], 5, 1)).toBe(6);
+    expect(moveSelection([5, 6, 7], 7, 1)).toBe(7);
+    expect(moveSelection([5, 6, 7], 5, -1)).toBe(5);
+    expect(moveSelection([5, 6, 7], 99, -1)).toBe(5);
+  });
+
+  it("finds the printed value in the snippet, or its number", () => {
+    expect(highlightValue("backlog now exceeds €18.1 billion, up", "€18.1 billion")).toEqual({
+      before: "backlog now exceeds ",
+      match: "€18.1 billion",
+      after: ", up",
+    });
+    expect(highlightValue("expected to be 8 to 11% at CER", "11%")?.match).toBe("11%");
+    expect(highlightValue("backlog of EUR 18.1bn", "€18.1 billion")?.match).toBe("18.1");
+    expect(highlightValue("nothing here", "42")).toBeNull();
+  });
+
+  const hf = (id: number, fiscal_period: string, period_end: string, value_units: number, extra: Partial<FactOut> = {}) =>
+    ({
+      id,
+      metric: "cloud_revenue",
+      basis: "reported",
+      status: "verified",
+      value_units,
+      fiscal_year: 2026,
+      fiscal_period,
+      period_end,
+      period: `FY2026 ${fiscal_period}`,
+      scale: "billions",
+      ...extra,
+    }) as FactOut;
+
+  it("puts the claim after the same metric's other figures, in the claim's scale", () => {
+    const claim = hf(9, "Q3", "2026-09-30", 5.6e9, { status: "unverified" });
+    const facts = [
+      hf(2, "Q2", "2026-06-30", 5.1e9),
+      hf(1, "Q1", "2026-03-31", 4.99e9),
+      hf(3, "Q2", "2026-06-30", 5.0e9, { status: "unverified" }),
+      hf(4, "Q1", "2026-03-31", 1e9, { status: "rejected" }),
+      hf(5, "Q1", "2026-03-31", 1e9, { metric: "other" }),
+      hf(6, "Q1", "2026-03-31", 1e9, { basis: "adjusted" }),
+      claim,
+    ];
+    expect(historyAgainstClaim(claim, facts)).toEqual([
+      { id: 1, label: "Q1·26", value: 4.99, claim: false },
+      { id: 2, label: "Q2·26", value: 5.1, claim: false },
+      { id: 9, label: "Claim", value: 5.6, claim: true },
+    ]);
+    expect(historyAgainstClaim(claim, [claim])).toEqual([]);
+    expect(historyAgainstClaim(claim, facts, 1).map((b) => b.id)).toEqual([2, 9]);
+  });
+
+  it("offers the filing's value as a correction in the printed scale", () => {
+    const fact = { scale: "billions", unit: "currency", currency: "USD", value: 2.8 } as const;
+    const rows = [
+      { xbrl_value: 2_846_000_000, outcome: "mismatch", checked_at: "2026-09-02T00:00:00Z" },
+      { xbrl_value: null, outcome: "no_data", checked_at: "2026-09-03T00:00:00Z" },
+    ];
+    expect(filedCorrection(fact, rows)).toEqual({ value: "2.846", display: "USD 2.846 bn" });
+    expect(filedCorrection(fact, [{ xbrl_value: 2_800_000_000, outcome: "match", checked_at: "x" }])).toBeNull();
+    expect(filedCorrection(fact, [])).toBeNull();
+  });
+
+  it("names the KPIs a figure feeds, same basis only", () => {
+    const kpis = [
+      kpi("growth", "current_cloud_backlog_growth"),
+      kpi("margin", "operating_margin"),
+      { ...kpi("adj", "current_cloud_backlog"), basis: "adjusted" as const },
+    ];
+    expect(feedsKpis({ metric: "current_cloud_backlog", basis: "reported" }, kpis).map((k) => k.id)).toEqual(["growth"]);
   });
 });
