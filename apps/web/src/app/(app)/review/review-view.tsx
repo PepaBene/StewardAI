@@ -14,7 +14,6 @@ import { ProvenanceTag } from "@/components/evidence/provenance-tag";
 import { isTypingTarget, ReviewActionBar } from "@/components/evidence/review-action-bar";
 import { FeedbackControl } from "@/components/feedback/feedback-control";
 import { PageHeader } from "@/components/page-header";
-import { HoldingsTabs } from "@/components/portfolio/holdings-tabs";
 import { Blueprint, BlueprintCorners } from "@/components/ui/blueprint";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
@@ -132,7 +131,6 @@ export function ReviewView() {
           </Button>
         }
       />
-      <HoldingsTabs />
       <p className="-mt-2 max-w-prose text-sm text-text-muted">
         Held by the validator or quarantined by reconciliation, none of these is used in a verdict until you accept or
         correct it. Every decision needs a reason and re-judges the holding&rsquo;s verdicts.

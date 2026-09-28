@@ -17,7 +17,6 @@ import { BarChart, CATEGORICAL_BG, Donut, Gauge, SparkArea } from "@/components/
 import { EmptyState } from "@/components/empty-state";
 import { JobStatusBadge } from "@/components/jobs/job-status-badge";
 import { PageHeader } from "@/components/page-header";
-import { HoldingsTabs } from "@/components/portfolio/holdings-tabs";
 import { Blueprint } from "@/components/ui/blueprint";
 import { Button } from "@/components/ui/button";
 import { getBrowserApiClient, type JobSummary, type ThesisBoard } from "@/lib/api/client";
@@ -58,7 +57,6 @@ export function ThesisBoardView() {
         description="Each holding's thesis, scored from its KPIs against the latest verified figures."
         aside={<RejudgeAll onDone={reload} />}
       />
-      <HoldingsTabs />
 
       {state.kind === "loading" ? (
         <p className="flex items-center gap-2 text-sm text-text-muted" role="status">
