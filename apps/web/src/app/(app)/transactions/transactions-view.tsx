@@ -511,7 +511,7 @@ function TransactionTable({ rows, busy }: { rows: TransactionOut[]; busy: boolea
     largest.set(k, Math.max(largest.get(k) ?? 0, Math.abs(r.amount)));
   }
   return (
-    <div className={cn("overflow-x-auto", busy && "opacity-60")}>
+    <div className={cn("relative overflow-x-auto", busy && "opacity-60")}>
       <table className="w-full min-w-[56rem] text-sm">
         <caption className="sr-only">Transactions, newest first</caption>
         <thead className="bg-surface-muted">
@@ -631,7 +631,7 @@ function Totals({ totals, count }: { totals: TotalByCurrency[]; count: number })
       {totals.length === 0 ? (
         <p className="text-sm text-text-muted">No transactions match these filters.</p>
       ) : (
-        <div className="-mx-5.5 overflow-x-auto">
+        <div className="relative -mx-5.5 overflow-x-auto">
           <table className="w-full min-w-[32rem] text-sm">
             <caption className="sr-only">Count and sum of amounts per type, subtype and currency over every matching transaction</caption>
             <thead className="bg-surface-muted">

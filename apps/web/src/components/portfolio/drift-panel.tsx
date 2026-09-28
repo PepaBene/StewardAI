@@ -94,7 +94,7 @@ export function DriftTable({ data }: { data: PortfolioOverview }) {
       ) : targeted.length === 0 && !cashRow ? (
         <p className="text-sm text-text-muted">The strategy sets no position or cash targets.</p>
       ) : (
-        <div className="-mx-6 overflow-x-auto px-6">
+        <div className="relative -mx-6 overflow-x-auto px-6">
           <table className="w-full min-w-[30rem] text-sm">
             <caption className="sr-only">Drift from target weights</caption>
             <thead>

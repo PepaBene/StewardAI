@@ -15,7 +15,7 @@ export function ReturnsHeatmap({ points, loading }: { points: readonly { date: s
     <Blueprint className="flex min-w-0 flex-col gap-3.5 px-6 py-5.5" aria-label="Monthly returns">
       <PanelHeading kicker="Returns" title="Monthly heatmap, time-weighted" action={rows.length ? <HeatScale cap={CAP} /> : null} />
       {rows.length ? (
-        <div className="-mx-6 overflow-x-auto px-6">
+        <div className="relative -mx-6 overflow-x-auto px-6">
           <Heatmap rows={rows} cap={CAP} scale={false} caption="Monthly returns, time-weighted (flow-adjusted)" className="min-w-[36rem]" />
         </div>
       ) : (
