@@ -36,6 +36,7 @@ export const JOB_TYPES = [
   "etf_look_through",
   "monthly_review",
   "chat",
+  "sec_xbrl",
 ] as const;
 export type JobType = (typeof JOB_TYPES)[number];
 

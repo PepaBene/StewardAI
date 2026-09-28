@@ -2117,6 +2117,49 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/holdings/{ticker}/segments": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Holding Segments
+         * @description Revenue by region, business segment and product as the company reports them: the
+         *     latest fiscal year (or quarter) from its SEC XBRL filing, with the earlier periods
+         *     stored for the same basis. Holdings outside EDGAR show the rows entered in their
+         *     holding profile, labelled as entered manually.
+         */
+        get: operations["get_holding_segments"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/jobs/sec-xbrl": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Run Sec Xbrl
+         * @description Read shares outstanding and revenue breakdowns from the SEC XBRL filings now.
+         */
+        post: operations["run_sec_xbrl"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -2517,7 +2560,7 @@ export interface components {
              * Critical Job Types
              * @description Job types that run normally at the monthly cap.
              */
-            critical_job_types?: ("portfolio_sync" | "earnings_check" | "thesis_verdicts" | "earnings_calendar" | "earnings_calendar_full" | "earnings_due" | "fact_reconcile" | "reference_data" | "price_history" | "holiday_refresh" | "macro_collect" | "event_escalation" | "monitor" | "news_ingest" | "daily_digest" | "weekly_digest" | "research" | "ownership_13f" | "etf_look_through" | "monthly_review" | "chat")[];
+            critical_job_types?: ("portfolio_sync" | "earnings_check" | "thesis_verdicts" | "earnings_calendar" | "earnings_calendar_full" | "earnings_due" | "fact_reconcile" | "reference_data" | "price_history" | "holiday_refresh" | "macro_collect" | "event_escalation" | "monitor" | "news_ingest" | "daily_digest" | "weekly_digest" | "research" | "ownership_13f" | "etf_look_through" | "monthly_review" | "chat" | "sec_xbrl")[];
             /**
              * Per Job Cap Usd
              * @description Most AI spend of one run of a job type, in USD. A run over it fails.
@@ -5082,6 +5125,26 @@ export interface components {
              * @default SEC Form 13F data sets
              */
             source: string;
+            /**
+             * Applicable
+             * @description False for holdings Form 13F cannot cover (non-US listings).
+             * @default true
+             */
+            applicable: boolean;
+            /** Not Applicable Reason */
+            not_applicable_reason?: string | null;
+            /** @description The denominator of the % figures, with its source. */
+            shares_outstanding?: components["schemas"]["SharesOutstandingOut"] | null;
+            /**
+             * Pct Of Shares Outstanding
+             * @description Aggregate institutional %: the latest period's figure.
+             */
+            pct_of_shares_outstanding?: number | null;
+            /**
+             * Basis Label
+             * @description What the % measures, e.g. "US 13F filers' holdings of the US line - a floor" for ADRs.
+             */
+            basis_label?: string | null;
         };
         /** HoldingPrices */
         HoldingPrices: {
@@ -5192,6 +5255,12 @@ export interface components {
             watch_topics?: string[];
             /** Exposures */
             exposures?: components["schemas"]["Exposure"][];
+            share_basis?: components["schemas"]["ShareBasis"];
+            /**
+             * Manual Segments
+             * @description Revenue by region / segment / product entered by hand; shown only when no SEC XBRL breakdown exists for the holding.
+             */
+            manual_segments?: components["schemas"]["ManualSegmentRow"][];
         };
         /**
          * HoldingProfilesConfig
@@ -5219,6 +5288,47 @@ export interface components {
             /** Note */
             note: string | null;
             body: components["schemas"]["HoldingProfilesConfig"];
+        };
+        /** HoldingSegments */
+        HoldingSegments: {
+            /** Ticker */
+            ticker: string;
+            /**
+             * Basis
+             * @description The period basis shown.
+             */
+            basis: ("annual" | "quarter") | null;
+            /** Available Bases */
+            available_bases: ("annual" | "quarter")[];
+            period: components["schemas"]["SegmentPeriod"] | null;
+            /** Currency */
+            currency: string | null;
+            /** Geographic */
+            geographic: components["schemas"]["SegmentRow"][];
+            /** Segment */
+            segment: components["schemas"]["SegmentRow"][];
+            /** Product */
+            product: components["schemas"]["SegmentRow"][];
+            /**
+             * Total Revenue
+             * @description The filing's undimensioned revenue for the period (a breakdown can sum to less: hedging gains, unallocated items).
+             */
+            total_revenue: number | string | null;
+            /**
+             * History
+             * @description Per breakdown, the same-basis periods stored, oldest first (at most 8).
+             */
+            history: {
+                [key: string]: components["schemas"]["SegmentHistoryPoint"][];
+            };
+            source: components["schemas"]["SegmentSource"] | null;
+            /**
+             * As Of
+             * @description Filing date (SEC) or period end (manual).
+             */
+            as_of: string | null;
+            /** Notes */
+            notes?: string[];
         };
         /** HoldingsPrices */
         HoldingsPrices: {
@@ -5581,6 +5691,8 @@ export interface components {
             ownership_13f?: components["schemas"]["JobSchedule"];
             /** @description ETF look-through: the funds' holdings from iShares and Vanguard, skipped when the as-of date has not moved. Default: Saturdays 06:40. */
             etf_look_through?: components["schemas"]["JobSchedule"];
+            /** @description Shares outstanding and revenue by region / segment from the holdings' latest SEC XBRL filings; only filings not parsed yet are downloaded. Default: Tuesdays 05:40. */
+            sec_xbrl?: components["schemas"]["JobSchedule"];
             earnings_check?: components["schemas"]["EarningsCheckSettings"];
             earnings_calendar_settings?: components["schemas"]["EarningsCalendarSettings"];
             news?: components["schemas"]["NewsSettings"];
@@ -5595,6 +5707,7 @@ export interface components {
             review?: components["schemas"]["ReviewSettings"];
             ownership?: components["schemas"]["OwnershipSettings"];
             look_through?: components["schemas"]["LookThroughSettings"];
+            xbrl?: components["schemas"]["XbrlSettings"];
         };
         /** JobsConfigVersion */
         JobsConfigVersion: {
@@ -5952,6 +6065,48 @@ export interface components {
             shares: number | string | null;
             /** Accession */
             accession: string;
+        };
+        /**
+         * ManualSegmentRow
+         * @description Revenue for one region, segment or product, entered by hand from an annual report
+         *     (for issuers whose filings carry no machine-readable breakdown, e.g. CEZ and KB).
+         */
+        ManualSegmentRow: {
+            /**
+             * Label
+             * @example Czech Republic
+             */
+            label: string;
+            /**
+             * Axis
+             * @enum {string}
+             */
+            axis: "geographic" | "segment" | "product";
+            /**
+             * Value
+             * @description Revenue in `currency` for the period.
+             */
+            value: number;
+            /**
+             * Currency
+             * @example CZK
+             */
+            currency: string;
+            /**
+             * Period Start
+             * Format: date
+             */
+            period_start: string;
+            /**
+             * Period End
+             * Format: date
+             */
+            period_end: string;
+            /**
+             * Source
+             * @description Where the figure comes from, e.g. 'Annual Report 2025, segment note, p. 212'.
+             */
+            source: string;
         };
         /** MarketHoliday */
         MarketHoliday: {
@@ -6482,6 +6637,11 @@ export interface components {
             new_holders: number | null;
             /** Exited Holders */
             exited_holders: number | null;
+            /**
+             * Pct Of Shares Outstanding
+             * @description All 13F holders' shares (x ads_ratio) / shares outstanding, as a fraction.
+             */
+            pct_of_shares_outstanding?: number | null;
         };
         /**
          * OwnershipSettings
@@ -7805,6 +7965,98 @@ export interface components {
             /** Score */
             score: number;
         };
+        /** SegmentHistoryPoint */
+        SegmentHistoryPoint: {
+            period: components["schemas"]["SegmentPeriod"];
+            /** Rows */
+            rows: components["schemas"]["SegmentRow"][];
+        };
+        /** SegmentPeriod */
+        SegmentPeriod: {
+            /**
+             * Start
+             * Format: date
+             */
+            start: string;
+            /**
+             * End
+             * Format: date
+             */
+            end: string;
+            /** Months */
+            months: number;
+            /** Basis */
+            basis: ("annual" | "quarter") | null;
+            /**
+             * Label
+             * @description "FY2025" for a fiscal year, else "3M to 30 Jun 2026".
+             */
+            label: string;
+        };
+        /** SegmentRow */
+        SegmentRow: {
+            /**
+             * Label
+             * @description As the filing labels the member.
+             */
+            label: string;
+            /**
+             * Member
+             * @description XBRL member (e.g. country:US); null when manual.
+             */
+            member: string | null;
+            /** Value */
+            value: number | string;
+            /**
+             * Share
+             * @description Fraction of the breakdown's sum (subtotals excluded); null for a subtotal.
+             */
+            share: number | null;
+            /**
+             * Subtotal
+             * @description The sum of other members shown (e.g. a region group).
+             * @default false
+             */
+            subtotal: boolean;
+            /** Concept */
+            concept?: string | null;
+            /**
+             * Label Source
+             * @default filing
+             * @enum {string}
+             */
+            label_source: "filing" | "derived" | "manual";
+        };
+        /** SegmentSource */
+        SegmentSource: {
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "sec_xbrl" | "manual";
+            /**
+             * Tier
+             * @description Provenance label for the UI.
+             */
+            tier: string;
+            /** Form */
+            form?: string | null;
+            /** Accession */
+            accession?: string | null;
+            /** Filed */
+            filed?: string | null;
+            /** Instance Url */
+            instance_url?: string | null;
+            /** Label Url */
+            label_url?: string | null;
+            /** Filing Url */
+            filing_url?: string | null;
+            /**
+             * Note
+             * @description Manual rows: where they come from.
+             */
+            note?: string | null;
+        };
         /** Sentence */
         Sentence: {
             /** Text */
@@ -7855,6 +8107,116 @@ export interface components {
             event_type: "guidance_change" | "m_and_a" | "dividend_cut" | "earnings_release" | "management_change" | "regulatory_legal" | "capital_allocation" | "credit_rating" | "central_bank" | "macro_surprise" | "insider_transaction" | "product_business" | "sector_competitor" | "index_change" | "analyst_rating" | "delisting" | "entity_status" | "other";
             /** Severity */
             severity: number;
+        };
+        /**
+         * ShareBasis
+         * @description How a holding's 13F figures (shares of its US line) compare with shares outstanding.
+         *
+         *     Defaults when a field is empty (steward.fundamentals.shares.DEFAULT_BASIS_BY_CIK): one US
+         *     share represents one home-market share, except TSM (1 ADS = 5 common shares, as its
+         *     20-F states); where a filing tags shares outstanding per class, every class is counted
+         *     (Alphabet A+B+C, Novo Nordisk A+B). Narrow it to the class the US line is, e.g. GOOGL
+         *     us-gaap:CommonClassAMember or NVO nvo:BShareCapitalMember.
+         */
+        ShareBasis: {
+            /**
+             * Ads Ratio
+             * @description Home-market shares represented by one share of the US-listed line (ADS ratio). Empty: the default (TSM 5, others 1).
+             */
+            ads_ratio?: number | null;
+            /**
+             * Share Classes
+             * @description Share-class members counted in the denominator when the filing tags shares outstanding per class, e.g. us-gaap:CommonClassAMember. Empty (the default): all classes.
+             */
+            share_classes?: string[];
+            /**
+             * Manual Shares Outstanding
+             * @description Shares outstanding entered by hand, for issuers that do not file XBRL with the SEC (e.g. Prague-listed companies). Used only when no SEC figure exists.
+             */
+            manual_shares_outstanding?: number | null;
+            /**
+             * Manual As Of
+             * @description Date the manual figure is for.
+             */
+            manual_as_of?: string | null;
+            /**
+             * Manual Source
+             * @description Where the manual figure comes from, e.g. 'CEZ shareholder structure page'.
+             * @default
+             */
+            manual_source: string;
+        };
+        /** ShareClassOut */
+        ShareClassOut: {
+            /** Member */
+            member: string;
+            /** Label */
+            label: string;
+            /** Shares */
+            shares: number | string;
+            /** Counted */
+            counted: boolean;
+        };
+        /** SharesOutstandingOut */
+        SharesOutstandingOut: {
+            /**
+             * Shares
+             * @description Home-market shares outstanding (the denominator).
+             */
+            shares: number | string;
+            /**
+             * As Of
+             * Format: date
+             */
+            as_of: string;
+            /** Method */
+            method: string;
+            /** Method Label */
+            method_label: string;
+            /**
+             * Classes
+             * @description Per class when the filing tags classes.
+             */
+            classes?: components["schemas"]["ShareClassOut"][];
+            /**
+             * Denominator Label
+             * @description e.g. "all share classes (A + B + C)".
+             */
+            denominator_label: string;
+            /** Accession */
+            accession: string | null;
+            /** Form */
+            form: string | null;
+            /** Filed */
+            filed: string | null;
+            /** Source Url */
+            source_url: string | null;
+            /** Source Tier */
+            source_tier: string;
+            /**
+             * Ads Ratio
+             * @description Home-market shares per US-listed share applied.
+             */
+            ads_ratio: number | string;
+            /**
+             * Ads Ratio Source
+             * @enum {string}
+             */
+            ads_ratio_source: "profile" | "default";
+            /**
+             * Ads Ratio Reported
+             * @description The ratio the latest 20-F states, when read.
+             */
+            ads_ratio_reported?: number | string | null;
+            /** Ads Ratio Text */
+            ads_ratio_text?: string | null;
+            /**
+             * Foreign Issuer
+             * @description Files a 20-F / 40-F (its US line is an ADR/NYRS).
+             */
+            foreign_issuer: boolean;
+            /** Notes */
+            notes?: string[];
         };
         /** SharpeStats */
         SharpeStats: {
@@ -8414,6 +8776,11 @@ export interface components {
              * @description (shares - prev_shares) / prev_shares, as a fraction (0.125 = +12.5 %); null when prev_shares is null or zero.
              */
             shares_change_pct?: number | null;
+            /**
+             * Pct Of Shares Outstanding
+             * @description shares x ads_ratio / shares outstanding, as a fraction; null without a shares-outstanding figure.
+             */
+            pct_of_shares_outstanding?: number | null;
         };
         /** TotalByCurrency */
         TotalByCurrency: {
@@ -8785,6 +9152,50 @@ export interface components {
              * Format: date-time
              */
             fetched_at: string;
+        };
+        /** XbrlRunRequest */
+        XbrlRunRequest: {
+            /**
+             * Ticker
+             * @description One holding, or all when null.
+             */
+            ticker?: string | null;
+            /**
+             * Force
+             * @description Parse the latest filings again.
+             * @default false
+             */
+            force: boolean;
+        };
+        /**
+         * XbrlSettings
+         * @description SEC XBRL fundamentals: shares outstanding and revenue by region / segment / product,
+         *     read from each holding's latest 10-K / 10-Q / 20-F XBRL instance.
+         */
+        XbrlSettings: {
+            /**
+             * Enabled
+             * @default true
+             */
+            enabled: boolean;
+            /**
+             * Quarterly
+             * @description Also parse the latest 10-Q when it is newer than the annual report (US issuers; 20-F filers publish annual XBRL only).
+             * @default true
+             */
+            quarterly: boolean;
+            /**
+             * Read Ads Ratio
+             * @description For 20-F filers, read the ADS ratio the annual report states ('each ADS represents five common shares') to check the configured share basis. Downloads the report's main document (up to about 10 MB) once per new 20-F.
+             * @default true
+             */
+            read_ads_ratio: boolean;
+            /**
+             * Max Document Mb
+             * @description Largest filing document downloaded.
+             * @default 40
+             */
+            max_document_mb: number;
         };
     };
     responses: never;
@@ -12191,6 +12602,73 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ActionOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_holding_segments: {
+        parameters: {
+            query?: {
+                /** @description annual or quarter */
+                basis?: ("annual" | "quarter") | null;
+            };
+            header?: never;
+            path: {
+                ticker: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HoldingSegments"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    run_sec_xbrl: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["XbrlRunRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["JobSummary"];
                 };
             };
             /** @description Validation Error */

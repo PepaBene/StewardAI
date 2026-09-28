@@ -37,6 +37,7 @@ const FULL: JobsConfig = {
   monthly_review: { enabled: true, cron: "0 8 1-3 * *", timezone: "Europe/Prague" },
   ownership_13f: { enabled: false, cron: "0 6 10 * *", timezone: "America/New_York" },
   etf_look_through: { enabled: true, cron: "0 7 * * 0", timezone: "UTC" },
+  sec_xbrl: { enabled: false, cron: "0 6 * * wed", timezone: "UTC" },
   earnings_check: {
     extraction_model: "claude-opus-5-5",
     locate_model: "claude-sonnet-5",
@@ -144,6 +145,7 @@ const FULL: JobsConfig = {
     stale_after_days: 90,
     keep_snapshots: 4,
   },
+  xbrl: { enabled: false, quarterly: false, read_ads_ratio: false, max_document_mb: 20 },
 };
 
 describe("jobs form", () => {

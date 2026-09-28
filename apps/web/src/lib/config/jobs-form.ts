@@ -28,7 +28,8 @@ export type SettingsKey =
   | "chat"
   | "review"
   | "ownership"
-  | "look_through";
+  | "look_through"
+  | "xbrl";
 type Settings<S extends SettingsKey> = NonNullable<JobsConfig[S]>;
 
 /** Labels and the backend's default cron per known schedule (apps/backend/src/steward/config/jobs.py). */
@@ -113,6 +114,12 @@ export const SCHEDULES: Record<ScheduleKey, { label: string; description: string
     label: "ETF look-through",
     description: "The funds' holdings from iShares and Vanguard (skipped when the as-of date has not moved).",
     cron: "40 6 * * 6",
+  },
+  sec_xbrl: {
+    label: "SEC XBRL fundamentals",
+    description:
+      "Shares outstanding (the 13F % denominator) and revenue by region / segment from the holdings' latest 10-K, 10-Q and 20-F XBRL. Only filings not parsed yet are downloaded.",
+    cron: "40 5 * * 2",
   },
 };
 export const SCHEDULE_KEYS = Object.keys(SCHEDULES) as ScheduleKey[];
@@ -262,6 +269,7 @@ export const DEFAULT_JOBS: JobsConfig = {
     stale_after_days: 60,
     keep_snapshots: 12,
   },
+  xbrl: { enabled: true, quarterly: true, read_ads_ratio: true, max_document_mb: 40 },
 };
 
 /** Model ids offered as suggestions; any `claude-…` id is accepted. */
@@ -487,6 +495,22 @@ export const SETTINGS: { [S in SettingsKey]: { title: string; description: strin
       { key: "stale_after_days", label: "Label a snapshot stale after (days)", kind: "int", min: 7, max: 400, hint: "Vanguard publishes month-end data a few weeks late." },
       { key: "keep_snapshots", label: "Snapshots kept per fund", kind: "int", min: 1, max: 200 },
       { key: "vanguard_consumer_id", label: "Vanguard X-Consumer-ID", kind: "text", hint: "ie0 for www.ie.vanguard (uk0 for vanguard.co.uk, de0 for de.vanguard)." },
+    ],
+  },
+  xbrl: {
+    title: "SEC XBRL fundamentals",
+    description:
+      "Shares outstanding and revenue by region / segment / product from each holding's latest XBRL filing (SEC EDGAR, official).",
+    fields: [
+      { key: "enabled", label: "Read SEC XBRL filings", kind: "bool", hint: "Off: the scheduled run does nothing." },
+      { key: "quarterly", label: "Also parse the latest 10-Q", kind: "bool", hint: "US issuers; 20-F filers publish annual XBRL only." },
+      {
+        key: "read_ads_ratio",
+        label: "Read the ADS ratio from 20-F text",
+        kind: "bool",
+        hint: "Checks the share basis against what the annual report states (one download per new 20-F).",
+      },
+      { key: "max_document_mb", label: "Largest document (MB)", kind: "int", min: 1, max: 200 },
     ],
   },
 };

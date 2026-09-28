@@ -27,6 +27,7 @@ import { HoldingNews, useHoldingNews } from "@/components/news/holding-news";
 import { IdentitySection, useHoldingIdentity } from "@/components/reference/identity-section";
 import { OwnershipSection, useHoldingOwnership } from "@/components/reference/ownership-section";
 import { PriceRiskSection } from "@/components/reference/price-risk-section";
+import { SegmentsPanel } from "@/components/reference/segments-panel";
 import { HoldingResearch } from "@/components/research/holding-research";
 import { Blueprint, PanelHeading } from "@/components/ui/blueprint";
 import { Button } from "@/components/ui/button";
@@ -262,6 +263,8 @@ export function HoldingContent({
         <TimelinePanel ticker={ticker} entries={timeline} loaded={news.items !== null || news.failed} />
         <HoldersPanel data={current(ownership.state)} loaded={ownership.state.kind !== "loading"} />
       </div>
+
+      <SegmentsPanel ticker={ticker} />
 
       <Blueprint aria-labelledby="thesis-heading" className="space-y-5 px-[22px] py-5">
         <PanelHeading

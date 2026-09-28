@@ -8,6 +8,7 @@ import { BarChart, CandleChart, DrawdownChart, HBar, Radar, Ring } from "@/compo
 import { openChatPanel } from "@/components/chat/chat-panel";
 import { BandBadge } from "@/components/portfolio/band-badge";
 import { FreshnessLabel } from "@/components/portfolio/freshness-label";
+import { OutstandingNote } from "@/components/reference/outstanding-note";
 import { Blueprint, PanelHeading } from "@/components/ui/blueprint";
 import { Button } from "@/components/ui/button";
 import type {
@@ -49,6 +50,7 @@ import {
   type CandleRangeId,
   type TimelineEntry,
 } from "@/lib/reference/holding-detail";
+import { formatOutstandingPct, holderPctByCik } from "@/lib/reference/shares-outstanding";
 import { isExternalUrl } from "@/lib/sources/sources";
 import { cn } from "@/lib/utils";
 
@@ -766,15 +768,21 @@ export function TimelinePanel({ ticker, entries, loaded }: { ticker: string; ent
 
 export function HoldersPanel({ data, loaded }: { data: HoldingOwnership | null; loaded: boolean }) {
   const rows = data ? holderBars(data.top_holders, data.top_holders_previous_period) : [];
+  const pctOut = holderPctByCik(data);
   const period = data?.periods[0]?.period ?? null;
   return (
     <Panel id="holders-heading" kicker="Ownership · Form 13F" title="Largest reported holders">
       {rows.length === 0 ? (
-        <p className="text-sm text-text-muted">{loaded ? "No 13F holders reported for this holding." : "Loading…"}</p>
+        <p className="text-sm text-text-muted">
+          {!loaded ? "Loading…" : data?.applicable === false ? "Not covered by Form 13F." : "No 13F holders reported for this holding."}
+        </p>
       ) : (
         <ul className="flex flex-col gap-2">
           {rows.map((r) => (
-            <li key={r.key} className="grid grid-cols-[minmax(0,9.5rem)_1fr_4rem_3.75rem] items-center gap-2.5 text-[13px]">
+            <li
+              key={r.key}
+              className="grid grid-cols-[minmax(0,7rem)_1fr_3.5rem_3.25rem_3.5rem] items-center gap-2 text-[13px] sm:grid-cols-[minmax(0,9.5rem)_1fr_4rem_3.5rem_3.75rem] sm:gap-2.5"
+            >
               <span className="truncate" title={r.name}>
                 {r.name}
               </span>
@@ -783,6 +791,9 @@ export function HoldersPanel({ data, loaded }: { data: HoldingOwnership | null; 
               </span>
               <span className="num text-right" title={`${formatNumber(r.shares)} shares`}>
                 {formatCompact(r.shares)}
+              </span>
+              <span className="num text-right" title="of shares outstanding">
+                {formatOutstandingPct(pctOut.get(r.key))}
               </span>
               <span
                 className={cn(
@@ -805,6 +816,7 @@ export function HoldersPanel({ data, loaded }: { data: HoldingOwnership | null; 
             : ""}
         </p>
       ) : null}
+      <OutstandingNote data={data} />
     </Panel>
   );
 }

@@ -809,6 +809,27 @@ class LookThroughSettings(ConfigModel):
         return next((f for f in self.funds if f.isin == isin), None)
 
 
+class XbrlSettings(ConfigModel):
+    """SEC XBRL fundamentals: shares outstanding and revenue by region / segment / product,
+    read from each holding's latest 10-K / 10-Q / 20-F XBRL instance."""
+
+    enabled: bool = True
+    quarterly: bool = Field(
+        default=True,
+        description="Also parse the latest 10-Q when it is newer than the annual report "
+        "(US issuers; 20-F filers publish annual XBRL only).",
+    )
+    read_ads_ratio: bool = Field(
+        default=True,
+        description="For 20-F filers, read the ADS ratio the annual report states ('each ADS "
+        "represents five common shares') to check the configured share basis. Downloads the "
+        "report's main document (up to about 10 MB) once per new 20-F.",
+    )
+    max_document_mb: int = Field(
+        default=40, ge=1, le=200, description="Largest filing document downloaded."
+    )
+
+
 class JobsConfig(ConfigModel):
     """Schedules for the worker's timed jobs. Stored as `config_version` rows, domain `jobs`.
 
@@ -895,6 +916,12 @@ class JobsConfig(ConfigModel):
         description="ETF look-through: the funds' holdings from iShares and Vanguard, skipped "
         "when the as-of date has not moved. Default: Saturdays 06:40.",
     )
+    sec_xbrl: JobSchedule = Field(
+        default_factory=lambda: JobSchedule(cron="40 5 * * 2"),
+        description="Shares outstanding and revenue by region / segment from the holdings' "
+        "latest SEC XBRL filings; only filings not parsed yet are downloaded. Default: "
+        "Tuesdays 05:40.",
+    )
     earnings_check: EarningsCheckSettings = Field(default_factory=EarningsCheckSettings)
     earnings_calendar_settings: EarningsCalendarSettings = Field(
         default_factory=EarningsCalendarSettings
@@ -911,6 +938,7 @@ class JobsConfig(ConfigModel):
     review: ReviewSettings = Field(default_factory=ReviewSettings)
     ownership: OwnershipSettings = Field(default_factory=OwnershipSettings)
     look_through: LookThroughSettings = Field(default_factory=LookThroughSettings)
+    xbrl: XbrlSettings = Field(default_factory=XbrlSettings)
 
     def schedules(self) -> dict[str, JobSchedule]:
         return {
@@ -930,6 +958,7 @@ class JobsConfig(ConfigModel):
             "monthly_review": self.monthly_review,
             "ownership_13f": self.ownership_13f,
             "etf_look_through": self.etf_look_through,
+            "sec_xbrl": self.sec_xbrl,
         }
 
     def next_run_after(self, job_type: str, moment: dt.datetime) -> dt.datetime | None:
