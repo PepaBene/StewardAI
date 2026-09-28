@@ -1,5 +1,7 @@
 import type { DriftReport, StrategyConfig, StrategyRule as Rule } from "@/lib/api/client";
 
+import { shortTicker } from "./ticker";
+
 /*
  * Strategy rule compliance for the Overview, evaluated client-side against the drift report
  * the page already has — the same checks as the backend (steward/portfolio/breaches.py
@@ -45,9 +47,7 @@ function pct(x: number | null | undefined, digits = 1): string {
   return x === null || x === undefined || !Number.isFinite(x) ? "—" : `${(x * 100).toFixed(digits)}%`;
 }
 
-function short(ticker: string): string {
-  return ticker.replace(/_(US_)?EQ$/, "").replace(/[a-z]$/, "");
-}
+const short = shortTicker;
 
 /** Position band row: targeted positions inside their band. Null when nothing has a target. */
 export function positionBandsRow(drift: DriftReport): ComplianceRow | null {

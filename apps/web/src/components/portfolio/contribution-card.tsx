@@ -5,12 +5,12 @@ import { useCallback, useState } from "react";
 
 import { AlertMessage } from "@/components/alert-message";
 import { ContributionWaterfall } from "@/components/portfolio/contribution-waterfall";
+import { RangeButtons } from "@/components/portfolio/range-buttons";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Blueprint, PanelHeading } from "@/components/ui/blueprint";
 import { getBrowserApiClient, type ContributionReport } from "@/lib/api/client";
 import { useApiResource } from "@/lib/hooks/use-api-resource";
 import { DEFAULT_RANGE, PRICE_RANGES, rangeDays, type PriceRangeId } from "@/lib/reference/prices";
-import { cn } from "@/lib/utils";
 
 /**
  * Per-holding contribution to the period's return (§5.4), self-fetching its own window
@@ -28,54 +28,37 @@ export function ContributionCard() {
   const data = state.kind === "ok" ? state.data : state.kind === "error" ? state.previous : null;
 
   return (
-    <Card>
-      <CardHeader className="flex-row flex-wrap items-center justify-between gap-2 space-y-0">
-        <div>
-          <CardTitle>Contribution to return</CardTitle>
-          <CardDescription>Why the portfolio moved: each holding&rsquo;s own trading netted out.</CardDescription>
-        </div>
-        <RangeSelector value={range} onChange={setRange} />
-      </CardHeader>
-      <CardContent>
-        {state.kind === "loading" ? (
-          <p className="flex items-center gap-2 text-sm text-text-muted" role="status">
-            <LoaderCircleIcon aria-hidden="true" className="size-4 animate-spin" />
-            Loading contribution…
-          </p>
-        ) : null}
-        {state.kind === "error" ? (
-          <AlertMessage title={state.title}>
-            <p>{state.detail}</p>
-            <Button variant="outline" size="sm" className="mt-2" onClick={() => reload()}>
-              <RefreshCwIcon aria-hidden="true" />
-              Try again
-            </Button>
-          </AlertMessage>
-        ) : null}
-        {data ? <ContributionContent data={data} /> : null}
-      </CardContent>
-    </Card>
-  );
-}
-
-function RangeSelector({ value, onChange }: { value: PriceRangeId; onChange: (id: PriceRangeId) => void }) {
-  return (
-    <div role="group" aria-label="Contribution period" className="inline-flex rounded-md border border-border bg-surface-raised p-0.5">
-      {PRICE_RANGES.map((r) => (
-        <button
-          key={r.id}
-          type="button"
-          aria-pressed={value === r.id}
-          onClick={() => onChange(r.id)}
-          className={cn(
-            "rounded-sm px-2.5 py-1 text-xs font-medium",
-            value === r.id ? "bg-accent text-accent-foreground" : "text-text-muted hover:bg-surface-muted hover:text-text",
-          )}
-        >
-          {r.label}
-        </button>
-      ))}
-    </div>
+    <Blueprint className="flex min-w-0 flex-col gap-4 px-6 py-5.5" aria-label="Contribution to return">
+      <PanelHeading
+        kicker="Contribution"
+        title="Why the portfolio moved"
+        action={
+          <RangeButtons
+            options={PRICE_RANGES.map((r) => ({ id: r.id, label: r.label }))}
+            value={range}
+            onChange={setRange}
+            label="Contribution period"
+          />
+        }
+      />
+      <p className="-mt-2 text-xs text-text-muted">Each holding&rsquo;s contribution to the return, its own trading netted out.</p>
+      {state.kind === "loading" ? (
+        <p className="flex items-center gap-2 text-sm text-text-muted" role="status">
+          <LoaderCircleIcon aria-hidden="true" className="size-4 animate-spin" />
+          Loading contribution…
+        </p>
+      ) : null}
+      {state.kind === "error" ? (
+        <AlertMessage title={state.title}>
+          <p>{state.detail}</p>
+          <Button variant="outline" size="sm" className="mt-2" onClick={() => reload()}>
+            <RefreshCwIcon aria-hidden="true" />
+            Try again
+          </Button>
+        </AlertMessage>
+      ) : null}
+      {data ? <ContributionContent data={data} /> : null}
+    </Blueprint>
   );
 }
 

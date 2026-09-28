@@ -4,6 +4,7 @@ import { Bar, BarChart, Cell, ReferenceLine, ResponsiveContainer, Tooltip, XAxis
 
 import type { HoldingContribution } from "@/lib/api/client";
 import { formatMoney } from "@/lib/format";
+import { shortTicker } from "@/lib/portfolio/ticker";
 
 const AXIS_TICK = { fill: "var(--text-muted)", fontSize: 12 };
 
@@ -21,7 +22,7 @@ function ChartTooltip({
   if (!row) return null;
   return (
     <div className="num rounded-md border border-border bg-surface-raised px-3 py-2 text-xs shadow-md">
-      <span className="font-medium text-text">{row.name ?? row.ticker}</span>:{" "}
+      <span className="font-medium text-text">{row.name ?? row.ticker}</span> <span className="font-mono text-text-muted">{row.ticker}</span>:{" "}
       {formatMoney(row.contribution_base, currency, { signed: true })}
     </div>
   );
@@ -36,10 +37,10 @@ function ChartTooltip({
  */
 export function ContributionWaterfall({ holdings, currency, label }: { holdings: HoldingContribution[]; currency: string; label: string }) {
   if (holdings.length === 0) return null;
-  const rows = holdings.map((h) => ({ ...h, label: h.name ?? h.ticker }));
+  const rows = holdings.map((h) => ({ ...h, label: shortTicker(h.ticker) }));
   const bound = Math.max(1, ...rows.map((r) => Math.abs(r.contribution_base))) * 1.15;
   return (
-    <div role="img" aria-label={label} style={{ height: Math.max(120, rows.length * 32) }} className="w-full">
+    <div role="img" aria-label={label} style={{ height: Math.max(120, rows.length * 26) }} className="w-full">
       <ResponsiveContainer width="100%" height="100%">
         <BarChart data={rows} layout="vertical" margin={{ top: 4, right: 16, bottom: 4, left: 4 }} barCategoryGap={8}>
           <XAxis
@@ -50,10 +51,18 @@ export function ContributionWaterfall({ holdings, currency, label }: { holdings:
             axisLine={false}
             tickFormatter={(v: number) => formatMoney(v, currency, { decimals: 0 })}
           />
-          <YAxis type="category" dataKey="label" width={88} tick={AXIS_TICK} tickLine={false} axisLine={false} />
+          <YAxis
+            type="category"
+            dataKey="label"
+            width={64}
+            tick={{ ...AXIS_TICK, fontFamily: "var(--font-mono)", fontSize: 11 }}
+            tickLine={false}
+            axisLine={false}
+            interval={0}
+          />
           <ReferenceLine x={0} stroke="var(--border)" />
           <Tooltip cursor={{ fill: "var(--surface-muted)" }} content={<ChartTooltip currency={currency} />} />
-          <Bar dataKey="contribution_base" radius={2} isAnimationActive={false} maxBarSize={20}>
+          <Bar dataKey="contribution_base" radius={2} isAnimationActive={false} maxBarSize={16}>
             {rows.map((r) => (
               <Cell key={r.ticker} fill={r.contribution_base >= 0 ? "var(--gain)" : "var(--loss)"} />
             ))}
