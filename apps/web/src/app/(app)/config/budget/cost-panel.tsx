@@ -12,6 +12,7 @@ import { formatMoney, formatPercent } from "@/lib/format";
 
 import { budgetApi, type CostSummary } from "./budget-api";
 import { currentBudgetMonth } from "./budget-form";
+import { BlueprintCorners } from "@/components/ui/blueprint";
 
 const usd = (v: number | null | undefined) => formatMoney(v, "USD", { decimals: 2 });
 /** Step costs are recorded to the millionth of a dollar; small ones show 4 decimals. */
@@ -62,8 +63,9 @@ export function CostPanel() {
     <section
       id="costs"
       aria-labelledby="costs-heading"
-      className="scroll-mt-24 space-y-3 rounded-lg border border-border bg-surface-raised p-4"
+      className="scroll-mt-24 space-y-3 blueprint p-5"
     >
+      <BlueprintCorners />
       <div className="flex flex-wrap items-end justify-between gap-2">
         <div>
           <h2 id="costs-heading" className="text-[22px] leading-tight font-semibold">
@@ -71,7 +73,7 @@ export function CostPanel() {
           </h2>
           <p className="max-w-prose text-sm text-text-muted">
             The sum of every AI step&rsquo;s recorded cost, per calendar month in Prague time. Each step&rsquo;s cost is in the{" "}
-            <Link href="/activity#job-log" className="text-accent hover:underline">
+            <Link href="/activity#job-log" className="text-accent-ink hover:underline">
               job log
             </Link>
             .
@@ -127,7 +129,7 @@ export function CostPanel() {
                   <>
                     <Link
                       href={`/activity?type=${encodeURIComponent(r.job_type)}#job-log`}
-                      className="font-mono text-xs hover:text-accent hover:underline"
+                      className="font-mono text-xs hover:text-accent-ink hover:underline"
                     >
                       {r.job_type}
                     </Link>

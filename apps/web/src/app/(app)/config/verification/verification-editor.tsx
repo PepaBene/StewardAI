@@ -26,11 +26,12 @@ import {
   type VerificationForm,
 } from "@/lib/config/verification-form";
 import { configSaveQuery, useConfigEditor } from "@/lib/hooks/use-config-editor";
+import { BlueprintCorners } from "@/components/ui/blueprint";
 
 const api = () => getBrowserApiClient();
 const TARGET_OPTIONS = CLAIM_TARGETS.map((t) => ({ value: t, label: CLAIM_TARGET_LABELS[t] }));
 const EFFORT_OPTIONS = [{ value: "", label: "Model default" }, ...EFFORTS.map((e) => ({ value: e, label: e }))];
-const SECTION = "space-y-3 rounded-lg border border-border bg-surface-raised p-4";
+const SECTION = "blueprint space-y-3 p-5";
 
 /**
  * The Verification config: every threshold of the defence layers (numeric validation,
@@ -92,12 +93,13 @@ export function VerificationEditor() {
       {form ? (
         <>
           <section aria-labelledby="figures-heading" className={SECTION}>
+            <BlueprintCorners />
             <h2 id="figures-heading" className="text-[22px] leading-tight font-semibold">
               Extracted figures
             </h2>
             <p className="max-w-prose text-sm text-text-muted">
               Checked in code before a figure is stored as verified. A figure outside a bound is held for your review in the{" "}
-              <Link href="/review" className="text-accent hover:underline">
+              <Link href="/review" className="text-accent-ink hover:underline">
                 review queue
               </Link>
               .
@@ -181,6 +183,8 @@ export function VerificationEditor() {
           </section>
 
           <section aria-labelledby="corroboration-heading" className={SECTION}>
+
+            <BlueprintCorners />
             <h2 id="corroboration-heading" className="text-[22px] leading-tight font-semibold">
               Corroboration of news
             </h2>
@@ -204,12 +208,14 @@ export function VerificationEditor() {
           </section>
 
           <section aria-labelledby="trust-heading" className={SECTION}>
+
+            <BlueprintCorners />
             <h2 id="trust-heading" className="scroll-mt-24 text-[22px] leading-tight font-semibold">
               Source trust from your feedback
             </h2>
             <p className="max-w-prose text-sm text-text-muted">
               Every source starts at 1 (scores run from 0 to 1). The current scores are on the{" "}
-              <Link href="/activity#source-trust" className="text-accent hover:underline">
+              <Link href="/activity#source-trust" className="text-accent-ink hover:underline">
                 Activity page
               </Link>
               .
@@ -246,6 +252,8 @@ export function VerificationEditor() {
           </section>
 
           <section aria-labelledby="claims-heading" className={SECTION}>
+
+            <BlueprintCorners />
             <h2 id="claims-heading" className="text-[22px] leading-tight font-semibold">
               Claim verifier
             </h2>

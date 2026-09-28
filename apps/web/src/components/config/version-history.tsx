@@ -15,6 +15,8 @@ import { useCallback, useEffect, useId, useState } from "react";
 
 import { AlertMessage } from "@/components/alert-message";
 import { EmptyState } from "@/components/empty-state";
+import { PageHeader } from "@/components/page-header";
+import { BlueprintCorners } from "@/components/ui/blueprint";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import {
@@ -137,40 +139,42 @@ export function VersionHistory({
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div>
-          <p className="text-sm text-text-muted">
-            <Link href="/config" className="hover:text-text hover:underline">
+      <PageHeader
+        kicker={
+          <>
+            <Link href="/config" className="hover:underline">
               Config
-            </Link>{" "}
-            /{" "}
-            {info.editor ? (
-              <Link href={info.editor} className="hover:text-text hover:underline">
-                {info.label}
-              </Link>
-            ) : (
-              info.label
-            )}{" "}
-            / History
-          </p>
-          <h1 className="page-title">{info.label}: version history</h1>
-          <p className="mt-1 max-w-prose text-sm text-text-muted">
-            Every save is a new version; nothing is overwritten. Compare any two versions, or roll
-            back: the old version&rsquo;s body is saved again as a new active version, and every job
-            uses it from its next run.
-          </p>
-        </div>
-        {info.editor ? (
-          <Button asChild variant="outline" size="sm">
-            <Link href={info.editor}>
-              <PencilIcon aria-hidden="true" />
-              Open editor
             </Link>
-          </Button>
-        ) : (
-          <span className="text-sm text-text-muted">{info.note}</span>
-        )}
-      </div>
+            {info.editor ? (
+              <>
+                {" · "}
+                <Link href={info.editor} className="hover:underline">
+                  {info.label}
+                </Link>
+              </>
+            ) : null}
+          </>
+        }
+        title={`${info.label}: version history`}
+        description={
+          <p className="max-w-prose">
+            Every save is a new version; nothing is overwritten. Compare any two versions, or roll back: the old
+            version&rsquo;s body is saved again as a new active version, and every job uses it from its next run.
+          </p>
+        }
+        aside={
+          info.editor ? (
+            <Button asChild variant="outline" size="sm">
+              <Link href={info.editor}>
+                <PencilIcon aria-hidden="true" />
+                Open editor
+              </Link>
+            </Button>
+          ) : (
+            <span className="text-sm text-text-muted">{info.note}</span>
+          )
+        }
+      />
 
       <DomainSwitcher current={domain} />
 
@@ -199,7 +203,7 @@ export function VersionHistory({
       ) : null}
 
       {versions.kind === "ok" && list.length > 0 ? (
-        <div className="grid gap-6 lg:grid-cols-[minmax(0,24rem)_minmax(0,1fr)]">
+        <div className="grid gap-6 xl:grid-cols-[minmax(0,24rem)_minmax(0,1fr)]">
           <VersionList versions={list} selected={selected} onSelect={select} />
           {current ? (
             <div className="space-y-4">
@@ -247,7 +251,7 @@ export function VersionHistory({
                     aria-selected={view === tab}
                     onClick={() => setView(tab)}
                     className={cn(
-                      "-mb-px h-9 border-b-2 px-3 text-sm",
+                      "-mb-px h-9 border-b-2 px-3 font-heading text-[15px] font-semibold",
                       view === tab ? "border-accent font-medium text-text" : "border-transparent text-text-muted hover:text-text",
                     )}
                   >
@@ -288,9 +292,9 @@ function DomainSwitcher({ current }: { current: ConfigDomainSlug }) {
               href={`/config/history/${slug}`}
               aria-current={slug === current ? "page" : undefined}
               className={cn(
-                "inline-flex h-8 items-center rounded-md border px-2.5 text-sm",
+                "inline-flex h-8 items-center border px-2.5 text-sm",
                 slug === current
-                  ? "border-accent bg-surface-raised font-medium text-text"
+                  ? "border-accent bg-accent-soft font-medium text-accent-ink"
                   : "border-border text-text-muted hover:text-text",
               )}
             >
@@ -307,11 +311,11 @@ function ActiveBadge({ className }: { className?: string }) {
   return (
     <span
       className={cn(
-        "inline-flex items-center gap-1 rounded-sm border border-border bg-neutral-signal-subtle px-1.5 py-0.5 text-xs font-medium text-text",
+        "inline-flex items-center gap-1 bg-accent-soft px-1.5 py-0.5 text-xs font-semibold text-accent-ink",
         className,
       )}
     >
-      <CheckIcon aria-hidden="true" className="size-3.5 text-neutral-signal" />
+      <CheckIcon aria-hidden="true" className="size-3.5" />
       Active
     </span>
   );
@@ -327,10 +331,10 @@ function VersionList({
   onSelect: (id: number) => void;
 }) {
   return (
-    <div className="overflow-hidden rounded-lg border border-border bg-surface-raised">
+    <div className="overflow-hidden border border-border">
       <table className="w-full text-sm">
         <caption className="sr-only">Saved versions, newest first. Choose one to see its changes.</caption>
-        <thead className="bg-surface-muted">
+        <thead className="bg-surface-muted text-[11px] tracking-[0.08em] uppercase">
           <tr className="border-b border-border text-text-muted">
             <th scope="col" className="px-3 py-2 text-left font-medium">
               Version
@@ -353,7 +357,7 @@ function VersionList({
                     className="block w-full rounded-sm text-left"
                   >
                     <span className="flex flex-wrap items-center gap-2">
-                      <span className={cn("num font-medium", isSelected ? "text-accent" : "text-text")}>#{v.id}</span>
+                      <span className={cn("num font-medium", isSelected ? "text-accent-ink" : "text-text")}>#{v.id}</span>
                       {v.active ? <ActiveBadge /> : null}
                       <span className="num text-xs text-text-muted">{formatDateTime(v.created_at)}</span>
                     </span>
@@ -418,13 +422,13 @@ function RollbackResult({ state, domain }: { state: RollbackState; domain: Confi
         {domain === "strategy" ? (
           <>
             Drift is computed against it now.{" "}
-            <Link href="/" className="inline-flex items-center gap-1 text-accent hover:underline">
+            <Link href="/" className="inline-flex items-center gap-1 text-accent-ink hover:underline">
               See the Overview drift
               <ArrowRightIcon aria-hidden="true" className="size-3.5" />
             </Link>
           </>
         ) : info.editor ? (
-          <Link href={info.editor} className="inline-flex items-center gap-1 text-accent hover:underline">
+          <Link href={info.editor} className="inline-flex items-center gap-1 text-accent-ink hover:underline">
             Open the {info.label.toLowerCase()} editor
             <ArrowRightIcon aria-hidden="true" className="size-3.5" />
           </Link>
@@ -492,7 +496,7 @@ function DiffPanel({
   }, [domain, fromId, toId]);
 
   const selectClass =
-    "h-9 w-full rounded-md border border-border bg-surface-raised px-2 text-sm text-text outline-none focus-visible:border-focus focus-visible:ring-2 focus-visible:ring-focus/30";
+    "h-9 w-full border border-border px-2 text-sm text-text outline-none focus-visible:border-focus focus-visible:ring-2 focus-visible:ring-focus/30";
 
   return (
     <div className="space-y-3">
@@ -544,7 +548,7 @@ function DiffPanel({
           No differences between #{diff.data.from_id} and #{diff.data.to_id}.
         </p>
       ) : (
-        <div className="overflow-x-auto rounded-lg border border-border bg-surface-raised">
+        <div className="overflow-x-auto border border-border">
           <table className="w-full min-w-[36rem] text-sm">
             <caption className="sr-only">
               {diff.data.changes.length} changes from version {diff.data.from_id} to version {diff.data.to_id}

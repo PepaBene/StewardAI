@@ -442,7 +442,7 @@ function Effects({ mark }: { mark: FeedbackOut }) {
         <span key={p.text}>
           {i > 0 ? "; " : ""}
           {p.href ? (
-            <Link href={p.href} className="text-accent hover:underline">
+            <Link href={p.href} className="text-accent-ink hover:underline">
               {p.text}
             </Link>
           ) : (

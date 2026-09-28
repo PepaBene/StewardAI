@@ -228,7 +228,7 @@ export function ChatThread({
                 <LoaderCircleIcon aria-hidden="true" className="size-4 animate-spin" />
                 Writing the answer…
                 {pending.job_id ? (
-                  <Link href={jobHref(pending.job_id)} className="text-accent hover:underline">
+                  <Link href={jobHref(pending.job_id)} className="text-accent-ink hover:underline">
                     job #{pending.job_id}
                   </Link>
                 ) : null}
@@ -238,7 +238,7 @@ export function ChatThread({
               <AlertMessage title="No answer">
                 {stopped}{" "}
                 {pending?.job_id ? (
-                  <Link href={jobHref(pending.job_id)} className="text-accent hover:underline">
+                  <Link href={jobHref(pending.job_id)} className="text-accent-ink hover:underline">
                     Open job #{pending.job_id}
                   </Link>
                 ) : null}
@@ -386,7 +386,7 @@ function Message({
           <ShieldAlertIcon aria-hidden="true" className="size-3.5 text-warning-signal" />
           The assistant could not answer.
           {m.job_id ? (
-            <Link href={jobHref(m.job_id)} className="text-accent hover:underline">
+            <Link href={jobHref(m.job_id)} className="text-accent-ink hover:underline">
               job #{m.job_id}
             </Link>
           ) : null}
@@ -556,7 +556,7 @@ function ConfirmedJob({ jobId }: { jobId: number }) {
   return (
     <p className="flex flex-wrap items-center gap-2 text-xs">
       Started as{" "}
-      <Link href={jobHref(jobId)} className="text-accent hover:underline">
+      <Link href={jobHref(jobId)} className="text-accent-ink hover:underline">
         job #{jobId}
       </Link>
       {status ? <JobStatusBadge status={status} /> : null}

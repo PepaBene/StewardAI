@@ -226,7 +226,7 @@ export function CommandPalette() {
                 <Link
                   href={jobHref(status.jobId)}
                   onClick={() => dialog.current?.close()}
-                  className="text-accent hover:underline"
+                  className="text-accent-ink hover:underline"
                 >
                   Follow it
                 </Link>

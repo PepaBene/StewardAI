@@ -15,7 +15,7 @@ import { useApiResource } from "@/lib/hooks/use-api-resource";
 import { CALENDAR_NOTE, closureKey, isoToday, isPast, selectedClosures, sortClosures } from "@/lib/reference/calendar";
 
 const fetchCalendar = () => getBrowserApiClient().GET("/calendar/exchanges");
-const LINK = "text-accent underline-offset-4 hover:underline";
+const LINK = "text-accent-ink underline-offset-4 hover:underline";
 
 /**
  * Exchange calendar: the closures confirmed into the Jobs config, and the public holidays
@@ -114,7 +114,7 @@ function CalendarContent({ data, reload }: { data: ExchangeCalendar; reload: () 
         ) : (
           <ul className="flex flex-wrap gap-2 text-sm">
             {exchanges.map(([mic, country]) => (
-              <li key={mic} className="rounded-md border border-border bg-surface-raised px-2 py-1">
+              <li key={mic} className="border border-border px-2 py-1">
                 <span className="font-mono">{mic}</span> <span className="text-text-muted">· {country}</span>
               </li>
             ))}
@@ -207,7 +207,7 @@ function Suggestions({ data, reload }: { data: ExchangeCalendar; reload: () => v
           loaded yet: use <strong>Refresh holidays</strong>.
         </EmptyState>
       ) : (
-        <div className="overflow-x-auto rounded-lg border border-border bg-surface-raised">
+        <div className="overflow-x-auto border border-border">
           <table className="w-full min-w-[32rem] text-sm">
             <caption className="sr-only">Suggested exchange closures; select the days the exchange is closed</caption>
             <thead className="bg-surface-muted">
@@ -282,7 +282,7 @@ function Confirmed({ data }: { data: ExchangeCalendar }) {
       {rows.length === 0 ? (
         <EmptyState title="No closures confirmed">Confirm suggested days above, or add them in Config: Jobs.</EmptyState>
       ) : (
-        <div className="overflow-x-auto rounded-lg border border-border bg-surface-raised">
+        <div className="overflow-x-auto border border-border">
           <table className="w-full min-w-[28rem] text-sm">
             <thead className="bg-surface-muted">
               <tr className="border-b border-border text-text-muted">

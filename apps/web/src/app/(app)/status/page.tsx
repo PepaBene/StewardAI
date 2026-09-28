@@ -17,7 +17,7 @@ export default function StatusPage() {
           Calls <code className="font-mono">GET /health</code> on the StewardAI Python API
           through the generated, typed client, opens a job run by its number, and lists the reference data gaps
           below. The job log, coverage gaps, monitoring alerts and source trust are on the{" "}
-          <Link href="/activity" className="text-accent hover:underline">
+          <Link href="/activity" className="text-accent-ink hover:underline">
             Activity
           </Link>{" "}
           page.

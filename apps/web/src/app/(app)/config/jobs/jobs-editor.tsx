@@ -39,6 +39,7 @@ import {
 } from "@/lib/config/jobs-form";
 import { configSaveQuery, useConfigEditor } from "@/lib/hooks/use-config-editor";
 import { SEVERITY } from "@/lib/news/labels";
+import { BlueprintCorners } from "@/components/ui/blueprint";
 
 const api = () => getBrowserApiClient();
 const EFFORT_OPTIONS = EFFORTS.map((e) => ({ value: e, label: e }));
@@ -195,7 +196,8 @@ function ScheduleCard({
   // A model-level error (bad cron or time zone) is reported on the schedule itself.
   const own = errors[schedule.name] ?? [];
   return (
-    <div aria-labelledby={headingId} role="group" className="space-y-3 rounded-lg border border-border bg-surface-raised p-4">
+    <div aria-labelledby={headingId} role="group" className="space-y-3 blueprint p-5">
+      <BlueprintCorners />
       <div className="flex flex-wrap items-baseline justify-between gap-2">
         <div>
           <h3 id={headingId} className="font-medium">
@@ -259,7 +261,8 @@ function SettingsCard({
   const listId = useId();
   const headingId = `${section}-heading`;
   return (
-    <section aria-labelledby={headingId} className="space-y-3 rounded-lg border border-border bg-surface-raised p-4">
+    <section aria-labelledby={headingId} className="space-y-3 blueprint p-5">
+      <BlueprintCorners />
       <div>
         <h2 id={headingId} className="text-[22px] leading-tight font-semibold">
           {info.title}
@@ -352,7 +355,7 @@ function ClosuresEditor({
       <p className="text-xs text-text-muted">
         Days an exchange is closed, used without a deploy. Public holidays are not exchange calendars; review the suggested
         days on the{" "}
-        <Link href="/config/calendar" className="text-accent underline-offset-4 hover:underline">
+        <Link href="/config/calendar" className="text-accent-ink underline-offset-4 hover:underline">
           exchange calendar
         </Link>{" "}
         page.
@@ -496,7 +499,7 @@ function MacroSeriesEditor({
     <div className="space-y-4">
       <p className="text-xs text-text-muted">
         Each series&rsquo; key names it in digests and in the macro surprise bands of{" "}
-        <Link href="/config/event-rules#triggers-heading" className="text-accent underline-offset-4 hover:underline">
+        <Link href="/config/event-rules#triggers-heading" className="text-accent-ink underline-offset-4 hover:underline">
           Config: Event rules
         </Link>
         .
