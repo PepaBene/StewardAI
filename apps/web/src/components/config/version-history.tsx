@@ -203,7 +203,7 @@ export function VersionHistory({
       ) : null}
 
       {versions.kind === "ok" && list.length > 0 ? (
-        <div className="grid gap-6 xl:grid-cols-[minmax(0,24rem)_minmax(0,1fr)]">
+        <div className="grid grid-cols-[minmax(0,1fr)] gap-6 xl:grid-cols-[minmax(0,24rem)_minmax(0,1fr)]">
           <VersionList versions={list} selected={selected} onSelect={select} />
           {current ? (
             <div className="space-y-4">
@@ -333,14 +333,14 @@ function VersionList({
   return (
     <div className="blueprint">
       <BlueprintCorners />
-      <table className="w-full text-sm">
+      <table className="w-full table-fixed text-sm">
         <caption className="sr-only">Saved versions, newest first. Choose one to see its changes.</caption>
         <thead className="bg-surface-muted text-[11px] tracking-[0.08em] uppercase">
           <tr className="border-b border-border text-text-muted">
             <th scope="col" className="px-3 py-2 text-left font-medium">
               Version
             </th>
-            <th scope="col" className="px-3 py-2 text-right font-medium">
+            <th scope="col" className="w-24 px-3 py-2 text-right font-medium">
               Changes
             </th>
           </tr>
@@ -549,7 +549,7 @@ function DiffPanel({
           No differences between #{diff.data.from_id} and #{diff.data.to_id}.
         </p>
       ) : (
-        <div className="overflow-x-auto border border-border">
+        <div className="relative overflow-x-auto border border-border">
           <table className="w-full min-w-[36rem] text-sm">
             <caption className="sr-only">
               {diff.data.changes.length} changes from version {diff.data.from_id} to version {diff.data.to_id}

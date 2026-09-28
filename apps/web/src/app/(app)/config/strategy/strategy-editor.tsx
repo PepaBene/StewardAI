@@ -197,9 +197,9 @@ export function StrategyEditor() {
 
       {form && body ? (
         <>
-          <div className="grid items-start gap-5 xl:grid-cols-[minmax(0,1.55fr)_minmax(0,1fr)]">
+          <div className="grid grid-cols-[minmax(0,1fr)] items-start gap-5 xl:grid-cols-[minmax(0,1.55fr)_minmax(0,1fr)]">
             <TargetsPanel form={form} body={body} errors={errors} set={set} holdings={holdings} drift={drift} />
-            <div className="grid gap-5">
+            <div className="grid grid-cols-[minmax(0,1fr)] gap-5">
               <RulesPanel form={form} errors={errors} set={set} />
               <HistoryPanel
                 versions={versions}
@@ -210,7 +210,7 @@ export function StrategyEditor() {
             </div>
           </div>
           <CategoryTargetsPanel form={form} body={body} errors={errors} set={set} drift={drift} />
-          <div className="grid items-start gap-5">
+          <div className="grid grid-cols-[minmax(0,1fr)] items-start gap-5">
             <BasicsSection form={form} errors={errors} set={set} />
             <CategoriesSection form={form} errors={errors} set={set} holdings={holdings} />
           </div>
@@ -367,7 +367,7 @@ function TargetsPanel({
         </div>
       ) : null}
 
-      <div className="mt-3 overflow-x-auto">
+      <div className="relative mt-3 overflow-x-auto">
         <div className="min-w-[38rem]" role="table" aria-label="Position and cash targets">
           <div role="row" className={cn(POSITION_GRID, TABLE_HEAD, "px-5 py-2")}>
             <span role="columnheader">Holding</span>
@@ -532,7 +532,7 @@ function CategoryTargetsPanel({ form, body, errors, set, drift }: SectionProps &
         </p>
       </div>
       {form.target_categories.length > 0 ? (
-        <div className="overflow-x-auto">
+        <div className="relative overflow-x-auto">
           <div className="min-w-[48rem]" role="table" aria-label="Category targets">
             <div role="row" className={cn(CATEGORY_GRID, TABLE_HEAD, "px-5 py-2")}>
               <span role="columnheader">Dimension</span>
@@ -909,7 +909,7 @@ function CategoriesSection({ form, errors, set, holdings }: SectionProps & { hol
       </div>
 
       {form.categories.length > 0 ? (
-        <div className="overflow-x-auto border border-border">
+        <div className="relative overflow-x-auto border border-border">
           <table className="w-full min-w-[40rem] text-sm">
             <caption className="sr-only">Bucket per dimension for each holding</caption>
             <thead className={TABLE_HEAD}>

@@ -75,7 +75,7 @@ export function ConfigSidebar() {
       >
         Configuration
       </Link>
-      <ul className="-mx-4 flex gap-0.5 overflow-x-auto px-4 pb-1 lg:mx-0 lg:flex-col lg:overflow-visible lg:px-0 lg:pb-0">
+      <ul className="relative -mx-4 flex gap-0.5 overflow-x-auto px-4 pb-1 lg:mx-0 lg:flex-col lg:overflow-visible lg:px-0 lg:pb-0">
         {CONFIG_NAV.map((item) => {
           const Icon = ICONS[item.key];
           const current = item.key === active;
