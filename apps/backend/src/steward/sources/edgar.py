@@ -126,6 +126,22 @@ class EdgarClient:
         data: dict[str, Any] = response.json()
         return data
 
+    async def submissions(self, cik: str) -> dict[str, Any]:
+        """The issuer's submissions JSON as EDGAR serves it."""
+        data: dict[str, Any] = (await self._get(SUBMISSIONS_URL.format(cik=pad_cik(cik)))).json()
+        return data
+
+    async def instance_document(self, filing: Filing) -> tuple[str, bytes]:
+        """(URL, content) of the filing's XBRL instance (`*_htm.xml`, the extracted
+        instance of an inline XBRL filing, or a plain `.xml` instance)."""
+        index = (await self._get(filing.url("index.json"))).json()
+        names = [str(i.get("name", "")) for i in index.get("directory", {}).get("item", [])]
+        name = pick_instance(names, filing.primary_document)
+        if name is None:
+            raise EdgarError(f"no XBRL instance in {filing.accession}")
+        url = filing.url(name)
+        return url, (await self._get(url)).content
+
     async def exhibit_documents(self, filing: Filing) -> list[tuple[str, str]]:
         """(type, file name) of every document in the filing, from its index page."""
         text = html_to_text((await self._get(filing.index_url)).text)
@@ -224,6 +240,25 @@ def parse_index(text: str) -> list[tuple[str, str]]:
         doc_type = "" if re.fullmatch(r"[\d,]*", after) else after
         documents.append((doc_type.upper(), name))
     return documents
+
+
+def pick_instance(names: list[str], primary_document: str) -> str | None:
+    """The XBRL instance among a filing's file names: the primary document's `_htm.xml`,
+    else any `_htm.xml`, else a lone `.xml` that is not a linkbase, schema or summary."""
+    stem = primary_document.rsplit(".", 1)[0]
+    if f"{stem}_htm.xml" in names:
+        return f"{stem}_htm.xml"
+    extracted = [n for n in names if n.endswith("_htm.xml")]
+    if extracted:
+        return extracted[0]
+    plain = [
+        n
+        for n in names
+        if n.endswith(".xml")
+        and not re.search(r"_(cal|def|lab|pre)\.xml$", n)
+        and n not in ("FilingSummary.xml", "MetaLinks.xml")
+    ]
+    return plain[0] if len(plain) == 1 else None
 
 
 def pick_press_release(documents: list[tuple[str, str]]) -> str | None:

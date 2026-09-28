@@ -25,6 +25,7 @@ from api.prompts_routes import router as prompts_router
 from api.reference_routes import router as reference_router
 from api.research_routes import router as research_router
 from api.routes import router
+from api.valuation_routes import router as valuation_router
 from api.verify_routes import router as verify_router
 from steward import __version__
 from steward.config import StrategyConfig, ThesesConfig
@@ -213,6 +214,7 @@ def create_app() -> FastAPI:
 
     app.include_router(config_history_router)
     app.include_router(market_router)
+    app.include_router(valuation_router)
     app.include_router(router)
     app.include_router(prompts_router)
     app.include_router(budget_router)
