@@ -105,7 +105,7 @@ class HoldingOwnership(BaseModel):
     )
 
 
-US_BASIS = "13F filers' holdings (managers above USD 100 M) of shares outstanding"
+US_BASIS = "13F filers only (managers above USD 100 M); smaller holders are not counted"
 ADR_BASIS = "US 13F filers' holdings of the US line — a floor"
 ETF_TYPES = {"ETP", "ETF", "FUND"}
 

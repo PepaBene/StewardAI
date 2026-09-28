@@ -295,12 +295,20 @@ async def holding_segments(
     parsed = await pool.fetchval(
         "select count(*) from public.xbrl_filing where ticker = $1", ticker
     )
-    result.notes.append(
-        "The latest SEC filing tags no revenue by region, segment or product."
-        if parsed
-        else "No SEC XBRL filing parsed for this holding and no manual rows in its holding "
-        "profile (Config → Holding profiles)."
+    kind = await pool.fetchval(
+        "select upper(coalesce(security_type, '')) from public.instrument where t212_ticker = $1",
+        ticker,
     )
+    if kind in ("ETP", "ETF", "FUND"):
+        note = "A fund: revenue by region or segment applies to companies, not to ETFs."
+    elif parsed:
+        note = "The latest SEC filing tags no revenue by region, segment or product."
+    else:
+        note = (
+            "No SEC XBRL filing parsed for this holding and no manual rows in its holding "
+            "profile (Config → Holding profiles)."
+        )
+    result.notes.append(note)
     return result
 
 
@@ -364,7 +372,7 @@ async def latest_shares(
             else f"{names} only (of {len(classes)} classes)"
         )
     else:
-        denominator = "shares outstanding (single figure)"
+        denominator = "one figure for all shares"
     raw = _json_dict(row["raw"])
     notes = [str(n) for n in raw.get("notes") or []]
     reported = row["ads_ratio_reported"]

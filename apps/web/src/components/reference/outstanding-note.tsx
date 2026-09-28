@@ -1,7 +1,13 @@
-import type { HoldingOwnership } from "@/lib/api/client";
+import type { HoldingOwnership, SharesOutstandingOut } from "@/lib/api/client";
 import { formatDate } from "@/lib/format";
 import { denominatorText, formatOutstandingPct, outstandingView } from "@/lib/reference/shares-outstanding";
 import { cn } from "@/lib/utils";
+
+function ratioSource(so: SharesOutstandingOut): string {
+  const from = so.ads_ratio_source === "profile" ? "holding profile" : "default";
+  const stated = so.ads_ratio_reported !== null && so.ads_ratio_reported !== undefined;
+  return stated && Number(so.ads_ratio_reported) === Number(so.ads_ratio) ? `${from}; the 20-F states the same` : from;
+}
 
 /**
  * 13F holders' aggregate share of shares outstanding, what it measures ("US 13F filers'
@@ -29,7 +35,7 @@ export function OutstandingNote({ data, className }: { data: HoldingOwnership | 
       </p>
       <p>
         Denominator: {denominatorText(view.so, formatDate)}
-        {view.ratio ? ` · ${view.ratio} (${view.so.ads_ratio_source === "profile" ? "holding profile" : "default"})` : ""}.
+        {view.ratio ? ` · ${view.ratio} (${ratioSource(view.so)})` : ""}.
       </p>
       {(view.so.notes ?? []).map((n) => (
         <p key={n}>{n}</p>

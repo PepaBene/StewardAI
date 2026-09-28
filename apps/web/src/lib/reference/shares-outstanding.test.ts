@@ -10,7 +10,7 @@ const so = (over: Partial<SharesOutstandingOut> = {}): SharesOutstandingOut => (
   method: "dei_companyfacts",
   method_label: "cover page (dei:EntityCommonStockSharesOutstanding), SEC companyfacts",
   classes: [],
-  denominator_label: "shares outstanding (single figure)",
+  denominator_label: "one figure for all shares",
   accession: "0001628280-26-025362",
   form: "20-F",
   filed: "2026-04-16",
@@ -52,7 +52,7 @@ describe("% of shares outstanding", () => {
     expect(adsRatioText(so())).toBe("1 US share = 5 home-market shares");
     expect(adsRatioText(so({ ads_ratio: 1 }))).toBeNull();
     expect(denominatorText(so(), (d) => d)).toBe(
-      "25.93B shares outstanding (shares outstanding (single figure)), as of 2025-12-31 — cover page (dei:EntityCommonStockSharesOutstanding), SEC companyfacts · 20-F",
+      "25.93B shares outstanding (one figure for all shares), as of 2025-12-31 — cover page (dei:EntityCommonStockSharesOutstanding), SEC companyfacts · 20-F",
     );
   });
 
