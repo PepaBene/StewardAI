@@ -21,6 +21,7 @@ import {
 } from "@/lib/config/prompts-form";
 import { mergeErrors } from "@/lib/config/strategy-form";
 import { configSaveQuery, useConfigEditor } from "@/lib/hooks/use-config-editor";
+import { BlueprintCorners } from "@/components/ui/blueprint";
 
 const api = () => getBrowserApiClient();
 
@@ -144,7 +145,8 @@ function PromptCard({
   const overridden = text !== undefined;
   const headingId = `prompt-${prompt.key}`;
   return (
-    <section aria-labelledby={headingId} className="space-y-3 rounded-lg border border-border bg-surface-raised p-4">
+    <section aria-labelledby={headingId} className="space-y-3 blueprint p-5">
+      <BlueprintCorners />
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="max-w-prose space-y-1">
           <h2 id={headingId} className="flex flex-wrap items-center gap-2 text-[22px] leading-tight font-semibold">

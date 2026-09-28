@@ -171,6 +171,8 @@ export function formatFactValue(fact: {
 }): string {
   const scale = SCALE_ABBREV[fact.scale] ?? fact.scale;
   const written = fact.value_as_written;
+  // Already printed with its unit ("€18.1 billion", "14.1%"): shown as printed, not decorated twice.
+  if (/[^\d\s.,+\-−'()]/.test(written.trim())) return written.trim();
   switch (fact.unit) {
     case "percent":
       return `${written}%`;

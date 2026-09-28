@@ -20,7 +20,7 @@ export default async function LoginPage({ searchParams }: PageProps<"/login">) {
   return (
     <Card>
       <CardHeader>
-        <CardTitle className="text-xl">Sign in</CardTitle>
+        <CardTitle className="text-[28px]">Sign in</CardTitle>
         <CardDescription>
           Owner access only. You will be asked for your authenticator code next.
         </CardDescription>

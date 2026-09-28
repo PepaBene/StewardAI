@@ -66,7 +66,7 @@ export function ConfidenceBadge({
   }, [open]);
 
   const chipClasses = cn(
-    "inline-flex items-center gap-1 rounded-sm border px-1.5 py-0.5 text-xs font-medium whitespace-nowrap",
+    "inline-flex items-center gap-1 border px-1.5 py-0.5 text-xs font-medium whitespace-nowrap",
     quiet
       ? "border-transparent bg-transparent text-text-muted"
       : cn(
@@ -120,7 +120,7 @@ export function ConfidenceBadge({
               id={panelId}
               role="tooltip"
               style={position ? { top: position.top, left: position.left } : { top: 0, left: 0, visibility: "hidden" }}
-              className="fixed z-50 w-80 max-w-[calc(100vw-1rem)] space-y-1.5 rounded-lg border border-border bg-surface-raised p-3 text-left text-sm font-normal text-text shadow-lg"
+              className="fixed z-50 w-80 max-w-[calc(100vw-1rem)] space-y-1.5 border border-border bg-surface-raised p-3 text-left text-sm font-normal text-text shadow-lg"
             >
               <p className="text-xs font-medium text-text-muted">
                 {label}: {description}

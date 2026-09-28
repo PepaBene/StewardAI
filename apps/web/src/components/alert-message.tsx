@@ -24,10 +24,10 @@ export function AlertMessage({
     <div
       role={tone === "warning" ? "alert" : "status"}
       className={cn(
-        "flex gap-3 rounded-md border p-3 text-sm",
+        "flex gap-3 border border-l-[3px] px-3.5 py-3 text-sm",
         tone === "warning"
-          ? "border-warning-signal/40 bg-warning-signal-subtle"
-          : "border-info-signal/40 bg-info-signal-subtle",
+          ? "border-warning-signal/40 border-l-warning-signal bg-warning-signal-subtle"
+          : "border-info-signal/40 border-l-info-signal bg-info-signal-subtle",
         className,
       )}
     >
@@ -39,7 +39,7 @@ export function AlertMessage({
         )}
       />
       <div className="space-y-1">
-        <p className="font-medium text-text">{title}</p>
+        <p className="font-semibold text-text">{title}</p>
         {children ? <div className="text-text-muted">{children}</div> : null}
       </div>
     </div>

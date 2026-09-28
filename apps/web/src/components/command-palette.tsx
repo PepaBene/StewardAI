@@ -172,13 +172,13 @@ export function CommandPalette() {
       <dialog
         ref={dialog}
         aria-label="Command palette"
-        className="m-auto mt-[15vh] w-[min(36rem,calc(100vw-2rem))] border border-border bg-surface-raised p-0 text-text shadow-lg backdrop:bg-text/30"
+        className="m-auto mt-[15vh] w-[min(40rem,calc(100vw-2rem))] border border-border border-t-2 border-t-accent bg-surface-raised p-0 whitespace-normal text-text shadow-2xl backdrop:bg-text/30"
         onClick={(e) => {
           if (e.target === dialog.current) dialog.current.close();
         }}
       >
-        <div className="flex items-center gap-2 border-b border-border px-3">
-          <SearchIcon aria-hidden="true" className="size-4 text-text-muted" />
+        <div className="flex items-center gap-2.5 border-b border-border px-4">
+          <SearchIcon aria-hidden="true" className="size-[18px] text-accent" />
           <input
             ref={input}
             role="combobox"
@@ -193,8 +193,9 @@ export function CommandPalette() {
               setActive(0);
             }}
             onKeyDown={onKeyDown}
-            className="h-12 flex-1 bg-transparent text-base outline-none placeholder:text-text-muted"
+            className="h-13 flex-1 bg-transparent text-base outline-none placeholder:text-text-muted"
           />
+          <kbd className="hidden border border-border px-1.5 font-mono text-[11px] text-text-muted sm:inline">Esc</kbd>
         </div>
         <ul id={listId} role="listbox" aria-label="Commands" className="max-h-[50vh] overflow-y-auto p-1">
           {results.length === 0 ? <li className="px-3 py-6 text-center text-sm text-text-muted">No matches.</li> : null}
@@ -207,17 +208,17 @@ export function CommandPalette() {
               onMouseEnter={() => setActive(i)}
               onClick={() => void execute(c)}
               className={cn(
-                "flex cursor-pointer items-center gap-2 rounded-md px-3 py-2 text-sm",
-                i === selected ? "bg-surface-muted text-text" : "text-text-muted",
+                "flex cursor-pointer items-center gap-2.5 border-l-2 px-3 py-2 text-sm",
+                i === selected ? "border-accent bg-accent-soft text-accent-ink" : "border-transparent text-text-muted",
               )}
             >
               {c.ui ? <MessageSquareIcon aria-hidden="true" className="size-4" /> : c.action ? <PlayIcon aria-hidden="true" className="size-4" /> : <ArrowRightIcon aria-hidden="true" className="size-4" />}
               <span className="flex-1 text-text">{c.label}</span>
-              <span className="text-xs text-text-muted">{c.group}</span>
+              <span className="font-mono text-[10px] tracking-[0.08em] text-text-faint uppercase">{c.group}</span>
             </li>
           ))}
         </ul>
-        <div className="flex items-center justify-between gap-2 border-t border-border px-3 py-2 text-xs text-text-muted" role="status">
+        <div className="flex items-center justify-between gap-2 border-t border-border bg-surface-muted px-4 py-2 text-xs text-text-muted" role="status">
           {status ? (
             <span className="flex items-center gap-1.5 text-text">
               {status.busy ? <LoaderCircleIcon aria-hidden="true" className="size-3.5 animate-spin" /> : null}
@@ -226,14 +227,24 @@ export function CommandPalette() {
                 <Link
                   href={jobHref(status.jobId)}
                   onClick={() => dialog.current?.close()}
-                  className="text-accent hover:underline"
+                  className="text-accent-ink hover:underline"
                 >
                   Follow it
                 </Link>
               ) : null}
             </span>
           ) : (
-            <span>↑↓ to move · Enter to open or run · Esc to close</span>
+            <span className="flex flex-wrap items-center gap-x-3 gap-y-1">
+              <span>
+                <kbd className="border border-border px-1 font-mono text-[10px]">↑↓</kbd> to move
+              </span>
+              <span>
+                <kbd className="border border-border px-1 font-mono text-[10px]">Enter</kbd> to open or run
+              </span>
+              <span>
+                <kbd className="border border-border px-1 font-mono text-[10px]">Esc</kbd> to close
+              </span>
+            </span>
           )}
         </div>
       </dialog>

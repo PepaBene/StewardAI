@@ -16,9 +16,12 @@ export async function generateMetadata({ params }: PageProps<"/config/history/[d
   return { title: isDomainSlug(domain) ? `${CONFIG_DOMAINS[domain].label} history` : "History" };
 }
 
-export default async function ConfigHistoryPage({ params }: PageProps<"/config/history/[domain]">) {
+export default async function ConfigHistoryPage({ params, searchParams }: PageProps<"/config/history/[domain]">) {
   const { domain } = await params;
+  // ?version=<id> opens that version's diff (the editors' "View diff" links).
+  const raw = Number((await searchParams).version);
+  const initialVersion = Number.isSafeInteger(raw) && raw > 0 ? raw : null;
   if (!isDomainSlug(domain)) notFound();
   // Keyed so switching domains starts from a fresh selection.
-  return <VersionHistory key={domain} domain={domain} />;
+  return <VersionHistory key={domain} domain={domain} initialVersion={initialVersion} />;
 }

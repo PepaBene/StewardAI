@@ -42,7 +42,7 @@ export function EvidenceRelationBadge({ relation, className }: { relation: Evide
       title={description}
       data-relation={relation}
       className={cn(
-        "inline-flex items-center gap-1 rounded-sm border px-1.5 py-0.5 text-xs font-medium whitespace-nowrap",
+        "inline-flex items-center gap-1 border px-1.5 py-0.5 text-xs font-medium whitespace-nowrap",
         classes.border,
         classes.bg,
         classes.text,

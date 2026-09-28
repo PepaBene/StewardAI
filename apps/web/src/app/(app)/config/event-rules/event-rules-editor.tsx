@@ -26,6 +26,7 @@ import {
 } from "@/lib/config/news-forms";
 import { configSaveQuery, useConfigEditor } from "@/lib/hooks/use-config-editor";
 import { EVENT_LABELS, EVENT_TYPES, SEVERITY } from "@/lib/news/labels";
+import { BlueprintCorners } from "@/components/ui/blueprint";
 
 const api = () => getBrowserApiClient();
 const LEVELS = ([0, 1, 2, 3] as const).map((s) => ({ value: s, label: `${s} · ${SEVERITY[s].label}` }));
@@ -84,7 +85,8 @@ export function EventRulesEditor() {
 
       {form ? (
         <>
-          <section aria-labelledby="severity-heading" className="space-y-3 rounded-lg border border-border bg-surface-raised p-4">
+          <section aria-labelledby="severity-heading" className="space-y-3 blueprint p-5">
+            <BlueprintCorners />
             <h2 id="severity-heading" className="text-[22px] leading-tight font-semibold">
               Severity per event type
             </h2>
@@ -109,7 +111,7 @@ export function EventRulesEditor() {
               Per-holding overrides
             </h2>
             {form.overrides.map((o, i) => (
-              <div key={o.key} className="flex flex-wrap items-start gap-3 rounded-lg border border-border bg-surface-raised p-3">
+              <div key={o.key} className="flex flex-wrap items-start gap-3 border border-border p-3">
                 <TextField className="w-56" label="Ticker" path={`overrides.${i}.ticker`} errors={editor.errors} value={o.ticker} onChange={(v) => setOverride(o.key, { ticker: v })} />
                 <SelectField className="w-60" label="Event type" path={`overrides.${i}.event_type`} errors={editor.errors} value={o.event_type} options={EVENT_OPTIONS} onChange={(v) => setOverride(o.key, { event_type: v })} />
                 <SelectField className="w-44" label="Severity" path={`overrides.${i}.severity`} errors={editor.errors} value={o.severity as 0 | 1 | 2 | 3} options={LEVELS} onChange={(v) => setOverride(o.key, { severity: v })} />
@@ -124,7 +126,8 @@ export function EventRulesEditor() {
             </Button>
           </section>
 
-          <section aria-labelledby="adjust-heading" className="space-y-3 rounded-lg border border-border bg-surface-raised p-4">
+          <section aria-labelledby="adjust-heading" className="space-y-3 blueprint p-5">
+            <BlueprintCorners />
             <h2 id="adjust-heading" className="text-[22px] leading-tight font-semibold">
               Adjustments
             </h2>
@@ -147,7 +150,8 @@ export function EventRulesEditor() {
             </div>
           </section>
 
-          <section aria-labelledby="triggers-heading" className="space-y-3 rounded-lg border border-border bg-surface-raised p-4">
+          <section aria-labelledby="triggers-heading" className="space-y-3 blueprint p-5">
+            <BlueprintCorners />
             <h2 id="triggers-heading" className="text-[22px] leading-tight font-semibold">
               Price moves and macro surprises
             </h2>
@@ -231,7 +235,7 @@ function AnnouncementRules({
         {rules.map((r, i) => {
           const path = `announcement_types.${i}`;
           return (
-            <li key={r.key} className="grid items-start gap-2 rounded-lg border border-border bg-surface-raised p-3 sm:grid-cols-[auto_10rem_minmax(0,1fr)_14rem_auto]">
+            <li key={r.key} className="grid items-start gap-2 border border-border p-3 sm:grid-cols-[auto_10rem_minmax(0,1fr)_14rem_auto]">
               <span className="mt-7 font-mono text-sm text-text-muted">{i + 1}.</span>
               <SelectField label="Service" hideLabel={i > 0} path={`${path}.service`} errors={errors} value={r.service} options={ANNOUNCEMENT_SERVICES} onChange={(v) => set(r.key, { service: v })} />
               <TextField

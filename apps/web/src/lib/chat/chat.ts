@@ -147,6 +147,39 @@ export function actionLabel(action: Pick<ActionOut, "kind" | "params">): string 
   }
 }
 
+// ---------------------------------------------------------------------------
+// Panel furniture
+// ---------------------------------------------------------------------------
+
+/**
+ * Starter questions under the composer. Each is answerable from the app's own records
+ * (strategy rules and drift, the thesis board, the calendar), so none promises data the
+ * assistant cannot reach.
+ */
+export const SUGGESTED_PROMPTS: readonly string[] = [
+  "Which holdings are outside their target band?",
+  "Did any strategy rule breach this week?",
+  "Which theses are on watch or at risk, and why?",
+  "What results or dividends are due in the next 30 days?",
+];
+
+export type SourceChip = { id: string; number: number; title: string; kindLabel: string; href: string | null; external: boolean };
+
+/** One chip per numbered source ("[1] Portfolio snapshot 2026-09-27"), linked where the source has a page. */
+export function sourceChips(sources: readonly Source[], kindLabel: (kind: string) => string): SourceChip[] {
+  return [...sourceNumbering(sources).values()].map(({ number, source }) => {
+    const link = primarySourceLink(source);
+    return {
+      id: source.id,
+      number,
+      title: source.title,
+      kindLabel: kindLabel(source.kind),
+      href: link?.href ?? null,
+      external: link?.external ?? false,
+    };
+  });
+}
+
 export const ACTION_STATUS: Record<ActionOut["status"], string> = {
   proposed: "Proposed: nothing starts until you confirm",
   confirmed: "Confirmed",
