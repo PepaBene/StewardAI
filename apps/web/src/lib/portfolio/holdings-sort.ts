@@ -1,13 +1,16 @@
 import type { Holding } from "@/lib/api/client";
 
-export type HoldingsSortKey = "value" | "weight" | "ppl" | "drift" | "name";
+export type HoldingsSortKey = "value" | "weight" | "ppl" | "drift" | "name" | "day";
 export type SortDirection = "asc" | "desc";
 export type HoldingsSort = { key: HoldingsSortKey; direction: SortDirection };
 
 /** The Holdings list opens sorted by value, largest first. */
 export const DEFAULT_HOLDINGS_SORT: HoldingsSort = { key: "value", direction: "desc" };
 
-function sortValue(holding: Holding, key: HoldingsSortKey): number | string | null {
+/** Figures that live outside the holding itself (today's move comes from the price endpoint). */
+export type SortContext = { dayChange?: (ticker: string) => number | null | undefined };
+
+function sortValue(holding: Holding, key: HoldingsSortKey, context: SortContext): number | string | null {
   switch (key) {
     case "value":
       return holding.value_base;
@@ -19,16 +22,20 @@ function sortValue(holding: Holding, key: HoldingsSortKey): number | string | nu
       return holding.drift;
     case "name":
       return (holding.name ?? holding.ticker).toLocaleLowerCase();
+    case "day": {
+      const d = context.dayChange?.(holding.ticker);
+      return typeof d === "number" && Number.isFinite(d) ? d : null;
+    }
   }
 }
 
-/** Sorted copy. Missing values (no target, no weight) go last in either direction;
- * ties fall back to ticker so the order is stable. */
-export function sortHoldings(holdings: readonly Holding[], sort: HoldingsSort): Holding[] {
+/** Sorted copy. Missing values (no target, no weight, no day move) go last in either
+ * direction; ties fall back to ticker so the order is stable. */
+export function sortHoldings(holdings: readonly Holding[], sort: HoldingsSort, context: SortContext = {}): Holding[] {
   const factor = sort.direction === "asc" ? 1 : -1;
   return [...holdings].sort((a, b) => {
-    const va = sortValue(a, sort.key);
-    const vb = sortValue(b, sort.key);
+    const va = sortValue(a, sort.key, context);
+    const vb = sortValue(b, sort.key, context);
     if (va === null && vb !== null) return 1;
     if (vb === null && va !== null) return -1;
     if (va !== null && vb !== null && va !== vb) return (va < vb ? -1 : 1) * factor;
