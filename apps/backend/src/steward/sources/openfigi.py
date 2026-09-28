@@ -111,7 +111,13 @@ HOME_COMPOSITE: dict[str, str] = {
 }  # fmt: skip
 
 # Composite exchange code -> Stooq market suffix (Stooq covers a subset of markets).
-STOOQ_SUFFIX: dict[str, str] = {"US": "us", "LN": "uk", "GR": "de", "JP": "jp", "PW": "pl"}
+# Amsterdam (NA), Copenhagen (DC) and Prague (CP) use the same country-suffix scheme
+# (`asml.nl`, `cez.cz`, as the repo's fixtures do). They could not be checked against Stooq
+# itself (it resets connections from cloud hosts): a wrong one shows as "Stooq has no data",
+# Yahoo fills in, and the holding profile's `price_symbol` corrects it.
+STOOQ_SUFFIX: dict[str, str] = {
+    "US": "us", "LN": "uk", "GR": "de", "JP": "jp", "PW": "pl", "NA": "nl", "DC": "dk", "CP": "cz",
+}  # fmt: skip
 
 
 @dataclass(frozen=True)

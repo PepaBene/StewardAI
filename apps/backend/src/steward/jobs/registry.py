@@ -25,6 +25,7 @@ from steward.news.pipeline import news_ingest_handler
 from steward.ownership.collect import ownership_13f_handler
 from steward.portfolio.sync import portfolio_sync_handler
 from steward.reference.identity import reference_data_handler
+from steward.reference.intraday import intraday_prices_handler
 from steward.reference.prices import holiday_refresh_handler, price_history_handler
 from steward.research.run import research_handler
 from steward.review.monthly import monthly_review_handler
@@ -40,6 +41,7 @@ JobType = Literal[
     "fact_reconcile",
     "reference_data",
     "price_history",
+    "intraday_prices",
     "holiday_refresh",
     "macro_collect",
     "event_escalation",
@@ -66,6 +68,7 @@ JOB_HANDLERS: dict[str, JobHandler] = {
     "fact_reconcile": fact_reconcile_handler,
     "reference_data": reference_data_handler,
     "price_history": price_history_handler,
+    "intraday_prices": intraday_prices_handler,
     "holiday_refresh": holiday_refresh_handler,
     "macro_collect": macro_collect_handler,
     "event_escalation": event_escalation_handler,

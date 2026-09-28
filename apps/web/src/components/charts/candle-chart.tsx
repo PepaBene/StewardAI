@@ -3,7 +3,7 @@ import { formatCompact, formatNumber } from "@/lib/charts/format";
 import { areaPath, linePath, n, type Point } from "@/lib/charts/path";
 import { bandScale, extent, isFiniteNumber, linearScale, niceTicks } from "@/lib/charts/scale";
 import { movingAverage } from "@/lib/charts/series";
-import { formatDay, timeTicks } from "@/lib/charts/time";
+import { formatDay, timeTicks, type TimeTick } from "@/lib/charts/time";
 import { cn } from "@/lib/utils";
 
 import { AXIS_TEXT, ChartEmpty, Legend, SVG_BASE, type LegendEntry } from "./shared";
@@ -27,6 +27,8 @@ export type CandleChartProps = {
   height?: number;
   volumeHeight?: number;
   formatPrice?: (value: number) => string;
+  /** X-axis labels in place of the month ticks (e.g. hours for 5-minute bars). */
+  xTicks?: readonly TimeTick[];
   ariaLabel?: string;
   className?: string;
 };
@@ -46,6 +48,7 @@ export function CandleChart({
   height = 280,
   volumeHeight = 56,
   formatPrice = (v) => formatNumber(v, 2),
+  xTicks,
   ariaLabel,
   className,
 }: CandleChartProps) {
@@ -213,7 +216,7 @@ export function CandleChart({
             })
           : null}
 
-        {timeTicks(bars.map((b) => b.date)).map((t) => (
+        {(xTicks ?? timeTicks(bars.map((b) => b.date))).map((t) => (
           <text key={t.index} x={n(cx(t.index))} y={total - 6} fontSize={11} className={AXIS_TEXT}>
             {t.label}
           </text>

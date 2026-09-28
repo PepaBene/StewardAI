@@ -326,21 +326,46 @@ class ReferenceSettings(ConfigModel):
 StooqSymbol = Annotated[str, Field(pattern=r"^\^?[a-z0-9._-]{1,24}$", examples=["^spx"])]
 
 
+YahooSymbol = Annotated[
+    str, Field(pattern=r"^\^?[A-Z0-9][A-Z0-9.=-]{0,23}$", examples=["^GSPC", "VWCE.DE"])
+]
+
+# Yahoo symbols of the Stooq indices whose Yahoo counterpart is known (checked on
+# 2026-09-28: ^GSPC and ^STOXX answer; ^SXXP has no data, and Yahoo's ^PX is a CBOE symbol,
+# not Prague's PX, so PX has none). Used when a market strip item or benchmark names none.
+STOOQ_INDEX_YAHOO: dict[str, str] = {
+    "^spx": "^GSPC", "^stoxx": "^STOXX", "^dax": "^GDAXI", "^ukx": "^FTSE", "^ndq": "^IXIC",
+    "^dji": "^DJI", "^cac": "^FCHI", "^aex": "^AEX", "^nkx": "^N225",
+}  # fmt: skip
+
+
 class MarketStripItem(ConfigModel):
     symbol: StooqSymbol
     label: str = Field(min_length=1, max_length=40, examples=["S&P 500"])
+    yahoo_symbol: YahooSymbol | None = Field(
+        default=None,
+        description="Yahoo Finance symbol of the same index (^GSPC, ^STOXX): intraday values, "
+        "and closes when Stooq has none. Empty: the known counterpart of the Stooq symbol.",
+    )
+
+    def yahoo(self) -> str | None:
+        return self.yahoo_symbol or STOOQ_INDEX_YAHOO.get(self.symbol)
 
 
 def _default_market_strip() -> list[MarketStripItem]:
     return [
-        MarketStripItem(symbol="^spx", label="S&P 500"),
-        MarketStripItem(symbol="^stoxx", label="STOXX Europe 600"),
+        MarketStripItem(symbol="^spx", label="S&P 500", yahoo_symbol="^GSPC"),
+        MarketStripItem(symbol="^stoxx", label="STOXX Europe 600", yahoo_symbol="^STOXX"),
         MarketStripItem(symbol="^px", label="PX"),
     ]
 
 
+IntradayInterval = Literal[5, 10, 15, 20, 30, 60]
+
+
 class PriceSettings(ConfigModel):
-    """Daily price history (Stooq) and the risk figures computed from it."""
+    """Daily price history (Stooq, Yahoo as the fallback), intraday prices (Yahoo) and the
+    risk figures computed from the daily closes."""
 
     benchmark_symbols: list[StooqSymbol] = Field(
         default_factory=lambda: ["^spx"],
@@ -359,13 +384,46 @@ class PriceSettings(ConfigModel):
         default_factory=_default_market_strip,
         max_length=12,
         description="Index quotes on the market strip: Stooq symbols (collected with the "
-        "benchmarks) and the label shown. A symbol Stooq has no data for shows as empty.",
+        "benchmarks), the label shown and optionally the Yahoo symbol of the same index. "
+        "Stooq's close first; else Yahoo's; for PX (^px) the Prague Stock Exchange's page, "
+        "read once a day. An index no source has data for shows as empty.",
+    )
+    yahoo_daily_fallback: bool = Field(
+        default=True,
+        description="Daily closes from Yahoo Finance (unofficial) for a symbol Stooq refuses, "
+        "cannot be reached for or has no symbol for. Stooq stays the source of record.",
+    )
+    intraday_enabled: bool = Field(
+        default=True,
+        description="Intraday prices (Yahoo Finance, unofficial): 5-minute bars about 15 "
+        "minutes delayed, polled only while each listing's market is open, and fetched when a "
+        "holding page opens. Unofficial: it may rate-limit or break without notice; pages "
+        "then fall back to daily closes with a note.",
+    )
+    intraday_interval_minutes: IntradayInterval = Field(
+        default=15,
+        description="How often intraday prices are polled while a market is open (minutes).",
+    )
+    intraday_retention_days: int = Field(
+        default=5, ge=1, le=14, description="Days of 5-minute bars kept."
+    )
+    intraday_cache_seconds: int = Field(
+        default=120,
+        ge=30,
+        le=900,
+        description="A holding page re-fetches its intraday prices when the stored ones are "
+        "older than this during trading hours.",
     )
 
     @model_validator(mode="after")
     def _unique_strip(self) -> Self:
         require_unique("market strip symbols", (i.symbol for i in self.market_strip))
         return self
+
+    def index_yahoo(self, symbol: str) -> str | None:
+        """The Yahoo symbol of a Stooq index symbol (a strip item's own, else the known one)."""
+        item = next((i for i in self.market_strip if i.symbol == symbol), None)
+        return item.yahoo() if item else STOOQ_INDEX_YAHOO.get(symbol)
 
 
 CountryCode = Annotated[str, Field(pattern=r"^[A-Z]{2}$", examples=["CZ"])]
@@ -1069,6 +1127,26 @@ class JobsConfig(ConfigModel):
             "etf_look_through": self.etf_look_through,
             "sec_xbrl": self.sec_xbrl,
         }
+
+    def interval_schedules(self) -> dict[str, JobSchedule]:
+        """Jobs whose schedule follows from a setting rather than a cron of their own: the
+        intraday poll (Prices: enabled and interval), weekdays in the hours any of the
+        supported markets can be open (UTC; each listing's own session is checked per run).
+        Not watched for missed runs: a skipped poll is covered by the next one."""
+        prices = self.prices
+        return {
+            "intraday_prices": JobSchedule(
+                enabled=prices.intraday_enabled,
+                cron=f"*/{prices.intraday_interval_minutes} 6-21 * * 1-5"
+                if prices.intraday_interval_minutes < 60
+                else "0 6-21 * * 1-5",
+                timezone="UTC",
+            )
+        }
+
+    def worker_schedules(self) -> dict[str, JobSchedule]:
+        """Everything the worker schedules: the cron schedules and the interval ones."""
+        return {**self.schedules(), **self.interval_schedules()}
 
     def next_run_after(self, job_type: str, moment: dt.datetime) -> dt.datetime | None:
         """The first scheduled run of `job_type` after `moment`; None when the job has no

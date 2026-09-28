@@ -23,6 +23,7 @@ import { FeedbackControl } from "@/components/feedback/feedback-control";
 import { AsOfLabel } from "@/components/freshness/as-of-label";
 import { CitationLink } from "@/components/news/citation";
 import { SeverityBadge, TierBadge } from "@/components/news/severity-badge";
+import { DigestIntradaySpark, ON_ACCENT } from "@/components/reports/digest-intraday";
 import { DigestShell } from "@/components/reports/digest-shell";
 import { usePortfolioHistory } from "@/components/reports/reports-shell";
 import { Blueprint, BlueprintCorners, PanelHeading } from "@/components/ui/blueprint";
@@ -477,10 +478,11 @@ function Hero({ report, alerts }: { report: ReportOut; alerts: AlertOut[] | null
           sub={history === undefined ? "Loading…" : own ? "Flow-adjusted index, daily closes" : "No index points around this window"}
         >
           {spark.length > 1 ? (
-            <div className="mt-2 w-32 [&_path]:stroke-accent-foreground">
+            <div className="mt-2 w-32" style={ON_ACCENT}>
               <Sparkline values={spark} width={128} height={26} label="Portfolio index, 10 days to the digest" className="h-[26px]" />
             </div>
           ) : null}
+          {body.kind !== "weekly" ? <DigestIntradaySpark until={body.window_end} /> : null}
         </HeroStat>
         <HeroStat
           label="vs benchmark"

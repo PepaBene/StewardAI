@@ -61,6 +61,7 @@ import {
 } from "@/lib/portfolio/holdings-view";
 import { fundsByTicker } from "@/lib/portfolio/look-through";
 import { TREEMAP_MODES, type TreemapMode } from "@/lib/portfolio/treemap";
+import { dayMove } from "@/lib/prices/intraday";
 import { cn } from "@/lib/utils";
 
 const fetchHoldings = () => getBrowserApiClient().GET("/portfolio/holdings");
@@ -179,7 +180,8 @@ function HoldingsContent({
   history: PortfolioHistory | null;
 }) {
   const priceMap = useMemo(() => priceIndex(prices), [prices]);
-  const dayChange = useCallback((ticker: string) => priceMap.get(ticker)?.day_change_pct ?? null, [priceMap]);
+  // The intraday change (Yahoo, unofficial) when its session is newer than the last close.
+  const dayChange = useCallback((ticker: string) => dayMove(priceMap.get(ticker), formatDate).value, [priceMap]);
   const [mode, setMode] = useState<TreemapMode>("day");
 
   if (!data.freshness) {
@@ -389,8 +391,8 @@ function DailyMovesPanel({ prices }: { prices: HoldingPrices[] | null }) {
         </div>
       )}
       <p className="text-xs text-text-muted">
-        Each cell is the holding&rsquo;s close over its previous stored close (Stooq), in percent; column headers are
-        the day of the month. Dashed cells have no close that day.
+        Each cell is the holding&rsquo;s close over its previous stored close (Stooq, or Yahoo Finance where Stooq has
+        none), in percent; column headers are the day of the month. Dashed cells have no close that day.
       </p>
     </Blueprint>
   );
@@ -455,8 +457,8 @@ function ChartsGrid({
         })}
       </ul>
       <p className="text-xs text-text-muted">
-        Stooq daily closes in each instrument&rsquo;s currency; the line is gain-coloured when the last close is at or
-        above the first.
+        Daily closes (Stooq, or Yahoo Finance where Stooq has none) in each instrument&rsquo;s currency; the line is
+        gain-coloured when the last close is at or above the first.
       </p>
     </section>
   );
@@ -614,7 +616,8 @@ function HoldingRow({
   const tone = gainLossTone(h.ppl);
   const short = displayTicker(h.ticker);
   const cls = securityClass(h.security_type);
-  const day = prices?.day_change_pct ?? null;
+  const move = dayMove(prices, (d) => formatDate(d));
+  const day = move.value;
   const bars = prices?.bars ?? [];
   return (
     <tr className="border-b border-border-soft align-middle hover:bg-border-soft">
@@ -644,11 +647,14 @@ function HoldingRow({
       <td className="num px-3 py-2.5 text-right text-text-muted">{formatPrice(h.avg_price, h.instrument_currency)}</td>
       <td className="num px-3 py-2.5 text-right">
         {formatPrice(h.current_price, h.instrument_currency)}
-        <span
-          className="block text-[11px]"
-          title={prices?.as_of ? `Close-to-close, ${formatDate(prices.as_of)} (Stooq)` : "No stored closes"}
-        >
+        <span className="block text-[11px]" title={move.title}>
           {day === null ? <span className="text-text-muted">—</span> : <Change value={day} />}
+          {move.kind === "intraday" && move.stamp ? (
+            <span className="ml-1 font-mono text-[10px] text-text-faint">
+              <span className="sr-only">intraday, </span>
+              {move.stamp}
+            </span>
+          ) : null}
         </span>
       </td>
       <td className="w-32 px-3 py-2.5">

@@ -77,6 +77,7 @@ import {
   ScorePanel,
   TimelinePanel,
 } from "./holding-overview";
+import { intradayData, useHoldingIntraday } from "./holding-intraday";
 
 const POLL_MS = 3000;
 const POLL_LIMIT_MS = 10 * 60 * 1000;
@@ -177,6 +178,7 @@ export function HoldingContent({
   const ownership = useHoldingOwnership(ticker);
   const identity = useHoldingIdentity(ticker);
   const news = useHoldingNews(ticker);
+  const intraday = useHoldingIntraday(ticker);
 
   const priceData = current(prices);
   const boardData = current(board);
@@ -244,10 +246,11 @@ export function HoldingContent({
         classes={classes}
         row={row}
         bars={priceData?.bars ?? []}
+        intraday={intradayData(intraday)}
       />
 
       <div className="grid grid-cols-1 gap-5 lg:grid-cols-[minmax(0,2.1fr)_minmax(0,1fr)]">
-        <CandlePanel ticker={ticker} history={priceData} loading={prices.kind === "loading"} />
+        <CandlePanel ticker={ticker} history={priceData} loading={prices.kind === "loading"} intraday={intraday} />
         <div className="flex min-w-0 flex-col gap-5">
           <PositionPanel position={detail.position} base={detail.base_currency ?? ""} drift={drift} />
           <ScorePanel row={row} kpis={detail.kpis} method={boardData?.score_method ?? null} loaded={board.kind !== "loading"} />

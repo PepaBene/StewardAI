@@ -57,6 +57,8 @@ export type ProfileForm = {
   fiscal_year_end_month: number;
   /** Stooq symbol override (e.g. "sap.de"); empty = derived from OpenFIGI. */
   price_symbol: string;
+  /** Yahoo Finance symbol override (e.g. "NOVO-B.CO"); empty = derived from the listing. */
+  yahoo_symbol: string;
   reporting_currency: string;
   competitors: string;
   suppliers: string;
@@ -91,6 +93,7 @@ export function newProfile(ticker = ""): ProfileForm {
     sec_ticker: "",
     fiscal_year_end_month: 12,
     price_symbol: "",
+    yahoo_symbol: "",
     reporting_currency: "",
     competitors: "",
     suppliers: "",
@@ -120,6 +123,7 @@ export function profilesFromBody(body: HoldingProfilesConfig | null): ProfileFor
     sec_ticker: p.sec_ticker ?? "",
     fiscal_year_end_month: p.fiscal_year_end_month,
     price_symbol: p.price_symbol ?? "",
+    yahoo_symbol: p.yahoo_symbol ?? "",
     reporting_currency: p.reporting_currency ?? "",
     competitors: joined(p.competitors),
     suppliers: joined(p.suppliers),
@@ -189,6 +193,7 @@ export function profilesToBody(forms: ProfileForm[]): HoldingProfilesConfig {
         sec_ticker: orNull(f.sec_ticker)?.toUpperCase() ?? null,
         fiscal_year_end_month: f.fiscal_year_end_month,
         price_symbol: orNull(f.price_symbol)?.toLowerCase() ?? null,
+        yahoo_symbol: orNull(f.yahoo_symbol)?.toUpperCase() ?? null,
         reporting_currency: orNull(f.reporting_currency)?.toUpperCase() ?? null,
         competitors: lines(f.competitors),
         suppliers: lines(f.suppliers),

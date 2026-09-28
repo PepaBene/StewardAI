@@ -1,6 +1,7 @@
 """Valuation read models: a holding's P/E, P/B and dividend yield, and the portfolio's
 against its benchmark. Computed on read from stored data only: the latest Stooq close
-(`price_bar`), the stored reference rates (`fx_rate`), the fundamentals the
+(`price_bar`, from the one series the price layer picks per holding: Stooq, else the
+Yahoo fallback), the stored reference rates (`fx_rate`), the fundamentals the
 `valuation_refresh` job stored, the holding profile's manual figures and the ETF providers'
 fund figures. Nothing is estimated; a ratio that cannot be computed is null with a reason.
 """
@@ -19,7 +20,7 @@ from steward.config.jobs import FundValuationSource, JobsConfig
 from steward.config.store import load_active
 from steward.fundamentals.shares import DEFAULT_BASIS_BY_CIK, basis_for
 from steward.fx.convert import FxRate, FxSourceName, FxTable, MissingRateError
-from steward.reference.prices import symbols_for
+from steward.reference.price_series import SeriesRef, choose_one, holding_symbols
 from steward.valuation.collect import STATUS_KEY
 from steward.valuation.common import (
     fund_for_ticker,
@@ -410,29 +411,33 @@ def ratio(
 
 
 async def _price(
-    pool: asyncpg.Pool, symbol: str | None, currency: str | None, today: dt.date
+    pool: asyncpg.Pool, ref: SeriesRef | None, currency: str | None, today: dt.date
 ) -> ValuationPrice | None:
-    if not symbol:
+    """The latest close of the holding's chosen daily series (Stooq, else Yahoo). A Yahoo
+    close carries its own quote currency; a Stooq close is in its market's currency."""
+    if ref is None:
         return None
     row = await pool.fetchrow(
-        "select date, close from public.price_bar where symbol = $1 and source = 'stooq'"
+        "select date, close, currency from public.price_bar where symbol = $1 and source = $2"
         " order by date desc limit 1",
-        symbol,
+        ref.symbol,
+        ref.source,
     )
     if row is None:
         return None
     return ValuationPrice(
-        symbol=symbol,
+        symbol=ref.symbol,
         close=float(row["close"]),
-        currency=currency,
+        currency=row["currency"] or currency,
         date=row["date"],
+        source=f"{ref.name} daily close" + (" (unofficial)" if ref.source == "yahoo" else ""),
         stale=(today - row["date"]).days > PRICE_STALE_DAYS,
     )
 
 
 async def pe_history(
     pool: asyncpg.Pool,
-    symbol: str,
+    ref: SeriesRef,
     price_ccy: str | None,
     eps_ccy: str,
     steps: list[EpsStep],
@@ -445,9 +450,10 @@ async def pe_history(
         return []
     since = today - dt.timedelta(days=HISTORY_DAYS)
     bars = await pool.fetch(
-        "select date, close from public.price_bar where symbol = $1 and source = 'stooq'"
-        " and date >= $2 order by date",
-        symbol,
+        "select date, close from public.price_bar where symbol = $1 and source = $2"
+        " and date >= $3 order by date",
+        ref.symbol,
+        ref.source,
         since,
     )
     weekly: dict[tuple[int, int], asyncpg.Record] = {}
@@ -510,9 +516,11 @@ async def holding_valuation(
     status = status if status is not None else await _status(pool)
     profile = profiles.for_ticker(ticker) or HoldingProfile(ticker=ticker)
     info = (await instrument_info(pool, [ticker])).get(ticker)
-    symbol = (await symbols_for(pool, [ticker], profiles)).get(ticker)
+    symbols = (await holding_symbols(pool, [ticker], profiles)).get(ticker)
+    ref = await choose_one(pool, symbols) if symbols else None
+    stooq_symbol = symbols.stooq if symbols else None
     price = await _price(
-        pool, symbol, price_currency(symbol, info.currency if info else None), today
+        pool, ref, price_currency(stooq_symbol, info.currency if info else None), today
     )
     source = await fx_source(pool)
     fx = await fx_table(pool, source, price.date if price else today)
@@ -642,10 +650,10 @@ async def holding_valuation(
         )
 
     history: list[PePoint] = []
-    if with_history and chosen is not None and eps is not None and symbol and price:
+    if with_history and chosen is not None and eps is not None and ref and price:
         history = await pe_history(
             pool,
-            symbol,
+            ref,
             price.currency,
             eps.currency,
             merged_steps(chosen, candidates.values()),

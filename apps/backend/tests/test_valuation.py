@@ -786,3 +786,21 @@ async def test_ads_ratio_from_the_share_basis_and_the_20f(
         2,
         "holding profile (share basis)",
     )
+
+
+@pytestmark_db
+async def test_price_comes_from_the_yahoo_fallback_when_stooq_has_nothing(
+    api: httpx.AsyncClient, backend_pool: asyncpg.Pool
+) -> None:
+    """Once Stooq stops delivering, the price layer's Yahoo series is newer and is the one
+    every reader uses; the P/E must follow it rather than read Stooq's stale close."""
+    await _seed(backend_pool)  # Stooq cez.cz close of 25 Sep
+    await backend_pool.execute(
+        "insert into public.price_bar (symbol, date, close, source, currency)"
+        " values ('CEZ.PR', '2026-09-26', 1100, 'yahoo', 'CZK')"
+    )
+    cez = (await api.get("/holdings/CEZ_EQ/valuation")).json()
+    assert cez["price"]["symbol"] == "CEZ.PR"
+    assert cez["price"]["source"] == "Yahoo daily close (unofficial)"
+    assert cez["price"]["currency"] == "CZK"
+    assert cez["pe"]["value"] == pytest.approx(1100 / 52.4)

@@ -581,7 +581,7 @@
           "portfolio"
         ],
         "summary": "Get Holdings Prices",
-        "description": "Every current holding's daily closes over the last `days` (from Stooq's stored bars,\nresolved as for the holding page) with the latest close-to-close change. A holding with\nno stored prices is listed with no bars and null figures.",
+        "description": "Every current holding's daily closes over the last `days` (Stooq, else Yahoo, as\nfor the holding page) with the latest close-to-close change, and the latest stored\nintraday quote when intraday prices are on. A holding with no stored prices is listed\nwith no bars and null figures.",
         "operationId": "get_holdings_prices",
         "security": [
           {
@@ -632,7 +632,7 @@
           "market"
         ],
         "summary": "Get Market Strip",
-        "description": "The reference rate of each held currency against the base currency and the\nconfigured index quotes, each with its previous value and change. Anything without\nstored data is null, never estimated.",
+        "description": "The reference rate of each held currency against the base currency and the\nconfigured index quotes, each with its previous value, change, source, kind (intraday\nor close) and as-of time. Anything without stored data is null, never estimated.",
         "operationId": "get_market_strip",
         "responses": {
           "200": {
@@ -651,6 +651,113 @@
             "HTTPBearer": []
           }
         ]
+      }
+    },
+    "/holdings/{ticker}/intraday": {
+      "get": {
+        "tags": [
+          "holdings"
+        ],
+        "summary": "Get Holding Intraday",
+        "description": "The holding's latest session in 5-minute bars with its last price, trade time\n(exchange time), previous close and delay (Yahoo Finance, unofficial). Fetched from\nYahoo first when the stored quote is older than the configured cache during trading\nhours. When Yahoo fails or intraday prices are off, `note` says so and `daily` holds the\nlatest daily close to show instead.",
+        "operationId": "get_holding_intraday",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "ticker",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9._-]{1,32}$",
+              "title": "Ticker"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HoldingIntraday"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/portfolio/intraday": {
+      "get": {
+        "tags": [
+          "portfolio"
+        ],
+        "summary": "Get Portfolio Intraday",
+        "description": "The portfolio's value path over the latest day with intraday bars up to `until`: the\nlatest snapshot's quantities times each 5-minute close, in the base currency at the\nstored reference rates, over the holdings that have bars (`coverage`).",
+        "operationId": "get_portfolio_intraday",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "until",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date-time"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Latest bar time considered (default now); the path covers its UTC day.",
+              "title": "Until"
+            },
+            "description": "Latest bar time considered (default now); the path covers its UTC day."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PortfolioIntraday"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
       }
     },
     "/portfolio/look-through": {
@@ -7492,6 +7599,7 @@
                 "fact_reconcile",
                 "reference_data",
                 "price_history",
+                "intraday_prices",
                 "holiday_refresh",
                 "macro_collect",
                 "event_escalation",
@@ -7527,6 +7635,7 @@
                 "fact_reconcile",
                 "reference_data",
                 "price_history",
+                "intraday_prices",
                 "holiday_refresh",
                 "macro_collect",
                 "event_escalation",
@@ -9128,6 +9237,31 @@
           "portfolio_share_looked_through"
         ],
         "title": "Coverage"
+      },
+      "DailyFallback": {
+        "properties": {
+          "date": {
+            "type": "string",
+            "format": "date",
+            "title": "Date"
+          },
+          "close": {
+            "type": "number",
+            "title": "Close"
+          },
+          "source": {
+            "type": "string",
+            "title": "Source",
+            "description": "Stooq or Yahoo (daily closes)."
+          }
+        },
+        "type": "object",
+        "required": [
+          "date",
+          "close",
+          "source"
+        ],
+        "title": "DailyFallback"
       },
       "DayCount": {
         "properties": {
@@ -13820,7 +13954,20 @@
                 "type": "null"
               }
             ],
-            "title": "Price Symbol"
+            "title": "Price Symbol",
+            "description": "Symbol of the daily series in use (Stooq's, or Yahoo's when Stooq has none)."
+          },
+          "prices_source": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Prices Source",
+            "description": "Stooq or Yahoo."
           },
           "prices_last_date": {
             "anyOf": [
@@ -14228,6 +14375,252 @@
         ],
         "title": "HoldingIdentity"
       },
+      "HoldingIntraday": {
+        "properties": {
+          "ticker": {
+            "type": "string",
+            "title": "Ticker"
+          },
+          "symbol": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Symbol",
+            "description": "Yahoo symbol; null when none is known."
+          },
+          "enabled": {
+            "type": "boolean",
+            "title": "Enabled",
+            "description": "Intraday prices are on (Config -> Jobs -> Prices)."
+          },
+          "available": {
+            "type": "boolean",
+            "title": "Available",
+            "description": "Intraday bars or a last price are stored."
+          },
+          "source": {
+            "type": "string",
+            "title": "Source",
+            "default": "Yahoo Finance (unofficial)"
+          },
+          "kind": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "intraday",
+                  "close"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Kind",
+            "description": "intraday: a last trade during the session; close: the session's close."
+          },
+          "last_price": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Price"
+          },
+          "last_trade_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Trade At",
+            "description": "Time of the last price (UTC)."
+          },
+          "last_trade_time": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Trade Time",
+            "description": "Time of the last price, exchange time."
+          },
+          "exchange_tz": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Exchange Tz"
+          },
+          "exchange_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Exchange Name"
+          },
+          "currency": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Currency",
+            "description": "Quote currency as Yahoo reports it (GBp = pence)."
+          },
+          "session_date": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Session Date",
+            "description": "Exchange-local day of the last price."
+          },
+          "previous_close": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Previous Close"
+          },
+          "change": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Change"
+          },
+          "change_pct": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Change Pct",
+            "description": "Fraction against the previous close."
+          },
+          "delay_note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Delay Note"
+          },
+          "fetched_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fetched At"
+          },
+          "bars": {
+            "items": {
+              "$ref": "#/components/schemas/IntradayBarOut"
+            },
+            "type": "array",
+            "title": "Bars",
+            "description": "The session's 5-minute bars, oldest first."
+          },
+          "note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note",
+            "description": "Why intraday prices are missing or stale (the page shows daily closes)."
+          },
+          "daily": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/DailyFallback"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The latest stored daily close."
+          }
+        },
+        "type": "object",
+        "required": [
+          "ticker",
+          "symbol",
+          "enabled",
+          "available",
+          "kind",
+          "last_price",
+          "last_trade_at",
+          "last_trade_time",
+          "exchange_tz",
+          "exchange_name",
+          "currency",
+          "session_date",
+          "previous_close",
+          "change",
+          "change_pct",
+          "delay_note",
+          "fetched_at",
+          "bars",
+          "note",
+          "daily"
+        ],
+        "title": "HoldingIntraday"
+      },
       "HoldingOwnership": {
         "properties": {
           "ticker": {
@@ -14364,7 +14757,23 @@
               }
             ],
             "title": "Symbol",
-            "description": "Stooq symbol; null when none is known."
+            "description": "Symbol of the daily series (Stooq's, or Yahoo's when Stooq has none); null when none is known."
+          },
+          "source": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "Stooq",
+                  "Yahoo"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source",
+            "description": "Whose daily closes; null when none are stored."
           },
           "as_of": {
             "anyOf": [
@@ -14421,6 +14830,17 @@
             "type": "array",
             "title": "Bars",
             "description": "Daily closes from `days` before `as_of` to `as_of`, oldest first; empty when no prices are stored."
+          },
+          "intraday": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/IntradayQuote"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The latest intraday quote when intraday prices are on and one is stored (it may be newer than `as_of`)."
           }
         },
         "type": "object",
@@ -14568,6 +14988,19 @@
             ],
             "title": "Price Symbol",
             "description": "Stooq symbol for price history when the one derived from OpenFIGI is wrong or missing (e.g. 'sap.de')."
+          },
+          "yahoo_symbol": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^[A-Z0-9][A-Z0-9.=-]{0,23}$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Yahoo Symbol",
+            "description": "Yahoo Finance symbol (intraday prices, and daily prices when Stooq has none) when the one derived from the listing is wrong or missing (e.g. 'NOVO-B.CO')."
           },
           "reporting_currency": {
             "anyOf": [
@@ -15274,6 +15707,18 @@
             "type": "string",
             "title": "Label"
           },
+          "yahoo_symbol": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Yahoo Symbol",
+            "description": "Yahoo's symbol of the index."
+          },
           "last_close": {
             "anyOf": [
               {
@@ -15283,7 +15728,8 @@
                 "type": "null"
               }
             ],
-            "title": "Last Close"
+            "title": "Last Close",
+            "description": "The latest value: a close, or the intraday value when `kind` is intraday."
           },
           "as_of": {
             "anyOf": [
@@ -15296,7 +15742,64 @@
               }
             ],
             "title": "As Of",
-            "description": "Date of the latest stored close."
+            "description": "Day of the latest value (exchange-local)."
+          },
+          "as_of_time": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "As Of Time",
+            "description": "When the latest value was computed (UTC), when known."
+          },
+          "exchange_tz": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Exchange Tz"
+          },
+          "kind": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "intraday",
+                  "close"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Kind",
+            "description": "intraday: a value during the session; close: a close."
+          },
+          "source": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "Stooq",
+                  "Yahoo",
+                  "Prague Stock Exchange"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source",
+            "description": "Where the latest value is from."
           },
           "previous_close": {
             "anyOf": [
@@ -15452,6 +15955,194 @@
           "report_date_checked_at"
         ],
         "title": "InstrumentInfo"
+      },
+      "IntradayBarOut": {
+        "properties": {
+          "ts": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Ts",
+            "description": "Start of the 5-minute bar (UTC)."
+          },
+          "time": {
+            "type": "string",
+            "title": "Time",
+            "description": "Start of the bar in exchange time, HH:MM."
+          },
+          "open": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Open"
+          },
+          "high": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "High"
+          },
+          "low": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Low"
+          },
+          "close": {
+            "type": "number",
+            "title": "Close"
+          },
+          "volume": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Volume"
+          }
+        },
+        "type": "object",
+        "required": [
+          "ts",
+          "time",
+          "open",
+          "high",
+          "low",
+          "close",
+          "volume"
+        ],
+        "title": "IntradayBarOut"
+      },
+      "IntradayQuote": {
+        "properties": {
+          "symbol": {
+            "type": "string",
+            "title": "Symbol"
+          },
+          "source": {
+            "type": "string",
+            "title": "Source",
+            "default": "Yahoo Finance (unofficial)"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "intraday",
+              "close"
+            ],
+            "title": "Kind",
+            "description": "intraday: a last trade during the session; close: the session's close."
+          },
+          "price": {
+            "type": "number",
+            "title": "Price"
+          },
+          "price_time": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Price Time",
+            "description": "When the price traded (UTC)."
+          },
+          "time_local": {
+            "type": "string",
+            "title": "Time Local",
+            "description": "HH:MM in the exchange's time zone."
+          },
+          "exchange_tz": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Exchange Tz"
+          },
+          "session_date": {
+            "type": "string",
+            "format": "date",
+            "title": "Session Date",
+            "description": "Exchange-local day of the price."
+          },
+          "previous_close": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Previous Close"
+          },
+          "change_pct": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Change Pct",
+            "description": "Fraction (0.012 = +1.2 %) of the latest against the previous value."
+          },
+          "currency": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Currency"
+          },
+          "delay_note": {
+            "type": "string",
+            "title": "Delay Note"
+          },
+          "fetched_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Fetched At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "symbol",
+          "kind",
+          "price",
+          "price_time",
+          "time_local",
+          "exchange_tz",
+          "session_date",
+          "previous_close",
+          "change_pct",
+          "currency",
+          "delay_note",
+          "fetched_at"
+        ],
+        "title": "IntradayQuote",
+        "description": "The latest stored Yahoo quote of a holding's listing (Yahoo Finance, unofficial)."
       },
       "IssuerGroup": {
         "properties": {
@@ -17350,6 +18041,23 @@
             "examples": [
               "S&P 500"
             ]
+          },
+          "yahoo_symbol": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^\\^?[A-Z0-9][A-Z0-9.=-]{0,23}$",
+                "examples": [
+                  "^GSPC",
+                  "VWCE.DE"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Yahoo Symbol",
+            "description": "Yahoo Finance symbol of the same index (^GSPC, ^STOXX): intraday values, and closes when Stooq has none. Empty: the known counterpart of the Stooq symbol."
           }
         },
         "additionalProperties": false,
@@ -18700,7 +19408,42 @@
           },
           "stooq_close": {
             "type": "number",
-            "title": "Stooq Close"
+            "title": "Stooq Close",
+            "description": "The stored close compared (named for Stooq, kept for older clients; `source` says whose close it is)."
+          },
+          "close": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Close"
+          },
+          "source": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source",
+            "description": "Stooq or Yahoo."
+          },
+          "symbol": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Symbol"
           },
           "trading212_price": {
             "type": "number",
@@ -18887,6 +19630,219 @@
           "values"
         ],
         "title": "PortfolioHistory"
+      },
+      "PortfolioIntraday": {
+        "properties": {
+          "day": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Day",
+            "description": "UTC day of the path (the latest with bars)."
+          },
+          "base_currency": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Base Currency"
+          },
+          "fx_source": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "cnb",
+                  "ecb"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fx Source"
+          },
+          "fx_rate_date": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fx Rate Date",
+            "description": "Oldest reference rate used."
+          },
+          "positions_as_of": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Positions As Of",
+            "description": "Snapshot whose quantities are used."
+          },
+          "source": {
+            "type": "string",
+            "title": "Source",
+            "default": "Yahoo Finance (unofficial)"
+          },
+          "enabled": {
+            "type": "boolean",
+            "title": "Enabled"
+          },
+          "points": {
+            "items": {
+              "$ref": "#/components/schemas/PortfolioIntradayPoint"
+            },
+            "type": "array",
+            "title": "Points",
+            "description": "Every 5-minute timestamp any covered holding traded at, oldest first. A holding counts at its previous close before its first bar of the day."
+          },
+          "previous_value": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Previous Value",
+            "description": "Covered holdings at their previous closes (base currency)."
+          },
+          "last_value": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Value"
+          },
+          "change_pct": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Change Pct",
+            "description": "Fraction, last value against previous."
+          },
+          "coverage": {
+            "$ref": "#/components/schemas/PortfolioIntradayCoverage"
+          },
+          "note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note"
+          }
+        },
+        "type": "object",
+        "required": [
+          "day",
+          "base_currency",
+          "fx_source",
+          "fx_rate_date",
+          "positions_as_of",
+          "enabled",
+          "points",
+          "previous_value",
+          "last_value",
+          "change_pct",
+          "coverage",
+          "note"
+        ],
+        "title": "PortfolioIntraday"
+      },
+      "PortfolioIntradayCoverage": {
+        "properties": {
+          "holdings": {
+            "type": "integer",
+            "title": "Holdings",
+            "description": "Positions in the latest snapshot."
+          },
+          "covered": {
+            "type": "integer",
+            "title": "Covered",
+            "description": "Positions with intraday bars on `day`."
+          },
+          "covered_weight": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Covered Weight",
+            "description": "Share of the snapshot's value (base currency) the covered positions hold."
+          },
+          "missing": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Missing",
+            "description": "Tickers without intraday bars on `day`."
+          }
+        },
+        "type": "object",
+        "required": [
+          "holdings",
+          "covered",
+          "covered_weight",
+          "missing"
+        ],
+        "title": "PortfolioIntradayCoverage"
+      },
+      "PortfolioIntradayPoint": {
+        "properties": {
+          "ts": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Ts"
+          },
+          "value": {
+            "type": "number",
+            "title": "Value",
+            "description": "Covered holdings' value in the base currency."
+          }
+        },
+        "type": "object",
+        "required": [
+          "ts",
+          "value"
+        ],
+        "title": "PortfolioIntradayPoint"
       },
       "PortfolioOverview": {
         "properties": {
@@ -19580,13 +20536,52 @@
                 "type": "null"
               }
             ],
-            "title": "Symbol"
+            "title": "Symbol",
+            "description": "Symbol of the series shown (the Stooq symbol when nothing is stored)."
           },
           "source": {
             "type": "string",
-            "const": "Stooq",
+            "enum": [
+              "Stooq",
+              "Yahoo"
+            ],
             "title": "Source",
+            "description": "Whose daily closes: Stooq (the source of record) or Yahoo Finance (unofficial; the fallback when Stooq has none).",
             "default": "Stooq"
+          },
+          "stooq_symbol": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Stooq Symbol"
+          },
+          "yahoo_symbol": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Yahoo Symbol"
+          },
+          "fallback_reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fallback Reason",
+            "description": "Why Stooq's closes are not the ones shown."
           },
           "as_of": {
             "anyOf": [
@@ -19630,6 +20625,21 @@
               }
             ],
             "title": "Benchmark Symbol"
+          },
+          "benchmark_source": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "Stooq",
+                  "Yahoo"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Benchmark Source"
           },
           "benchmark": {
             "items": {
@@ -19677,7 +20687,7 @@
                 "type": "null"
               }
             ],
-            "description": "Latest Stooq close vs Trading212's price on a sync day."
+            "description": "Latest stored close vs Trading212's price on a sync day."
           }
         },
         "type": "object",
@@ -19751,13 +20761,55 @@
             "type": "array",
             "maxItems": 12,
             "title": "Market Strip",
-            "description": "Index quotes on the market strip: Stooq symbols (collected with the benchmarks) and the label shown. A symbol Stooq has no data for shows as empty."
+            "description": "Index quotes on the market strip: Stooq symbols (collected with the benchmarks), the label shown and optionally the Yahoo symbol of the same index. Stooq's close first; else Yahoo's; for PX (^px) the Prague Stock Exchange's page, read once a day. An index no source has data for shows as empty."
+          },
+          "yahoo_daily_fallback": {
+            "type": "boolean",
+            "title": "Yahoo Daily Fallback",
+            "description": "Daily closes from Yahoo Finance (unofficial) for a symbol Stooq refuses, cannot be reached for or has no symbol for. Stooq stays the source of record.",
+            "default": true
+          },
+          "intraday_enabled": {
+            "type": "boolean",
+            "title": "Intraday Enabled",
+            "description": "Intraday prices (Yahoo Finance, unofficial): 5-minute bars about 15 minutes delayed, polled only while each listing's market is open, and fetched when a holding page opens. Unofficial: it may rate-limit or break without notice; pages then fall back to daily closes with a note.",
+            "default": true
+          },
+          "intraday_interval_minutes": {
+            "type": "integer",
+            "enum": [
+              5,
+              10,
+              15,
+              20,
+              30,
+              60
+            ],
+            "title": "Intraday Interval Minutes",
+            "description": "How often intraday prices are polled while a market is open (minutes).",
+            "default": 15
+          },
+          "intraday_retention_days": {
+            "type": "integer",
+            "maximum": 14.0,
+            "minimum": 1.0,
+            "title": "Intraday Retention Days",
+            "description": "Days of 5-minute bars kept.",
+            "default": 5
+          },
+          "intraday_cache_seconds": {
+            "type": "integer",
+            "maximum": 900.0,
+            "minimum": 30.0,
+            "title": "Intraday Cache Seconds",
+            "description": "A holding page re-fetches its intraday prices when the stored ones are older than this during trading hours.",
+            "default": 120
           }
         },
         "additionalProperties": false,
         "type": "object",
         "title": "PriceSettings",
-        "description": "Daily price history (Stooq) and the risk figures computed from it."
+        "description": "Daily price history (Stooq, Yahoo as the fallback), intraday prices (Yahoo) and the\nrisk figures computed from the daily closes."
       },
       "PromptDefault": {
         "properties": {

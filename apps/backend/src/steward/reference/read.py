@@ -9,11 +9,18 @@ import asyncpg
 from pydantic import BaseModel, Field
 
 from steward.config.holding_profiles import HoldingProfile, HoldingProfilesConfig
-from steward.config.jobs import ExchangeClosure, JobsConfig
+from steward.config.jobs import ExchangeClosure, JobsConfig, PriceSettings
 from steward.config.store import StoredConfig, load_active, save_config
 from steward.reference import risk
 from steward.reference.calendar import closure_suggestions
-from steward.reference.prices import CHECKS_KEY, GAPS_KEY
+from steward.reference.price_series import (
+    SeriesRef,
+    choose_one,
+    choose_series,
+    holding_symbols,
+    index_symbols,
+)
+from steward.reference.prices import CHECKS_KEY, GAPS_KEY, NO_STOOQ_SYMBOL, SOURCES_KEY
 from steward.sources.esma import MIC_COUNTRY
 
 RelationshipType = Literal[
@@ -355,7 +362,13 @@ class Correlation(BaseModel):
 
 class PlausibilityCheck(BaseModel):
     date: dt.date
-    stooq_close: float
+    stooq_close: float = Field(
+        description="The stored close compared (named for Stooq, kept for older clients; "
+        "`source` says whose close it is)."
+    )
+    close: float | None = None
+    source: str | None = Field(default=None, description="Stooq or Yahoo.")
+    symbol: str | None = None
     trading212_price: float
     difference_pct: float
     flagged: bool = Field(description="Beyond the configured tolerance.")
@@ -363,43 +376,70 @@ class PlausibilityCheck(BaseModel):
 
 class PriceHistory(BaseModel):
     ticker: str
-    symbol: str | None
-    source: Literal["Stooq"] = "Stooq"
+    symbol: str | None = Field(
+        description="Symbol of the series shown (the Stooq symbol when nothing is stored)."
+    )
+    source: Literal["Stooq", "Yahoo"] = Field(
+        default="Stooq",
+        description="Whose daily closes: Stooq (the source of record) or Yahoo Finance "
+        "(unofficial; the fallback when Stooq has none).",
+    )
+    stooq_symbol: str | None = None
+    yahoo_symbol: str | None = None
+    fallback_reason: str | None = Field(
+        default=None, description="Why Stooq's closes are not the ones shown."
+    )
     as_of: dt.date | None = Field(description="Date of the latest stored close.")
     fetched_at: dt.datetime | None
     bars: list[PriceBarOut]
     benchmark_symbol: str | None
+    benchmark_source: Literal["Stooq", "Yahoo"] | None = None
     benchmark: list[PricePoint]
     risk: RiskCard | None
     correlations: list[Correlation] = Field(description="With each other holding, last 252 days.")
     gap: str | None = Field(description="Why there is no price history, when there is none.")
     plausibility: PlausibilityCheck | None = Field(
-        description="Latest Stooq close vs Trading212's price on a sync day."
+        description="Latest stored close vs Trading212's price on a sync day."
     )
 
 
 async def load_series(
-    pool: asyncpg.Pool, symbol: str, since: dt.date | None = None
+    pool: asyncpg.Pool,
+    symbol: str | SeriesRef,
+    since: dt.date | None = None,
 ) -> list[tuple[dt.date, float]]:
+    """A stored daily series (a bare symbol is Stooq's), oldest first."""
+    ref = SeriesRef(symbol, "stooq") if isinstance(symbol, str) else symbol
     rows = await pool.fetch(
-        "select date, close from public.price_bar where symbol = $1 and source = 'stooq'"
+        "select date, close from public.price_bar where symbol = $1 and source = $3"
         " and ($2::date is null or date >= $2) order by date",
-        symbol,
+        ref.symbol,
         since,
+        ref.source,
     )
     return [(r["date"], float(r["close"])) for r in rows]
+
+
+async def index_series(
+    pool: asyncpg.Pool, settings: PriceSettings, symbol: str, since: dt.date | None = None
+) -> tuple[SeriesRef | None, list[tuple[dt.date, float]]]:
+    """A benchmark's chosen series (Stooq, else Yahoo's counterpart index)."""
+    ref = await choose_one(pool, index_symbols(settings, symbol))
+    return ref, (await load_series(pool, ref, since) if ref else [])
 
 
 def _opt(value: Any) -> float | None:
     return None if value is None else float(value)
 
 
-async def load_bars(pool: asyncpg.Pool, symbol: str) -> list[PriceBarOut]:
-    """Every stored Stooq bar of `symbol`, oldest first."""
+async def load_bars(pool: asyncpg.Pool, symbol: str | SeriesRef) -> list[PriceBarOut]:
+    """Every stored bar of one series (a bare symbol is Stooq's), oldest first."""
+    ref = SeriesRef(symbol, "stooq") if isinstance(symbol, str) else symbol
     rows = await pool.fetch(
         "select date, open, high, low, close, volume from public.price_bar"
-        " where symbol = $1 and source = 'stooq' order by date",
-        symbol,
+        " where symbol = $1 and source = $2 order by date",
+        ref.symbol,
+        ref.source,
     )
     return [
         PriceBarOut(
@@ -419,61 +459,80 @@ async def _state(pool: asyncpg.Pool, key: str) -> dict[str, Any]:
     return dict(json.loads(raw)) if raw else {}
 
 
+async def current_tickers(pool: asyncpg.Pool) -> list[str]:
+    rows = await pool.fetch(
+        "select distinct ticker from public.position_snapshot where snapshot_date = coalesce("
+        " (select max(snapshot_date) from public.account_snapshot),"
+        " (select max(snapshot_date) from public.position_snapshot)) order by ticker"
+    )
+    return [r["ticker"] for r in rows]
+
+
 async def price_history(pool: asyncpg.Pool, ticker: str, days: int) -> PriceHistory:
     jobs = await load_active(pool, "jobs", JobsConfig)
     profiles = await load_active(pool, "holding_profiles", HoldingProfilesConfig)
-    benchmarks = (jobs.body if jobs else JobsConfig()).prices.benchmark_symbols
+    settings = (jobs.body if jobs else JobsConfig()).prices
+    benchmarks = settings.benchmark_symbols
     benchmark_symbol = benchmarks[0] if benchmarks else None
-    profile = profiles.body.for_ticker(ticker) if profiles else None
-    symbol = (profile.price_symbol if profile else None) or await pool.fetchval(
-        "select price_symbol from public.instrument where t212_ticker = $1", ticker
-    )
+    profiles_body = profiles.body if profiles else HoldingProfilesConfig()
+    others = [t for t in await current_tickers(pool) if t != ticker]
+    all_symbols = await holding_symbols(pool, [ticker, *others], profiles_body)
+    chosen = await choose_series(pool, all_symbols)
+    symbols = all_symbols[ticker]
+    ref = chosen[ticker]
     gaps = (await _state(pool, GAPS_KEY)).get("gaps", {})
     checks = (await _state(pool, CHECKS_KEY)).get("checks", {})
-    stored_bars = await load_bars(pool, symbol) if symbol else []
+    sources = (await _state(pool, SOURCES_KEY)).get("sources", {})
+    stored_bars = await load_bars(pool, ref) if ref else []
     series = [(b.date, b.close) for b in stored_bars]
-    bench = await load_series(pool, benchmark_symbol) if benchmark_symbol else []
+    bench_ref, bench = (
+        await index_series(pool, settings, benchmark_symbol) if benchmark_symbol else (None, [])
+    )
     since = (series[-1][0] if series else dt.date.today()) - dt.timedelta(days=days)
     fetched = (
         await pool.fetchval(
-            "select max(fetched_at) from public.price_bar where symbol = $1", symbol
+            "select max(fetched_at) from public.price_bar where symbol = $1 and source = $2",
+            ref.symbol,
+            ref.source,
         )
-        if symbol
+        if ref
         else None
     )
     correlations = []
     if series:
-        others = await pool.fetch(
-            "select distinct t212_ticker, price_symbol from public.instrument"
-            " where price_symbol is not null and t212_ticker <> $1 and t212_ticker in"
-            " (select ticker from public.position_snapshot where snapshot_date = coalesce("
-            " (select max(snapshot_date) from public.account_snapshot),"
-            " (select max(snapshot_date) from public.position_snapshot)))",
-            ticker,
-        )
         for other in others:
-            other_series = await load_series(pool, other["price_symbol"])
+            other_symbols = all_symbols[other]
+            if not other_symbols.stooq and not other_symbols.yahoo:
+                continue
+            other_ref = chosen.get(other)
+            other_series = await load_series(pool, other_ref) if other_ref else []
             correlations.append(
-                Correlation(
-                    ticker=other["t212_ticker"],
-                    correlation=risk.correlation(series, other_series),
-                )
+                Correlation(ticker=other, correlation=risk.correlation(series, other_series))
             )
     figures = risk.figures(series, bench or None) if series else None
     gap = None
     if not series:
         gap = (gaps.get(ticker) or {}).get("reason") or (
-            "no Stooq symbol (set price_symbol in the holding profile)"
-            if not symbol
-            else "no prices stored yet"
+            NO_STOOQ_SYMBOL if not symbols.stooq and not symbols.yahoo else "no prices stored yet"
+        )
+    fallback_reason = None
+    if ref is not None and ref.source != "stooq":
+        used = sources.get(ticker) or {}
+        fallback_reason = used.get("stooq_gap") or (
+            NO_STOOQ_SYMBOL if not symbols.stooq else "Stooq's closes are older"
         )
     return PriceHistory(
         ticker=ticker,
-        symbol=symbol,
+        symbol=ref.symbol if ref else symbols.stooq,
+        source=ref.name if ref else "Stooq",
+        stooq_symbol=symbols.stooq,
+        yahoo_symbol=symbols.yahoo,
+        fallback_reason=fallback_reason,
         as_of=series[-1][0] if series else None,
         fetched_at=fetched,
         bars=[b for b in stored_bars if b.date >= since],
         benchmark_symbol=benchmark_symbol,
+        benchmark_source=bench_ref.name if bench_ref else None,
         benchmark=[PricePoint(date=d, close=c) for d, c in bench if d >= since],
         risk=RiskCard(**figures.__dict__) if figures else None,
         correlations=correlations,

@@ -218,9 +218,10 @@ export interface paths {
         };
         /**
          * Get Holdings Prices
-         * @description Every current holding's daily closes over the last `days` (from Stooq's stored bars,
-         *     resolved as for the holding page) with the latest close-to-close change. A holding with
-         *     no stored prices is listed with no bars and null figures.
+         * @description Every current holding's daily closes over the last `days` (Stooq, else Yahoo, as
+         *     for the holding page) with the latest close-to-close change, and the latest stored
+         *     intraday quote when intraday prices are on. A holding with no stored prices is listed
+         *     with no bars and null figures.
          */
         get: operations["get_holdings_prices"];
         put?: never;
@@ -241,10 +242,56 @@ export interface paths {
         /**
          * Get Market Strip
          * @description The reference rate of each held currency against the base currency and the
-         *     configured index quotes, each with its previous value and change. Anything without
-         *     stored data is null, never estimated.
+         *     configured index quotes, each with its previous value, change, source, kind (intraday
+         *     or close) and as-of time. Anything without stored data is null, never estimated.
          */
         get: operations["get_market_strip"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/holdings/{ticker}/intraday": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Holding Intraday
+         * @description The holding's latest session in 5-minute bars with its last price, trade time
+         *     (exchange time), previous close and delay (Yahoo Finance, unofficial). Fetched from
+         *     Yahoo first when the stored quote is older than the configured cache during trading
+         *     hours. When Yahoo fails or intraday prices are off, `note` says so and `daily` holds the
+         *     latest daily close to show instead.
+         */
+        get: operations["get_holding_intraday"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/portfolio/intraday": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Portfolio Intraday
+         * @description The portfolio's value path over the latest day with intraday bars up to `until`: the
+         *     latest snapshot's quantities times each 5-minute close, in the base currency at the
+         *     stored reference rates, over the holdings that have bars (`coverage`).
+         */
+        get: operations["get_portfolio_intraday"];
         put?: never;
         post?: never;
         delete?: never;
@@ -2664,7 +2711,7 @@ export interface components {
              * Critical Job Types
              * @description Job types that run normally at the monthly cap.
              */
-            critical_job_types?: ("portfolio_sync" | "earnings_check" | "thesis_verdicts" | "earnings_calendar" | "earnings_calendar_full" | "earnings_due" | "fact_reconcile" | "reference_data" | "price_history" | "holiday_refresh" | "macro_collect" | "event_escalation" | "monitor" | "news_ingest" | "daily_digest" | "weekly_digest" | "research" | "ownership_13f" | "etf_look_through" | "monthly_review" | "chat" | "sec_xbrl" | "valuation_refresh")[];
+            critical_job_types?: ("portfolio_sync" | "earnings_check" | "thesis_verdicts" | "earnings_calendar" | "earnings_calendar_full" | "earnings_due" | "fact_reconcile" | "reference_data" | "price_history" | "intraday_prices" | "holiday_refresh" | "macro_collect" | "event_escalation" | "monitor" | "news_ingest" | "daily_digest" | "weekly_digest" | "research" | "ownership_13f" | "etf_look_through" | "monthly_review" | "chat" | "sec_xbrl" | "valuation_refresh")[];
             /**
              * Per Job Cap Usd
              * @description Most AI spend of one run of a job type, in USD. A run over it fails.
@@ -3347,6 +3394,21 @@ export interface components {
              * @description Share of total portfolio value that is direct stocks or looked-through funds (the rest is cash and funds not looked through).
              */
             portfolio_share_looked_through: number | null;
+        };
+        /** DailyFallback */
+        DailyFallback: {
+            /**
+             * Date
+             * Format: date
+             */
+            date: string;
+            /** Close */
+            close: number;
+            /**
+             * Source
+             * @description Stooq or Yahoo (daily closes).
+             */
+            source: string;
         };
         /** DayCount */
         DayCount: {
@@ -5258,8 +5320,16 @@ export interface components {
             earnings_last_check: string | null;
             /** Earnings Last Status */
             earnings_last_status: string | null;
-            /** Price Symbol */
+            /**
+             * Price Symbol
+             * @description Symbol of the daily series in use (Stooq's, or Yahoo's when Stooq has none).
+             */
             price_symbol: string | null;
+            /**
+             * Prices Source
+             * @description Stooq or Yahoo.
+             */
+            prices_source?: string | null;
             /** Prices Last Date */
             prices_last_date: string | null;
             /**
@@ -5365,6 +5435,87 @@ export interface components {
             /** @description Tier 3: community-edited. */
             wikidata: components["schemas"]["WikidataSummary"] | null;
         };
+        /** HoldingIntraday */
+        HoldingIntraday: {
+            /** Ticker */
+            ticker: string;
+            /**
+             * Symbol
+             * @description Yahoo symbol; null when none is known.
+             */
+            symbol: string | null;
+            /**
+             * Enabled
+             * @description Intraday prices are on (Config -> Jobs -> Prices).
+             */
+            enabled: boolean;
+            /**
+             * Available
+             * @description Intraday bars or a last price are stored.
+             */
+            available: boolean;
+            /**
+             * Source
+             * @default Yahoo Finance (unofficial)
+             */
+            source: string;
+            /**
+             * Kind
+             * @description intraday: a last trade during the session; close: the session's close.
+             */
+            kind: ("intraday" | "close") | null;
+            /** Last Price */
+            last_price: number | null;
+            /**
+             * Last Trade At
+             * @description Time of the last price (UTC).
+             */
+            last_trade_at: string | null;
+            /**
+             * Last Trade Time
+             * @description Time of the last price, exchange time.
+             */
+            last_trade_time: string | null;
+            /** Exchange Tz */
+            exchange_tz: string | null;
+            /** Exchange Name */
+            exchange_name: string | null;
+            /**
+             * Currency
+             * @description Quote currency as Yahoo reports it (GBp = pence).
+             */
+            currency: string | null;
+            /**
+             * Session Date
+             * @description Exchange-local day of the last price.
+             */
+            session_date: string | null;
+            /** Previous Close */
+            previous_close: number | null;
+            /** Change */
+            change: number | null;
+            /**
+             * Change Pct
+             * @description Fraction against the previous close.
+             */
+            change_pct: number | null;
+            /** Delay Note */
+            delay_note: string | null;
+            /** Fetched At */
+            fetched_at: string | null;
+            /**
+             * Bars
+             * @description The session's 5-minute bars, oldest first.
+             */
+            bars: components["schemas"]["IntradayBarOut"][];
+            /**
+             * Note
+             * @description Why intraday prices are missing or stale (the page shows daily closes).
+             */
+            note: string | null;
+            /** @description The latest stored daily close. */
+            daily: components["schemas"]["DailyFallback"] | null;
+        };
         /** HoldingOwnership */
         HoldingOwnership: {
             /** Ticker */
@@ -5420,9 +5571,14 @@ export interface components {
             name: string | null;
             /**
              * Symbol
-             * @description Stooq symbol; null when none is known.
+             * @description Symbol of the daily series (Stooq's, or Yahoo's when Stooq has none); null when none is known.
              */
             symbol: string | null;
+            /**
+             * Source
+             * @description Whose daily closes; null when none are stored.
+             */
+            source?: ("Stooq" | "Yahoo") | null;
             /**
              * As Of
              * @description Date of the latest stored close.
@@ -5445,6 +5601,8 @@ export interface components {
              * @description Daily closes from `days` before `as_of` to `as_of`, oldest first; empty when no prices are stored.
              */
             bars: components["schemas"]["PricePoint"][];
+            /** @description The latest intraday quote when intraday prices are on and one is stored (it may be newer than `as_of`). */
+            intraday?: components["schemas"]["IntradayQuote"] | null;
         };
         /** HoldingProfile */
         HoldingProfile: {
@@ -5506,6 +5664,11 @@ export interface components {
              * @description Stooq symbol for price history when the one derived from OpenFIGI is wrong or missing (e.g. 'sap.de').
              */
             price_symbol?: string | null;
+            /**
+             * Yahoo Symbol
+             * @description Yahoo Finance symbol (intraday prices, and daily prices when Stooq has none) when the one derived from the listing is wrong or missing (e.g. 'NOVO-B.CO').
+             */
+            yahoo_symbol?: string | null;
             /**
              * Reporting Currency
              * @description Currency the company reports in; figures in another are held.
@@ -5732,13 +5895,38 @@ export interface components {
             symbol: string;
             /** Label */
             label: string;
-            /** Last Close */
+            /**
+             * Yahoo Symbol
+             * @description Yahoo's symbol of the index.
+             */
+            yahoo_symbol?: string | null;
+            /**
+             * Last Close
+             * @description The latest value: a close, or the intraday value when `kind` is intraday.
+             */
             last_close: number | null;
             /**
              * As Of
-             * @description Date of the latest stored close.
+             * @description Day of the latest value (exchange-local).
              */
             as_of: string | null;
+            /**
+             * As Of Time
+             * @description When the latest value was computed (UTC), when known.
+             */
+            as_of_time?: string | null;
+            /** Exchange Tz */
+            exchange_tz?: string | null;
+            /**
+             * Kind
+             * @description intraday: a value during the session; close: a close.
+             */
+            kind?: ("intraday" | "close") | null;
+            /**
+             * Source
+             * @description Where the latest value is from.
+             */
+            source?: ("Stooq" | "Yahoo" | "Prague Stock Exchange") | null;
             /** Previous Close */
             previous_close: number | null;
             /** Previous Date */
@@ -5767,6 +5955,86 @@ export interface components {
             last_report_date: string | null;
             /** Report Date Checked At */
             report_date_checked_at: string | null;
+        };
+        /** IntradayBarOut */
+        IntradayBarOut: {
+            /**
+             * Ts
+             * Format: date-time
+             * @description Start of the 5-minute bar (UTC).
+             */
+            ts: string;
+            /**
+             * Time
+             * @description Start of the bar in exchange time, HH:MM.
+             */
+            time: string;
+            /** Open */
+            open: number | null;
+            /** High */
+            high: number | null;
+            /** Low */
+            low: number | null;
+            /** Close */
+            close: number;
+            /** Volume */
+            volume: number | null;
+        };
+        /**
+         * IntradayQuote
+         * @description The latest stored Yahoo quote of a holding's listing (Yahoo Finance, unofficial).
+         */
+        IntradayQuote: {
+            /** Symbol */
+            symbol: string;
+            /**
+             * Source
+             * @default Yahoo Finance (unofficial)
+             */
+            source: string;
+            /**
+             * Kind
+             * @description intraday: a last trade during the session; close: the session's close.
+             * @enum {string}
+             */
+            kind: "intraday" | "close";
+            /** Price */
+            price: number;
+            /**
+             * Price Time
+             * Format: date-time
+             * @description When the price traded (UTC).
+             */
+            price_time: string;
+            /**
+             * Time Local
+             * @description HH:MM in the exchange's time zone.
+             */
+            time_local: string;
+            /** Exchange Tz */
+            exchange_tz: string | null;
+            /**
+             * Session Date
+             * Format: date
+             * @description Exchange-local day of the price.
+             */
+            session_date: string;
+            /** Previous Close */
+            previous_close: number | null;
+            /**
+             * Change Pct
+             * @description Fraction (0.012 = +1.2 %) of the latest against the previous value.
+             */
+            change_pct: number | null;
+            /** Currency */
+            currency: string | null;
+            /** Delay Note */
+            delay_note: string;
+            /**
+             * Fetched At
+             * Format: date-time
+             */
+            fetched_at: string;
         };
         /**
          * IssuerGroup
@@ -6527,6 +6795,11 @@ export interface components {
              * @example S&P 500
              */
             label: string;
+            /**
+             * Yahoo Symbol
+             * @description Yahoo Finance symbol of the same index (^GSPC, ^STOXX): intraday values, and closes when Stooq has none. Empty: the known counterpart of the Stooq symbol.
+             */
+            yahoo_symbol?: string | null;
         };
         /** MessageOut */
         MessageOut: {
@@ -7100,8 +7373,20 @@ export interface components {
              * Format: date
              */
             date: string;
-            /** Stooq Close */
+            /**
+             * Stooq Close
+             * @description The stored close compared (named for Stooq, kept for older clients; `source` says whose close it is).
+             */
             stooq_close: number;
+            /** Close */
+            close?: number | null;
+            /**
+             * Source
+             * @description Stooq or Yahoo.
+             */
+            source?: string | null;
+            /** Symbol */
+            symbol?: string | null;
             /** Trading212 Price */
             trading212_price: number;
             /** Difference Pct */
@@ -7168,6 +7453,91 @@ export interface components {
              * @description Absolute figures of every day snapshot in the window, oldest first, in `values_currency` (snapshots taken in another base currency are left out). Unlike `points` these include deposits and withdrawals.
              */
             values: components["schemas"]["SnapshotValues"][];
+        };
+        /** PortfolioIntraday */
+        PortfolioIntraday: {
+            /**
+             * Day
+             * @description UTC day of the path (the latest with bars).
+             */
+            day: string | null;
+            /** Base Currency */
+            base_currency: string | null;
+            /** Fx Source */
+            fx_source: ("cnb" | "ecb") | null;
+            /**
+             * Fx Rate Date
+             * @description Oldest reference rate used.
+             */
+            fx_rate_date: string | null;
+            /**
+             * Positions As Of
+             * @description Snapshot whose quantities are used.
+             */
+            positions_as_of: string | null;
+            /**
+             * Source
+             * @default Yahoo Finance (unofficial)
+             */
+            source: string;
+            /** Enabled */
+            enabled: boolean;
+            /**
+             * Points
+             * @description Every 5-minute timestamp any covered holding traded at, oldest first. A holding counts at its previous close before its first bar of the day.
+             */
+            points: components["schemas"]["PortfolioIntradayPoint"][];
+            /**
+             * Previous Value
+             * @description Covered holdings at their previous closes (base currency).
+             */
+            previous_value: number | null;
+            /** Last Value */
+            last_value: number | null;
+            /**
+             * Change Pct
+             * @description Fraction, last value against previous.
+             */
+            change_pct: number | null;
+            coverage: components["schemas"]["PortfolioIntradayCoverage"];
+            /** Note */
+            note: string | null;
+        };
+        /** PortfolioIntradayCoverage */
+        PortfolioIntradayCoverage: {
+            /**
+             * Holdings
+             * @description Positions in the latest snapshot.
+             */
+            holdings: number;
+            /**
+             * Covered
+             * @description Positions with intraday bars on `day`.
+             */
+            covered: number;
+            /**
+             * Covered Weight
+             * @description Share of the snapshot's value (base currency) the covered positions hold.
+             */
+            covered_weight: number | null;
+            /**
+             * Missing
+             * @description Tickers without intraday bars on `day`.
+             */
+            missing: string[];
+        };
+        /** PortfolioIntradayPoint */
+        PortfolioIntradayPoint: {
+            /**
+             * Ts
+             * Format: date-time
+             */
+            ts: string;
+            /**
+             * Value
+             * @description Covered holdings' value in the base currency.
+             */
+            value: number;
         };
         /** PortfolioOverview */
         PortfolioOverview: {
@@ -7403,14 +7773,27 @@ export interface components {
         PriceHistory: {
             /** Ticker */
             ticker: string;
-            /** Symbol */
+            /**
+             * Symbol
+             * @description Symbol of the series shown (the Stooq symbol when nothing is stored).
+             */
             symbol: string | null;
             /**
              * Source
+             * @description Whose daily closes: Stooq (the source of record) or Yahoo Finance (unofficial; the fallback when Stooq has none).
              * @default Stooq
-             * @constant
+             * @enum {string}
              */
-            source: "Stooq";
+            source: "Stooq" | "Yahoo";
+            /** Stooq Symbol */
+            stooq_symbol?: string | null;
+            /** Yahoo Symbol */
+            yahoo_symbol?: string | null;
+            /**
+             * Fallback Reason
+             * @description Why Stooq's closes are not the ones shown.
+             */
+            fallback_reason?: string | null;
             /**
              * As Of
              * @description Date of the latest stored close.
@@ -7422,6 +7805,8 @@ export interface components {
             bars: components["schemas"]["PriceBarOut"][];
             /** Benchmark Symbol */
             benchmark_symbol: string | null;
+            /** Benchmark Source */
+            benchmark_source?: ("Stooq" | "Yahoo") | null;
             /** Benchmark */
             benchmark: components["schemas"]["PricePoint"][];
             risk: components["schemas"]["RiskCard"] | null;
@@ -7435,7 +7820,7 @@ export interface components {
              * @description Why there is no price history, when there is none.
              */
             gap: string | null;
-            /** @description Latest Stooq close vs Trading212's price on a sync day. */
+            /** @description Latest stored close vs Trading212's price on a sync day. */
             plausibility: components["schemas"]["PlausibilityCheck"] | null;
         };
         /** PricePoint */
@@ -7450,7 +7835,8 @@ export interface components {
         };
         /**
          * PriceSettings
-         * @description Daily price history (Stooq) and the risk figures computed from it.
+         * @description Daily price history (Stooq, Yahoo as the fallback), intraday prices (Yahoo) and the
+         *     risk figures computed from the daily closes.
          */
         PriceSettings: {
             /**
@@ -7471,9 +7857,40 @@ export interface components {
             plausibility_tolerance_pct: number;
             /**
              * Market Strip
-             * @description Index quotes on the market strip: Stooq symbols (collected with the benchmarks) and the label shown. A symbol Stooq has no data for shows as empty.
+             * @description Index quotes on the market strip: Stooq symbols (collected with the benchmarks), the label shown and optionally the Yahoo symbol of the same index. Stooq's close first; else Yahoo's; for PX (^px) the Prague Stock Exchange's page, read once a day. An index no source has data for shows as empty.
              */
             market_strip?: components["schemas"]["MarketStripItem"][];
+            /**
+             * Yahoo Daily Fallback
+             * @description Daily closes from Yahoo Finance (unofficial) for a symbol Stooq refuses, cannot be reached for or has no symbol for. Stooq stays the source of record.
+             * @default true
+             */
+            yahoo_daily_fallback: boolean;
+            /**
+             * Intraday Enabled
+             * @description Intraday prices (Yahoo Finance, unofficial): 5-minute bars about 15 minutes delayed, polled only while each listing's market is open, and fetched when a holding page opens. Unofficial: it may rate-limit or break without notice; pages then fall back to daily closes with a note.
+             * @default true
+             */
+            intraday_enabled: boolean;
+            /**
+             * Intraday Interval Minutes
+             * @description How often intraday prices are polled while a market is open (minutes).
+             * @default 15
+             * @enum {integer}
+             */
+            intraday_interval_minutes: 5 | 10 | 15 | 20 | 30 | 60;
+            /**
+             * Intraday Retention Days
+             * @description Days of 5-minute bars kept.
+             * @default 5
+             */
+            intraday_retention_days: number;
+            /**
+             * Intraday Cache Seconds
+             * @description A holding page re-fetches its intraday prices when the stored ones are older than this during trading hours.
+             * @default 120
+             */
+            intraday_cache_seconds: number;
         };
         /** PromptDefault */
         PromptDefault: {
@@ -10191,6 +10608,69 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["MarketStrip"];
+                };
+            };
+        };
+    };
+    get_holding_intraday: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                ticker: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HoldingIntraday"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_portfolio_intraday: {
+        parameters: {
+            query?: {
+                /** @description Latest bar time considered (default now); the path covers its UTC day. */
+                until?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PortfolioIntraday"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };

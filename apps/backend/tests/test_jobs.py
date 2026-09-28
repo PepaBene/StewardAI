@@ -221,6 +221,7 @@ async def test_schedule_follows_the_jobs_config() -> None:
         "etf_look_through",
         "fact_reconcile",
         "holiday_refresh",
+        "intraday_prices",
         "macro_collect",
         "monitor",
         "monthly_review",
