@@ -344,20 +344,21 @@ async def intraday_prices_handler(ctx: JobContext) -> None:
 
 async def refresh_pse_px(
     pool: asyncpg.Pool, http: httpx.AsyncClient, now: dt.datetime, detail: dict[str, Any]
-) -> None:
-    """Read PX off the PSE detail page unless it was read in the last PSE_MIN_AGE."""
+) -> bool:
+    """Read PX off the PSE detail page unless it was read in the last PSE_MIN_AGE. True when
+    a PSE value is stored (fresh or cached)."""
     last = await pool.fetchval(
         "select fetched_at from public.market_quote where symbol = $1 and source = 'pse'",
         PSE_SYMBOL,
     )
     if last is not None and now - last < PSE_MIN_AGE:
         detail["pse_px"] = f"cached (read {last.isoformat()})"
-        return
+        return True
     try:
         fetched = await pse_index(http, PX_ISIN)
     except (PseError, httpx.HTTPError) as exc:
         detail["pse_px_error"] = f"{type(exc).__name__}: {exc}"[:300]
-        return
+        return last is not None
     value = fetched.value
     kind: QuoteKind = "close" if value.is_close(now) else "intraday"
     async with pool.acquire() as conn, conn.transaction():
@@ -374,7 +375,7 @@ async def refresh_pse_px(
         await conn.execute(
             "insert into public.market_quote (symbol, source, kind, price, price_time,"
             " session_date, previous_close, currency, exchange_name, exchange_tz,"
-            " payload_kind, fetched_at) values ($1, 'pse', $2, $3, $4, $5, $6, 'CZK',"
+            " payload_kind, fetched_at) values ($1, 'pse', $2, $3, $4, $5, $6, null,"
             " 'Prague Stock Exchange', 'Europe/Prague', 'pse_detail', now())"
             " on conflict (symbol, source) do update set kind = excluded.kind,"
             " price = excluded.price, price_time = excluded.price_time,"
@@ -388,6 +389,7 @@ async def refresh_pse_px(
             value.previous_close,
         )
     detail["pse_px"] = {"value": float(value.value), "at": value.at.isoformat(), "kind": kind}
+    return True
 
 
 # ---------------------------------------------------------------------------
@@ -443,13 +445,17 @@ def _f(value: Decimal | None) -> float | None:
     return None if value is None else float(value)
 
 
-def quote_kind(
-    price_time: dt.datetime, session_end: dt.datetime | None, now: dt.datetime
-) -> QuoteKind:
-    """close: the session is over and the price is from its end; else intraday."""
-    if session_end is not None and now >= session_end:
-        if price_time >= session_end - dt.timedelta(minutes=10):
-            return "close"
+def quote_kind(quote: Any, now: dt.datetime) -> QuoteKind:
+    """close: the price is an earlier session's last (it traded before the trading period
+    Yahoo reported as current), or the session is over and the price is from its end; else
+    intraday (a price during the session, possibly one fetched mid-session and not since)."""
+    price_time: dt.datetime = quote["price_time"]
+    start: dt.datetime | None = quote["session_start"]
+    end: dt.datetime | None = quote["session_end"]
+    if start is not None and price_time < start:
+        return "close"
+    if end is not None and now >= end and price_time >= end - dt.timedelta(minutes=10):
+        return "close"
     return "intraday"
 
 
@@ -590,7 +596,7 @@ async def holding_intraday(
         symbol=symbol,
         enabled=True,
         available=True,
-        kind=quote_kind(quote["price_time"], quote["session_end"], now),
+        kind=quote_kind(quote, now),
         last_price=float(price),
         last_trade_at=quote["price_time"],
         last_trade_time=quote["price_time"].astimezone(zone).strftime("%H:%M"),

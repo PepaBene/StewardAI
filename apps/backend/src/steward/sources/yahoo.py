@@ -99,6 +99,14 @@ def _dec(value: Any) -> Decimal | None:
     return out if out.is_finite() else None
 
 
+def _price(value: Any, decimals: int) -> Decimal | None:
+    """A price rounded to Yahoo's `priceHint` decimals: Yahoo serialises prices through
+    32-bit floats (185.92 arrives as 185.9199981689453), so the digits past the hint are
+    noise, not precision."""
+    out = _dec(value)
+    return None if out is None else out.quantize(Decimal(1).scaleb(-decimals))
+
+
 def _ts(value: Any) -> dt.datetime | None:
     if not isinstance(value, int | float) or isinstance(value, bool):
         return None
@@ -137,17 +145,21 @@ def parse_chart(
     result = body["chart"]["result"][0]
     meta_raw = result.get("meta") or {}
     regular = (meta_raw.get("currentTradingPeriod") or {}).get("regular") or {}
+    hint = meta_raw.get("priceHint")
+    decimals = hint if isinstance(hint, int) and 0 <= hint <= 8 else 4
     meta = YahooMeta(
         symbol=str(meta_raw.get("symbol") or symbol),
         currency=meta_raw.get("currency"),
         exchange_name=meta_raw.get("fullExchangeName") or meta_raw.get("exchangeName"),
         exchange_tz=meta_raw.get("exchangeTimezoneName"),
         instrument_type=meta_raw.get("instrumentType"),
-        price=_dec(meta_raw.get("regularMarketPrice")),
+        price=_price(meta_raw.get("regularMarketPrice"), decimals),
         price_time=_ts(meta_raw.get("regularMarketTime")),
         # `previousClose` is the prior session's close; on multi-day ranges only
         # `chartPreviousClose` (the close before the range) is given.
-        previous_close=_dec(meta_raw.get("previousClose") or meta_raw.get("chartPreviousClose")),
+        previous_close=_price(
+            meta_raw.get("previousClose") or meta_raw.get("chartPreviousClose"), decimals
+        ),
         session_start=_ts(regular.get("start")),
         session_end=_ts(regular.get("end")),
     )
@@ -164,15 +176,15 @@ def parse_chart(
     bars = []
     for i, stamp in enumerate(stamps):
         ts = _ts(stamp)
-        close = _dec(closes[i])
+        close = _price(closes[i], decimals)
         if ts is None or close is None or close <= 0:
             continue
         bars.append(
             YahooBar(
                 ts=ts,
-                open=_dec(opens[i]),
-                high=_dec(highs[i]),
-                low=_dec(lows[i]),
+                open=_price(opens[i], decimals),
+                high=_price(highs[i], decimals),
+                low=_price(lows[i], decimals),
                 close=close,
                 volume=_dec(volumes[i]),
             )

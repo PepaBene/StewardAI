@@ -250,6 +250,7 @@ async def collect_series(
     yahoo_fallback: bool,
     notes: dict[str, str],
     counts: dict[str, int],
+    yahoo_hint: str = "set yahoo_symbol in the holding profile",
 ) -> tuple[dict[str, Any], str | None]:
     """The source chain for one holding or index: Stooq, else Yahoo. Returns (which source
     delivered, with why Stooq did not; gap reason when neither did)."""
@@ -263,7 +264,7 @@ async def collect_series(
     if not yahoo_fallback:
         return {}, stooq_gap
     if not symbols.yahoo:
-        return {}, f"{stooq_gap}; no Yahoo symbol (set yahoo_symbol in the holding profile)"
+        return {}, f"{stooq_gap}; no Yahoo symbol ({yahoo_hint})"
     count, gap = await collect_yahoo(pool, deps, symbols.yahoo, years, notes)
     counts[symbols.yahoo] = count
     if gap is not None:
@@ -478,6 +479,11 @@ async def run_price_history(ctx: JobContext, deps: PriceDeps) -> None:
                 settings.yahoo_daily_fallback,
                 restated,
                 counts,
+                "set yahoo_symbol in the holding profile"
+                if ticker
+                else "Yahoo has no such index"
+                if key == PSE_SYMBOL
+                else "set its Yahoo symbol in Config: Jobs: Prices: Market strip",
             )
             if used:
                 sources[key] = used
@@ -511,7 +517,14 @@ async def run_price_history(ctx: JobContext, deps: PriceDeps) -> None:
     if PSE_SYMBOL in indices and sources.get(PSE_SYMBOL, {}).get("source") != "stooq":
         # No PX close from Stooq (Yahoo has no PX): the Prague Stock Exchange's own page.
         async with ctx.step("pse_px") as step:
-            await refresh_pse_px(pool, deps.http, deps.now, step.detail)
+            if await refresh_pse_px(pool, deps.http, deps.now, step.detail):
+                sources[PSE_SYMBOL] = {
+                    "source": "pse",
+                    "stooq_gap": (gaps.pop(PSE_SYMBOL, None) or {}).get("reason"),
+                }
+                now = dt.datetime.now(dt.UTC).isoformat()
+                await _save_state(pool, GAPS_KEY, {"at": now, "gaps": gaps})
+                await _save_state(pool, SOURCES_KEY, {"at": now, "sources": sources})
 
     async with ctx.step("price_moves") as step:
         rules = await load_active(pool, "event_rules", EventRulesConfig)

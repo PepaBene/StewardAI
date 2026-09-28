@@ -132,7 +132,7 @@ async def yahoo_quotes(
         zone = ZoneInfo(r["exchange_tz"] or "UTC")
         out[r["symbol"]] = IntradayQuote(
             symbol=r["symbol"],
-            kind=quote_kind(r["price_time"], r["session_end"], now),
+            kind=quote_kind(r, now),
             price=float(r["price"]),
             price_time=r["price_time"],
             time_local=r["price_time"].astimezone(zone).strftime("%H:%M"),
@@ -366,11 +366,7 @@ async def _index_quote(
         # A daily close stays the value of record for its own day.
         if quote.as_of is not None and live["session_date"] <= quote.as_of:
             continue
-        kind = (
-            quote_kind(live["price_time"], live["session_end"], now)
-            if live["source"] == "yahoo"
-            else live["kind"]
-        )
+        kind = quote_kind(live, now) if live["source"] == "yahoo" else live["kind"]
         prev_value = live["previous_close"]
         quote = IndexQuote(
             symbol=symbol,
