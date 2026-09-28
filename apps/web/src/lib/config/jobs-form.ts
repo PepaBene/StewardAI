@@ -27,7 +27,8 @@ export type SettingsKey =
   | "calendar"
   | "chat"
   | "review"
-  | "ownership";
+  | "ownership"
+  | "xbrl";
 type Settings<S extends SettingsKey> = NonNullable<JobsConfig[S]>;
 
 /** Labels and the backend's default cron per known schedule (apps/backend/src/steward/config/jobs.py). */
@@ -107,6 +108,12 @@ export const SCHEDULES: Record<ScheduleKey, { label: string; description: string
     label: "Institutional ownership (13F)",
     description: "Load new SEC Form 13F data sets (published quarterly, about 100 MB each).",
     cron: "0 5 5 * *",
+  },
+  sec_xbrl: {
+    label: "SEC XBRL fundamentals",
+    description:
+      "Shares outstanding (the 13F % denominator) and revenue by region / segment from the holdings' latest 10-K, 10-Q and 20-F XBRL. Only filings not parsed yet are downloaded.",
+    cron: "40 5 * * 2",
   },
 };
 export const SCHEDULE_KEYS = Object.keys(SCHEDULES) as ScheduleKey[];
@@ -239,6 +246,7 @@ export const DEFAULT_JOBS: JobsConfig = {
     tracked_managers: [],
     top_holders: 10,
   },
+  xbrl: { enabled: true, quarterly: true, read_ads_ratio: true, max_document_mb: 40 },
 };
 
 /** Model ids offered as suggestions; any `claude-…` id is accepted. */
@@ -451,6 +459,22 @@ export const SETTINGS: { [S in SettingsKey]: { title: string; description: strin
       { key: "datasets_per_run", label: "Data sets per run", kind: "int", min: 1, max: 8, hint: "About 100 MB each." },
       { key: "history_datasets", label: "Data sets kept (history)", kind: "int", min: 1, max: 60, hint: "The newest this many quarterly sets (8 = two years). An empty database fills over successive runs." },
       { key: "top_holders", label: "Largest holders shown", kind: "int", min: 1, max: 50 },
+    ],
+  },
+  xbrl: {
+    title: "SEC XBRL fundamentals",
+    description:
+      "Shares outstanding and revenue by region / segment / product from each holding's latest XBRL filing (SEC EDGAR, official).",
+    fields: [
+      { key: "enabled", label: "Read SEC XBRL filings", kind: "bool", hint: "Off: the scheduled run does nothing." },
+      { key: "quarterly", label: "Also parse the latest 10-Q", kind: "bool", hint: "US issuers; 20-F filers publish annual XBRL only." },
+      {
+        key: "read_ads_ratio",
+        label: "Read the ADS ratio from 20-F text",
+        kind: "bool",
+        hint: "Checks the share basis against what the annual report states (one download per new 20-F).",
+      },
+      { key: "max_document_mb", label: "Largest document (MB)", kind: "int", min: 1, max: 200 },
     ],
   },
 };

@@ -36,6 +36,7 @@ const FULL: JobsConfig = {
   weekly_digest: { enabled: false, cron: "0 18 * * sun", timezone: "Europe/London" },
   monthly_review: { enabled: true, cron: "0 8 1-3 * *", timezone: "Europe/Prague" },
   ownership_13f: { enabled: false, cron: "0 6 10 * *", timezone: "America/New_York" },
+  sec_xbrl: { enabled: false, cron: "0 6 * * wed", timezone: "UTC" },
   earnings_check: {
     extraction_model: "claude-opus-5-5",
     locate_model: "claude-sonnet-5",
@@ -125,6 +126,7 @@ const FULL: JobsConfig = {
     ],
     top_holders: 25,
   },
+  xbrl: { enabled: false, quarterly: false, read_ads_ratio: false, max_document_mb: 20 },
 };
 
 describe("jobs form", () => {

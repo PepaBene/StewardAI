@@ -28,6 +28,7 @@ import {
   getBrowserApiClient,
   type CitedSentence,
   type HoldingDetail,
+  type HoldingSegments,
   type JobDetail,
   type JobSummary,
   type ResearchReportOut,
@@ -54,10 +55,12 @@ import {
   WRITTEN_BY,
   writtenBy,
 } from "@/lib/research/report";
+import { salesRegionFigure } from "@/lib/reference/segments";
 import { sourceKindLabel, type CitationIndex } from "@/lib/sources/sources";
 import { cn } from "@/lib/utils";
 
 import { KpiThresholdFigure } from "./kpi-figure";
+import { SalesRegionFigureView } from "./sales-region-figure";
 
 const LINK = "text-accent-ink underline-offset-4 hover:underline";
 
@@ -163,6 +166,10 @@ function Report({ report }: { report: ResearchReportOut }) {
   const figures = holding ? keyFigures(body.sources, holding.facts) : [];
   const citedFactIds = body.sources.filter((s) => s.kind === "fact").map((s) => Number(s.ref));
   const kpiFig = holding ? kpiFigure(holding.kpis, holding.facts, citedFactIds) : null;
+  const segments = useOptional<HoldingSegments>(`segments:${body.ticker}`, () =>
+    getBrowserApiClient().GET("/holdings/{ticker}/segments", { params: { path: { ticker: body.ticker } } }),
+  );
+  const regionFig = salesRegionFigure(segments, formatDate);
   const duration = job ? durationBetween(job.started_at, job.finished_at) : null;
 
   return (
@@ -268,10 +275,19 @@ function Report({ report }: { report: ResearchReportOut }) {
             </AlertMessage>
           ) : null}
 
-          {kpiFig ? (
-            <Blueprint className="px-[22px] py-5">
-              <KpiThresholdFigure figure={kpiFig} number={1} />
-            </Blueprint>
+          {regionFig || kpiFig ? (
+            <div className={cn("grid gap-5", regionFig && kpiFig && "xl:grid-cols-2")}>
+              {regionFig ? (
+                <Blueprint className="px-[22px] py-5">
+                  <SalesRegionFigureView figure={regionFig} number={1} />
+                </Blueprint>
+              ) : null}
+              {kpiFig ? (
+                <Blueprint className="px-[22px] py-5">
+                  <KpiThresholdFigure figure={kpiFig} number={regionFig ? 2 : 1} />
+                </Blueprint>
+              ) : null}
+            </div>
           ) : null}
 
           <p className="flex flex-wrap items-center gap-2 text-xs text-text-muted">

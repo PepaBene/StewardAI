@@ -1,5 +1,6 @@
 import type { Exposure, HoldingProfile, HoldingProfilesConfig } from "@/lib/api/client";
 
+import { fundamentalsFromProfile, fundamentalsToProfile, newFundamentals, type FundamentalsForm } from "./fundamentals-form";
 import { lines } from "./theses-form";
 
 /* Editable form state for holding profiles; list fields are one entry per line. */
@@ -35,6 +36,8 @@ export type ProfileForm = {
   customers: string;
   watch_topics: string;
   exposures: ExposureForm[];
+  /** SEC XBRL fields: 13F share basis and manual revenue rows (fundamentals-form.ts). */
+  fundamentals: FundamentalsForm;
 };
 
 let counter = 0;
@@ -65,6 +68,7 @@ export function newProfile(ticker = ""): ProfileForm {
     customers: "",
     watch_topics: "",
     exposures: [],
+    fundamentals: newFundamentals(),
   };
 }
 
@@ -96,6 +100,7 @@ export function profilesFromBody(body: HoldingProfilesConfig | null): ProfileFor
       name: e.name,
       share: e.share === null || e.share === undefined ? "" : String(e.share),
     })),
+    fundamentals: fundamentalsFromProfile(p),
   }));
 }
 
@@ -128,6 +133,7 @@ export function profilesToBody(forms: ProfileForm[]): HoldingProfilesConfig {
           name: e.name.trim(),
           share: e.share.trim() ? Number(e.share.trim().replace(",", ".")) : null,
         })),
+        ...fundamentalsToProfile(f.fundamentals),
       }),
     ),
   };

@@ -5,6 +5,7 @@ import { useCallback } from "react";
 
 import { AlertMessage } from "@/components/alert-message";
 import { EmptyState } from "@/components/empty-state";
+import { OutstandingNote } from "@/components/reference/outstanding-note";
 import { Blueprint, PanelHeading } from "@/components/ui/blueprint";
 import { getBrowserApiClient } from "@/lib/api/client";
 import { formatDate } from "@/lib/format";
@@ -18,6 +19,7 @@ import {
   ownershipState,
   periodLabel,
 } from "@/lib/reference/ownership";
+import { formatOutstandingPct } from "@/lib/reference/shares-outstanding";
 
 function Change({ value }: { value: number | string | null }) {
   const c = formatChange(value);
@@ -60,17 +62,29 @@ export function OwnershipSection({ resource }: { resource: ReturnType<typeof use
         </p>
       ) : null}
       {state.kind === "error" ? <AlertMessage title={`13F ownership: ${state.title}`}>{state.detail}</AlertMessage> : null}
-      {view?.kind === "empty" ? <EmptyState title="No 13F ownership">{view.reason}</EmptyState> : null}
+      {view?.kind === "empty" ? (
+        <EmptyState title={data?.applicable === false ? "13F ownership: not applicable" : "No 13F ownership"}>
+          {data?.applicable === false ? data.not_applicable_reason : view.reason}
+        </EmptyState>
+      ) : null}
       {data && view?.kind === "ok" ? (
         <>
           <p className="num text-sm">
             <span className="font-medium">{view.latest.holders}</span> managers held{" "}
             <span className="font-medium">{formatShares(view.latest.shares)}</span> shares worth{" "}
             <span className="font-medium">{formatUsdCompact(view.latest.value_usd)}</span>
+            {typeof view.latest.pct_of_shares_outstanding === "number" ? (
+              <>
+                {" "}
+                — <span className="font-medium">{formatOutstandingPct(view.latest.pct_of_shares_outstanding)}</span> of
+                shares outstanding
+              </>
+            ) : null}
             <span className="text-text-muted"> · {periodLabel(view.latest, formatDate)}</span>
           </p>
+          <OutstandingNote data={data} />
           <div className="relative overflow-x-auto border border-border">
-            <table className="w-full min-w-[40rem] text-sm">
+            <table className="w-full min-w-[46rem] text-sm">
               <caption className="px-3 pt-2 text-left text-xs text-text-muted">
                 Per quarter, newest first; changes are against the quarter before it.
               </caption>
@@ -84,6 +98,7 @@ export function OwnershipSection({ resource }: { resource: ReturnType<typeof use
                   <th scope="col" className="px-3 py-2 text-right font-medium">Shares</th>
                   <th scope="col" className="px-3 py-2 text-right font-medium">Change</th>
                   <th scope="col" className="px-3 py-2 text-right font-medium">Value</th>
+                  <th scope="col" className="px-3 py-2 text-right font-medium">% of shares out.</th>
                 </tr>
               </thead>
               <tbody>
@@ -107,6 +122,7 @@ export function OwnershipSection({ resource }: { resource: ReturnType<typeof use
                     <td className="num px-3 py-2 text-right" title={`${p.value_usd} USD`}>
                       {formatUsdCompact(p.value_usd)}
                     </td>
+                    <td className="num px-3 py-2 text-right">{formatOutstandingPct(p.pct_of_shares_outstanding)}</td>
                   </tr>
                 ))}
               </tbody>
@@ -129,6 +145,9 @@ export function OwnershipSection({ resource }: { resource: ReturnType<typeof use
                       <span className="num flex flex-wrap items-center gap-3 text-text-muted">
                         <span>{formatShares(h.shares)} shares</span>
                         <span>{formatUsdCompact(h.value_usd)}</span>
+                        {typeof h.pct_of_shares_outstanding === "number" ? (
+                          <span title="of shares outstanding">{formatOutstandingPct(h.pct_of_shares_outstanding)}</span>
+                        ) : null}
                         {filing ? (
                           <a href={filing} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-xs text-accent hover:underline">
                             filing

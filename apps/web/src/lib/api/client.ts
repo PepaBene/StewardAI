@@ -172,6 +172,14 @@ export type HoldingOwnership = Schemas["HoldingOwnership"];
 export type OwnershipPeriod = Schemas["OwnershipPeriod"];
 export type TopHolder = Schemas["TopHolder"];
 export type ManagerChange = Schemas["ManagerChange"];
+// SEC XBRL fundamentals: revenue breakdowns and shares outstanding.
+export type HoldingSegments = Schemas["HoldingSegments"];
+export type SegmentRow = Schemas["SegmentRow"];
+export type SegmentPeriod = Schemas["SegmentPeriod"];
+export type SegmentHistoryPoint = Schemas["SegmentHistoryPoint"];
+export type SharesOutstandingOut = Schemas["SharesOutstandingOut"];
+export type ShareBasis = Schemas["ShareBasis"];
+export type ManualSegmentRow = Schemas["ManualSegmentRow"];
 // Prompts config: owner overrides of the AI steps' system prompts.
 export type PromptsConfig = Schemas["PromptsConfig"];
 export type PromptDefault = Schemas["PromptDefault"];
