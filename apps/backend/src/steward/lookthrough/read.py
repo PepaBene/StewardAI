@@ -456,7 +456,8 @@ class _Securities:
             sec.names.append(name)
         if isin:
             sec.isins.add(isin)
-        sec.ticker = sec.ticker or ticker
+        # A direct position's own (Trading212) ticker wins over a fund line's local one.
+        sec.ticker = ticker if via[0] == "direct" and ticker else (sec.ticker or ticker)
         sec.sector = sec.sector or sector
         sec.country = sec.country or country
         sec.currency = sec.currency or currency
