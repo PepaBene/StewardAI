@@ -5992,6 +5992,124 @@
           }
         }
       }
+    },
+    "/holdings/{ticker}/segments": {
+      "get": {
+        "tags": [
+          "holdings"
+        ],
+        "summary": "Get Holding Segments",
+        "description": "Revenue by region, business segment and product as the company reports them: the\nlatest fiscal year (or quarter) from its SEC XBRL filing, with the earlier periods\nstored for the same basis. Holdings outside EDGAR show the rows entered in their\nholding profile, labelled as entered manually.",
+        "operationId": "get_holding_segments",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "ticker",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9._-]{1,32}$",
+              "title": "Ticker"
+            }
+          },
+          {
+            "name": "basis",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "enum": [
+                    "annual",
+                    "quarter"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "annual or quarter",
+              "title": "Basis"
+            },
+            "description": "annual or quarter"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HoldingSegments"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/jobs/sec-xbrl": {
+      "post": {
+        "tags": [
+          "jobs"
+        ],
+        "summary": "Run Sec Xbrl",
+        "description": "Read shares outstanding and revenue breakdowns from the SEC XBRL filings now.",
+        "operationId": "run_sec_xbrl",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/XbrlRunRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "202": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/JobSummary"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
     }
   },
   "components": {
@@ -6849,7 +6967,8 @@
                 "research",
                 "ownership_13f",
                 "monthly_review",
-                "chat"
+                "chat",
+                "sec_xbrl"
               ]
             },
             "type": "array",
@@ -6881,7 +7000,8 @@
                 "research",
                 "ownership_13f",
                 "monthly_review",
-                "chat"
+                "chat",
+                "sec_xbrl"
               ]
             },
             "type": "object",
@@ -12313,6 +12433,58 @@
             "type": "string",
             "title": "Source",
             "default": "SEC Form 13F data sets"
+          },
+          "applicable": {
+            "type": "boolean",
+            "title": "Applicable",
+            "description": "False for holdings Form 13F cannot cover (non-US listings).",
+            "default": true
+          },
+          "not_applicable_reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Not Applicable Reason"
+          },
+          "shares_outstanding": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SharesOutstandingOut"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The denominator of the % figures, with its source."
+          },
+          "pct_of_shares_outstanding": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pct Of Shares Outstanding",
+            "description": "Aggregate institutional %: the latest period's figure."
+          },
+          "basis_label": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Basis Label",
+            "description": "What the % measures, e.g. \"US 13F filers' holdings of the US line - a floor\" for ADRs."
           }
         },
         "type": "object",
@@ -12614,6 +12786,18 @@
             },
             "type": "array",
             "title": "Exposures"
+          },
+          "share_basis": {
+            "$ref": "#/components/schemas/ShareBasis"
+          },
+          "manual_segments": {
+            "items": {
+              "$ref": "#/components/schemas/ManualSegmentRow"
+            },
+            "type": "array",
+            "maxItems": 60,
+            "title": "Manual Segments",
+            "description": "Revenue by region / segment / product entered by hand; shown only when no SEC XBRL breakdown exists for the holding."
           }
         },
         "additionalProperties": false,
@@ -12678,6 +12862,156 @@
           "body"
         ],
         "title": "HoldingProfilesConfigVersion"
+      },
+      "HoldingSegments": {
+        "properties": {
+          "ticker": {
+            "type": "string",
+            "title": "Ticker"
+          },
+          "basis": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "annual",
+                  "quarter"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Basis",
+            "description": "The period basis shown."
+          },
+          "available_bases": {
+            "items": {
+              "type": "string",
+              "enum": [
+                "annual",
+                "quarter"
+              ]
+            },
+            "type": "array",
+            "title": "Available Bases"
+          },
+          "period": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SegmentPeriod"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "currency": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Currency"
+          },
+          "geographic": {
+            "items": {
+              "$ref": "#/components/schemas/SegmentRow"
+            },
+            "type": "array",
+            "title": "Geographic"
+          },
+          "segment": {
+            "items": {
+              "$ref": "#/components/schemas/SegmentRow"
+            },
+            "type": "array",
+            "title": "Segment"
+          },
+          "product": {
+            "items": {
+              "$ref": "#/components/schemas/SegmentRow"
+            },
+            "type": "array",
+            "title": "Product"
+          },
+          "total_revenue": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Total Revenue",
+            "description": "The filing's undimensioned revenue for the period (a breakdown can sum to less: hedging gains, unallocated items)."
+          },
+          "history": {
+            "additionalProperties": {
+              "items": {
+                "$ref": "#/components/schemas/SegmentHistoryPoint"
+              },
+              "type": "array"
+            },
+            "type": "object",
+            "title": "History",
+            "description": "Per breakdown, the same-basis periods stored, oldest first (at most 8)."
+          },
+          "source": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SegmentSource"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "as_of": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "As Of",
+            "description": "Filing date (SEC) or period end (manual)."
+          },
+          "notes": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Notes"
+          }
+        },
+        "type": "object",
+        "required": [
+          "ticker",
+          "basis",
+          "available_bases",
+          "period",
+          "currency",
+          "geographic",
+          "segment",
+          "product",
+          "total_revenue",
+          "history",
+          "source",
+          "as_of"
+        ],
+        "title": "HoldingSegments"
       },
       "HoldingsPrices": {
         "properties": {
@@ -13662,6 +13996,10 @@
             "$ref": "#/components/schemas/JobSchedule",
             "description": "Load new SEC Form 13F data sets (published quarterly). Default: the 5th of each month, 05:00."
           },
+          "sec_xbrl": {
+            "$ref": "#/components/schemas/JobSchedule",
+            "description": "Shares outstanding and revenue by region / segment from the holdings' latest SEC XBRL filings; only filings not parsed yet are downloaded. Default: Tuesdays 05:40."
+          },
           "earnings_check": {
             "$ref": "#/components/schemas/EarningsCheckSettings"
           },
@@ -13700,6 +14038,9 @@
           },
           "ownership": {
             "$ref": "#/components/schemas/OwnershipSettings"
+          },
+          "xbrl": {
+            "$ref": "#/components/schemas/XbrlSettings"
           }
         },
         "additionalProperties": false,
@@ -14315,6 +14656,72 @@
           "accession"
         ],
         "title": "ManagerChange"
+      },
+      "ManualSegmentRow": {
+        "properties": {
+          "label": {
+            "type": "string",
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Label",
+            "examples": [
+              "Czech Republic"
+            ]
+          },
+          "axis": {
+            "type": "string",
+            "enum": [
+              "geographic",
+              "segment",
+              "product"
+            ],
+            "title": "Axis"
+          },
+          "value": {
+            "type": "number",
+            "minimum": 0.0,
+            "title": "Value",
+            "description": "Revenue in `currency` for the period."
+          },
+          "currency": {
+            "type": "string",
+            "pattern": "^[A-Z]{3}$",
+            "title": "Currency",
+            "examples": [
+              "CZK"
+            ]
+          },
+          "period_start": {
+            "type": "string",
+            "format": "date",
+            "title": "Period Start"
+          },
+          "period_end": {
+            "type": "string",
+            "format": "date",
+            "title": "Period End"
+          },
+          "source": {
+            "type": "string",
+            "maxLength": 300,
+            "minLength": 1,
+            "title": "Source",
+            "description": "Where the figure comes from, e.g. 'Annual Report 2025, segment note, p. 212'."
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "label",
+          "axis",
+          "value",
+          "currency",
+          "period_start",
+          "period_end",
+          "source"
+        ],
+        "title": "ManualSegmentRow",
+        "description": "Revenue for one region, segment or product, entered by hand from an annual report\n(for issuers whose filings carry no machine-readable breakdown, e.g. CEZ and KB)."
       },
       "MarketHoliday": {
         "properties": {
@@ -15569,6 +15976,18 @@
               }
             ],
             "title": "Exited Holders"
+          },
+          "pct_of_shares_outstanding": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pct Of Shares Outstanding",
+            "description": "All 13F holders' shares (x ads_ratio) / shares outstanding, as a fraction."
           }
         },
         "type": "object",
@@ -18761,6 +19180,255 @@
         ],
         "title": "ScorePoint"
       },
+      "SegmentHistoryPoint": {
+        "properties": {
+          "period": {
+            "$ref": "#/components/schemas/SegmentPeriod"
+          },
+          "rows": {
+            "items": {
+              "$ref": "#/components/schemas/SegmentRow"
+            },
+            "type": "array",
+            "title": "Rows"
+          }
+        },
+        "type": "object",
+        "required": [
+          "period",
+          "rows"
+        ],
+        "title": "SegmentHistoryPoint"
+      },
+      "SegmentPeriod": {
+        "properties": {
+          "start": {
+            "type": "string",
+            "format": "date",
+            "title": "Start"
+          },
+          "end": {
+            "type": "string",
+            "format": "date",
+            "title": "End"
+          },
+          "months": {
+            "type": "integer",
+            "title": "Months"
+          },
+          "basis": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "annual",
+                  "quarter"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Basis"
+          },
+          "label": {
+            "type": "string",
+            "title": "Label",
+            "description": "\"FY2025\" for a fiscal year, else \"3M to 30 Jun 2026\"."
+          }
+        },
+        "type": "object",
+        "required": [
+          "start",
+          "end",
+          "months",
+          "basis",
+          "label"
+        ],
+        "title": "SegmentPeriod"
+      },
+      "SegmentRow": {
+        "properties": {
+          "label": {
+            "type": "string",
+            "title": "Label",
+            "description": "As the filing labels the member."
+          },
+          "member": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Member",
+            "description": "XBRL member (e.g. country:US); null when manual."
+          },
+          "value": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              }
+            ],
+            "title": "Value"
+          },
+          "share": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Share",
+            "description": "Fraction of the breakdown's sum (subtotals excluded); null for a subtotal."
+          },
+          "subtotal": {
+            "type": "boolean",
+            "title": "Subtotal",
+            "description": "The sum of other members shown (e.g. a region group).",
+            "default": false
+          },
+          "concept": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Concept"
+          },
+          "label_source": {
+            "type": "string",
+            "enum": [
+              "filing",
+              "derived",
+              "manual"
+            ],
+            "title": "Label Source",
+            "default": "filing"
+          }
+        },
+        "type": "object",
+        "required": [
+          "label",
+          "member",
+          "value",
+          "share"
+        ],
+        "title": "SegmentRow"
+      },
+      "SegmentSource": {
+        "properties": {
+          "kind": {
+            "type": "string",
+            "enum": [
+              "sec_xbrl",
+              "manual"
+            ],
+            "title": "Kind"
+          },
+          "tier": {
+            "type": "string",
+            "title": "Tier",
+            "description": "Provenance label for the UI."
+          },
+          "form": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Form"
+          },
+          "accession": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Accession"
+          },
+          "filed": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Filed"
+          },
+          "instance_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Instance Url"
+          },
+          "label_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Label Url"
+          },
+          "filing_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Filing Url"
+          },
+          "note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note",
+            "description": "Manual rows: where they come from."
+          }
+        },
+        "type": "object",
+        "required": [
+          "kind",
+          "tier"
+        ],
+        "title": "SegmentSource"
+      },
       "Sentence": {
         "properties": {
           "text": {
@@ -18894,6 +19562,275 @@
           "severity"
         ],
         "title": "SeverityOverride"
+      },
+      "ShareBasis": {
+        "properties": {
+          "ads_ratio": {
+            "anyOf": [
+              {
+                "type": "number",
+                "maximum": 1000.0,
+                "exclusiveMinimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ads Ratio",
+            "description": "Home-market shares represented by one share of the US-listed line (ADS ratio). Empty: the default (TSM 5, others 1)."
+          },
+          "share_classes": {
+            "items": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9-]+:[A-Za-z0-9_]+$"
+            },
+            "type": "array",
+            "title": "Share Classes",
+            "description": "Share-class members counted in the denominator when the filing tags shares outstanding per class, e.g. us-gaap:CommonClassAMember. Empty (the default): all classes."
+          },
+          "manual_shares_outstanding": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "exclusiveMinimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Manual Shares Outstanding",
+            "description": "Shares outstanding entered by hand, for issuers that do not file XBRL with the SEC (e.g. Prague-listed companies). Used only when no SEC figure exists."
+          },
+          "manual_as_of": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Manual As Of",
+            "description": "Date the manual figure is for."
+          },
+          "manual_source": {
+            "type": "string",
+            "maxLength": 300,
+            "title": "Manual Source",
+            "description": "Where the manual figure comes from, e.g. 'CEZ shareholder structure page'.",
+            "default": ""
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "ShareBasis",
+        "description": "How a holding's 13F figures (shares of its US line) compare with shares outstanding.\n\nDefaults when a field is empty (steward.fundamentals.shares.DEFAULT_BASIS_BY_CIK): one US\nshare represents one home-market share, except TSM (1 ADS = 5 common shares, as its\n20-F states); where a filing tags shares outstanding per class, every class is counted\n(Alphabet A+B+C, Novo Nordisk A+B). Narrow it to the class the US line is, e.g. GOOGL\nus-gaap:CommonClassAMember or NVO nvo:BShareCapitalMember."
+      },
+      "ShareClassOut": {
+        "properties": {
+          "member": {
+            "type": "string",
+            "title": "Member"
+          },
+          "label": {
+            "type": "string",
+            "title": "Label"
+          },
+          "shares": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              }
+            ],
+            "title": "Shares"
+          },
+          "counted": {
+            "type": "boolean",
+            "title": "Counted"
+          }
+        },
+        "type": "object",
+        "required": [
+          "member",
+          "label",
+          "shares",
+          "counted"
+        ],
+        "title": "ShareClassOut"
+      },
+      "SharesOutstandingOut": {
+        "properties": {
+          "shares": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              }
+            ],
+            "title": "Shares",
+            "description": "Home-market shares outstanding (the denominator)."
+          },
+          "as_of": {
+            "type": "string",
+            "format": "date",
+            "title": "As Of"
+          },
+          "method": {
+            "type": "string",
+            "title": "Method"
+          },
+          "method_label": {
+            "type": "string",
+            "title": "Method Label"
+          },
+          "classes": {
+            "items": {
+              "$ref": "#/components/schemas/ShareClassOut"
+            },
+            "type": "array",
+            "title": "Classes",
+            "description": "Per class when the filing tags classes."
+          },
+          "denominator_label": {
+            "type": "string",
+            "title": "Denominator Label",
+            "description": "e.g. \"all share classes (A + B + C)\"."
+          },
+          "accession": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Accession"
+          },
+          "form": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Form"
+          },
+          "filed": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Filed"
+          },
+          "source_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Url"
+          },
+          "source_tier": {
+            "type": "string",
+            "title": "Source Tier"
+          },
+          "ads_ratio": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              }
+            ],
+            "title": "Ads Ratio",
+            "description": "Home-market shares per US-listed share applied."
+          },
+          "ads_ratio_source": {
+            "type": "string",
+            "enum": [
+              "profile",
+              "default"
+            ],
+            "title": "Ads Ratio Source"
+          },
+          "ads_ratio_reported": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ads Ratio Reported",
+            "description": "The ratio the latest 20-F states, when read."
+          },
+          "ads_ratio_text": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ads Ratio Text"
+          },
+          "foreign_issuer": {
+            "type": "boolean",
+            "title": "Foreign Issuer",
+            "description": "Files a 20-F / 40-F (its US line is an ADR/NYRS)."
+          },
+          "notes": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Notes"
+          }
+        },
+        "type": "object",
+        "required": [
+          "shares",
+          "as_of",
+          "method",
+          "method_label",
+          "denominator_label",
+          "accession",
+          "form",
+          "filed",
+          "source_url",
+          "source_tier",
+          "ads_ratio",
+          "ads_ratio_source",
+          "foreign_issuer"
+        ],
+        "title": "SharesOutstandingOut"
       },
       "SnapshotValues": {
         "properties": {
@@ -20163,6 +21100,18 @@
             ],
             "title": "Shares Change Pct",
             "description": "(shares - prev_shares) / prev_shares, as a fraction (0.125 = +12.5 %); null when prev_shares is null or zero."
+          },
+          "pct_of_shares_outstanding": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pct Of Shares Outstanding",
+            "description": "shares x ads_ratio / shares outstanding, as a fraction; null without a shares-outstanding figure."
           }
         },
         "type": "object",
@@ -20875,6 +21824,67 @@
           "fetched_at"
         ],
         "title": "WikidataSummary"
+      },
+      "XbrlRunRequest": {
+        "properties": {
+          "ticker": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^[A-Za-z0-9._-]{1,32}$",
+                "examples": [
+                  "AAPL_US_EQ"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ticker",
+            "description": "One holding, or all when null."
+          },
+          "force": {
+            "type": "boolean",
+            "title": "Force",
+            "description": "Parse the latest filings again.",
+            "default": false
+          }
+        },
+        "type": "object",
+        "title": "XbrlRunRequest"
+      },
+      "XbrlSettings": {
+        "properties": {
+          "enabled": {
+            "type": "boolean",
+            "title": "Enabled",
+            "default": true
+          },
+          "quarterly": {
+            "type": "boolean",
+            "title": "Quarterly",
+            "description": "Also parse the latest 10-Q when it is newer than the annual report (US issuers; 20-F filers publish annual XBRL only).",
+            "default": true
+          },
+          "read_ads_ratio": {
+            "type": "boolean",
+            "title": "Read Ads Ratio",
+            "description": "For 20-F filers, read the ADS ratio the annual report states ('each ADS represents five common shares') to check the configured share basis. Downloads the report's main document (up to about 10 MB) once per new 20-F.",
+            "default": true
+          },
+          "max_document_mb": {
+            "type": "integer",
+            "maximum": 200.0,
+            "minimum": 1.0,
+            "title": "Max Document Mb",
+            "description": "Largest filing document downloaded.",
+            "default": 40
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "XbrlSettings",
+        "description": "SEC XBRL fundamentals: shares outstanding and revenue by region / segment / product,\nread from each holding's latest 10-K / 10-Q / 20-F XBRL instance."
       }
     },
     "securitySchemes": {

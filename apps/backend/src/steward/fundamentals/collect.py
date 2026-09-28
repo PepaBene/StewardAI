@@ -333,7 +333,8 @@ async def collect_ticker(
     }
 
 
-async def sec_xbrl_handler(ctx: JobContext) -> None:
+async def run_sec_xbrl(ctx: JobContext, edgar: EdgarClient | None) -> None:
+    """The job body; `edgar` is None when SEC_USER_AGENT is not set (the run fails then)."""
     pool = ctx.pool
     async with ctx.step("load_config") as step:
         jobs = await load_active(pool, "jobs", JobsConfig)
@@ -348,28 +349,31 @@ async def sec_xbrl_handler(ctx: JobContext) -> None:
         if not settings.enabled:
             step.detail["skipped"] = "disabled in the Jobs config (xbrl.enabled)"
             return
-    agent = get_settings().sec_user_agent
-    if not agent:
+    if edgar is None:
         raise JobFailed("SEC_USER_AGENT is not set: the SEC requires a contact User-Agent")
     failed: list[str] = []
-    async with httpx.AsyncClient(
-        timeout=httpx.Timeout(60.0, read=180.0),
-        headers={"User-Agent": f"StewardAI/{__version__}"},
-        follow_redirects=True,
-    ) as http:
-        edgar = EdgarClient(http, agent)
-        for ticker in tickers:
-            async with ctx.step(f"xbrl:{ticker}") as step:
-                profile = config.for_ticker(ticker) or HoldingProfile(ticker=ticker)
-                try:
-                    await collect_ticker(ctx, edgar, ticker, profile, settings, step.detail)
-                except (EdgarError, XbrlError, httpx.HTTPError, ValueError) as exc:
-                    # Keep what is stored; the next run tries again.
-                    step.detail["error"] = f"{type(exc).__name__}: {exc}"[:500]
-                    failed.append(ticker)
+    for ticker in tickers:
+        async with ctx.step(f"xbrl:{ticker}") as step:
+            profile = config.for_ticker(ticker) or HoldingProfile(ticker=ticker)
+            try:
+                await collect_ticker(ctx, edgar, ticker, profile, settings, step.detail)
+            except (EdgarError, XbrlError, httpx.HTTPError, ValueError) as exc:
+                # Keep what is stored; the next run tries again.
+                step.detail["error"] = f"{type(exc).__name__}: {exc}"[:500]
+                failed.append(ticker)
     async with ctx.step("summary") as step:
         step.detail.update(
             holdings=len(tickers),
             failed=failed,
             checked_at=dt.datetime.now(dt.UTC).isoformat(),
         )
+
+
+async def sec_xbrl_handler(ctx: JobContext) -> None:
+    agent = get_settings().sec_user_agent
+    async with httpx.AsyncClient(
+        timeout=httpx.Timeout(60.0, read=180.0),
+        headers={"User-Agent": f"StewardAI/{__version__}"},
+        follow_redirects=True,
+    ) as http:
+        await run_sec_xbrl(ctx, EdgarClient(http, agent) if agent else None)

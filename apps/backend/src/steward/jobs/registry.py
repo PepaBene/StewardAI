@@ -14,8 +14,8 @@ from steward.earnings.calendar import (
 )
 from steward.earnings.check import earnings_check_handler, thesis_verdicts_handler
 from steward.earnings.reconcile import fact_reconcile_handler
-from steward.jobs.runner import JobHandler
 from steward.fundamentals.collect import sec_xbrl_handler
+from steward.jobs.runner import JobHandler
 from steward.macro.collect import macro_collect_handler
 from steward.monitor import monitor_handler
 from steward.news.digest import daily_digest_handler, weekly_digest_handler
