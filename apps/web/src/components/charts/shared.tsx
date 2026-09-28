@@ -150,8 +150,11 @@ export function SrTable({
   columns: readonly string[];
   rows: readonly (readonly ReactNode[])[];
 }) {
+  // The wrapper, not the table, is visually hidden: a <table> ignores the 1px width of
+  // `sr-only` and grows to its content, which pushed phone-width pages sideways.
   return (
-    <table className="sr-only">
+    <div className="sr-only">
+    <table>
       <caption>{caption}</caption>
       <thead>
         <tr>
@@ -178,5 +181,6 @@ export function SrTable({
         ))}
       </tbody>
     </table>
+    </div>
   );
 }

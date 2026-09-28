@@ -61,7 +61,7 @@ export default async function AppLayout({ children }: LayoutProps<"/">) {
           <div className="ml-2 lg:ml-7">
             <CommandPalette />
           </div>
-          <div className="ml-auto flex min-w-0 items-center gap-1 whitespace-nowrap sm:gap-2">
+          <div className="ml-auto flex min-w-0 items-center gap-1 sm:gap-2">
             <SyncIndicator />
             <ChatPanel />
             <span aria-hidden="true" className="mx-1.5 hidden h-[22px] w-px bg-border lg:block" />
@@ -83,7 +83,9 @@ export default async function AppLayout({ children }: LayoutProps<"/">) {
           </div>
         </div>
         <div className="mx-auto flex max-w-[1440px] items-stretch gap-6 px-4 md:px-8">
-          <AppNav />
+          <div className="min-w-0 flex-1 xl:flex-none">
+            <AppNav />
+          </div>
           <MarketStrip />
         </div>
       </header>
