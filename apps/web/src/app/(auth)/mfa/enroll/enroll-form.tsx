@@ -95,7 +95,7 @@ export function EnrollForm() {
   return (
     <Card>
       <CardHeader>
-        <CardTitle className="text-xl">Set up two-factor authentication</CardTitle>
+        <CardTitle className="text-[28px]">Set up two-factor authentication</CardTitle>
         <CardDescription>
           StewardAI requires an authenticator app (TOTP) for every sign-in.
         </CardDescription>

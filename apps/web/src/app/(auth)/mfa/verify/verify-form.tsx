@@ -61,7 +61,7 @@ export function VerifyForm() {
   return (
     <Card>
       <CardHeader>
-        <CardTitle className="text-xl">Two-factor verification</CardTitle>
+        <CardTitle className="text-[28px]">Two-factor verification</CardTitle>
         <CardDescription>Enter the code from your authenticator app.</CardDescription>
       </CardHeader>
       <CardContent>

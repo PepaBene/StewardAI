@@ -25,8 +25,8 @@ export function ThemeToggle() {
           <MoonIcon className="hidden dark:block" aria-hidden="true" />
         </Button>
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="end">
-        <DropdownMenuLabel>Theme</DropdownMenuLabel>
+      <DropdownMenuContent align="end" className="min-w-40">
+        <DropdownMenuLabel className="kicker px-2 pt-1.5 pb-1">Theme</DropdownMenuLabel>
         <DropdownMenuRadioGroup value={theme} onValueChange={setTheme}>
           <DropdownMenuRadioItem value="light">
             <SunIcon aria-hidden="true" className="size-4" /> Light
