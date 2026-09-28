@@ -42,6 +42,7 @@ from steward.reference.identity import holding_tickers
 from steward.reference.price_series import (
     PriceSymbols,
     choose_one,
+    describe,
     holding_symbols,
     yahoo_mic,
 )
@@ -243,7 +244,7 @@ async def fetch_symbol(
     try:
         chart = await yahoo.yahoo_intraday(http, symbol, retry=retry)
     except (yahoo.YahooError, httpx.HTTPError, ValueError) as exc:
-        reason = f"{type(exc).__name__}: {exc}"[:300]
+        reason = f"{describe(exc)}"[:300]
         await record_status(pool, symbol, now, reason)
         return 0, reason
     count = await store_chart(pool, symbol, chart)
@@ -357,7 +358,7 @@ async def refresh_pse_px(
     try:
         fetched = await pse_index(http, PX_ISIN)
     except (PseError, httpx.HTTPError) as exc:
-        detail["pse_px_error"] = f"{type(exc).__name__}: {exc}"[:300]
+        detail["pse_px_error"] = f"{describe(exc)}"[:300]
         return last is not None
     value = fetched.value
     kind: QuoteKind = "close" if value.is_close(now) else "intraday"

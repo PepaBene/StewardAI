@@ -53,6 +53,7 @@ from steward.reference.price_series import (
     PriceSymbols,
     SeriesRef,
     choose_one,
+    describe,
     holding_symbols,
     index_symbols,
 )
@@ -179,7 +180,7 @@ async def collect_symbol(
     try:
         bars = await stooq_daily(deps.http, symbol, start, deps.today, api_key=deps.api_key)
     except (MarketDataError, httpx.HTTPError) as exc:
-        return 0, f"Stooq unreachable: {type(exc).__name__}: {exc}"[:300]
+        return 0, f"Stooq unreachable: {describe(exc)}"[:300]
     if not bars:
         return 0, None if last else f"Stooq has no data for {symbol}"
     if backfill:
@@ -191,7 +192,7 @@ async def collect_symbol(
             )
         except (MarketDataError, httpx.HTTPError) as exc:
             # Storing only the restated recent bars would put a false jump in the series.
-            return 0, f"Stooq restated history; refetch failed: {type(exc).__name__}: {exc}"[:300]
+            return 0, f"Stooq restated history; refetch failed: {describe(exc)}"[:300]
         if notes is not None:
             notes[symbol] = f"history restated by Stooq; refetched {len(bars)} bars"
     return await store_bars(pool, bars), None
@@ -227,7 +228,7 @@ async def collect_yahoo(
     except yahoo.YahooNoData:
         return 0, None if last else f"Yahoo has no data for {symbol}"
     except (yahoo.YahooError, httpx.HTTPError, ValueError) as exc:
-        return 0, f"Yahoo unreachable: {type(exc).__name__}: {exc}"[:300]
+        return 0, f"Yahoo unreachable: {describe(exc)}"[:300]
     if not bars:
         return 0, None if last else f"Yahoo has no data for {symbol}"
     if backfill:
@@ -236,7 +237,7 @@ async def collect_yahoo(
         try:
             chart, bars = await _yahoo_daily(pool, deps, symbol, full_start)
         except (yahoo.YahooError, httpx.HTTPError, ValueError) as exc:
-            return 0, f"Yahoo restated history; refetch failed: {type(exc).__name__}: {exc}"[:300]
+            return 0, f"Yahoo restated history; refetch failed: {describe(exc)}"[:300]
         if notes is not None:
             notes[symbol] = f"history restated by Yahoo; refetched {len(bars)} bars"
     return await store_bars(pool, bars, "yahoo", chart.meta.currency), None

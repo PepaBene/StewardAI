@@ -63,6 +63,12 @@ INDEX_MIC: dict[str, str] = {
 }  # fmt: skip
 
 
+def describe(exc: BaseException) -> str:
+    """ "ConnectError: reset by peer", or just "ConnectError" when the error has no message."""
+    text = str(exc).strip()
+    return f"{type(exc).__name__}: {text}" if text else type(exc).__name__
+
+
 def yahoo_from_stooq(stooq: str | None) -> str | None:
     """`novo-b.dk` -> `NOVO-B.CO`, `msft.us` -> `MSFT`; None for indices and unknown markets."""
     if not stooq or stooq.startswith("^"):
