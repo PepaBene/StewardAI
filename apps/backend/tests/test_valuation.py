@@ -55,9 +55,9 @@ from steward.valuation.fundamentals import (
 )
 from steward.valuation.read import (
     PE_CAP,
-    FigureOut,
-    HoldingContribution,
-    PriceOut,
+    PerShareFigure,
+    ValuationContribution,
+    ValuationPrice,
     aggregate,
     ratio,
 )
@@ -374,12 +374,12 @@ def test_pick_instance() -> None:
 # ---------------------------------------------------------------------------
 
 
-def _price(close: float, currency: str = "USD") -> PriceOut:
-    return PriceOut(symbol="x.us", close=close, currency=currency, date=TODAY, stale=False)
+def _price(close: float, currency: str = "USD") -> ValuationPrice:
+    return ValuationPrice(symbol="x.us", close=close, currency=currency, date=TODAY, stale=False)
 
 
-def _figure(value: float, currency: str = "USD") -> FigureOut:
-    return FigureOut(
+def _figure(value: float, currency: str = "USD") -> PerShareFigure:
+    return PerShareFigure(
         value=value,
         currency=currency,
         period_start=None,
@@ -420,8 +420,8 @@ def _row(
     pb: float | None = None,
     dy: float | None = None,
     note: str | None = None,
-) -> HoldingContribution:
-    return HoldingContribution(
+) -> ValuationContribution:
+    return ValuationContribution(
         ticker="T",
         name=None,
         kind="stock",

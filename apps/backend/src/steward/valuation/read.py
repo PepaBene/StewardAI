@@ -26,7 +26,7 @@ from steward.valuation.common import (
     instrument_info,
     price_currency,
 )
-from steward.valuation.fundamentals import EpsStep, FactRef, Figure, SourceFigures
+from steward.valuation.fundamentals import EpsStep, Figure, FundamentalFactRef, SourceFigures
 
 # iShares' method, applied to the portfolio so it compares like for like with CSPX.
 PE_CAP = 60.0
@@ -62,12 +62,12 @@ PORTFOLIO_METHOD = (
 )
 
 
-class RatioOut(BaseModel):
+class ValuationRatio(BaseModel):
     value: float | None = Field(description="Null when it cannot be computed (see reason).")
     reason: str | None = Field(description="Why the value is null, e.g. 'n/m: negative earnings'.")
 
 
-class PriceOut(BaseModel):
+class ValuationPrice(BaseModel):
     symbol: str
     close: float
     currency: str | None
@@ -76,7 +76,7 @@ class PriceOut(BaseModel):
     stale: bool
 
 
-class FigureOut(BaseModel):
+class PerShareFigure(BaseModel):
     value: float
     currency: str
     period_start: dt.date | None
@@ -84,10 +84,10 @@ class FigureOut(BaseModel):
     method: str
     annual_only: bool
     stale: bool = Field(description="The period ended more than 200 days ago.")
-    inputs: list[FactRef] = Field(default_factory=list)
+    inputs: list[FundamentalFactRef] = Field(default_factory=list)
 
 
-class FundamentalsOut(BaseModel):
+class FundamentalsSource(BaseModel):
     source: SourceName
     source_label: str
     basis: str | None
@@ -100,7 +100,7 @@ class FundamentalsOut(BaseModel):
     last_error: str | None
 
 
-class AlternativeOut(BaseModel):
+class ValuationAlternative(BaseModel):
     source: SourceName
     source_label: str
     basis: str | None
@@ -111,7 +111,7 @@ class AlternativeOut(BaseModel):
     pe: float | None
 
 
-class CrossCheckOut(BaseModel):
+class ValuationCrossCheck(BaseModel):
     source: str = "finnhub"
     source_label: str = SOURCE_LABEL["finnhub"]
     symbol: str | None
@@ -122,7 +122,7 @@ class CrossCheckOut(BaseModel):
     fetched_at: dt.datetime
 
 
-class FundValuationOut(BaseModel):
+class FundValuation(BaseModel):
     key: str
     label: str
     provider: str
@@ -151,22 +151,22 @@ class HoldingValuation(BaseModel):
     ticker: str
     name: str | None
     kind: Literal["stock", "fund"]
-    price: PriceOut | None
-    pe: RatioOut
-    pb: RatioOut
-    dividend_yield: RatioOut = Field(description="Fraction (0.012 = 1.2 %).")
-    eps_ttm: FigureOut | None
-    book_value_per_share: FigureOut | None
-    dividend_per_share: FigureOut | None
+    price: ValuationPrice | None
+    pe: ValuationRatio
+    pb: ValuationRatio
+    dividend_yield: ValuationRatio = Field(description="Fraction (0.012 = 1.2 %).")
+    eps_ttm: PerShareFigure | None
+    book_value_per_share: PerShareFigure | None
+    dividend_per_share: PerShareFigure | None
     shares_per_listing: float = Field(
         description="Ordinary shares per priced unit (depositary receipts)."
     )
-    fundamentals: FundamentalsOut | None = Field(description="The figures the ratios use.")
-    alternatives: list[AlternativeOut] = Field(
+    fundamentals: FundamentalsSource | None = Field(description="The figures the ratios use.")
+    alternatives: list[ValuationAlternative] = Field(
         description="Other sources or accounting bases, for comparison (not used)."
     )
-    cross_check: CrossCheckOut | None
-    fund: FundValuationOut | None = Field(description="ETFs: the provider's fund figures.")
+    cross_check: ValuationCrossCheck | None
+    fund: FundValuation | None = Field(description="ETFs: the provider's fund figures.")
     pe_history: list[PePoint] = Field(
         description="Weekly P/E over two years: each close over the EPS TTM in force then "
         "(from the first filing of each period); empty when it cannot be built."
@@ -204,14 +204,14 @@ def _json(value: Any) -> dict[str, Any]:
 
 async def latest_fund(
     pool: asyncpg.Pool, fund: FundValuationSource, today: dt.date
-) -> FundValuationOut | None:
+) -> FundValuation | None:
     row = await pool.fetchrow(
         "select * from public.fund_valuation where fund_key = $1 order by as_of desc limit 1",
         fund.key,
     )
     if row is None:
         return None
-    return FundValuationOut(
+    return FundValuation(
         key=fund.key,
         label=fund.label,
         provider=row["provider"],
@@ -244,10 +244,10 @@ def _stale(end: dt.date | None, today: dt.date) -> bool:
     return end is not None and (today - end).days > FIGURES_STALE_DAYS
 
 
-def _figure_out(figure: Figure | None, today: dt.date) -> FigureOut | None:
+def _figure_out(figure: Figure | None, today: dt.date) -> PerShareFigure | None:
     if figure is None:
         return None
-    return FigureOut(
+    return PerShareFigure(
         value=figure.value,
         currency=figure.currency,
         period_start=figure.period_start,
@@ -261,11 +261,11 @@ def _figure_out(figure: Figure | None, today: dt.date) -> FigureOut | None:
 
 def _manual_figure(
     value: float | None, profile: HoldingProfile, what: str, today: dt.date
-) -> FigureOut | None:
+) -> PerShareFigure | None:
     manual = profile.manual_fundamentals
     if manual is None or value is None:
         return None
-    return FigureOut(
+    return PerShareFigure(
         value=value,
         currency=manual.currency,
         period_start=None,
@@ -278,10 +278,10 @@ def _manual_figure(
 
 
 class _Chosen(BaseModel):
-    fundamentals: FundamentalsOut
-    eps: FigureOut | None
-    bvps: FigureOut | None
-    dps: FigureOut | None
+    fundamentals: FundamentalsSource
+    eps: PerShareFigure | None
+    bvps: PerShareFigure | None
+    dps: PerShareFigure | None
     steps: list[EpsStep]
 
 
@@ -296,7 +296,7 @@ def _from_row(row: asyncpg.Record, today: dt.date) -> tuple[_Chosen, SourceFigur
         else row["source"]
     )
     chosen = _Chosen(
-        fundamentals=FundamentalsOut(
+        fundamentals=FundamentalsSource(
             source=row["source"],
             source_label=SOURCE_LABEL[label_source],
             basis=figures.basis,
@@ -321,7 +321,7 @@ def _from_manual(profile: HoldingProfile, today: dt.date) -> _Chosen | None:
     if manual is None:
         return None
     return _Chosen(
-        fundamentals=FundamentalsOut(
+        fundamentals=FundamentalsSource(
             source="manual",
             source_label=SOURCE_LABEL["manual"],
             basis=None,
@@ -378,34 +378,34 @@ def _convert(
 
 
 def ratio(
-    price: PriceOut | None,
-    figure: FigureOut | None,
+    price: ValuationPrice | None,
+    figure: PerShareFigure | None,
     per_listing: float,
     fx: FxTable | None,
     kind: Literal["pe", "pb", "yield"],
     missing: str,
-) -> RatioOut:
+) -> ValuationRatio:
     if price is None:
-        return RatioOut(value=None, reason="no stored price")
+        return ValuationRatio(value=None, reason="no stored price")
     if figure is None:
-        return RatioOut(value=None, reason=missing)
+        return ValuationRatio(value=None, reason=missing)
     per_unit = figure.value * per_listing
     if kind in ("pe", "pb") and per_unit <= 0:
         what = "negative earnings" if kind == "pe" else "negative book value"
         if per_unit == 0:
             what = "zero earnings" if kind == "pe" else "zero book value"
-        return RatioOut(value=None, reason=f"n/m: {what}")
+        return ValuationRatio(value=None, reason=f"n/m: {what}")
     converted, why = _convert(fx, price.close, price.currency, figure.currency)
     if converted is None:
-        return RatioOut(value=None, reason=why)
+        return ValuationRatio(value=None, reason=why)
     if kind == "yield":
-        return RatioOut(value=per_unit / converted if converted > 0 else None, reason=None)
-    return RatioOut(value=converted / per_unit, reason=None)
+        return ValuationRatio(value=per_unit / converted if converted > 0 else None, reason=None)
+    return ValuationRatio(value=converted / per_unit, reason=None)
 
 
 async def _price(
     pool: asyncpg.Pool, symbol: str | None, currency: str | None, today: dt.date
-) -> PriceOut | None:
+) -> ValuationPrice | None:
     if not symbol:
         return None
     row = await pool.fetchrow(
@@ -415,7 +415,7 @@ async def _price(
     )
     if row is None:
         return None
-    return PriceOut(
+    return ValuationPrice(
         symbol=symbol,
         close=float(row["close"]),
         currency=currency,
@@ -531,13 +531,13 @@ async def holding_valuation(
         return HoldingValuation(
             **common,
             kind="fund",
-            pe=RatioOut(
+            pe=ValuationRatio(
                 value=fund.pe if fund else None, reason=None if fund and fund.pe else reason
             ),
-            pb=RatioOut(
+            pb=ValuationRatio(
                 value=fund.pb if fund else None, reason=None if fund and fund.pb else reason
             ),
-            dividend_yield=RatioOut(
+            dividend_yield=ValuationRatio(
                 value=fund.dividend_yield if fund else None,
                 reason=None
                 if fund and fund.dividend_yield is not None
@@ -585,7 +585,7 @@ async def holding_valuation(
     dps = chosen.dps if chosen else None
     if depositary_unknown:
         dr = "depositary receipt: set 'shares per listing' in the holding profile"
-        pe = pb = dy = RatioOut(value=None, reason=dr)
+        pe = pb = dy = ValuationRatio(value=None, reason=dr)
     else:
         pe = ratio(
             price,
@@ -612,7 +612,7 @@ async def holding_valuation(
             missing if chosen is None else "no dividends per share in the figures",
         )
 
-    alternatives: list[AlternativeOut] = []
+    alternatives: list[ValuationAlternative] = []
     for key, candidate in candidates.items():
         if candidate is chosen:
             continue
@@ -630,7 +630,7 @@ async def holding_valuation(
     cross = None
     if "finnhub" in rows:
         body = _json(rows["finnhub"]["figures"])
-        cross = CrossCheckOut(
+        cross = ValuationCrossCheck(
             symbol=body.get("symbol"),
             pe=body.get("pe"),
             pb=body.get("pb"),
@@ -690,13 +690,13 @@ def _missing_reason(
 def _alternative(
     key: str,
     basis: str | None,
-    eps: FigureOut | None,
-    price: PriceOut | None,
+    eps: PerShareFigure | None,
+    price: ValuationPrice | None,
     per_listing: float,
     fx: FxTable | None,
-) -> AlternativeOut:
+) -> ValuationAlternative:
     pe = ratio(price, eps, per_listing, fx, "pe", "")
-    return AlternativeOut(
+    return ValuationAlternative(
         source=key,
         source_label=SOURCE_LABEL[key],
         basis=basis,
@@ -713,20 +713,20 @@ def _alternative(
 # ---------------------------------------------------------------------------
 
 
-class Coverage(BaseModel):
+class ValuationCoverage(BaseModel):
     pe: float = Field(description="Share of invested value (0..1) with a P/E (incl. excluded n/m).")
     pb: float
     dividend_yield: float
 
 
-class Aggregate(BaseModel):
+class ValuationAggregate(BaseModel):
     pe: float | None
     pb: float | None
     dividend_yield: float | None = Field(description="Fraction.")
-    coverage: Coverage
+    coverage: ValuationCoverage
 
 
-class HoldingContribution(BaseModel):
+class ValuationContribution(BaseModel):
     ticker: str
     name: str | None
     kind: Literal["stock", "fund"]
@@ -760,18 +760,18 @@ class BenchmarkValuation(BaseModel):
 class PortfolioValuation(BaseModel):
     as_of: dt.date | None = Field(description="The snapshot the weights come from.")
     base_currency: str | None
-    portfolio: Aggregate
+    portfolio: ValuationAggregate
     benchmark: BenchmarkValuation | None = Field(
         description="The Prices config's first benchmark, via the fund configured for it."
     )
     comparisons: list[BenchmarkValuation] = Field(
         description="Every configured fund's (and, where published, its index's) figures."
     )
-    holdings: list[HoldingContribution]
+    holdings: list[ValuationContribution]
     method: str
 
 
-def aggregate(rows: list[HoldingContribution]) -> Aggregate:
+def aggregate(rows: list[ValuationContribution]) -> ValuationAggregate:
     total = sum(r.weight for r in rows)
 
     def harmonic(values: list[tuple[float, float]]) -> float | None:
@@ -790,7 +790,7 @@ def aggregate(rows: list[HoldingContribution]) -> Aggregate:
     )
     dy_rows = [r for r in rows if r.dividend_yield is not None]
     dy_weight = sum(r.weight for r in dy_rows)
-    return Aggregate(
+    return ValuationAggregate(
         pe=harmonic([(r.weight, r.pe) for r in pe_rows if r.pe is not None]),
         pb=harmonic([(r.weight, r.pb) for r in pb_rows if r.pb is not None]),
         dividend_yield=(
@@ -798,7 +798,7 @@ def aggregate(rows: list[HoldingContribution]) -> Aggregate:
             if dy_weight > 0
             else None
         ),
-        coverage=Coverage(
+        coverage=ValuationCoverage(
             pe=pe_covered / total if total else 0.0,
             pb=pb_covered / total if total else 0.0,
             dividend_yield=dy_weight / total if total else 0.0,
@@ -806,7 +806,7 @@ def aggregate(rows: list[HoldingContribution]) -> Aggregate:
     )
 
 
-def contribution(valuation: HoldingValuation, weight: float) -> HoldingContribution:
+def contribution(valuation: HoldingValuation, weight: float) -> ValuationContribution:
     pe_raw = valuation.pe.value
     pb_raw = valuation.pb.value
     pe_note = valuation.pe.reason
@@ -831,7 +831,7 @@ def contribution(valuation: HoldingValuation, weight: float) -> HoldingContribut
         or (valuation.eps_ttm and valuation.eps_ttm.stale)
         or (valuation.fund and valuation.fund.stale)
     )
-    return HoldingContribution(
+    return ValuationContribution(
         ticker=valuation.ticker,
         name=valuation.name,
         kind=valuation.kind,
@@ -849,7 +849,7 @@ def contribution(valuation: HoldingValuation, weight: float) -> HoldingContribut
 
 
 def _benchmarks(
-    fund: FundValuationSource, figures: FundValuationOut, symbol: str | None
+    fund: FundValuationSource, figures: FundValuation, symbol: str | None
 ) -> list[BenchmarkValuation]:
     out = [
         BenchmarkValuation(

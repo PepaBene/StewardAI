@@ -95,7 +95,7 @@ class Fact:
         return self.concept.split(":", 1)[0]
 
 
-class FactRef(BaseModel):
+class FundamentalFactRef(BaseModel):
     """One input fact, as filed."""
 
     concept: str
@@ -124,7 +124,7 @@ class Figure(BaseModel):
         description="The latest figure is a full year because the source has no interim "
         "figures (20-F filers), or newer interim figures could not be combined.",
     )
-    inputs: list[FactRef]
+    inputs: list[FundamentalFactRef]
 
 
 class EpsStep(BaseModel):
@@ -240,8 +240,8 @@ def latest_per_period(facts: Iterable[Fact]) -> list[Fact]:
     return sorted(best.values(), key=lambda f: (f.end, f.start or dt.date.min))
 
 
-def _ref(f: Fact) -> FactRef:
-    return FactRef(
+def _ref(f: Fact) -> FundamentalFactRef:
+    return FundamentalFactRef(
         concept=f.concept,
         start=f.start,
         end=f.end,

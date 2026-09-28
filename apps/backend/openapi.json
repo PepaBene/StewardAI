@@ -6290,55 +6290,6 @@
         ],
         "title": "ActivityCoverage"
       },
-      "Aggregate": {
-        "properties": {
-          "pe": {
-            "anyOf": [
-              {
-                "type": "number"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Pe"
-          },
-          "pb": {
-            "anyOf": [
-              {
-                "type": "number"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Pb"
-          },
-          "dividend_yield": {
-            "anyOf": [
-              {
-                "type": "number"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Dividend Yield",
-            "description": "Fraction."
-          },
-          "coverage": {
-            "$ref": "#/components/schemas/Coverage"
-          }
-        },
-        "type": "object",
-        "required": [
-          "pe",
-          "pb",
-          "dividend_yield",
-          "coverage"
-        ],
-        "title": "Aggregate"
-      },
       "AlertOut": {
         "properties": {
           "id": {
@@ -6549,102 +6500,6 @@
           "weight"
         ],
         "title": "AllocationSlice"
-      },
-      "AlternativeOut": {
-        "properties": {
-          "source": {
-            "type": "string",
-            "enum": [
-              "sec",
-              "esef",
-              "manual"
-            ],
-            "title": "Source"
-          },
-          "source_label": {
-            "type": "string",
-            "title": "Source Label"
-          },
-          "basis": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Basis"
-          },
-          "eps_ttm": {
-            "anyOf": [
-              {
-                "type": "number"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Eps Ttm"
-          },
-          "currency": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Currency"
-          },
-          "period_end": {
-            "anyOf": [
-              {
-                "type": "string",
-                "format": "date"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Period End"
-          },
-          "method": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Method"
-          },
-          "pe": {
-            "anyOf": [
-              {
-                "type": "number"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Pe"
-          }
-        },
-        "type": "object",
-        "required": [
-          "source",
-          "source_label",
-          "basis",
-          "eps_ttm",
-          "currency",
-          "period_end",
-          "method",
-          "pe"
-        ],
-        "title": "AlternativeOut"
       },
       "AnnouncementRule": {
         "properties": {
@@ -8477,7 +8332,7 @@
           },
           "holdings": {
             "items": {
-              "$ref": "#/components/schemas/steward__portfolio__read__HoldingContribution"
+              "$ref": "#/components/schemas/HoldingContribution"
             },
             "type": "array",
             "title": "Holdings",
@@ -8710,114 +8565,6 @@
           "by_model"
         ],
         "title": "CostSummary"
-      },
-      "Coverage": {
-        "properties": {
-          "pe": {
-            "type": "number",
-            "title": "Pe",
-            "description": "Share of invested value (0..1) with a P/E (incl. excluded n/m)."
-          },
-          "pb": {
-            "type": "number",
-            "title": "Pb"
-          },
-          "dividend_yield": {
-            "type": "number",
-            "title": "Dividend Yield"
-          }
-        },
-        "type": "object",
-        "required": [
-          "pe",
-          "pb",
-          "dividend_yield"
-        ],
-        "title": "Coverage"
-      },
-      "CrossCheckOut": {
-        "properties": {
-          "source": {
-            "type": "string",
-            "title": "Source",
-            "default": "finnhub"
-          },
-          "source_label": {
-            "type": "string",
-            "title": "Source Label",
-            "default": "Finnhub basic financials (tier 2)"
-          },
-          "symbol": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Symbol"
-          },
-          "pe": {
-            "anyOf": [
-              {
-                "type": "number"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Pe"
-          },
-          "pb": {
-            "anyOf": [
-              {
-                "type": "number"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Pb"
-          },
-          "eps_ttm": {
-            "anyOf": [
-              {
-                "type": "number"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Eps Ttm"
-          },
-          "dividend_yield": {
-            "anyOf": [
-              {
-                "type": "number"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Dividend Yield"
-          },
-          "fetched_at": {
-            "type": "string",
-            "format": "date-time",
-            "title": "Fetched At"
-          }
-        },
-        "type": "object",
-        "required": [
-          "symbol",
-          "pe",
-          "pb",
-          "eps_ttm",
-          "dividend_yield",
-          "fetched_at"
-        ],
-        "title": "CrossCheckOut"
       },
       "DayCount": {
         "properties": {
@@ -11444,98 +11191,6 @@
         ],
         "title": "FactOut"
       },
-      "FactRef": {
-        "properties": {
-          "concept": {
-            "type": "string",
-            "title": "Concept"
-          },
-          "start": {
-            "anyOf": [
-              {
-                "type": "string",
-                "format": "date"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Start"
-          },
-          "end": {
-            "type": "string",
-            "format": "date",
-            "title": "End"
-          },
-          "value": {
-            "type": "number",
-            "title": "Value"
-          },
-          "unit": {
-            "type": "string",
-            "title": "Unit"
-          },
-          "source": {
-            "type": "string",
-            "title": "Source",
-            "description": "sec (companyfacts), sec_instance (the filing's XBRL instance) or esef (filings.xbrl.org)."
-          },
-          "ref": {
-            "type": "string",
-            "title": "Ref",
-            "description": "Accession number or filings.xbrl.org filing id."
-          },
-          "form": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Form"
-          },
-          "filed": {
-            "anyOf": [
-              {
-                "type": "string",
-                "format": "date"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Filed"
-          },
-          "url": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Url"
-          }
-        },
-        "type": "object",
-        "required": [
-          "concept",
-          "start",
-          "end",
-          "value",
-          "unit",
-          "source",
-          "ref",
-          "form",
-          "filed",
-          "url"
-        ],
-        "title": "FactRef",
-        "description": "One input fact, as filed."
-      },
       "FactReview": {
         "properties": {
           "action": {
@@ -11842,73 +11497,6 @@
         ],
         "title": "FeedbackOut"
       },
-      "FigureOut": {
-        "properties": {
-          "value": {
-            "type": "number",
-            "title": "Value"
-          },
-          "currency": {
-            "type": "string",
-            "title": "Currency"
-          },
-          "period_start": {
-            "anyOf": [
-              {
-                "type": "string",
-                "format": "date"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Period Start"
-          },
-          "period_end": {
-            "anyOf": [
-              {
-                "type": "string",
-                "format": "date"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Period End"
-          },
-          "method": {
-            "type": "string",
-            "title": "Method"
-          },
-          "annual_only": {
-            "type": "boolean",
-            "title": "Annual Only"
-          },
-          "stale": {
-            "type": "boolean",
-            "title": "Stale",
-            "description": "The period ended more than 200 days ago."
-          },
-          "inputs": {
-            "items": {
-              "$ref": "#/components/schemas/FactRef"
-            },
-            "type": "array",
-            "title": "Inputs"
-          }
-        },
-        "type": "object",
-        "required": [
-          "value",
-          "currency",
-          "period_start",
-          "period_end",
-          "method",
-          "annual_only",
-          "stale"
-        ],
-        "title": "FigureOut"
-      },
       "FredSeries": {
         "properties": {
           "key": {
@@ -11985,7 +11573,7 @@
         ],
         "title": "Freshness"
       },
-      "FundValuationOut": {
+      "FundValuation": {
         "properties": {
           "key": {
             "type": "string",
@@ -12131,7 +11719,7 @@
           "fetched_at",
           "stale"
         ],
-        "title": "FundValuationOut"
+        "title": "FundValuation"
       },
       "FundValuationSource": {
         "properties": {
@@ -12227,7 +11815,99 @@
         "title": "FundValuationSource",
         "description": "Where an ETF's fund-level P/E and P/B are published (they stand in for its index)."
       },
-      "FundamentalsOut": {
+      "FundamentalFactRef": {
+        "properties": {
+          "concept": {
+            "type": "string",
+            "title": "Concept"
+          },
+          "start": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Start"
+          },
+          "end": {
+            "type": "string",
+            "format": "date",
+            "title": "End"
+          },
+          "value": {
+            "type": "number",
+            "title": "Value"
+          },
+          "unit": {
+            "type": "string",
+            "title": "Unit"
+          },
+          "source": {
+            "type": "string",
+            "title": "Source",
+            "description": "sec (companyfacts), sec_instance (the filing's XBRL instance) or esef (filings.xbrl.org)."
+          },
+          "ref": {
+            "type": "string",
+            "title": "Ref",
+            "description": "Accession number or filings.xbrl.org filing id."
+          },
+          "form": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Form"
+          },
+          "filed": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Filed"
+          },
+          "url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Url"
+          }
+        },
+        "type": "object",
+        "required": [
+          "concept",
+          "start",
+          "end",
+          "value",
+          "unit",
+          "source",
+          "ref",
+          "form",
+          "filed",
+          "url"
+        ],
+        "title": "FundamentalFactRef",
+        "description": "One input fact, as filed."
+      },
+      "FundamentalsSource": {
         "properties": {
           "source": {
             "type": "string",
@@ -12336,7 +12016,7 @@
           "notes",
           "last_error"
         ],
-        "title": "FundamentalsOut"
+        "title": "FundamentalsSource"
       },
       "FxQuote": {
         "properties": {
@@ -12747,6 +12427,50 @@
           "drift_status"
         ],
         "title": "Holding"
+      },
+      "HoldingContribution": {
+        "properties": {
+          "ticker": {
+            "type": "string",
+            "title": "Ticker"
+          },
+          "name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
+          },
+          "contribution_base": {
+            "type": "number",
+            "title": "Contribution Base",
+            "description": "The holding's organic gain over the period, in base currency — its value change with its own trading netted out."
+          },
+          "contribution_pct": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Contribution Pct",
+            "description": "contribution_base as a fraction of the portfolio's total value at the start of the period; null when that value was zero."
+          }
+        },
+        "type": "object",
+        "required": [
+          "ticker",
+          "name",
+          "contribution_base",
+          "contribution_pct"
+        ],
+        "title": "HoldingContribution"
       },
       "HoldingCoverage": {
         "properties": {
@@ -13704,7 +13428,7 @@
           "price": {
             "anyOf": [
               {
-                "$ref": "#/components/schemas/PriceOut"
+                "$ref": "#/components/schemas/ValuationPrice"
               },
               {
                 "type": "null"
@@ -13712,19 +13436,19 @@
             ]
           },
           "pe": {
-            "$ref": "#/components/schemas/RatioOut"
+            "$ref": "#/components/schemas/ValuationRatio"
           },
           "pb": {
-            "$ref": "#/components/schemas/RatioOut"
+            "$ref": "#/components/schemas/ValuationRatio"
           },
           "dividend_yield": {
-            "$ref": "#/components/schemas/RatioOut",
+            "$ref": "#/components/schemas/ValuationRatio",
             "description": "Fraction (0.012 = 1.2 %)."
           },
           "eps_ttm": {
             "anyOf": [
               {
-                "$ref": "#/components/schemas/FigureOut"
+                "$ref": "#/components/schemas/PerShareFigure"
               },
               {
                 "type": "null"
@@ -13734,7 +13458,7 @@
           "book_value_per_share": {
             "anyOf": [
               {
-                "$ref": "#/components/schemas/FigureOut"
+                "$ref": "#/components/schemas/PerShareFigure"
               },
               {
                 "type": "null"
@@ -13744,7 +13468,7 @@
           "dividend_per_share": {
             "anyOf": [
               {
-                "$ref": "#/components/schemas/FigureOut"
+                "$ref": "#/components/schemas/PerShareFigure"
               },
               {
                 "type": "null"
@@ -13759,7 +13483,7 @@
           "fundamentals": {
             "anyOf": [
               {
-                "$ref": "#/components/schemas/FundamentalsOut"
+                "$ref": "#/components/schemas/FundamentalsSource"
               },
               {
                 "type": "null"
@@ -13769,7 +13493,7 @@
           },
           "alternatives": {
             "items": {
-              "$ref": "#/components/schemas/AlternativeOut"
+              "$ref": "#/components/schemas/ValuationAlternative"
             },
             "type": "array",
             "title": "Alternatives",
@@ -13778,7 +13502,7 @@
           "cross_check": {
             "anyOf": [
               {
-                "$ref": "#/components/schemas/CrossCheckOut"
+                "$ref": "#/components/schemas/ValuationCrossCheck"
               },
               {
                 "type": "null"
@@ -13788,7 +13512,7 @@
           "fund": {
             "anyOf": [
               {
-                "$ref": "#/components/schemas/FundValuationOut"
+                "$ref": "#/components/schemas/FundValuation"
               },
               {
                 "type": "null"
@@ -16912,6 +16636,73 @@
         ],
         "title": "PePoint"
       },
+      "PerShareFigure": {
+        "properties": {
+          "value": {
+            "type": "number",
+            "title": "Value"
+          },
+          "currency": {
+            "type": "string",
+            "title": "Currency"
+          },
+          "period_start": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Period Start"
+          },
+          "period_end": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Period End"
+          },
+          "method": {
+            "type": "string",
+            "title": "Method"
+          },
+          "annual_only": {
+            "type": "boolean",
+            "title": "Annual Only"
+          },
+          "stale": {
+            "type": "boolean",
+            "title": "Stale",
+            "description": "The period ended more than 200 days ago."
+          },
+          "inputs": {
+            "items": {
+              "$ref": "#/components/schemas/FundamentalFactRef"
+            },
+            "type": "array",
+            "title": "Inputs"
+          }
+        },
+        "type": "object",
+        "required": [
+          "value",
+          "currency",
+          "period_start",
+          "period_end",
+          "method",
+          "annual_only",
+          "stale"
+        ],
+        "title": "PerShareFigure"
+      },
       "PlausibilityCheck": {
         "properties": {
           "date": {
@@ -17235,7 +17026,7 @@
             "title": "Base Currency"
           },
           "portfolio": {
-            "$ref": "#/components/schemas/Aggregate"
+            "$ref": "#/components/schemas/ValuationAggregate"
           },
           "benchmark": {
             "anyOf": [
@@ -17258,7 +17049,7 @@
           },
           "holdings": {
             "items": {
-              "$ref": "#/components/schemas/steward__valuation__read__HoldingContribution"
+              "$ref": "#/components/schemas/ValuationContribution"
             },
             "type": "array",
             "title": "Holdings"
@@ -17835,52 +17626,6 @@
         ],
         "title": "PriceHistory"
       },
-      "PriceOut": {
-        "properties": {
-          "symbol": {
-            "type": "string",
-            "title": "Symbol"
-          },
-          "close": {
-            "type": "number",
-            "title": "Close"
-          },
-          "currency": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Currency"
-          },
-          "date": {
-            "type": "string",
-            "format": "date",
-            "title": "Date"
-          },
-          "source": {
-            "type": "string",
-            "title": "Source",
-            "default": "Stooq daily close"
-          },
-          "stale": {
-            "type": "boolean",
-            "title": "Stale"
-          }
-        },
-        "type": "object",
-        "required": [
-          "symbol",
-          "close",
-          "currency",
-          "date",
-          "stale"
-        ],
-        "title": "PriceOut"
-      },
       "PricePoint": {
         "properties": {
           "date": {
@@ -18139,40 +17884,6 @@
         "additionalProperties": false,
         "type": "object",
         "title": "QuietHours"
-      },
-      "RatioOut": {
-        "properties": {
-          "value": {
-            "anyOf": [
-              {
-                "type": "number"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Value",
-            "description": "Null when it cannot be computed (see reason)."
-          },
-          "reason": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Reason",
-            "description": "Why the value is null, e.g. 'n/m: negative earnings'."
-          }
-        },
-        "type": "object",
-        "required": [
-          "value",
-          "reason"
-        ],
-        "title": "RatioOut"
       },
       "ReadinessResponse": {
         "properties": {
@@ -21965,6 +21676,481 @@
         ],
         "title": "Valuation"
       },
+      "ValuationAggregate": {
+        "properties": {
+          "pe": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pe"
+          },
+          "pb": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pb"
+          },
+          "dividend_yield": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Dividend Yield",
+            "description": "Fraction."
+          },
+          "coverage": {
+            "$ref": "#/components/schemas/ValuationCoverage"
+          }
+        },
+        "type": "object",
+        "required": [
+          "pe",
+          "pb",
+          "dividend_yield",
+          "coverage"
+        ],
+        "title": "ValuationAggregate"
+      },
+      "ValuationAlternative": {
+        "properties": {
+          "source": {
+            "type": "string",
+            "enum": [
+              "sec",
+              "esef",
+              "manual"
+            ],
+            "title": "Source"
+          },
+          "source_label": {
+            "type": "string",
+            "title": "Source Label"
+          },
+          "basis": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Basis"
+          },
+          "eps_ttm": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Eps Ttm"
+          },
+          "currency": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Currency"
+          },
+          "period_end": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Period End"
+          },
+          "method": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Method"
+          },
+          "pe": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pe"
+          }
+        },
+        "type": "object",
+        "required": [
+          "source",
+          "source_label",
+          "basis",
+          "eps_ttm",
+          "currency",
+          "period_end",
+          "method",
+          "pe"
+        ],
+        "title": "ValuationAlternative"
+      },
+      "ValuationContribution": {
+        "properties": {
+          "ticker": {
+            "type": "string",
+            "title": "Ticker"
+          },
+          "name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "stock",
+              "fund"
+            ],
+            "title": "Kind"
+          },
+          "weight": {
+            "type": "number",
+            "title": "Weight",
+            "description": "Share of invested value (cash excluded), 0..1."
+          },
+          "pe": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pe",
+            "description": "As used: capped at 60; null when excluded or missing."
+          },
+          "pe_raw": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pe Raw"
+          },
+          "pe_note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pe Note"
+          },
+          "pb": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pb"
+          },
+          "pb_raw": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pb Raw"
+          },
+          "pb_note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pb Note"
+          },
+          "dividend_yield": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Dividend Yield"
+          },
+          "source_label": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Label"
+          },
+          "stale": {
+            "type": "boolean",
+            "title": "Stale"
+          }
+        },
+        "type": "object",
+        "required": [
+          "ticker",
+          "name",
+          "kind",
+          "weight",
+          "pe",
+          "pe_raw",
+          "pe_note",
+          "pb",
+          "pb_raw",
+          "pb_note",
+          "dividend_yield",
+          "source_label",
+          "stale"
+        ],
+        "title": "ValuationContribution"
+      },
+      "ValuationCoverage": {
+        "properties": {
+          "pe": {
+            "type": "number",
+            "title": "Pe",
+            "description": "Share of invested value (0..1) with a P/E (incl. excluded n/m)."
+          },
+          "pb": {
+            "type": "number",
+            "title": "Pb"
+          },
+          "dividend_yield": {
+            "type": "number",
+            "title": "Dividend Yield"
+          }
+        },
+        "type": "object",
+        "required": [
+          "pe",
+          "pb",
+          "dividend_yield"
+        ],
+        "title": "ValuationCoverage"
+      },
+      "ValuationCrossCheck": {
+        "properties": {
+          "source": {
+            "type": "string",
+            "title": "Source",
+            "default": "finnhub"
+          },
+          "source_label": {
+            "type": "string",
+            "title": "Source Label",
+            "default": "Finnhub basic financials (tier 2)"
+          },
+          "symbol": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Symbol"
+          },
+          "pe": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pe"
+          },
+          "pb": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pb"
+          },
+          "eps_ttm": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Eps Ttm"
+          },
+          "dividend_yield": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Dividend Yield"
+          },
+          "fetched_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Fetched At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "symbol",
+          "pe",
+          "pb",
+          "eps_ttm",
+          "dividend_yield",
+          "fetched_at"
+        ],
+        "title": "ValuationCrossCheck"
+      },
+      "ValuationPrice": {
+        "properties": {
+          "symbol": {
+            "type": "string",
+            "title": "Symbol"
+          },
+          "close": {
+            "type": "number",
+            "title": "Close"
+          },
+          "currency": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Currency"
+          },
+          "date": {
+            "type": "string",
+            "format": "date",
+            "title": "Date"
+          },
+          "source": {
+            "type": "string",
+            "title": "Source",
+            "default": "Stooq daily close"
+          },
+          "stale": {
+            "type": "boolean",
+            "title": "Stale"
+          }
+        },
+        "type": "object",
+        "required": [
+          "symbol",
+          "close",
+          "currency",
+          "date",
+          "stale"
+        ],
+        "title": "ValuationPrice"
+      },
+      "ValuationRatio": {
+        "properties": {
+          "value": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Value",
+            "description": "Null when it cannot be computed (see reason)."
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason",
+            "description": "Why the value is null, e.g. 'n/m: negative earnings'."
+          }
+        },
+        "type": "object",
+        "required": [
+          "value",
+          "reason"
+        ],
+        "title": "ValuationRatio"
+      },
       "ValuationRefreshRequest": {
         "properties": {
           "ticker": {
@@ -22377,192 +22563,6 @@
           "fetched_at"
         ],
         "title": "WikidataSummary"
-      },
-      "steward__portfolio__read__HoldingContribution": {
-        "properties": {
-          "ticker": {
-            "type": "string",
-            "title": "Ticker"
-          },
-          "name": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Name"
-          },
-          "contribution_base": {
-            "type": "number",
-            "title": "Contribution Base",
-            "description": "The holding's organic gain over the period, in base currency — its value change with its own trading netted out."
-          },
-          "contribution_pct": {
-            "anyOf": [
-              {
-                "type": "number"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Contribution Pct",
-            "description": "contribution_base as a fraction of the portfolio's total value at the start of the period; null when that value was zero."
-          }
-        },
-        "type": "object",
-        "required": [
-          "ticker",
-          "name",
-          "contribution_base",
-          "contribution_pct"
-        ],
-        "title": "HoldingContribution"
-      },
-      "steward__valuation__read__HoldingContribution": {
-        "properties": {
-          "ticker": {
-            "type": "string",
-            "title": "Ticker"
-          },
-          "name": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Name"
-          },
-          "kind": {
-            "type": "string",
-            "enum": [
-              "stock",
-              "fund"
-            ],
-            "title": "Kind"
-          },
-          "weight": {
-            "type": "number",
-            "title": "Weight",
-            "description": "Share of invested value (cash excluded), 0..1."
-          },
-          "pe": {
-            "anyOf": [
-              {
-                "type": "number"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Pe",
-            "description": "As used: capped at 60; null when excluded or missing."
-          },
-          "pe_raw": {
-            "anyOf": [
-              {
-                "type": "number"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Pe Raw"
-          },
-          "pe_note": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Pe Note"
-          },
-          "pb": {
-            "anyOf": [
-              {
-                "type": "number"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Pb"
-          },
-          "pb_raw": {
-            "anyOf": [
-              {
-                "type": "number"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Pb Raw"
-          },
-          "pb_note": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Pb Note"
-          },
-          "dividend_yield": {
-            "anyOf": [
-              {
-                "type": "number"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Dividend Yield"
-          },
-          "source_label": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Source Label"
-          },
-          "stale": {
-            "type": "boolean",
-            "title": "Stale"
-          }
-        },
-        "type": "object",
-        "required": [
-          "ticker",
-          "name",
-          "kind",
-          "weight",
-          "pe",
-          "pe_raw",
-          "pe_note",
-          "pb",
-          "pb_raw",
-          "pb_note",
-          "dividend_yield",
-          "source_label",
-          "stale"
-        ],
-        "title": "HoldingContribution"
       }
     },
     "securitySchemes": {
