@@ -17,11 +17,11 @@ import { FreshnessLabel } from "@/components/portfolio/freshness-label";
 import { OverviewHero, type HistoryLoad } from "@/components/portfolio/overview-hero";
 import { ReturnsHeatmap } from "@/components/portfolio/returns-heatmap";
 import { RiskPanel } from "@/components/portfolio/risk-panel";
+import { RiskStatTile } from "@/components/portfolio/risk-stat-tile";
 import { StatTile } from "@/components/portfolio/stat-tile";
 import { useSyncStatus } from "@/components/sync/sync-status-provider";
 import { Button } from "@/components/ui/button";
 import { getBrowserApiClient, type PortfolioHistory, type PortfolioOverview } from "@/lib/api/client";
-import { formatNumber, formatPct } from "@/lib/charts/format";
 import { formatDate, formatMoney, formatPercent, gainLossTone } from "@/lib/format";
 import { useApiResource } from "@/lib/hooks/use-api-resource";
 import { herfindahlIndex } from "@/lib/portfolio/concentration";
@@ -225,22 +225,9 @@ function Overview({ data }: { data: PortfolioOverview }) {
             spark={values.map((v) => v.unrealised)}
             sparkNote={`Unrealised P/L, ${rangeLabel}`}
           />
-          <StatTile
-            label={risk && !risk.fullYear ? `Volatility · since ${formatDate(risk.from)}` : "Volatility · 1Y"}
-            value={risk?.volatility != null ? formatPct(risk.volatility, 1) : "—"}
-            sub={
-              risk ? (
-                <>
-                  Max DD {risk.maxDrawdown != null ? formatPct(risk.maxDrawdown, 1) : "—"}
-                  {risk.beta != null ? <> · β {formatNumber(risk.beta, 2)}</> : null}
-                  {risk.return != null ? <> · return {formatSignedPct(risk.return)}</> : null}
-                </>
-              ) : history.kind === "loading" ? (
-                "Loading history…"
-              ) : (
-                "Not enough history yet"
-              )
-            }
+          <RiskStatTile
+            figures={risk}
+            historyLoading={history.kind === "loading"}
             spark={indexSpark}
             sparkNote={`Flow-adjusted performance index, ${rangeLabel}`}
           />

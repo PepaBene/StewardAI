@@ -30,6 +30,7 @@ from steward.trading212.models import (
     HistoryTransaction,
     Instrument,
     Position,
+    T212Model,
 )
 
 logger = logging.getLogger(__name__)
@@ -127,7 +128,12 @@ class Trading212Client:
             payload = await self._get(next_path)
             if not isinstance(payload, dict) or not isinstance(payload.get("items"), list):
                 raise Trading212Error(f"Unexpected {path} page shape")
-            yield _parse_list(model, payload["items"])
+            items = payload["items"]
+            parsed = _parse_list(model, items)
+            for item, raw in zip(parsed, items, strict=True):
+                if isinstance(item, T212Model):
+                    item.attach_source(raw)
+            yield parsed
             next_path = _relative_page_path(payload.get("nextPagePath"))
 
     async def _get(self, path: str, params: dict[str, str] | None = None) -> Any:

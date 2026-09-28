@@ -5,9 +5,10 @@ import { useCallback } from "react";
 
 import { ChartEmpty } from "@/components/charts";
 import { CashFlowSankey, fetchCashFlow } from "@/components/portfolio/cash-flow-sankey";
+import { CashFlowFeeNote } from "@/components/portfolio/fee-note";
 import { Blueprint, PanelHeading } from "@/components/ui/blueprint";
 import { useApiResource } from "@/lib/hooks/use-api-resource";
-import { cashFlowGraph, splitBuys } from "@/lib/portfolio/cash-flow";
+import { cashFlowGraph, feeFlow, splitBuys } from "@/lib/portfolio/cash-flow";
 import { formatCompactMoney } from "@/lib/portfolio/money";
 
 /** Year-to-date cash flow on the Overview: where deposits, sales and income went. */
@@ -19,7 +20,12 @@ export function CashFlowPanel({ year, today }: { year: number; today: string }) 
   const currency = data?.currency ?? null;
   const graph =
     data && currency
-      ? cashFlowGraph(data.totals, currency, data.rowsComplete ? splitBuys(data.rows, data.holdings, currency) : null)
+      ? cashFlowGraph(
+          data.totals,
+          currency,
+          data.rowsComplete ? splitBuys(data.rows, data.holdings, currency) : null,
+          feeFlow(data.fees, currency),
+        )
       : null;
 
   return (
@@ -47,6 +53,7 @@ export function CashFlowPanel({ year, today }: { year: number; today: string }) 
               ? " Buys split by each instrument's security type."
               : ""}
             {graph.excludedCurrencies.length ? ` Rows in ${graph.excludedCurrencies.join(", ")} are not included.` : ""}
+            <CashFlowFeeNote fees={data?.fees ?? null} graph={graph} currency={currency} />
           </p>
         </>
       )}

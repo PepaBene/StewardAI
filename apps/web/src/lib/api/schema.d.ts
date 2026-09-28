@@ -342,6 +342,31 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/portfolio/risk": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Portfolio Risk
+         * @description Sharpe ratio of the portfolio and of the first benchmark over the window: the
+         *     time-weighted daily returns of /portfolio/history (weekdays) in the base currency, in
+         *     excess of the forward-filled CZK risk-free rate (CZEONIA from the ČNB, /100/252 per
+         *     trading day), annualised by sqrt(252); with the annualised volatility, mean excess
+         *     return, average risk-free rate, the window and the number of observations. `sharpe` is
+         *     null with a `reason` under 60 observations or without a stored risk-free rate.
+         */
+        get: operations["get_portfolio_risk"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/portfolio/transactions": {
         parameters: {
             query?: never;
@@ -2762,6 +2787,32 @@ export interface components {
             /** Name */
             name: string;
         };
+        /**
+         * CnbSeries
+         * @description A Czech National Bank rate from its keyless text files.
+         */
+        CnbSeries: {
+            /** Key */
+            key: string;
+            /** Label */
+            label: string;
+            /**
+             * Series
+             * @description czeonia: the CZK overnight reference rate, daily (yearly.txt/daily.txt; the portfolio's risk-free rate). repo_2w: the 2-week repo rate's change history.
+             * @enum {string}
+             */
+            series: "czeonia" | "repo_2w";
+            /**
+             * Unit
+             * @default %
+             */
+            unit: string;
+            /**
+             * Policy Rate
+             * @default false
+             */
+            policy_rate: boolean;
+        };
         /** ComplianceRow */
         ComplianceRow: {
             /**
@@ -4171,6 +4222,85 @@ export interface components {
             /** Detail */
             detail: string;
         };
+        /** FeeNameTotal */
+        FeeNameTotal: {
+            /** Name */
+            name: string;
+            /**
+             * Category
+             * @enum {string}
+             */
+            category: "fx" | "tax" | "account";
+            /** Count */
+            count: number;
+            /**
+             * Amount
+             * @description In the fee summary's `currency`.
+             */
+            amount: number;
+        };
+        /** FeeTotals */
+        FeeTotals: {
+            /**
+             * Currency
+             * @description Base currency the amounts are converted to; null before the first sync.
+             */
+            currency: string | null;
+            /** Fx Source */
+            fx_source: ("cnb" | "ecb") | null;
+            /**
+             * Fx Conversion
+             * @description CURRENCY_CONVERSION_FEE on fills.
+             */
+            fx_conversion: number;
+            /**
+             * Taxes Levies
+             * @description Every other fill charge (stamp duty, FTT, ...).
+             */
+            taxes_levies: number;
+            /**
+             * Account Fees
+             * @description Cash transactions of type FEE (abs(amount)).
+             */
+            account_fees: number;
+            /** Total */
+            total: number;
+            /**
+             * Included In Buys
+             * @description Part of the fill fees that buys' amounts already include (fee_basis 'included'): subtract it from buys before showing fees separately.
+             */
+            included_in_buys: number;
+            /**
+             * Included In Sales
+             * @description Part of the fill fees already deducted from sales' amounts: add it back to sales before showing fees separately.
+             */
+            included_in_sales: number;
+            /** By Name */
+            by_name: components["schemas"]["FeeNameTotal"][];
+            /**
+             * Unconverted
+             * @description Currencies of fees left out of the sums for lack of a stored FX rate.
+             */
+            unconverted: string[];
+            /**
+             * Fills
+             * @description Order rows matching the filters.
+             */
+            fills: number;
+            /**
+             * Fills Captured
+             * @description Of those, fills whose fees the sync has read.
+             */
+            fills_captured: number;
+            /** Fills With Fees */
+            fills_with_fees: number;
+            /**
+             * Status
+             * @description not_captured: no fill in the filtered set has had its fees read yet (stored before fee capture; the next sync re-reads the order history).
+             * @enum {string}
+             */
+            status: "captured" | "partial" | "not_captured" | "no_fills";
+        };
         /** FeedbackIn */
         FeedbackIn: {
             /**
@@ -5285,6 +5415,11 @@ export interface components {
             fred?: components["schemas"]["FredSeries"][];
             /** Ecb */
             ecb?: components["schemas"]["EcbSeries"][];
+            /**
+             * Cnb
+             * @description ČNB rates. CZEONIA is the risk-free rate of the Sharpe ratio (series key 'czeonia'); the repo rate's changes are ČNB decisions.
+             */
+            cnb?: components["schemas"]["CnbSeries"][];
         };
         /** ManagerChange */
         ManagerChange: {
@@ -5982,6 +6117,23 @@ export interface components {
             drift: components["schemas"]["DriftReport"] | null;
             /** Fx Rates */
             fx_rates: components["schemas"]["FxRateUsed"][];
+        };
+        /** PortfolioRisk */
+        PortfolioRisk: {
+            /** As Of */
+            as_of: string | null;
+            /** Days */
+            days: number;
+            /** Base Currency */
+            base_currency: string | null;
+            /** Method */
+            method: string;
+            risk_free: components["schemas"]["RiskFree"] | null;
+            portfolio: components["schemas"]["SharpeStats"];
+            /** Benchmark Symbol */
+            benchmark_symbol: string | null;
+            /** @description The same figures for the benchmark, converted to the base currency; null without a configured benchmark. */
+            benchmark: components["schemas"]["SharpeStats"] | null;
         };
         /** PositionCountRule */
         PositionCountRule: {
@@ -7090,6 +7242,38 @@ export interface components {
             /** Observations */
             observations: number;
         };
+        /** RiskFree */
+        RiskFree: {
+            /**
+             * Series Id
+             * @description macro_series id, e.g. 'czeonia'.
+             */
+            series_id: string;
+            /**
+             * Source
+             * @description macro_series source, e.g. 'cnb'.
+             */
+            source: string;
+            /** Label */
+            label: string;
+            /**
+             * Latest Rate
+             * @description Latest stored value, as a fraction.
+             */
+            latest_rate: number | null;
+            /**
+             * Latest Date
+             * @description The day the latest value is for.
+             */
+            latest_date: string | null;
+            /** Url */
+            url: string | null;
+            /**
+             * Fallback
+             * @description True when the preferred series (CZEONIA for CZK) has nothing stored and a policy rate stands in.
+             */
+            fallback: boolean;
+        };
         /** RuleMatch */
         RuleMatch: {
             /**
@@ -7170,6 +7354,47 @@ export interface components {
             event_type: "guidance_change" | "m_and_a" | "dividend_cut" | "earnings_release" | "management_change" | "regulatory_legal" | "capital_allocation" | "credit_rating" | "central_bank" | "macro_surprise" | "insider_transaction" | "product_business" | "sector_competitor" | "index_change" | "analyst_rating" | "delisting" | "entity_status" | "other";
             /** Severity */
             severity: number;
+        };
+        /** SharpeStats */
+        SharpeStats: {
+            /** Sharpe */
+            sharpe: number | null;
+            /**
+             * Annualised Volatility
+             * @description Sample stdev of the daily returns x sqrt(252), fraction.
+             */
+            annualised_volatility: number | null;
+            /**
+             * Annualised Return
+             * @description Mean daily return x 252, fraction.
+             */
+            annualised_return: number | null;
+            /**
+             * Mean Excess Return
+             * @description Mean daily excess return x 252, fraction.
+             */
+            mean_excess_return: number | null;
+            /**
+             * Risk Free Average
+             * @description Mean daily risk-free rate x 252 over the observations, fraction.
+             */
+            risk_free_average: number | null;
+            /** Observations */
+            observations: number;
+            /** Window Start */
+            window_start: string | null;
+            /** Window End */
+            window_end: string | null;
+            /**
+             * Currency
+             * @description Currency the returns are measured in.
+             */
+            currency: string | null;
+            /**
+             * Reason
+             * @description Why `sharpe` is null, when it is.
+             */
+            reason: string | null;
         };
         /** SnapshotValues */
         SnapshotValues: {
@@ -7715,6 +7940,27 @@ export interface components {
             /** Name */
             name: string;
         };
+        /** TransactionFeeOut */
+        TransactionFeeOut: {
+            /**
+             * Name
+             * @description Trading212's name, e.g. CURRENCY_CONVERSION_FEE.
+             */
+            name: string;
+            /**
+             * Category
+             * @description fx: FX conversion; tax: taxes & levies.
+             * @enum {string}
+             */
+            category: "fx" | "tax";
+            /**
+             * Amount
+             * @description abs(quantity) as Trading212 reported it, in `currency`.
+             */
+            amount: number;
+            /** Currency */
+            currency: string | null;
+        };
         /** TransactionOut */
         TransactionOut: {
             /** Id */
@@ -7746,6 +7992,21 @@ export interface components {
              * Format: date-time
              */
             occurred_at: string;
+            /**
+             * Fees
+             * @description Orders: the fill's fees and taxes (walletImpact.taxes).
+             */
+            fees?: components["schemas"]["TransactionFeeOut"][];
+            /**
+             * Fees Captured
+             * @description Orders: whether the sync has read this fill's fees yet (false: stored before fee capture; the one-time order-history re-read fills it in). Null for dividends and cash.
+             */
+            fees_captured?: boolean | null;
+            /**
+             * Fee Basis
+             * @description Orders with fees: whether `amount` (walletImpact.netValue) already includes them; unknown is read as excluded, Trading212's documented behaviour.
+             */
+            fee_basis?: ("excluded" | "included" | "unknown") | null;
         };
         /** TransactionsPage */
         TransactionsPage: {
@@ -7771,6 +8032,8 @@ export interface components {
              * @description Pass as `cursor` for the next (older) page; null on the last page.
              */
             next_cursor: string | null;
+            /** @description Fees and taxes over every matching row, converted to the base currency. */
+            fees: components["schemas"]["FeeTotals"];
         };
         /**
          * TrustSettings
@@ -8433,6 +8696,37 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ContributionReport"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_portfolio_risk: {
+        parameters: {
+            query?: {
+                days?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PortfolioRisk"];
                 };
             };
             /** @description Validation Error */
