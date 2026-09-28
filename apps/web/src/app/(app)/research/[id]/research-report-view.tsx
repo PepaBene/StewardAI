@@ -617,7 +617,7 @@ function ResearchSentence({
       <span className="font-sans">
         <SentenceCheckMark sentence={sentence} />
         <FeedbackControl
-          className="ml-1"
+          className="ml-1 print:hidden"
           target={{ kind: "report_sentence", id: reportId, sentencePath: path }}
           label={`sentence “${sentence.text.slice(0, 60)}${sentence.text.length > 60 ? "…" : ""}”`}
         />
@@ -645,7 +645,7 @@ function InlineSentence({
       <span className="font-sans">
         <SentenceCheckMark sentence={sentence} />
         <FeedbackControl
-          className="ml-1"
+          className="ml-1 print:hidden"
           target={{ kind: "report_sentence", id: reportId, sentencePath: path }}
           label={`sentence “${sentence.text.slice(0, 60)}${sentence.text.length > 60 ? "…" : ""}”`}
         />
