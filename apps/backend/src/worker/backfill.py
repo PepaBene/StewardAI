@@ -33,7 +33,8 @@ BACKFILL_TAG = {"backfill": True}
 PROGRESS_SECONDS = 15.0
 
 # Portfolio first (the other jobs work on its holdings), then identity (price symbols,
-# CUSIPs for 13F), then market data, calendars, macro, ownership and news. The worker's
+# CUSIPs for 13F), then market data, calendars, macro, ownership (13F, then the SEC XBRL
+# shares outstanding it is compared with, and segment revenue) and news. The worker's
 # catch-up on start (worker.catchup) runs these in the same order.
 DATA_SEQUENCE = [
     "portfolio_sync",
@@ -43,6 +44,8 @@ DATA_SEQUENCE = [
     "macro_collect",
     "earnings_calendar_full",
     "ownership_13f",
+    "etf_look_through",
+    "sec_xbrl",
     "news_ingest",
 ]
 DEFAULT_SEQUENCE = [*DATA_SEQUENCE, "monitor"]

@@ -36,6 +36,8 @@ const FULL: JobsConfig = {
   weekly_digest: { enabled: false, cron: "0 18 * * sun", timezone: "Europe/London" },
   monthly_review: { enabled: true, cron: "0 8 1-3 * *", timezone: "Europe/Prague" },
   ownership_13f: { enabled: false, cron: "0 6 10 * *", timezone: "America/New_York" },
+  etf_look_through: { enabled: true, cron: "0 7 * * 0", timezone: "UTC" },
+  sec_xbrl: { enabled: false, cron: "0 6 * * wed", timezone: "UTC" },
   earnings_check: {
     extraction_model: "claude-opus-5-5",
     locate_model: "claude-sonnet-5",
@@ -87,6 +89,7 @@ const FULL: JobsConfig = {
     eurostat: [{ key: "hicp", label: "HICP", dataset: "prc_hicp_minr", filters: { unit: "RCH_A", coicop18: "TOTAL" }, unit: "%" }],
     fred: [{ key: "fed_funds", label: "Fed funds", series_id: "DFF", units: "chg", unit: "pp", policy_rate: true }],
     ecb: [{ key: "ecb_deposit_rate", label: "ECB deposit rate", flow_key: "FM/D.U2.EUR.4F.KR.DFR.LEV", unit: "%", policy_rate: false }],
+    cnb: [{ key: "czeonia", label: "CZEONIA", series: "czeonia", unit: "%", policy_rate: false }],
   },
   monitoring: { alert_failed_jobs: ["portfolio_sync", "macro_collect"], missed_run_grace_minutes: 120, news_coverage_hours: 72 },
   reference: {
@@ -135,6 +138,24 @@ const FULL: JobsConfig = {
     ],
     top_holders: 25,
   },
+  look_through: {
+    enabled: false,
+    funds: [{ isin: "IE00B5BMR087", label: "CSPX", provider: "ishares", portfolio_id: "253743" }],
+    benchmark_proxies: [{ symbol: "^spx", fund_isin: "IE00B5BMR087", label: "S&P 500" }],
+    issuer_groups: [],
+    direct_sectors: { TSM_US_EQ: "Information Technology" },
+    direct_countries: {},
+    ishares_api_url: "https://www.blackrock.com/varnish-api/uk-retail01-product-data/product-data",
+    ishares_site: "ishares-uk",
+    ishares_locale: "en_GB",
+    ishares_spreadsheet_fallback: false,
+    vanguard_graphql_url: "https://www.vanguard.co.uk/gpx/graphql",
+    vanguard_consumer_id: "uk0",
+    cached_fallback_days: 30,
+    stale_after_days: 90,
+    keep_snapshots: 4,
+  },
+  xbrl: { enabled: false, quarterly: false, read_ads_ratio: false, max_document_mb: 20 },
 };
 
 describe("jobs form", () => {
@@ -311,6 +332,19 @@ describe("jobs form: escalation, macro and monitoring", () => {
     expect(form.macroSeries.eurostat.map((r) => r.key)).toEqual(["hicp", "unemployment", "gdp", "industrial_production", "sentiment"]);
     expect(form.macroSeries.fred.map((r) => r.ref)).toEqual(["CPIAUCSL", "UNRATE", "DFF"]);
     expect(form.macroSeries.ecb[0].policy_rate).toBe(true);
+  });
+
+  it("edits ČNB rates (CZEONIA for the Sharpe ratio, the repo rate as a policy rate)", () => {
+    const form = jobsFromBody(null);
+    expect(form.macroSeries.cnb.map((r) => [r.key, r.ref, r.policy_rate])).toEqual([
+      ["czeonia", "czeonia", false],
+      ["cnb_repo_2w", "repo_2w", true],
+    ]);
+    form.macroSeries.cnb = form.macroSeries.cnb.slice(0, 1);
+    const body = jobsToBody(form);
+    expect(body.macro!.cnb).toEqual([{ key: "czeonia", label: "CZEONIA (CZK overnight rate)", series: "czeonia", unit: "%", policy_rate: false }]);
+    // A stored config from before the ČNB source keeps the defaults.
+    expect(jobsFromBody({ macro: { ecb: [] } } as never).macroSeries.cnb).toHaveLength(2);
   });
 
   it("parses dimension filters", () => {

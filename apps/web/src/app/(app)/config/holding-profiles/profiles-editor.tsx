@@ -23,6 +23,8 @@ import {
 import { configSaveQuery, useConfigEditor } from "@/lib/hooks/use-config-editor";
 import { BlueprintCorners } from "@/components/ui/blueprint";
 
+import { FundamentalsFields } from "./fundamentals-fields";
+
 const api = () => getBrowserApiClient();
 
 const MONTHS = [
@@ -298,6 +300,13 @@ function ProfileCard({
           </Button>
         </fieldset>
       </details>
+
+      <FundamentalsFields
+        form={form.fundamentals}
+        path={path}
+        errors={errors}
+        onChange={(change) => onChange((f) => ({ ...f, fundamentals: change(f.fundamentals) }))}
+      />
     </section>
   );
 }

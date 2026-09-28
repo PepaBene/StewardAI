@@ -38,8 +38,10 @@ BudgetJobType = Literal[
     "weekly_digest",
     "research",
     "ownership_13f",
+    "etf_look_through",
     "monthly_review",
     "chat",
+    "sec_xbrl",
 ]
 
 AtCap = Literal["alert_only", "pause_noncritical", "downgrade_noncritical"]

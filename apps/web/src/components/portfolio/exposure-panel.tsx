@@ -1,10 +1,17 @@
+"use client";
+
+import { useState } from "react";
+
 import { StackedBar } from "@/components/charts";
+import { ToggleSwitch } from "@/components/config/toggle-switch";
 import { AllocationBars, type AllocationItem } from "@/components/portfolio/allocation-bars";
 import { DriftBar } from "@/components/portfolio/drift-bar";
 import { DriftStatusBadge } from "@/components/portfolio/drift-status-badge";
+import { LookThroughExposure } from "@/components/portfolio/look-through-exposure";
 import { Blueprint, PanelHeading } from "@/components/ui/blueprint";
 import type { DriftReport } from "@/lib/api/client";
 import { formatPercent, formatPp } from "@/lib/format";
+import { hasLookThrough, type LookThroughReport } from "@/lib/portfolio/look-through";
 
 const ORDER = ["sector", "geography", "region", "currency", "asset_class"];
 const TITLES: Record<string, string> = { geography: "Region", asset_class: "Asset class" };
@@ -20,7 +27,20 @@ function title(dimension: string) {
  * one 100% bar each, cash included so the parts add up to the weight basis; buckets with a
  * target list their drift and status beneath.
  */
-export function ExposurePanel({ drift, currency }: { drift: DriftReport; currency: string }) {
+export function ExposurePanel({
+  drift,
+  currency,
+  lookThrough,
+}: {
+  drift: DriftReport;
+  currency: string;
+  /** GET /portfolio/look-through; the "Look-through" toggle starts on when it has data. */
+  lookThrough?: LookThroughReport | null;
+}) {
+  const available = hasLookThrough(lookThrough);
+  // null = follow the data (on when a fund is looked through) until the owner flips it.
+  const [choice, setChoice] = useState<boolean | null>(null);
+  const on = available && (choice ?? true);
   const dims = drift.categories
     .filter((c) => c.buckets.some((b) => b.bucket !== "Unclassified" || b.target_weight !== null))
     .sort((a, b) => {
@@ -32,7 +52,40 @@ export function ExposurePanel({ drift, currency }: { drift: DriftReport; currenc
 
   return (
     <Blueprint className="flex min-w-0 flex-col gap-4.5 px-6 py-5.5" aria-label="Exposure by category">
-      <PanelHeading kicker="Exposure" title={dims.length ? dims.slice(0, 3).map((d) => title(d.dimension).toLowerCase()).join(", ").replace(/^./, (c) => c.toUpperCase()) : "By category"} />
+      <PanelHeading
+        kicker="Exposure"
+        title={on ? "Look-through: country, sector, currency" : dims.length ? dims.slice(0, 3).map((d) => title(d.dimension).toLowerCase()).join(", ").replace(/^./, (c) => c.toUpperCase()) : "By category"}
+        action={<LookThroughToggle on={on} available={available} onChange={setChoice} />}
+      />
+      {on && lookThrough ? <LookThroughExposure report={lookThrough} currency={currency} /> : null}
+      {lookThrough && !available ? (
+        <p className="text-[11px] text-text-faint">
+          Look-through: no fund holdings stored yet. The weekly ETF look-through job (Config → Jobs) fetches them from the issuers.
+        </p>
+      ) : null}
+      {on ? null : <AsHeld dims={dims} cash={cash} currency={currency} />}
+    </Blueprint>
+  );
+}
+
+function LookThroughToggle({ on, available, onChange }: { on: boolean; available: boolean; onChange: (on: boolean) => void }) {
+  return (
+    <span className="flex items-center gap-2 text-xs text-text-muted">
+      <span aria-hidden="true">Look-through</span>
+      <ToggleSwitch
+        checked={on}
+        onChange={onChange}
+        disabled={!available}
+        label={available ? "Look through ETFs" : "Look through ETFs (no fund holdings stored yet)"}
+      />
+    </span>
+  );
+}
+
+/** Exposure as held: each ETF classified as a whole by the strategy's categories. */
+function AsHeld({ dims, cash, currency }: { dims: DriftReport["categories"]; cash: number; currency: string }) {
+  return (
+    <>
       {dims.length === 0 ? (
         <p className="text-sm text-text-muted">No holdings are classified yet (strategy config: categories).</p>
       ) : null}
@@ -92,6 +145,6 @@ export function ExposurePanel({ drift, currency }: { drift: DriftReport; currenc
       <p className="text-[11px] text-text-faint">
         Currency is each instrument&rsquo;s trading currency; ETFs are classified as a whole (no look-through).
       </p>
-    </Blueprint>
+    </>
   );
 }

@@ -13,18 +13,20 @@ import { ConcentrationCompliance } from "@/components/portfolio/concentration-co
 import { ContributionCard } from "@/components/portfolio/contribution-card";
 import { DriftPanel, DriftTable } from "@/components/portfolio/drift-panel";
 import { ExposurePanel } from "@/components/portfolio/exposure-panel";
+import { useLookThrough } from "@/components/portfolio/look-through-exposure";
 import { FreshnessLabel } from "@/components/portfolio/freshness-label";
 import { OverviewHero, type HistoryLoad } from "@/components/portfolio/overview-hero";
 import { ReturnsHeatmap } from "@/components/portfolio/returns-heatmap";
 import { RiskPanel } from "@/components/portfolio/risk-panel";
+import { RiskStatTile } from "@/components/portfolio/risk-stat-tile";
 import { StatTile } from "@/components/portfolio/stat-tile";
 import { useSyncStatus } from "@/components/sync/sync-status-provider";
 import { Button } from "@/components/ui/button";
 import { getBrowserApiClient, type PortfolioHistory, type PortfolioOverview } from "@/lib/api/client";
-import { formatNumber, formatPct } from "@/lib/charts/format";
 import { formatDate, formatMoney, formatPercent, gainLossTone } from "@/lib/format";
 import { useApiResource } from "@/lib/hooks/use-api-resource";
 import { herfindahlIndex } from "@/lib/portfolio/concentration";
+import { lookThroughRisk } from "@/lib/portfolio/look-through";
 import { formatCompactMoney, formatSignedPct } from "@/lib/portfolio/money";
 import { DEFAULT_HERO_RANGE, HISTORY_DAYS, rangeStart, sliceFrom, trailingRisk, type HeroRangeId } from "@/lib/portfolio/performance";
 import { foreignCurrencyShare, riskAxes } from "@/lib/portfolio/risk-profile";
@@ -114,6 +116,7 @@ function Overview({ data }: { data: PortfolioOverview }) {
   const [range, setRange] = useState<HeroRangeId>(DEFAULT_HERO_RANGE);
   const h = history.kind === "ok" && !history.data.gap ? history.data : null;
   const risk = useMemo(() => (h ? trailingRisk(h.points, h.benchmark) : null), [h]);
+  const lookThrough = useLookThrough().report;
 
   if (!data.freshness || !data.account || !data.base) {
     return (
@@ -157,6 +160,7 @@ function Overview({ data }: { data: PortfolioOverview }) {
     fxShare,
     benchmarkVolatility: risk?.benchmarkVolatility,
     benchmarkMaxDrawdown: risk?.benchmarkMaxDrawdown,
+    lookThrough: lookThroughRisk(lookThrough),
   });
 
   // Tile sparklines follow the hero's range (absolute values in the history's currency).
@@ -225,22 +229,9 @@ function Overview({ data }: { data: PortfolioOverview }) {
             spark={values.map((v) => v.unrealised)}
             sparkNote={`Unrealised P/L, ${rangeLabel}`}
           />
-          <StatTile
-            label={risk && !risk.fullYear ? `Volatility · since ${formatDate(risk.from)}` : "Volatility · 1Y"}
-            value={risk?.volatility != null ? formatPct(risk.volatility, 1) : "—"}
-            sub={
-              risk ? (
-                <>
-                  Max DD {risk.maxDrawdown != null ? formatPct(risk.maxDrawdown, 1) : "—"}
-                  {risk.beta != null ? <> · β {formatNumber(risk.beta, 2)}</> : null}
-                  {risk.return != null ? <> · return {formatSignedPct(risk.return)}</> : null}
-                </>
-              ) : history.kind === "loading" ? (
-                "Loading history…"
-              ) : (
-                "Not enough history yet"
-              )
-            }
+          <RiskStatTile
+            figures={risk}
+            historyLoading={history.kind === "loading"}
             spark={indexSpark}
             sparkNote={`Flow-adjusted performance index, ${rangeLabel}`}
           />
@@ -256,6 +247,7 @@ function Overview({ data }: { data: PortfolioOverview }) {
           fxShare={fxShare}
           benchmarkSymbol={h?.benchmark_symbol ?? null}
           loading={history.kind === "loading"}
+          lookThrough={lookThrough}
         />
       </div>
 
@@ -266,7 +258,7 @@ function Overview({ data }: { data: PortfolioOverview }) {
 
       <div className="grid grid-cols-1 gap-5 xl:grid-cols-[minmax(0,1.45fr)_minmax(0,1fr)]">
         <CashFlowPanel year={Number(today.slice(0, 4))} today={today} />
-        {drift ? <ExposurePanel drift={drift} currency={baseCcy} /> : null}
+        {drift ? <ExposurePanel drift={drift} currency={baseCcy} lookThrough={lookThrough} /> : null}
       </div>
 
       <div className="grid grid-cols-1 items-start gap-5 xl:grid-cols-2">

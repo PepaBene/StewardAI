@@ -4,6 +4,7 @@ import { useCallback, useMemo, useState } from "react";
 
 import { ChartEmpty, SrTable, StackedBar } from "@/components/charts";
 import { CashFlowSankey, fetchCashFlow } from "@/components/portfolio/cash-flow-sankey";
+import { CashFlowFeeNote } from "@/components/portfolio/fee-note";
 import { RangeButtons } from "@/components/portfolio/range-buttons";
 import { Blueprint, PanelHeading } from "@/components/ui/blueprint";
 import { getBrowserApiClient, type TotalByCurrency } from "@/lib/api/client";
@@ -14,6 +15,7 @@ import {
   cashFlowGraph,
   dividendsByTicker,
   dividendTotal,
+  feeFlow,
   flowPeriods,
   monthlyOrderFlows,
   splitBuys,
@@ -50,7 +52,10 @@ export function FlowCharts() {
 
   const data = state.kind === "ok" ? state.data : state.kind === "error" ? state.previous : null;
   const currency = data?.currency ?? null;
-  const graph = data && currency ? cashFlowGraph(data.totals, currency, data.rowsComplete ? splitBuys(data.rows, data.holdings, currency) : null) : null;
+  const graph =
+    data && currency
+      ? cashFlowGraph(data.totals, currency, data.rowsComplete ? splitBuys(data.rows, data.holdings, currency) : null, feeFlow(data.fees, currency))
+      : null;
   const months = data && currency && data.rowsComplete ? monthlyOrderFlows(data.rows, currency, period.from, period.to) : null;
   const prevTotals: TotalByCurrency[] | null = prev.kind === "ok" ? prev.data.totals : null;
   const cost = overview.kind === "ok" ? overview.data.account : null;
@@ -85,6 +90,7 @@ export function FlowCharts() {
               {graph.nodes.some((n) => n.id.startsWith("out:buy:")) ? "Buys split by each instrument's security type. " : ""}
               {graph.nodes.some((n) => n.id === "in:earlier") ? "“Earlier cash” is cash held before the period that was spent in it. " : ""}
               {graph.excludedCurrencies.length ? `Rows in ${graph.excludedCurrencies.join(", ")} are not included.` : ""}
+              <CashFlowFeeNote fees={data?.fees ?? null} graph={graph} currency={currency} />
             </p>
           </>
         ) : (

@@ -1,0 +1,165 @@
+[
+ {
+  "data": {
+   "borHoldings": [
+    {
+     "holdings": {
+      "items": [
+       {
+        "issuerName": "NVIDIA Corp",
+        "securityLongDescription": "NVIDIA Corp",
+        "isin": "US67066G1040",
+        "sedol1": "2379504",
+        "ticker": "NVDA",
+        "gicsSectorDescription": "Information Technology",
+        "icbSectorDescription": "Technology Hardware & Equipment",
+        "icbIndustryDescription": "Technology",
+        "marketValuePercentage": 4.76598,
+        "securityType": "EQ.STOCK",
+        "effectiveDate": "2026-08-31",
+        "bloombergIsoCountry": "US",
+        "marketValueBaseCurrency": 4079260657.08
+       },
+       {
+        "issuerName": "Apple Inc",
+        "securityLongDescription": "Apple Inc",
+        "isin": "US0378331005",
+        "sedol1": "2046251",
+        "ticker": "AAPL",
+        "gicsSectorDescription": "Information Technology",
+        "icbSectorDescription": "Technology Hardware & Equipment",
+        "icbIndustryDescription": "Technology",
+        "marketValuePercentage": 4.23529,
+        "securityType": "EQ.STOCK",
+        "effectiveDate": "2026-08-31",
+        "bloombergIsoCountry": "US",
+        "marketValueBaseCurrency": 3625035857.3
+       },
+       {
+        "issuerName": "Taiwan Semiconductor Manufacturing Co Ltd",
+        "securityLongDescription": "Taiwan Semiconductor Manufacturing Co Ltd",
+        "isin": "TW0002330008",
+        "sedol1": "6889106",
+        "ticker": "2330",
+        "gicsSectorDescription": "Information Technology",
+        "icbSectorDescription": "Technology Hardware & Equipment",
+        "icbIndustryDescription": "Technology",
+        "marketValuePercentage": 1.70366,
+        "securityType": "EQ.STOCK",
+        "effectiveDate": "2026-08-31",
+        "bloombergIsoCountry": "TW",
+        "marketValueBaseCurrency": 1458183069.32
+       },
+       {
+        "issuerName": "CEZ AS",
+        "securityLongDescription": "CEZ AS",
+        "isin": "CZ0005112300",
+        "sedol1": "5624030",
+        "ticker": "CEZ",
+        "gicsSectorDescription": "Utilities",
+        "icbSectorDescription": "Electricity",
+        "icbIndustryDescription": "Utilities",
+        "marketValuePercentage": 0.01173,
+        "securityType": "EQ.STOCK",
+        "effectiveDate": "2026-08-31",
+        "bloombergIsoCountry": "CZ",
+        "marketValueBaseCurrency": 10039989.42
+       }
+      ],
+      "totalHoldings": 4093,
+      "lastItemKey": "{\"skey\":0.00736,\"pkey\":\"fundBorHoldings-9679-11e7339062ab71fc0f9afc22d65920223e9beadd\",\"portIdKey\":\"fundBorHoldings-9679-2026-08-31\"}"
+     }
+    }
+   ]
+  }
+ },
+ {
+  "data": {
+   "borHoldings": [
+    {
+     "holdings": {
+      "items": [
+       {
+        "issuerName": "ASML Holding NV",
+        "securityLongDescription": "ASML Holding NV",
+        "isin": "NL0010273215",
+        "sedol1": "B929F46",
+        "ticker": "ASML",
+        "gicsSectorDescription": "Information Technology",
+        "icbSectorDescription": "Technology Hardware & Equipment",
+        "icbIndustryDescription": "Technology",
+        "marketValuePercentage": 0.60211,
+        "securityType": "EQ.STOCK",
+        "effectiveDate": "2026-08-31",
+        "bloombergIsoCountry": "NL",
+        "marketValueBaseCurrency": 515355356.23
+       },
+       {
+        "issuerName": "Microsoft Corp",
+        "securityLongDescription": "Microsoft Corp",
+        "isin": "US5949181045",
+        "sedol1": "2588173",
+        "ticker": "MSFT",
+        "gicsSectorDescription": "Information Technology",
+        "icbSectorDescription": "Software & Computer Services",
+        "icbIndustryDescription": "Technology",
+        "marketValuePercentage": 3.4866,
+        "securityType": "EQ.STOCK",
+        "effectiveDate": "2026-08-31",
+        "bloombergIsoCountry": "US",
+        "marketValueBaseCurrency": 2984221186.17
+       },
+       {
+        "issuerName": null,
+        "securityLongDescription": "US Dollar",
+        "isin": null,
+        "sedol1": null,
+        "ticker": "USD",
+        "gicsSectorDescription": null,
+        "icbSectorDescription": null,
+        "icbIndustryDescription": null,
+        "marketValuePercentage": 0.23133,
+        "securityType": "CRNY",
+        "effectiveDate": "2026-08-31",
+        "bloombergIsoCountry": "US",
+        "marketValueBaseCurrency": 197996450.47
+       },
+       {
+        "issuerName": null,
+        "securityLongDescription": "USD/JPY FWD 20260916",
+        "isin": null,
+        "sedol1": null,
+        "ticker": "USD",
+        "gicsSectorDescription": null,
+        "icbSectorDescription": null,
+        "icbIndustryDescription": null,
+        "marketValuePercentage": 0.05613,
+        "securityType": "CT.FOREX",
+        "effectiveDate": "2026-08-31",
+        "bloombergIsoCountry": null,
+        "marketValueBaseCurrency": 48041733.14
+       },
+       {
+        "issuerName": "Tencent Holdings Ltd",
+        "securityLongDescription": "Tencent Holdings Ltd",
+        "isin": "KYG875721634",
+        "sedol1": "BMMV2K8",
+        "ticker": "700",
+        "gicsSectorDescription": "Communication Services",
+        "icbSectorDescription": "Software & Computer Services",
+        "icbIndustryDescription": "Technology",
+        "marketValuePercentage": 0.3346,
+        "securityType": "EQ.STOCK",
+        "effectiveDate": "2026-08-31",
+        "bloombergIsoCountry": "HK",
+        "marketValueBaseCurrency": 286390791.78
+       }
+      ],
+      "totalHoldings": 4093,
+      "lastItemKey": null
+     }
+    }
+   ]
+  }
+ }
+]

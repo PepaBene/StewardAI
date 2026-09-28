@@ -12,7 +12,7 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import Link from "next/link";
-import { useCallback, useMemo, useState, type ReactNode } from "react";
+import { Fragment, useCallback, useMemo, useState, type ReactNode } from "react";
 
 import { AlertMessage } from "@/components/alert-message";
 import { HBar, Heatmap, SparkArea, Sparkline } from "@/components/charts";
@@ -20,7 +20,9 @@ import { EmptyState } from "@/components/empty-state";
 import { PageHeader } from "@/components/page-header";
 import { BandBadge } from "@/components/portfolio/band-badge";
 import { FreshnessLabel } from "@/components/portfolio/freshness-label";
+import { FundExpandButton, FundLookThroughRow } from "@/components/portfolio/fund-look-through-row";
 import { HoldingsTabs } from "@/components/portfolio/holdings-tabs";
+import { useLookThrough } from "@/components/portfolio/look-through-exposure";
 import { PortfolioTreemap, TreemapModeSwitch } from "@/components/portfolio/portfolio-treemap";
 import { Blueprint, PanelHeading } from "@/components/ui/blueprint";
 import { Button } from "@/components/ui/button";
@@ -57,6 +59,7 @@ import {
   weightScale,
   type HoldingPrices,
 } from "@/lib/portfolio/holdings-view";
+import { fundsByTicker } from "@/lib/portfolio/look-through";
 import { TREEMAP_MODES, type TreemapMode } from "@/lib/portfolio/treemap";
 import { dayMove } from "@/lib/prices/intraday";
 import { cn } from "@/lib/utils";
@@ -490,6 +493,15 @@ function HoldingsTable({
   const invested = investedShare(data.holdings);
   const pnl = unrealisedTotal(data.holdings);
   const sortLabel = COLUMNS.find((c) => c.key === sort.key)?.label ?? sort.key;
+  const lookThrough = useLookThrough();
+  const funds = useMemo(() => fundsByTicker(lookThrough.report), [lookThrough.report]);
+  const [open, setOpen] = useState<ReadonlySet<string>>(() => new Set());
+  const toggle = (ticker: string) =>
+    setOpen((prev) => {
+      const next = new Set(prev);
+      if (!next.delete(ticker)) next.add(ticker);
+      return next;
+    });
 
   return (
     <Blueprint className="overflow-visible">
@@ -540,9 +552,31 @@ function HoldingsTable({
             </tr>
           </thead>
           <tbody>
-            {rows.map((h) => (
-              <HoldingRow key={h.ticker} h={h} baseCcy={baseCcy} scale={scale} prices={priceMap.get(h.ticker)} />
-            ))}
+            {rows.map((h) => {
+              const expandable = securityClass(h.security_type) === "ETF" || funds.has(h.ticker);
+              const rowId = `look-through-${h.ticker}`;
+              return (
+                <Fragment key={h.ticker}>
+                  <HoldingRow
+                    h={h}
+                    baseCcy={baseCcy}
+                    scale={scale}
+                    prices={priceMap.get(h.ticker)}
+                    expand={expandable ? { open: open.has(h.ticker), onToggle: () => toggle(h.ticker), controls: rowId } : undefined}
+                  />
+                  {expandable && open.has(h.ticker) ? (
+                    <FundLookThroughRow
+                      id={rowId}
+                      fund={funds.get(h.ticker) ?? null}
+                      loading={lookThrough.loading}
+                      error={lookThrough.error}
+                      colSpan={COLUMNS.length}
+                      currency={baseCcy}
+                    />
+                  ) : null}
+                </Fragment>
+              );
+            })}
           </tbody>
           <tfoot>
             <tr className="font-semibold">
@@ -570,11 +604,14 @@ function HoldingRow({
   baseCcy,
   scale,
   prices,
+  expand,
 }: {
   h: Holding;
   baseCcy: string;
   scale: number;
   prices: HoldingPrices | undefined;
+  /** ETF rows: the disclosure for its underlying holdings (look-through). */
+  expand?: { open: boolean; onToggle: () => void; controls: string };
 }) {
   const tone = gainLossTone(h.ppl);
   const short = displayTicker(h.ticker);
@@ -585,6 +622,7 @@ function HoldingRow({
   return (
     <tr className="border-b border-border-soft align-middle hover:bg-border-soft">
       <th scope="row" className="py-2.5 pr-3 pl-5 text-left font-normal">
+        <div className="flex items-center justify-between gap-2">
         <Link href={`/holdings/${encodeURIComponent(h.ticker)}`} className="group flex min-w-0 items-center gap-2.5">
           <span
             aria-hidden="true"
@@ -602,6 +640,8 @@ function HoldingRow({
             </span>
           </span>
         </Link>
+        {expand ? <FundExpandButton open={expand.open} onToggle={expand.onToggle} controls={expand.controls} name={h.name ?? h.ticker} /> : null}
+        </div>
       </th>
       <td className="num px-3 py-2.5 text-right">{formatQuantity(h.quantity)}</td>
       <td className="num px-3 py-2.5 text-right text-text-muted">{formatPrice(h.avg_price, h.instrument_currency)}</td>

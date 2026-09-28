@@ -46,7 +46,14 @@ describe("13F ownership", () => {
   });
 
   it("shows an empty state for a holding no 13F filing lists (non-US)", () => {
-    const empty: HoldingOwnership = { ticker: "CEZ_CZ_EQ", cusips: [], periods: [], top_holders: [], source: "SEC Form 13F data sets" };
+    const empty: HoldingOwnership = {
+      ticker: "CEZ_CZ_EQ",
+      cusips: [],
+      periods: [],
+      top_holders: [],
+      source: "SEC Form 13F data sets",
+      applicable: true,
+    };
     const state = ownershipState(empty);
     expect(state.kind).toBe("empty");
     expect(state.kind === "empty" && state.reason).toMatch(/US-listed securities only/);
@@ -59,6 +66,7 @@ describe("13F ownership", () => {
       periods: [period("2026-03-31"), period("2026-06-30")],
       top_holders: [],
       source: "SEC Form 13F data sets",
+      applicable: true,
     };
     const state = ownershipState(data);
     expect(state.kind === "ok" && state.periods.map((p) => p.period)).toEqual(["2026-06-30", "2026-03-31"]);

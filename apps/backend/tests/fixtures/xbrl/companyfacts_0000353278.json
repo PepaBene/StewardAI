@@ -1,0 +1,45 @@
+{
+ "cik": 353278,
+ "entityName": "NOVO NORDISK A/S",
+ "facts": {
+  "ifrs-full": {
+   "NumberOfSharesOutstanding": {
+    "label": null,
+    "description": null,
+    "units": {
+     "shares": [
+      {
+       "end": "2024-12-31",
+       "val": 4441000000,
+       "accn": "0001628280-25-003920",
+       "fy": 2024,
+       "fp": "FY",
+       "form": "20-F",
+       "filed": "2025-02-05"
+      },
+      {
+       "end": "2024-12-31",
+       "val": 4441000000,
+       "accn": "0000353278-26-000012",
+       "fy": 2025,
+       "fp": "FY",
+       "form": "20-F",
+       "filed": "2026-02-04",
+       "frame": "CY2024Q4I"
+      },
+      {
+       "end": "2025-12-31",
+       "val": 4444000000,
+       "accn": "0000353278-26-000012",
+       "fy": 2025,
+       "fp": "FY",
+       "form": "20-F",
+       "filed": "2026-02-04",
+       "frame": "CY2025Q4I"
+      }
+     ]
+    }
+   }
+  }
+ }
+}
