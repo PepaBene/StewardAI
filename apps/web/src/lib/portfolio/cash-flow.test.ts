@@ -2,7 +2,17 @@ import { describe, expect, it } from "vitest";
 
 import type { TransactionOut } from "@/lib/api/client";
 
-import { cashFlowGraph, dividendsByTicker, monthlyOrderFlows, monthsBetween, securityClass, splitBuys } from "./cash-flow";
+import {
+  cashFlowGraph,
+  dividendsByTicker,
+  dividendTotal,
+  flowPeriods,
+  monthlyOrderFlows,
+  monthsBetween,
+  securityClass,
+  splitBuys,
+  yearEarlier,
+} from "./cash-flow";
 
 const total = (type: "order" | "dividend" | "cash", subtype: string | null, amount: number, currency = "CZK") => ({
   type,
@@ -57,6 +67,18 @@ describe("cash-flow graph", () => {
   it("ignores a split that does not add up to the buys", () => {
     const g = cashFlowGraph([total("cash", "DEPOSIT", 100), total("order", "BUY", -80)], "CZK", { stocks: 10, etfs: 10, other: 0 });
     expect(g.nodes.map((n) => n.label)).toContain("Buys");
+  });
+});
+
+describe("periods", () => {
+  it("offers this quarter, year to date and the last 12 months", () => {
+    expect(flowPeriods(new Date("2026-09-28T10:00:00Z")).map((p) => [p.label, p.from, p.to])).toEqual([
+      ["Q3", "2026-07-01", "2026-09-28"],
+      ["YTD", "2026-01-01", "2026-09-28"],
+      ["1Y", "2025-09-29", "2026-09-28"],
+    ]);
+    expect(yearEarlier({ from: "2026-01-01", to: "2026-09-28" })).toEqual({ from: "2025-01-01", to: "2025-09-28" });
+    expect(dividendTotal([total("dividend", "ORDINARY", 24), total("dividend", null, 5, "EUR")], "CZK")).toBe(24);
   });
 });
 

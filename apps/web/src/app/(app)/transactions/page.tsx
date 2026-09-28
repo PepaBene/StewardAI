@@ -3,7 +3,7 @@ import { Suspense } from "react";
 
 import { TransactionsView } from "./transactions-view";
 
-export const metadata: Metadata = { title: "Transactions and dividends" };
+export const metadata: Metadata = { title: "Transactions" };
 
 export default function TransactionsPage() {
   return (

@@ -196,6 +196,37 @@ export function dividendsByTicker(rows: readonly TransactionOut[], currency: str
   return head;
 }
 
+export type FlowPeriod = { id: "quarter" | "ytd" | "1y"; label: string; title: string; from: string; to: string };
+
+function isoDay(d: Date): string {
+  return d.toISOString().slice(0, 10);
+}
+
+/** The Transactions charts' periods ending `today` (UTC): this quarter, year to date, last 12 months. */
+export function flowPeriods(today: Date = new Date()): FlowPeriod[] {
+  const y = today.getUTCFullYear();
+  const q = Math.floor(today.getUTCMonth() / 3);
+  const yearAgo = new Date(today);
+  yearAgo.setUTCFullYear(y - 1);
+  yearAgo.setUTCDate(yearAgo.getUTCDate() + 1);
+  const to = isoDay(today);
+  return [
+    { id: "quarter", label: `Q${q + 1}`, title: `Q${q + 1} ${y}`, from: `${y}-${String(q * 3 + 1).padStart(2, "0")}-01`, to },
+    { id: "ytd", label: "YTD", title: `${y} YTD`, from: `${y}-01-01`, to },
+    { id: "1y", label: "1Y", title: "Last 12 months", from: isoDay(yearAgo), to },
+  ];
+}
+
+/** The same window one year earlier (for a year-on-year comparison). */
+export function yearEarlier(period: { from: string; to: string }): { from: string; to: string } {
+  const shift = (iso: string) => {
+    const d = new Date(`${iso}T00:00:00Z`);
+    d.setUTCFullYear(d.getUTCFullYear() - 1);
+    return isoDay(d);
+  };
+  return { from: shift(period.from), to: shift(period.to) };
+}
+
 /** Sum of dividends in `currency` from totals. */
 export function dividendTotal(totals: readonly TotalByCurrency[], currency: string): number {
   return totals.filter((t) => t.type === "dividend" && t.currency === currency).reduce((s, t) => s + t.amount, 0);
