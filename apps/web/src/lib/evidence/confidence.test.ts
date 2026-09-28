@@ -72,6 +72,14 @@ describe("fact values", () => {
     expect(formatFactValue({ value_as_written: "94,036", scale: "millions", unit: "currency", currency: "USD" })).toBe("USD 94,036 m");
     expect(formatFactValue({ value_as_written: "1.57", scale: "units", unit: "per_share", currency: "USD" })).toBe("USD 1.57 / share");
     expect(formatFactValue({ value_as_written: "46.5", scale: "units", unit: "percent", currency: null })).toBe("46.5%");
+    // Printed with its unit already: shown as printed, not decorated twice.
+    expect(formatFactValue({ value_as_written: "€18.1 billion", scale: "billions", unit: "currency", currency: "EUR" })).toBe(
+      "€18.1 billion",
+    );
+    expect(formatFactValue({ value_as_written: "14.1%", scale: "units", unit: "percent", currency: null })).toBe("14.1%");
+    expect(formatFactValue({ value_as_written: "-1,204.5", scale: "millions", unit: "currency", currency: "USD" })).toBe(
+      "USD -1,204.5 m",
+    );
   });
 });
 

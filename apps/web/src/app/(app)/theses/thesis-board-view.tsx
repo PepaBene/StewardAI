@@ -320,7 +320,7 @@ function StatRow({ board }: { board: ThesisBoard }) {
       </Blueprint>
 
       <Blueprint className="flex flex-col gap-2 px-5 py-[18px]">
-        <h2 className="text-xs font-normal text-text-muted" title={methodHint}>
+        <h2 className="font-sans text-xs font-normal text-text-muted" title={methodHint}>
           Score by holding
         </h2>
         {scored.length === 0 ? (
@@ -342,7 +342,7 @@ function StatRow({ board }: { board: ThesisBoard }) {
       </Blueprint>
 
       <Blueprint className="flex flex-col gap-1 px-5 py-[18px]">
-        <h2 className="flex items-center gap-1 text-xs font-normal text-text-muted">
+        <h2 className="flex items-center gap-1 font-sans text-xs font-normal text-text-muted">
           Weighted thesis score
           <a href="#score-method" title={methodHint} className="text-text-faint hover:text-text">
             <InfoIcon aria-hidden="true" className="size-3.5" />
@@ -366,7 +366,7 @@ function StatRow({ board }: { board: ThesisBoard }) {
       </Blueprint>
 
       <Blueprint className="flex flex-col gap-1.5 px-5 py-[18px]">
-        <h2 className="text-xs font-normal text-text-muted">Verdicts, last 30 days</h2>
+        <h2 className="font-sans text-xs font-normal text-text-muted">Verdicts, last 30 days</h2>
         <p className="font-heading text-[32px] leading-none font-semibold">
           <span className="num">{board.verdicts_30d.count}</span>{" "}
           <span className="font-sans text-sm font-normal text-text-muted">
