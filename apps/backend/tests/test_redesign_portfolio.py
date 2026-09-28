@@ -387,6 +387,9 @@ async def test_market_strip_rates_and_index_quotes(
         "symbol": "^spx", "label": "S&P 500", "last_close": 5100.0,
         "as_of": day(4).isoformat(), "previous_close": 5000.0,
         "previous_date": day(3).isoformat(), "change_pct": pytest.approx(0.02),
+        # Stooq's close; ^GSPC is the known Yahoo counterpart (no Yahoo data stored here).
+        "yahoo_symbol": "^GSPC", "as_of_time": None, "exchange_tz": None, "kind": "close",
+        "source": "Stooq",
     }  # fmt: skip
     assert stoxx["last_close"] is None and stoxx["change_pct"] is None
     assert px["last_close"] == 2000.0 and px["previous_close"] is None

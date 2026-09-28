@@ -226,6 +226,8 @@ async def yahoo_chart(
     try:
         body = response.json()
     except ValueError as exc:
+        if response.status_code == 404:
+            raise YahooNoData("Yahoo returned HTTP 404 (unknown symbol)") from exc
         raise YahooError(f"Yahoo returned HTTP {response.status_code} without JSON") from exc
     return parse_chart(
         symbol,
@@ -243,8 +245,10 @@ async def yahoo_intraday(http: httpx.AsyncClient, symbol: str, *, retry: bool = 
 
 
 # Yahoo's ranges for daily bars, shortest first: the smallest one covering the days wanted.
-DAILY_RANGES = (("5d", 5), ("1mo", 31), ("3mo", 92), ("6mo", 183), ("1y", 366), ("2y", 731),
-                ("5y", 1827), ("10y", 3653))  # fmt: skip
+# The spans allow the few days of padding the history start carries (2 years + 5 days is
+# still the 2y range; the bars before the start are dropped).
+DAILY_RANGES = (("5d", 5), ("1mo", 31), ("3mo", 92), ("6mo", 183), ("1y", 372), ("2y", 740),
+                ("5y", 1835), ("10y", 3660))  # fmt: skip
 
 
 def daily_range(days: int) -> str:
