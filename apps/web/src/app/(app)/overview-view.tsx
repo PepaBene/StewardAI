@@ -13,6 +13,7 @@ import { ConcentrationCompliance } from "@/components/portfolio/concentration-co
 import { ContributionCard } from "@/components/portfolio/contribution-card";
 import { DriftPanel, DriftTable } from "@/components/portfolio/drift-panel";
 import { ExposurePanel } from "@/components/portfolio/exposure-panel";
+import { useLookThrough } from "@/components/portfolio/look-through-exposure";
 import { FreshnessLabel } from "@/components/portfolio/freshness-label";
 import { OverviewHero, type HistoryLoad } from "@/components/portfolio/overview-hero";
 import { ReturnsHeatmap } from "@/components/portfolio/returns-heatmap";
@@ -25,6 +26,7 @@ import { getBrowserApiClient, type PortfolioHistory, type PortfolioOverview } fr
 import { formatDate, formatMoney, formatPercent, gainLossTone } from "@/lib/format";
 import { useApiResource } from "@/lib/hooks/use-api-resource";
 import { herfindahlIndex } from "@/lib/portfolio/concentration";
+import { lookThroughRisk } from "@/lib/portfolio/look-through";
 import { formatCompactMoney, formatSignedPct } from "@/lib/portfolio/money";
 import { DEFAULT_HERO_RANGE, HISTORY_DAYS, rangeStart, sliceFrom, trailingRisk, type HeroRangeId } from "@/lib/portfolio/performance";
 import { foreignCurrencyShare, riskAxes } from "@/lib/portfolio/risk-profile";
@@ -114,6 +116,7 @@ function Overview({ data }: { data: PortfolioOverview }) {
   const [range, setRange] = useState<HeroRangeId>(DEFAULT_HERO_RANGE);
   const h = history.kind === "ok" && !history.data.gap ? history.data : null;
   const risk = useMemo(() => (h ? trailingRisk(h.points, h.benchmark) : null), [h]);
+  const lookThrough = useLookThrough().report;
 
   if (!data.freshness || !data.account || !data.base) {
     return (
@@ -157,6 +160,7 @@ function Overview({ data }: { data: PortfolioOverview }) {
     fxShare,
     benchmarkVolatility: risk?.benchmarkVolatility,
     benchmarkMaxDrawdown: risk?.benchmarkMaxDrawdown,
+    lookThrough: lookThroughRisk(lookThrough),
   });
 
   // Tile sparklines follow the hero's range (absolute values in the history's currency).
@@ -243,6 +247,7 @@ function Overview({ data }: { data: PortfolioOverview }) {
           fxShare={fxShare}
           benchmarkSymbol={h?.benchmark_symbol ?? null}
           loading={history.kind === "loading"}
+          lookThrough={lookThrough}
         />
       </div>
 
@@ -253,7 +258,7 @@ function Overview({ data }: { data: PortfolioOverview }) {
 
       <div className="grid grid-cols-1 gap-5 xl:grid-cols-[minmax(0,1.45fr)_minmax(0,1fr)]">
         <CashFlowPanel year={Number(today.slice(0, 4))} today={today} />
-        {drift ? <ExposurePanel drift={drift} currency={baseCcy} /> : null}
+        {drift ? <ExposurePanel drift={drift} currency={baseCcy} lookThrough={lookThrough} /> : null}
       </div>
 
       <div className="grid grid-cols-1 items-start gap-5 xl:grid-cols-2">

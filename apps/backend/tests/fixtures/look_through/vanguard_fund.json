@@ -1,0 +1,269 @@
+{
+ "data": {
+  "funds": [
+   {
+    "profile": {
+     "fundFullName": "Vanguard FTSE All-World UCITS ETF (USD) Accumulating",
+     "fundCurrency": "USD",
+     "primarySectorEquityClassification": "ICB Sectors"
+    },
+    "marketAllocation": [
+     {
+      "date": "2026-08-31",
+      "countryName": "Czech Republic",
+      "countryCode": "CZ",
+      "holdingStatCode": "FTCTYATPCS",
+      "regionCode": "EM",
+      "regionName": "Emerging Markets",
+      "fundMktPercent": 0.01914,
+      "benchmarkMktPercent": 0.01497
+     },
+     {
+      "date": "2026-08-31",
+      "countryName": "United Kingdom",
+      "countryCode": "GB",
+      "holdingStatCode": "FTCTYATPCS",
+      "regionCode": "EU",
+      "regionName": "Europe",
+      "fundMktPercent": 3.25239,
+      "benchmarkMktPercent": 3.19962
+     },
+     {
+      "date": "2026-08-31",
+      "countryName": "Japan",
+      "countryCode": "JP",
+      "holdingStatCode": "FTCTYATPCS",
+      "regionCode": "FE",
+      "regionName": "Pacific",
+      "fundMktPercent": 5.99971,
+      "benchmarkMktPercent": 5.98321
+     },
+     {
+      "date": "2026-08-31",
+      "countryName": "Netherlands",
+      "countryCode": "NL",
+      "holdingStatCode": "FTCTYATPCS",
+      "regionCode": "EU",
+      "regionName": "Europe",
+      "fundMktPercent": 1.14188,
+      "benchmarkMktPercent": 1.13991
+     },
+     {
+      "date": "2026-08-31",
+      "countryName": "Taiwan",
+      "countryCode": "TW",
+      "holdingStatCode": "FTCTYATPCS",
+      "regionCode": "EM",
+      "regionName": "Emerging Markets",
+      "fundMktPercent": 3.30919,
+      "benchmarkMktPercent": 3.30465
+     },
+     {
+      "date": "2026-08-31",
+      "countryName": "United States",
+      "countryCode": "US",
+      "holdingStatCode": "FTCTYATPCS",
+      "regionCode": "NA",
+      "regionName": "North America",
+      "fundMktPercent": 61.68409,
+      "benchmarkMktPercent": 61.71133
+     },
+     {
+      "date": "2026-08-31",
+      "countryName": "Czech Republic",
+      "countryCode": "CZ",
+      "holdingStatCode": "MSCTYATPCS",
+      "regionCode": "EM",
+      "regionName": "Emerging Markets",
+      "fundMktPercent": 0.01914,
+      "benchmarkMktPercent": 0.01497
+     },
+     {
+      "date": "2026-08-31",
+      "countryName": "United Kingdom",
+      "countryCode": "GB",
+      "holdingStatCode": "MSCTYATPCS",
+      "regionCode": "EU",
+      "regionName": "Europe",
+      "fundMktPercent": 3.19644,
+      "benchmarkMktPercent": 3.17947
+     },
+     {
+      "date": "2026-08-31",
+      "countryName": "Japan",
+      "countryCode": "JP",
+      "holdingStatCode": "MSCTYATPCS",
+      "regionCode": "FE",
+      "regionName": "Pacific",
+      "fundMktPercent": 5.99971,
+      "benchmarkMktPercent": 5.98321
+     },
+     {
+      "date": "2026-08-31",
+      "countryName": "Netherlands",
+      "countryCode": "NL",
+      "holdingStatCode": "MSCTYATPCS",
+      "regionCode": "EU",
+      "regionName": "Europe",
+      "fundMktPercent": 1.13041,
+      "benchmarkMktPercent": 1.11065
+     },
+     {
+      "date": "2026-08-31",
+      "countryName": "Taiwan",
+      "countryCode": "TW",
+      "holdingStatCode": "MSCTYATPCS",
+      "regionCode": "EM",
+      "regionName": "Emerging Markets",
+      "fundMktPercent": 3.30919,
+      "benchmarkMktPercent": 3.30465
+     },
+     {
+      "date": "2026-08-31",
+      "countryName": "United States",
+      "countryCode": "US",
+      "holdingStatCode": "MSCTYATPCS",
+      "regionCode": "NA",
+      "regionName": "North America",
+      "fundMktPercent": 61.58227,
+      "benchmarkMktPercent": 61.50906
+     },
+     {
+      "date": "2026-08-31",
+      "countryName": null,
+      "countryCode": null,
+      "holdingStatCode": "SASTTYPPC",
+      "regionCode": "EM",
+      "regionName": "Emerging Markets",
+      "fundMktPercent": 9.96481,
+      "benchmarkMktPercent": 9.98151
+     },
+     {
+      "date": "2026-08-31",
+      "countryName": null,
+      "countryCode": null,
+      "holdingStatCode": "SASTTYPPC",
+      "regionCode": "EU",
+      "regionName": "Europe",
+      "fundMktPercent": 14.03269,
+      "benchmarkMktPercent": 14.01223
+     },
+     {
+      "date": "2026-08-31",
+      "countryName": null,
+      "countryCode": null,
+      "holdingStatCode": "SASTTYPPC",
+      "regionCode": "FE",
+      "regionName": "Pacific",
+      "fundMktPercent": 11.00391,
+      "benchmarkMktPercent": 10.99324
+     },
+     {
+      "date": "2026-08-31",
+      "countryName": null,
+      "countryCode": null,
+      "holdingStatCode": "SASTTYPPC",
+      "regionCode": "ME",
+      "regionName": "Middle East",
+      "fundMktPercent": 0.29978,
+      "benchmarkMktPercent": 0.30023
+     },
+     {
+      "date": "2026-08-31",
+      "countryName": null,
+      "countryCode": null,
+      "holdingStatCode": "SASTTYPPC",
+      "regionCode": "NA",
+      "regionName": "North America",
+      "fundMktPercent": 64.69879,
+      "benchmarkMktPercent": 64.71278
+     },
+     {
+      "date": "2026-08-31",
+      "countryName": null,
+      "countryCode": null,
+      "holdingStatCode": "SASTTYPPC",
+      "regionCode": "OT",
+      "regionName": "Other",
+      "fundMktPercent": 2e-05,
+      "benchmarkMktPercent": null
+     }
+    ],
+    "sectorDiversification": [
+     {
+      "date": "2026-08-31",
+      "sectorName": "Basic Materials",
+      "fundPercent": 3.4405,
+      "benchmarkPercent": 3.4249
+     },
+     {
+      "date": "2026-08-31",
+      "sectorName": "Utilities",
+      "fundPercent": 2.5439,
+      "benchmarkPercent": 2.55129
+     },
+     {
+      "date": "2026-08-31",
+      "sectorName": "Telecommunications",
+      "fundPercent": 3.32067,
+      "benchmarkPercent": 3.32603
+     },
+     {
+      "date": "2026-08-31",
+      "sectorName": "Technology",
+      "fundPercent": 34.10595,
+      "benchmarkPercent": 34.08874
+     },
+     {
+      "date": "2026-08-31",
+      "sectorName": "Energy",
+      "fundPercent": 4.15356,
+      "benchmarkPercent": 4.14968
+     },
+     {
+      "date": "2026-08-31",
+      "sectorName": "Other",
+      "fundPercent": 0.00551,
+      "benchmarkPercent": 0.04429
+     },
+     {
+      "date": "2026-08-31",
+      "sectorName": "Real Estate",
+      "fundPercent": 1.74243,
+      "benchmarkPercent": 1.74143
+     },
+     {
+      "date": "2026-08-31",
+      "sectorName": "Consumer Discretionary",
+      "fundPercent": 11.01967,
+      "benchmarkPercent": 11.04032
+     },
+     {
+      "date": "2026-08-31",
+      "sectorName": "Financials",
+      "fundPercent": 15.49143,
+      "benchmarkPercent": 15.46601
+     },
+     {
+      "date": "2026-08-31",
+      "sectorName": "Consumer Staples",
+      "fundPercent": 3.88856,
+      "benchmarkPercent": 3.89436
+     },
+     {
+      "date": "2026-08-31",
+      "sectorName": "Industrials",
+      "fundPercent": 12.3171,
+      "benchmarkPercent": 12.29483
+     },
+     {
+      "date": "2026-08-31",
+      "sectorName": "Health Care",
+      "fundPercent": 7.97072,
+      "benchmarkPercent": 7.97814
+     }
+    ]
+   }
+  ]
+ }
+}

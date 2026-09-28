@@ -653,6 +653,84 @@
         ]
       }
     },
+    "/portfolio/look-through": {
+      "get": {
+        "tags": [
+          "portfolio"
+        ],
+        "summary": "Get Portfolio Look Through",
+        "description": "Exposure by country, region, sector and currency with the funds expanded (direct\nstocks plus fund weight x holding weight; cash, the funds' own cash & derivatives and\nfunds with no snapshot are separate buckets), the top underlying holdings merged across\nfunds and direct positions, concentration (HHI, 1/HHI, top-10 share) of the portfolio and\nof the benchmark proxy, FX exposure against the benchmark, each fund's as-of date, source\nand tier, and coverage. Read from stored snapshots only; nothing is fetched here.",
+        "operationId": "get_portfolio_look_through",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "top",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 100,
+              "minimum": 1,
+              "default": 25,
+              "title": "Top"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LookThroughReport"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/jobs/etf-look-through": {
+      "post": {
+        "tags": [
+          "jobs"
+        ],
+        "summary": "Run Etf Look Through",
+        "description": "Fetch the funds' holdings from the issuers now (skipped per fund when the stored\nas-of date is already current).",
+        "operationId": "run_etf_look_through",
+        "responses": {
+          "202": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/JobSummary"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
     "/portfolio/overview": {
       "get": {
         "tags": [
@@ -6527,6 +6605,175 @@
         ],
         "title": "BaseTotals"
       },
+      "BenchmarkBucket": {
+        "properties": {
+          "key": {
+            "type": "string",
+            "title": "Key"
+          },
+          "label": {
+            "type": "string",
+            "title": "Label"
+          },
+          "weight": {
+            "type": "number",
+            "title": "Weight"
+          }
+        },
+        "type": "object",
+        "required": [
+          "key",
+          "label",
+          "weight"
+        ],
+        "title": "BenchmarkBucket"
+      },
+      "BenchmarkLookThrough": {
+        "properties": {
+          "key": {
+            "type": "string",
+            "title": "Key"
+          },
+          "label": {
+            "type": "string",
+            "title": "Label"
+          },
+          "symbol": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Symbol"
+          },
+          "primary": {
+            "type": "boolean",
+            "title": "Primary"
+          },
+          "source_label": {
+            "type": "string",
+            "title": "Source Label"
+          },
+          "as_of": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "As Of"
+          },
+          "definition": {
+            "type": "string",
+            "title": "Definition"
+          },
+          "sector_scheme": {
+            "type": "string",
+            "enum": [
+              "gics",
+              "icb_industry"
+            ],
+            "title": "Sector Scheme"
+          },
+          "currency_derived": {
+            "type": "boolean",
+            "title": "Currency Derived"
+          },
+          "exposures": {
+            "additionalProperties": {
+              "items": {
+                "$ref": "#/components/schemas/BenchmarkBucket"
+              },
+              "type": "array"
+            },
+            "type": "object",
+            "title": "Exposures"
+          },
+          "concentration": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Concentration"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "foreign_share": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Foreign Share",
+            "description": "Share in currencies other than the base currency."
+          }
+        },
+        "type": "object",
+        "required": [
+          "key",
+          "label",
+          "symbol",
+          "primary",
+          "source_label",
+          "as_of",
+          "definition",
+          "sector_scheme",
+          "currency_derived",
+          "exposures",
+          "concentration",
+          "foreign_share"
+        ],
+        "title": "BenchmarkLookThrough"
+      },
+      "BenchmarkProxy": {
+        "properties": {
+          "symbol": {
+            "type": "string",
+            "pattern": "^\\^?[a-z0-9._-]{1,24}$",
+            "title": "Symbol",
+            "description": "A benchmark symbol from prices.benchmark_symbols.",
+            "examples": [
+              "^spx"
+            ]
+          },
+          "fund_isin": {
+            "type": "string",
+            "pattern": "^[A-Z]{2}[A-Z0-9]{9}[0-9]$",
+            "title": "Fund Isin",
+            "examples": [
+              "IE00B5BMR087"
+            ]
+          },
+          "label": {
+            "type": "string",
+            "maxLength": 60,
+            "minLength": 1,
+            "title": "Label",
+            "examples": [
+              "S&P 500"
+            ]
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "symbol",
+          "fund_isin",
+          "label"
+        ],
+        "title": "BenchmarkProxy",
+        "description": "Which fund's holdings stand in for a benchmark index's constituents."
+      },
       "BoardKpi": {
         "properties": {
           "kpi": {
@@ -6899,6 +7146,7 @@
                 "weekly_digest",
                 "research",
                 "ownership_13f",
+                "etf_look_through",
                 "monthly_review",
                 "chat"
               ]
@@ -6931,6 +7179,7 @@
                 "weekly_digest",
                 "research",
                 "ownership_13f",
+                "etf_look_through",
                 "monthly_review",
                 "chat"
               ]
@@ -7893,6 +8142,41 @@
         ],
         "title": "ComplianceRow"
       },
+      "Concentration": {
+        "properties": {
+          "hhi": {
+            "type": "number",
+            "title": "Hhi",
+            "description": "Sum of squared weights (weights renormalised to 1)."
+          },
+          "effective_n": {
+            "type": "number",
+            "title": "Effective N",
+            "description": "1 / HHI: as concentrated as this many equal names."
+          },
+          "top10_share": {
+            "type": "number",
+            "title": "Top10 Share"
+          },
+          "holdings": {
+            "type": "integer",
+            "title": "Holdings"
+          },
+          "basis": {
+            "type": "string",
+            "title": "Basis"
+          }
+        },
+        "type": "object",
+        "required": [
+          "hhi",
+          "effective_n",
+          "top10_share",
+          "holdings",
+          "basis"
+        ],
+        "title": "Concentration"
+      },
       "ConfigDiff": {
         "properties": {
           "domain": {
@@ -8421,6 +8705,70 @@
           "by_model"
         ],
         "title": "CostSummary"
+      },
+      "Coverage": {
+        "properties": {
+          "total_value": {
+            "type": "number",
+            "title": "Total Value"
+          },
+          "cash_value": {
+            "type": "number",
+            "title": "Cash Value"
+          },
+          "direct_value": {
+            "type": "number",
+            "title": "Direct Value"
+          },
+          "fund_value": {
+            "type": "number",
+            "title": "Fund Value"
+          },
+          "looked_through_value": {
+            "type": "number",
+            "title": "Looked Through Value"
+          },
+          "not_looked_through_value": {
+            "type": "number",
+            "title": "Not Looked Through Value"
+          },
+          "fund_share_looked_through": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fund Share Looked Through",
+            "description": "Share of the funds' value whose holdings are looked through."
+          },
+          "portfolio_share_looked_through": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Portfolio Share Looked Through",
+            "description": "Share of total portfolio value that is direct stocks or looked-through funds (the rest is cash and funds not looked through)."
+          }
+        },
+        "type": "object",
+        "required": [
+          "total_value",
+          "cash_value",
+          "direct_value",
+          "fund_value",
+          "looked_through_value",
+          "not_looked_through_value",
+          "fund_share_looked_through",
+          "portfolio_share_looked_through"
+        ],
+        "title": "Coverage"
       },
       "DayCount": {
         "properties": {
@@ -10740,6 +11088,107 @@
         ],
         "title": "Exposure"
       },
+      "ExposureBucket": {
+        "properties": {
+          "key": {
+            "type": "string",
+            "title": "Key",
+            "description": "ISO country code, region, GICS sector or currency code; or one of __cash__, __fund_cash__, __not_looked_through__, __unclassified__."
+          },
+          "label": {
+            "type": "string",
+            "title": "Label"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "classified",
+              "unclassified",
+              "cash",
+              "fund_cash",
+              "not_looked_through"
+            ],
+            "title": "Kind"
+          },
+          "weight": {
+            "type": "number",
+            "title": "Weight",
+            "description": "Share of total portfolio value."
+          },
+          "value_base": {
+            "type": "number",
+            "title": "Value Base"
+          },
+          "direct_weight": {
+            "type": "number",
+            "title": "Direct Weight",
+            "description": "Part of `weight` held directly."
+          },
+          "fund_weight": {
+            "type": "number",
+            "title": "Fund Weight",
+            "description": "Part of `weight` held through funds."
+          },
+          "benchmark_weight": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Benchmark Weight",
+            "description": "The primary benchmark's weight in this bucket (its looked-through part renormalised to 100%); null for buckets it has no counterpart for."
+          }
+        },
+        "type": "object",
+        "required": [
+          "key",
+          "label",
+          "kind",
+          "weight",
+          "value_base",
+          "direct_weight",
+          "fund_weight",
+          "benchmark_weight"
+        ],
+        "title": "ExposureBucket"
+      },
+      "ExposureDimension": {
+        "properties": {
+          "dimension": {
+            "type": "string",
+            "enum": [
+              "country",
+              "region",
+              "sector",
+              "currency"
+            ],
+            "title": "Dimension"
+          },
+          "basis": {
+            "type": "string",
+            "title": "Basis",
+            "description": "How the buckets were classified."
+          },
+          "buckets": {
+            "items": {
+              "$ref": "#/components/schemas/ExposureBucket"
+            },
+            "type": "array",
+            "title": "Buckets",
+            "description": "By weight, special buckets last."
+          }
+        },
+        "type": "object",
+        "required": [
+          "dimension",
+          "basis",
+          "buckets"
+        ],
+        "title": "ExposureDimension"
+      },
       "FactCheck": {
         "properties": {
           "check": {
@@ -11581,6 +12030,436 @@
         ],
         "title": "Freshness"
       },
+      "FundHolding": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "isin": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Isin"
+          },
+          "ticker": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ticker"
+          },
+          "sector": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sector"
+          },
+          "country": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Country"
+          },
+          "currency": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Currency"
+          },
+          "weight_in_fund": {
+            "type": "number",
+            "title": "Weight In Fund"
+          },
+          "portfolio_weight": {
+            "type": "number",
+            "title": "Portfolio Weight"
+          },
+          "value_base": {
+            "type": "number",
+            "title": "Value Base"
+          }
+        },
+        "type": "object",
+        "required": [
+          "name",
+          "isin",
+          "ticker",
+          "sector",
+          "country",
+          "currency",
+          "weight_in_fund",
+          "portfolio_weight",
+          "value_base"
+        ],
+        "title": "FundHolding"
+      },
+      "FundLookThrough": {
+        "properties": {
+          "isin": {
+            "type": "string",
+            "title": "Isin"
+          },
+          "label": {
+            "type": "string",
+            "title": "Label"
+          },
+          "ticker": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ticker",
+            "description": "The Trading212 ticker when the fund is held."
+          },
+          "name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
+          },
+          "provider": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "ishares",
+                  "vanguard"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Provider"
+          },
+          "portfolio_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Portfolio Id"
+          },
+          "held": {
+            "type": "boolean",
+            "title": "Held"
+          },
+          "benchmark_proxy_for": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Benchmark Proxy For"
+          },
+          "value_base": {
+            "type": "number",
+            "title": "Value Base"
+          },
+          "weight": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Weight"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "ok",
+              "stale",
+              "missing",
+              "not_configured"
+            ],
+            "title": "Status"
+          },
+          "as_of": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "As Of"
+          },
+          "fetched_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fetched At"
+          },
+          "source": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source"
+          },
+          "source_label": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Label"
+          },
+          "tier": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tier"
+          },
+          "tier_label": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tier Label"
+          },
+          "fallback": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "cached",
+                  "spreadsheet"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fallback",
+            "description": "cached: the latest fetch failed and this stored snapshot is shown; spreadsheet: read from the iShares full-fund download (no country, no ISIN)."
+          },
+          "last_attempt": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/LastAttempt"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "country_basis": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Country Basis"
+          },
+          "currency_basis": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Currency Basis"
+          },
+          "equity_share": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Equity Share"
+          },
+          "holdings_count": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Holdings Count"
+          },
+          "warnings": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Warnings"
+          },
+          "top_holdings": {
+            "items": {
+              "$ref": "#/components/schemas/FundHolding"
+            },
+            "type": "array",
+            "title": "Top Holdings"
+          }
+        },
+        "type": "object",
+        "required": [
+          "isin",
+          "label",
+          "ticker",
+          "name",
+          "provider",
+          "portfolio_id",
+          "held",
+          "benchmark_proxy_for",
+          "value_base",
+          "weight",
+          "status",
+          "as_of",
+          "fetched_at",
+          "source",
+          "source_label",
+          "tier",
+          "tier_label",
+          "fallback",
+          "last_attempt",
+          "country_basis",
+          "currency_basis",
+          "equity_share",
+          "holdings_count",
+          "warnings",
+          "top_holdings"
+        ],
+        "title": "FundLookThrough"
+      },
+      "FxExposure": {
+        "properties": {
+          "base_currency": {
+            "type": "string",
+            "title": "Base Currency"
+          },
+          "foreign_share": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Foreign Share",
+            "description": "Share of known-currency value (securities looked through plus cash) in currencies other than the base currency."
+          },
+          "known_share": {
+            "type": "number",
+            "title": "Known Share",
+            "description": "Share of total value whose currency is known."
+          },
+          "benchmark_foreign_share": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Benchmark Foreign Share"
+          },
+          "benchmark_label": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Benchmark Label"
+          },
+          "rows": {
+            "items": {
+              "$ref": "#/components/schemas/FxRow"
+            },
+            "type": "array",
+            "title": "Rows"
+          }
+        },
+        "type": "object",
+        "required": [
+          "base_currency",
+          "foreign_share",
+          "known_share",
+          "benchmark_foreign_share",
+          "benchmark_label",
+          "rows"
+        ],
+        "title": "FxExposure"
+      },
       "FxQuote": {
         "properties": {
           "currency": {
@@ -11705,6 +12584,37 @@
           "rate_date"
         ],
         "title": "FxRateUsed"
+      },
+      "FxRow": {
+        "properties": {
+          "currency": {
+            "type": "string",
+            "title": "Currency"
+          },
+          "weight": {
+            "type": "number",
+            "title": "Weight",
+            "description": "Share of the portfolio's known-currency value."
+          },
+          "benchmark_weight": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Benchmark Weight"
+          }
+        },
+        "type": "object",
+        "required": [
+          "currency",
+          "weight",
+          "benchmark_weight"
+        ],
+        "title": "FxRow"
       },
       "GoldenAccuracy": {
         "properties": {
@@ -13318,6 +14228,37 @@
         ],
         "title": "InstrumentInfo"
       },
+      "IssuerGroup": {
+        "properties": {
+          "label": {
+            "type": "string",
+            "maxLength": 80,
+            "minLength": 1,
+            "title": "Label"
+          },
+          "isins": {
+            "items": {
+              "type": "string",
+              "pattern": "^[A-Z]{2}[A-Z0-9]{9}[0-9]$",
+              "examples": [
+                "IE00B5BMR087"
+              ]
+            },
+            "type": "array",
+            "maxItems": 10,
+            "minItems": 2,
+            "title": "Isins"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "label",
+          "isins"
+        ],
+        "title": "IssuerGroup",
+        "description": "Securities of one issuer counted together in the top underlying holdings (an ADR and\nits ordinary share, two share classes)."
+      },
       "ItemLink": {
         "properties": {
           "ticker": {
@@ -13909,6 +14850,10 @@
             "$ref": "#/components/schemas/JobSchedule",
             "description": "Load new SEC Form 13F data sets (published quarterly). Default: the 5th of each month, 05:00."
           },
+          "etf_look_through": {
+            "$ref": "#/components/schemas/JobSchedule",
+            "description": "ETF look-through: the funds' holdings from iShares and Vanguard, skipped when the as-of date has not moved. Default: Saturdays 06:40."
+          },
           "earnings_check": {
             "$ref": "#/components/schemas/EarningsCheckSettings"
           },
@@ -13947,6 +14892,9 @@
           },
           "ownership": {
             "$ref": "#/components/schemas/OwnershipSettings"
+          },
+          "look_through": {
+            "$ref": "#/components/schemas/LookThroughSettings"
           }
         },
         "additionalProperties": false,
@@ -14091,6 +15039,61 @@
           "history"
         ],
         "title": "KpiStatus"
+      },
+      "LastAttempt": {
+        "properties": {
+          "checked_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Checked At"
+          },
+          "ok": {
+            "type": "boolean",
+            "title": "Ok"
+          },
+          "outcome": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Outcome"
+          },
+          "error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error"
+          },
+          "fallback": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fallback"
+          }
+        },
+        "type": "object",
+        "required": [
+          "checked_at",
+          "ok",
+          "outcome",
+          "error",
+          "fallback"
+        ],
+        "title": "LastAttempt"
       },
       "LegalEntityOut": {
         "properties": {
@@ -14381,6 +15384,325 @@
           "home"
         ],
         "title": "ListingOut"
+      },
+      "LookThroughFund": {
+        "properties": {
+          "isin": {
+            "type": "string",
+            "pattern": "^[A-Z]{2}[A-Z0-9]{9}[0-9]$",
+            "title": "Isin",
+            "examples": [
+              "IE00B5BMR087"
+            ]
+          },
+          "label": {
+            "type": "string",
+            "maxLength": 40,
+            "minLength": 1,
+            "title": "Label",
+            "examples": [
+              "CSPX"
+            ]
+          },
+          "provider": {
+            "type": "string",
+            "enum": [
+              "ishares",
+              "vanguard"
+            ],
+            "title": "Provider"
+          },
+          "portfolio_id": {
+            "type": "string",
+            "pattern": "^[A-Za-z0-9-]{1,24}$",
+            "title": "Portfolio Id",
+            "description": "The issuer's fund id: the iShares product/portfolio id (CSPX 253743) or the Vanguard Europe port id (VWCE 9679)."
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "isin",
+          "label",
+          "provider",
+          "portfolio_id"
+        ],
+        "title": "LookThroughFund",
+        "description": "A fund whose holdings are read from its issuer. Matched to a position by ISIN."
+      },
+      "LookThroughReport": {
+        "properties": {
+          "snapshot_date": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Snapshot Date"
+          },
+          "base_currency": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Base Currency"
+          },
+          "available": {
+            "type": "boolean",
+            "title": "Available",
+            "description": "At least one held fund is looked through."
+          },
+          "method": {
+            "type": "string",
+            "title": "Method"
+          },
+          "coverage": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Coverage"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "exposures": {
+            "items": {
+              "$ref": "#/components/schemas/ExposureDimension"
+            },
+            "type": "array",
+            "title": "Exposures"
+          },
+          "top_holdings": {
+            "items": {
+              "$ref": "#/components/schemas/UnderlyingHolding"
+            },
+            "type": "array",
+            "title": "Top Holdings"
+          },
+          "concentration": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Concentration"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "benchmark": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/BenchmarkLookThrough"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The primary benchmark."
+          },
+          "benchmarks": {
+            "items": {
+              "$ref": "#/components/schemas/BenchmarkLookThrough"
+            },
+            "type": "array",
+            "title": "Benchmarks"
+          },
+          "fx": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/FxExposure"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "funds": {
+            "items": {
+              "$ref": "#/components/schemas/FundLookThrough"
+            },
+            "type": "array",
+            "title": "Funds"
+          },
+          "notes": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Notes"
+          }
+        },
+        "type": "object",
+        "required": [
+          "snapshot_date",
+          "base_currency",
+          "available",
+          "method",
+          "coverage",
+          "exposures",
+          "top_holdings",
+          "concentration",
+          "benchmark",
+          "benchmarks",
+          "fx",
+          "funds",
+          "notes"
+        ],
+        "title": "LookThroughReport"
+      },
+      "LookThroughSettings": {
+        "properties": {
+          "enabled": {
+            "type": "boolean",
+            "title": "Enabled",
+            "description": "Fetch from the issuers (off: stored snapshots are still shown).",
+            "default": true
+          },
+          "funds": {
+            "items": {
+              "$ref": "#/components/schemas/LookThroughFund"
+            },
+            "type": "array",
+            "maxItems": 30,
+            "title": "Funds",
+            "description": "Funds looked through, by ISIN: provider and the issuer's fund id."
+          },
+          "benchmark_proxies": {
+            "items": {
+              "$ref": "#/components/schemas/BenchmarkProxy"
+            },
+            "type": "array",
+            "maxItems": 10,
+            "title": "Benchmark Proxies",
+            "description": "The benchmark's constituents are proxied by this fund's holdings (equity lines renormalised to 100%). A proxy fund is fetched even when it is not held."
+          },
+          "issuer_groups": {
+            "items": {
+              "$ref": "#/components/schemas/IssuerGroup"
+            },
+            "type": "array",
+            "maxItems": 50,
+            "title": "Issuer Groups",
+            "description": "ISINs of one issuer counted together in the top underlying holdings."
+          },
+          "direct_sectors": {
+            "patternProperties": {
+              "^[A-Za-z0-9._-]{1,32}$": {
+                "type": "string",
+                "enum": [
+                  "Information Technology",
+                  "Financials",
+                  "Health Care",
+                  "Consumer Discretionary",
+                  "Communication Services",
+                  "Industrials",
+                  "Consumer Staples",
+                  "Energy",
+                  "Utilities",
+                  "Materials",
+                  "Real Estate"
+                ]
+              }
+            },
+            "propertyNames": {
+              "examples": [
+                "AAPL_US_EQ"
+              ]
+            },
+            "type": "object",
+            "title": "Direct Sectors",
+            "description": "Sector of a directly held stock when no fund holds the same ISIN and the strategy's sector bucket is not a GICS sector."
+          },
+          "direct_countries": {
+            "patternProperties": {
+              "^[A-Za-z0-9._-]{1,32}$": {
+                "type": "string",
+                "pattern": "^[A-Z]{2}$"
+              }
+            },
+            "propertyNames": {
+              "examples": [
+                "AAPL_US_EQ"
+              ]
+            },
+            "type": "object",
+            "title": "Direct Countries",
+            "description": "Country of a directly held stock, overriding its home market."
+          },
+          "ishares_api_url": {
+            "type": "string",
+            "pattern": "^https://[^\\s]+$",
+            "title": "Ishares Api Url",
+            "default": "https://www.blackrock.com/varnish-api/uk-retail01-product-data/product-data"
+          },
+          "ishares_site": {
+            "type": "string",
+            "pattern": "^[a-z0-9-]{2,40}$",
+            "title": "Ishares Site",
+            "default": "ishares-uk"
+          },
+          "ishares_locale": {
+            "type": "string",
+            "pattern": "^[a-z]{2}_[A-Z]{2}$",
+            "title": "Ishares Locale",
+            "default": "en_GB"
+          },
+          "ishares_spreadsheet_fallback": {
+            "type": "boolean",
+            "title": "Ishares Spreadsheet Fallback",
+            "description": "When the holdings JSON fails and no recent snapshot is stored, read the full-fund download (no country or ISIN column).",
+            "default": true
+          },
+          "vanguard_graphql_url": {
+            "type": "string",
+            "pattern": "^https://[^\\s]+$",
+            "title": "Vanguard Graphql Url",
+            "default": "https://www.ie.vanguard/gpx/graphql"
+          },
+          "vanguard_consumer_id": {
+            "type": "string",
+            "pattern": "^[a-z]{2}[0-9]$",
+            "title": "Vanguard Consumer Id",
+            "default": "ie0"
+          },
+          "cached_fallback_days": {
+            "type": "integer",
+            "maximum": 400.0,
+            "minimum": 1.0,
+            "title": "Cached Fallback Days",
+            "description": "On a failed fetch, a stored snapshot this recent is kept in use instead of trying the spreadsheet fallback.",
+            "default": 45
+          },
+          "stale_after_days": {
+            "type": "integer",
+            "maximum": 400.0,
+            "minimum": 7.0,
+            "title": "Stale After Days",
+            "description": "A snapshot older than this is labelled stale (Vanguard publishes month-end data a few weeks late).",
+            "default": 60
+          },
+          "keep_snapshots": {
+            "type": "integer",
+            "maximum": 200.0,
+            "minimum": 1.0,
+            "title": "Keep Snapshots",
+            "description": "Snapshots kept per fund.",
+            "default": 12
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "LookThroughSettings",
+        "description": "ETF look-through: holdings of the funds the portfolio holds, from the issuers'\n(undocumented) data endpoints, stored weekly as dated snapshots."
       },
       "MacroFigure": {
         "properties": {
@@ -21062,6 +22384,123 @@
         "title": "TrustSettings",
         "description": "Source trust (layer 1): owner feedback moves a source's score between 0 and 1."
       },
+      "UnderlyingHolding": {
+        "properties": {
+          "key": {
+            "type": "string",
+            "title": "Key"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "isin": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Isin"
+          },
+          "isins": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Isins"
+          },
+          "ticker": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ticker"
+          },
+          "sector": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sector"
+          },
+          "country": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Country"
+          },
+          "currency": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Currency"
+          },
+          "weight": {
+            "type": "number",
+            "title": "Weight",
+            "description": "Share of total portfolio value, direct plus via funds."
+          },
+          "value_base": {
+            "type": "number",
+            "title": "Value Base"
+          },
+          "via": {
+            "items": {
+              "$ref": "#/components/schemas/Via"
+            },
+            "type": "array",
+            "title": "Via"
+          },
+          "benchmark_weight": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Benchmark Weight"
+          }
+        },
+        "type": "object",
+        "required": [
+          "key",
+          "name",
+          "isin",
+          "isins",
+          "ticker",
+          "sector",
+          "country",
+          "currency",
+          "weight",
+          "value_base",
+          "via",
+          "benchmark_weight"
+        ],
+        "title": "UnderlyingHolding"
+      },
       "ValidationError": {
         "properties": {
           "loc": {
@@ -21429,6 +22868,50 @@
           "body"
         ],
         "title": "VerificationConfigVersion"
+      },
+      "Via": {
+        "properties": {
+          "kind": {
+            "type": "string",
+            "enum": [
+              "direct",
+              "fund"
+            ],
+            "title": "Kind"
+          },
+          "ticker": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ticker"
+          },
+          "label": {
+            "type": "string",
+            "title": "Label"
+          },
+          "weight": {
+            "type": "number",
+            "title": "Weight"
+          },
+          "value_base": {
+            "type": "number",
+            "title": "Value Base"
+          }
+        },
+        "type": "object",
+        "required": [
+          "kind",
+          "ticker",
+          "label",
+          "weight",
+          "value_base"
+        ],
+        "title": "Via"
       },
       "WikidataSummary": {
         "properties": {

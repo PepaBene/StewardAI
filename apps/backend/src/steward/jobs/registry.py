@@ -15,6 +15,7 @@ from steward.earnings.calendar import (
 from steward.earnings.check import earnings_check_handler, thesis_verdicts_handler
 from steward.earnings.reconcile import fact_reconcile_handler
 from steward.jobs.runner import JobHandler
+from steward.lookthrough.collect import etf_look_through_handler
 from steward.macro.collect import macro_collect_handler
 from steward.monitor import monitor_handler
 from steward.news.digest import daily_digest_handler, weekly_digest_handler
@@ -46,6 +47,7 @@ JobType = Literal[
     "weekly_digest",
     "research",
     "ownership_13f",
+    "etf_look_through",
     "monthly_review",
     "chat",
 ]
@@ -69,6 +71,7 @@ JOB_HANDLERS: dict[str, JobHandler] = {
     "weekly_digest": weekly_digest_handler,
     "research": research_handler,
     "ownership_13f": ownership_13f_handler,
+    "etf_look_through": etf_look_through_handler,
     "monthly_review": monthly_review_handler,
     "chat": chat_handler,
 }

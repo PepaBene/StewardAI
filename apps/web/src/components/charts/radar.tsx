@@ -11,6 +11,12 @@ export type RadarSeries = {
   values: readonly (number | null)[];
   /** Draw as a dashed outline (comparison). Default: the second series is dashed. */
   dashed?: boolean;
+  /**
+   * A dashed comparison that may leave axes null (unknown there): drawn through the known
+   * axes only, as open segments between neighbouring known axes plus a small mark on each,
+   * never closed through an unknown one. Needs at least one known value.
+   */
+  partial?: boolean;
 };
 
 export type RadarProps = {
@@ -44,7 +50,11 @@ export function Radar({
 }: RadarProps) {
   const drawable = series
     .slice(0, 2)
-    .filter((s) => s.values.length === axes.length && s.values.every(isFiniteNumber));
+    .filter(
+      (s, i) =>
+        s.values.length === axes.length &&
+        (s.values.every(isFiniteNumber) || (i > 0 && s.partial && s.values.some(isFiniteNumber))),
+    );
   if (axes.length < 3 || drawable.length === 0 || !(max > 0)) {
     return <ChartEmpty minHeight={180} className={className} />;
   }
@@ -54,6 +64,17 @@ export function Radar({
   const r = 92;
   const R = radarLayout(axes.length, W / 2, H / 2, r);
   const frac = (vs: readonly (number | null)[]) => vs.map((v) => (v as number) / max);
+  // Open segments between neighbouring known values of a partial series.
+  const partialPath = (vs: readonly (number | null)[]) =>
+    vs
+      .map((v, i) => {
+        const next = vs[(i + 1) % vs.length];
+        if (!isFiniteNumber(v) || !isFiniteNumber(next)) return "";
+        const [x1, y1] = R.point(i, v / max);
+        const [x2, y2] = R.point((i + 1) % vs.length, next / max);
+        return `M${x1.toFixed(1)},${y1.toFixed(1)}L${x2.toFixed(1)},${y2.toFixed(1)}`;
+      })
+      .join("");
   const [primary, compare] = drawable;
   const dashedIdx = drawable.map((s, i) => s.dashed ?? i === 1);
 
@@ -77,7 +98,16 @@ export function Radar({
           return <line key={i} x1={W / 2} y1={H / 2} x2={x} y2={y} className="stroke-border" strokeWidth={1} />;
         })}
         {drawable.map((s, i) =>
-          dashedIdx[i] ? (
+          dashedIdx[i] && !s.values.every(isFiniteNumber) ? (
+            <g key={i} className="stroke-text-muted" fill="none">
+              <path d={partialPath(s.values)} strokeWidth={1.25} strokeDasharray="3 3" />
+              {s.values.map((v, j) => {
+                if (!isFiniteNumber(v)) return null;
+                const [x, y] = R.point(j, v / max);
+                return <circle key={j} cx={x} cy={y} r={2} strokeWidth={1.25} />;
+              })}
+            </g>
+          ) : dashedIdx[i] ? (
             <polygon
               key={i}
               points={R.polygon(frac(s.values))}
@@ -122,7 +152,7 @@ export function Radar({
         rows={axes.map((a, i) => [
           a,
           formatValue(primary.values[i] as number),
-          ...(compare ? [formatValue(compare.values[i] as number)] : []),
+          ...(compare ? [isFiniteNumber(compare.values[i]) ? formatValue(compare.values[i] as number) : "—"] : []),
         ])}
       />
     </figure>

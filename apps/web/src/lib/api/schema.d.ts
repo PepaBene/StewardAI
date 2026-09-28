@@ -253,6 +253,52 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/portfolio/look-through": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Portfolio Look Through
+         * @description Exposure by country, region, sector and currency with the funds expanded (direct
+         *     stocks plus fund weight x holding weight; cash, the funds' own cash & derivatives and
+         *     funds with no snapshot are separate buckets), the top underlying holdings merged across
+         *     funds and direct positions, concentration (HHI, 1/HHI, top-10 share) of the portfolio and
+         *     of the benchmark proxy, FX exposure against the benchmark, each fund's as-of date, source
+         *     and tier, and coverage. Read from stored snapshots only; nothing is fetched here.
+         */
+        get: operations["get_portfolio_look_through"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/jobs/etf-look-through": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Run Etf Look Through
+         * @description Fetch the funds' holdings from the issuers now (skipped per fund when the stored
+         *     as-of date is already current).
+         */
+        post: operations["run_etf_look_through"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/portfolio/overview": {
         parameters: {
             query?: never;
@@ -2251,6 +2297,71 @@ export interface components {
             /** Invested */
             invested: number;
         };
+        /** BenchmarkBucket */
+        BenchmarkBucket: {
+            /** Key */
+            key: string;
+            /** Label */
+            label: string;
+            /** Weight */
+            weight: number;
+        };
+        /** BenchmarkLookThrough */
+        BenchmarkLookThrough: {
+            /** Key */
+            key: string;
+            /** Label */
+            label: string;
+            /** Symbol */
+            symbol: string | null;
+            /** Primary */
+            primary: boolean;
+            /** Source Label */
+            source_label: string;
+            /** As Of */
+            as_of: string | null;
+            /** Definition */
+            definition: string;
+            /**
+             * Sector Scheme
+             * @enum {string}
+             */
+            sector_scheme: "gics" | "icb_industry";
+            /** Currency Derived */
+            currency_derived: boolean;
+            /** Exposures */
+            exposures: {
+                [key: string]: components["schemas"]["BenchmarkBucket"][];
+            };
+            concentration: components["schemas"]["Concentration"] | null;
+            /**
+             * Foreign Share
+             * @description Share in currencies other than the base currency.
+             */
+            foreign_share: number | null;
+        };
+        /**
+         * BenchmarkProxy
+         * @description Which fund's holdings stand in for a benchmark index's constituents.
+         */
+        BenchmarkProxy: {
+            /**
+             * Symbol
+             * @description A benchmark symbol from prices.benchmark_symbols.
+             * @example ^spx
+             */
+            symbol: string;
+            /**
+             * Fund Isin
+             * @example IE00B5BMR087
+             */
+            fund_isin: string;
+            /**
+             * Label
+             * @example S&P 500
+             */
+            label: string;
+        };
         /** BoardKpi */
         BoardKpi: {
             kpi: components["schemas"]["ThesisKPI"];
@@ -2406,7 +2517,7 @@ export interface components {
              * Critical Job Types
              * @description Job types that run normally at the monthly cap.
              */
-            critical_job_types?: ("portfolio_sync" | "earnings_check" | "thesis_verdicts" | "earnings_calendar" | "earnings_calendar_full" | "earnings_due" | "fact_reconcile" | "reference_data" | "price_history" | "holiday_refresh" | "macro_collect" | "event_escalation" | "monitor" | "news_ingest" | "daily_digest" | "weekly_digest" | "research" | "ownership_13f" | "monthly_review" | "chat")[];
+            critical_job_types?: ("portfolio_sync" | "earnings_check" | "thesis_verdicts" | "earnings_calendar" | "earnings_calendar_full" | "earnings_due" | "fact_reconcile" | "reference_data" | "price_history" | "holiday_refresh" | "macro_collect" | "event_escalation" | "monitor" | "news_ingest" | "daily_digest" | "weekly_digest" | "research" | "ownership_13f" | "etf_look_through" | "monthly_review" | "chat")[];
             /**
              * Per Job Cap Usd
              * @description Most AI spend of one run of a job type, in USD. A run over it fails.
@@ -2837,6 +2948,25 @@ export interface components {
             /** Source Ids */
             source_ids?: string[];
         };
+        /** Concentration */
+        Concentration: {
+            /**
+             * Hhi
+             * @description Sum of squared weights (weights renormalised to 1).
+             */
+            hhi: number;
+            /**
+             * Effective N
+             * @description 1 / HHI: as concentrated as this many equal names.
+             */
+            effective_n: number;
+            /** Top10 Share */
+            top10_share: number;
+            /** Holdings */
+            holdings: number;
+            /** Basis */
+            basis: string;
+        };
         /** ConfigDiff */
         ConfigDiff: {
             /** Domain */
@@ -3045,6 +3175,31 @@ export interface components {
             by_job_type: components["schemas"]["JobTypeCost"][];
             /** By Model */
             by_model: components["schemas"]["ModelCost"][];
+        };
+        /** Coverage */
+        Coverage: {
+            /** Total Value */
+            total_value: number;
+            /** Cash Value */
+            cash_value: number;
+            /** Direct Value */
+            direct_value: number;
+            /** Fund Value */
+            fund_value: number;
+            /** Looked Through Value */
+            looked_through_value: number;
+            /** Not Looked Through Value */
+            not_looked_through_value: number;
+            /**
+             * Fund Share Looked Through
+             * @description Share of the funds' value whose holdings are looked through.
+             */
+            fund_share_looked_through: number | null;
+            /**
+             * Portfolio Share Looked Through
+             * @description Share of total portfolio value that is direct stocks or looked-through funds (the rest is cash and funds not looked through).
+             */
+            portfolio_share_looked_through: number | null;
         };
         /** DayCount */
         DayCount: {
@@ -4064,6 +4219,61 @@ export interface components {
              */
             share?: number | null;
         };
+        /** ExposureBucket */
+        ExposureBucket: {
+            /**
+             * Key
+             * @description ISO country code, region, GICS sector or currency code; or one of __cash__, __fund_cash__, __not_looked_through__, __unclassified__.
+             */
+            key: string;
+            /** Label */
+            label: string;
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "classified" | "unclassified" | "cash" | "fund_cash" | "not_looked_through";
+            /**
+             * Weight
+             * @description Share of total portfolio value.
+             */
+            weight: number;
+            /** Value Base */
+            value_base: number;
+            /**
+             * Direct Weight
+             * @description Part of `weight` held directly.
+             */
+            direct_weight: number;
+            /**
+             * Fund Weight
+             * @description Part of `weight` held through funds.
+             */
+            fund_weight: number;
+            /**
+             * Benchmark Weight
+             * @description The primary benchmark's weight in this bucket (its looked-through part renormalised to 100%); null for buckets it has no counterpart for.
+             */
+            benchmark_weight: number | null;
+        };
+        /** ExposureDimension */
+        ExposureDimension: {
+            /**
+             * Dimension
+             * @enum {string}
+             */
+            dimension: "country" | "region" | "sector" | "currency";
+            /**
+             * Basis
+             * @description How the buckets were classified.
+             */
+            basis: string;
+            /**
+             * Buckets
+             * @description By weight, special buckets last.
+             */
+            buckets: components["schemas"]["ExposureBucket"][];
+        };
         /** FactCheck */
         FactCheck: {
             /** Check */
@@ -4424,6 +4634,109 @@ export interface components {
             /** Job Id */
             job_id: number;
         };
+        /** FundHolding */
+        FundHolding: {
+            /** Name */
+            name: string;
+            /** Isin */
+            isin: string | null;
+            /** Ticker */
+            ticker: string | null;
+            /** Sector */
+            sector: string | null;
+            /** Country */
+            country: string | null;
+            /** Currency */
+            currency: string | null;
+            /** Weight In Fund */
+            weight_in_fund: number;
+            /** Portfolio Weight */
+            portfolio_weight: number;
+            /** Value Base */
+            value_base: number;
+        };
+        /** FundLookThrough */
+        FundLookThrough: {
+            /** Isin */
+            isin: string;
+            /** Label */
+            label: string;
+            /**
+             * Ticker
+             * @description The Trading212 ticker when the fund is held.
+             */
+            ticker: string | null;
+            /** Name */
+            name: string | null;
+            /** Provider */
+            provider: ("ishares" | "vanguard") | null;
+            /** Portfolio Id */
+            portfolio_id: string | null;
+            /** Held */
+            held: boolean;
+            /** Benchmark Proxy For */
+            benchmark_proxy_for: string[];
+            /** Value Base */
+            value_base: number;
+            /** Weight */
+            weight: number | null;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "ok" | "stale" | "missing" | "not_configured";
+            /** As Of */
+            as_of: string | null;
+            /** Fetched At */
+            fetched_at: string | null;
+            /** Source */
+            source: string | null;
+            /** Source Label */
+            source_label: string | null;
+            /** Tier */
+            tier: number | null;
+            /** Tier Label */
+            tier_label: string | null;
+            /**
+             * Fallback
+             * @description cached: the latest fetch failed and this stored snapshot is shown; spreadsheet: read from the iShares full-fund download (no country, no ISIN).
+             */
+            fallback: ("cached" | "spreadsheet") | null;
+            last_attempt: components["schemas"]["LastAttempt"] | null;
+            /** Country Basis */
+            country_basis: string | null;
+            /** Currency Basis */
+            currency_basis: string | null;
+            /** Equity Share */
+            equity_share: number | null;
+            /** Holdings Count */
+            holdings_count: number | null;
+            /** Warnings */
+            warnings: string[];
+            /** Top Holdings */
+            top_holdings: components["schemas"]["FundHolding"][];
+        };
+        /** FxExposure */
+        FxExposure: {
+            /** Base Currency */
+            base_currency: string;
+            /**
+             * Foreign Share
+             * @description Share of known-currency value (securities looked through plus cash) in currencies other than the base currency.
+             */
+            foreign_share: number | null;
+            /**
+             * Known Share
+             * @description Share of total value whose currency is known.
+             */
+            known_share: number;
+            /** Benchmark Foreign Share */
+            benchmark_foreign_share: number | null;
+            /** Benchmark Label */
+            benchmark_label: string | null;
+            /** Rows */
+            rows: components["schemas"]["FxRow"][];
+        };
         /** FxQuote */
         FxQuote: {
             /** Currency */
@@ -4467,6 +4780,18 @@ export interface components {
             rate: number;
             /** Rate Date */
             rate_date: string | null;
+        };
+        /** FxRow */
+        FxRow: {
+            /** Currency */
+            currency: string;
+            /**
+             * Weight
+             * @description Share of the portfolio's known-currency value.
+             */
+            weight: number;
+            /** Benchmark Weight */
+            benchmark_weight: number | null;
         };
         /** GoldenAccuracy */
         GoldenAccuracy: {
@@ -4999,6 +5324,17 @@ export interface components {
             /** Report Date Checked At */
             report_date_checked_at: string | null;
         };
+        /**
+         * IssuerGroup
+         * @description Securities of one issuer counted together in the top underlying holdings (an ADR and
+         *     its ordinary share, two share classes).
+         */
+        IssuerGroup: {
+            /** Label */
+            label: string;
+            /** Isins */
+            isins: string[];
+        };
         /** ItemLink */
         ItemLink: {
             /** Ticker */
@@ -5243,6 +5579,8 @@ export interface components {
             monthly_review?: components["schemas"]["JobSchedule"];
             /** @description Load new SEC Form 13F data sets (published quarterly). Default: the 5th of each month, 05:00. */
             ownership_13f?: components["schemas"]["JobSchedule"];
+            /** @description ETF look-through: the funds' holdings from iShares and Vanguard, skipped when the as-of date has not moved. Default: Saturdays 06:40. */
+            etf_look_through?: components["schemas"]["JobSchedule"];
             earnings_check?: components["schemas"]["EarningsCheckSettings"];
             earnings_calendar_settings?: components["schemas"]["EarningsCalendarSettings"];
             news?: components["schemas"]["NewsSettings"];
@@ -5256,6 +5594,7 @@ export interface components {
             chat?: components["schemas"]["ChatSettings"];
             review?: components["schemas"]["ReviewSettings"];
             ownership?: components["schemas"]["OwnershipSettings"];
+            look_through?: components["schemas"]["LookThroughSettings"];
         };
         /** JobsConfigVersion */
         JobsConfigVersion: {
@@ -5305,6 +5644,22 @@ export interface components {
              * @description Latest verdict per period, newest first.
              */
             history: components["schemas"]["VerdictOut"][];
+        };
+        /** LastAttempt */
+        LastAttempt: {
+            /**
+             * Checked At
+             * Format: date-time
+             */
+            checked_at: string;
+            /** Ok */
+            ok: boolean;
+            /** Outcome */
+            outcome: string | null;
+            /** Error */
+            error: string | null;
+            /** Fallback */
+            fallback: string | null;
         };
         /** LegalEntityOut */
         LegalEntityOut: {
@@ -5367,6 +5722,152 @@ export interface components {
             status: string | null;
             /** Home */
             home: boolean;
+        };
+        /**
+         * LookThroughFund
+         * @description A fund whose holdings are read from its issuer. Matched to a position by ISIN.
+         */
+        LookThroughFund: {
+            /**
+             * Isin
+             * @example IE00B5BMR087
+             */
+            isin: string;
+            /**
+             * Label
+             * @example CSPX
+             */
+            label: string;
+            /**
+             * Provider
+             * @enum {string}
+             */
+            provider: "ishares" | "vanguard";
+            /**
+             * Portfolio Id
+             * @description The issuer's fund id: the iShares product/portfolio id (CSPX 253743) or the Vanguard Europe port id (VWCE 9679).
+             */
+            portfolio_id: string;
+        };
+        /** LookThroughReport */
+        LookThroughReport: {
+            /** Snapshot Date */
+            snapshot_date: string | null;
+            /** Base Currency */
+            base_currency: string | null;
+            /**
+             * Available
+             * @description At least one held fund is looked through.
+             */
+            available: boolean;
+            /** Method */
+            method: string;
+            coverage: components["schemas"]["Coverage"] | null;
+            /** Exposures */
+            exposures: components["schemas"]["ExposureDimension"][];
+            /** Top Holdings */
+            top_holdings: components["schemas"]["UnderlyingHolding"][];
+            concentration: components["schemas"]["Concentration"] | null;
+            /** @description The primary benchmark. */
+            benchmark: components["schemas"]["BenchmarkLookThrough"] | null;
+            /** Benchmarks */
+            benchmarks: components["schemas"]["BenchmarkLookThrough"][];
+            fx: components["schemas"]["FxExposure"] | null;
+            /** Funds */
+            funds: components["schemas"]["FundLookThrough"][];
+            /** Notes */
+            notes: string[];
+        };
+        /**
+         * LookThroughSettings
+         * @description ETF look-through: holdings of the funds the portfolio holds, from the issuers'
+         *     (undocumented) data endpoints, stored weekly as dated snapshots.
+         */
+        LookThroughSettings: {
+            /**
+             * Enabled
+             * @description Fetch from the issuers (off: stored snapshots are still shown).
+             * @default true
+             */
+            enabled: boolean;
+            /**
+             * Funds
+             * @description Funds looked through, by ISIN: provider and the issuer's fund id.
+             */
+            funds?: components["schemas"]["LookThroughFund"][];
+            /**
+             * Benchmark Proxies
+             * @description The benchmark's constituents are proxied by this fund's holdings (equity lines renormalised to 100%). A proxy fund is fetched even when it is not held.
+             */
+            benchmark_proxies?: components["schemas"]["BenchmarkProxy"][];
+            /**
+             * Issuer Groups
+             * @description ISINs of one issuer counted together in the top underlying holdings.
+             */
+            issuer_groups?: components["schemas"]["IssuerGroup"][];
+            /**
+             * Direct Sectors
+             * @description Sector of a directly held stock when no fund holds the same ISIN and the strategy's sector bucket is not a GICS sector.
+             */
+            direct_sectors?: {
+                [key: string]: "Information Technology" | "Financials" | "Health Care" | "Consumer Discretionary" | "Communication Services" | "Industrials" | "Consumer Staples" | "Energy" | "Utilities" | "Materials" | "Real Estate";
+            };
+            /**
+             * Direct Countries
+             * @description Country of a directly held stock, overriding its home market.
+             */
+            direct_countries?: {
+                [key: string]: string;
+            };
+            /**
+             * Ishares Api Url
+             * @default https://www.blackrock.com/varnish-api/uk-retail01-product-data/product-data
+             */
+            ishares_api_url: string;
+            /**
+             * Ishares Site
+             * @default ishares-uk
+             */
+            ishares_site: string;
+            /**
+             * Ishares Locale
+             * @default en_GB
+             */
+            ishares_locale: string;
+            /**
+             * Ishares Spreadsheet Fallback
+             * @description When the holdings JSON fails and no recent snapshot is stored, read the full-fund download (no country or ISIN column).
+             * @default true
+             */
+            ishares_spreadsheet_fallback: boolean;
+            /**
+             * Vanguard Graphql Url
+             * @default https://www.ie.vanguard/gpx/graphql
+             */
+            vanguard_graphql_url: string;
+            /**
+             * Vanguard Consumer Id
+             * @default ie0
+             */
+            vanguard_consumer_id: string;
+            /**
+             * Cached Fallback Days
+             * @description On a failed fetch, a stored snapshot this recent is kept in use instead of trying the spreadsheet fallback.
+             * @default 45
+             */
+            cached_fallback_days: number;
+            /**
+             * Stale After Days
+             * @description A snapshot older than this is labelled stale (Vanguard publishes month-end data a few weeks late).
+             * @default 60
+             */
+            stale_after_days: number;
+            /**
+             * Keep Snapshots
+             * @description Snapshots kept per fund.
+             * @default 12
+             */
+            keep_snapshots: number;
         };
         /** MacroFigure */
         MacroFigure: {
@@ -8059,6 +8560,36 @@ export interface components {
              */
             demote_below: number;
         };
+        /** UnderlyingHolding */
+        UnderlyingHolding: {
+            /** Key */
+            key: string;
+            /** Name */
+            name: string;
+            /** Isin */
+            isin: string | null;
+            /** Isins */
+            isins: string[];
+            /** Ticker */
+            ticker: string | null;
+            /** Sector */
+            sector: string | null;
+            /** Country */
+            country: string | null;
+            /** Currency */
+            currency: string | null;
+            /**
+             * Weight
+             * @description Share of total portfolio value, direct plus via funds.
+             */
+            weight: number;
+            /** Value Base */
+            value_base: number;
+            /** Via */
+            via: components["schemas"]["Via"][];
+            /** Benchmark Weight */
+            benchmark_weight: number | null;
+        };
         /** ValidationError */
         ValidationError: {
             /** Location */
@@ -8213,6 +8744,22 @@ export interface components {
             /** Note */
             note: string | null;
             body: components["schemas"]["VerificationConfig"];
+        };
+        /** Via */
+        Via: {
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "direct" | "fund";
+            /** Ticker */
+            ticker: string | null;
+            /** Label */
+            label: string;
+            /** Weight */
+            weight: number;
+            /** Value Base */
+            value_base: number;
         };
         /** WikidataSummary */
         WikidataSummary: {
@@ -8603,6 +9150,57 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["MarketStrip"];
+                };
+            };
+        };
+    };
+    get_portfolio_look_through: {
+        parameters: {
+            query?: {
+                top?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LookThroughReport"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    run_etf_look_through: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["JobSummary"];
                 };
             };
         };
