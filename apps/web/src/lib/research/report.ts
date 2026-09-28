@@ -1,10 +1,16 @@
 import type {
   CitedSentence,
+  ClaimCheckSummary,
+  FactOut,
+  KpiStatus,
   ResearchBody,
   ResearchProfilesConfig,
   ResearchSectionId,
+  Source,
   ValuationMethod,
+  VerdictStatus,
 } from "@/lib/api/client";
+import { formatFactValue, humanizeMetric } from "@/lib/evidence/confidence";
 import { buildCitationIndex, type CitationIndex } from "@/lib/sources/sources";
 
 /*
@@ -116,4 +122,126 @@ export function profileOptions(config: Pick<ResearchProfilesConfig, "profiles" |
 export function normaliseTicker(value: string): string | null {
   const t = value.trim();
   return /^[A-Za-z0-9._-]{1,32}$/.test(t) ? t : null;
+}
+
+// ---------------------------------------------------------------------------
+// Report page: run pipeline, claim check, key figures, KPI figure, run details
+// ---------------------------------------------------------------------------
+
+/** "write_business" -> "Write business", "verify_claims" -> "Verify claims". */
+export function stepLabel(name: string): string {
+  const text = name.replaceAll("_", " ").trim();
+  return text.charAt(0).toUpperCase() + text.slice(1);
+}
+
+/** The section shown as the report's conclusion, when the run wrote one ("summary" or "conclusion"). */
+export function conclusionSection<S extends { id: string }>(sections: readonly S[]): S | null {
+  return sections.find((s) => s.id === "summary" || s.id === "conclusion") ?? null;
+}
+
+/** "13 / 15": sentences the claim verifier supported, of all it looked at (removed ones excluded). */
+export function claimTally(
+  claims: Pick<ClaimCheckSummary, "supported" | "unsupported" | "unchecked"> | null | undefined,
+): { supported: number; total: number } | null {
+  if (!claims) return null;
+  const total = claims.supported + claims.unsupported + claims.unchecked;
+  return total > 0 ? { supported: claims.supported, total } : null;
+}
+
+/** How a run was requested, in words: "By hand", "On schedule", or the trigger as stored. */
+export function triggerLabel(trigger: string | null | undefined): string {
+  if (!trigger) return "—";
+  const known: Record<string, string> = { manual: "By hand", schedule: "On schedule", scheduled: "On schedule", chat: "From chat" };
+  return known[trigger] ?? stepLabel(trigger);
+}
+
+type KeyFact = Pick<
+  FactOut,
+  "id" | "metric" | "basis" | "status" | "value_units" | "period_end" | "fiscal_year" | "fiscal_period" | "period"
+> &
+  Parameters<typeof formatFactValue>[0];
+
+function periodOrder(f: Pick<FactOut, "period_end" | "fiscal_year" | "fiscal_period">): string {
+  return f.period_end ?? `${f.fiscal_year}-${f.fiscal_period}`;
+}
+
+/** The same metric's stored figures (same basis, not rejected), oldest first, one per period. */
+export function metricSeries<F extends KeyFact>(fact: Pick<F, "metric" | "basis">, facts: readonly F[]): F[] {
+  const byPeriod = new Map<string, F>();
+  for (const f of facts) {
+    if (f.metric !== fact.metric || f.basis !== fact.basis || f.status === "rejected") continue;
+    const key = periodOrder(f);
+    const seen = byPeriod.get(key);
+    if (!seen || (seen.status !== "verified" && f.status === "verified")) byPeriod.set(key, f);
+  }
+  return [...byPeriod.values()].sort((a, b) => periodOrder(a).localeCompare(periodOrder(b)));
+}
+
+export type KeyFigure = { sourceId: string; factId: number; label: string; value: string; series: number[] };
+
+/**
+ * One row per fact the report cites (by its source card, `kind: "fact"`, `ref` = fact id),
+ * once per metric: the cited value as printed and the metric's stored history for a
+ * sparkline. Facts not found in `facts` (e.g. the holding page could not be read) are left out.
+ */
+export function keyFigures<F extends KeyFact>(sources: readonly Pick<Source, "id" | "kind" | "ref">[], facts: readonly F[]): KeyFigure[] {
+  const byId = new Map(facts.map((f) => [f.id, f]));
+  const seen = new Set<string>();
+  const out: KeyFigure[] = [];
+  for (const s of sources) {
+    if (s.kind !== "fact") continue;
+    const fact = byId.get(Number(s.ref));
+    if (!fact) continue;
+    const key = `${fact.metric}|${fact.basis}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push({
+      sourceId: s.id,
+      factId: fact.id,
+      label: `${humanizeMetric(fact.metric)}${fact.basis === "adjusted" ? " (adj.)" : ""} · ${fact.period}`,
+      value: formatFactValue(fact),
+      series: metricSeries(fact, facts).map((f) => f.value_units),
+    });
+  }
+  return out;
+}
+
+/** A KPI's value from a fact, in the KPI's unit: "%" and "x" as printed, "EUR bn" / "USD m" rescaled. */
+export function factInKpiUnit(fact: Pick<FactOut, "value" | "value_units" | "unit">, kpiUnit: string): number {
+  if (fact.unit === "percent" || fact.unit === "ratio" || fact.unit === "per_share") return fact.value;
+  const scale = /\bbn$/i.test(kpiUnit) ? 1e9 : /\bm$/i.test(kpiUnit) ? 1e6 : /\bk$/i.test(kpiUnit) ? 1e3 : 1;
+  return fact.value_units / scale;
+}
+
+export type KpiFigure = {
+  kpi: KpiStatus["kpi"];
+  /** The KPI's current verdict; unknown when never judged. */
+  status: VerdictStatus;
+  points: { label: string; value: number }[];
+};
+
+/**
+ * The thesis KPI to chart against its threshold: one whose metric the report cites and that
+ * has at least two stored figures, a breaching one first. Null when there is none (no KPI
+ * history, or the report cites none of the KPIs' metrics).
+ */
+export function kpiFigure<F extends KeyFact & Pick<FactOut, "value" | "unit">>(
+  kpis: readonly Pick<KpiStatus, "kpi" | "current">[],
+  facts: readonly F[],
+  citedFactIds: readonly number[],
+): KpiFigure | null {
+  const cited = new Set(facts.filter((f) => citedFactIds.includes(f.id)).map((f) => `${f.metric}|${f.basis}`));
+  const candidates = kpis
+    .filter((k) => cited.has(`${k.kpi.metric}|${k.kpi.basis}`))
+    .map((k) => {
+      const series = metricSeries({ metric: k.kpi.metric, basis: k.kpi.basis }, facts);
+      return {
+        kpi: k.kpi,
+        status: k.current?.status ?? "unknown",
+        points: series.map((f) => ({ label: `${f.fiscal_period}·${String(f.fiscal_year).slice(-2)}`, value: factInKpiUnit(f, k.kpi.unit) })),
+      };
+    })
+    .filter((c) => c.points.length >= 2);
+  if (candidates.length === 0) return null;
+  return candidates.find((c) => c.status === "breach") ?? candidates[0];
 }
