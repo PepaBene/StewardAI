@@ -5,7 +5,7 @@ from typing import Annotated, Any, Literal, Self
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from apscheduler.triggers.cron import CronTrigger
-from pydantic import Field, field_validator, model_validator
+from pydantic import AnyHttpUrl, Field, field_validator, model_validator
 
 from steward.config.common import ConfigModel, Ticker, require_unique
 
@@ -663,6 +663,108 @@ class OwnershipSettings(ConfigModel):
     top_holders: int = Field(default=10, ge=1, le=50)
 
 
+FundKey = Annotated[str, Field(pattern=r"^[A-Za-z0-9._-]{1,32}$", examples=["CSPX"])]
+
+
+class FundValuationSource(ConfigModel):
+    """Where an ETF's fund-level P/E and P/B are published (they stand in for its index)."""
+
+    key: FundKey
+    label: str = Field(min_length=1, max_length=120)
+    provider: Literal["ishares", "vanguard"]
+    url: AnyHttpUrl = Field(
+        description="iShares: the product page (its embedded JSON carries the figures). "
+        "Vanguard: the product-data GraphQL endpoint (e.g. https://www.vanguard.co.uk/gpx/graphql)."
+    )
+    port_id: str | None = Field(
+        default=None,
+        pattern=r"^[0-9]{1,10}$",
+        description="Vanguard only: the fund's port id (9679 = FTSE All-World UCITS ETF Acc).",
+    )
+    consumer_id: str = Field(
+        default="uk0",
+        pattern=r"^[a-z0-9]{1,10}$",
+        description="Vanguard only: the site's x-consumer-id header (uk0 for vanguard.co.uk).",
+    )
+    tickers: list[Ticker] = Field(
+        default_factory=list, description="Holdings whose valuation is this fund's."
+    )
+    index_label: str = Field(
+        default="", max_length=80, description="The index the fund tracks, e.g. 'S&P 500'."
+    )
+    benchmark_symbols: list[StooqSymbol] = Field(
+        default_factory=list,
+        description="Benchmark symbols (Prices config) this fund's figures stand in for.",
+    )
+
+    @model_validator(mode="after")
+    def _vanguard_needs_port(self) -> Self:
+        if self.provider == "vanguard" and not self.port_id:
+            raise ValueError("a Vanguard fund needs its port_id")
+        return self
+
+
+def _default_fund_sources() -> list[FundValuationSource]:
+    return [
+        FundValuationSource(
+            key="CSPX",
+            label="iShares Core S&P 500 UCITS ETF (Acc)",
+            provider="ishares",
+            url=AnyHttpUrl(
+                "https://www.ishares.com/uk/individual/en/products/253743/"
+                "ishares-sp-500-b-ucits-etf-acc-fund?switchLocale=y&siteEntryPassthrough=true"
+            ),
+            tickers=["CSPXl_EQ"],
+            index_label="S&P 500",
+            benchmark_symbols=["^spx"],
+        ),
+        FundValuationSource(
+            key="VWCE",
+            label="Vanguard FTSE All-World UCITS ETF (USD) Acc",
+            provider="vanguard",
+            url=AnyHttpUrl("https://www.vanguard.co.uk/gpx/graphql"),
+            port_id="9679",
+            tickers=["VWCEd_EQ"],
+            index_label="FTSE All-World",
+        ),
+    ]
+
+
+class ValuationSettings(ConfigModel):
+    """P/E, P/B and dividend yield: fundamentals from SEC XBRL and ESEF, fund figures from
+    the ETF providers."""
+
+    enabled: bool = Field(default=True, description="Off: the scheduled run does nothing.")
+    full_refresh_days: int = Field(
+        default=7,
+        ge=1,
+        le=90,
+        description="Each run re-reads a holding's fundamentals when the issuer filed a new "
+        "report since the last read, and in any case after this many days.",
+    )
+    esef_max_age_months: int = Field(
+        default=18,
+        ge=3,
+        le=60,
+        description="ESEF filings (filings.xbrl.org) with an older period end are ignored.",
+    )
+    finnhub_cross_check: bool = Field(
+        default=True,
+        description="Also read Finnhub's basic financials (P/E, P/B, EPS) as a tier-2 "
+        "cross-check. Needs FINNHUB_API_KEY; never required.",
+    )
+    funds: list[FundValuationSource] = Field(
+        default_factory=_default_fund_sources,
+        max_length=20,
+        description="ETFs whose fund-level P/E and P/B are read from the provider.",
+    )
+
+    @model_validator(mode="after")
+    def _unique_funds(self) -> Self:
+        require_unique("fund keys", (f.key for f in self.funds))
+        return self
+
+
 Isin = Annotated[str, Field(pattern=r"^[A-Z]{2}[A-Z0-9]{9}[0-9]$", examples=["IE00B5BMR087"])]
 GicsSector = Literal[
     "Information Technology",
@@ -911,6 +1013,11 @@ class JobsConfig(ConfigModel):
         description="Load new SEC Form 13F data sets (published quarterly). Default: the 5th "
         "of each month, 05:00.",
     )
+    valuation_refresh: JobSchedule = Field(
+        default_factory=lambda: JobSchedule(cron="45 7 * * *"),
+        description="Fundamentals (SEC XBRL, ESEF) of holdings that filed since the last read "
+        "(all of them weekly) and the ETF providers' fund P/E and P/B. Default: daily 07:45.",
+    )
     etf_look_through: JobSchedule = Field(
         default_factory=lambda: JobSchedule(cron="40 6 * * 6"),
         description="ETF look-through: the funds' holdings from iShares and Vanguard, skipped "
@@ -937,6 +1044,7 @@ class JobsConfig(ConfigModel):
     chat: ChatSettings = Field(default_factory=ChatSettings)
     review: ReviewSettings = Field(default_factory=ReviewSettings)
     ownership: OwnershipSettings = Field(default_factory=OwnershipSettings)
+    valuation: ValuationSettings = Field(default_factory=ValuationSettings)
     look_through: LookThroughSettings = Field(default_factory=LookThroughSettings)
     xbrl: XbrlSettings = Field(default_factory=XbrlSettings)
 
@@ -957,6 +1065,7 @@ class JobsConfig(ConfigModel):
             "weekly_digest": self.weekly_digest,
             "monthly_review": self.monthly_review,
             "ownership_13f": self.ownership_13f,
+            "valuation_refresh": self.valuation_refresh,
             "etf_look_through": self.etf_look_through,
             "sec_xbrl": self.sec_xbrl,
         }

@@ -37,6 +37,7 @@ export const JOB_TYPES = [
   "monthly_review",
   "chat",
   "sec_xbrl",
+  "valuation_refresh",
 ] as const;
 export type JobType = (typeof JOB_TYPES)[number];
 

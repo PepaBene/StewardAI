@@ -1,0 +1,372 @@
+{
+"cik": 1046179,
+"entityName": "Taiwan Semiconductor Manufacturing Company Limited",
+"facts": {
+"ifrs-full": {
+"DilutedEarningsLossPerShare": {
+"label": null,
+"description": null,
+"units": {
+"TWD/shares": [
+{
+"start": "2023-01-01",
+"end": "2023-12-31",
+"val": 32.85,
+"accn": "0001193125-24-099840",
+"fy": 2023,
+"fp": "FY",
+"form": "20-F",
+"filed": "2024-04-18"
+},
+{
+"start": "2023-01-01",
+"end": "2023-12-31",
+"val": 32.85,
+"accn": "0001193125-25-083423",
+"fy": 2024,
+"fp": "FY",
+"form": "20-F",
+"filed": "2025-04-17",
+"frame": "CY2023"
+},
+{
+"start": "2024-01-01",
+"end": "2024-12-31",
+"val": 44.67,
+"accn": "0001193125-25-083423",
+"fy": 2024,
+"fp": "FY",
+"form": "20-F",
+"filed": "2025-04-17",
+"frame": "CY2024"
+}
+],
+"USD/shares": [
+{
+"start": "2023-01-01",
+"end": "2023-12-31",
+"val": 1.07,
+"accn": "0001193125-24-099840",
+"fy": 2023,
+"fp": "FY",
+"form": "20-F",
+"filed": "2024-04-18",
+"frame": "CY2023"
+},
+{
+"start": "2024-01-01",
+"end": "2024-12-31",
+"val": 1.36,
+"accn": "0001193125-25-083423",
+"fy": 2024,
+"fp": "FY",
+"form": "20-F",
+"filed": "2025-04-17",
+"frame": "CY2024"
+}
+]
+}
+},
+"EquityAttributableToOwnersOfParent": {
+"label": null,
+"description": null,
+"units": {
+"TWD": [
+{
+"end": "2023-12-31",
+"val": 3429522400000,
+"accn": "0001193125-24-099840",
+"fy": 2023,
+"fp": "FY",
+"form": "20-F",
+"filed": "2024-04-18"
+},
+{
+"end": "2023-12-31",
+"val": 3429522400000,
+"accn": "0001193125-25-083423",
+"fy": 2024,
+"fp": "FY",
+"form": "20-F",
+"filed": "2025-04-17",
+"frame": "CY2023Q4I"
+},
+{
+"end": "2024-12-31",
+"val": 4244266500000,
+"accn": "0001193125-25-083423",
+"fy": 2024,
+"fp": "FY",
+"form": "20-F",
+"filed": "2025-04-17",
+"frame": "CY2024Q4I"
+}
+],
+"USD": [
+{
+"end": "2023-12-31",
+"val": 112002700000,
+"accn": "0001193125-24-099840",
+"fy": 2023,
+"fp": "FY",
+"form": "20-F",
+"filed": "2024-04-18",
+"frame": "CY2023Q4I"
+},
+{
+"end": "2024-12-31",
+"val": 129437800000,
+"accn": "0001193125-25-083423",
+"fy": 2024,
+"fp": "FY",
+"form": "20-F",
+"filed": "2025-04-17",
+"frame": "CY2024Q4I"
+}
+]
+}
+},
+"Equity": {
+"label": null,
+"description": null,
+"units": {
+"TWD": [
+{
+"end": "2023-12-31",
+"val": 3453866500000,
+"accn": "0001193125-24-099840",
+"fy": 2023,
+"fp": "FY",
+"form": "20-F",
+"filed": "2024-04-18"
+},
+{
+"end": "2023-12-31",
+"val": 3453866500000,
+"accn": "0001193125-25-083423",
+"fy": 2024,
+"fp": "FY",
+"form": "20-F",
+"filed": "2025-04-17",
+"frame": "CY2023Q4I"
+},
+{
+"end": "2024-12-31",
+"val": 4279271600000,
+"accn": "0001193125-25-083423",
+"fy": 2024,
+"fp": "FY",
+"form": "20-F",
+"filed": "2025-04-17",
+"frame": "CY2024Q4I"
+}
+],
+"USD": [
+{
+"end": "2023-12-31",
+"val": 112797800000,
+"accn": "0001193125-24-099840",
+"fy": 2023,
+"fp": "FY",
+"form": "20-F",
+"filed": "2024-04-18",
+"frame": "CY2023Q4I"
+},
+{
+"end": "2024-12-31",
+"val": 130505400000,
+"accn": "0001193125-25-083423",
+"fy": 2024,
+"fp": "FY",
+"form": "20-F",
+"filed": "2025-04-17",
+"frame": "CY2024Q4I"
+}
+]
+}
+},
+"DividendsRecognisedAsDistributionsToOwnersPerShare": {
+"label": null,
+"description": null,
+"units": {
+"TWD/shares": [
+{
+"start": "2023-01-01",
+"end": "2023-03-31",
+"val": 3,
+"accn": "0001193125-25-083423",
+"fy": 2024,
+"fp": "FY",
+"form": "20-F",
+"filed": "2025-04-17",
+"frame": "CY2023Q1"
+},
+{
+"start": "2023-04-01",
+"end": "2023-06-30",
+"val": 3,
+"accn": "0001193125-25-083423",
+"fy": 2024,
+"fp": "FY",
+"form": "20-F",
+"filed": "2025-04-17",
+"frame": "CY2023Q2"
+},
+{
+"start": "2023-07-01",
+"end": "2023-09-30",
+"val": 3.5,
+"accn": "0001193125-25-083423",
+"fy": 2024,
+"fp": "FY",
+"form": "20-F",
+"filed": "2025-04-17",
+"frame": "CY2023Q3"
+},
+{
+"start": "2023-10-01",
+"end": "2023-12-31",
+"val": 3.5,
+"accn": "0001193125-25-083423",
+"fy": 2024,
+"fp": "FY",
+"form": "20-F",
+"filed": "2025-04-17",
+"frame": "CY2023Q4"
+},
+{
+"start": "2024-01-01",
+"end": "2024-03-31",
+"val": 4,
+"accn": "0001193125-25-083423",
+"fy": 2024,
+"fp": "FY",
+"form": "20-F",
+"filed": "2025-04-17",
+"frame": "CY2024Q1"
+},
+{
+"start": "2024-04-01",
+"end": "2024-06-30",
+"val": 4,
+"accn": "0001193125-25-083423",
+"fy": 2024,
+"fp": "FY",
+"form": "20-F",
+"filed": "2025-04-17",
+"frame": "CY2024Q2"
+},
+{
+"start": "2024-07-01",
+"end": "2024-09-30",
+"val": 4.5,
+"accn": "0001193125-25-083423",
+"fy": 2024,
+"fp": "FY",
+"form": "20-F",
+"filed": "2025-04-17",
+"frame": "CY2024Q3"
+},
+{
+"start": "2024-10-01",
+"end": "2024-12-31",
+"val": 4.5,
+"accn": "0001193125-25-083423",
+"fy": 2024,
+"fp": "FY",
+"form": "20-F",
+"filed": "2025-04-17",
+"frame": "CY2024Q4"
+}
+],
+"USD/shares": [
+{
+"start": "2023-01-01",
+"end": "2023-03-31",
+"val": 3,
+"accn": "0001193125-24-099840",
+"fy": 2023,
+"fp": "FY",
+"form": "20-F",
+"filed": "2024-04-18",
+"frame": "CY2023Q1"
+},
+{
+"start": "2023-04-01",
+"end": "2023-06-30",
+"val": 3,
+"accn": "0001193125-24-099840",
+"fy": 2023,
+"fp": "FY",
+"form": "20-F",
+"filed": "2024-04-18",
+"frame": "CY2023Q2"
+},
+{
+"start": "2023-07-01",
+"end": "2023-09-30",
+"val": 3.5,
+"accn": "0001193125-24-099840",
+"fy": 2023,
+"fp": "FY",
+"form": "20-F",
+"filed": "2024-04-18",
+"frame": "CY2023Q3"
+},
+{
+"start": "2023-10-01",
+"end": "2023-12-31",
+"val": 3.5,
+"accn": "0001193125-24-099840",
+"fy": 2023,
+"fp": "FY",
+"form": "20-F",
+"filed": "2024-04-18",
+"frame": "CY2023Q4"
+}
+]
+}
+}
+},
+"dei": {
+"EntityCommonStockSharesOutstanding": {
+"label": "Entity Common Stock, Shares Outstanding",
+"description": "Indicate number of shares or other units outstanding of each of registrant's classes of capital or common stock or other ownership interests, if and as stated on cover of related periodic report. Where multiple classes or units exist define each class/interest by adding class of stock items such as Common Class A [Member], Common Class B [Member] or Partnership Interest [Member] onto the Instrument [Domain] of the Entity Listings, Instrument.",
+"units": {
+"shares": [
+{
+"end": "2023-12-31",
+"val": 25932070992,
+"accn": "0001193125-24-099840",
+"fy": 2023,
+"fp": "FY",
+"form": "20-F",
+"filed": "2024-04-18",
+"frame": "CY2023Q4I"
+},
+{
+"end": "2024-12-31",
+"val": 25932733242,
+"accn": "0001193125-25-083423",
+"fy": 2024,
+"fp": "FY",
+"form": "20-F",
+"filed": "2025-04-17",
+"frame": "CY2024Q4I"
+},
+{
+"end": "2025-12-31",
+"val": 25932524521,
+"accn": "0001628280-26-025362",
+"fy": 2025,
+"fp": "FY",
+"form": "20-F",
+"filed": "2026-04-16",
+"frame": "CY2025Q4I"
+}
+]
+}
+}
+}
+}
+}

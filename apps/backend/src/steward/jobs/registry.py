@@ -28,6 +28,7 @@ from steward.reference.identity import reference_data_handler
 from steward.reference.prices import holiday_refresh_handler, price_history_handler
 from steward.research.run import research_handler
 from steward.review.monthly import monthly_review_handler
+from steward.valuation.collect import valuation_refresh_handler
 
 JobType = Literal[
     "portfolio_sync",
@@ -52,6 +53,7 @@ JobType = Literal[
     "monthly_review",
     "chat",
     "sec_xbrl",
+    "valuation_refresh",
 ]
 
 JOB_HANDLERS: dict[str, JobHandler] = {
@@ -77,4 +79,5 @@ JOB_HANDLERS: dict[str, JobHandler] = {
     "monthly_review": monthly_review_handler,
     "chat": chat_handler,
     "sec_xbrl": sec_xbrl_handler,
+    "valuation_refresh": valuation_refresh_handler,
 }

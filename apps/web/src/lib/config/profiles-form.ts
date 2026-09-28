@@ -15,6 +15,33 @@ export const EXPOSURE_KINDS: readonly ExposureKind[] = [
 
 export type ExposureForm = { key: string; kind: ExposureKind; name: string; share: string };
 
+export type ValuationSource = NonNullable<HoldingProfile["valuation_source"]>;
+export const VALUATION_SOURCES: readonly { value: ValuationSource; label: string }[] = [
+  { value: "auto", label: "Automatic (freshest filing; manual when none)" },
+  { value: "sec", label: "SEC XBRL only" },
+  { value: "esef", label: "ESEF (filings.xbrl.org) only" },
+  { value: "manual", label: "Manual figures below" },
+];
+
+/** Hand-entered per-share figures (`manual_fundamentals`); all empty = none. */
+export type ManualForm = {
+  eps_ttm: string;
+  book_value_per_share: string;
+  dividend_per_share: string;
+  currency: string;
+  as_of: string;
+  source_note: string;
+};
+
+export const EMPTY_MANUAL: ManualForm = {
+  eps_ttm: "",
+  book_value_per_share: "",
+  dividend_per_share: "",
+  currency: "",
+  as_of: "",
+  source_note: "",
+};
+
 export type ProfileForm = {
   key: string;
   ticker: string;
@@ -36,6 +63,8 @@ export type ProfileForm = {
   customers: string;
   watch_topics: string;
   exposures: ExposureForm[];
+  valuation_source: ValuationSource;
+  manual: ManualForm;
   /** SEC XBRL fields: 13F share basis and manual revenue rows (fundamentals-form.ts). */
   fundamentals: FundamentalsForm;
 };
@@ -68,6 +97,8 @@ export function newProfile(ticker = ""): ProfileForm {
     customers: "",
     watch_topics: "",
     exposures: [],
+    valuation_source: "auto",
+    manual: { ...EMPTY_MANUAL },
     fundamentals: newFundamentals(),
   };
 }
@@ -100,8 +131,43 @@ export function profilesFromBody(body: HoldingProfilesConfig | null): ProfileFor
       name: e.name,
       share: e.share === null || e.share === undefined ? "" : String(e.share),
     })),
+    valuation_source: p.valuation_source ?? "auto",
+    manual: manualFromBody(p.manual_fundamentals),
     fundamentals: fundamentalsFromProfile(p),
   }));
+}
+
+const numberText = (v: number | null | undefined) => (v === null || v === undefined ? "" : String(v));
+
+function manualFromBody(m: HoldingProfile["manual_fundamentals"]): ManualForm {
+  if (!m) return { ...EMPTY_MANUAL };
+  return {
+    eps_ttm: numberText(m.eps_ttm),
+    book_value_per_share: numberText(m.book_value_per_share),
+    dividend_per_share: numberText(m.dividend_per_share),
+    currency: m.currency,
+    as_of: m.as_of,
+    source_note: m.source_note ?? "",
+  };
+}
+
+/** "1 234,5" -> 1234.5; empty -> null. Anything unparsable is sent as-is so the backend names the field. */
+function decimal(text: string): number | null {
+  const t = text.trim().replace(/\s/g, "").replace(",", ".");
+  return t ? Number(t) : null;
+}
+
+export function manualToBody(m: ManualForm): HoldingProfile["manual_fundamentals"] {
+  const empty = Object.values(m).every((v) => !v.trim());
+  if (empty) return null;
+  return {
+    eps_ttm: decimal(m.eps_ttm),
+    book_value_per_share: decimal(m.book_value_per_share),
+    dividend_per_share: decimal(m.dividend_per_share),
+    currency: m.currency.trim().toUpperCase(),
+    as_of: m.as_of.trim(),
+    source_note: m.source_note.trim(),
+  };
 }
 
 const orNull = (text: string) => (text.trim() ? text.trim() : null);
@@ -133,6 +199,8 @@ export function profilesToBody(forms: ProfileForm[]): HoldingProfilesConfig {
           name: e.name.trim(),
           share: e.share.trim() ? Number(e.share.trim().replace(",", ".")) : null,
         })),
+        valuation_source: f.valuation_source,
+        manual_fundamentals: manualToBody(f.manual),
         ...fundamentalsToProfile(f.fundamentals),
       }),
     ),

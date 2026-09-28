@@ -1,0 +1,173 @@
+{
+"cik": "0001046179",
+"entityType": "other",
+"sic": "3674",
+"sicDescription": "Semiconductors & Related Devices",
+"ownerOrg": "04 Manufacturing",
+"insiderTransactionForOwnerExists": 0,
+"insiderTransactionForIssuerExists": 1,
+"name": "TAIWAN SEMICONDUCTOR MANUFACTURING CO LTD",
+"tickers": [
+"TSM",
+"TSMWF"
+],
+"exchanges": [
+"NYSE",
+"OTC"
+],
+"ein": "000000000",
+"lei": null,
+"description": "",
+"website": "",
+"investorWebsite": "",
+"category": "Large accelerated filer",
+"fiscalYearEnd": "1231",
+"stateOfIncorporation": "",
+"stateOfIncorporationDescription": "",
+"addresses": {
+"mailing": {
+"street1": "NO. 8, LI-HSIN ROAD 6",
+"street2": "HSINCHU SCIENCE PARK",
+"city": "HSINCHU",
+"stateOrCountry": null,
+"zipCode": null,
+"stateOrCountryDescription": null,
+"isForeignLocation": 1,
+"foreignStateTerritory": null,
+"country": "Taiwan",
+"countryCode": "F5"
+},
+"business": {
+"street1": "NO. 8, LI-HSIN ROAD 6",
+"street2": "HSINCHU SCIENCE PARK",
+"city": "HSINCHU",
+"stateOrCountry": null,
+"zipCode": null,
+"stateOrCountryDescription": null,
+"isForeignLocation": 1,
+"foreignStateTerritory": null,
+"country": "Taiwan",
+"countryCode": "F5"
+}
+},
+"phone": "886-3-5636688",
+"flags": "",
+"formerNames": [],
+"filings": {
+"recent": {
+"accessionNumber": [
+"0001046179-26-000660",
+"0001046179-26-000658",
+"0001046179-26-000552",
+"0001628280-26-025362",
+"0001193125-25-083423"
+],
+"filingDate": [
+"2026-09-24",
+"2026-09-10",
+"2026-09-01",
+"2026-04-16",
+"2025-04-17"
+],
+"reportDate": [
+"2026-08-31",
+"2026-08-31",
+"2026-09-01",
+"2025-12-31",
+"2024-12-31"
+],
+"acceptanceDateTime": [
+"2026-09-24T10:02:44.000Z",
+"2026-09-10T10:15:36.000Z",
+"2026-09-01T10:07:38.000Z",
+"2026-04-16T10:05:49.000Z",
+"2025-04-17T10:16:18.000Z"
+],
+"act": [
+"34",
+"34",
+"34",
+"34",
+"34"
+],
+"form": [
+"6-K",
+"6-K",
+"6-K",
+"20-F",
+"20-F"
+],
+"fileNumber": [
+"001-14700",
+"001-14700",
+"001-14700",
+"001-14700",
+"001-14700"
+],
+"filmNumber": [
+"261402064",
+"261369568",
+"261348436",
+"26865574",
+"25844257"
+],
+"items": [
+"",
+"",
+"",
+"",
+""
+],
+"core_type": [
+"6-K",
+"6-K",
+"6-K",
+"XBRL",
+"XBRL"
+],
+"size": [
+28095,
+100154,
+17441,
+41479898,
+39838824
+],
+"isXBRL": [
+0,
+0,
+0,
+1,
+1
+],
+"isInlineXBRL": [
+0,
+0,
+0,
+1,
+1
+],
+"isXBRLNumeric": [
+0,
+0,
+0,
+1,
+null
+],
+"primaryDocument": [
+"tsm-monthend6kx20260924.htm",
+"tsm-revenue20260910.htm",
+"tsm-dividendadjustmentx202.htm",
+"tsm-20251231.htm",
+"d896993d20f.htm"
+],
+"primaryDocDescription": [
+"6-K",
+"6-K",
+"6-K",
+"20-F",
+"FORM 20-F"
+]
+},
+"files": []
+}
+}

@@ -176,6 +176,16 @@ export type HoldingOwnership = Schemas["HoldingOwnership"];
 export type OwnershipPeriod = Schemas["OwnershipPeriod"];
 export type TopHolder = Schemas["TopHolder"];
 export type ManagerChange = Schemas["ManagerChange"];
+// Valuation: P/E, P/B and dividend yield per holding and for the portfolio vs its benchmark.
+export type HoldingValuation = Schemas["HoldingValuation"];
+export type PortfolioValuation = Schemas["PortfolioValuation"];
+export type ValuationRatio = Schemas["ValuationRatio"];
+export type PerShareFigure = Schemas["PerShareFigure"];
+export type FundValuation = Schemas["FundValuation"];
+export type BenchmarkValuation = Schemas["BenchmarkValuation"];
+export type ValuationContribution = Schemas["ValuationContribution"];
+export type PePoint = Schemas["PePoint"];
+export type ManualFundamentals = Schemas["ManualFundamentals"];
 // SEC XBRL fundamentals: revenue breakdowns and shares outstanding.
 export type HoldingSegments = Schemas["HoldingSegments"];
 export type SegmentRow = Schemas["SegmentRow"];

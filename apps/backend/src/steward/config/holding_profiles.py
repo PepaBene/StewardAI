@@ -26,6 +26,43 @@ class Exposure(ConfigModel):
     share: Weight | None = Field(default=None, description="Share of revenue or cost, 0..1.")
 
 
+class ManualFundamentals(ConfigModel):
+    """Per-share figures entered by hand, for a holding no automatic source covers (e.g.
+    Prague listings, whose filings are not machine-readable). Shown as "entered manually"."""
+
+    eps_ttm: float | None = Field(
+        default=None,
+        description="Diluted earnings per share over the trailing twelve months (or the "
+        "latest full year), per ordinary share.",
+    )
+    book_value_per_share: float | None = Field(
+        default=None, description="Equity attributable to shareholders per ordinary share."
+    )
+    dividend_per_share: float | None = Field(
+        default=None, ge=0, description="Dividends per ordinary share paid over the last year."
+    )
+    currency: CurrencyCode = Field(description="Currency of the per-share figures.")
+    as_of: dt.date = Field(description="Period end (or date) the figures are for.")
+    source_note: str = Field(
+        default="",
+        max_length=300,
+        description="Where the figures come from, e.g. 'Annual report 2025, p. 112'.",
+    )
+
+    @model_validator(mode="after")
+    def _some_figure(self) -> Self:
+        if (
+            self.eps_ttm is None
+            and self.book_value_per_share is None
+            and (self.dividend_per_share is None)
+        ):
+            raise ValueError("enter at least one of EPS, book value or dividend per share")
+        return self
+
+
+ValuationSource = Literal["auto", "sec", "esef", "manual"]
+
+
 class ShareBasis(ConfigModel):
     """How a holding's 13F figures (shares of its US line) compare with shares outstanding.
 
@@ -143,6 +180,18 @@ class HoldingProfile(ConfigModel):
     )
     reporting_currency: CurrencyCode | None = Field(
         default=None, description="Currency the company reports in; figures in another are held."
+    )
+
+    # Valuation (P/E, P/B, dividend yield).
+    valuation_source: ValuationSource = Field(
+        default="auto",
+        description="Which fundamentals the valuation uses: 'auto' takes the freshest "
+        "automatic source (SEC XBRL, then ESEF) and the manual figures only when there is "
+        "none; 'sec', 'esef' or 'manual' force one.",
+    )
+    manual_fundamentals: ManualFundamentals | None = Field(
+        default=None,
+        description="Hand-entered per-share figures for holdings without an automatic source.",
     )
 
     # News relevance (used from Phase 3).

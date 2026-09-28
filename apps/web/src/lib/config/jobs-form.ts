@@ -28,6 +28,7 @@ export type SettingsKey =
   | "chat"
   | "review"
   | "ownership"
+  | "valuation"
   | "look_through"
   | "xbrl";
 type Settings<S extends SettingsKey> = NonNullable<JobsConfig[S]>;
@@ -109,6 +110,12 @@ export const SCHEDULES: Record<ScheduleKey, { label: string; description: string
     label: "Institutional ownership (13F)",
     description: "Load new SEC Form 13F data sets (published quarterly, about 100 MB each).",
     cron: "0 5 5 * *",
+  },
+  valuation_refresh: {
+    label: "Valuation fundamentals",
+    description:
+      "EPS, book value and dividends per share from SEC XBRL and ESEF for holdings that filed since the last read (all of them weekly), and the ETF providers' fund P/E and P/B.",
+    cron: "45 7 * * *",
   },
   etf_look_through: {
     label: "ETF look-through",
@@ -255,6 +262,12 @@ export const DEFAULT_JOBS: JobsConfig = {
     history_datasets: 8,
     tracked_managers: [],
     top_holders: 10,
+  },
+  valuation: {
+    enabled: true,
+    full_refresh_days: 7,
+    esef_max_age_months: 18,
+    finnhub_cross_check: true,
   },
   // Funds, benchmark proxies and issuer groups: the backend's defaults (CSPX 253743, VWCE 9679).
   look_through: {
@@ -482,6 +495,17 @@ export const SETTINGS: { [S in SettingsKey]: { title: string; description: strin
       { key: "datasets_per_run", label: "Data sets per run", kind: "int", min: 1, max: 8, hint: "About 100 MB each." },
       { key: "history_datasets", label: "Data sets kept (history)", kind: "int", min: 1, max: 60, hint: "The newest this many quarterly sets (8 = two years). An empty database fills over successive runs." },
       { key: "top_holders", label: "Largest holders shown", kind: "int", min: 1, max: 50 },
+    ],
+  },
+  valuation: {
+    title: "Valuation",
+    description:
+      "P/E, P/B and dividend yield: fundamentals from SEC XBRL (with the filing's own instance when companyfacts lags) and ESEF reports on filings.xbrl.org; fund-level figures from the ETF providers (the funds list is kept as saved).",
+    fields: [
+      { key: "enabled", label: "Refresh valuation fundamentals", kind: "bool", hint: "Off: the scheduled run does nothing." },
+      { key: "full_refresh_days", label: "Re-read every holding every (days)", kind: "int", min: 1, max: 90, hint: "A holding that filed a new report is re-read on the next run anyway." },
+      { key: "esef_max_age_months", label: "Ignore ESEF reports older than (months)", kind: "int", min: 3, max: 60 },
+      { key: "finnhub_cross_check", label: "Finnhub cross-check (tier 2)", kind: "bool", hint: "Only with FINNHUB_API_KEY; never required." },
     ],
   },
   look_through: {

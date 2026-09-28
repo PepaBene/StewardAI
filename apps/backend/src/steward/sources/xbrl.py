@@ -1,5 +1,9 @@
 """Reading an SEC filing's full XBRL instance (`*_htm.xml`) and its label linkbase (`*_lab.xml`).
 
+Used by the SEC XBRL job (segments, shares outstanding) and the valuation job (EPS, equity
+and dividends per share when companyfacts lags the latest filing: `plain_facts`). ESEF
+reports from filings.xbrl.org (xBRL-JSON) are read by `steward.sources.esef`.
+
 companyfacts drops every dimensional fact, so two things live only in the instance:
 
 - revenue by region, business segment and product (`srt:StatementGeographicalAxis`,
@@ -170,11 +174,16 @@ def _guard(data: bytes) -> None:
         raise XbrlError("refusing an XML document with a DTD or entity declaration")
 
 
-def _canonical_prefix(uri: str, declared: str) -> str:
+def canonical_prefix(uri: str, declared: str) -> str:
+    """The prefix stored names use for a standard taxonomy's namespace URI (whatever prefix
+    the document declares for it: CEZ's ESEF writes `ifrs:`), else the declared one."""
     for start, prefix in STANDARD_PREFIXES:
         if uri.startswith(start):
             return prefix
     return declared
+
+
+_canonical_prefix = canonical_prefix
 
 
 class _Names:
@@ -761,3 +770,43 @@ def ads_ratio(text: str) -> tuple[Decimal, str] | None:
         start = max(0, match.start() - 80)
         return value, flat[start : match.end() + 20].strip()
     return None
+
+
+# ------------------------------------------------------------------ non-dimensional facts
+
+
+@dataclass(frozen=True)
+class PlainFact:
+    """A non-dimensional numeric fact with its period. `start` is None for an instant
+    (balance-sheet) fact; `unit` is written as companyfacts writes it ("USD/shares")."""
+
+    concept: str
+    start: dt.date | None
+    end: dt.date
+    value: Decimal
+    unit: str
+    decimals: str | None
+    fact: Fact
+
+
+def plain_unit(unit: str) -> str:
+    """'iso4217:USD/xbrli:shares' -> 'USD/shares'; 'xbrli:shares' -> 'shares'."""
+    return "/".join(part.rsplit(":", 1)[-1] for part in unit.split("/"))
+
+
+def plain_facts(instance: Instance) -> list[PlainFact]:
+    """The instance's undimensioned numeric facts (face-statement totals, cover-page figures)."""
+    out: list[PlainFact] = []
+    for f in instance.facts:
+        c = f.context
+        if c.dims or c.typed or f.unit is None or f.number is None:
+            continue
+        if c.is_duration:
+            start, end = c.start, c.end
+        elif c.instant is not None:
+            start, end = None, c.instant
+        else:
+            continue
+        assert end is not None
+        out.append(PlainFact(f.concept, start, end, f.number, plain_unit(f.unit), f.decimals, f))
+    return out

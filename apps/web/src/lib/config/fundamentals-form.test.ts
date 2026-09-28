@@ -27,6 +27,8 @@ const CEZ: HoldingProfilesConfig = {
       customers: [],
       watch_topics: [],
       exposures: [],
+      valuation_source: "auto",
+      manual_fundamentals: null,
       share_basis: {
         ads_ratio: null,
         share_classes: [],

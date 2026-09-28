@@ -46,6 +46,7 @@ DATA_SEQUENCE = [
     "ownership_13f",
     "etf_look_through",
     "sec_xbrl",
+    "valuation_refresh",
     "news_ingest",
 ]
 DEFAULT_SEQUENCE = [*DATA_SEQUENCE, "monitor"]

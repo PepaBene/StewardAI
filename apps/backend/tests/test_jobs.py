@@ -230,6 +230,7 @@ async def test_schedule_follows_the_jobs_config() -> None:
         "price_history",
         "reference_data",
         "sec_xbrl",
+        "valuation_refresh",
         "weekly_digest",
     ]
     job = scheduler.get_job("config:portfolio_sync")

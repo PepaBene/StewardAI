@@ -10,14 +10,16 @@ import { SelectField, TextAreaField, TextField } from "@/components/config/field
 import { EmptyState } from "@/components/empty-state";
 import { Button } from "@/components/ui/button";
 import { getBrowserApiClient, type Holding, type HoldingProfilesConfig } from "@/lib/api/client";
-import type { FieldErrors } from "@/lib/api/validation-errors";
+import { errorsAt, type FieldErrors } from "@/lib/api/validation-errors";
 import {
   EXPOSURE_KINDS,
+  VALUATION_SOURCES,
   newExposure,
   newProfile,
   profilesFromBody,
   profilesToBody,
   type ExposureForm,
+  type ManualForm,
   type ProfileForm,
 } from "@/lib/config/profiles-form";
 import { configSaveQuery, useConfigEditor } from "@/lib/hooks/use-config-editor";
@@ -238,6 +240,8 @@ function ProfileCard({
         <TextAreaField label="Aliases and former names" hint="One per line." rows={2} {...text("aliases")} />
       </fieldset>
 
+      <ValuationFields form={form} path={path} errors={errors} onChange={onChange} />
+
       <details className="rounded-md border border-border p-3">
         <summary className="cursor-pointer text-sm font-medium">News relevance and exposures</summary>
         <div className="mt-3 grid gap-3 lg:grid-cols-2">
@@ -301,5 +305,79 @@ function ProfileCard({
         onChange={(change) => onChange((f) => ({ ...f, fundamentals: change(f.fundamentals) }))}
       />
     </section>
+  );
+}
+
+/**
+ * Valuation inputs: which fundamentals the P/E uses, the depositary ratio, and figures entered
+ * by hand for holdings no automatic source covers (shown as "entered manually").
+ */
+function ValuationFields({
+  form,
+  path,
+  errors,
+  onChange,
+}: {
+  form: ProfileForm;
+  path: string;
+  errors: FieldErrors;
+  onChange: (change: (form: ProfileForm) => ProfileForm) => void;
+}) {
+  const manualPath = `${path}.manual_fundamentals`;
+  const manual = (key: keyof ManualForm) => ({
+    path: `${manualPath}.${key}`,
+    errors,
+    value: form.manual[key],
+    onChange: (v: string) => onChange((f) => ({ ...f, manual: { ...f.manual, [key]: v } })),
+  });
+  const hasManual = Object.values(form.manual).some((v) => v.trim());
+  const open = hasManual || form.valuation_source !== "auto";
+  const manualErrors = errorsAt(errors, manualPath);
+  return (
+    <details className="rounded-md border border-border p-3" open={open || undefined}>
+      <summary className="cursor-pointer text-sm font-medium">Valuation (P/E, P/B, dividend yield)</summary>
+      <div className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        <SelectField
+          label="Fundamentals from"
+          path={`${path}.valuation_source`}
+          errors={errors}
+          value={form.valuation_source}
+          options={VALUATION_SOURCES.map((o) => ({ value: o.value, label: o.label }))}
+          onChange={(v) => onChange((f) => ({ ...f, valuation_source: v }))}
+          hint="Automatic uses SEC XBRL or ESEF, whichever is fresher, and your figures only when neither has any."
+        />
+        <p className="self-center text-xs text-text-muted sm:col-span-1 lg:col-span-3">
+          Depositary receipts: per-share figures are multiplied by the ADS ratio under SEC XBRL fundamentals &rarr; share basis
+          (empty: the ratio the 20-F states, e.g. TSMC 5, else 1).
+        </p>
+      </div>
+      <fieldset className="mt-3 space-y-2">
+        <legend className="text-sm font-medium">Figures entered manually</legend>
+        <p className="text-xs text-text-muted">
+          For holdings without machine-readable filings (e.g. Prague listings). Per ordinary share, from the company&rsquo;s own
+          report; leave everything empty for none.
+        </p>
+        <div className="grid gap-3 sm:grid-cols-3 lg:grid-cols-6">
+          <TextField label="EPS (TTM)" inputMode="decimal" {...manual("eps_ttm")} />
+          <TextField label="Book value / share" inputMode="decimal" {...manual("book_value_per_share")} />
+          <TextField label="Dividend / share (12 m)" inputMode="decimal" {...manual("dividend_per_share")} />
+          <TextField label="Currency" placeholder="CZK" maxLength={3} {...manual("currency")} />
+          <TextField label="As of" type="date" {...manual("as_of")} />
+          <TextField className="sm:col-span-3 lg:col-span-6" label="Source" placeholder="Annual report 2025, p. 17" {...manual("source_note")} />
+        </div>
+        {manualErrors.length > 0 ? (
+          <ul className="space-y-0.5 text-xs text-text">
+            {manualErrors.map((m) => (
+              <li key={m} className="flex gap-1">
+                <span aria-hidden="true" className="text-warning-signal">
+                  ●
+                </span>
+                {m}
+              </li>
+            ))}
+          </ul>
+        ) : null}
+      </fieldset>
+    </details>
   );
 }
