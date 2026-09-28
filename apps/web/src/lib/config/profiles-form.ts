@@ -1,5 +1,6 @@
 import type { Exposure, HoldingProfile, HoldingProfilesConfig } from "@/lib/api/client";
 
+import { fundamentalsFromProfile, fundamentalsToProfile, newFundamentals, type FundamentalsForm } from "./fundamentals-form";
 import { lines } from "./theses-form";
 
 /* Editable form state for holding profiles; list fields are one entry per line. */
@@ -63,9 +64,9 @@ export type ProfileForm = {
   watch_topics: string;
   exposures: ExposureForm[];
   valuation_source: ValuationSource;
-  /** Ordinary shares per listed unit (depositary receipts); empty = 1. */
-  shares_per_listing: string;
   manual: ManualForm;
+  /** SEC XBRL fields: 13F share basis and manual revenue rows (fundamentals-form.ts). */
+  fundamentals: FundamentalsForm;
 };
 
 let counter = 0;
@@ -97,8 +98,8 @@ export function newProfile(ticker = ""): ProfileForm {
     watch_topics: "",
     exposures: [],
     valuation_source: "auto",
-    shares_per_listing: "",
     manual: { ...EMPTY_MANUAL },
+    fundamentals: newFundamentals(),
   };
 }
 
@@ -131,8 +132,8 @@ export function profilesFromBody(body: HoldingProfilesConfig | null): ProfileFor
       share: e.share === null || e.share === undefined ? "" : String(e.share),
     })),
     valuation_source: p.valuation_source ?? "auto",
-    shares_per_listing: p.shares_per_listing === null || p.shares_per_listing === undefined ? "" : String(p.shares_per_listing),
     manual: manualFromBody(p.manual_fundamentals),
+    fundamentals: fundamentalsFromProfile(p),
   }));
 }
 
@@ -199,8 +200,8 @@ export function profilesToBody(forms: ProfileForm[]): HoldingProfilesConfig {
           share: e.share.trim() ? Number(e.share.trim().replace(",", ".")) : null,
         })),
         valuation_source: f.valuation_source,
-        shares_per_listing: decimal(f.shares_per_listing),
         manual_fundamentals: manualToBody(f.manual),
+        ...fundamentalsToProfile(f.fundamentals),
       }),
     ),
   };

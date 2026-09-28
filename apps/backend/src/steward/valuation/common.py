@@ -11,8 +11,6 @@ from steward.sources.market import stooq_currency
 
 # Trading212 / OpenFIGI security types of exchange-traded funds.
 FUND_TYPES = {"ETP", "ETF", "Mutual Fund", "Unit"}
-# OpenFIGI security types of depositary receipts (their per-share figures need a ratio).
-DR_TYPES = {"ADR", "GDR", "Depositary Receipt"}
 
 
 def price_currency(symbol: str | None, instrument_currency: str | None) -> str | None:
@@ -33,18 +31,13 @@ class InstrumentInfo:
     security_type: str | None
     issuer_lei: str | None
     is_fund: bool
-    is_depositary: bool
 
 
 async def instrument_info(pool: asyncpg.Pool, tickers: list[str]) -> dict[str, InstrumentInfo]:
     rows = await pool.fetch(
-        "select i.t212_ticker, i.name, i.currency, i.security_type, i.issuer_lei,"
-        " exists (select 1 from public.instrument_identifier d where d.ticker = i.t212_ticker"
-        "   and (d.security_type = any($2::text[]) or d.security_type2 = any($2::text[])))"
-        "   as depositary"
+        "select i.t212_ticker, i.name, i.currency, i.security_type, i.issuer_lei"
         " from public.instrument i where i.t212_ticker = any($1::text[])",
         tickers,
-        sorted(DR_TYPES),
     )
     out = {}
     for r in rows:
@@ -56,7 +49,6 @@ async def instrument_info(pool: asyncpg.Pool, tickers: list[str]) -> dict[str, I
             security_type=r["security_type"],
             issuer_lei=r["issuer_lei"],
             is_fund=kind in FUND_TYPES,
-            is_depositary=kind in DR_TYPES or bool(r["depositary"]),
         )
     return out
 

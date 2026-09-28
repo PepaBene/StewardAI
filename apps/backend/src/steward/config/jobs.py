@@ -458,6 +458,19 @@ class EcbSeries(ConfigModel):
     policy_rate: bool = False
 
 
+class CnbSeries(ConfigModel):
+    """A Czech National Bank rate from its keyless text files."""
+
+    key: Annotated[str, Field(pattern=r"^[a-z0-9_]{1,40}$")]
+    label: str = Field(min_length=1, max_length=100)
+    series: Literal["czeonia", "repo_2w"] = Field(
+        description="czeonia: the CZK overnight reference rate, daily (yearly.txt/daily.txt; "
+        "the portfolio's risk-free rate). repo_2w: the 2-week repo rate's change history."
+    )
+    unit: str = Field(default="%", max_length=20)
+    policy_rate: bool = False
+
+
 def _eurostat_defaults() -> list[EurostatSeries]:
     rows = [
         ("hicp", "HICP inflation, annual rate", "prc_hicp_minr",
@@ -517,6 +530,17 @@ class MacroSettings(ConfigModel):
                 policy_rate=True,
             ),
         ]
+    )
+    cnb: list[CnbSeries] = Field(
+        default_factory=lambda: [
+            # Moves every business day: not a policy rate, and no surprise band.
+            CnbSeries(key="czeonia", label="CZEONIA (CZK overnight rate)", series="czeonia"),
+            CnbSeries(
+                key="cnb_repo_2w", label="ČNB 2-week repo rate", series="repo_2w", policy_rate=True
+            ),
+        ],
+        description="ČNB rates. CZEONIA is the risk-free rate of the Sharpe ratio (series key "
+        "'czeonia'); the repo rate's changes are ČNB decisions.",
     )
 
 
@@ -741,6 +765,173 @@ class ValuationSettings(ConfigModel):
         return self
 
 
+Isin = Annotated[str, Field(pattern=r"^[A-Z]{2}[A-Z0-9]{9}[0-9]$", examples=["IE00B5BMR087"])]
+GicsSector = Literal[
+    "Information Technology",
+    "Financials",
+    "Health Care",
+    "Consumer Discretionary",
+    "Communication Services",
+    "Industrials",
+    "Consumer Staples",
+    "Energy",
+    "Utilities",
+    "Materials",
+    "Real Estate",
+]
+
+CSPX_ISIN = "IE00B5BMR087"
+VWCE_ISIN = "IE00BK5BQT80"
+
+
+class LookThroughFund(ConfigModel):
+    """A fund whose holdings are read from its issuer. Matched to a position by ISIN."""
+
+    isin: Isin
+    label: str = Field(min_length=1, max_length=40, examples=["CSPX"])
+    provider: Literal["ishares", "vanguard"]
+    portfolio_id: str = Field(
+        pattern=r"^[A-Za-z0-9-]{1,24}$",
+        description="The issuer's fund id: the iShares product/portfolio id (CSPX 253743) or "
+        "the Vanguard Europe port id (VWCE 9679).",
+    )
+
+
+class BenchmarkProxy(ConfigModel):
+    """Which fund's holdings stand in for a benchmark index's constituents."""
+
+    symbol: StooqSymbol = Field(description="A benchmark symbol from prices.benchmark_symbols.")
+    fund_isin: Isin
+    label: str = Field(min_length=1, max_length=60, examples=["S&P 500"])
+
+
+class IssuerGroup(ConfigModel):
+    """Securities of one issuer counted together in the top underlying holdings (an ADR and
+    its ordinary share, two share classes)."""
+
+    label: str = Field(min_length=1, max_length=80)
+    isins: list[Isin] = Field(min_length=2, max_length=10)
+
+
+def _default_funds() -> list[LookThroughFund]:
+    return [
+        LookThroughFund(isin=CSPX_ISIN, label="CSPX", provider="ishares", portfolio_id="253743"),
+        LookThroughFund(isin=VWCE_ISIN, label="VWCE", provider="vanguard", portfolio_id="9679"),
+    ]
+
+
+def _default_issuer_groups() -> list[IssuerGroup]:
+    return [
+        IssuerGroup(
+            label="Taiwan Semiconductor Manufacturing", isins=["US8740391003", "TW0002330008"]
+        ),
+        IssuerGroup(label="Alphabet", isins=["US02079K3059", "US02079K1079"]),
+    ]
+
+
+class LookThroughSettings(ConfigModel):
+    """ETF look-through: holdings of the funds the portfolio holds, from the issuers'
+    (undocumented) data endpoints, stored weekly as dated snapshots."""
+
+    enabled: bool = Field(
+        default=True, description="Fetch from the issuers (off: stored snapshots are still shown)."
+    )
+    funds: list[LookThroughFund] = Field(
+        default_factory=_default_funds,
+        max_length=30,
+        description="Funds looked through, by ISIN: provider and the issuer's fund id.",
+    )
+    benchmark_proxies: list[BenchmarkProxy] = Field(
+        default_factory=lambda: [
+            BenchmarkProxy(symbol="^spx", fund_isin=CSPX_ISIN, label="S&P 500")
+        ],
+        max_length=10,
+        description="The benchmark's constituents are proxied by this fund's holdings (equity "
+        "lines renormalised to 100%). A proxy fund is fetched even when it is not held.",
+    )
+    issuer_groups: list[IssuerGroup] = Field(
+        default_factory=_default_issuer_groups,
+        max_length=50,
+        description="ISINs of one issuer counted together in the top underlying holdings.",
+    )
+    direct_sectors: dict[Ticker, GicsSector] = Field(
+        default_factory=dict,
+        description="Sector of a directly held stock when no fund holds the same ISIN and the "
+        "strategy's sector bucket is not a GICS sector.",
+    )
+    direct_countries: dict[Ticker, Annotated[str, Field(pattern=r"^[A-Z]{2}$")]] = Field(
+        default_factory=dict,
+        description="Country of a directly held stock, overriding its home market.",
+    )
+    ishares_api_url: str = Field(
+        default="https://www.blackrock.com/varnish-api/uk-retail01-product-data/product-data",
+        pattern=r"^https://[^\s]+$",
+    )
+    ishares_site: str = Field(default="ishares-uk", pattern=r"^[a-z0-9-]{2,40}$")
+    ishares_locale: str = Field(default="en_GB", pattern=r"^[a-z]{2}_[A-Z]{2}$")
+    ishares_spreadsheet_fallback: bool = Field(
+        default=True,
+        description="When the holdings JSON fails and no recent snapshot is stored, read the "
+        "full-fund download (no country or ISIN column).",
+    )
+    vanguard_graphql_url: str = Field(
+        default="https://www.ie.vanguard/gpx/graphql", pattern=r"^https://[^\s]+$"
+    )
+    vanguard_consumer_id: str = Field(default="ie0", pattern=r"^[a-z]{2}[0-9]$")
+    cached_fallback_days: int = Field(
+        default=45,
+        ge=1,
+        le=400,
+        description="On a failed fetch, a stored snapshot this recent is kept in use instead "
+        "of trying the spreadsheet fallback.",
+    )
+    stale_after_days: int = Field(
+        default=60,
+        ge=7,
+        le=400,
+        description="A snapshot older than this is labelled stale (Vanguard publishes "
+        "month-end data a few weeks late).",
+    )
+    keep_snapshots: int = Field(default=12, ge=1, le=200, description="Snapshots kept per fund.")
+
+    @model_validator(mode="after")
+    def _consistent(self) -> Self:
+        require_unique("look-through fund ISINs", (f.isin for f in self.funds))
+        require_unique("benchmark proxy symbols", (b.symbol for b in self.benchmark_proxies))
+        isins = {f.isin for f in self.funds}
+        for proxy in self.benchmark_proxies:
+            if proxy.fund_isin not in isins:
+                raise ValueError(
+                    f"benchmark proxy {proxy.symbol!r} names fund {proxy.fund_isin}, which is "
+                    "not in funds"
+                )
+        return self
+
+    def fund(self, isin: str | None) -> LookThroughFund | None:
+        return next((f for f in self.funds if f.isin == isin), None)
+
+
+class XbrlSettings(ConfigModel):
+    """SEC XBRL fundamentals: shares outstanding and revenue by region / segment / product,
+    read from each holding's latest 10-K / 10-Q / 20-F XBRL instance."""
+
+    enabled: bool = True
+    quarterly: bool = Field(
+        default=True,
+        description="Also parse the latest 10-Q when it is newer than the annual report "
+        "(US issuers; 20-F filers publish annual XBRL only).",
+    )
+    read_ads_ratio: bool = Field(
+        default=True,
+        description="For 20-F filers, read the ADS ratio the annual report states ('each ADS "
+        "represents five common shares') to check the configured share basis. Downloads the "
+        "report's main document (up to about 10 MB) once per new 20-F.",
+    )
+    max_document_mb: int = Field(
+        default=40, ge=1, le=200, description="Largest filing document downloaded."
+    )
+
+
 class JobsConfig(ConfigModel):
     """Schedules for the worker's timed jobs. Stored as `config_version` rows, domain `jobs`.
 
@@ -827,6 +1018,17 @@ class JobsConfig(ConfigModel):
         description="Fundamentals (SEC XBRL, ESEF) of holdings that filed since the last read "
         "(all of them weekly) and the ETF providers' fund P/E and P/B. Default: daily 07:45.",
     )
+    etf_look_through: JobSchedule = Field(
+        default_factory=lambda: JobSchedule(cron="40 6 * * 6"),
+        description="ETF look-through: the funds' holdings from iShares and Vanguard, skipped "
+        "when the as-of date has not moved. Default: Saturdays 06:40.",
+    )
+    sec_xbrl: JobSchedule = Field(
+        default_factory=lambda: JobSchedule(cron="40 5 * * 2"),
+        description="Shares outstanding and revenue by region / segment from the holdings' "
+        "latest SEC XBRL filings; only filings not parsed yet are downloaded. Default: "
+        "Tuesdays 05:40.",
+    )
     earnings_check: EarningsCheckSettings = Field(default_factory=EarningsCheckSettings)
     earnings_calendar_settings: EarningsCalendarSettings = Field(
         default_factory=EarningsCalendarSettings
@@ -843,6 +1045,8 @@ class JobsConfig(ConfigModel):
     review: ReviewSettings = Field(default_factory=ReviewSettings)
     ownership: OwnershipSettings = Field(default_factory=OwnershipSettings)
     valuation: ValuationSettings = Field(default_factory=ValuationSettings)
+    look_through: LookThroughSettings = Field(default_factory=LookThroughSettings)
+    xbrl: XbrlSettings = Field(default_factory=XbrlSettings)
 
     def schedules(self) -> dict[str, JobSchedule]:
         return {
@@ -862,6 +1066,8 @@ class JobsConfig(ConfigModel):
             "monthly_review": self.monthly_review,
             "ownership_13f": self.ownership_13f,
             "valuation_refresh": self.valuation_refresh,
+            "etf_look_through": self.etf_look_through,
+            "sec_xbrl": self.sec_xbrl,
         }
 
     def next_run_after(self, job_type: str, moment: dt.datetime) -> dt.datetime | None:

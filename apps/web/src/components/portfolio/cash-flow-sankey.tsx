@@ -3,6 +3,7 @@
 import { Sankey } from "@/components/charts";
 import {
   getBrowserApiClient,
+  type FeeTotals,
   type Holding,
   type TotalByCurrency,
   type TransactionOut,
@@ -22,6 +23,8 @@ export type CashFlowData = {
   holdings: Holding[];
   /** Account currency (from the holdings list); null before the first sync. */
   currency: string | null;
+  /** Fees over every transaction in the period, in the base currency (see FeeTotals). */
+  fees: FeeTotals | null;
 };
 
 const PAGE = 500;
@@ -63,6 +66,7 @@ export async function fetchCashFlow(
       rowsComplete: complete,
       holdings: holdings.data?.holdings ?? [],
       currency: holdings.data?.account_currency ?? totals.data.totals[0]?.currency ?? null,
+      fees: totals.data.fees ?? null,
     },
     response: totals.response,
   };

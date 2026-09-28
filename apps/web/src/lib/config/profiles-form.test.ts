@@ -27,7 +27,6 @@ const BODY: HoldingProfilesConfig = {
       watch_topics: ["App Store regulation"],
       exposures: [{ kind: "revenue_region", name: "Greater China", share: 0.16 }],
       valuation_source: "auto",
-      shares_per_listing: null,
       manual_fundamentals: null,
     },
     {
@@ -50,7 +49,6 @@ const BODY: HoldingProfilesConfig = {
       watch_topics: [],
       exposures: [],
       valuation_source: "manual",
-      shares_per_listing: null,
       manual_fundamentals: {
         eps_ttm: 52.4,
         book_value_per_share: 449.9,
@@ -87,10 +85,8 @@ describe("holding profiles form", () => {
   it("sends manual fundamentals only when something is entered", () => {
     const form = newProfile("KOMB_EQ");
     expect(profilesToBody([form]).profiles![0].manual_fundamentals).toBeNull();
-    form.shares_per_listing = "5";
     form.manual = { eps_ttm: "94,08", book_value_per_share: " ", dividend_per_share: "95.6", currency: "czk", as_of: "2026-06-30", source_note: " H1 report " };
     const [profile] = profilesToBody([form]).profiles!;
-    expect(profile.shares_per_listing).toBe(5);
     expect(profile.manual_fundamentals).toEqual({
       eps_ttm: 94.08,
       book_value_per_share: null,

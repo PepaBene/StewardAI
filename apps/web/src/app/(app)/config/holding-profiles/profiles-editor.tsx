@@ -25,6 +25,8 @@ import {
 import { configSaveQuery, useConfigEditor } from "@/lib/hooks/use-config-editor";
 import { BlueprintCorners } from "@/components/ui/blueprint";
 
+import { FundamentalsFields } from "./fundamentals-fields";
+
 const api = () => getBrowserApiClient();
 
 const MONTHS = [
@@ -295,6 +297,13 @@ function ProfileCard({
           </Button>
         </fieldset>
       </details>
+
+      <FundamentalsFields
+        form={form.fundamentals}
+        path={path}
+        errors={errors}
+        onChange={(change) => onChange((f) => ({ ...f, fundamentals: change(f.fundamentals) }))}
+      />
     </section>
   );
 }
@@ -322,7 +331,7 @@ function ValuationFields({
     onChange: (v: string) => onChange((f) => ({ ...f, manual: { ...f.manual, [key]: v } })),
   });
   const hasManual = Object.values(form.manual).some((v) => v.trim());
-  const open = hasManual || form.valuation_source !== "auto" || Boolean(form.shares_per_listing.trim());
+  const open = hasManual || form.valuation_source !== "auto";
   const manualErrors = errorsAt(errors, manualPath);
   return (
     <details className="rounded-md border border-border p-3" open={open || undefined}>
@@ -337,16 +346,10 @@ function ValuationFields({
           onChange={(v) => onChange((f) => ({ ...f, valuation_source: v }))}
           hint="Automatic uses SEC XBRL or ESEF, whichever is fresher, and your figures only when neither has any."
         />
-        <TextField
-          label="Shares per listed unit"
-          placeholder="1"
-          inputMode="decimal"
-          path={`${path}.shares_per_listing`}
-          errors={errors}
-          value={form.shares_per_listing}
-          onChange={(v) => onChange((f) => ({ ...f, shares_per_listing: v }))}
-          hint="Depositary receipts only, e.g. 5 for TSMC's ADS (one ADS = five shares)."
-        />
+        <p className="self-center text-xs text-text-muted sm:col-span-1 lg:col-span-3">
+          Depositary receipts: per-share figures are multiplied by the ADS ratio under SEC XBRL fundamentals &rarr; share basis
+          (empty: the ratio the 20-F states, e.g. TSMC 5, else 1).
+        </p>
       </div>
       <fieldset className="mt-3 space-y-2">
         <legend className="text-sm font-medium">Figures entered manually</legend>

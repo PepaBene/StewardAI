@@ -1,4 +1,4 @@
-import type { TotalByCurrency, TransactionOut } from "@/lib/api/client";
+import type { FeeTotals, TotalByCurrency, TransactionOut } from "@/lib/api/client";
 
 /*
  * Cash-flow derivations for the Overview and Transactions screens, all from GET
@@ -20,9 +20,61 @@ export type CashFlowGraph = {
   inflow: number;
   /** Bought with it. */
   bought: number;
+  /** FX conversion, taxes & levies and account fees drawn in the graph (0 without fee data). */
+  fees: number;
   /** Other currencies present in the totals and left out of the sums. */
   excludedCurrencies: string[];
 };
+
+/**
+ * The period's fees in the graph's currency, from GET /portfolio/transactions `fees`:
+ * fill charges split FX conversion / taxes & levies, account fees (cash FEE rows), and the
+ * part of the fill fees Trading212 had already netted into order amounts.
+ */
+export type FeeFlow = {
+  fx: number;
+  taxes: number;
+  account: number;
+  includedInBuys: number;
+  includedInSales: number;
+};
+
+/** The fee summary as a FeeFlow in `currency`, or null when it is in another currency. */
+export function feeFlow(fees: FeeTotals | null | undefined, currency: string): FeeFlow | null {
+  if (!fees || fees.currency !== currency) return null;
+  return {
+    fx: fees.fx_conversion,
+    taxes: fees.taxes_levies,
+    account: fees.account_fees,
+    includedInBuys: fees.included_in_buys,
+    includedInSales: fees.included_in_sales,
+  };
+}
+
+export type FeeNode = { id: string; label: string; value: number };
+
+/**
+ * The fee nodes of the cash-flow graph: one "FX & fees" node when only one kind of charge
+ * is present, otherwise one node per kind (FX conversion / Taxes & levies / Account fees).
+ */
+export function feeNodes(fees: FeeFlow): FeeNode[] {
+  const parts: FeeNode[] = [
+    { id: "fees:fx", label: "FX conversion", value: fees.fx },
+    { id: "fees:tax", label: "Taxes & levies", value: fees.taxes },
+    { id: "fees:account", label: "Account fees", value: fees.account },
+  ].filter((p) => p.value > 0);
+  if (parts.length === 1) return [{ id: "fees", label: "FX & fees", value: parts[0].value }];
+  return parts;
+}
+
+/** What the fee summary's `status` means for the reader; null when fees are fully read. */
+export function feeStatusNote(fees: Pick<FeeTotals, "status" | "fills" | "fills_captured"> | null | undefined): string | null {
+  if (!fees) return null;
+  if (fees.status === "not_captured") return "No fee data yet: Trading212 fill fees are backfilled on the next sync.";
+  if (fees.status === "partial")
+    return `Fees read for ${fees.fills_captured} of ${fees.fills} orders; the rest are backfilled on the next sync.`;
+  return null;
+}
 
 /** "MARKET_BUY" -> "Market buy". */
 export function humanizeSubtype(value: string | null): string {
@@ -53,11 +105,19 @@ export function securityClass(securityType: string | null | undefined): "etf" | 
  * any other negative flow are uses. Whatever came in and was not used is "Cash kept"; when
  * more was used than came in, the difference is drawn from "Earlier cash". With `split`,
  * buys are shown as Stocks / ETFs (and "Other buys" for instruments no longer held).
+ *
+ * With `fees`, the fees are uses of their own ("FX & fees", or split by kind). Trading212's
+ * order amount (netValue) excludes fill fees as documented, so a buy took amount + fees out
+ * of cash and a sale paid out amount - fees: adding the fee node makes "Cash kept" right.
+ * Where the backend found the fees already inside the amounts (`includedIn*`), they are
+ * taken out of buys / added back to sales first, so no fee is counted twice. Cash FEE rows
+ * are drawn only in the fee node (not also as a "Fee" use).
  */
 export function cashFlowGraph(
   totals: readonly TotalByCurrency[],
   currency: string,
   split?: BuySplit | null,
+  fees?: FeeFlow | null,
 ): CashFlowGraph {
   const excluded = [...new Set(totals.filter((t) => t.currency !== currency).map((t) => t.currency ?? "unknown"))];
   const sources = new Map<string, { label: string; value: number }>();
@@ -69,6 +129,7 @@ export function cashFlowGraph(
 
   for (const t of totals) {
     if (t.currency !== currency || t.amount === 0) continue;
+    if (fees && t.type === "cash" && t.subtype === "FEE") continue;
     if (t.type === "dividend") {
       if (t.amount > 0) add(sources, "dividend", "Dividends", t.amount);
       else add(uses, "dividend", "Dividend adjustments", -t.amount);
@@ -79,21 +140,31 @@ export function cashFlowGraph(
     else add(uses, key, USE_LABEL[key] ?? humanizeSubtype(t.subtype), -t.amount);
   }
 
-  const bought = uses.get("order:BUY")?.value ?? 0;
+  const booked = uses.get("order:BUY")?.value ?? 0;
   const splitOk =
-    split && bought > 0 && Math.abs(split.stocks + split.etfs + split.other - bought) <= Math.max(1, bought * 1e-6);
+    split && booked > 0 && Math.abs(split.stocks + split.etfs + split.other - booked) <= Math.max(1, booked * 1e-6);
+  // Fees Trading212 had already put inside the buys' amounts move to the fee node.
+  const inBuys = fees ? Math.min(Math.max(fees.includedInBuys, 0), booked) : 0;
+  const bought = booked - inBuys;
+  if (inBuys > 0) uses.set("order:BUY", { label: uses.get("order:BUY")!.label, value: bought });
+  const inSales = fees ? Math.max(fees.includedInSales, 0) : 0;
+  if (inSales > 0) add(sources, "order:SELL", SOURCE_LABEL["order:SELL"], inSales);
   if (splitOk) {
     uses.delete("order:BUY");
+    const scale = booked > 0 ? bought / booked : 1;
     const parts: [string, string, number][] = [
-      ["buy:stock", "Stocks", split!.stocks],
-      ["buy:etf", "ETFs", split!.etfs],
-      ["buy:other", "Other buys", split!.other],
+      ["buy:stock", "Stocks", split!.stocks * scale],
+      ["buy:etf", "ETFs", split!.etfs * scale],
+      ["buy:other", "Other buys", split!.other * scale],
     ];
     const rest = new Map(uses);
     uses.clear();
     for (const [k, label, v] of parts) if (v > 0) uses.set(k, { label, value: v });
     for (const [k, v] of rest) uses.set(k, v);
   }
+
+  const fee = fees ? feeNodes(fees) : [];
+  for (const f of fee) uses.set(f.id, { label: f.label, value: f.value });
 
   const inflow = [...sources.values()].reduce((s, x) => s + x.value, 0);
   const used = [...uses.values()].reduce((s, x) => s + x.value, 0);
@@ -119,7 +190,7 @@ export function cashFlowGraph(
       emphasis: id.startsWith("buy:") || id === "order:BUY",
     })),
   ];
-  return { nodes, links, inflow, bought, excludedCurrencies: excluded };
+  return { nodes, links, inflow, bought, fees: fee.reduce((s, f) => s + f.value, 0), excludedCurrencies: excluded };
 }
 
 /** Buys in `currency` split by the instrument's security type (from the holdings list). */

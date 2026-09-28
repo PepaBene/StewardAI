@@ -17,6 +17,7 @@ from pydantic import BaseModel, Field
 from steward.config.holding_profiles import HoldingProfile, HoldingProfilesConfig
 from steward.config.jobs import FundValuationSource, JobsConfig
 from steward.config.store import load_active
+from steward.fundamentals.shares import DEFAULT_BASIS_BY_CIK, basis_for
 from steward.fx.convert import FxRate, FxSourceName, FxTable, MissingRateError
 from steward.reference.prices import symbols_for
 from steward.valuation.collect import STATUS_KEY
@@ -159,8 +160,13 @@ class HoldingValuation(BaseModel):
     eps_ttm: PerShareFigure | None
     book_value_per_share: PerShareFigure | None
     dividend_per_share: PerShareFigure | None
-    shares_per_listing: float = Field(
-        description="Ordinary shares per priced unit (depositary receipts)."
+    ads_ratio: float = Field(
+        description="Home-market shares one priced share represents (TSMC's ADS = 5); "
+        "per-share figures are multiplied by it."
+    )
+    ads_ratio_source: str = Field(
+        description="Where the ratio comes from: the holding profile's share basis, the "
+        "ratio the 20-F states (SEC XBRL job), the documented default, or 1."
     )
     fundamentals: FundamentalsSource | None = Field(description="The figures the ratios use.")
     alternatives: list[ValuationAlternative] = Field(
@@ -550,7 +556,8 @@ async def holding_valuation(
             eps_ttm=None,
             book_value_per_share=None,
             dividend_per_share=None,
-            shares_per_listing=1.0,
+            ads_ratio=1.0,
+            ads_ratio_source="fund units",
             fundamentals=None,
             alternatives=[],
             cross_check=None,
@@ -574,8 +581,7 @@ async def holding_valuation(
         candidates["manual"] = manual
     chosen, pick_problem = _pick(candidates, profile.valuation_source)
 
-    per_listing = profile.shares_per_listing or 1.0
-    depositary_unknown = bool(info and info.is_depositary and profile.shares_per_listing is None)
+    per_listing, per_listing_source = await listing_ratio(pool, ticker, profile)
     if chosen is None:
         missing = pick_problem or _missing_reason(profile, rows, held)
     else:
@@ -583,34 +589,30 @@ async def holding_valuation(
     eps = chosen.eps if chosen else None
     bvps = chosen.bvps if chosen else None
     dps = chosen.dps if chosen else None
-    if depositary_unknown:
-        dr = "depositary receipt: set 'shares per listing' in the holding profile"
-        pe = pb = dy = ValuationRatio(value=None, reason=dr)
-    else:
-        pe = ratio(
-            price,
-            eps,
-            per_listing,
-            fx,
-            "pe",
-            missing if chosen is None else "no EPS in the figures",
-        )
-        pb = ratio(
-            price,
-            bvps,
-            per_listing,
-            fx,
-            "pb",
-            missing if chosen is None else "no book value per share in the figures",
-        )
-        dy = ratio(
-            price,
-            dps,
-            per_listing,
-            fx,
-            "yield",
-            missing if chosen is None else "no dividends per share in the figures",
-        )
+    pe = ratio(
+        price,
+        eps,
+        per_listing,
+        fx,
+        "pe",
+        missing if chosen is None else "no EPS in the figures",
+    )
+    pb = ratio(
+        price,
+        bvps,
+        per_listing,
+        fx,
+        "pb",
+        missing if chosen is None else "no book value per share in the figures",
+    )
+    dy = ratio(
+        price,
+        dps,
+        per_listing,
+        fx,
+        "yield",
+        missing if chosen is None else "no dividends per share in the figures",
+    )
 
     alternatives: list[ValuationAlternative] = []
     for key, candidate in candidates.items():
@@ -640,14 +642,7 @@ async def holding_valuation(
         )
 
     history: list[PePoint] = []
-    if (
-        with_history
-        and chosen is not None
-        and eps is not None
-        and symbol
-        and price
-        and not depositary_unknown
-    ):
+    if with_history and chosen is not None and eps is not None and symbol and price:
         history = await pe_history(
             pool,
             symbol,
@@ -668,7 +663,8 @@ async def holding_valuation(
         eps_ttm=eps,
         book_value_per_share=bvps,
         dividend_per_share=dps,
-        shares_per_listing=per_listing,
+        ads_ratio=per_listing,
+        ads_ratio_source=per_listing_source,
         fundamentals=chosen.fundamentals if chosen else None,
         alternatives=alternatives,
         cross_check=cross,
@@ -676,6 +672,33 @@ async def holding_valuation(
         pe_history=history,
         method=HOLDING_METHOD,
     )
+
+
+async def listing_ratio(
+    pool: asyncpg.Pool, ticker: str, profile: HoldingProfile
+) -> tuple[float, str]:
+    """Home-market shares per priced share, from the one setting the SEC XBRL package owns
+    (`share_basis.ads_ratio`): the holding profile's value, else the ratio the latest 20-F
+    states (read by the SEC XBRL job into `shares_outstanding`), else the documented
+    default by CIK (TSMC 5), else 1."""
+    if profile.share_basis.ads_ratio is not None:
+        return float(profile.share_basis.ads_ratio), "holding profile (share basis)"
+    row = await pool.fetchrow(
+        "select s.ads_ratio_reported, s.form, s.accession, i.cik from public.instrument i"
+        " left join lateral (select ads_ratio_reported, form, accession"
+        "   from public.shares_outstanding where ticker = i.t212_ticker"
+        "   and ads_ratio_reported is not null order by as_of desc, fetched_at desc limit 1) s"
+        "   on true where i.t212_ticker = $1",
+        ticker,
+    )
+    if row is not None and row["ads_ratio_reported"] is not None:
+        where = " ".join(x for x in (row["form"], row["accession"]) if x) or "annual report"
+        return float(row["ads_ratio_reported"]), f"stated in the {where}"
+    cik = profile.sec_cik.zfill(10) if profile.sec_cik else (row["cik"] if row else None)
+    default = DEFAULT_BASIS_BY_CIK.get(cik or "")
+    if default is not None and default.ads_ratio is not None:
+        return float(basis_for(profile, cik).ads_ratio), f"default: {default.note}"
+    return 1.0, "one home-market share per listed share (default)"
 
 
 def merged_steps(chosen: _Chosen, candidates: Iterable[_Chosen]) -> list[EpsStep]:

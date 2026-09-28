@@ -17,6 +17,7 @@ import {
   FRED_UNITS,
   jobsFromBody,
   jobsToBody,
+  MACRO_REF,
   MACRO_SOURCES,
   MODEL_SUGGESTIONS,
   newClosure,
@@ -518,7 +519,7 @@ function MacroSeriesEditor({
             {rows.length === 0 ? <p className="text-sm text-text-muted">No {label} series.</p> : null}
             {rows.map((r, i) => {
               const path = `${listPath}.${i}`;
-              const refPath = `${path}.${source === "eurostat" ? "dataset" : source === "fred" ? "series_id" : "flow_key"}`;
+              const refPath = `${path}.${MACRO_REF[source]}`;
               return (
                 <div key={r.rowKey} role="group" aria-label={`${label} series ${r.key || i + 1}`} className="space-y-2 rounded-md border border-border p-3">
                   <div className="grid items-start gap-2 sm:grid-cols-2 lg:grid-cols-[1fr_2fr_1.5fr_0.7fr_auto]">

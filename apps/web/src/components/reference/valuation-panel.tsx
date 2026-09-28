@@ -185,7 +185,12 @@ function StockBody({ data }: { data: HoldingValuation }) {
             {eps && !manual ? (
               <p>
                 EPS {eps.method}
-                {data.shares_per_listing !== 1 ? <> · {data.shares_per_listing} shares per listed unit</> : null}
+                {data.ads_ratio !== 1 ? (
+                  <>
+                    {" "}
+                    · × {data.ads_ratio} shares per listed share ({data.ads_ratio_source})
+                  </>
+                ) : null}
               </p>
             ) : null}
             {data.book_value_per_share ? (

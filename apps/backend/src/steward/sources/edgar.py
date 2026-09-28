@@ -126,21 +126,18 @@ class EdgarClient:
         data: dict[str, Any] = response.json()
         return data
 
-    async def submissions(self, cik: str) -> dict[str, Any]:
-        """The issuer's submissions JSON as EDGAR serves it."""
-        data: dict[str, Any] = (await self._get(SUBMISSIONS_URL.format(cik=pad_cik(cik)))).json()
-        return data
+    async def filing_files(self, filing: Filing) -> list[str]:
+        """Names of every file in the filing's archive folder (its `index.json`)."""
+        data: dict[str, Any] = (await self._get(filing.url("index.json"))).json()
+        items = (data.get("directory") or {}).get("item") or []
+        return [str(i["name"]) for i in items if isinstance(i, dict) and i.get("name")]
 
-    async def instance_document(self, filing: Filing) -> tuple[str, bytes]:
-        """(URL, content) of the filing's XBRL instance (`*_htm.xml`, the extracted
-        instance of an inline XBRL filing, or a plain `.xml` instance)."""
-        index = (await self._get(filing.url("index.json"))).json()
-        names = [str(i.get("name", "")) for i in index.get("directory", {}).get("item", [])]
-        name = pick_instance(names, filing.primary_document)
-        if name is None:
-            raise EdgarError(f"no XBRL instance in {filing.accession}")
-        url = filing.url(name)
-        return url, (await self._get(url)).content
+    async def document(self, url: str, max_bytes: int = 64 * 1024 * 1024) -> bytes:
+        """A filing document's bytes (an XBRL instance is 3-11 MB)."""
+        content = (await self._get(url)).content
+        if len(content) > max_bytes:
+            raise EdgarError(f"EDGAR {url} is {len(content)} bytes, over the {max_bytes} limit")
+        return content
 
     async def exhibit_documents(self, filing: Filing) -> list[tuple[str, str]]:
         """(type, file name) of every document in the filing, from its index page."""
@@ -242,23 +239,57 @@ def parse_index(text: str) -> list[tuple[str, str]]:
     return documents
 
 
-def pick_instance(names: list[str], primary_document: str) -> str | None:
-    """The XBRL instance among a filing's file names: the primary document's `_htm.xml`,
-    else any `_htm.xml`, else a lone `.xml` that is not a linkbase, schema or summary."""
-    stem = primary_document.rsplit(".", 1)[0]
-    if f"{stem}_htm.xml" in names:
-        return f"{stem}_htm.xml"
-    extracted = [n for n in names if n.endswith("_htm.xml")]
-    if extracted:
-        return extracted[0]
-    plain = [
-        n
-        for n in names
-        if n.endswith(".xml")
-        and not re.search(r"_(cal|def|lab|pre)\.xml$", n)
-        and n not in ("FilingSummary.xml", "MetaLinks.xml")
-    ]
-    return plain[0] if len(plain) == 1 else None
+PERIODIC_FORMS = ("10-K", "10-Q", "20-F", "40-F", "10-K/A", "20-F/A")
+ANNUAL_FORMS = ("10-K", "20-F", "40-F", "10-K/A", "20-F/A")
+
+
+def latest_periodic(filings: list[Filing]) -> tuple[Filing | None, Filing | None]:
+    """The latest annual report (10-K / 20-F / 40-F) and the latest 10-Q filed after it."""
+    ordered = sorted(filings, key=lambda f: (f.filing_date, f.accession), reverse=True)
+    annual = next((f for f in ordered if f.form in ANNUAL_FORMS), None)
+    quarter = next(
+        (
+            f
+            for f in ordered
+            if f.form in ("10-Q", "10-Q/A")
+            and (
+                annual is None
+                or (f.filing_date, f.accession) > (annual.filing_date, annual.accession)
+            )
+        ),
+        None,
+    )
+    return annual, quarter
+
+
+def _after(a: Filing, b: Filing) -> bool:
+    return (a.filing_date, a.accession) > (b.filing_date, b.accession)
+
+
+def xbrl_documents(filing: Filing, files: list[str]) -> tuple[str | None, str | None]:
+    """The filing's XBRL instance and label linkbase names. Inline XBRL filings carry the
+    SEC's extracted instance `<primary document>_htm.xml`; older ones a plain `.xml`. Labels
+    come from `_lab.xml`, or from the company schema (`.xsd`) that embeds the linkbases."""
+    names = set(files)
+    base = filing.primary_document.rsplit(".", 1)[0]
+    instance: str | None = f"{base}_htm.xml" if f"{base}_htm.xml" in names else None
+    if instance is None:
+        instance = next((n for n in files if n.endswith("_htm.xml")), None)
+    if instance is None:
+        linkbases = ("_cal.xml", "_def.xml", "_lab.xml", "_pre.xml")
+        instance = next(
+            (
+                n
+                for n in files
+                if n.endswith(".xml") and not n.endswith(linkbases) and n != "FilingSummary.xml"
+            ),
+            None,
+        )
+    # Some filing agents embed the linkbases in the company schema instead of `_lab.xml`.
+    label = next((n for n in files if n.endswith("_lab.xml")), None) or next(
+        (n for n in files if n.endswith(".xsd")), None
+    )
+    return instance, label
 
 
 def pick_press_release(documents: list[tuple[str, str]]) -> str | None:

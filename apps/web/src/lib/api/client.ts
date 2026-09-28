@@ -84,6 +84,10 @@ export type TransactionOut = Schemas["TransactionOut"];
 export type TransactionType = TransactionOut["type"];
 export type TransactionsPage = Schemas["TransactionsPage"];
 export type TotalByCurrency = Schemas["TotalByCurrency"];
+export type FeeTotals = Schemas["FeeTotals"];
+export type TransactionFeeOut = Schemas["TransactionFeeOut"];
+export type PortfolioRisk = Schemas["PortfolioRisk"];
+export type SharpeStats = Schemas["SharpeStats"];
 export type HoldingIdentity = Schemas["HoldingIdentity"];
 export type IdentifierOut = Schemas["IdentifierOut"];
 export type ListingOut = Schemas["ListingOut"];
@@ -182,6 +186,14 @@ export type BenchmarkValuation = Schemas["BenchmarkValuation"];
 export type ValuationContribution = Schemas["ValuationContribution"];
 export type PePoint = Schemas["PePoint"];
 export type ManualFundamentals = Schemas["ManualFundamentals"];
+// SEC XBRL fundamentals: revenue breakdowns and shares outstanding.
+export type HoldingSegments = Schemas["HoldingSegments"];
+export type SegmentRow = Schemas["SegmentRow"];
+export type SegmentPeriod = Schemas["SegmentPeriod"];
+export type SegmentHistoryPoint = Schemas["SegmentHistoryPoint"];
+export type SharesOutstandingOut = Schemas["SharesOutstandingOut"];
+export type ShareBasis = Schemas["ShareBasis"];
+export type ManualSegmentRow = Schemas["ManualSegmentRow"];
 // Prompts config: owner overrides of the AI steps' system prompts.
 export type PromptsConfig = Schemas["PromptsConfig"];
 export type PromptDefault = Schemas["PromptDefault"];

@@ -9,6 +9,7 @@ import { AlertMessage } from "@/components/alert-message";
 import { EmptyState } from "@/components/empty-state";
 import { PageHeader } from "@/components/page-header";
 import { HoldingsTabs } from "@/components/portfolio/holdings-tabs";
+import { FeeCell, FeeTotalsPanel } from "@/components/portfolio/transaction-fees";
 import { Blueprint, BlueprintCorners, PanelHeading } from "@/components/ui/blueprint";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -273,7 +274,10 @@ export function TransactionsView() {
       {load.kind === "ok" ? (
         <div className="grid grid-cols-1 gap-5 xl:grid-cols-[minmax(0,1.5fr)_minmax(0,1fr)]">
           <Totals totals={load.page.totals} count={load.page.total_count} />
-          <Dividends filters={filters} dividends={load.page.dividends} />
+          <div className="flex min-w-0 flex-col gap-5">
+            <Dividends filters={filters} dividends={load.page.dividends} />
+            {load.page.fees ? <FeeTotalsPanel fees={load.page.fees} /> : null}
+          </div>
         </div>
       ) : null}
     </div>
@@ -512,7 +516,7 @@ function TransactionTable({ rows, busy }: { rows: TransactionOut[]; busy: boolea
   }
   return (
     <div className={cn("relative overflow-x-auto", busy && "opacity-60")}>
-      <table className="w-full min-w-[56rem] text-sm">
+      <table className="w-full min-w-[62rem] text-sm">
         <caption className="sr-only">Transactions, newest first</caption>
         <thead className="bg-surface-muted">
           <tr className="border-b border-border text-left text-[11px] tracking-[0.08em] text-text-muted uppercase">
@@ -525,6 +529,9 @@ function TransactionTable({ rows, busy }: { rows: TransactionOut[]; busy: boolea
             </th>
             <th scope="col" className="w-[18%] px-3 py-2.5 font-medium">
               <span title="Each amount against the largest on this page (same currency)">Relative size</span>
+            </th>
+            <th scope="col" className="px-3 py-2.5 text-right font-medium">
+              <span title="Trading212 fees and taxes on the fill (FX conversion, stamp duty, …)">Fees</span>
             </th>
             <th scope="col" className="px-5 py-2.5 text-right font-medium">Amount</th>
           </tr>
@@ -570,6 +577,9 @@ function TransactionTable({ rows, busy }: { rows: TransactionOut[]; busy: boolea
                   <div className="h-1.5 bg-border-soft">
                     <div className="h-full bg-accent/55" style={{ width: `${max > 0 ? (Math.abs(r.amount) / max) * 100 : 0}%` }} />
                   </div>
+                </td>
+                <td className="px-3 py-2.5 text-right text-[13px]">
+                  <FeeCell row={r} />
                 </td>
                 <td className={cn("num px-5 py-2.5 text-right font-semibold whitespace-nowrap", r.amount > 0 && "text-gain")}>
                   {money(r.amount, r.currency, true)}

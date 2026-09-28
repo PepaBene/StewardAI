@@ -46,8 +46,10 @@ export const JOB_TYPES = [
   "monitor",
   "research",
   "ownership_13f",
+  "etf_look_through",
   "monthly_review",
   "chat",
+  "sec_xbrl",
   "valuation_refresh",
 ] as const;
 

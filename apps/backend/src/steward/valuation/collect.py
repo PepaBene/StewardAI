@@ -4,10 +4,12 @@ behind P/E, P/B and dividend yield, and the ETF providers' fund-level figures.
 Per holding (ETFs excepted, they are valued at fund level):
 
 - SEC: the issuer's latest periodic report (10-Q, 10-K, 20-F, 40-F) is looked up in its
-  submissions. When it differs from the one the stored figures were built on, or those are
+  filing list. When it differs from the one the stored figures were built on, or those are
   older than `full_refresh_days`, companyfacts is read again. When companyfacts carries no
   EPS from that latest report (it can lag, or miss a filing's financial statements as it
-  did TSMC's FY2025 20-F), the report's own XBRL instance is parsed instead.
+  did TSMC's FY2025 20-F), the report's own XBRL instance is parsed instead. The share
+  count for book value per share may come from the SEC XBRL job's `shares_outstanding`
+  (class-summed cover-page figure) when it is the one closest to the balance-sheet date.
 - ESEF (filings.xbrl.org), for issuers with an LEI: the latest filing within
   `esef_max_age_months`, plus the latest annual report when that is an interim one (so a
   half year can be rolled into a trailing year). Novo Nordisk's quarterly reports make its
@@ -39,7 +41,14 @@ from steward.jobs.runner import JobContext
 from steward.reference.identity import holding_tickers
 from steward.reference.prices import symbols_for
 from steward.settings import get_settings
-from steward.sources.edgar import EdgarClient, EdgarError, Filing, parse_submissions
+from steward.sources.edgar import (
+    EdgarClient,
+    EdgarError,
+    Filing,
+    latest_periodic,
+    xbrl_documents,
+)
+from steward.sources.esef import EsefFiling, esef_document, esef_filings, parse_xbrl_json
 from steward.sources.finnhub import FinnhubError, basic_financials
 from steward.sources.fund_characteristics import (
     FundDataError,
@@ -47,14 +56,7 @@ from steward.sources.fund_characteristics import (
     ishares_characteristics,
     vanguard_characteristics,
 )
-from steward.sources.xbrl import (
-    EsefFiling,
-    XbrlError,
-    esef_document,
-    esef_filings,
-    parse_instance,
-    parse_xbrl_json,
-)
+from steward.sources.xbrl import XbrlError, parse_instance, plain_facts
 from steward.valuation.common import (
     fund_for_ticker,
     fx_currencies,
@@ -76,7 +78,6 @@ from steward.valuation.fundamentals import (
 
 logger = logging.getLogger(__name__)
 
-PERIODIC_FORMS = {"10-Q", "10-K", "20-F", "40-F", "10-Q/A", "10-K/A", "20-F/A", "40-F/A"}
 STATUS_KEY = "valuation_status"
 FINNHUB_FIELDS = (
     "peTTM",
@@ -250,9 +251,54 @@ async def refresh_funds(
 # ---------------------------------------------------------------------------
 
 
-def latest_periodic(filings: list[Filing]) -> Filing | None:
-    periodic = [f for f in filings if f.form in PERIODIC_FORMS]
-    return max(periodic, key=lambda f: (f.filing_date, f.accession)) if periodic else None
+def latest_report(filings: list[Filing]) -> Filing | None:
+    """The latest periodic report: the 10-Q filed after the latest annual report, else that
+    annual report (10-K, 20-F, 40-F)."""
+    annual, quarter = latest_periodic(filings)
+    return quarter or annual
+
+
+# shares_outstanding.method (the SEC XBRL job) -> the concept the figure was read from.
+TABLE_SHARE_CONCEPTS = {
+    "dei_companyfacts": "dei:EntityCommonStockSharesOutstanding",
+    "dei_instance": "dei:EntityCommonStockSharesOutstanding",
+    "dei_instance_classes": "dei:EntityCommonStockSharesOutstanding",
+    "us_gaap_common_stock": "us-gaap:CommonStockSharesOutstanding",
+    "ifrs_number_of_shares": "ifrs-full:NumberOfSharesOutstanding",
+}
+
+
+async def table_shares(pool: asyncpg.Pool, ticker: str) -> list[Fact]:
+    """The SEC XBRL job's latest shares-outstanding figure (`shares_outstanding`) as a share
+    fact for book value per share. It sums share classes from the filing instance, which
+    companyfacts cannot (Alphabet, Novo Nordisk). Not used when the holding profile narrows
+    the counted classes (that figure is not all shares) or when it was entered manually.
+    `_shares_for` then picks whichever count is closest to the balance-sheet date."""
+    row = await pool.fetchrow(
+        "select shares, as_of, method, classes, accession, form, filed, source_url"
+        " from public.shares_outstanding where ticker = $1"
+        " order by as_of desc, fetched_at desc limit 1",
+        ticker,
+    )
+    if row is None or row["method"] not in TABLE_SHARE_CONCEPTS:
+        return []
+    classes = json.loads(row["classes"]) if isinstance(row["classes"], str) else row["classes"]
+    if any(c.get("counted") is False for c in classes or []):
+        return []
+    return [
+        Fact(
+            concept=TABLE_SHARE_CONCEPTS[row["method"]],
+            start=None,
+            end=row["as_of"],
+            value=Decimal(row["shares"]),
+            unit="shares",
+            source="sec_xbrl",
+            ref=row["accession"] or "",
+            filed=row["filed"],
+            form=row["form"],
+            url=row["source_url"],
+        )
+    ]
 
 
 def _due(
@@ -286,8 +332,7 @@ async def refresh_sec(
 ) -> None:
     assert deps.edgar is not None
     edgar = deps.edgar
-    submissions = await edgar.submissions(cik)
-    latest = latest_periodic(parse_submissions(cik, submissions))
+    latest = latest_report(await edgar.filings(cik))
     if latest is None:
         detail["sec"] = "no periodic reports (10-Q, 10-K, 20-F) on EDGAR"
         return
@@ -314,8 +359,11 @@ async def refresh_sec(
     if latest.accession not in eps_refs:
         # companyfacts has nothing (or only the cover page) from the latest report.
         try:
-            instance_url, content = await edgar.instance_document(latest)
-            parsed = parse_instance(content, ALL_CONCEPTS)
+            instance_name, _labels = xbrl_documents(latest, await edgar.filing_files(latest))
+            if instance_name is None:
+                raise XbrlError(f"{latest.form} {latest.accession} has no XBRL instance")
+            instance_url = latest.url(instance_name)
+            parsed = plain_facts(parse_instance(await edgar.document(instance_url), ALL_CONCEPTS))
         except (EdgarError, XbrlError, httpx.HTTPError) as exc:
             detail["instance_error"] = str(exc)[:300]
         else:
@@ -335,12 +383,16 @@ async def refresh_sec(
                 )
                 for x in parsed
             ]
-            raw["instance"] = {"url": instance_url, "facts": [x.raw for x in parsed]}
+            raw["instance"] = {
+                "url": instance_url,
+                "facts": [{"contextRef": x.fact.context.id, "xml": x.fact.xml} for x in parsed],
+            }
             detail["instance_fallback"] = (
                 f"companyfacts lacks {latest.form} {latest.accession}: read {len(parsed)} facts "
                 "from its XBRL instance"
             )
-    figures = compute("sec", facts, tc.preferred, deps.today)
+    shares = await table_shares(pool, tc.ticker)
+    figures = compute("sec", [*facts, *shares], tc.preferred, deps.today)
     if figures is None:
         detail["sec"] = "no EPS in the SEC filings"
         return
@@ -472,7 +524,7 @@ async def refresh_esef(
         raw["filings"].append({**filing.raw, "json_url": filing.json_url})
         raw["facts"] += [{**x.raw, "filing": filing.id} for x in parsed]
     if not any(f.concept in SHARES_CONCEPTS for f in facts):
-        facts += _stored_shares(tc.stored.get("sec"))
+        facts += await table_shares(pool, tc.ticker) or _stored_shares(tc.stored.get("sec"))
     figures = compute("esef", facts, tc.preferred, deps.today)
     if figures is None:
         detail["esef"] = "no EPS in the ESEF filings"

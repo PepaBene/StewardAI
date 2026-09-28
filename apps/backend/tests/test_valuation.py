@@ -31,14 +31,10 @@ from steward.config.jobs import FundValuationSource, JobsConfig
 from steward.config.store import save_config
 from steward.fx.convert import FxRate, FxTable
 from steward.jobs.runner import JobContext, run_job
-from steward.sources.edgar import EdgarClient, pick_instance
+from steward.sources.edgar import EdgarClient
+from steward.sources.esef import EsefFiling, parse_filings, parse_xbrl_json
 from steward.sources.fund_characteristics import FundDataError, parse_ishares, parse_vanguard
-from steward.sources.xbrl import (
-    EsefFiling,
-    parse_filings,
-    parse_instance,
-    parse_xbrl_json,
-)
+from steward.sources.xbrl import XbrlError, parse_instance, plain_facts
 from steward.valuation.collect import (
     ValuationDeps,
     pick_esef,
@@ -208,7 +204,9 @@ def test_tsmc_companyfacts_stop_at_fy2024() -> None:
 
 
 def test_instance_parser_reads_non_dimensional_facts() -> None:
-    facts = parse_instance((FIXTURES / "tsm-20251231_htm.xml").read_bytes(), ALL_CONCEPTS)
+    facts = plain_facts(
+        parse_instance((FIXTURES / "tsm-20251231_htm.xml").read_bytes(), ALL_CONCEPTS)
+    )
     eps = [f for f in facts if f.concept == "ifrs-full:DilutedEarningsLossPerShare"]
     assert ("USD/shares", Decimal("2.09")) in {(f.unit, f.value) for f in eps if f.end.year == 2025}
     assert ("TWD/shares", Decimal("65.47")) in {
@@ -217,7 +215,12 @@ def test_instance_parser_reads_non_dimensional_facts() -> None:
     shares = [f for f in facts if f.concept == "dei:EntityCommonStockSharesOutstanding"]
     assert shares and shares[0].start is None and shares[0].value == Decimal(25932524521)
     # The dimensional context (c-2) is never read as a total.
-    assert all(f.raw["contextRef"] != "c-2" for f in facts)
+    assert all(f.fact.context.id != "c-2" for f in facts)
+
+
+def test_instance_with_a_dtd_is_refused() -> None:
+    with pytest.raises(XbrlError):
+        parse_instance(b'<?xml version="1.0"?><!DOCTYPE x [<!ENTITY a "b">]><xbrl/>')
 
 
 def test_currency_choice_prefers_a_convertible_reporting_currency() -> None:
@@ -359,18 +362,6 @@ def test_vanguard_characteristics() -> None:
 def test_vanguard_errors_fail_loudly() -> None:
     with pytest.raises(FundDataError):
         parse_vanguard({"errors": [{"message": "Cannot query field"}]}, "u")
-
-
-def test_pick_instance() -> None:
-    names = [
-        "tsm-20251231.htm",
-        "tsm-20251231_htm.xml",
-        "tsm-20251231_lab.xml",
-        "Financial_Report.xlsx",
-    ]
-    assert pick_instance(names, "tsm-20251231.htm") == "tsm-20251231_htm.xml"
-    assert pick_instance(["a.xml", "a_lab.xml", "FilingSummary.xml"], "a.htm") == "a.xml"
-    assert pick_instance(["a_lab.xml"], "a.htm") is None
 
 
 # ---------------------------------------------------------------------------
@@ -570,7 +561,6 @@ async def _seed(pool: asyncpg.Pool) -> None:
                         ticker="TSM_US_EQ",
                         sec_cik="1046179",
                         reporting_currency="TWD",
-                        shares_per_listing=5,
                     ),
                     HoldingProfile(
                         ticker="CEZ_EQ",
@@ -639,6 +629,9 @@ async def test_refresh_falls_back_to_the_instance_and_serves_ratios(
     assert "EarningsPerShareDiluted" not in json.dumps(raw["companyfacts"])  # IFRS filer
 
     tsm = (await api.get("/holdings/TSM_US_EQ/valuation")).json()
+    # No share basis in the profile: the documented default (1 ADS = 5 common shares).
+    assert tsm["ads_ratio"] == 5
+    assert tsm["ads_ratio_source"].startswith("default: TSMC 20-F")
     assert tsm["pe"]["value"] == pytest.approx(242.10 / (2.09 * 5))
     assert tsm["eps_ttm"]["annual_only"] is True
     assert tsm["eps_ttm"]["stale"] is True  # period ended over 200 days ago
@@ -759,3 +752,37 @@ def test_pe_history_starts_with_the_other_sources_older_steps() -> None:
         ("2026-03-04", 23.03),
         ("2026-09-02", 26.2),
     ]
+
+
+@pytestmark_db
+async def test_ads_ratio_from_the_share_basis_and_the_20f(
+    api: httpx.AsyncClient, backend_pool: asyncpg.Pool
+) -> None:
+    await _seed(backend_pool)
+    await backend_pool.execute(
+        "insert into public.shares_outstanding (ticker, cik, shares, as_of, method, accession,"
+        " form, ads_ratio_reported, ads_ratio_text, raw) values ('TSM_US_EQ', '0001046179',"
+        " 25932524521, '2025-12-31', 'dei_instance', '0001628280-26-025362', '20-F', 5,"
+        " 'each ADS represents five (5) common shares', '{}'::jsonb)"
+    )
+    stated = (await api.get("/holdings/TSM_US_EQ/valuation")).json()
+    assert stated["ads_ratio"] == 5
+    assert stated["ads_ratio_source"] == "stated in the 20-F 0001628280-26-025362"
+    async with backend_pool.acquire() as conn, conn.transaction():
+        await save_config(
+            conn,
+            "holding_profiles",
+            HoldingProfilesConfig(
+                profiles=[
+                    HoldingProfile(
+                        ticker="TSM_US_EQ", sec_cik="1046179", share_basis={"ads_ratio": 2}
+                    )
+                ]
+            ),
+            created_by=None,
+        )
+    profile = (await api.get("/holdings/TSM_US_EQ/valuation")).json()
+    assert (profile["ads_ratio"], profile["ads_ratio_source"]) == (
+        2,
+        "holding profile (share basis)",
+    )
