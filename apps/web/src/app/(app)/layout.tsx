@@ -49,19 +49,19 @@ export default async function AppLayout({ children }: LayoutProps<"/">) {
       </a>
       <header className="border-b border-border bg-surface">
         <div className="mx-auto flex h-[60px] max-w-[1440px] items-center gap-3 px-4 md:px-8">
-          <Link href="/" className="flex shrink-0 items-center gap-2.5">
+          <Link href="/" aria-label="StewardAI" className="flex shrink-0 items-center gap-2.5">
             <span
               aria-hidden="true"
               className="grid size-[26px] place-items-center bg-accent font-heading text-lg leading-none font-bold text-accent-foreground"
             >
               S
             </span>
-            <span className="font-heading text-[22px] font-semibold tracking-[-0.01em]">StewardAI</span>
+            <span className="hidden font-heading text-[22px] font-semibold tracking-[-0.01em] sm:inline">StewardAI</span>
           </Link>
           <div className="ml-2 lg:ml-7">
             <CommandPalette />
           </div>
-          <div className="ml-auto flex items-center gap-2 whitespace-nowrap">
+          <div className="ml-auto flex min-w-0 items-center gap-1 whitespace-nowrap sm:gap-2">
             <SyncIndicator />
             <ChatPanel />
             <span aria-hidden="true" className="mx-1.5 hidden h-[22px] w-px bg-border lg:block" />
