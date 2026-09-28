@@ -8,7 +8,7 @@ import { LineChart } from "@/components/charts";
 import { Blueprint, PanelHeading } from "@/components/ui/blueprint";
 import { Button } from "@/components/ui/button";
 import { getBrowserApiClient, type FundValuation, type HoldingValuation, type ValuationRatio } from "@/lib/api/client";
-import { formatDate } from "@/lib/format";
+import { formatDate, formatDateTime } from "@/lib/format";
 import { useApiResource } from "@/lib/hooks/use-api-resource";
 import { jobHref } from "@/lib/jobs/job-detail";
 import {
@@ -91,7 +91,7 @@ export function ValuationPanel({ ticker }: { ticker: string }) {
         <p className="-mt-1 text-[11px] text-text-faint">
           Close {data.price.currency ?? ""} {data.price.close.toLocaleString("en-GB", { maximumFractionDigits: 2 })} on{" "}
           {formatDate(data.price.date)} ({data.price.source}){data.price.stale ? " · stale" : ""}
-          {data.checked_at ? <> · fundamentals checked {formatDate(data.checked_at)}</> : null}
+          {data.checked_at ? <> · fundamentals checked {formatDateTime(data.checked_at)}</> : null}
         </p>
       ) : null}
       {state.kind === "loading" ? (
@@ -147,13 +147,13 @@ function RefreshControl({ ticker }: { ticker: string }) {
 function StockBody({ data }: { data: HoldingValuation }) {
   const eps = data.eps_ttm;
   const manual = data.fundamentals?.source === "manual";
-  const flags = [...figureFlags(eps), ...(manual ? ["entered manually"] : [])];
+  const flags = figureFlags(eps);
   const nothing = !data.fundamentals && data.pe.value === null && data.pb.value === null;
   const history = data.pe_history.map((p) => ({ date: p.date, value: p.pe }));
   const errors = Object.entries(data.errors ?? {});
 
   return (
-    <div className="grid grid-cols-1 gap-5 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.15fr)]">
+    <div className={cn("grid grid-cols-1 gap-5", !manual && "lg:grid-cols-[minmax(0,1fr)_minmax(0,1.15fr)]")}>
       <div className="flex min-w-0 flex-col gap-3">
         <dl className="grid grid-cols-2 gap-x-4 gap-y-3 sm:grid-cols-4">
           <Stat label="P/E (TTM)" value={ratioText(data.pe)} sub={reasonOf(data.pe)} />
@@ -182,7 +182,7 @@ function StockBody({ data }: { data: HoldingValuation }) {
                 <Flag key={f}>{f}</Flag>
               ))}
             </p>
-            {eps ? (
+            {eps && !manual ? (
               <p>
                 EPS {eps.method}
                 {data.shares_per_listing !== 1 ? <> · {data.shares_per_listing} shares per listed unit</> : null}
@@ -190,7 +190,8 @@ function StockBody({ data }: { data: HoldingValuation }) {
             ) : null}
             {data.book_value_per_share ? (
               <p>
-                Book value {formatPerShare(data.book_value_per_share)} per share ({data.book_value_per_share.method})
+                Book value {formatPerShare(data.book_value_per_share)} per share
+                {manual ? null : <> ({data.book_value_per_share.method})</>}
               </p>
             ) : null}
             {data.dividend_per_share ? (
@@ -198,11 +199,11 @@ function StockBody({ data }: { data: HoldingValuation }) {
                 Dividends {formatPerShare(data.dividend_per_share)} per share ({periodLabel(data.dividend_per_share)})
               </p>
             ) : null}
-            {data.fundamentals.fetched_at ? <p>Read {formatDate(data.fundamentals.fetched_at)}</p> : null}
-            {data.fundamentals.as_of ? <p>Entered for {formatDate(data.fundamentals.as_of)}</p> : null}
+            {data.fundamentals.fetched_at ? <p>Read {formatDateTime(data.fundamentals.fetched_at)}</p> : null}
+            {data.fundamentals.as_of ? <p>Entered for {formatDate(data.fundamentals.as_of)} in the holding profile</p> : null}
             {data.fundamentals.notes.map((n) => (
               <p key={n} className="text-text-faint">
-                {n}
+                {manual ? <>Source: {n}</> : n}
               </p>
             ))}
           </div>
@@ -230,7 +231,7 @@ function StockBody({ data }: { data: HoldingValuation }) {
           <p className="border-t border-border pt-3 text-[12px] text-text-muted">
             Cross-check, {data.cross_check.source_label}: P/E {formatMultiple(data.cross_check.pe)} · P/B {formatMultiple(data.cross_check.pb)}
             {data.cross_check.eps_ttm !== null && data.cross_check.eps_ttm !== undefined ? ` · EPS ${data.cross_check.eps_ttm.toFixed(2)}` : ""} · read{" "}
-            {formatDate(data.cross_check.fetched_at)}
+            {formatDateTime(data.cross_check.fetched_at)}
           </p>
         ) : null}
         {errors.length > 0 ? (
@@ -239,8 +240,11 @@ function StockBody({ data }: { data: HoldingValuation }) {
           </p>
         ) : null}
       </div>
+      {manual ? null : (
       <div className="flex min-w-0 flex-col gap-2">
-        <p className="text-[11px] tracking-wide text-text-muted uppercase">P/E over two years</p>
+        <p className="text-[11px] tracking-wide text-text-muted uppercase">
+          {history.length > 1 && historySpanDays(history) < 600 ? `P/E since ${formatDate(history[0].date)}` : "P/E over two years"}
+        </p>
         {history.length >= 4 ? (
           <LineChart
             data={history}
@@ -252,13 +256,14 @@ function StockBody({ data }: { data: HoldingValuation }) {
           />
         ) : (
           <div className="flex min-h-[140px] items-center justify-center border border-dashed border-border px-4 text-center text-[12px] text-text-faint">
-            {manual ? "No history for figures entered manually." : "Not enough EPS history to chart the P/E."}
+            Not enough EPS history to chart the P/E.
           </div>
         )}
         <p className="text-[11px] leading-snug text-text-faint">
           Each week&rsquo;s close over the EPS TTM in force then (a step on each report&rsquo;s filing date). {data.method}
         </p>
       </div>
+      )}
     </div>
   );
 }
@@ -296,4 +301,9 @@ function FundBody({ data }: { data: HoldingValuation }) {
       ) : null}
     </div>
   );
+}
+
+function historySpanDays(points: readonly { date: string }[]): number {
+  if (points.length < 2) return 0;
+  return (Date.parse(points[points.length - 1].date) - Date.parse(points[0].date)) / 86_400_000;
 }

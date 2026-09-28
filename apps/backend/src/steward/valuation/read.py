@@ -7,6 +7,7 @@ fund figures. Nothing is estimated; a ratio that cannot be computed is null with
 
 import datetime as dt
 import json
+from collections.abc import Iterable
 from decimal import Decimal
 from typing import Any, Literal
 
@@ -270,8 +271,7 @@ def _manual_figure(
         currency=manual.currency,
         period_start=None,
         period_end=manual.as_of,
-        method=f"{what} entered manually"
-        + (f": {manual.source_note}" if manual.source_note else ""),
+        method=f"{what} entered manually",
         annual_only=False,
         stale=_stale(manual.as_of, today),
     )
@@ -649,7 +649,14 @@ async def holding_valuation(
         and not depositary_unknown
     ):
         history = await pe_history(
-            pool, symbol, price.currency, eps.currency, chosen.steps, per_listing, source, today
+            pool,
+            symbol,
+            price.currency,
+            eps.currency,
+            merged_steps(chosen, candidates.values()),
+            per_listing,
+            source,
+            today,
         )
 
     return HoldingValuation(
@@ -669,6 +676,28 @@ async def holding_valuation(
         pe_history=history,
         method=HOLDING_METHOD,
     )
+
+
+def merged_steps(chosen: _Chosen, candidates: Iterable[_Chosen]) -> list[EpsStep]:
+    """The chosen source's EPS steps, preceded by another automatic source's steps (same
+    currency and basis) from before the chosen source's first one: ESEF interim reports go
+    back only so far, the SEC's annual figures further."""
+    steps = list(chosen.steps)
+    if not steps or chosen.eps is None:
+        return steps
+    first = steps[0].effective
+    for other in candidates:
+        if (
+            other is chosen
+            or other.eps is None
+            or other.fundamentals.source == "manual"
+            or other.eps.currency != chosen.eps.currency
+            or other.fundamentals.basis != chosen.fundamentals.basis
+        ):
+            continue
+        steps = [s for s in other.steps if s.effective < first] + steps
+        break
+    return steps
 
 
 def _missing_reason(
