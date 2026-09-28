@@ -1,6 +1,11 @@
-import type { NewsStats, SourceHealth, SourcesHealth, SourceTrustOut } from "@/lib/api/client";
+import type { SourceTrustOut } from "@/lib/api/client";
+import type { components } from "@/lib/api/schema";
 import { EMPTY_FILTERS, type FeedFilters } from "@/lib/news/feed-filters";
 import { eventLabel } from "@/lib/news/labels";
+
+export type NewsStats = components["schemas"]["NewsStats"];
+export type SourceHealth = components["schemas"]["SourceHealth"];
+export type SourcesHealth = components["schemas"]["SourcesHealth"];
 
 /*
  * The News page's summary panels, from `GET /news/stats`, `GET /news/sources/health` and
@@ -57,12 +62,19 @@ export function timelineTitle(stats: Pick<NewsStats, "total" | "days">): string 
 // Categories
 // ---------------------------------------------------------------------------
 
-/** Classified stories per event type, most first, as donut segments with readable labels. */
-export function categorySegments(stats: Pick<NewsStats, "by_event_type">): { label: string; value: number }[] {
-  return stats.by_event_type
+/**
+ * Classified stories per event type, most first, as donut segments with readable labels.
+ * Past `limit` types the tail folds into one "N more types" segment (the event type
+ * "other" keeps its own slice, so the two never read alike).
+ */
+export function categorySegments(stats: Pick<NewsStats, "by_event_type">, limit = 6): { label: string; value: number }[] {
+  const all = stats.by_event_type
     .filter((c) => c.count > 0)
     .sort((a, b) => b.count - a.count)
     .map((c) => ({ label: eventLabel(c.event_type), value: c.count }));
+  if (all.length <= limit) return all;
+  const tail = all.slice(limit - 1);
+  return [...all.slice(0, limit - 1), { label: `${tail.length} more types`, value: tail.reduce((s, c) => s + c.value, 0) }];
 }
 
 // ---------------------------------------------------------------------------

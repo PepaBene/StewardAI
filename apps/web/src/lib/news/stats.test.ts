@@ -1,6 +1,5 @@
 import { describe, expect, it } from "vitest";
 
-import type { SourceHealth } from "@/lib/api/client";
 import { EMPTY_FILTERS } from "@/lib/news/feed-filters";
 
 import {
@@ -14,6 +13,7 @@ import {
   storyTime,
   timelineTitle,
   trustBars,
+  type SourceHealth,
 } from "./stats";
 
 describe("severityColumns", () => {
@@ -54,6 +54,17 @@ describe("categorySegments", () => {
     ).toEqual([
       { label: "Guidance change", value: 3 },
       { label: "M&A", value: 1 },
+    ]);
+  });
+});
+
+describe("categorySegments folding", () => {
+  it("folds the tail past the limit into one segment", () => {
+    const by_event_type = ["m_and_a", "guidance_change", "other", "central_bank"].map((event_type, i) => ({ event_type, count: 4 - i }));
+    expect(categorySegments({ by_event_type }, 3)).toEqual([
+      { label: "M&A", value: 4 },
+      { label: "Guidance change", value: 3 },
+      { label: "2 more types", value: 3 },
     ]);
   });
 });
