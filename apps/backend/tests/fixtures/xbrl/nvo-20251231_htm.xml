@@ -1,0 +1,1073 @@
+<?xml version="1.0" encoding="utf-8"?>
+<xbrl
+  xml:lang="en-US"
+  xmlns="http://www.xbrl.org/2003/instance"
+  xmlns:country="http://xbrl.sec.gov/country/2025"
+  xmlns:currency="http://xbrl.sec.gov/currency/2025"
+  xmlns:cyd="http://xbrl.sec.gov/cyd/2025"
+  xmlns:dei="http://xbrl.sec.gov/dei/2025"
+  xmlns:ecd="http://xbrl.sec.gov/ecd/2025"
+  xmlns:ifrs-full="https://xbrl.ifrs.org/taxonomy/2025-03-27/ifrs-full"
+  xmlns:iso4217="http://www.xbrl.org/2003/iso4217"
+  xmlns:link="http://www.xbrl.org/2003/linkbase"
+  xmlns:nvo="http://www.novonordisk.com/20251231"
+  xmlns:srt="http://fasb.org/srt/2025"
+  xmlns:utr="http://www.xbrl.org/2009/utr"
+  xmlns:xbrldi="http://xbrl.org/2006/xbrldi"
+  xmlns:xhtml="http://www.w3.org/1999/xhtml"
+  xmlns:xlink="http://www.w3.org/1999/xlink">
+    <context id="c-1">
+        <entity>
+            <identifier scheme="http://www.sec.gov/CIK">0000353278</identifier>
+        </entity>
+        <period>
+            <startDate>2025-01-01</startDate>
+            <endDate>2025-12-31</endDate>
+        </period>
+    </context>
+    <context id="c-3">
+        <entity>
+            <identifier scheme="http://www.sec.gov/CIK">0000353278</identifier>
+            <segment>
+                <xbrldi:explicitMember dimension="ifrs-full:ClassesOfShareCapitalAxis">nvo:BShareCapitalMember</xbrldi:explicitMember>
+            </segment>
+        </entity>
+        <period>
+            <startDate>2025-01-01</startDate>
+            <endDate>2025-12-31</endDate>
+        </period>
+    </context>
+    <context id="c-4">
+        <entity>
+            <identifier scheme="http://www.sec.gov/CIK">0000353278</identifier>
+            <segment>
+                <xbrldi:explicitMember dimension="ifrs-full:ClassesOfShareCapitalAxis">nvo:AmericanDepositaryReceiptsMember</xbrldi:explicitMember>
+            </segment>
+        </entity>
+        <period>
+            <startDate>2025-01-01</startDate>
+            <endDate>2025-12-31</endDate>
+        </period>
+    </context>
+    <context id="c-5">
+        <entity>
+            <identifier scheme="http://www.sec.gov/CIK">0000353278</identifier>
+            <segment>
+                <xbrldi:explicitMember dimension="ifrs-full:ClassesOfShareCapitalAxis">nvo:AShareCapitalMember</xbrldi:explicitMember>
+            </segment>
+        </entity>
+        <period>
+            <instant>2025-12-31</instant>
+        </period>
+    </context>
+    <context id="c-6">
+        <entity>
+            <identifier scheme="http://www.sec.gov/CIK">0000353278</identifier>
+            <segment>
+                <xbrldi:explicitMember dimension="ifrs-full:ClassesOfShareCapitalAxis">nvo:BShareCapitalMember</xbrldi:explicitMember>
+            </segment>
+        </entity>
+        <period>
+            <instant>2025-12-31</instant>
+        </period>
+    </context>
+    <context id="c-7">
+        <entity>
+            <identifier scheme="http://www.sec.gov/CIK">0000353278</identifier>
+        </entity>
+        <period>
+            <startDate>2024-01-01</startDate>
+            <endDate>2024-12-31</endDate>
+        </period>
+    </context>
+    <context id="c-8">
+        <entity>
+            <identifier scheme="http://www.sec.gov/CIK">0000353278</identifier>
+        </entity>
+        <period>
+            <startDate>2023-01-01</startDate>
+            <endDate>2023-12-31</endDate>
+        </period>
+    </context>
+    <context id="c-9">
+        <entity>
+            <identifier scheme="http://www.sec.gov/CIK">0000353278</identifier>
+        </entity>
+        <period>
+            <instant>2024-12-31</instant>
+        </period>
+    </context>
+    <context id="c-10">
+        <entity>
+            <identifier scheme="http://www.sec.gov/CIK">0000353278</identifier>
+        </entity>
+        <period>
+            <instant>2023-12-31</instant>
+        </period>
+    </context>
+    <context id="c-12">
+        <entity>
+            <identifier scheme="http://www.sec.gov/CIK">0000353278</identifier>
+        </entity>
+        <period>
+            <instant>2025-12-31</instant>
+        </period>
+    </context>
+    <context id="c-87">
+        <entity>
+            <identifier scheme="http://www.sec.gov/CIK">0000353278</identifier>
+            <segment>
+                <xbrldi:explicitMember dimension="ifrs-full:SegmentConsolidationItemsAxis">ifrs-full:OperatingSegmentsMember</xbrldi:explicitMember>
+                <xbrldi:explicitMember dimension="ifrs-full:SegmentsAxis">nvo:ObesityAndDiabetesCareMember</xbrldi:explicitMember>
+            </segment>
+        </entity>
+        <period>
+            <startDate>2025-01-01</startDate>
+            <endDate>2025-12-31</endDate>
+        </period>
+    </context>
+    <context id="c-88">
+        <entity>
+            <identifier scheme="http://www.sec.gov/CIK">0000353278</identifier>
+            <segment>
+                <xbrldi:explicitMember dimension="ifrs-full:SegmentConsolidationItemsAxis">ifrs-full:OperatingSegmentsMember</xbrldi:explicitMember>
+                <xbrldi:explicitMember dimension="ifrs-full:SegmentsAxis">nvo:ObesityAndDiabetesCareMember</xbrldi:explicitMember>
+            </segment>
+        </entity>
+        <period>
+            <startDate>2024-01-01</startDate>
+            <endDate>2024-12-31</endDate>
+        </period>
+    </context>
+    <context id="c-89">
+        <entity>
+            <identifier scheme="http://www.sec.gov/CIK">0000353278</identifier>
+            <segment>
+                <xbrldi:explicitMember dimension="ifrs-full:SegmentConsolidationItemsAxis">ifrs-full:OperatingSegmentsMember</xbrldi:explicitMember>
+                <xbrldi:explicitMember dimension="ifrs-full:SegmentsAxis">nvo:ObesityAndDiabetesCareMember</xbrldi:explicitMember>
+            </segment>
+        </entity>
+        <period>
+            <startDate>2023-01-01</startDate>
+            <endDate>2023-12-31</endDate>
+        </period>
+    </context>
+    <context id="c-90">
+        <entity>
+            <identifier scheme="http://www.sec.gov/CIK">0000353278</identifier>
+            <segment>
+                <xbrldi:explicitMember dimension="ifrs-full:SegmentConsolidationItemsAxis">ifrs-full:OperatingSegmentsMember</xbrldi:explicitMember>
+                <xbrldi:explicitMember dimension="ifrs-full:SegmentsAxis">nvo:RareDiseaseMember</xbrldi:explicitMember>
+            </segment>
+        </entity>
+        <period>
+            <startDate>2025-01-01</startDate>
+            <endDate>2025-12-31</endDate>
+        </period>
+    </context>
+    <context id="c-91">
+        <entity>
+            <identifier scheme="http://www.sec.gov/CIK">0000353278</identifier>
+            <segment>
+                <xbrldi:explicitMember dimension="ifrs-full:SegmentConsolidationItemsAxis">ifrs-full:OperatingSegmentsMember</xbrldi:explicitMember>
+                <xbrldi:explicitMember dimension="ifrs-full:SegmentsAxis">nvo:RareDiseaseMember</xbrldi:explicitMember>
+            </segment>
+        </entity>
+        <period>
+            <startDate>2024-01-01</startDate>
+            <endDate>2024-12-31</endDate>
+        </period>
+    </context>
+    <context id="c-92">
+        <entity>
+            <identifier scheme="http://www.sec.gov/CIK">0000353278</identifier>
+            <segment>
+                <xbrldi:explicitMember dimension="ifrs-full:SegmentConsolidationItemsAxis">ifrs-full:OperatingSegmentsMember</xbrldi:explicitMember>
+                <xbrldi:explicitMember dimension="ifrs-full:SegmentsAxis">nvo:RareDiseaseMember</xbrldi:explicitMember>
+            </segment>
+        </entity>
+        <period>
+            <startDate>2023-01-01</startDate>
+            <endDate>2023-12-31</endDate>
+        </period>
+    </context>
+    <context id="c-93">
+        <entity>
+            <identifier scheme="http://www.sec.gov/CIK">0000353278</identifier>
+            <segment>
+                <xbrldi:explicitMember dimension="ifrs-full:GeographicalAreasAxis">country:US</xbrldi:explicitMember>
+            </segment>
+        </entity>
+        <period>
+            <startDate>2025-01-01</startDate>
+            <endDate>2025-12-31</endDate>
+        </period>
+    </context>
+    <context id="c-94">
+        <entity>
+            <identifier scheme="http://www.sec.gov/CIK">0000353278</identifier>
+            <segment>
+                <xbrldi:explicitMember dimension="ifrs-full:GeographicalAreasAxis">country:US</xbrldi:explicitMember>
+            </segment>
+        </entity>
+        <period>
+            <startDate>2024-01-01</startDate>
+            <endDate>2024-12-31</endDate>
+        </period>
+    </context>
+    <context id="c-101">
+        <entity>
+            <identifier scheme="http://www.sec.gov/CIK">0000353278</identifier>
+            <segment>
+                <xbrldi:explicitMember dimension="ifrs-full:GeographicalAreasAxis">country:US</xbrldi:explicitMember>
+                <xbrldi:explicitMember dimension="ifrs-full:ProductsAndServicesAxis">nvo:OzempicMember</xbrldi:explicitMember>
+                <xbrldi:explicitMember dimension="ifrs-full:SegmentsAxis">nvo:ObesityAndDiabetesCareMember</xbrldi:explicitMember>
+            </segment>
+        </entity>
+        <period>
+            <startDate>2025-01-01</startDate>
+            <endDate>2025-12-31</endDate>
+        </period>
+    </context>
+    <context id="c-102">
+        <entity>
+            <identifier scheme="http://www.sec.gov/CIK">0000353278</identifier>
+            <segment>
+                <xbrldi:explicitMember dimension="ifrs-full:GeographicalAreasAxis">country:US</xbrldi:explicitMember>
+                <xbrldi:explicitMember dimension="ifrs-full:ProductsAndServicesAxis">nvo:OzempicMember</xbrldi:explicitMember>
+                <xbrldi:explicitMember dimension="ifrs-full:SegmentsAxis">nvo:ObesityAndDiabetesCareMember</xbrldi:explicitMember>
+            </segment>
+        </entity>
+        <period>
+            <startDate>2024-01-01</startDate>
+            <endDate>2024-12-31</endDate>
+        </period>
+    </context>
+    <context id="c-103">
+        <entity>
+            <identifier scheme="http://www.sec.gov/CIK">0000353278</identifier>
+            <segment>
+                <xbrldi:explicitMember dimension="ifrs-full:GeographicalAreasAxis">country:US</xbrldi:explicitMember>
+                <xbrldi:explicitMember dimension="ifrs-full:ProductsAndServicesAxis">nvo:OzempicMember</xbrldi:explicitMember>
+                <xbrldi:explicitMember dimension="ifrs-full:SegmentsAxis">nvo:ObesityAndDiabetesCareMember</xbrldi:explicitMember>
+            </segment>
+        </entity>
+        <period>
+            <startDate>2023-01-01</startDate>
+            <endDate>2023-12-31</endDate>
+        </period>
+    </context>
+    <context id="c-104">
+        <entity>
+            <identifier scheme="http://www.sec.gov/CIK">0000353278</identifier>
+            <segment>
+                <xbrldi:explicitMember dimension="ifrs-full:GeographicalAreasAxis">nvo:InternationalOperationsMember</xbrldi:explicitMember>
+                <xbrldi:explicitMember dimension="ifrs-full:ProductsAndServicesAxis">nvo:OzempicMember</xbrldi:explicitMember>
+                <xbrldi:explicitMember dimension="ifrs-full:SegmentsAxis">nvo:ObesityAndDiabetesCareMember</xbrldi:explicitMember>
+            </segment>
+        </entity>
+        <period>
+            <startDate>2025-01-01</startDate>
+            <endDate>2025-12-31</endDate>
+        </period>
+    </context>
+    <context id="c-105">
+        <entity>
+            <identifier scheme="http://www.sec.gov/CIK">0000353278</identifier>
+            <segment>
+                <xbrldi:explicitMember dimension="ifrs-full:GeographicalAreasAxis">nvo:InternationalOperationsMember</xbrldi:explicitMember>
+                <xbrldi:explicitMember dimension="ifrs-full:ProductsAndServicesAxis">nvo:OzempicMember</xbrldi:explicitMember>
+                <xbrldi:explicitMember dimension="ifrs-full:SegmentsAxis">nvo:ObesityAndDiabetesCareMember</xbrldi:explicitMember>
+            </segment>
+        </entity>
+        <period>
+            <startDate>2024-01-01</startDate>
+            <endDate>2024-12-31</endDate>
+        </period>
+    </context>
+    <context id="c-106">
+        <entity>
+            <identifier scheme="http://www.sec.gov/CIK">0000353278</identifier>
+            <segment>
+                <xbrldi:explicitMember dimension="ifrs-full:GeographicalAreasAxis">nvo:InternationalOperationsMember</xbrldi:explicitMember>
+                <xbrldi:explicitMember dimension="ifrs-full:ProductsAndServicesAxis">nvo:OzempicMember</xbrldi:explicitMember>
+                <xbrldi:explicitMember dimension="ifrs-full:SegmentsAxis">nvo:ObesityAndDiabetesCareMember</xbrldi:explicitMember>
+            </segment>
+        </entity>
+        <period>
+            <startDate>2023-01-01</startDate>
+            <endDate>2023-12-31</endDate>
+        </period>
+    </context>
+    <context id="c-107">
+        <entity>
+            <identifier scheme="http://www.sec.gov/CIK">0000353278</identifier>
+            <segment>
+                <xbrldi:explicitMember dimension="ifrs-full:GeographicalAreasAxis">nvo:EUCANMember</xbrldi:explicitMember>
+                <xbrldi:explicitMember dimension="ifrs-full:ProductsAndServicesAxis">nvo:OzempicMember</xbrldi:explicitMember>
+                <xbrldi:explicitMember dimension="ifrs-full:SegmentsAxis">nvo:ObesityAndDiabetesCareMember</xbrldi:explicitMember>
+            </segment>
+        </entity>
+        <period>
+            <startDate>2025-01-01</startDate>
+            <endDate>2025-12-31</endDate>
+        </period>
+    </context>
+    <context id="c-108">
+        <entity>
+            <identifier scheme="http://www.sec.gov/CIK">0000353278</identifier>
+            <segment>
+                <xbrldi:explicitMember dimension="ifrs-full:GeographicalAreasAxis">nvo:EUCANMember</xbrldi:explicitMember>
+                <xbrldi:explicitMember dimension="ifrs-full:ProductsAndServicesAxis">nvo:OzempicMember</xbrldi:explicitMember>
+                <xbrldi:explicitMember dimension="ifrs-full:SegmentsAxis">nvo:ObesityAndDiabetesCareMember</xbrldi:explicitMember>
+            </segment>
+        </entity>
+        <period>
+            <startDate>2024-01-01</startDate>
+            <endDate>2024-12-31</endDate>
+        </period>
+    </context>
+    <context id="c-109">
+        <entity>
+            <identifier scheme="http://www.sec.gov/CIK">0000353278</identifier>
+            <segment>
+                <xbrldi:explicitMember dimension="ifrs-full:GeographicalAreasAxis">nvo:EUCANMember</xbrldi:explicitMember>
+                <xbrldi:explicitMember dimension="ifrs-full:ProductsAndServicesAxis">nvo:OzempicMember</xbrldi:explicitMember>
+                <xbrldi:explicitMember dimension="ifrs-full:SegmentsAxis">nvo:ObesityAndDiabetesCareMember</xbrldi:explicitMember>
+            </segment>
+        </entity>
+        <period>
+            <startDate>2023-01-01</startDate>
+            <endDate>2023-12-31</endDate>
+        </period>
+    </context>
+    <context id="c-110">
+        <entity>
+            <identifier scheme="http://www.sec.gov/CIK">0000353278</identifier>
+            <segment>
+                <xbrldi:explicitMember dimension="ifrs-full:GeographicalAreasAxis">nvo:EmergingMarketsMember</xbrldi:explicitMember>
+                <xbrldi:explicitMember dimension="ifrs-full:ProductsAndServicesAxis">nvo:OzempicMember</xbrldi:explicitMember>
+                <xbrldi:explicitMember dimension="ifrs-full:SegmentsAxis">nvo:ObesityAndDiabetesCareMember</xbrldi:explicitMember>
+            </segment>
+        </entity>
+        <period>
+            <startDate>2025-01-01</startDate>
+            <endDate>2025-12-31</endDate>
+        </period>
+    </context>
+    <context id="c-111">
+        <entity>
+            <identifier scheme="http://www.sec.gov/CIK">0000353278</identifier>
+            <segment>
+                <xbrldi:explicitMember dimension="ifrs-full:GeographicalAreasAxis">nvo:EmergingMarketsMember</xbrldi:explicitMember>
+                <xbrldi:explicitMember dimension="ifrs-full:ProductsAndServicesAxis">nvo:OzempicMember</xbrldi:explicitMember>
+                <xbrldi:explicitMember dimension="ifrs-full:SegmentsAxis">nvo:ObesityAndDiabetesCareMember</xbrldi:explicitMember>
+            </segment>
+        </entity>
+        <period>
+            <startDate>2024-01-01</startDate>
+            <endDate>2024-12-31</endDate>
+        </period>
+    </context>
+    <context id="c-112">
+        <entity>
+            <identifier scheme="http://www.sec.gov/CIK">0000353278</identifier>
+            <segment>
+                <xbrldi:explicitMember dimension="ifrs-full:GeographicalAreasAxis">nvo:EmergingMarketsMember</xbrldi:explicitMember>
+                <xbrldi:explicitMember dimension="ifrs-full:ProductsAndServicesAxis">nvo:OzempicMember</xbrldi:explicitMember>
+                <xbrldi:explicitMember dimension="ifrs-full:SegmentsAxis">nvo:ObesityAndDiabetesCareMember</xbrldi:explicitMember>
+            </segment>
+        </entity>
+        <period>
+            <startDate>2023-01-01</startDate>
+            <endDate>2023-12-31</endDate>
+        </period>
+    </context>
+    <context id="c-113">
+        <entity>
+            <identifier scheme="http://www.sec.gov/CIK">0000353278</identifier>
+            <segment>
+                <xbrldi:explicitMember dimension="ifrs-full:GeographicalAreasAxis">nvo:APACMember</xbrldi:explicitMember>
+                <xbrldi:explicitMember dimension="ifrs-full:ProductsAndServicesAxis">nvo:OzempicMember</xbrldi:explicitMember>
+                <xbrldi:explicitMember dimension="ifrs-full:SegmentsAxis">nvo:ObesityAndDiabetesCareMember</xbrldi:explicitMember>
+            </segment>
+        </entity>
+        <period>
+            <startDate>2025-01-01</startDate>
+            <endDate>2025-12-31</endDate>
+        </period>
+    </context>
+    <context id="c-114">
+        <entity>
+            <identifier scheme="http://www.sec.gov/CIK">0000353278</identifier>
+            <segment>
+                <xbrldi:explicitMember dimension="ifrs-full:GeographicalAreasAxis">nvo:APACMember</xbrldi:explicitMember>
+                <xbrldi:explicitMember dimension="ifrs-full:ProductsAndServicesAxis">nvo:OzempicMember</xbrldi:explicitMember>
+                <xbrldi:explicitMember dimension="ifrs-full:SegmentsAxis">nvo:ObesityAndDiabetesCareMember</xbrldi:explicitMember>
+            </segment>
+        </entity>
+        <period>
+            <startDate>2024-01-01</startDate>
+            <endDate>2024-12-31</endDate>
+        </period>
+    </context>
+    <context id="c-115">
+        <entity>
+            <identifier scheme="http://www.sec.gov/CIK">0000353278</identifier>
+            <segment>
+                <xbrldi:explicitMember dimension="ifrs-full:GeographicalAreasAxis">nvo:APACMember</xbrldi:explicitMember>
+                <xbrldi:explicitMember dimension="ifrs-full:ProductsAndServicesAxis">nvo:OzempicMember</xbrldi:explicitMember>
+                <xbrldi:explicitMember dimension="ifrs-full:SegmentsAxis">nvo:ObesityAndDiabetesCareMember</xbrldi:explicitMember>
+            </segment>
+        </entity>
+        <period>
+            <startDate>2023-01-01</startDate>
+            <endDate>2023-12-31</endDate>
+        </period>
+    </context>
+    <context id="c-116">
+        <entity>
+            <identifier scheme="http://www.sec.gov/CIK">0000353278</identifier>
+            <segment>
+                <xbrldi:explicitMember dimension="ifrs-full:GeographicalAreasAxis">country:CN</xbrldi:explicitMember>
+                <xbrldi:explicitMember dimension="ifrs-full:ProductsAndServicesAxis">nvo:OzempicMember</xbrldi:explicitMember>
+                <xbrldi:explicitMember dimension="ifrs-full:SegmentsAxis">nvo:ObesityAndDiabetesCareMember</xbrldi:explicitMember>
+            </segment>
+        </entity>
+        <period>
+            <startDate>2025-01-01</startDate>
+            <endDate>2025-12-31</endDate>
+        </period>
+    </context>
+    <context id="c-117">
+        <entity>
+            <identifier scheme="http://www.sec.gov/CIK">0000353278</identifier>
+            <segment>
+                <xbrldi:explicitMember dimension="ifrs-full:GeographicalAreasAxis">country:CN</xbrldi:explicitMember>
+                <xbrldi:explicitMember dimension="ifrs-full:ProductsAndServicesAxis">nvo:OzempicMember</xbrldi:explicitMember>
+                <xbrldi:explicitMember dimension="ifrs-full:SegmentsAxis">nvo:ObesityAndDiabetesCareMember</xbrldi:explicitMember>
+            </segment>
+        </entity>
+        <period>
+            <startDate>2024-01-01</startDate>
+            <endDate>2024-12-31</endDate>
+        </period>
+    </context>
+    <context id="c-118">
+        <entity>
+            <identifier scheme="http://www.sec.gov/CIK">0000353278</identifier>
+            <segment>
+                <xbrldi:explicitMember dimension="ifrs-full:GeographicalAreasAxis">country:CN</xbrldi:explicitMember>
+                <xbrldi:explicitMember dimension="ifrs-full:ProductsAndServicesAxis">nvo:OzempicMember</xbrldi:explicitMember>
+                <xbrldi:explicitMember dimension="ifrs-full:SegmentsAxis">nvo:ObesityAndDiabetesCareMember</xbrldi:explicitMember>
+            </segment>
+        </entity>
+        <period>
+            <startDate>2023-01-01</startDate>
+            <endDate>2023-12-31</endDate>
+        </period>
+    </context>
+    <context id="c-119">
+        <entity>
+            <identifier scheme="http://www.sec.gov/CIK">0000353278</identifier>
+            <segment>
+                <xbrldi:explicitMember dimension="ifrs-full:ProductsAndServicesAxis">nvo:OzempicMember</xbrldi:explicitMember>
+                <xbrldi:explicitMember dimension="ifrs-full:SegmentsAxis">nvo:ObesityAndDiabetesCareMember</xbrldi:explicitMember>
+            </segment>
+        </entity>
+        <period>
+            <startDate>2025-01-01</startDate>
+            <endDate>2025-12-31</endDate>
+        </period>
+    </context>
+    <context id="c-120">
+        <entity>
+            <identifier scheme="http://www.sec.gov/CIK">0000353278</identifier>
+            <segment>
+                <xbrldi:explicitMember dimension="ifrs-full:ProductsAndServicesAxis">nvo:OzempicMember</xbrldi:explicitMember>
+                <xbrldi:explicitMember dimension="ifrs-full:SegmentsAxis">nvo:ObesityAndDiabetesCareMember</xbrldi:explicitMember>
+            </segment>
+        </entity>
+        <period>
+            <startDate>2024-01-01</startDate>
+            <endDate>2024-12-31</endDate>
+        </period>
+    </context>
+    <context id="c-121">
+        <entity>
+            <identifier scheme="http://www.sec.gov/CIK">0000353278</identifier>
+            <segment>
+                <xbrldi:explicitMember dimension="ifrs-full:ProductsAndServicesAxis">nvo:OzempicMember</xbrldi:explicitMember>
+                <xbrldi:explicitMember dimension="ifrs-full:SegmentsAxis">nvo:ObesityAndDiabetesCareMember</xbrldi:explicitMember>
+            </segment>
+        </entity>
+        <period>
+            <startDate>2023-01-01</startDate>
+            <endDate>2023-12-31</endDate>
+        </period>
+    </context>
+    <context id="c-122">
+        <entity>
+            <identifier scheme="http://www.sec.gov/CIK">0000353278</identifier>
+            <segment>
+                <xbrldi:explicitMember dimension="ifrs-full:GeographicalAreasAxis">country:US</xbrldi:explicitMember>
+                <xbrldi:explicitMember dimension="ifrs-full:ProductsAndServicesAxis">nvo:RybelsusMember</xbrldi:explicitMember>
+                <xbrldi:explicitMember dimension="ifrs-full:SegmentsAxis">nvo:ObesityAndDiabetesCareMember</xbrldi:explicitMember>
+            </segment>
+        </entity>
+        <period>
+            <startDate>2025-01-01</startDate>
+            <endDate>2025-12-31</endDate>
+        </period>
+    </context>
+    <context id="c-123">
+        <entity>
+            <identifier scheme="http://www.sec.gov/CIK">0000353278</identifier>
+            <segment>
+                <xbrldi:explicitMember dimension="ifrs-full:GeographicalAreasAxis">country:US</xbrldi:explicitMember>
+                <xbrldi:explicitMember dimension="ifrs-full:ProductsAndServicesAxis">nvo:RybelsusMember</xbrldi:explicitMember>
+                <xbrldi:explicitMember dimension="ifrs-full:SegmentsAxis">nvo:ObesityAndDiabetesCareMember</xbrldi:explicitMember>
+            </segment>
+        </entity>
+        <period>
+            <startDate>2024-01-01</startDate>
+            <endDate>2024-12-31</endDate>
+        </period>
+    </context>
+    <context id="c-124">
+        <entity>
+            <identifier scheme="http://www.sec.gov/CIK">0000353278</identifier>
+            <segment>
+                <xbrldi:explicitMember dimension="ifrs-full:GeographicalAreasAxis">country:US</xbrldi:explicitMember>
+                <xbrldi:explicitMember dimension="ifrs-full:ProductsAndServicesAxis">nvo:RybelsusMember</xbrldi:explicitMember>
+                <xbrldi:explicitMember dimension="ifrs-full:SegmentsAxis">nvo:ObesityAndDiabetesCareMember</xbrldi:explicitMember>
+            </segment>
+        </entity>
+        <period>
+            <startDate>2023-01-01</startDate>
+            <endDate>2023-12-31</endDate>
+        </period>
+    </context>
+    <context id="c-581">
+        <entity>
+            <identifier scheme="http://www.sec.gov/CIK">0000353278</identifier>
+            <segment>
+                <xbrldi:explicitMember dimension="ifrs-full:SegmentsAxis">nvo:ObesityAndDiabetesCareMember</xbrldi:explicitMember>
+            </segment>
+        </entity>
+        <period>
+            <startDate>2025-01-01</startDate>
+            <endDate>2025-12-31</endDate>
+        </period>
+    </context>
+    <context id="c-582">
+        <entity>
+            <identifier scheme="http://www.sec.gov/CIK">0000353278</identifier>
+            <segment>
+                <xbrldi:explicitMember dimension="ifrs-full:SegmentsAxis">nvo:ObesityAndDiabetesCareMember</xbrldi:explicitMember>
+            </segment>
+        </entity>
+        <period>
+            <startDate>2024-01-01</startDate>
+            <endDate>2024-12-31</endDate>
+        </period>
+    </context>
+    <context id="c-583">
+        <entity>
+            <identifier scheme="http://www.sec.gov/CIK">0000353278</identifier>
+            <segment>
+                <xbrldi:explicitMember dimension="ifrs-full:SegmentsAxis">nvo:ObesityAndDiabetesCareMember</xbrldi:explicitMember>
+            </segment>
+        </entity>
+        <period>
+            <startDate>2023-01-01</startDate>
+            <endDate>2023-12-31</endDate>
+        </period>
+    </context>
+    <context id="c-728">
+        <entity>
+            <identifier scheme="http://www.sec.gov/CIK">0000353278</identifier>
+            <segment>
+                <xbrldi:explicitMember dimension="ifrs-full:SegmentsAxis">nvo:RareDiseaseMember</xbrldi:explicitMember>
+            </segment>
+        </entity>
+        <period>
+            <startDate>2025-01-01</startDate>
+            <endDate>2025-12-31</endDate>
+        </period>
+    </context>
+    <context id="c-729">
+        <entity>
+            <identifier scheme="http://www.sec.gov/CIK">0000353278</identifier>
+            <segment>
+                <xbrldi:explicitMember dimension="ifrs-full:SegmentsAxis">nvo:RareDiseaseMember</xbrldi:explicitMember>
+            </segment>
+        </entity>
+        <period>
+            <startDate>2024-01-01</startDate>
+            <endDate>2024-12-31</endDate>
+        </period>
+    </context>
+    <context id="c-730">
+        <entity>
+            <identifier scheme="http://www.sec.gov/CIK">0000353278</identifier>
+            <segment>
+                <xbrldi:explicitMember dimension="ifrs-full:SegmentsAxis">nvo:RareDiseaseMember</xbrldi:explicitMember>
+            </segment>
+        </entity>
+        <period>
+            <startDate>2023-01-01</startDate>
+            <endDate>2023-12-31</endDate>
+        </period>
+    </context>
+    <context id="c-731">
+        <entity>
+            <identifier scheme="http://www.sec.gov/CIK">0000353278</identifier>
+            <segment>
+                <xbrldi:explicitMember dimension="ifrs-full:GeographicalAreasAxis">country:US</xbrldi:explicitMember>
+            </segment>
+        </entity>
+        <period>
+            <startDate>2023-01-01</startDate>
+            <endDate>2023-12-31</endDate>
+        </period>
+    </context>
+    <context id="c-732">
+        <entity>
+            <identifier scheme="http://www.sec.gov/CIK">0000353278</identifier>
+            <segment>
+                <xbrldi:explicitMember dimension="ifrs-full:GeographicalAreasAxis">nvo:InternationalOperationsMember</xbrldi:explicitMember>
+            </segment>
+        </entity>
+        <period>
+            <startDate>2025-01-01</startDate>
+            <endDate>2025-12-31</endDate>
+        </period>
+    </context>
+    <context id="c-733">
+        <entity>
+            <identifier scheme="http://www.sec.gov/CIK">0000353278</identifier>
+            <segment>
+                <xbrldi:explicitMember dimension="ifrs-full:GeographicalAreasAxis">nvo:InternationalOperationsMember</xbrldi:explicitMember>
+            </segment>
+        </entity>
+        <period>
+            <startDate>2024-01-01</startDate>
+            <endDate>2024-12-31</endDate>
+        </period>
+    </context>
+    <context id="c-734">
+        <entity>
+            <identifier scheme="http://www.sec.gov/CIK">0000353278</identifier>
+            <segment>
+                <xbrldi:explicitMember dimension="ifrs-full:GeographicalAreasAxis">nvo:InternationalOperationsMember</xbrldi:explicitMember>
+            </segment>
+        </entity>
+        <period>
+            <startDate>2023-01-01</startDate>
+            <endDate>2023-12-31</endDate>
+        </period>
+    </context>
+    <context id="c-735">
+        <entity>
+            <identifier scheme="http://www.sec.gov/CIK">0000353278</identifier>
+            <segment>
+                <xbrldi:explicitMember dimension="ifrs-full:GeographicalAreasAxis">nvo:EUCANMember</xbrldi:explicitMember>
+            </segment>
+        </entity>
+        <period>
+            <startDate>2025-01-01</startDate>
+            <endDate>2025-12-31</endDate>
+        </period>
+    </context>
+    <context id="c-736">
+        <entity>
+            <identifier scheme="http://www.sec.gov/CIK">0000353278</identifier>
+            <segment>
+                <xbrldi:explicitMember dimension="ifrs-full:GeographicalAreasAxis">nvo:EUCANMember</xbrldi:explicitMember>
+            </segment>
+        </entity>
+        <period>
+            <startDate>2024-01-01</startDate>
+            <endDate>2024-12-31</endDate>
+        </period>
+    </context>
+    <context id="c-737">
+        <entity>
+            <identifier scheme="http://www.sec.gov/CIK">0000353278</identifier>
+            <segment>
+                <xbrldi:explicitMember dimension="ifrs-full:GeographicalAreasAxis">nvo:EUCANMember</xbrldi:explicitMember>
+            </segment>
+        </entity>
+        <period>
+            <startDate>2023-01-01</startDate>
+            <endDate>2023-12-31</endDate>
+        </period>
+    </context>
+    <context id="c-738">
+        <entity>
+            <identifier scheme="http://www.sec.gov/CIK">0000353278</identifier>
+            <segment>
+                <xbrldi:explicitMember dimension="ifrs-full:GeographicalAreasAxis">nvo:EmergingMarketsMember</xbrldi:explicitMember>
+            </segment>
+        </entity>
+        <period>
+            <startDate>2025-01-01</startDate>
+            <endDate>2025-12-31</endDate>
+        </period>
+    </context>
+    <context id="c-739">
+        <entity>
+            <identifier scheme="http://www.sec.gov/CIK">0000353278</identifier>
+            <segment>
+                <xbrldi:explicitMember dimension="ifrs-full:GeographicalAreasAxis">nvo:EmergingMarketsMember</xbrldi:explicitMember>
+            </segment>
+        </entity>
+        <period>
+            <startDate>2024-01-01</startDate>
+            <endDate>2024-12-31</endDate>
+        </period>
+    </context>
+    <context id="c-740">
+        <entity>
+            <identifier scheme="http://www.sec.gov/CIK">0000353278</identifier>
+            <segment>
+                <xbrldi:explicitMember dimension="ifrs-full:GeographicalAreasAxis">nvo:EmergingMarketsMember</xbrldi:explicitMember>
+            </segment>
+        </entity>
+        <period>
+            <startDate>2023-01-01</startDate>
+            <endDate>2023-12-31</endDate>
+        </period>
+    </context>
+    <context id="c-741">
+        <entity>
+            <identifier scheme="http://www.sec.gov/CIK">0000353278</identifier>
+            <segment>
+                <xbrldi:explicitMember dimension="ifrs-full:GeographicalAreasAxis">nvo:APACMember</xbrldi:explicitMember>
+            </segment>
+        </entity>
+        <period>
+            <startDate>2025-01-01</startDate>
+            <endDate>2025-12-31</endDate>
+        </period>
+    </context>
+    <context id="c-742">
+        <entity>
+            <identifier scheme="http://www.sec.gov/CIK">0000353278</identifier>
+            <segment>
+                <xbrldi:explicitMember dimension="ifrs-full:GeographicalAreasAxis">nvo:APACMember</xbrldi:explicitMember>
+            </segment>
+        </entity>
+        <period>
+            <startDate>2024-01-01</startDate>
+            <endDate>2024-12-31</endDate>
+        </period>
+    </context>
+    <context id="c-743">
+        <entity>
+            <identifier scheme="http://www.sec.gov/CIK">0000353278</identifier>
+            <segment>
+                <xbrldi:explicitMember dimension="ifrs-full:GeographicalAreasAxis">nvo:APACMember</xbrldi:explicitMember>
+            </segment>
+        </entity>
+        <period>
+            <startDate>2023-01-01</startDate>
+            <endDate>2023-12-31</endDate>
+        </period>
+    </context>
+    <context id="c-744">
+        <entity>
+            <identifier scheme="http://www.sec.gov/CIK">0000353278</identifier>
+            <segment>
+                <xbrldi:explicitMember dimension="ifrs-full:GeographicalAreasAxis">country:CN</xbrldi:explicitMember>
+            </segment>
+        </entity>
+        <period>
+            <startDate>2025-01-01</startDate>
+            <endDate>2025-12-31</endDate>
+        </period>
+    </context>
+    <context id="c-745">
+        <entity>
+            <identifier scheme="http://www.sec.gov/CIK">0000353278</identifier>
+            <segment>
+                <xbrldi:explicitMember dimension="ifrs-full:GeographicalAreasAxis">country:CN</xbrldi:explicitMember>
+            </segment>
+        </entity>
+        <period>
+            <startDate>2024-01-01</startDate>
+            <endDate>2024-12-31</endDate>
+        </period>
+    </context>
+    <context id="c-746">
+        <entity>
+            <identifier scheme="http://www.sec.gov/CIK">0000353278</identifier>
+            <segment>
+                <xbrldi:explicitMember dimension="ifrs-full:GeographicalAreasAxis">country:CN</xbrldi:explicitMember>
+            </segment>
+        </entity>
+        <period>
+            <startDate>2023-01-01</startDate>
+            <endDate>2023-12-31</endDate>
+        </period>
+    </context>
+    <context id="c-984">
+        <entity>
+            <identifier scheme="http://www.sec.gov/CIK">0000353278</identifier>
+            <segment>
+                <xbrldi:explicitMember dimension="ifrs-full:ClassesOfShareCapitalAxis">nvo:AShareCapitalMember</xbrldi:explicitMember>
+            </segment>
+        </entity>
+        <period>
+            <instant>2023-12-31</instant>
+        </period>
+    </context>
+    <context id="c-985">
+        <entity>
+            <identifier scheme="http://www.sec.gov/CIK">0000353278</identifier>
+            <segment>
+                <xbrldi:explicitMember dimension="ifrs-full:ClassesOfShareCapitalAxis">nvo:BShareCapitalMember</xbrldi:explicitMember>
+            </segment>
+        </entity>
+        <period>
+            <instant>2023-12-31</instant>
+        </period>
+    </context>
+    <context id="c-986">
+        <entity>
+            <identifier scheme="http://www.sec.gov/CIK">0000353278</identifier>
+            <segment>
+                <xbrldi:explicitMember dimension="ifrs-full:ClassesOfShareCapitalAxis">ifrs-full:IssuedCapitalMember</xbrldi:explicitMember>
+            </segment>
+        </entity>
+        <period>
+            <instant>2023-12-31</instant>
+        </period>
+    </context>
+    <context id="c-987">
+        <entity>
+            <identifier scheme="http://www.sec.gov/CIK">0000353278</identifier>
+            <segment>
+                <xbrldi:explicitMember dimension="ifrs-full:ClassesOfShareCapitalAxis">ifrs-full:TreasurySharesMember</xbrldi:explicitMember>
+            </segment>
+        </entity>
+        <period>
+            <instant>2023-12-31</instant>
+        </period>
+    </context>
+    <context id="c-992">
+        <entity>
+            <identifier scheme="http://www.sec.gov/CIK">0000353278</identifier>
+            <segment>
+                <xbrldi:explicitMember dimension="ifrs-full:ClassesOfShareCapitalAxis">nvo:AShareCapitalMember</xbrldi:explicitMember>
+            </segment>
+        </entity>
+        <period>
+            <instant>2024-12-31</instant>
+        </period>
+    </context>
+    <context id="c-993">
+        <entity>
+            <identifier scheme="http://www.sec.gov/CIK">0000353278</identifier>
+            <segment>
+                <xbrldi:explicitMember dimension="ifrs-full:ClassesOfShareCapitalAxis">nvo:BShareCapitalMember</xbrldi:explicitMember>
+            </segment>
+        </entity>
+        <period>
+            <instant>2024-12-31</instant>
+        </period>
+    </context>
+    <context id="c-994">
+        <entity>
+            <identifier scheme="http://www.sec.gov/CIK">0000353278</identifier>
+            <segment>
+                <xbrldi:explicitMember dimension="ifrs-full:ClassesOfShareCapitalAxis">ifrs-full:IssuedCapitalMember</xbrldi:explicitMember>
+            </segment>
+        </entity>
+        <period>
+            <instant>2024-12-31</instant>
+        </period>
+    </context>
+    <context id="c-995">
+        <entity>
+            <identifier scheme="http://www.sec.gov/CIK">0000353278</identifier>
+            <segment>
+                <xbrldi:explicitMember dimension="ifrs-full:ClassesOfShareCapitalAxis">ifrs-full:TreasurySharesMember</xbrldi:explicitMember>
+            </segment>
+        </entity>
+        <period>
+            <instant>2024-12-31</instant>
+        </period>
+    </context>
+    <context id="c-999">
+        <entity>
+            <identifier scheme="http://www.sec.gov/CIK">0000353278</identifier>
+            <segment>
+                <xbrldi:explicitMember dimension="ifrs-full:ClassesOfShareCapitalAxis">ifrs-full:IssuedCapitalMember</xbrldi:explicitMember>
+            </segment>
+        </entity>
+        <period>
+            <instant>2025-12-31</instant>
+        </period>
+    </context>
+    <context id="c-1000">
+        <entity>
+            <identifier scheme="http://www.sec.gov/CIK">0000353278</identifier>
+            <segment>
+                <xbrldi:explicitMember dimension="ifrs-full:ClassesOfShareCapitalAxis">ifrs-full:TreasurySharesMember</xbrldi:explicitMember>
+            </segment>
+        </entity>
+        <period>
+            <instant>2025-12-31</instant>
+        </period>
+    </context>
+    <unit id="shares">
+        <measure>shares</measure>
+    </unit>
+    <unit id="dkk">
+        <measure>iso4217:DKK</measure>
+    </unit>
+    <dei:EntityCentralIndexKey contextRef="c-1" id="f-41">0000353278</dei:EntityCentralIndexKey>
+    <dei:DocumentFiscalPeriodFocus contextRef="c-1" id="f-42">FY</dei:DocumentFiscalPeriodFocus>
+    <dei:DocumentFiscalYearFocus contextRef="c-1" id="f-43">2025</dei:DocumentFiscalYearFocus>
+    <dei:DocumentType contextRef="c-1" id="f-1">20-F</dei:DocumentType>
+    <dei:DocumentPeriodEndDate contextRef="c-1" id="f-4">2025-12-31</dei:DocumentPeriodEndDate>
+    <dei:Security12bTitle contextRef="c-3" id="f-23">B shares, nominal value DKK 0.10 each</dei:Security12bTitle>
+    <dei:Security12bTitle contextRef="c-4" id="f-25">American Depositary Receipts, each representing one B Share</dei:Security12bTitle>
+    <dei:TradingSymbol contextRef="c-4" id="f-26">NVO</dei:TradingSymbol>
+    <dei:EntityCommonStockSharesOutstanding contextRef="c-5" decimals="INF" id="f-28" unitRef="shares">1074872000</dei:EntityCommonStockSharesOutstanding>
+    <dei:EntityCommonStockSharesOutstanding contextRef="c-6" decimals="INF" id="f-29" unitRef="shares">3390128000</dei:EntityCommonStockSharesOutstanding>
+    <ifrs-full:Revenue contextRef="c-1" decimals="-6" id="f-64" unitRef="dkk">309064000000</ifrs-full:Revenue>
+    <ifrs-full:Revenue contextRef="c-7" decimals="-6" id="f-65" unitRef="dkk">290403000000</ifrs-full:Revenue>
+    <ifrs-full:Revenue contextRef="c-8" decimals="-6" id="f-66" unitRef="dkk">232261000000</ifrs-full:Revenue>
+    <ifrs-full:Revenue contextRef="c-1" decimals="-6" id="f-418" unitRef="dkk">309064000000</ifrs-full:Revenue>
+    <ifrs-full:Revenue contextRef="c-7" decimals="-6" id="f-419" unitRef="dkk">290403000000</ifrs-full:Revenue>
+    <ifrs-full:Revenue contextRef="c-8" decimals="-6" id="f-420" unitRef="dkk">232261000000</ifrs-full:Revenue>
+    <ifrs-full:Revenue contextRef="c-87" decimals="-6" id="f-500" unitRef="dkk">289456000000</ifrs-full:Revenue>
+    <ifrs-full:Revenue contextRef="c-88" decimals="-6" id="f-501" unitRef="dkk">271764000000</ifrs-full:Revenue>
+    <ifrs-full:Revenue contextRef="c-89" decimals="-6" id="f-502" unitRef="dkk">215098000000</ifrs-full:Revenue>
+    <ifrs-full:Revenue contextRef="c-90" decimals="-6" id="f-503" unitRef="dkk">19608000000</ifrs-full:Revenue>
+    <ifrs-full:Revenue contextRef="c-91" decimals="-6" id="f-504" unitRef="dkk">18639000000</ifrs-full:Revenue>
+    <ifrs-full:Revenue contextRef="c-92" decimals="-6" id="f-505" unitRef="dkk">17163000000</ifrs-full:Revenue>
+    <ifrs-full:Revenue contextRef="c-1" decimals="-6" id="f-506" unitRef="dkk">309064000000</ifrs-full:Revenue>
+    <ifrs-full:Revenue contextRef="c-7" decimals="-6" id="f-507" unitRef="dkk">290403000000</ifrs-full:Revenue>
+    <ifrs-full:Revenue contextRef="c-8" decimals="-6" id="f-508" unitRef="dkk">232261000000</ifrs-full:Revenue>
+    <ifrs-full:Revenue contextRef="c-1" decimals="-6" id="f-601" unitRef="dkk">309064000000</ifrs-full:Revenue>
+    <ifrs-full:Revenue contextRef="c-93" decimals="-6" id="f-602" unitRef="dkk">173166000000</ifrs-full:Revenue>
+    <ifrs-full:Revenue contextRef="c-94" decimals="-6" id="f-603" unitRef="dkk">167402000000</ifrs-full:Revenue>
+    <ifrs-full:Revenue contextRef="c-101" decimals="-6" id="f-612" unitRef="dkk">88467000000</ifrs-full:Revenue>
+    <ifrs-full:Revenue contextRef="c-102" decimals="-6" id="f-613" unitRef="dkk">84201000000</ifrs-full:Revenue>
+    <ifrs-full:Revenue contextRef="c-103" decimals="-6" id="f-614" unitRef="dkk">63010000000</ifrs-full:Revenue>
+    <ifrs-full:Revenue contextRef="c-104" decimals="-6" id="f-615" unitRef="dkk">38622000000</ifrs-full:Revenue>
+    <ifrs-full:Revenue contextRef="c-105" decimals="-6" id="f-616" unitRef="dkk">36141000000</ifrs-full:Revenue>
+    <ifrs-full:Revenue contextRef="c-106" decimals="-6" id="f-617" unitRef="dkk">32708000000</ifrs-full:Revenue>
+    <ifrs-full:Revenue contextRef="c-107" decimals="-6" id="f-618" unitRef="dkk">22774000000</ifrs-full:Revenue>
+    <ifrs-full:Revenue contextRef="c-108" decimals="-6" id="f-619" unitRef="dkk">19819000000</ifrs-full:Revenue>
+    <ifrs-full:Revenue contextRef="c-109" decimals="-6" id="f-620" unitRef="dkk">17917000000</ifrs-full:Revenue>
+    <ifrs-full:Revenue contextRef="c-110" decimals="-6" id="f-621" unitRef="dkk">7235000000</ifrs-full:Revenue>
+    <ifrs-full:Revenue contextRef="c-111" decimals="-6" id="f-622" unitRef="dkk">7448000000</ifrs-full:Revenue>
+    <ifrs-full:Revenue contextRef="c-112" decimals="-6" id="f-623" unitRef="dkk">7102000000</ifrs-full:Revenue>
+    <ifrs-full:Revenue contextRef="c-113" decimals="-6" id="f-624" unitRef="dkk">3214000000</ifrs-full:Revenue>
+    <ifrs-full:Revenue contextRef="c-114" decimals="-6" id="f-625" unitRef="dkk">3112000000</ifrs-full:Revenue>
+    <ifrs-full:Revenue contextRef="c-115" decimals="-6" id="f-626" unitRef="dkk">2868000000</ifrs-full:Revenue>
+    <ifrs-full:Revenue contextRef="c-116" decimals="-6" id="f-627" unitRef="dkk">5399000000</ifrs-full:Revenue>
+    <ifrs-full:Revenue contextRef="c-117" decimals="-6" id="f-628" unitRef="dkk">5762000000</ifrs-full:Revenue>
+    <ifrs-full:Revenue contextRef="c-118" decimals="-6" id="f-629" unitRef="dkk">4821000000</ifrs-full:Revenue>
+    <ifrs-full:Revenue contextRef="c-119" decimals="-6" id="f-630" unitRef="dkk">127089000000</ifrs-full:Revenue>
+    <ifrs-full:Revenue contextRef="c-120" decimals="-6" id="f-631" unitRef="dkk">120342000000</ifrs-full:Revenue>
+    <ifrs-full:Revenue contextRef="c-121" decimals="-6" id="f-632" unitRef="dkk">95718000000</ifrs-full:Revenue>
+    <ifrs-full:Revenue contextRef="c-122" decimals="-6" id="f-633" unitRef="dkk">8833000000</ifrs-full:Revenue>
+    <ifrs-full:Revenue contextRef="c-123" decimals="-6" id="f-634" unitRef="dkk">10795000000</ifrs-full:Revenue>
+    <ifrs-full:Revenue contextRef="c-124" decimals="-6" id="f-635" unitRef="dkk">11060000000</ifrs-full:Revenue>
+    <ifrs-full:Revenue contextRef="c-581" decimals="-6" id="f-1092" unitRef="dkk">289456000000</ifrs-full:Revenue>
+    <ifrs-full:Revenue contextRef="c-582" decimals="-6" id="f-1093" unitRef="dkk">271764000000</ifrs-full:Revenue>
+    <ifrs-full:Revenue contextRef="c-583" decimals="-6" id="f-1094" unitRef="dkk">215098000000</ifrs-full:Revenue>
+    <ifrs-full:Revenue contextRef="c-728" decimals="-6" id="f-1239" unitRef="dkk">19608000000</ifrs-full:Revenue>
+    <ifrs-full:Revenue contextRef="c-729" decimals="-6" id="f-1240" unitRef="dkk">18639000000</ifrs-full:Revenue>
+    <ifrs-full:Revenue contextRef="c-730" decimals="-6" id="f-1241" unitRef="dkk">17163000000</ifrs-full:Revenue>
+    <ifrs-full:Revenue contextRef="c-93" decimals="-6" id="f-1242" unitRef="dkk">173166000000</ifrs-full:Revenue>
+    <ifrs-full:Revenue contextRef="c-94" decimals="-6" id="f-1243" unitRef="dkk">167402000000</ifrs-full:Revenue>
+    <ifrs-full:Revenue contextRef="c-731" decimals="-6" id="f-1244" unitRef="dkk">127534000000</ifrs-full:Revenue>
+    <ifrs-full:Revenue contextRef="c-732" decimals="-6" id="f-1245" unitRef="dkk">135898000000</ifrs-full:Revenue>
+    <ifrs-full:Revenue contextRef="c-733" decimals="-6" id="f-1246" unitRef="dkk">123001000000</ifrs-full:Revenue>
+    <ifrs-full:Revenue contextRef="c-734" decimals="-6" id="f-1247" unitRef="dkk">104727000000</ifrs-full:Revenue>
+    <ifrs-full:Revenue contextRef="c-735" decimals="-6" id="f-1248" unitRef="dkk">66091000000</ifrs-full:Revenue>
+    <ifrs-full:Revenue contextRef="c-736" decimals="-6" id="f-1249" unitRef="dkk">57547000000</ifrs-full:Revenue>
+    <ifrs-full:Revenue contextRef="c-737" decimals="-6" id="f-1250" unitRef="dkk">48148000000</ifrs-full:Revenue>
+    <ifrs-full:Revenue contextRef="c-738" decimals="-6" id="f-1251" unitRef="dkk">30436000000</ifrs-full:Revenue>
+    <ifrs-full:Revenue contextRef="c-739" decimals="-6" id="f-1252" unitRef="dkk">29515000000</ifrs-full:Revenue>
+    <ifrs-full:Revenue contextRef="c-740" decimals="-6" id="f-1253" unitRef="dkk">24784000000</ifrs-full:Revenue>
+    <ifrs-full:Revenue contextRef="c-741" decimals="-6" id="f-1254" unitRef="dkk">20713000000</ifrs-full:Revenue>
+    <ifrs-full:Revenue contextRef="c-742" decimals="-6" id="f-1255" unitRef="dkk">17438000000</ifrs-full:Revenue>
+    <ifrs-full:Revenue contextRef="c-743" decimals="-6" id="f-1256" unitRef="dkk">15108000000</ifrs-full:Revenue>
+    <ifrs-full:Revenue contextRef="c-744" decimals="-6" id="f-1257" unitRef="dkk">18658000000</ifrs-full:Revenue>
+    <ifrs-full:Revenue contextRef="c-745" decimals="-6" id="f-1258" unitRef="dkk">18501000000</ifrs-full:Revenue>
+    <ifrs-full:Revenue contextRef="c-746" decimals="-6" id="f-1259" unitRef="dkk">16687000000</ifrs-full:Revenue>
+    <ifrs-full:Revenue contextRef="c-1" decimals="-6" id="f-1260" unitRef="dkk">309064000000</ifrs-full:Revenue>
+    <ifrs-full:Revenue contextRef="c-7" decimals="-6" id="f-1261" unitRef="dkk">290403000000</ifrs-full:Revenue>
+    <ifrs-full:Revenue contextRef="c-8" decimals="-6" id="f-1262" unitRef="dkk">232261000000</ifrs-full:Revenue>
+    <ifrs-full:NumberOfSharesOutstanding
+      contextRef="c-984"
+      decimals="-6"
+      id="f-2092"
+      unitRef="shares">1075000000</ifrs-full:NumberOfSharesOutstanding>
+    <ifrs-full:NumberOfSharesOutstanding
+      contextRef="c-985"
+      decimals="-6"
+      id="f-2093"
+      unitRef="shares">3435000000</ifrs-full:NumberOfSharesOutstanding>
+    <ifrs-full:NumberOfSharesOutstanding
+      contextRef="c-986"
+      decimals="-6"
+      id="f-2094"
+      unitRef="shares">4510000000</ifrs-full:NumberOfSharesOutstanding>
+    <ifrs-full:NumberOfSharesOutstanding
+      contextRef="c-987"
+      decimals="-6"
+      id="f-2095"
+      unitRef="shares">52000000</ifrs-full:NumberOfSharesOutstanding>
+    <ifrs-full:NumberOfSharesOutstanding
+      contextRef="c-10"
+      decimals="-6"
+      id="f-2096"
+      unitRef="shares">4458000000</ifrs-full:NumberOfSharesOutstanding>
+    <ifrs-full:NumberOfSharesOutstanding
+      contextRef="c-992"
+      decimals="-6"
+      id="f-2112"
+      unitRef="shares">1075000000</ifrs-full:NumberOfSharesOutstanding>
+    <ifrs-full:NumberOfSharesOutstanding
+      contextRef="c-993"
+      decimals="-6"
+      id="f-2113"
+      unitRef="shares">3390000000</ifrs-full:NumberOfSharesOutstanding>
+    <ifrs-full:NumberOfSharesOutstanding
+      contextRef="c-994"
+      decimals="-6"
+      id="f-2114"
+      unitRef="shares">4465000000</ifrs-full:NumberOfSharesOutstanding>
+    <ifrs-full:NumberOfSharesOutstanding
+      contextRef="c-995"
+      decimals="-6"
+      id="f-2115"
+      unitRef="shares">24000000</ifrs-full:NumberOfSharesOutstanding>
+    <ifrs-full:NumberOfSharesOutstanding contextRef="c-9" decimals="-6" id="f-2116" unitRef="shares">4441000000</ifrs-full:NumberOfSharesOutstanding>
+    <ifrs-full:NumberOfSharesOutstanding contextRef="c-5" decimals="-6" id="f-2127" unitRef="shares">1075000000</ifrs-full:NumberOfSharesOutstanding>
+    <ifrs-full:NumberOfSharesOutstanding contextRef="c-6" decimals="-6" id="f-2128" unitRef="shares">3390000000</ifrs-full:NumberOfSharesOutstanding>
+    <ifrs-full:NumberOfSharesOutstanding
+      contextRef="c-999"
+      decimals="-6"
+      id="f-2129"
+      unitRef="shares">4465000000</ifrs-full:NumberOfSharesOutstanding>
+    <ifrs-full:NumberOfSharesOutstanding
+      contextRef="c-1000"
+      decimals="-6"
+      id="f-2130"
+      unitRef="shares">21000000</ifrs-full:NumberOfSharesOutstanding>
+    <ifrs-full:NumberOfSharesOutstanding
+      contextRef="c-12"
+      decimals="-6"
+      id="f-2131"
+      unitRef="shares">4444000000</ifrs-full:NumberOfSharesOutstanding>
+</xbrl>

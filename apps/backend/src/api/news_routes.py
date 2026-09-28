@@ -19,6 +19,7 @@ from steward.news.read import (
     Confidence,
     DisputedStory,
     EscalationOut,
+    EscalationStatus,
     FeedFilters,
     NewsFeed,
     ReportOut,
@@ -31,6 +32,7 @@ from steward.news.read import (
     recent_alerts,
     resolve_story,
 )
+from steward.news.stats import NewsStats, SourcesHealth, news_stats, sources_health
 from steward.notify.alerts import create_alerts
 from steward.notify.route import AlertRequest
 from steward.portfolio.read import JobSummary
@@ -78,6 +80,23 @@ async def get_news(
         limit=limit,
     )
     return await news_feed(pool, filters, await _jobs_config(pool))
+
+
+@router.get("/news/stats", tags=["news"])
+async def get_news_stats(
+    pool: Pool, _owner: Owner, days: Annotated[int, Query(ge=1, le=90)] = 14
+) -> NewsStats:
+    """Stories over the last `days` UTC days (today included), each dated by its earliest
+    item's publication: per day by severity, per event type, and how many are disputed.
+    Repeats of an earlier story are left out; unclassified stories are counted apart."""
+    return await news_stats(pool, days, dt.datetime.now(dt.UTC))
+
+
+@router.get("/news/sources/health", tags=["news"])
+async def get_news_sources_health(pool: Pool, _owner: Owner) -> SourcesHealth:
+    """Every configured news source with its last fetch time, item count and error, and
+    whether it is healthy (`rule` states how that is decided)."""
+    return await sources_health(pool, dt.datetime.now(dt.UTC))
 
 
 @router.get("/stories/disputed", tags=["news"])
@@ -213,11 +232,12 @@ async def get_escalations(
     _owner: Owner,
     ticker: Annotated[str | None, Query(pattern=r"^[A-Za-z0-9._-]{1,32}$")] = None,
     limit: Annotated[int, Query(ge=1, le=200)] = 50,
+    status_: Annotated[EscalationStatus | None, Query(alias="status")] = None,
 ) -> list[EscalationOut]:
     """Impact notes on confirmed severity-2+ stories and large price moves, newest first:
     each cites its sources and names the thesis KPIs or exit conditions it touches, or
-    states that none applies."""
-    return await list_escalations(pool, ticker, limit)
+    states that none applies. `status` keeps only open, acknowledged or resolved ones."""
+    return await list_escalations(pool, ticker, limit, status=status_)
 
 
 @router.get("/escalations/{report_id}", tags=["reports"])

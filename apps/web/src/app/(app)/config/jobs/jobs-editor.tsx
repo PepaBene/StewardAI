@@ -17,6 +17,7 @@ import {
   FRED_UNITS,
   jobsFromBody,
   jobsToBody,
+  MACRO_REF,
   MACRO_SOURCES,
   MODEL_SUGGESTIONS,
   newClosure,
@@ -39,6 +40,7 @@ import {
 } from "@/lib/config/jobs-form";
 import { configSaveQuery, useConfigEditor } from "@/lib/hooks/use-config-editor";
 import { SEVERITY } from "@/lib/news/labels";
+import { BlueprintCorners } from "@/components/ui/blueprint";
 
 const api = () => getBrowserApiClient();
 const EFFORT_OPTIONS = EFFORTS.map((e) => ({ value: e, label: e }));
@@ -117,7 +119,7 @@ export function JobsEditor() {
       {form ? (
         <>
           <section aria-labelledby="schedules-heading" className="space-y-3">
-            <h2 id="schedules-heading" className="text-lg font-semibold">
+            <h2 id="schedules-heading" className="text-[22px] leading-tight font-semibold">
               Schedules
             </h2>
             <CheckboxField
@@ -195,7 +197,8 @@ function ScheduleCard({
   // A model-level error (bad cron or time zone) is reported on the schedule itself.
   const own = errors[schedule.name] ?? [];
   return (
-    <div aria-labelledby={headingId} role="group" className="space-y-3 rounded-lg border border-border bg-surface-raised p-4">
+    <div aria-labelledby={headingId} role="group" className="space-y-3 blueprint p-5">
+      <BlueprintCorners />
       <div className="flex flex-wrap items-baseline justify-between gap-2">
         <div>
           <h3 id={headingId} className="font-medium">
@@ -259,9 +262,10 @@ function SettingsCard({
   const listId = useId();
   const headingId = `${section}-heading`;
   return (
-    <section aria-labelledby={headingId} className="space-y-3 rounded-lg border border-border bg-surface-raised p-4">
+    <section aria-labelledby={headingId} className="space-y-3 blueprint p-5">
+      <BlueprintCorners />
       <div>
-        <h2 id={headingId} className="text-lg font-semibold">
+        <h2 id={headingId} className="text-[22px] leading-tight font-semibold">
           {info.title}
         </h2>
         <p className="text-sm text-text-muted">{info.description}</p>
@@ -300,7 +304,7 @@ function SettingsCard({
               />
             );
           }
-          if (field.kind === "lines") {
+          if (field.kind === "lines" || field.kind === "symbol-lines") {
             return <TextAreaField key={field.key} label={field.label} path={path} errors={errors} value={String(value)} rows={3} onChange={(v) => onChange(field.key, v)} hint={hint} />;
           }
           if (field.kind === "severity") {
@@ -352,7 +356,7 @@ function ClosuresEditor({
       <p className="text-xs text-text-muted">
         Days an exchange is closed, used without a deploy. Public holidays are not exchange calendars; review the suggested
         days on the{" "}
-        <Link href="/config/calendar" className="text-accent underline-offset-4 hover:underline">
+        <Link href="/config/calendar" className="text-accent-ink underline-offset-4 hover:underline">
           exchange calendar
         </Link>{" "}
         page.
@@ -496,7 +500,7 @@ function MacroSeriesEditor({
     <div className="space-y-4">
       <p className="text-xs text-text-muted">
         Each series&rsquo; key names it in digests and in the macro surprise bands of{" "}
-        <Link href="/config/event-rules#triggers-heading" className="text-accent underline-offset-4 hover:underline">
+        <Link href="/config/event-rules#triggers-heading" className="text-accent-ink underline-offset-4 hover:underline">
           Config: Event rules
         </Link>
         .
@@ -515,7 +519,7 @@ function MacroSeriesEditor({
             {rows.length === 0 ? <p className="text-sm text-text-muted">No {label} series.</p> : null}
             {rows.map((r, i) => {
               const path = `${listPath}.${i}`;
-              const refPath = `${path}.${source === "eurostat" ? "dataset" : source === "fred" ? "series_id" : "flow_key"}`;
+              const refPath = `${path}.${MACRO_REF[source]}`;
               return (
                 <div key={r.rowKey} role="group" aria-label={`${label} series ${r.key || i + 1}`} className="space-y-2 rounded-md border border-border p-3">
                   <div className="grid items-start gap-2 sm:grid-cols-2 lg:grid-cols-[1fr_2fr_1.5fr_0.7fr_auto]">

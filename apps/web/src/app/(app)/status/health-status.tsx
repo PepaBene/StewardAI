@@ -63,8 +63,9 @@ export function HealthStatus() {
   }
 
   return (
-    <Card className="max-w-xl">
+    <Card>
       <CardHeader>
+        <div className="kicker">Backend</div>
         <CardTitle>Python API</CardTitle>
         <CardDescription className="break-all font-mono">{getApiBaseUrl()}</CardDescription>
       </CardHeader>
@@ -80,7 +81,7 @@ export function HealthStatus() {
           <dl className="grid grid-cols-[max-content_1fr] gap-x-6 gap-y-2 text-sm">
             <dt className="text-text-muted">Status</dt>
             <dd className="flex items-center gap-1.5 font-medium">
-              <CircleCheckIcon aria-hidden="true" className="size-4" />
+              <CircleCheckIcon aria-hidden="true" className="size-4 text-accent" />
               {result.data.status}
             </dd>
             <dt className="text-text-muted">HTTP</dt>

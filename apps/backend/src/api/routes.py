@@ -41,6 +41,7 @@ from steward.earnings.read import (
 )
 from steward.earnings.review import ReviewError, ReviewItem, review_queue
 from steward.earnings.review import review_fact as review_fact_in_db
+from steward.earnings.review_stats import ReviewStats, review_stats
 from steward.jobs import queue
 from steward.jobs.runner import create_job
 from steward.portfolio.read import (
@@ -55,6 +56,7 @@ from steward.portfolio.read import (
     portfolio_holdings,
     portfolio_overview,
 )
+from steward.portfolio.risk import PortfolioRisk, portfolio_risk
 from steward.portfolio.transactions import (
     TransactionFilters,
     TransactionsPage,
@@ -104,7 +106,7 @@ async def get_portfolio_history(
 async def get_portfolio_contribution(
     pool: Pool,
     _owner: Owner,
-    days: Annotated[int, Query(ge=7, le=3700)] = 365,
+    days: Annotated[int, Query(ge=1, le=3700)] = 365,
 ) -> ContributionReport:
     """Every holding's contribution to the portfolio's return over the window, in base
     currency: its own trading (buying or selling more of it) netted out, so a holding is
@@ -114,11 +116,30 @@ async def get_portfolio_contribution(
     return await contribution_to_return(pool, days)
 
 
+@router.get("/portfolio/risk", tags=["portfolio"])
+async def get_portfolio_risk(
+    pool: Pool,
+    _owner: Owner,
+    days: Annotated[int, Query(ge=30, le=3700)] = 365,
+) -> PortfolioRisk:
+    """Sharpe ratio of the portfolio and of the first benchmark over the window: the
+    time-weighted daily returns of /portfolio/history (weekdays) in the base currency, in
+    excess of the forward-filled CZK risk-free rate (CZEONIA from the ČNB, /100/252 per
+    trading day), annualised by sqrt(252); with the annualised volatility, mean excess
+    return, average risk-free rate, the window and the number of observations. `sharpe` is
+    null with a `reason` under 60 observations or without a stored risk-free rate."""
+    return await portfolio_risk(pool, days)
+
+
 @router.get("/portfolio/transactions", tags=["portfolio"])
 async def get_portfolio_transactions(
     pool: Pool,
     _owner: Owner,
     type: Annotated[list[TransactionType] | None, Query(description="Any of these.")] = None,
+    subtype: Annotated[
+        list[Annotated[str, Field(pattern=r"^[A-Za-z_]{1,32}$")]] | None,
+        Query(description="Any of these, as Trading212 names them (BUY, SELL, DEPOSIT, ...)."),
+    ] = None,
     ticker: Annotated[str | None, Query(pattern=r"^[A-Za-z0-9._-]{1,32}$")] = None,
     start: Annotated[dt.date | None, Query(alias="from", description="On or after.")] = None,
     end: Annotated[dt.date | None, Query(alias="to", description="On or before.")] = None,
@@ -126,7 +147,9 @@ async def get_portfolio_transactions(
     limit: Annotated[int, Query(ge=1, le=500)] = 100,
 ) -> TransactionsPage:
     """Orders, dividends and cash movements, newest first, with totals per type and
-    currency over every row matching the filters (dates are UTC days, both inclusive)."""
+    currency over every row matching the filters (dates are UTC days, both inclusive).
+    `subtype` narrows server-side (e.g. BUY or SELL orders), so counts, totals and paging
+    all follow it."""
     try:
         decoded = decode_cursor(cursor) if cursor else None
     except ValueError as exc:
@@ -135,6 +158,7 @@ async def get_portfolio_transactions(
         pool,
         TransactionFilters(
             types=list(type or []),
+            subtypes=list(subtype or []),
             ticker=ticker,
             start=dt.datetime.combine(start, dt.time(0), tzinfo=dt.UTC) if start else None,
             end=(
@@ -188,13 +212,21 @@ class JobStepOut(BaseModel):
     cost_usd: float | None
 
 
+_ATTEMPTS_DESCRIPTION = (
+    "Times the runner started this job, a resumed run included; above 1 means it was retried."
+    " 0 = never started."
+)
+
+
 class JobDetail(JobSummary):
     params: dict[str, Any]
+    attempts: int = Field(description=_ATTEMPTS_DESCRIPTION)
     steps: list[JobStepOut]
 
 
 class JobListItem(JobSummary):
     params: dict[str, Any]
+    attempts: int = Field(description=_ATTEMPTS_DESCRIPTION)
     cost_usd: float | None = Field(description="Sum of the run's step costs; null if none.")
     failed_step: str | None = Field(description="The first failed step's name, if any.")
 
@@ -220,7 +252,7 @@ async def list_jobs(
     outcome and cost. Filters combine (AND)."""
     rows = await pool.fetch(
         "select j.id, j.job_type, j.trigger, j.status, j.error, j.created_at, j.started_at,"
-        " j.finished_at, j.params, s.cost_usd, s.failed_step from public.job j"
+        " j.finished_at, j.params, j.attempts, s.cost_usd, s.failed_step from public.job j"
         " left join lateral (select sum(cost_usd) as cost_usd, (array_agg(name order by"
         " step_index) filter (where status = 'failed'))[1] as failed_step"
         " from public.job_step where job_id = j.id) s on true"
@@ -254,7 +286,7 @@ async def get_job(job_id: IdPath, pool: Pool, _owner: Owner) -> JobDetail:
     """One job run with its steps, to follow an on-demand run to completion."""
     row = await pool.fetchrow(
         "select id, job_type, trigger, status, error, created_at, started_at, finished_at,"
-        " params from public.job where id = $1",
+        " params, attempts from public.job where id = $1",
         job_id,
     )
     if row is None:
@@ -360,7 +392,10 @@ Storage = Annotated[EvidenceStore, Depends(get_storage)]
 @router.get("/theses/board", tags=["holdings"])
 async def get_thesis_board(pool: Pool, _owner: Owner) -> ThesisBoard:
     """Every holding with a thesis, once: each KPI's current pass / breach / unknown with the
-    verdict behind it. A KPI never judged is listed as unknown, never left out."""
+    verdict behind it. A KPI never judged is listed as unknown, never left out. Each row has
+    a 0-100 thesis score computed from those verdicts, its history and a state; the board
+    has the weight-weighted portfolio score and verdict activity. `score_method` states the
+    formula."""
     return await thesis_board(pool, local_today())
 
 
@@ -472,6 +507,16 @@ async def get_review_queue(
     """Facts waiting for the owner: held by the validator or quarantined by reconciliation,
     each with its snippet, source, the checks it broke and the reconciliation behind it."""
     return await review_queue(pool, ticker)
+
+
+@router.get("/facts/review-stats", tags=["holdings"])
+async def get_review_stats(
+    pool: Pool, _owner: Owner, days: Annotated[int, Query(ge=1, le=365)] = 30
+) -> ReviewStats:
+    """Review counts over the last `days` UTC days (today included): facts pending now and
+    how many of them a thesis KPI waits on, owner decisions per day, facts marked wrong, and
+    the last recorded golden-set extraction accuracy (null when none is recorded)."""
+    return await review_stats(pool, days, dt.datetime.now(dt.UTC))
 
 
 @router.get("/facts/index", tags=["holdings"])

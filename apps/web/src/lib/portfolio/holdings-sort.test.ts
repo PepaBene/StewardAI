@@ -9,6 +9,7 @@ function holding(ticker: string, value_base: number, extra: Partial<Holding> = {
     ticker,
     name: ticker,
     isin: null,
+    security_type: null,
     quantity: 1,
     avg_price: 1,
     current_price: 1,
@@ -73,5 +74,13 @@ describe("nextSort", () => {
   it("starts names ascending and figures descending", () => {
     expect(nextSort(DEFAULT_HOLDINGS_SORT, "name").direction).toBe("asc");
     expect(nextSort(DEFAULT_HOLDINGS_SORT, "ppl").direction).toBe("desc");
+  });
+
+  it("sorts by today's move from the price lookup, holdings without one last", () => {
+    const rows = [holding("A", 10), holding("B", 20), holding("C", 30)];
+    const moves: Record<string, number | null> = { A: 0.01, B: null, C: -0.02 };
+    const dayChange = (t: string) => moves[t];
+    expect(sortHoldings(rows, { key: "day", direction: "desc" }, { dayChange }).map((h) => h.ticker)).toEqual(["A", "C", "B"]);
+    expect(sortHoldings(rows, { key: "day", direction: "asc" }, { dayChange }).map((h) => h.ticker)).toEqual(["C", "A", "B"]);
   });
 });

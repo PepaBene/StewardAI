@@ -23,7 +23,7 @@ import { cn } from "@/lib/utils";
 const ICONS = { accept: CheckIcon, correct: PencilIcon, reject: XIcon } as const satisfies Record<ReviewAction, unknown>;
 
 const TEXTAREA =
-  "w-full rounded-md border border-border bg-surface-raised px-3 py-1.5 text-base text-text shadow-xs outline-none placeholder:text-text-muted md:text-sm focus-visible:border-focus focus-visible:ring-2 focus-visible:ring-focus/30 aria-invalid:border-warning-signal aria-invalid:ring-2 aria-invalid:ring-warning-signal/30";
+  "w-full border border-border bg-surface-raised px-3 py-1.5 text-base text-text shadow-xs outline-none placeholder:text-text-muted md:text-sm focus-visible:border-focus focus-visible:ring-2 focus-visible:ring-focus/30 aria-invalid:border-warning-signal aria-invalid:ring-2 aria-invalid:ring-warning-signal/30";
 
 export type ReviewResolution = {
   fact: FactOut;
@@ -125,7 +125,7 @@ export function FactReviewForm({
               <label
                 key={action}
                 className={cn(
-                  "inline-flex h-8 cursor-pointer items-center gap-1.5 rounded-md border border-border bg-surface-raised px-3 font-medium text-text hover:bg-surface-muted",
+                  "inline-flex h-8 cursor-pointer items-center gap-1.5 border border-border bg-surface-raised px-3 font-medium text-text hover:bg-surface-muted",
                   "has-checked:border-accent has-checked:bg-accent/10 has-focus-visible:outline-2 has-focus-visible:outline-offset-2 has-focus-visible:outline-focus",
                 )}
               >
@@ -190,7 +190,7 @@ export function FactReviewForm({
       </div>
 
       {failure ? (
-        <p role="alert" className="flex items-start gap-1.5 rounded-md border border-warning-signal/40 bg-warning-signal-subtle p-2 text-text">
+        <p role="alert" className="flex items-start gap-1.5 border border-warning-signal/40 bg-warning-signal-subtle p-2 text-text">
           <CircleAlertIcon aria-hidden="true" className="mt-0.5 size-4 shrink-0 text-warning-signal" />
           <span>
             <span className="font-medium">Not saved.</span> {failure}

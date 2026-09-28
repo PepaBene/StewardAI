@@ -36,6 +36,9 @@ const FULL: JobsConfig = {
   weekly_digest: { enabled: false, cron: "0 18 * * sun", timezone: "Europe/London" },
   monthly_review: { enabled: true, cron: "0 8 1-3 * *", timezone: "Europe/Prague" },
   ownership_13f: { enabled: false, cron: "0 6 10 * *", timezone: "America/New_York" },
+  valuation_refresh: { enabled: false, cron: "30 7 * * mon", timezone: "UTC" },
+  etf_look_through: { enabled: true, cron: "0 7 * * 0", timezone: "UTC" },
+  sec_xbrl: { enabled: false, cron: "0 6 * * wed", timezone: "UTC" },
   earnings_check: {
     extraction_model: "claude-opus-5-5",
     locate_model: "claude-sonnet-5",
@@ -87,6 +90,7 @@ const FULL: JobsConfig = {
     eurostat: [{ key: "hicp", label: "HICP", dataset: "prc_hicp_minr", filters: { unit: "RCH_A", coicop18: "TOTAL" }, unit: "%" }],
     fred: [{ key: "fed_funds", label: "Fed funds", series_id: "DFF", units: "chg", unit: "pp", policy_rate: true }],
     ecb: [{ key: "ecb_deposit_rate", label: "ECB deposit rate", flow_key: "FM/D.U2.EUR.4F.KR.DFR.LEV", unit: "%", policy_rate: false }],
+    cnb: [{ key: "czeonia", label: "CZEONIA", series: "czeonia", unit: "%", policy_rate: false }],
   },
   monitoring: { alert_failed_jobs: ["portfolio_sync", "macro_collect"], missed_run_grace_minutes: 120, news_coverage_hours: 72 },
   reference: {
@@ -96,7 +100,17 @@ const FULL: JobsConfig = {
     max_subsidiary_aliases: 120,
     wikidata_languages: ["en", "fr"],
   },
-  prices: { benchmark_symbols: ["^spx", "^dax", "^ukx"], history_years: 5, plausibility_tolerance_pct: 1.5 },
+  prices: {
+    benchmark_symbols: ["^spx", "^dax", "^ukx"],
+    history_years: 5,
+    plausibility_tolerance_pct: 1.5,
+    market_strip: [{ symbol: "^spx", label: "S&P 500", yahoo_symbol: "^GSPC" }, { symbol: "^ndx", label: "Nasdaq 100" }],
+    yahoo_daily_fallback: false,
+    intraday_enabled: false,
+    intraday_interval_minutes: 30,
+    intraday_retention_days: 3,
+    intraday_cache_seconds: 300,
+  },
   calendar: {
     holiday_countries: ["CZ", "US", "DE"],
     exchange_closures: [
@@ -125,6 +139,43 @@ const FULL: JobsConfig = {
     ],
     top_holders: 25,
   },
+  valuation: {
+    enabled: false,
+    full_refresh_days: 3,
+    esef_max_age_months: 12,
+    finnhub_cross_check: false,
+    funds: [
+      {
+        key: "CSPX",
+        label: "iShares Core S&P 500 UCITS ETF (Acc)",
+        provider: "ishares",
+        url: "https://www.ishares.com/uk/individual/en/products/253743/x",
+        port_id: null,
+        consumer_id: "uk0",
+        tickers: ["CSPXl_EQ"],
+        index_label: "S&P 500",
+        benchmark_symbols: ["^spx"],
+      },
+    ],
+  },
+  look_through: {
+    enabled: false,
+    funds: [{ isin: "IE00B5BMR087", label: "CSPX", provider: "ishares", portfolio_id: "253743" }],
+    benchmark_proxies: [{ symbol: "^spx", fund_isin: "IE00B5BMR087", label: "S&P 500" }],
+    issuer_groups: [],
+    direct_sectors: { TSM_US_EQ: "Information Technology" },
+    direct_countries: {},
+    ishares_api_url: "https://www.blackrock.com/varnish-api/uk-retail01-product-data/product-data",
+    ishares_site: "ishares-uk",
+    ishares_locale: "en_GB",
+    ishares_spreadsheet_fallback: false,
+    vanguard_graphql_url: "https://www.vanguard.co.uk/gpx/graphql",
+    vanguard_consumer_id: "uk0",
+    cached_fallback_days: 30,
+    stale_after_days: 90,
+    keep_snapshots: 4,
+  },
+  xbrl: { enabled: false, quarterly: false, read_ads_ratio: false, max_document_mb: 20 },
 };
 
 describe("jobs form", () => {
@@ -216,6 +267,18 @@ describe("jobs form: phase 5 schedules and settings", () => {
     expect(names).toEqual(expect.arrayContaining(["monthly_review", "ownership_13f"]));
   });
 
+  it("edits the valuation settings and keeps the funds list", () => {
+    expect(SCHEDULES.valuation_refresh.cron).toBe("45 7 * * *");
+    const form = jobsFromBody(FULL);
+    expect(form.settings.valuation.values.full_refresh_days).toBe("3");
+    form.settings.valuation.values.full_refresh_days = "14";
+    form.settings.valuation.values.finnhub_cross_check = true;
+    const body = jobsToBody(form);
+    expect(body.valuation!.full_refresh_days).toBe(14);
+    expect(body.valuation!.finnhub_cross_check).toBe(true);
+    expect(body.valuation!.funds).toEqual(FULL.valuation!.funds);
+  });
+
   it("edits the chat, review and ownership settings", () => {
     const form = jobsFromBody(FULL);
     expect(form.settings.chat.values.history_messages).toBe("20");
@@ -303,6 +366,19 @@ describe("jobs form: escalation, macro and monitoring", () => {
     expect(form.macroSeries.ecb[0].policy_rate).toBe(true);
   });
 
+  it("edits ČNB rates (CZEONIA for the Sharpe ratio, the repo rate as a policy rate)", () => {
+    const form = jobsFromBody(null);
+    expect(form.macroSeries.cnb.map((r) => [r.key, r.ref, r.policy_rate])).toEqual([
+      ["czeonia", "czeonia", false],
+      ["cnb_repo_2w", "repo_2w", true],
+    ]);
+    form.macroSeries.cnb = form.macroSeries.cnb.slice(0, 1);
+    const body = jobsToBody(form);
+    expect(body.macro!.cnb).toEqual([{ key: "czeonia", label: "CZEONIA (CZK overnight rate)", series: "czeonia", unit: "%", policy_rate: false }]);
+    // A stored config from before the ČNB source keeps the defaults.
+    expect(jobsFromBody({ macro: { ecb: [] } } as never).macroSeries.cnb).toHaveLength(2);
+  });
+
   it("parses dimension filters", () => {
     expect(parseFilters(" unit = RCH_A \n\ns_adj=SA\nbroken")).toEqual({ unit: "RCH_A", s_adj: "SA", broken: "" });
   });
@@ -352,5 +428,35 @@ describe("jobs form: optional effort, tiers and the other preferences", () => {
     expect(body.review).toMatchObject({ use_batch: true, batch_wait_minutes: 60, holder_drop_flag_pct: 10 });
     expect(body.chat).toMatchObject({ effort: null, source_tiers: [1, 2] });
     expect(body.digest!.min_severity_listed).toBe(1);
+  });
+});
+
+describe("jobs form: market strip", () => {
+  it("round-trips the market strip as symbol + label [| Yahoo symbol] lines", () => {
+    const form = jobsFromBody(null);
+    expect(form.settings.prices.values.market_strip).toBe(
+      "^spx S&P 500 | ^GSPC\n^stoxx STOXX Europe 600 | ^STOXX\n^px PX",
+    );
+    form.settings.prices.values.market_strip = "^dax DAX 40 | ^gdaxi\n^px";
+    const body = jobsToBody(form) as unknown as { prices: { market_strip: unknown } };
+    expect(body.prices.market_strip).toEqual([
+      { symbol: "^dax", label: "DAX 40", yahoo_symbol: "^GDAXI" },
+      { symbol: "^px", label: "^px" },
+    ]);
+  });
+});
+
+describe("jobs form: intraday prices", () => {
+  it("edits the intraday flag, interval and the Yahoo fallback, on by default", () => {
+    const form = jobsFromBody(null);
+    expect(form.settings.prices.values).toMatchObject({
+      intraday_enabled: true,
+      intraday_interval_minutes: "15",
+      yahoo_daily_fallback: true,
+    });
+    form.settings.prices.values.intraday_enabled = false;
+    form.settings.prices.values.intraday_interval_minutes = "30";
+    const body = jobsToBody(form);
+    expect(body.prices).toMatchObject({ intraday_enabled: false, intraday_interval_minutes: 30, intraday_retention_days: 5 });
   });
 });

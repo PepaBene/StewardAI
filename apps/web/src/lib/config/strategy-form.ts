@@ -121,6 +121,8 @@ export type RuleForm = {
   operator: Operator;
   on_breach: OnBreach;
   description: string;
+  /** Disabled rules are kept in the config but skipped by breach evaluation. */
+  enabled: boolean;
   /** A percentage for weight rules, a whole number for position_count. */
   value: string;
   ticker: string;
@@ -173,6 +175,7 @@ export function newRule(type: RuleType = "position_weight"): RuleForm {
     operator: "<=",
     on_breach: "severity_2",
     description: "",
+    enabled: true,
     value: "",
     ticker: "",
     dimension: "",
@@ -234,6 +237,7 @@ export function strategyFromBody(body: StrategyConfig | null): StrategyForm {
       operator: r.operator,
       on_breach: r.on_breach ?? "severity_2",
       description: r.description ?? "",
+      enabled: r.enabled ?? true,
       value: r.type === "position_count" ? String(r.value) : fractionToPercent(r.value),
       ticker: r.type === "position_weight" ? (r.ticker ?? "") : "",
       dimension: r.type === "category_weight" ? r.dimension : "",
@@ -248,6 +252,7 @@ function ruleToBody(r: RuleForm): StrategyRule {
     operator: r.operator,
     on_breach: r.on_breach,
     description: r.description,
+    enabled: r.enabled,
   };
   switch (r.type) {
     case "position_weight":

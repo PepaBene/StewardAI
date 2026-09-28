@@ -5,9 +5,9 @@ from typing import Annotated, Any, Literal, Self
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from apscheduler.triggers.cron import CronTrigger
-from pydantic import Field, field_validator, model_validator
+from pydantic import AnyHttpUrl, Field, field_validator, model_validator
 
-from steward.config.common import ConfigModel
+from steward.config.common import ConfigModel, Ticker, require_unique
 
 
 class JobSchedule(ConfigModel):
@@ -326,8 +326,46 @@ class ReferenceSettings(ConfigModel):
 StooqSymbol = Annotated[str, Field(pattern=r"^\^?[a-z0-9._-]{1,24}$", examples=["^spx"])]
 
 
+YahooSymbol = Annotated[
+    str, Field(pattern=r"^\^?[A-Z0-9][A-Z0-9.=-]{0,23}$", examples=["^GSPC", "VWCE.DE"])
+]
+
+# Yahoo symbols of the Stooq indices whose Yahoo counterpart is known (checked on
+# 2026-09-28: ^GSPC and ^STOXX answer; ^SXXP has no data, and Yahoo's ^PX is a CBOE symbol,
+# not Prague's PX, so PX has none). Used when a market strip item or benchmark names none.
+STOOQ_INDEX_YAHOO: dict[str, str] = {
+    "^spx": "^GSPC", "^stoxx": "^STOXX", "^dax": "^GDAXI", "^ukx": "^FTSE", "^ndq": "^IXIC",
+    "^dji": "^DJI", "^cac": "^FCHI", "^aex": "^AEX", "^nkx": "^N225",
+}  # fmt: skip
+
+
+class MarketStripItem(ConfigModel):
+    symbol: StooqSymbol
+    label: str = Field(min_length=1, max_length=40, examples=["S&P 500"])
+    yahoo_symbol: YahooSymbol | None = Field(
+        default=None,
+        description="Yahoo Finance symbol of the same index (^GSPC, ^STOXX): intraday values, "
+        "and closes when Stooq has none. Empty: the known counterpart of the Stooq symbol.",
+    )
+
+    def yahoo(self) -> str | None:
+        return self.yahoo_symbol or STOOQ_INDEX_YAHOO.get(self.symbol)
+
+
+def _default_market_strip() -> list[MarketStripItem]:
+    return [
+        MarketStripItem(symbol="^spx", label="S&P 500", yahoo_symbol="^GSPC"),
+        MarketStripItem(symbol="^stoxx", label="STOXX Europe 600", yahoo_symbol="^STOXX"),
+        MarketStripItem(symbol="^px", label="PX"),
+    ]
+
+
+IntradayInterval = Literal[5, 10, 15, 20, 30, 60]
+
+
 class PriceSettings(ConfigModel):
-    """Daily price history (Stooq) and the risk figures computed from it."""
+    """Daily price history (Stooq, Yahoo as the fallback), intraday prices (Yahoo) and the
+    risk figures computed from the daily closes."""
 
     benchmark_symbols: list[StooqSymbol] = Field(
         default_factory=lambda: ["^spx"],
@@ -342,6 +380,50 @@ class PriceSettings(ConfigModel):
         description="Largest gap between Stooq's close and Trading212's price on a sync day "
         "before it is flagged.",
     )
+    market_strip: list[MarketStripItem] = Field(
+        default_factory=_default_market_strip,
+        max_length=12,
+        description="Index quotes on the market strip: Stooq symbols (collected with the "
+        "benchmarks), the label shown and optionally the Yahoo symbol of the same index. "
+        "Stooq's close first; else Yahoo's; for PX (^px) the Prague Stock Exchange's page, "
+        "read once a day. An index no source has data for shows as empty.",
+    )
+    yahoo_daily_fallback: bool = Field(
+        default=True,
+        description="Daily closes from Yahoo Finance (unofficial) for a symbol Stooq refuses, "
+        "cannot be reached for or has no symbol for. Stooq stays the source of record.",
+    )
+    intraday_enabled: bool = Field(
+        default=True,
+        description="Intraday prices (Yahoo Finance, unofficial): 5-minute bars about 15 "
+        "minutes delayed, polled only while each listing's market is open, and fetched when a "
+        "holding page opens. Unofficial: it may rate-limit or break without notice; pages "
+        "then fall back to daily closes with a note.",
+    )
+    intraday_interval_minutes: IntradayInterval = Field(
+        default=15,
+        description="How often intraday prices are polled while a market is open (minutes).",
+    )
+    intraday_retention_days: int = Field(
+        default=5, ge=1, le=14, description="Days of 5-minute bars kept."
+    )
+    intraday_cache_seconds: int = Field(
+        default=120,
+        ge=30,
+        le=900,
+        description="A holding page re-fetches its intraday prices when the stored ones are "
+        "older than this during trading hours.",
+    )
+
+    @model_validator(mode="after")
+    def _unique_strip(self) -> Self:
+        require_unique("market strip symbols", (i.symbol for i in self.market_strip))
+        return self
+
+    def index_yahoo(self, symbol: str) -> str | None:
+        """The Yahoo symbol of a Stooq index symbol (a strip item's own, else the known one)."""
+        item = next((i for i in self.market_strip if i.symbol == symbol), None)
+        return item.yahoo() if item else STOOQ_INDEX_YAHOO.get(symbol)
 
 
 CountryCode = Annotated[str, Field(pattern=r"^[A-Z]{2}$", examples=["CZ"])]
@@ -434,6 +516,19 @@ class EcbSeries(ConfigModel):
     policy_rate: bool = False
 
 
+class CnbSeries(ConfigModel):
+    """A Czech National Bank rate from its keyless text files."""
+
+    key: Annotated[str, Field(pattern=r"^[a-z0-9_]{1,40}$")]
+    label: str = Field(min_length=1, max_length=100)
+    series: Literal["czeonia", "repo_2w"] = Field(
+        description="czeonia: the CZK overnight reference rate, daily (yearly.txt/daily.txt; "
+        "the portfolio's risk-free rate). repo_2w: the 2-week repo rate's change history."
+    )
+    unit: str = Field(default="%", max_length=20)
+    policy_rate: bool = False
+
+
 def _eurostat_defaults() -> list[EurostatSeries]:
     rows = [
         ("hicp", "HICP inflation, annual rate", "prc_hicp_minr",
@@ -493,6 +588,17 @@ class MacroSettings(ConfigModel):
                 policy_rate=True,
             ),
         ]
+    )
+    cnb: list[CnbSeries] = Field(
+        default_factory=lambda: [
+            # Moves every business day: not a policy rate, and no surprise band.
+            CnbSeries(key="czeonia", label="CZEONIA (CZK overnight rate)", series="czeonia"),
+            CnbSeries(
+                key="cnb_repo_2w", label="ČNB 2-week repo rate", series="repo_2w", policy_rate=True
+            ),
+        ],
+        description="ČNB rates. CZEONIA is the risk-free rate of the Sharpe ratio (series key "
+        "'czeonia'); the repo rate's changes are ČNB decisions.",
     )
 
 
@@ -615,6 +721,275 @@ class OwnershipSettings(ConfigModel):
     top_holders: int = Field(default=10, ge=1, le=50)
 
 
+FundKey = Annotated[str, Field(pattern=r"^[A-Za-z0-9._-]{1,32}$", examples=["CSPX"])]
+
+
+class FundValuationSource(ConfigModel):
+    """Where an ETF's fund-level P/E and P/B are published (they stand in for its index)."""
+
+    key: FundKey
+    label: str = Field(min_length=1, max_length=120)
+    provider: Literal["ishares", "vanguard"]
+    url: AnyHttpUrl = Field(
+        description="iShares: the product page (its embedded JSON carries the figures). "
+        "Vanguard: the product-data GraphQL endpoint (e.g. https://www.vanguard.co.uk/gpx/graphql)."
+    )
+    port_id: str | None = Field(
+        default=None,
+        pattern=r"^[0-9]{1,10}$",
+        description="Vanguard only: the fund's port id (9679 = FTSE All-World UCITS ETF Acc).",
+    )
+    consumer_id: str = Field(
+        default="uk0",
+        pattern=r"^[a-z0-9]{1,10}$",
+        description="Vanguard only: the site's x-consumer-id header (uk0 for vanguard.co.uk).",
+    )
+    tickers: list[Ticker] = Field(
+        default_factory=list, description="Holdings whose valuation is this fund's."
+    )
+    index_label: str = Field(
+        default="", max_length=80, description="The index the fund tracks, e.g. 'S&P 500'."
+    )
+    benchmark_symbols: list[StooqSymbol] = Field(
+        default_factory=list,
+        description="Benchmark symbols (Prices config) this fund's figures stand in for.",
+    )
+
+    @model_validator(mode="after")
+    def _vanguard_needs_port(self) -> Self:
+        if self.provider == "vanguard" and not self.port_id:
+            raise ValueError("a Vanguard fund needs its port_id")
+        return self
+
+
+def _default_fund_sources() -> list[FundValuationSource]:
+    return [
+        FundValuationSource(
+            key="CSPX",
+            label="iShares Core S&P 500 UCITS ETF (Acc)",
+            provider="ishares",
+            url=AnyHttpUrl(
+                "https://www.ishares.com/uk/individual/en/products/253743/"
+                "ishares-sp-500-b-ucits-etf-acc-fund?switchLocale=y&siteEntryPassthrough=true"
+            ),
+            tickers=["CSPXl_EQ"],
+            index_label="S&P 500",
+            benchmark_symbols=["^spx"],
+        ),
+        FundValuationSource(
+            key="VWCE",
+            label="Vanguard FTSE All-World UCITS ETF (USD) Acc",
+            provider="vanguard",
+            url=AnyHttpUrl("https://www.vanguard.co.uk/gpx/graphql"),
+            port_id="9679",
+            tickers=["VWCEd_EQ"],
+            index_label="FTSE All-World",
+        ),
+    ]
+
+
+class ValuationSettings(ConfigModel):
+    """P/E, P/B and dividend yield: fundamentals from SEC XBRL and ESEF, fund figures from
+    the ETF providers."""
+
+    enabled: bool = Field(default=True, description="Off: the scheduled run does nothing.")
+    full_refresh_days: int = Field(
+        default=7,
+        ge=1,
+        le=90,
+        description="Each run re-reads a holding's fundamentals when the issuer filed a new "
+        "report since the last read, and in any case after this many days.",
+    )
+    esef_max_age_months: int = Field(
+        default=18,
+        ge=3,
+        le=60,
+        description="ESEF filings (filings.xbrl.org) with an older period end are ignored.",
+    )
+    finnhub_cross_check: bool = Field(
+        default=True,
+        description="Also read Finnhub's basic financials (P/E, P/B, EPS) as a tier-2 "
+        "cross-check. Needs FINNHUB_API_KEY; never required.",
+    )
+    funds: list[FundValuationSource] = Field(
+        default_factory=_default_fund_sources,
+        max_length=20,
+        description="ETFs whose fund-level P/E and P/B are read from the provider.",
+    )
+
+    @model_validator(mode="after")
+    def _unique_funds(self) -> Self:
+        require_unique("fund keys", (f.key for f in self.funds))
+        return self
+
+
+Isin = Annotated[str, Field(pattern=r"^[A-Z]{2}[A-Z0-9]{9}[0-9]$", examples=["IE00B5BMR087"])]
+GicsSector = Literal[
+    "Information Technology",
+    "Financials",
+    "Health Care",
+    "Consumer Discretionary",
+    "Communication Services",
+    "Industrials",
+    "Consumer Staples",
+    "Energy",
+    "Utilities",
+    "Materials",
+    "Real Estate",
+]
+
+CSPX_ISIN = "IE00B5BMR087"
+VWCE_ISIN = "IE00BK5BQT80"
+
+
+class LookThroughFund(ConfigModel):
+    """A fund whose holdings are read from its issuer. Matched to a position by ISIN."""
+
+    isin: Isin
+    label: str = Field(min_length=1, max_length=40, examples=["CSPX"])
+    provider: Literal["ishares", "vanguard"]
+    portfolio_id: str = Field(
+        pattern=r"^[A-Za-z0-9-]{1,24}$",
+        description="The issuer's fund id: the iShares product/portfolio id (CSPX 253743) or "
+        "the Vanguard Europe port id (VWCE 9679).",
+    )
+
+
+class BenchmarkProxy(ConfigModel):
+    """Which fund's holdings stand in for a benchmark index's constituents."""
+
+    symbol: StooqSymbol = Field(description="A benchmark symbol from prices.benchmark_symbols.")
+    fund_isin: Isin
+    label: str = Field(min_length=1, max_length=60, examples=["S&P 500"])
+
+
+class IssuerGroup(ConfigModel):
+    """Securities of one issuer counted together in the top underlying holdings (an ADR and
+    its ordinary share, two share classes)."""
+
+    label: str = Field(min_length=1, max_length=80)
+    isins: list[Isin] = Field(min_length=2, max_length=10)
+
+
+def _default_funds() -> list[LookThroughFund]:
+    return [
+        LookThroughFund(isin=CSPX_ISIN, label="CSPX", provider="ishares", portfolio_id="253743"),
+        LookThroughFund(isin=VWCE_ISIN, label="VWCE", provider="vanguard", portfolio_id="9679"),
+    ]
+
+
+def _default_issuer_groups() -> list[IssuerGroup]:
+    return [
+        IssuerGroup(
+            label="Taiwan Semiconductor Manufacturing", isins=["US8740391003", "TW0002330008"]
+        ),
+        IssuerGroup(label="Alphabet", isins=["US02079K3059", "US02079K1079"]),
+    ]
+
+
+class LookThroughSettings(ConfigModel):
+    """ETF look-through: holdings of the funds the portfolio holds, from the issuers'
+    (undocumented) data endpoints, stored weekly as dated snapshots."""
+
+    enabled: bool = Field(
+        default=True, description="Fetch from the issuers (off: stored snapshots are still shown)."
+    )
+    funds: list[LookThroughFund] = Field(
+        default_factory=_default_funds,
+        max_length=30,
+        description="Funds looked through, by ISIN: provider and the issuer's fund id.",
+    )
+    benchmark_proxies: list[BenchmarkProxy] = Field(
+        default_factory=lambda: [
+            BenchmarkProxy(symbol="^spx", fund_isin=CSPX_ISIN, label="S&P 500")
+        ],
+        max_length=10,
+        description="The benchmark's constituents are proxied by this fund's holdings (equity "
+        "lines renormalised to 100%). A proxy fund is fetched even when it is not held.",
+    )
+    issuer_groups: list[IssuerGroup] = Field(
+        default_factory=_default_issuer_groups,
+        max_length=50,
+        description="ISINs of one issuer counted together in the top underlying holdings.",
+    )
+    direct_sectors: dict[Ticker, GicsSector] = Field(
+        default_factory=dict,
+        description="Sector of a directly held stock when no fund holds the same ISIN and the "
+        "strategy's sector bucket is not a GICS sector.",
+    )
+    direct_countries: dict[Ticker, Annotated[str, Field(pattern=r"^[A-Z]{2}$")]] = Field(
+        default_factory=dict,
+        description="Country of a directly held stock, overriding its home market.",
+    )
+    ishares_api_url: str = Field(
+        default="https://www.blackrock.com/varnish-api/uk-retail01-product-data/product-data",
+        pattern=r"^https://[^\s]+$",
+    )
+    ishares_site: str = Field(default="ishares-uk", pattern=r"^[a-z0-9-]{2,40}$")
+    ishares_locale: str = Field(default="en_GB", pattern=r"^[a-z]{2}_[A-Z]{2}$")
+    ishares_spreadsheet_fallback: bool = Field(
+        default=True,
+        description="When the holdings JSON fails and no recent snapshot is stored, read the "
+        "full-fund download (no country or ISIN column).",
+    )
+    vanguard_graphql_url: str = Field(
+        default="https://www.ie.vanguard/gpx/graphql", pattern=r"^https://[^\s]+$"
+    )
+    vanguard_consumer_id: str = Field(default="ie0", pattern=r"^[a-z]{2}[0-9]$")
+    cached_fallback_days: int = Field(
+        default=45,
+        ge=1,
+        le=400,
+        description="On a failed fetch, a stored snapshot this recent is kept in use instead "
+        "of trying the spreadsheet fallback.",
+    )
+    stale_after_days: int = Field(
+        default=60,
+        ge=7,
+        le=400,
+        description="A snapshot older than this is labelled stale (Vanguard publishes "
+        "month-end data a few weeks late).",
+    )
+    keep_snapshots: int = Field(default=12, ge=1, le=200, description="Snapshots kept per fund.")
+
+    @model_validator(mode="after")
+    def _consistent(self) -> Self:
+        require_unique("look-through fund ISINs", (f.isin for f in self.funds))
+        require_unique("benchmark proxy symbols", (b.symbol for b in self.benchmark_proxies))
+        isins = {f.isin for f in self.funds}
+        for proxy in self.benchmark_proxies:
+            if proxy.fund_isin not in isins:
+                raise ValueError(
+                    f"benchmark proxy {proxy.symbol!r} names fund {proxy.fund_isin}, which is "
+                    "not in funds"
+                )
+        return self
+
+    def fund(self, isin: str | None) -> LookThroughFund | None:
+        return next((f for f in self.funds if f.isin == isin), None)
+
+
+class XbrlSettings(ConfigModel):
+    """SEC XBRL fundamentals: shares outstanding and revenue by region / segment / product,
+    read from each holding's latest 10-K / 10-Q / 20-F XBRL instance."""
+
+    enabled: bool = True
+    quarterly: bool = Field(
+        default=True,
+        description="Also parse the latest 10-Q when it is newer than the annual report "
+        "(US issuers; 20-F filers publish annual XBRL only).",
+    )
+    read_ads_ratio: bool = Field(
+        default=True,
+        description="For 20-F filers, read the ADS ratio the annual report states ('each ADS "
+        "represents five common shares') to check the configured share basis. Downloads the "
+        "report's main document (up to about 10 MB) once per new 20-F.",
+    )
+    max_document_mb: int = Field(
+        default=40, ge=1, le=200, description="Largest filing document downloaded."
+    )
+
+
 class JobsConfig(ConfigModel):
     """Schedules for the worker's timed jobs. Stored as `config_version` rows, domain `jobs`.
 
@@ -696,6 +1071,22 @@ class JobsConfig(ConfigModel):
         description="Load new SEC Form 13F data sets (published quarterly). Default: the 5th "
         "of each month, 05:00.",
     )
+    valuation_refresh: JobSchedule = Field(
+        default_factory=lambda: JobSchedule(cron="45 7 * * *"),
+        description="Fundamentals (SEC XBRL, ESEF) of holdings that filed since the last read "
+        "(all of them weekly) and the ETF providers' fund P/E and P/B. Default: daily 07:45.",
+    )
+    etf_look_through: JobSchedule = Field(
+        default_factory=lambda: JobSchedule(cron="40 6 * * 6"),
+        description="ETF look-through: the funds' holdings from iShares and Vanguard, skipped "
+        "when the as-of date has not moved. Default: Saturdays 06:40.",
+    )
+    sec_xbrl: JobSchedule = Field(
+        default_factory=lambda: JobSchedule(cron="40 5 * * 2"),
+        description="Shares outstanding and revenue by region / segment from the holdings' "
+        "latest SEC XBRL filings; only filings not parsed yet are downloaded. Default: "
+        "Tuesdays 05:40.",
+    )
     earnings_check: EarningsCheckSettings = Field(default_factory=EarningsCheckSettings)
     earnings_calendar_settings: EarningsCalendarSettings = Field(
         default_factory=EarningsCalendarSettings
@@ -711,6 +1102,9 @@ class JobsConfig(ConfigModel):
     chat: ChatSettings = Field(default_factory=ChatSettings)
     review: ReviewSettings = Field(default_factory=ReviewSettings)
     ownership: OwnershipSettings = Field(default_factory=OwnershipSettings)
+    valuation: ValuationSettings = Field(default_factory=ValuationSettings)
+    look_through: LookThroughSettings = Field(default_factory=LookThroughSettings)
+    xbrl: XbrlSettings = Field(default_factory=XbrlSettings)
 
     def schedules(self) -> dict[str, JobSchedule]:
         return {
@@ -729,7 +1123,30 @@ class JobsConfig(ConfigModel):
             "weekly_digest": self.weekly_digest,
             "monthly_review": self.monthly_review,
             "ownership_13f": self.ownership_13f,
+            "valuation_refresh": self.valuation_refresh,
+            "etf_look_through": self.etf_look_through,
+            "sec_xbrl": self.sec_xbrl,
         }
+
+    def interval_schedules(self) -> dict[str, JobSchedule]:
+        """Jobs whose schedule follows from a setting rather than a cron of their own: the
+        intraday poll (Prices: enabled and interval), weekdays in the hours any of the
+        supported markets can be open (UTC; each listing's own session is checked per run).
+        Not watched for missed runs: a skipped poll is covered by the next one."""
+        prices = self.prices
+        return {
+            "intraday_prices": JobSchedule(
+                enabled=prices.intraday_enabled,
+                cron=f"*/{prices.intraday_interval_minutes} 6-21 * * 1-5"
+                if prices.intraday_interval_minutes < 60
+                else "0 6-21 * * 1-5",
+                timezone="UTC",
+            )
+        }
+
+    def worker_schedules(self) -> dict[str, JobSchedule]:
+        """Everything the worker schedules: the cron schedules and the interval ones."""
+        return {**self.schedules(), **self.interval_schedules()}
 
     def next_run_after(self, job_type: str, moment: dt.datetime) -> dt.datetime | None:
         """The first scheduled run of `job_type` after `moment`; None when the job has no

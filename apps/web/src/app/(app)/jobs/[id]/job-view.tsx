@@ -6,6 +6,8 @@ import { useCallback, useEffect, useRef } from "react";
 
 import { AlertMessage } from "@/components/alert-message";
 import { JobStatusBadge } from "@/components/jobs/job-status-badge";
+import { PageHeader } from "@/components/page-header";
+import { Blueprint } from "@/components/ui/blueprint";
 import { Button } from "@/components/ui/button";
 import { getBrowserApiClient, type JobDetail, type JobStepOut } from "@/lib/api/client";
 import { formatDateTime, formatRelative } from "@/lib/format";
@@ -49,12 +51,16 @@ export function JobView({ id }: { id: number }) {
 
   return (
     <div className="space-y-6">
-      <p className="text-sm text-text-muted">
-        <Link href="/activity#job-log" className="hover:text-text hover:underline">
-          Activity
-        </Link>{" "}
-        / Job <span className="num">#{id}</span>
-      </p>
+      {!job ? (
+        <PageHeader
+          kicker={
+            <Link href="/activity#job-log" className="hover:underline">
+              Oversight · Activity
+            </Link>
+          }
+          title={<>Job <span className="num">#{id}</span></>}
+        />
+      ) : null}
       {state.kind === "loading" ? (
         <p className="flex items-center gap-2 text-sm text-text-muted" role="status">
           <LoaderCircleIcon aria-hidden="true" className="size-4 animate-spin" />
@@ -84,39 +90,48 @@ function Job({ job, running, onReload }: { job: JobDetail; running: boolean; onR
   const duration = durationBetween(job.started_at, job.finished_at ?? (running && job.started_at ? now.toISOString() : null));
   return (
     <>
-      <div className="flex flex-wrap items-end justify-between gap-3">
-        <div>
-          <h1 className="flex flex-wrap items-center gap-2 text-2xl font-semibold tracking-tight">
+      <PageHeader
+        kicker={
+          <Link href="/activity#job-log" className="hover:underline">
+            Oversight · Activity · Job <span className="num">#{job.id}</span>
+          </Link>
+        }
+        title={
+          <span className="flex flex-wrap items-center gap-x-3 gap-y-1">
             {jobTypeLabel(job.job_type)} <span className="num font-normal text-text-muted">#{job.id}</span>
-            <JobStatusBadge status={job.status} />
-          </h1>
-          <p className="mt-1 text-sm text-text-muted">
+            <JobStatusBadge status={job.status} className="font-sans text-sm tracking-normal" />
+          </span>
+        }
+        description={
+          <>
             <span className="font-mono">{job.job_type}</span> · {job.trigger === "manual" ? "started by hand" : `trigger: ${job.trigger}`}
-          </p>
-        </div>
-        <Button variant="ghost" size="sm" onClick={onReload}>
-          {running ? <LoaderCircleIcon aria-hidden="true" className="animate-spin" /> : <RefreshCwIcon aria-hidden="true" />}
-          {running ? "Following the run…" : "Reload"}
-        </Button>
-      </div>
+          </>
+        }
+        aside={
+          <Button variant="outline" size="sm" onClick={onReload}>
+            {running ? <LoaderCircleIcon aria-hidden="true" className="animate-spin" /> : <RefreshCwIcon aria-hidden="true" />}
+            {running ? "Following the run…" : "Reload"}
+          </Button>
+        }
+      />
 
-      <dl className="grid max-w-3xl grid-cols-[max-content_1fr] gap-x-6 gap-y-1.5 rounded-lg border border-border bg-surface-raised p-4 text-sm">
-        <dt className="text-text-muted">Queued</dt>
-        <dd className="num">
-          <time dateTime={job.created_at}>{formatDateTime(job.created_at)}</time> · {formatRelative(new Date(job.created_at), now)}
-        </dd>
-        <dt className="text-text-muted">Started</dt>
-        <dd className="num">{job.started_at ? formatDateTime(job.started_at) : "Not yet"}</dd>
-        <dt className="text-text-muted">Finished</dt>
-        <dd className="num">{job.finished_at ? formatDateTime(job.finished_at) : running ? "Still running" : "—"}</dd>
-        <dt className="text-text-muted">Duration</dt>
-        <dd className="num">{duration === null ? "—" : formatDuration(duration)}</dd>
-        <dt className="text-text-muted">Model cost</dt>
-        <dd className="num" title={cost === null ? undefined : `${cost} USD`}>
-          {cost === null ? "No model calls recorded" : formatCost(cost)}
-          {models.length > 0 ? <span className="text-text-muted"> · {models.join(", ")}</span> : null}
-        </dd>
-      </dl>
+      <Blueprint as="div">
+        <dl className="grid divide-border-soft sm:grid-cols-2 lg:grid-cols-5 lg:divide-x">
+          <Tile label="Queued">
+            <time dateTime={job.created_at}>{formatDateTime(job.created_at)}</time>
+            <Sub>{formatRelative(new Date(job.created_at), now)}</Sub>
+          </Tile>
+          <Tile label="Started">{job.started_at ? formatDateTime(job.started_at) : "Not yet"}</Tile>
+          <Tile label="Finished">{job.finished_at ? formatDateTime(job.finished_at) : running ? "Still running" : "—"}</Tile>
+          <Tile label="Duration" big>
+            {duration === null ? "—" : formatDuration(duration)}
+          </Tile>
+          <Tile label="Model cost" big>
+            <span title={cost === null ? undefined : `${cost} USD`}>{cost === null ? "No model calls recorded" : formatCost(cost)}</span>
+            {models.length > 0 ? <Sub>{models.join(", ")}</Sub> : null}
+          </Tile>
+        </dl>
+      </Blueprint>
 
       {failure ? (
         <AlertMessage title={failure.step ? `Failed at step “${failure.step}”` : "The run failed"}>
@@ -125,28 +140,28 @@ function Job({ job, running, onReload }: { job: JobDetail; running: boolean; onR
       ) : null}
 
       {params ? (
-        <section aria-labelledby="params-heading" className="space-y-2">
-          <h2 id="params-heading" className="text-lg font-semibold">
+        <Blueprint aria-labelledby="params-heading" className="space-y-3 p-5">
+          <h2 id="params-heading" className="text-[22px] leading-tight font-semibold">
             Parameters
           </h2>
-          <pre className="max-w-3xl overflow-x-auto rounded-md border border-border bg-surface-muted p-3 font-mono text-xs">{params}</pre>
-        </section>
+          <pre className="overflow-x-auto border border-border bg-surface-muted p-3 font-mono text-xs">{params}</pre>
+        </Blueprint>
       ) : null}
 
-      <section aria-labelledby="steps-heading" className="space-y-2">
-        <h2 id="steps-heading" className="text-lg font-semibold">
+      <Blueprint aria-labelledby="steps-heading" className="space-y-3 p-5">
+        <h2 id="steps-heading" className="text-[22px] leading-tight font-semibold">
           Steps <span className="num text-sm font-normal text-text-muted">({job.steps.length})</span>
         </h2>
         {job.steps.length === 0 ? (
           <p className="text-sm text-text-muted">{running ? "No step has started yet." : "This run recorded no steps."}</p>
         ) : (
-          <ol className="space-y-2">
+          <ol className="divide-y divide-border-soft border-t border-border-soft">
             {job.steps.map((step) => (
               <Step key={step.step_index} step={step} now={now} />
             ))}
           </ol>
         )}
-      </section>
+      </Blueprint>
     </>
   );
 }
@@ -155,10 +170,10 @@ function Step({ step, now }: { step: JobStepOut; now: Date }) {
   const duration = durationBetween(step.started_at, step.finished_at ?? (step.status === "running" ? now.toISOString() : null));
   const detail = prettyJson(step.detail);
   return (
-    <li className="space-y-2 rounded-lg border border-border bg-surface-raised p-3 text-sm">
+    <li className="space-y-2 py-3 text-sm">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <p className="flex flex-wrap items-center gap-2">
-          <span className="num text-text-muted">{step.step_index + 1}.</span>
+          <span className="num font-mono text-xs text-text-muted">{String(step.step_index + 1).padStart(2, "0")}</span>
           <span className="font-medium">{step.name}</span>
           <JobStatusBadge status={step.status} />
         </p>
@@ -180,9 +195,22 @@ function Step({ step, now }: { step: JobStepOut; now: Date }) {
       {detail ? (
         <details>
           <summary className="cursor-pointer text-text-muted hover:text-text">Detail</summary>
-          <pre className="mt-2 max-h-96 overflow-auto rounded-md border border-border bg-surface-muted p-3 font-mono text-xs">{detail}</pre>
+          <pre className="mt-2 max-h-96 overflow-auto border border-border bg-surface-muted p-3 font-mono text-xs">{detail}</pre>
         </details>
       ) : null}
     </li>
   );
+}
+
+function Tile({ label, big, children }: { label: string; big?: boolean; children: React.ReactNode }) {
+  return (
+    <div className="space-y-1 border-b border-border-soft px-5 py-4 last:border-b-0 lg:border-b-0">
+      <dt className="text-xs text-text-muted">{label}</dt>
+      <dd className={big ? "num font-heading text-[26px] leading-tight font-semibold" : "num text-sm font-medium"}>{children}</dd>
+    </div>
+  );
+}
+
+function Sub({ children }: { children: React.ReactNode }) {
+  return <span className="block font-sans text-xs font-normal text-text-muted">{children}</span>;
 }

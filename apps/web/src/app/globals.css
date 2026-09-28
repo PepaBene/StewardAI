@@ -7,14 +7,50 @@
 @custom-variant cvd (&:where(.cvd, .cvd *));
 
 @theme {
+  /* Barlow for body, Barlow Condensed for headings and big figures, IBM Plex Mono for
+     tickers and data labels. */
   --font-sans:
-    "IBM Plex Sans", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto,
+    "Barlow", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto,
     "Helvetica Neue", Arial, sans-serif;
   --font-serif:
     "IBM Plex Serif", ui-serif, Georgia, "Times New Roman", serif;
   --font-mono:
     "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas,
     "Liberation Mono", monospace;
+  --font-heading:
+    "Barlow Condensed", "Barlow", ui-sans-serif, system-ui, sans-serif;
+
+  /* The Industry system is square: every radius utility resolves to 0. Only
+     rounded-full survives (status dots, rings, the sync dot). */
+  --radius-xs: 0px;
+  --radius-sm: 0px;
+  --radius-md: 0px;
+  --radius-lg: 0px;
+  --radius-xl: 0px;
+  --radius-2xl: 0px;
+  --radius-3xl: 0px;
+  --radius-4xl: 0px;
+  --radius: 0px;
+}
+
+/* Section kicker above a heading: small, tracked, uppercase, accent ink. */
+@utility kicker {
+  font-size: 11px;
+  line-height: 1.2;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  font-weight: 600;
+  color: var(--color-accent-ink);
+}
+
+/*
+ * Blueprint frame: the square, hairline-bordered object every card, figure and framed
+ * section wears, with "+" registration marks just outside its four corners. The marks
+ * are drawn by <BlueprintCorners/> (components/ui/blueprint.tsx) as four children.
+ */
+@utility blueprint {
+  position: relative;
+  border: 1px solid var(--color-border);
 }
 
 /*
@@ -54,7 +90,19 @@
 
   body {
     font-family: var(--font-sans);
+    line-height: 1.45;
     -webkit-font-smoothing: antialiased;
+  }
+
+  h1,
+  h2,
+  h3 {
+    font-family: var(--font-heading);
+    letter-spacing: -0.01em;
+  }
+
+  a {
+    text-underline-offset: 2px;
   }
 
   /* Visible focus ring for keyboard users, driven by the focus token. */
@@ -140,4 +188,47 @@
   text-decoration: underline;
   text-decoration-style: dashed;
   text-underline-offset: 2px;
+}
+
+/* Registration marks of a .blueprint frame (see BlueprintCorners). */
+.bp-corner {
+  position: absolute;
+  width: 11px;
+  height: 11px;
+  pointer-events: none;
+  color: color-mix(in srgb, var(--color-text) 55%, transparent);
+}
+.bp-corner::before,
+.bp-corner::after {
+  content: "";
+  position: absolute;
+  background: currentColor;
+}
+.bp-corner::before {
+  left: 5px;
+  top: 0;
+  width: 1px;
+  height: 100%;
+}
+.bp-corner::after {
+  top: 5px;
+  left: 0;
+  width: 100%;
+  height: 1px;
+}
+.bp-corner[data-corner="tl"] { top: -6px; left: -6px; }
+.bp-corner[data-corner="tr"] { top: -6px; right: -6px; }
+.bp-corner[data-corner="bl"] { bottom: -6px; left: -6px; }
+.bp-corner[data-corner="br"] { bottom: -6px; right: -6px; }
+
+/* Page title: the condensed 46px display heading every screen opens with. */
+@utility page-title {
+  font-family: var(--font-heading);
+  font-weight: 600;
+  font-size: 34px;
+  line-height: 1;
+  letter-spacing: -0.02em;
+  @media (width >= 48rem) {
+    font-size: 46px;
+  }
 }

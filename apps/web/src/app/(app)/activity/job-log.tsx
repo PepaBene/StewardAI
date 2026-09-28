@@ -9,6 +9,7 @@ import { AlertMessage } from "@/components/alert-message";
 import { EmptyState } from "@/components/empty-state";
 import { JobStatusBadge, JobStatusDot } from "@/components/jobs/job-status-badge";
 import { Button } from "@/components/ui/button";
+import { BlueprintCorners } from "@/components/ui/blueprint";
 import { getBrowserApiClient, type Holding, type JobList, type JobListItem } from "@/lib/api/client";
 import {
   EMPTY_JOB_FILTERS,
@@ -99,10 +100,11 @@ export function JobLog() {
     );
 
   return (
-    <section id="job-log" aria-labelledby="job-log-heading" className="scroll-mt-24 space-y-3">
+    <section id="job-log" aria-labelledby="job-log-heading" className="blueprint scroll-mt-24 space-y-3 px-5 py-5">
+      <BlueprintCorners />
       <div className="flex flex-wrap items-end justify-between gap-2">
         <div>
-          <h2 id="job-log-heading" className="text-lg font-semibold">
+          <h2 id="job-log-heading" className="text-[22px] leading-tight font-semibold">
             Job log
           </h2>
           <p className="text-sm text-text-muted">
@@ -115,7 +117,7 @@ export function JobLog() {
         </Button>
       </div>
 
-      <div className="flex flex-wrap items-start gap-x-6 gap-y-3 rounded-lg border border-border bg-surface-raised p-3">
+      <div className="flex flex-wrap items-start gap-x-6 gap-y-3 border border-border-soft bg-border-soft p-3">
         <label className="space-y-1 text-sm">
           <span className="block font-medium">Job type</span>
           <select
@@ -195,11 +197,11 @@ export function JobLog() {
         </EmptyState>
       ) : null}
       {load.kind === "ok" && load.jobs.length > 0 ? (
-        <div className="overflow-x-auto rounded-lg border border-border bg-surface-raised">
+        <div className="relative overflow-x-auto border border-border">
           <table className="w-full min-w-[56rem] text-sm">
             <caption className="sr-only">Job runs, newest first</caption>
             <thead className="bg-surface-muted">
-              <tr className="border-b border-border text-text-muted">
+              <tr className="border-b border-border text-[11px] tracking-[0.08em] text-text-muted uppercase">
                 <th scope="col" className="px-3 py-2 text-left font-medium">Run</th>
                 <th scope="col" className="px-3 py-2 text-left font-medium">Status</th>
                 <th scope="col" className="px-3 py-2 text-left font-medium">Queued</th>
@@ -214,7 +216,7 @@ export function JobLog() {
                 return (
                   <tr key={j.id} className="border-b border-border align-top last:border-0">
                     <th scope="row" className="px-3 py-2 text-left font-normal">
-                      <Link href={jobHref(j.id)} className="flex items-center gap-2 font-medium hover:text-accent hover:underline">
+                      <Link href={jobHref(j.id)} className="flex items-center gap-2 font-medium hover:text-accent-ink hover:underline">
                         <JobStatusDot status={j.status} />
                         {jobTypeLabel(j.job_type)} <span className="num text-text-muted">#{j.id}</span>
                       </Link>

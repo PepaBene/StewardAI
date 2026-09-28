@@ -54,6 +54,11 @@ class _RuleBase(ConfigModel):
     operator: ComparisonOperator
     on_breach: Severity = "severity_2"
     description: str = ""
+    enabled: bool = Field(
+        default=True,
+        description="A disabled rule is kept in the config (and still validated) but never "
+        "evaluated: no breach, no review compliance row, not offered to the AI.",
+    )
 
 
 class PositionWeightRule(_RuleBase):
@@ -140,6 +145,11 @@ class StrategyConfig(ConfigModel):
         description="Severity of a position, category or cash weight outside its target band. "
         "Severity 1 is listed in the next digest only; 2 or 3 also alert when it opens.",
     )
+
+    @property
+    def enabled_rules(self) -> list[StrategyRule]:
+        """The rules code evaluates: every rule not switched off."""
+        return [rule for rule in self.rules if rule.enabled]
 
     @model_validator(mode="after")
     def _default_fx_source(self) -> Self:

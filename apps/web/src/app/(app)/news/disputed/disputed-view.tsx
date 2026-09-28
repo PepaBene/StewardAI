@@ -18,6 +18,8 @@ import { EmptyState } from "@/components/empty-state";
 import { FeedbackControl } from "@/components/feedback/feedback-control";
 import { SeverityBadge, TierBadge } from "@/components/news/severity-badge";
 import { SeverityDot } from "@/components/news/severity-timeline";
+import { PageHeader } from "@/components/page-header";
+import { BlueprintCorners } from "@/components/ui/blueprint";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import {
@@ -78,38 +80,47 @@ export function DisputedView() {
     setLoad((l) => (l.kind === "ok" ? { ...l, stories: applyResolution(l.stories, updated) } : l));
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-wrap items-end justify-between gap-3">
-        <div>
-          <p className="text-sm text-text-muted">
-            <Link href="/news" className="hover:text-text hover:underline">
+    <div className="flex flex-col gap-5">
+      <PageHeader
+        kicker={
+          <>
+            <Link href="/news" className="hover:underline">
               News
             </Link>{" "}
             / Disputed
-          </p>
-          <h1 className="text-2xl font-semibold tracking-tight">Disputed stories</h1>
-          <p className="mt-1 max-w-prose text-sm text-text-muted">
-            Stories whose sources contradict each other: the claim and its sources beside the verified sources that
-            dispute it, each with its tier. A disputed story never alerts, and the holding&rsquo;s thesis verdicts do not
-            change until you resolve it.
-          </p>
-        </div>
-        <div className="flex flex-wrap items-center gap-2">
-          <label className="inline-flex items-center gap-2 text-sm">
-            <input
-              type="checkbox"
-              className="size-4 accent-accent"
-              checked={includeResolved}
-              onChange={(e) => router.replace(`${pathname}${e.target.checked ? "?resolved=1" : ""}`, { scroll: false })}
-            />
-            Show resolved
-          </label>
-          <Button variant="ghost" size="sm" onClick={() => setReloadKey((k) => k + 1)}>
-            <RefreshCwIcon aria-hidden="true" />
-            Reload
-          </Button>
-        </div>
-      </div>
+          </>
+        }
+        title="Disputed stories"
+        description={
+          <span className="block max-w-prose">
+            Stories whose sources contradict each other: the claim and its sources beside the verified sources that dispute
+            it, each with its tier. A disputed story never alerts, and the holding&rsquo;s thesis verdicts do not change
+            until you resolve it.
+          </span>
+        }
+        aside={
+          <>
+            {load.kind === "ok" ? (
+              <span className="num border border-border px-3 py-1.5 text-text">
+                <span className="font-heading text-lg font-semibold">{open.length}</span> open
+              </span>
+            ) : null}
+            <label className="inline-flex items-center gap-2 text-sm text-text">
+              <input
+                type="checkbox"
+                className="size-4 accent-accent"
+                checked={includeResolved}
+                onChange={(e) => router.replace(`${pathname}${e.target.checked ? "?resolved=1" : ""}`, { scroll: false })}
+              />
+              Show resolved
+            </label>
+            <Button variant="ghost" size="sm" onClick={() => setReloadKey((k) => k + 1)}>
+              <RefreshCwIcon aria-hidden="true" />
+              Reload
+            </Button>
+          </>
+        }
+      />
 
       {load.kind === "loading" ? (
         <p className="flex items-center gap-2 text-sm text-text-muted" role="status">
@@ -125,7 +136,7 @@ export function DisputedView() {
       ) : null}
 
       {open.length > 0 ? (
-        <ol className="space-y-4" aria-label="Open disputes">
+        <ol className="m-0 flex list-none flex-col gap-5 p-0" aria-label="Open disputes">
           {open.map((s) => (
             <StoryCard key={s.id} story={s} onResolved={onResolved} />
           ))}
@@ -134,10 +145,10 @@ export function DisputedView() {
 
       {includeResolved && resolved.length > 0 ? (
         <section aria-labelledby="resolved-heading" className="space-y-3">
-          <h2 id="resolved-heading" className="text-lg font-semibold">
+          <h2 id="resolved-heading" className="text-[22px] leading-tight font-semibold">
             Resolved <span className="num text-sm font-normal text-text-muted">({resolved.length})</span>
           </h2>
-          <ol className="space-y-4">
+          <ol className="m-0 flex list-none flex-col gap-5 p-0">
             {resolved.map((s) => (
               <StoryCard key={s.id} story={s} onResolved={onResolved} />
             ))}
@@ -160,19 +171,20 @@ function StoryCard({ story, onResolved }: { story: DisputedStory; onResolved: (u
       id={disputedStoryAnchor(story.id)}
       aria-labelledby={headingId}
       className={cn(
-        "scroll-mt-24 space-y-4 rounded-lg border bg-surface-raised p-4",
-        state.kind === "open" ? "border-disputed/40" : "border-border",
+        "blueprint scroll-mt-24 space-y-4 px-5 py-5",
+        state.kind === "open" && "border-l-2 border-l-disputed",
       )}
     >
+      <BlueprintCorners />
       <div className="flex flex-wrap items-start justify-between gap-2">
         <div className="min-w-0 flex-1 space-y-1">
-          <h3 id={headingId} className="flex items-start gap-2 font-medium">
+          <h3 id={headingId} className="flex items-start gap-2 text-[22px] leading-tight font-semibold">
             <SeverityDot severity={story.severity} className="mt-1.5" />
             {story.headline}
           </h3>
           <p className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-text-muted">
             {story.ticker ? (
-              <Link href={`/holdings/${encodeURIComponent(story.ticker)}`} className="font-mono text-xs text-accent hover:underline">
+              <Link href={`/holdings/${encodeURIComponent(story.ticker)}`} className="font-mono text-xs text-accent-ink hover:underline">
                 {story.ticker}
               </Link>
             ) : (
@@ -186,7 +198,7 @@ function StoryCard({ story, onResolved }: { story: DisputedStory; onResolved: (u
               <time dateTime={story.last_seen}>{formatRelative(new Date(story.last_seen), now)}</time>
             </span>
             <span aria-hidden="true">·</span>
-            <Link href={`/news?story=${story.id}`} className="text-accent hover:underline">
+            <Link href={`/news?story=${story.id}`} className="text-accent-ink hover:underline">
               all copies in the feed
             </Link>
           </p>
@@ -210,7 +222,7 @@ function StoryCard({ story, onResolved }: { story: DisputedStory; onResolved: (u
         </p>
       ) : null}
 
-      <div className="grid gap-4 lg:grid-cols-2">
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
         <SourceColumn title="The claim" description="The story's own sources." sources={story.claim} empty="No source is stored for the claim." />
         <SourceColumn
           title="Contradicted by"
@@ -272,10 +284,10 @@ function SourceColumn({
   return (
     <section
       aria-label={title}
-      className={cn("space-y-2 rounded-md border p-3", disputed ? "border-disputed/40" : "border-border")}
+      className={cn("space-y-2 border p-3", disputed ? "border-disputed/40 bg-disputed-subtle/40" : "border-border")}
     >
       <div>
-        <h4 className="text-sm font-medium">
+        <h4 className="kicker">
           {title} <span className="num font-normal text-text-muted">({sources.length})</span>
         </h4>
         <p className="text-xs text-text-muted">{description}</p>
@@ -293,8 +305,8 @@ function SourceColumn({
                 </time>
               ) : null}
             </p>
-            <a href={s.url} target="_blank" rel="noreferrer" className="inline-flex items-start gap-1 hover:text-accent hover:underline">
-              <span className="break-words">{s.headline ?? s.url}</span>
+            <a href={s.url} target="_blank" rel="noreferrer" className="inline-flex items-start gap-1 hover:text-accent-ink hover:underline">
+              <span className="[overflow-wrap:anywhere]">{s.headline ?? s.url}</span>
               <ExternalLinkIcon aria-hidden="true" className="mt-0.5 size-3 shrink-0 text-text-muted" />
             </a>
             {typeof s.news_item_id === "number" ? (
@@ -338,7 +350,7 @@ function ResolveForm({ story, onResolved }: { story: DisputedStory; onResolved: 
 
   return (
     <div className="space-y-2 rounded-md border border-border bg-surface-muted p-3">
-      <p className="text-sm font-medium">Resolve</p>
+      <p className="kicker">Resolve</p>
       <div className="space-y-1">
         <Label htmlFor={noteId}>Note (optional)</Label>
         <textarea

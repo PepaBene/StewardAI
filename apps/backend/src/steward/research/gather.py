@@ -452,10 +452,14 @@ async def risk(pool: asyncpg.Pool, reg: Registry, ticker: str) -> tuple[CodeSect
     sid = reg.add(
         "price",
         f"{history.symbol}:{first}:{last}",
-        f"Stooq daily closes {history.symbol} {first} to {last}",
-        url=f"https://stooq.com/q/?s={history.symbol}",
+        f"{history.source} daily closes {history.symbol} {first} to {last}",
+        url=(
+            f"https://stooq.com/q/?s={history.symbol}"
+            if history.source == "Stooq"
+            else f"https://finance.yahoo.com/quote/{history.symbol}/history"
+        ),
         app_path=f"/holdings/{ticker}",
-        tier=2,
+        tier=2 if history.source == "Stooq" else 3,
         snippet=f"{len(history.bars)} daily closes; last {history.bars[-1].close} on {last}",
         as_of=str(last),
     )
@@ -628,7 +632,7 @@ async def gather(
     if strategy is not None:
         rules = "; ".join(
             f"{r.id} ({r.type} {r.operator} {getattr(r, 'value', '')}): {r.description}"
-            for r in strategy.rules
+            for r in strategy.enabled_rules
         )
         strategy_sid = reg.add(
             "strategy",

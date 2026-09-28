@@ -1,4 +1,4 @@
-import type { EscalationBody, EscalationSource, NoteSentence } from "@/lib/api/client";
+import type { EscalationBody, EscalationOut, EscalationSource, NoteSentence } from "@/lib/api/client";
 
 import { hostOf, type CitationPreview } from "./digest";
 
@@ -109,4 +109,105 @@ export function formatMovePct(pct: number, locale?: string): string {
     signDisplay: "exceptZero",
   }).format(pct);
   return `${text} %`;
+}
+
+// ---------------------------------------------------------------------------
+// Lifecycle: open -> acknowledged -> resolved (and back to open)
+// ---------------------------------------------------------------------------
+
+export type EscalationState = EscalationOut["status"];
+
+export const ESCALATION_STATES = ["open", "acknowledged", "resolved"] as const satisfies readonly EscalationState[];
+
+export const ESCALATION_STATE_LABELS: Record<EscalationState, string> = {
+  open: "Open",
+  acknowledged: "Acknowledged",
+  resolved: "Resolved",
+};
+
+export type StatusTab = EscalationState | "all";
+
+/** The status tab from the URL (?status=…); open by default, as in the design. */
+export function parseStatusTab(value: string | null): StatusTab {
+  return value === "all" || (ESCALATION_STATES as readonly string[]).includes(value ?? "") ? (value as StatusTab) : "open";
+}
+
+export type EscalationAction = { to: EscalationState; label: string };
+
+/** What the owner can do next from each state. */
+export function escalationActions(status: EscalationState): EscalationAction[] {
+  switch (status) {
+    case "open":
+      return [
+        { to: "acknowledged", label: "Acknowledge" },
+        { to: "resolved", label: "Resolve" },
+      ];
+    case "acknowledged":
+      return [
+        { to: "resolved", label: "Resolve" },
+        { to: "open", label: "Reopen" },
+      ];
+    case "resolved":
+      return [{ to: "open", label: "Reopen" }];
+  }
+}
+
+/** Compact age: "45m", "3h", "2d". */
+export function ageLabel(createdAt: string, now: Date): string {
+  const minutes = Math.max(0, Math.floor((now.getTime() - Date.parse(createdAt)) / 60_000));
+  if (minutes < 60) return `${minutes}m`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 48) return `${hours}h`;
+  return `${Math.floor(hours / 24)}d`;
+}
+
+/** Minutes as "2h 10m", "45m", "3d 4h". */
+export function formatMinutes(minutes: number): string {
+  const m = Math.max(0, Math.round(minutes));
+  if (m < 60) return `${m}m`;
+  const h = Math.floor(m / 60);
+  if (h < 48) return m % 60 ? `${h}h ${m % 60}m` : `${h}h`;
+  const d = Math.floor(h / 24);
+  return h % 24 ? `${d}d ${h % 24}h` : `${d}d`;
+}
+
+export type AckTime = { id: number; createdAt: string; minutes: number };
+
+/** Time from written to first acknowledged, per escalation that has one, oldest first. */
+export function ackTimes(items: readonly Pick<EscalationOut, "id" | "created_at" | "acknowledged_at">[]): AckTime[] {
+  return items
+    .filter((e) => e.acknowledged_at)
+    .map((e) => ({
+      id: e.id,
+      createdAt: e.created_at,
+      minutes: Math.max(0, (Date.parse(e.acknowledged_at as string) - Date.parse(e.created_at)) / 60_000),
+    }))
+    .sort((a, b) => a.createdAt.localeCompare(b.createdAt) || a.id - b.id);
+}
+
+export type WeekTotal = { start: string; opened: number; acknowledged: number };
+
+/**
+ * Sums the stats' per-day counts into blocks of `size` days ending on the last day, so the
+ * newest block is always a full week; a shorter oldest block is dropped.
+ */
+export function weeklyTotals(
+  perDay: readonly { date: string; opened: number; acknowledged: number }[],
+  size = 7,
+): WeekTotal[] {
+  const out: WeekTotal[] = [];
+  for (let end = perDay.length; end - size >= 0; end -= size) {
+    const block = perDay.slice(end - size, end);
+    out.unshift({
+      start: block[0].date,
+      opened: block.reduce((n, d) => n + d.opened, 0),
+      acknowledged: block.reduce((n, d) => n + d.acknowledged, 0),
+    });
+  }
+  return out;
+}
+
+/** Replace one escalation in a list (after a PATCH), keeping the order. */
+export function replaceEscalation<T extends { id: number }>(items: readonly T[], updated: T): T[] {
+  return items.map((e) => (e.id === updated.id ? updated : e));
 }

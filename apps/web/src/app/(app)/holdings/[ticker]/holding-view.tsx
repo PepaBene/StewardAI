@@ -3,7 +3,6 @@
 import {
   ChevronDownIcon,
   ChevronRightIcon,
-  ExternalLinkIcon,
   InboxIcon,
   LayoutGridIcon,
   LoaderCircleIcon,
@@ -24,14 +23,14 @@ import { FactReviewForm, type ReviewResolution } from "@/components/evidence/fac
 import { ProvenanceTag } from "@/components/evidence/provenance-tag";
 import { VerdictStatusBadge } from "@/components/evidence/verdict-status-badge";
 import { FeedbackControl } from "@/components/feedback/feedback-control";
-import { DriftStatusBadge } from "@/components/portfolio/drift-status-badge";
-import { FreshnessLabel } from "@/components/portfolio/freshness-label";
-import { HoldingNews } from "@/components/news/holding-news";
-import { StatCard } from "@/components/portfolio/stat-card";
-import { IdentitySection } from "@/components/reference/identity-section";
-import { OwnershipSection } from "@/components/reference/ownership-section";
-import { HoldingResearch } from "@/components/research/holding-research";
+import { HoldingNews, useHoldingNews } from "@/components/news/holding-news";
+import { IdentitySection, useHoldingIdentity } from "@/components/reference/identity-section";
+import { OwnershipSection, useHoldingOwnership } from "@/components/reference/ownership-section";
 import { PriceRiskSection } from "@/components/reference/price-risk-section";
+import { ValuationPanel } from "@/components/reference/valuation-panel";
+import { SegmentsPanel } from "@/components/reference/segments-panel";
+import { HoldingResearch } from "@/components/research/holding-research";
+import { Blueprint, PanelHeading } from "@/components/ui/blueprint";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -57,10 +56,28 @@ import {
 } from "@/lib/evidence/confidence";
 import { factProvenance } from "@/lib/evidence/provenance";
 import { allowedReviewActions, isHeld, REVIEW_ACTIONS, reviewQueueHref, scaleHint } from "@/lib/evidence/review";
-import { formatDate, formatMoney, formatPercent, formatPrice, formatQuantity, formatRelative, gainLossTone } from "@/lib/format";
+import { formatDate, formatRelative } from "@/lib/format";
 import { useApiResource } from "@/lib/hooks/use-api-resource";
+import { useNow } from "@/lib/hooks/use-now";
 import { jobHref } from "@/lib/jobs/job-detail";
+import { byLead, groupByStory } from "@/lib/news/feed-filters";
 import { kpiAnchorId } from "@/lib/portfolio/kpi-anchor";
+import { BASE_PRICE_DAYS, buildTimeline } from "@/lib/reference/holding-detail";
+import { isExternalUrl } from "@/lib/sources/sources";
+
+import {
+  CandlePanel,
+  current,
+  DrawdownPanel,
+  HoldersPanel,
+  HoldingHeader,
+  KpiBarsPanel,
+  NextReportPanel,
+  PositionPanel,
+  ScorePanel,
+  TimelinePanel,
+} from "./holding-overview";
+import { intradayData, useHoldingIntraday } from "./holding-intraday";
 
 const POLL_MS = 3000;
 const POLL_LIMIT_MS = 10 * 60 * 1000;
@@ -90,7 +107,7 @@ export function HoldingView({ ticker }: { ticker: string }) {
   }, [busy, watching, reload]);
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-[22px]">
       {state.kind === "loading" ? (
         <p className="flex items-center gap-2 text-sm text-text-muted" role="status">
           <LoaderCircleIcon aria-hidden="true" className="size-4 animate-spin" />
@@ -121,6 +138,16 @@ export function HoldingView({ ticker }: { ticker: string }) {
   );
 }
 
+const fetchBoard = () => getBrowserApiClient().GET("/theses/board");
+const fetchStrategy = () => getBrowserApiClient().GET("/config/strategy");
+const fetchOverview = () => getBrowserApiClient().GET("/portfolio/overview");
+const fetchPortfolioHistory = () =>
+  getBrowserApiClient().GET("/portfolio/history", { params: { query: { days: BASE_PRICE_DAYS } } });
+
+function isoDay(d: Date) {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
+
 export function HoldingContent({
   detail,
   busy,
@@ -132,9 +159,62 @@ export function HoldingContent({
   onQueued: (job: JobSummary) => void;
   reload: () => void;
 }) {
-  const { instrument, thesis } = detail;
-  const name = instrument?.name ?? detail.profile?.company_name ?? detail.ticker;
+  const { thesis, ticker } = detail;
   const facts = useMemo(() => new Map(detail.facts.map((f) => [f.id, f])), [detail.facts]);
+  const now = useNow();
+
+  const pricesFetcher = useCallback(
+    () =>
+      getBrowserApiClient().GET("/holdings/{ticker}/prices", {
+        params: { path: { ticker }, query: { days: BASE_PRICE_DAYS } },
+      }),
+    [ticker],
+  );
+  const prices = useApiResource(pricesFetcher).state;
+  const board = useApiResource(fetchBoard).state;
+  const strategy = useApiResource(fetchStrategy).state;
+  const overview = useApiResource(fetchOverview).state;
+  const portfolioHistory = useApiResource(fetchPortfolioHistory).state;
+  const ownership = useHoldingOwnership(ticker);
+  const identity = useHoldingIdentity(ticker);
+  const news = useHoldingNews(ticker);
+  const intraday = useHoldingIntraday(ticker);
+
+  const priceData = current(prices);
+  const boardData = current(board);
+  const row = boardData?.rows.find((r) => r.ticker === ticker) ?? null;
+  const classes = current(strategy)?.body.classifications?.[ticker] ?? null;
+  const drift = current(overview)?.drift?.positions.find((p) => p.ticker === ticker) ?? null;
+  const indexPoints = current(portfolioHistory)?.points ?? null;
+
+  const timeline = useMemo(() => {
+    const verdicts = detail.kpis.flatMap((k) =>
+      k.history.map((v) => ({
+        kpiLabel: humanizeMetric(k.kpi.metric),
+        period: v.period,
+        status: v.status,
+        observed: formatObserved(v.observed_value, k.kpi.unit),
+        target: formatTarget(k.kpi.operator, k.kpi.threshold, k.kpi.unit),
+        created_at: v.created_at,
+        factCount: v.fact_ids.length,
+      })),
+    );
+    const stories = news.items
+      ? groupByStory(news.items).map((group) => {
+          const [lead] = byLead(group);
+          const sources = lead.story.source_count;
+          return {
+            id: lead.story.id,
+            date: lead.published_at,
+            headline: lead.headline,
+            source: `${lead.outlet_name ?? lead.outlet ?? "Source"}${sources > 1 ? ` · ${sources} sources` : ""}`,
+            severity: lead.story.severity,
+            href: isExternalUrl(lead.url) ? lead.url : null,
+          };
+        })
+      : [];
+    return buildTimeline(verdicts, stories);
+  }, [detail.kpis, news.items]);
 
   // A fact marked wrong is quarantined and the verdicts re-judged: follow that run.
   const onFeedback = useCallback(
@@ -160,47 +240,61 @@ export function HoldingContent({
 
   return (
     <>
-      <div className="flex flex-wrap items-end justify-between gap-3">
-        <div>
-          <p className="text-sm text-text-muted">
-            <Link href="/holdings" className="hover:text-text hover:underline">
-              Holdings
-            </Link>{" "}
-            / <span className="font-mono">{detail.ticker}</span>
-          </p>
-          <h1 className="text-2xl font-semibold tracking-tight">{name}</h1>
+      <HoldingHeader
+        detail={detail}
+        identity={current(identity.state)}
+        classes={classes}
+        row={row}
+        bars={priceData?.bars ?? []}
+        intraday={intradayData(intraday)}
+      />
+
+      <div className="grid grid-cols-1 gap-5 lg:grid-cols-[minmax(0,2.1fr)_minmax(0,1fr)]">
+        <CandlePanel ticker={ticker} history={priceData} loading={prices.kind === "loading"} intraday={intraday} />
+        <div className="flex min-w-0 flex-col gap-5">
+          <PositionPanel position={detail.position} base={detail.base_currency ?? ""} drift={drift} />
+          <ScorePanel row={row} kpis={detail.kpis} method={boardData?.score_method ?? null} loaded={board.kind !== "loading"} />
         </div>
-        {detail.freshness ? (
-          <FreshnessLabel syncedAt={detail.freshness.synced_at} snapshotDate={detail.freshness.snapshot_date} />
-        ) : null}
       </div>
 
-      <PositionCards detail={detail} />
+      <div className="grid grid-cols-1 gap-5 lg:grid-cols-3">
+        <KpiBarsPanel ticker={ticker} kpis={detail.kpis} hasThesis={Boolean(thesis)} />
+        <DrawdownPanel history={priceData} portfolioIndex={indexPoints} />
+        <NextReportPanel detail={detail} today={isoDay(now)} />
+      </div>
 
-      <JobActions detail={detail} busy={busy} onQueued={onQueued} />
+      <div className="grid grid-cols-1 gap-5 lg:grid-cols-[minmax(0,1.3fr)_minmax(0,1fr)]">
+        <TimelinePanel ticker={ticker} entries={timeline} loaded={news.items !== null || news.failed} />
+        <HoldersPanel data={current(ownership.state)} loaded={ownership.state.kind !== "loading"} />
+      </div>
 
-      <section aria-labelledby="thesis-heading" className="space-y-3">
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          <h2 id="thesis-heading" className="text-lg font-semibold">
-            Thesis
-          </h2>
-          <span className="flex flex-wrap gap-1">
-            <Button asChild variant="ghost" size="sm">
-              <Link href="/theses">
-                <LayoutGridIcon aria-hidden="true" />
-                Thesis board
-              </Link>
-            </Button>
-            <Button asChild variant="ghost" size="sm">
-              <Link href={`/config/theses#${encodeURIComponent(detail.ticker)}`}>
-                <PencilIcon aria-hidden="true" />
-                Edit thesis
-              </Link>
-            </Button>
-          </span>
-        </div>
+      <ValuationPanel ticker={ticker} />
+      <SegmentsPanel ticker={ticker} />
+
+      <Blueprint aria-labelledby="thesis-heading" className="space-y-5 px-[22px] py-5">
+        <PanelHeading
+          kicker="Thesis & evidence"
+          title={<span id="thesis-heading">Why you own it, and the verdicts</span>}
+          action={
+            <span className="flex flex-wrap gap-1">
+              <Button asChild variant="ghost" size="sm">
+                <Link href="/theses">
+                  <LayoutGridIcon aria-hidden="true" />
+                  Thesis board
+                </Link>
+              </Button>
+              <Button asChild variant="ghost" size="sm">
+                <Link href={`/config/theses#${encodeURIComponent(ticker)}`}>
+                  <PencilIcon aria-hidden="true" />
+                  Edit thesis
+                </Link>
+              </Button>
+            </span>
+          }
+        />
+        <JobActions detail={detail} busy={busy} onQueued={onQueued} />
         {thesis ? (
-          <div className="space-y-3 rounded-lg border border-border bg-surface-raised p-4 text-sm">
+          <div className="space-y-3 border-l-2 border-accent pl-4 text-sm">
             <p className="whitespace-pre-line">{thesis.why_owned}</p>
             {thesis.exit_conditions && thesis.exit_conditions.length > 0 ? (
               <div>
@@ -212,91 +306,34 @@ export function HoldingContent({
                 </ul>
               </div>
             ) : null}
-            {thesis.review_date ? (
-              <p className="text-text-muted">Review by {formatDate(thesis.review_date)}</p>
-            ) : null}
+            {thesis.review_date ? <p className="text-text-muted">Review by {formatDate(thesis.review_date)}</p> : null}
           </div>
         ) : (
           <EmptyState title="No thesis yet">
-            Write why you own {detail.ticker} and the KPIs that must hold in the{" "}
-            <Link className="text-accent underline-offset-4 hover:underline" href="/config/theses">
+            Write why you own {ticker} and the KPIs that must hold in the{" "}
+            <Link className="text-accent-ink underline-offset-4 hover:underline" href="/config/theses">
               theses editor
             </Link>
             .
           </EmptyState>
         )}
-      </section>
+        {thesis && thesis.kpis && thesis.kpis.length > 0 ? (
+          <KpiTable kpis={detail.kpis} facts={facts} onFeedback={onFeedback} />
+        ) : null}
+      </Blueprint>
 
-      {thesis && thesis.kpis && thesis.kpis.length > 0 ? (
-        <KpiTable kpis={detail.kpis} facts={facts} onFeedback={onFeedback} />
-      ) : null}
+      <FactsSection ticker={ticker} facts={detail.facts} reload={reload} onQueued={onQueued} onFeedback={onFeedback} />
 
-      <PriceRiskSection ticker={detail.ticker} currency={detail.position?.instrument_currency} />
+      <HoldingResearch ticker={ticker} />
 
-      <HoldingNews ticker={detail.ticker} />
+      <HoldingNews ticker={ticker} news={news} />
 
-      <FactsSection ticker={detail.ticker} facts={detail.facts} reload={reload} onQueued={onQueued} onFeedback={onFeedback} />
+      <PriceRiskSection ticker={ticker} currency={detail.position?.instrument_currency} />
 
-      <HoldingResearch ticker={detail.ticker} />
+      <OwnershipSection resource={ownership} />
 
-      <OwnershipSection ticker={detail.ticker} />
-
-      <IdentitySection ticker={detail.ticker} />
+      <IdentitySection ticker={ticker} resource={identity} />
     </>
-  );
-}
-
-function PositionCards({ detail }: { detail: HoldingDetail }) {
-  const { position, instrument } = detail;
-  const base = detail.base_currency ?? "";
-  const tone = gainLossTone(position?.ppl);
-  return (
-    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
-      <StatCard
-        label={`Value (${base || "base"})`}
-        value={position ? formatMoney(position.value_base, base) : "Not held"}
-        sub={position ? `${formatQuantity(position.quantity)} × ${formatPrice(position.current_price, position.instrument_currency)}` : null}
-      />
-      <StatCard
-        label="Weight"
-        value={formatPercent(position?.weight)}
-        sub={
-          position ? (
-            <span className="inline-flex items-center gap-1">
-              target {formatPercent(position.target_weight)}
-              <DriftStatusBadge status={position.drift_status} />
-            </span>
-          ) : null
-        }
-      />
-      <StatCard
-        label="Unrealised P/L"
-        value={position ? formatMoney(position.ppl, position.account_currency, { signed: true }) : "—"}
-        valueClassName={tone === "gain" ? "text-gain" : tone === "loss" ? "text-loss" : ""}
-        trend={position ? tone : undefined}
-        sub={position ? formatPercent(position.ppl_pct, { signed: true }) : null}
-      />
-      <StatCard
-        label="Next report date"
-        value={instrument?.next_report_date ? formatDate(instrument.next_report_date) : "Unknown"}
-        sub={
-          instrument?.report_date_source ? (
-            <a
-              href={instrument.report_date_source.startsWith("http") ? instrument.report_date_source : undefined}
-              className="inline-flex items-center gap-1 hover:text-text hover:underline"
-              target="_blank"
-              rel="noreferrer"
-            >
-              source <ExternalLinkIcon aria-hidden="true" className="size-3" />
-            </a>
-          ) : instrument?.last_report_date ? (
-            `last read ${formatDate(instrument.last_report_date)}`
-          ) : (
-            "set by the weekly calendar job"
-          )
-        }
-      />
-    </div>
   );
 }
 
@@ -309,7 +346,7 @@ function JobLine({ label, job }: { label: string; job: JobSummary | null | undef
       {" · "}
       <time dateTime={at}>{formatRelative(new Date(at))}</time>
       {" · "}
-      <Link href={jobHref(job.id)} className="text-accent hover:underline">
+      <Link href={jobHref(job.id)} className="text-accent-ink hover:underline">
         job #{job.id}
       </Link>
       {job.status === "failed" && job.error ? <span className="block text-text">{job.error}</span> : null}
@@ -357,7 +394,7 @@ function JobActions({
   }
 
   return (
-    <section aria-label="Checks" className="space-y-2 rounded-lg border border-border bg-surface-muted p-4">
+    <section aria-label="Checks" className="space-y-2 border border-border-soft bg-surface-muted p-4">
       <div className="flex flex-wrap items-center gap-2">
         <Button size="sm" onClick={() => void run("check")} disabled={pending || busy}>
           {busy ? <LoaderCircleIcon aria-hidden="true" className="animate-spin" /> : <PlayIcon aria-hidden="true" />}
@@ -408,15 +445,15 @@ function KpiTable({ kpis, facts, onFeedback }: { kpis: KpiStatus[]; facts: Map<n
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
   return (
-    <section aria-labelledby="kpi-heading" className="space-y-3">
-      <h2 id="kpi-heading" className="text-lg font-semibold">
-        Thesis KPIs
-      </h2>
-      <AskAboutSelection className="overflow-x-auto rounded-lg border border-border bg-surface-raised">
+    <section aria-labelledby="kpi-heading" className="scroll-mt-6 space-y-2">
+      <h3 id="kpi-heading" className="font-heading text-lg font-semibold">
+        Thesis KPIs: verdicts and evidence
+      </h3>
+      <AskAboutSelection className="relative overflow-x-auto border border-border">
         <table className="w-full min-w-[48rem] text-sm">
           <caption className="sr-only">Latest verdict per KPI; open a row for its evidence and history</caption>
           <thead className="bg-surface-muted">
-            <tr className="border-b border-border text-text-muted">
+            <tr className="border-b border-border text-[11px] tracking-[0.08em] text-text-muted uppercase">
               <th scope="col" className="px-3 py-2 text-left font-medium">KPI</th>
               <th scope="col" className="px-3 py-2 text-right font-medium">Target</th>
               <th scope="col" className="px-3 py-2 text-left font-medium">Period</th>
@@ -653,12 +690,10 @@ function FactsSection({
   }
 
   return (
-    <section aria-labelledby="facts-heading" className="space-y-3">
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <span className="flex flex-wrap items-center gap-2">
-          <h2 id="facts-heading" className="text-lg font-semibold">
-            Extracted figures
-          </h2>
+    <Blueprint aria-labelledby="facts-heading" className="space-y-3 px-[22px] py-5">
+      <div className="flex flex-wrap items-end justify-between gap-2">
+        <span className="flex flex-wrap items-end gap-3">
+          <PanelHeading kicker="Facts" title={<span id="facts-heading">Extracted figures</span>} />
           {shown.length > 0 ? (
             <ConfidenceBar counts={confidence} label={confidenceLabel || "No figures yet"} />
           ) : null}
@@ -698,14 +733,14 @@ function FactsSection({
         </AskAboutSelection>
       )}
       {rejected.length > 0 ? (
-        <details className="rounded-lg border border-border bg-surface-raised p-3 text-sm">
+        <details className="border border-border-soft p-3 text-sm">
           <summary className="cursor-pointer font-medium">
             {rejected.length} figure{rejected.length === 1 ? "" : "s"} rejected by the validator or by you
           </summary>
           <FactTable facts={rejected} onResolved={onResolved} onFeedback={onFeedback} />
         </details>
       ) : null}
-    </section>
+    </Blueprint>
   );
 }
 
@@ -721,10 +756,10 @@ function FactTable({
   const [open, setOpen] = useState<number | null>(null);
   if (facts.length === 0) return null;
   return (
-    <div className="mt-2 overflow-x-auto rounded-lg border border-border bg-surface-raised">
+    <div className="relative mt-2 overflow-x-auto border border-border">
       <table className="w-full min-w-[48rem] text-sm">
         <thead className="bg-surface-muted">
-          <tr className="border-b border-border text-text-muted">
+          <tr className="border-b border-border text-[11px] tracking-[0.08em] text-text-muted uppercase">
             <th scope="col" className="px-3 py-2 text-left font-medium">Period</th>
             <th scope="col" className="px-3 py-2 text-left font-medium">Metric</th>
             <th scope="col" className="px-3 py-2 text-right font-medium">Value</th>

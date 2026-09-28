@@ -7,6 +7,7 @@ import { useEffect, useId, useState, type FormEvent } from "react";
 
 import { AlertMessage } from "@/components/alert-message";
 import { EmptyState } from "@/components/empty-state";
+import { BlueprintCorners } from "@/components/ui/blueprint";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -88,49 +89,60 @@ export function ReportSearch({ state }: { state: SearchState }) {
   }
 
   return (
-    <section aria-labelledby={`${id}-heading`} className="space-y-3 rounded-lg border border-border bg-surface-raised p-4">
+    <section aria-labelledby={`${id}-heading`} className="blueprint space-y-3 px-5 py-3">
+      <BlueprintCorners />
       <h2 id={`${id}-heading`} className="sr-only">
         Search every report
       </h2>
-      <form role="search" onSubmit={submit} className="flex flex-wrap items-end gap-2">
-        <div className="min-w-60 flex-1 space-y-1">
-          <Label htmlFor={`${id}-q`}>Search every report</Label>
-          <Input
-            id={`${id}-q`}
-            type="search"
-            value={draft}
-            maxLength={QUERY_MAX}
-            onChange={(e) => setDraft(e.target.value)}
-            placeholder='A ticker, words, or "a phrase" (-word excludes)'
-            aria-describedby={`${id}-hint`}
-          />
-        </div>
-        <Button type="submit" size="sm" className="mb-0.5" disabled={!draft.trim()}>
-          <SearchIcon aria-hidden="true" />
-          Search
-        </Button>
-        {state.q ? (
-          <Button type="button" variant="ghost" size="sm" className="mb-0.5" onClick={() => {
-            setDraft("");
-            router.push(searchHref({ q: "", types: state.types }), { scroll: false });
-          }}>
-            <XIcon aria-hidden="true" />
-            Clear search
+      <div className="flex flex-wrap items-center gap-x-5 gap-y-2">
+        <form role="search" onSubmit={submit} className="flex min-w-72 flex-1 items-center gap-2">
+          <Label htmlFor={`${id}-q`} className="sr-only">
+            Search all reports
+          </Label>
+          <div className="relative min-w-0 flex-1">
+            <SearchIcon aria-hidden="true" className="pointer-events-none absolute top-1/2 left-2.5 size-4 -translate-y-1/2 text-text-faint" />
+            <Input
+              id={`${id}-q`}
+              type="search"
+              value={draft}
+              maxLength={QUERY_MAX}
+              onChange={(e) => setDraft(e.target.value)}
+              placeholder='Search all reports: a ticker, words, or "a phrase" (-word excludes)'
+              aria-describedby={`${id}-hint`}
+              className="pl-8"
+            />
+          </div>
+          <Button type="submit" size="sm" disabled={!draft.trim()}>
+            Search
           </Button>
-        ) : null}
-      </form>
-      <fieldset className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm">
-        <legend className="sr-only">Report types</legend>
-        <span id={`${id}-hint`} className="text-xs text-text-muted">
-          Types (none ticked: all):
-        </span>
-        {REPORT_TYPES.map((t) => (
-          <label key={t} className="inline-flex items-center gap-1.5">
-            <input type="checkbox" checked={state.types.includes(t)} onChange={() => toggleType(t)} className="size-4 accent-accent" />
-            {REPORT_TYPE_LABELS[t].plural}
-          </label>
-        ))}
-      </fieldset>
+          {state.q ? (
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              onClick={() => {
+                setDraft("");
+                router.push(searchHref({ q: "", types: state.types }), { scroll: false });
+              }}
+            >
+              <XIcon aria-hidden="true" />
+              Clear search
+            </Button>
+          ) : null}
+        </form>
+        <fieldset className="flex flex-wrap items-center gap-x-4 gap-y-1 text-[13px]">
+          <legend className="sr-only">Report types</legend>
+          <span id={`${id}-hint`} className="text-xs text-text-muted">
+            Types (none ticked: all):
+          </span>
+          {REPORT_TYPES.map((t) => (
+            <label key={t} className="inline-flex items-center gap-1.5">
+              <input type="checkbox" checked={state.types.includes(t)} onChange={() => toggleType(t)} className="size-4 accent-accent" />
+              {REPORT_TYPE_LABELS[t].plural}
+            </label>
+          ))}
+        </fieldset>
+      </div>
 
       {state.q ? (
         <div className="space-y-2" aria-live="polite">
@@ -152,10 +164,10 @@ export function ReportSearch({ state }: { state: SearchState }) {
               {load.hits.length === 0 ? (
                 <EmptyState title="No report contains it">Try fewer words, or untick the type filters.</EmptyState>
               ) : (
-                <ol className="divide-y divide-border rounded-lg border border-border">
+                <ol className="divide-y divide-border-soft border border-border">
                   {load.hits.map((h) => (
                     <li key={`${h.type}:${h.id}`}>
-                      <Link href={reportHitHref(h)} className="block space-y-1 p-3 hover:bg-surface-muted">
+                      <Link href={reportHitHref(h)} className="block space-y-1 p-3 hover:bg-border-soft">
                         <span className="flex flex-wrap items-center justify-between gap-2">
                           <span className="font-medium">{h.title}</span>
                           <time dateTime={h.created_at} className="num text-xs text-text-muted">

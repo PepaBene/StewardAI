@@ -47,6 +47,12 @@ class ModelCost(BaseModel):
 
 class CostSummary(BaseModel):
     month: str
+    period_start: dt.datetime = Field(
+        description="Start of the budget month (midnight on the 1st, Europe/Prague), inclusive."
+    )
+    period_end: dt.datetime = Field(
+        description="End of the budget month (midnight on the 1st of the next), exclusive."
+    )
     total_usd: float = Field(description="Sum of `job_step.cost_usd` of steps started in month.")
     cap_usd: float | None
     fraction: float | None = Field(description="total / cap; null without a cap.")
@@ -90,6 +96,8 @@ async def cost_summary(pool: Pool, _owner: Owner, month: MonthParam = None) -> C
     cap = cfg.monthly_cap_usd
     return CostSummary(
         month=month,
+        period_start=start,
+        period_end=end,
         total_usd=_f(total),
         cap_usd=cap,
         fraction=float(total / Decimal(str(cap))) if cap else None,

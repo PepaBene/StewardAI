@@ -25,7 +25,7 @@ from steward.portfolio.history import (
     position_organic_gain,
 )
 from steward.portfolio.snapshot import SNAPSHOT_TIMEZONE
-from steward.reference.read import PricePoint, load_series
+from steward.reference.read import PricePoint, index_series
 
 JobStatus = Literal["queued", "waiting", "running", "succeeded", "failed"]
 
@@ -99,6 +99,10 @@ class Holding(BaseModel):
     ticker: str
     name: str | None
     isin: str | None
+    security_type: str | None = Field(
+        description="OpenFIGI's security type (e.g. 'Common Stock', 'ETP'); null until the "
+        "reference-data job has resolved the instrument."
+    )
     quantity: float
     avg_price: float
     current_price: float
@@ -142,7 +146,7 @@ async def _latest_account(conn: asyncpg.Pool) -> asyncpg.Record | None:
 
 async def _positions(conn: asyncpg.Pool, snapshot_date: dt.date) -> list[asyncpg.Record]:
     rows: list[asyncpg.Record] = await conn.fetch(
-        "select p.*, i.name, i.isin from public.position_snapshot p"
+        "select p.*, i.name, i.isin, i.security_type from public.position_snapshot p"
         " left join public.instrument i on i.t212_ticker = p.ticker"
         " where p.snapshot_date = $1 order by p.value_base desc, p.ticker",
         snapshot_date,
@@ -284,6 +288,7 @@ async def portfolio_holdings(pool: asyncpg.Pool) -> HoldingsResponse:
                 ticker=p["ticker"],
                 name=p["name"],
                 isin=p["isin"],
+                security_type=p["security_type"],
                 quantity=float(p["quantity"]),
                 avg_price=float(p["avg_price"]),
                 current_price=float(p["current_price"]),
@@ -316,6 +321,17 @@ async def portfolio_holdings(pool: asyncpg.Pool) -> HoldingsResponse:
 # ---------------------------------------------------------------------------
 
 
+class SnapshotValues(BaseModel):
+    date: dt.date
+    total: float = Field(description="Invested plus cash.")
+    invested: float = Field(description="Market value of the open positions.")
+    cash: float
+    unrealised: float = Field(
+        description="Trading212's unrealised P/L, converted from the account currency at the "
+        "snapshot's own account-to-base rate."
+    )
+
+
 class PortfolioHistory(BaseModel):
     as_of: dt.date | None = Field(description="Date of the latest snapshot included.")
     base_currency: str | None
@@ -328,6 +344,15 @@ class PortfolioHistory(BaseModel):
     benchmark_symbol: str | None
     benchmark: list[PricePoint]
     gap: str | None = Field(description="Why there is no portfolio history, when there is none.")
+    values_currency: str | None = Field(
+        description="Currency of `values`: the latest snapshot's base currency; null before "
+        "the first sync.",
+    )
+    values: list[SnapshotValues] = Field(
+        description="Absolute figures of every day snapshot in the window, oldest first, in "
+        "`values_currency` (snapshots taken in another base currency are left out). Unlike "
+        "`points` these include deposits and withdrawals.",
+    )
 
 
 # Cash movements between the owner and the account: excluded from the index above. A fee
@@ -337,8 +362,9 @@ _EXTERNAL_FLOW_SUBTYPES = ("DEPOSIT", "WITHDRAW", "TRANSFER")
 
 async def _snapshot_series(pool: asyncpg.Pool, since: dt.date) -> list[asyncpg.Record]:
     rows: list[asyncpg.Record] = await pool.fetch(
-        "select snapshot_date, total_base, account_currency, fx_rate"
-        " from public.account_snapshot where snapshot_date >= $1 order by snapshot_date",
+        "select snapshot_date, total_base, account_currency, fx_rate, base_currency,"
+        " invested_base, cash_base, unrealized_ppl from public.account_snapshot"
+        " where snapshot_date >= $1 order by snapshot_date",
         since,
     )
     return rows
@@ -358,6 +384,24 @@ def _period_start(snapshot_date: dt.date) -> dt.datetime:
     """Midnight Prague time at the start of `snapshot_date` — the day boundary snapshots
     already use (steward.portfolio.snapshot.snapshot_date_for)."""
     return dt.datetime.combine(snapshot_date, dt.time(0), tzinfo=SNAPSHOT_TIMEZONE)
+
+
+def _snapshot_values(snapshots: list[asyncpg.Record]) -> tuple[str | None, list[SnapshotValues]]:
+    """The stored base-currency figures per day, in the latest snapshot's base currency."""
+    if not snapshots:
+        return None, []
+    currency: str = snapshots[-1]["base_currency"]
+    return currency, [
+        SnapshotValues(
+            date=r["snapshot_date"],
+            total=float(r["total_base"]),
+            invested=float(r["invested_base"]),
+            cash=float(r["cash_base"]),
+            unrealised=float(r["unrealized_ppl"] * r["fx_rate"]),
+        )
+        for r in snapshots
+        if r["base_currency"] == currency
+    ]
 
 
 def _daily_values(snapshots: list[asyncpg.Record], flows: list[asyncpg.Record]) -> list[DailyValue]:
@@ -413,10 +457,13 @@ async def portfolio_history(pool: asyncpg.Pool, days: int) -> PortfolioHistory:
             benchmark_symbol=benchmark_symbol,
             benchmark=[],
             gap="no portfolio snapshot yet",
+            values_currency=None,
+            values=[],
         )
 
     since = latest_date - dt.timedelta(days=days)
     snapshots = await _snapshot_series(pool, since)
+    values_currency, snapshot_values = _snapshot_values(snapshots)
     if len(snapshots) < 2:
         return PortfolioHistory(
             as_of=latest_date,
@@ -425,12 +472,20 @@ async def portfolio_history(pool: asyncpg.Pool, days: int) -> PortfolioHistory:
             benchmark_symbol=benchmark_symbol,
             benchmark=[],
             gap="fewer than two snapshots in this window",
+            values_currency=values_currency,
+            values=snapshot_values,
         )
 
     flows = await _cash_flows(pool, _period_start(snapshots[0]["snapshot_date"]))
     values = _daily_values(snapshots, flows)
     index = flow_adjusted_index(values)
-    bench = await load_series(pool, benchmark_symbol, since=since) if benchmark_symbol else []
+    _bench_ref, bench = (
+        await index_series(
+            pool, (jobs.body if jobs else JobsConfig()).prices, benchmark_symbol, since
+        )
+        if benchmark_symbol
+        else (None, [])
+    )
 
     stored = await load_active(pool, "strategy", StrategyConfig)
     base_currency = (stored.body.base_currency if stored else None) or snapshots[-1][
@@ -444,6 +499,8 @@ async def portfolio_history(pool: asyncpg.Pool, days: int) -> PortfolioHistory:
         benchmark_symbol=benchmark_symbol,
         benchmark=[PricePoint(date=d, close=c) for d, c in bench],
         gap=None,
+        values_currency=values_currency,
+        values=snapshot_values,
     )
 
 

@@ -196,6 +196,9 @@ class EventRulesConfig(ConfigModel):
             # The daily effective rate (DFF) drifts by a basis point or two; a Fed decision
             # moves it by 25 bp, so only moves beyond 0.1 pp count.
             "fed_funds": 0.1,
+            # A ČNB decision (the repo file lists changes only). CZEONIA has no band: it
+            # moves every day and is stored for the Sharpe ratio, not for events.
+            "cnb_repo_2w": 0.0,
         },
         description="Per macro series key: a new release that moves more than this against "
         "the previous one is a macro surprise (in the series' own unit; 0: any change, e.g. "

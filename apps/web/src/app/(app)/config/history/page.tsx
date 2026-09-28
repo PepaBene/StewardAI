@@ -1,37 +1,36 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 
+import { PageHeader } from "@/components/page-header";
+import { Blueprint } from "@/components/ui/blueprint";
 import { CONFIG_DOMAINS, DOMAIN_SLUGS, historyHref } from "@/lib/config/domains";
+
+import { ConfigTransfer } from "../config-transfer";
 
 export const metadata: Metadata = { title: "Config history" };
 
 export default function ConfigHistoryIndex() {
   return (
     <div className="space-y-6">
-      <div>
-        <p className="text-sm text-text-muted">
-          <Link href="/config" className="hover:text-text hover:underline">
+      <PageHeader
+        kicker={
+          <Link href="/config" className="hover:underline">
             Config
-          </Link>{" "}
-          / History
-        </p>
-        <h1 className="text-2xl font-semibold tracking-tight">Version history</h1>
-        <p className="mt-1 max-w-prose text-sm text-text-muted">
-          Pick a config domain to see its saved versions, compare any two, and roll back.
-        </p>
-      </div>
-      <ul className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+          </Link>
+        }
+        title="Version history"
+        description="Pick a config domain to see its saved versions, compare any two, and roll back. Export or import every domain at once below."
+      />
+      <ul className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
         {DOMAIN_SLUGS.map((slug) => (
-          <li key={slug}>
-            <Link
-              href={historyHref(slug)}
-              className="block rounded-lg border border-border bg-surface-raised px-4 py-3 font-medium transition-colors hover:border-accent"
-            >
+          <Blueprint as="li" key={slug} className="transition-colors hover:border-accent">
+            <Link href={historyHref(slug)} className="block px-4 py-3 font-medium">
               {CONFIG_DOMAINS[slug].label}
             </Link>
-          </li>
+          </Blueprint>
         ))}
       </ul>
+      <ConfigTransfer />
     </div>
   );
 }

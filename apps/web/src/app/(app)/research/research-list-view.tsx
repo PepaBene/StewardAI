@@ -7,7 +7,9 @@ import { useEffect, useState } from "react";
 
 import { AlertMessage } from "@/components/alert-message";
 import { EmptyState } from "@/components/empty-state";
+import { PageHeader } from "@/components/page-header";
 import { ResearchStarter } from "@/components/research/research-starter";
+import { Blueprint, PanelHeading } from "@/components/ui/blueprint";
 import { Button } from "@/components/ui/button";
 import { getBrowserApiClient, type ResearchSummary } from "@/lib/api/client";
 import { formatDateTime } from "@/lib/format";
@@ -43,40 +45,36 @@ export function ResearchListView() {
   }, [ticker, reloadKey]);
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-wrap items-end justify-between gap-3">
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight">Research</h1>
-          <p className="mt-1 max-w-prose text-sm text-text-muted">
-            Deep research on any ticker under a research profile. Figures come from stored records and are computed in
-            code; the model writes only the narrative sections, and every sentence cites its sources.
-          </p>
-        </div>
-        <div className="flex flex-wrap gap-2">
-          <Button asChild variant="ghost" size="sm">
-            <Link href="/reports?type=research">
-              <SearchIcon aria-hidden="true" />
-              Search reports
-            </Link>
-          </Button>
-          <Button asChild variant="ghost" size="sm">
-            <Link href="/config/research-profiles">
-              <SlidersHorizontalIcon aria-hidden="true" />
-              Research profiles
-            </Link>
-          </Button>
-        </div>
-      </div>
+    <div className="flex flex-col gap-[22px]">
+      <PageHeader
+        kicker="Research & Verification"
+        title="Research"
+        description="Deep research on any ticker under a research profile. Figures come from stored records and are computed in code; the model writes only the narrative sections, and every sentence cites its sources."
+        aside={
+          <>
+            <Button asChild variant="outline" size="sm">
+              <Link href="/reports?type=research">
+                <SearchIcon aria-hidden="true" />
+                Search reports
+              </Link>
+            </Button>
+            <Button asChild variant="outline" size="sm">
+              <Link href="/config/research-profiles">
+                <SlidersHorizontalIcon aria-hidden="true" />
+                Research profiles
+              </Link>
+            </Button>
+          </>
+        }
+      />
 
-      <section aria-labelledby="new-research-heading" className="space-y-2 rounded-lg border border-border bg-surface-raised p-4">
-        <h2 id="new-research-heading" className="font-medium">
-          New research
-        </h2>
+      <Blueprint aria-labelledby="new-research-heading" className="flex flex-col gap-3 px-5 py-[18px]">
+        <PanelHeading kicker="Start a run" title={<span id="new-research-heading">New research</span>} />
         <ResearchStarter initialTicker={ticker ?? ""} onFinished={() => setReloadKey((k) => k + 1)} />
-      </section>
+      </Blueprint>
 
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <h2 className="text-lg font-semibold">
+        <h2 className="text-[22px] leading-tight font-semibold">
           {ticker ? (
             <>
               Reports on <span className="font-mono">{ticker}</span>
@@ -84,6 +82,7 @@ export function ResearchListView() {
           ) : (
             "All reports"
           )}
+          {load.kind === "ok" ? <span className="num ml-2 bg-border-soft px-2 py-px align-middle font-sans text-xs font-normal">{load.items.length}</span> : null}
         </h2>
         <div className="flex gap-1">
           {ticker ? (
@@ -112,34 +111,54 @@ export function ResearchListView() {
         </EmptyState>
       ) : null}
       {load.kind === "ok" && load.items.length > 0 ? (
-        <ul className="divide-y divide-border rounded-lg border border-border bg-surface-raised">
-          {load.items.map((r) => (
-            <li key={r.id} className="space-y-1 p-4">
-              <span className="flex flex-wrap items-center justify-between gap-2">
-                <Link href={researchHref(r.id)} className="font-medium hover:text-accent hover:underline">
-                  {r.title}
-                </Link>
-                <time dateTime={r.created_at} className="num text-sm text-text-muted">
-                  {formatDateTime(r.created_at)}
-                </time>
-              </span>
-              {r.headline ? <span className="block text-sm text-text-muted">{r.headline}</span> : null}
-              <span className="flex flex-wrap gap-3 text-xs text-text-muted">
-                {r.ticker ? (
-                  <Link href={researchForTicker(r.ticker)} className="font-mono text-accent hover:underline" title={`Every report on ${r.ticker}`}>
-                    {r.ticker}
-                  </Link>
-                ) : null}
-                {r.profile ? <span>profile {r.profile}</span> : null}
-                {r.job_id !== null ? (
-                  <Link href={jobHref(r.job_id)} className="hover:text-text hover:underline">
-                    job #{r.job_id}
-                  </Link>
-                ) : null}
-              </span>
-            </li>
-          ))}
-        </ul>
+        <Blueprint className="overflow-x-auto">
+          <table className="w-full min-w-[44rem] text-sm">
+            <caption className="sr-only">Research reports, newest first</caption>
+            <thead className="bg-surface-muted">
+              <tr className="border-b border-border text-[11px] tracking-wide text-text-muted uppercase">
+                <th scope="col" className="px-4 py-2 text-left font-medium">Report</th>
+                <th scope="col" className="px-4 py-2 text-left font-medium">Ticker</th>
+                <th scope="col" className="px-4 py-2 text-left font-medium">Profile</th>
+                <th scope="col" className="px-4 py-2 text-right font-medium">Written</th>
+                <th scope="col" className="px-4 py-2 text-right font-medium">Job</th>
+              </tr>
+            </thead>
+            <tbody>
+              {load.items.map((r) => (
+                <tr key={r.id} className="border-b border-border-soft align-top last:border-0 hover:bg-border-soft">
+                  <th scope="row" className="px-4 py-3 text-left font-normal">
+                    <Link href={researchHref(r.id)} className="font-heading text-[17px] font-semibold hover:text-accent-ink hover:underline">
+                      {r.headline || r.title}
+                    </Link>
+                    {r.headline ? <span className="block text-xs text-text-muted">{r.title}</span> : null}
+                  </th>
+                  <td className="px-4 py-3">
+                    {r.ticker ? (
+                      <Link href={researchForTicker(r.ticker)} className="font-mono text-xs text-accent-ink hover:underline" title={`Every report on ${r.ticker}`}>
+                        {r.ticker}
+                      </Link>
+                    ) : (
+                      <span className="text-text-muted">—</span>
+                    )}
+                  </td>
+                  <td className="px-4 py-3 text-text-muted">{r.profile ?? "—"}</td>
+                  <td className="num px-4 py-3 text-right whitespace-nowrap text-text-muted">
+                    <time dateTime={r.created_at}>{formatDateTime(r.created_at)}</time>
+                  </td>
+                  <td className="num px-4 py-3 text-right">
+                    {r.job_id !== null ? (
+                      <Link href={jobHref(r.job_id)} className="text-text-muted hover:text-text hover:underline">
+                        #{r.job_id}
+                      </Link>
+                    ) : (
+                      <span className="text-text-muted">—</span>
+                    )}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </Blueprint>
       ) : null}
     </div>
   );

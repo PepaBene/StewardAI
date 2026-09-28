@@ -209,6 +209,208 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/portfolio/holdings/prices": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Holdings Prices
+         * @description Every current holding's daily closes over the last `days` (Stooq, else Yahoo, as
+         *     for the holding page) with the latest close-to-close change, and the latest stored
+         *     intraday quote when intraday prices are on. A holding with no stored prices is listed
+         *     with no bars and null figures.
+         */
+        get: operations["get_holdings_prices"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/market/strip": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Market Strip
+         * @description The reference rate of each held currency against the base currency and the
+         *     configured index quotes, each with its previous value, change, source, kind (intraday
+         *     or close) and as-of time. Anything without stored data is null, never estimated.
+         */
+        get: operations["get_market_strip"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/holdings/{ticker}/intraday": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Holding Intraday
+         * @description The holding's latest session in 5-minute bars with its last price, trade time
+         *     (exchange time), previous close and delay (Yahoo Finance, unofficial). Fetched from
+         *     Yahoo first when the stored quote is older than the configured cache during trading
+         *     hours. When Yahoo fails or intraday prices are off, `note` says so and `daily` holds the
+         *     latest daily close to show instead.
+         */
+        get: operations["get_holding_intraday"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/portfolio/intraday": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Portfolio Intraday
+         * @description The portfolio's value path over the latest day with intraday bars up to `until`: the
+         *     latest snapshot's quantities times each 5-minute close, in the base currency at the
+         *     stored reference rates, over the holdings that have bars (`coverage`).
+         */
+        get: operations["get_portfolio_intraday"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/portfolio/look-through": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Portfolio Look Through
+         * @description Exposure by country, region, sector and currency with the funds expanded (direct
+         *     stocks plus fund weight x holding weight; cash, the funds' own cash & derivatives and
+         *     funds with no snapshot are separate buckets), the top underlying holdings merged across
+         *     funds and direct positions, concentration (HHI, 1/HHI, top-10 share) of the portfolio and
+         *     of the benchmark proxy, FX exposure against the benchmark, each fund's as-of date, source
+         *     and tier, and coverage. Read from stored snapshots only; nothing is fetched here.
+         */
+        get: operations["get_portfolio_look_through"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/jobs/etf-look-through": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Run Etf Look Through
+         * @description Fetch the funds' holdings from the issuers now (skipped per fund when the stored
+         *     as-of date is already current).
+         */
+        post: operations["run_etf_look_through"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/holdings/{ticker}/valuation": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Holding Valuation
+         * @description P/E, P/B and dividend yield from the latest stored close and the stored fundamentals
+         *     (SEC XBRL, ESEF, or the holding profile's manual figures), each with its source, period,
+         *     basis and staleness; an ETF's are its provider's fund figures. A ratio that cannot be
+         *     computed is null with the reason (e.g. 'n/m: negative earnings').
+         */
+        get: operations["get_holding_valuation"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/portfolio/valuation": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Portfolio Valuation
+         * @description The portfolio's P/E, P/B and dividend yield (value-weighted, iShares' capping and
+         *     exclusion rules; see `method`) with the share of value covered, against the benchmark's
+         *     fund-level figures (the Prices config's first benchmark) and every configured fund.
+         */
+        get: operations["get_portfolio_valuation"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/jobs/valuation-refresh": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Run Valuation Refresh
+         * @description Refresh the fundamentals and fund figures behind the valuation now.
+         */
+        post: operations["run_valuation_refresh"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/portfolio/overview": {
         parameters: {
             query?: never;
@@ -298,6 +500,31 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/portfolio/risk": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Portfolio Risk
+         * @description Sharpe ratio of the portfolio and of the first benchmark over the window: the
+         *     time-weighted daily returns of /portfolio/history (weekdays) in the base currency, in
+         *     excess of the forward-filled CZK risk-free rate (CZEONIA from the ČNB, /100/252 per
+         *     trading day), annualised by sqrt(252); with the annualised volatility, mean excess
+         *     return, average risk-free rate, the window and the number of observations. `sharpe` is
+         *     null with a `reason` under 60 observations or without a stored risk-free rate.
+         */
+        get: operations["get_portfolio_risk"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/portfolio/transactions": {
         parameters: {
             query?: never;
@@ -309,6 +536,8 @@ export interface paths {
          * Get Portfolio Transactions
          * @description Orders, dividends and cash movements, newest first, with totals per type and
          *     currency over every row matching the filters (dates are UTC days, both inclusive).
+         *     `subtype` narrows server-side (e.g. BUY or SELL orders), so counts, totals and paging
+         *     all follow it.
          */
         get: operations["get_portfolio_transactions"];
         put?: never;
@@ -473,7 +702,10 @@ export interface paths {
         /**
          * Get Thesis Board
          * @description Every holding with a thesis, once: each KPI's current pass / breach / unknown with the
-         *     verdict behind it. A KPI never judged is listed as unknown, never left out.
+         *     verdict behind it. A KPI never judged is listed as unknown, never left out. Each row has
+         *     a 0-100 thesis score computed from those verdicts, its history and a state; the board
+         *     has the weight-weighted portfolio score and verdict activity. `score_method` states the
+         *     formula.
          */
         get: operations["get_thesis_board"];
         put?: never;
@@ -561,6 +793,28 @@ export interface paths {
          *     each with its snippet, source, the checks it broke and the reconciliation behind it.
          */
         get: operations["get_review_queue"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/facts/review-stats": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Review Stats
+         * @description Review counts over the last `days` UTC days (today included): facts pending now and
+         *     how many of them a thesis KPI waits on, owner decisions per day, facts marked wrong, and
+         *     the last recorded golden-set extraction accuracy (null when none is recorded).
+         */
+        get: operations["get_review_stats"];
         put?: never;
         post?: never;
         delete?: never;
@@ -1074,6 +1328,51 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/escalations/stats": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Escalation Stats
+         * @description How escalations are being handled: how many are open, acknowledged and resolved now,
+         *     the median time to the first acknowledgement, and per day of the window how many were
+         *     written and acknowledged (days in Europe/Prague).
+         */
+        get: operations["get_escalation_stats"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/escalations/{report_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Escalation */
+        get: operations["get_escalation"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /**
+         * Update Escalation
+         * @description Acknowledge, resolve or reopen an escalation. Acknowledging (or resolving one never
+         *     acknowledged) records when; reopening clears the resolution but keeps the first
+         *     acknowledgement. Setting the current status again changes nothing.
+         */
+        patch: operations["update_escalation"];
+        trace?: never;
+    };
     "/news": {
         parameters: {
             query?: never;
@@ -1087,6 +1386,49 @@ export interface paths {
          *     combine (AND); a repeated parameter matches any of its values.
          */
         get: operations["get_news"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/news/stats": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get News Stats
+         * @description Stories over the last `days` UTC days (today included), each dated by its earliest
+         *     item's publication: per day by severity, per event type, and how many are disputed.
+         *     Repeats of an earlier story are left out; unclassified stories are counted apart.
+         */
+        get: operations["get_news_stats"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/news/sources/health": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get News Sources Health
+         * @description Every configured news source with its last fetch time, item count and error, and
+         *     whether it is healthy (`rule` states how that is decided).
+         */
+        get: operations["get_news_sources_health"];
         put?: never;
         post?: never;
         delete?: never;
@@ -1247,26 +1589,9 @@ export interface paths {
          * Get Escalations
          * @description Impact notes on confirmed severity-2+ stories and large price moves, newest first:
          *     each cites its sources and names the thesis KPIs or exit conditions it touches, or
-         *     states that none applies.
+         *     states that none applies. `status` keeps only open, acknowledged or resolved ones.
          */
         get: operations["get_escalations"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/escalations/{report_id}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** Get Escalation */
-        get: operations["get_escalation"];
         put?: never;
         post?: never;
         delete?: never;
@@ -1904,6 +2229,49 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/holdings/{ticker}/segments": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Holding Segments
+         * @description Revenue by region, business segment and product as the company reports them: the
+         *     latest fiscal year (or quarter) from its SEC XBRL filing, with the earlier periods
+         *     stored for the same basis. Holdings outside EDGAR show the rows entered in their
+         *     holding profile, labelled as entered manually.
+         */
+        get: operations["get_holding_segments"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/jobs/sec-xbrl": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Run Sec Xbrl
+         * @description Read shares outstanding and revenue breakdowns from the SEC XBRL filings now.
+         */
+        post: operations["run_sec_xbrl"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -2084,6 +2452,110 @@ export interface components {
             /** Invested */
             invested: number;
         };
+        /** BenchmarkBucket */
+        BenchmarkBucket: {
+            /** Key */
+            key: string;
+            /** Label */
+            label: string;
+            /** Weight */
+            weight: number;
+        };
+        /** BenchmarkLookThrough */
+        BenchmarkLookThrough: {
+            /** Key */
+            key: string;
+            /** Label */
+            label: string;
+            /** Symbol */
+            symbol: string | null;
+            /** Primary */
+            primary: boolean;
+            /** Source Label */
+            source_label: string;
+            /** As Of */
+            as_of: string | null;
+            /** Definition */
+            definition: string;
+            /**
+             * Sector Scheme
+             * @enum {string}
+             */
+            sector_scheme: "gics" | "icb_industry";
+            /** Currency Derived */
+            currency_derived: boolean;
+            /** Exposures */
+            exposures: {
+                [key: string]: components["schemas"]["BenchmarkBucket"][];
+            };
+            concentration: components["schemas"]["Concentration"] | null;
+            /**
+             * Foreign Share
+             * @description Share in currencies other than the base currency.
+             */
+            foreign_share: number | null;
+        };
+        /**
+         * BenchmarkProxy
+         * @description Which fund's holdings stand in for a benchmark index's constituents.
+         */
+        BenchmarkProxy: {
+            /**
+             * Symbol
+             * @description A benchmark symbol from prices.benchmark_symbols.
+             * @example ^spx
+             */
+            symbol: string;
+            /**
+             * Fund Isin
+             * @example IE00B5BMR087
+             */
+            fund_isin: string;
+            /**
+             * Label
+             * @example S&P 500
+             */
+            label: string;
+        };
+        /** BenchmarkValuation */
+        BenchmarkValuation: {
+            /**
+             * Label
+             * @description What is compared: 'S&P 500', 'FTSE All-World'.
+             */
+            label: string;
+            /**
+             * Symbol
+             * @description The Prices benchmark symbol it stands for.
+             */
+            symbol: string | null;
+            /**
+             * Via
+             * @description Whose figures: 'CSPX fund figures (iShares)'.
+             */
+            via: string;
+            /** Fund Key */
+            fund_key: string;
+            /** Pe */
+            pe: number | null;
+            /** Pb */
+            pb: number | null;
+            /** Dividend Yield */
+            dividend_yield: number | null;
+            /** Dividend Yield Kind */
+            dividend_yield_kind: string | null;
+            /**
+             * As Of
+             * Format: date
+             */
+            as_of: string;
+            /** Source Url */
+            source_url: string;
+            /** Methodology */
+            methodology: string | null;
+            /** Stale */
+            stale: boolean;
+        };
         /** BoardKpi */
         BoardKpi: {
             kpi: components["schemas"]["ThesisKPI"];
@@ -2132,6 +2604,22 @@ export interface components {
              * @description Held or quarantined facts for this holding.
              */
             open_review_items: number;
+            /**
+             * Score
+             * @description 0-100: 100 x mean s_k over KPIs with a verdict, rounded half up; s_k = 1 pass, 0.5 unknown or stale, 0 breach. Null when no KPI has been judged. See score_method.
+             */
+            score: number | null;
+            /**
+             * Score History
+             * @description The score as of the end of each UTC day a verdict for one of this holding's KPIs was recorded (latest 12 such days, oldest first).
+             */
+            score_history: components["schemas"]["ScorePoint"][];
+            /**
+             * State
+             * @description unjudged: no score. Else by breaching KPIs (current verdict breach): intact none, watch one, at_risk two or more.
+             * @enum {string}
+             */
+            state: "intact" | "watch" | "at_risk" | "unjudged";
         };
         /** BucketDrift */
         BucketDrift: {
@@ -2223,7 +2711,7 @@ export interface components {
              * Critical Job Types
              * @description Job types that run normally at the monthly cap.
              */
-            critical_job_types?: ("portfolio_sync" | "earnings_check" | "thesis_verdicts" | "earnings_calendar" | "earnings_calendar_full" | "earnings_due" | "fact_reconcile" | "reference_data" | "price_history" | "holiday_refresh" | "macro_collect" | "event_escalation" | "monitor" | "news_ingest" | "daily_digest" | "weekly_digest" | "research" | "ownership_13f" | "monthly_review" | "chat")[];
+            critical_job_types?: ("portfolio_sync" | "earnings_check" | "thesis_verdicts" | "earnings_calendar" | "earnings_calendar_full" | "earnings_due" | "fact_reconcile" | "reference_data" | "price_history" | "intraday_prices" | "holiday_refresh" | "macro_collect" | "event_escalation" | "monitor" | "news_ingest" | "daily_digest" | "weekly_digest" | "research" | "ownership_13f" | "etf_look_through" | "monthly_review" | "chat" | "sec_xbrl" | "valuation_refresh")[];
             /**
              * Per Job Cap Usd
              * @description Most AI spend of one run of a job type, in USD. A run over it fails.
@@ -2312,6 +2800,12 @@ export interface components {
              */
             description: string;
             /**
+             * Enabled
+             * @description A disabled rule is kept in the config (and still validated) but never evaluated: no breach, no review compliance row, not offered to the AI.
+             * @default true
+             */
+            enabled: boolean;
+            /**
              * @description discriminator enum property added by openapi-typescript
              * @enum {string}
              */
@@ -2366,6 +2860,12 @@ export interface components {
              * @default
              */
             description: string;
+            /**
+             * Enabled
+             * @description A disabled rule is kept in the config (and still validated) but never evaluated: no breach, no review compliance row, not offered to the AI.
+             * @default true
+             */
+            enabled: boolean;
             /**
              * @description discriminator enum property added by openapi-typescript
              * @enum {string}
@@ -2592,6 +3092,32 @@ export interface components {
             /** Name */
             name: string;
         };
+        /**
+         * CnbSeries
+         * @description A Czech National Bank rate from its keyless text files.
+         */
+        CnbSeries: {
+            /** Key */
+            key: string;
+            /** Label */
+            label: string;
+            /**
+             * Series
+             * @description czeonia: the CZK overnight reference rate, daily (yearly.txt/daily.txt; the portfolio's risk-free rate). repo_2w: the 2-week repo rate's change history.
+             * @enum {string}
+             */
+            series: "czeonia" | "repo_2w";
+            /**
+             * Unit
+             * @default %
+             */
+            unit: string;
+            /**
+             * Policy Rate
+             * @default false
+             */
+            policy_rate: boolean;
+        };
         /** ComplianceRow */
         ComplianceRow: {
             /**
@@ -2615,6 +3141,25 @@ export interface components {
             detail: string;
             /** Source Ids */
             source_ids?: string[];
+        };
+        /** Concentration */
+        Concentration: {
+            /**
+             * Hhi
+             * @description Sum of squared weights (weights renormalised to 1).
+             */
+            hhi: number;
+            /**
+             * Effective N
+             * @description 1 / HHI: as concentrated as this many equal names.
+             */
+            effective_n: number;
+            /** Top10 Share */
+            top10_share: number;
+            /** Holdings */
+            holdings: number;
+            /** Basis */
+            basis: string;
         };
         /** ConfigDiff */
         ConfigDiff: {
@@ -2790,6 +3335,18 @@ export interface components {
             /** Month */
             month: string;
             /**
+             * Period Start
+             * Format: date-time
+             * @description Start of the budget month (midnight on the 1st, Europe/Prague), inclusive.
+             */
+            period_start: string;
+            /**
+             * Period End
+             * Format: date-time
+             * @description End of the budget month (midnight on the 1st of the next), exclusive.
+             */
+            period_end: string;
+            /**
              * Total Usd
              * @description Sum of `job_step.cost_usd` of steps started in month.
              */
@@ -2812,6 +3369,56 @@ export interface components {
             by_job_type: components["schemas"]["JobTypeCost"][];
             /** By Model */
             by_model: components["schemas"]["ModelCost"][];
+        };
+        /** Coverage */
+        Coverage: {
+            /** Total Value */
+            total_value: number;
+            /** Cash Value */
+            cash_value: number;
+            /** Direct Value */
+            direct_value: number;
+            /** Fund Value */
+            fund_value: number;
+            /** Looked Through Value */
+            looked_through_value: number;
+            /** Not Looked Through Value */
+            not_looked_through_value: number;
+            /**
+             * Fund Share Looked Through
+             * @description Share of the funds' value whose holdings are looked through.
+             */
+            fund_share_looked_through: number | null;
+            /**
+             * Portfolio Share Looked Through
+             * @description Share of total portfolio value that is direct stocks or looked-through funds (the rest is cash and funds not looked through).
+             */
+            portfolio_share_looked_through: number | null;
+        };
+        /** DailyFallback */
+        DailyFallback: {
+            /**
+             * Date
+             * Format: date
+             */
+            date: string;
+            /** Close */
+            close: number;
+            /**
+             * Source
+             * @description Stooq or Yahoo (daily closes).
+             */
+            source: string;
+        };
+        /** DayCount */
+        DayCount: {
+            /**
+             * Date
+             * Format: date
+             */
+            date: string;
+            /** Count */
+            count: number;
         };
         /** DiffChange */
         DiffChange: {
@@ -3347,6 +3954,24 @@ export interface components {
             } | null;
             claims?: components["schemas"]["ClaimCheckSummary"] | null;
         };
+        /** EscalationDay */
+        EscalationDay: {
+            /**
+             * Date
+             * Format: date
+             */
+            date: string;
+            /**
+             * Opened
+             * @description Escalations written that day.
+             */
+            opened: number;
+            /**
+             * Acknowledged
+             * @description Escalations first acknowledged that day.
+             */
+            acknowledged: number;
+        };
         /** EscalationOut */
         EscalationOut: {
             /** Id */
@@ -3380,6 +4005,22 @@ export interface components {
              * @description Models the run called.
              */
             models: string[];
+            /**
+             * Status
+             * @description Where the owner is with it.
+             * @enum {string}
+             */
+            status: "open" | "acknowledged" | "resolved";
+            /**
+             * Acknowledged At
+             * @description When the owner first acknowledged (or directly resolved) it; kept when reopened.
+             */
+            acknowledged_at: string | null;
+            /**
+             * Resolved At
+             * @description When the owner resolved it; null unless resolved.
+             */
+            resolved_at: string | null;
         };
         /**
          * EscalationSettings
@@ -3456,6 +4097,52 @@ export interface components {
              * @description The stored text the note's sentences are checked against.
              */
             snippet?: string | null;
+        };
+        /** EscalationStats */
+        EscalationStats: {
+            /**
+             * Open
+             * @description Escalations open now (any age).
+             */
+            open: number;
+            /**
+             * Acknowledged
+             * @description Escalations acknowledged and not resolved now.
+             */
+            acknowledged: number;
+            /**
+             * Resolved
+             * @description Escalations resolved now.
+             */
+            resolved: number;
+            /**
+             * Median Minutes To Ack
+             * @description Median minutes from an escalation being written to its first acknowledgement, over those acknowledged in the window. Null when none was.
+             */
+            median_minutes_to_ack: number | null;
+            /**
+             * Per Day
+             * @description Every day of the window, oldest first, today last (zeros included).
+             */
+            per_day: components["schemas"]["EscalationDay"][];
+            /**
+             * Days
+             * @description Length of the window in days, today included.
+             */
+            days: number;
+            /**
+             * Timezone
+             * @description Time zone the days are counted in.
+             */
+            timezone: string;
+        };
+        /** EscalationStatusUpdate */
+        EscalationStatusUpdate: {
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "open" | "acknowledged" | "resolved";
         };
         /** EurostatSeries */
         EurostatSeries: {
@@ -3601,6 +4288,13 @@ export interface components {
             note: string | null;
             body: components["schemas"]["EventRulesConfig"];
         };
+        /** EventTypeCount */
+        EventTypeCount: {
+            /** Event Type */
+            event_type: string;
+            /** Count */
+            count: number;
+        };
         /** EventTypeInfo */
         EventTypeInfo: {
             /**
@@ -3734,6 +4428,61 @@ export interface components {
              */
             share?: number | null;
         };
+        /** ExposureBucket */
+        ExposureBucket: {
+            /**
+             * Key
+             * @description ISO country code, region, GICS sector or currency code; or one of __cash__, __fund_cash__, __not_looked_through__, __unclassified__.
+             */
+            key: string;
+            /** Label */
+            label: string;
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "classified" | "unclassified" | "cash" | "fund_cash" | "not_looked_through";
+            /**
+             * Weight
+             * @description Share of total portfolio value.
+             */
+            weight: number;
+            /** Value Base */
+            value_base: number;
+            /**
+             * Direct Weight
+             * @description Part of `weight` held directly.
+             */
+            direct_weight: number;
+            /**
+             * Fund Weight
+             * @description Part of `weight` held through funds.
+             */
+            fund_weight: number;
+            /**
+             * Benchmark Weight
+             * @description The primary benchmark's weight in this bucket (its looked-through part renormalised to 100%); null for buckets it has no counterpart for.
+             */
+            benchmark_weight: number | null;
+        };
+        /** ExposureDimension */
+        ExposureDimension: {
+            /**
+             * Dimension
+             * @enum {string}
+             */
+            dimension: "country" | "region" | "sector" | "currency";
+            /**
+             * Basis
+             * @description How the buckets were classified.
+             */
+            basis: string;
+            /**
+             * Buckets
+             * @description By weight, special buckets last.
+             */
+            buckets: components["schemas"]["ExposureBucket"][];
+        };
         /** FactCheck */
         FactCheck: {
             /** Check */
@@ -3843,6 +4592,16 @@ export interface components {
              * @enum {string}
              */
             confidence: "verified" | "corroborated" | "unconfirmed" | "disputed";
+            /**
+             * Check Score
+             * @description Passed checks / all checks stored with the figure (0..1): the share of the validator's checks it passed (`checks`). Null when no check ran.
+             */
+            check_score: number | null;
+            /**
+             * Source Tier
+             * @description Trust tier (1 best, 3 weakest) of the host the figure was read from: 1 for the holding's own IR or results domains, else the news_sources config's domain tier; one tier lower while the owner's feedback has the host's trust below the verification config's demote_below. Null when the host has no configured tier.
+             */
+            source_tier: number | null;
         };
         /** FactReview */
         FactReview: {
@@ -3881,6 +4640,85 @@ export interface components {
             check: string;
             /** Detail */
             detail: string;
+        };
+        /** FeeNameTotal */
+        FeeNameTotal: {
+            /** Name */
+            name: string;
+            /**
+             * Category
+             * @enum {string}
+             */
+            category: "fx" | "tax" | "account";
+            /** Count */
+            count: number;
+            /**
+             * Amount
+             * @description In the fee summary's `currency`.
+             */
+            amount: number;
+        };
+        /** FeeTotals */
+        FeeTotals: {
+            /**
+             * Currency
+             * @description Base currency the amounts are converted to; null before the first sync.
+             */
+            currency: string | null;
+            /** Fx Source */
+            fx_source: ("cnb" | "ecb") | null;
+            /**
+             * Fx Conversion
+             * @description CURRENCY_CONVERSION_FEE on fills.
+             */
+            fx_conversion: number;
+            /**
+             * Taxes Levies
+             * @description Every other fill charge (stamp duty, FTT, ...).
+             */
+            taxes_levies: number;
+            /**
+             * Account Fees
+             * @description Cash transactions of type FEE (abs(amount)).
+             */
+            account_fees: number;
+            /** Total */
+            total: number;
+            /**
+             * Included In Buys
+             * @description Part of the fill fees that buys' amounts already include (fee_basis 'included'): subtract it from buys before showing fees separately.
+             */
+            included_in_buys: number;
+            /**
+             * Included In Sales
+             * @description Part of the fill fees already deducted from sales' amounts: add it back to sales before showing fees separately.
+             */
+            included_in_sales: number;
+            /** By Name */
+            by_name: components["schemas"]["FeeNameTotal"][];
+            /**
+             * Unconverted
+             * @description Currencies of fees left out of the sums for lack of a stored FX rate.
+             */
+            unconverted: string[];
+            /**
+             * Fills
+             * @description Order rows matching the filters.
+             */
+            fills: number;
+            /**
+             * Fills Captured
+             * @description Of those, fills whose fees the sync has read.
+             */
+            fills_captured: number;
+            /** Fills With Fees */
+            fills_with_fees: number;
+            /**
+             * Status
+             * @description not_captured: no fill in the filtered set has had its fees read yet (stored before fee capture; the next sync re-reads the order history).
+             * @enum {string}
+             */
+            status: "captured" | "partial" | "not_captured" | "no_fills";
         };
         /** FeedbackIn */
         FeedbackIn: {
@@ -4005,6 +4843,303 @@ export interface components {
             /** Job Id */
             job_id: number;
         };
+        /** FundHolding */
+        FundHolding: {
+            /** Name */
+            name: string;
+            /** Isin */
+            isin: string | null;
+            /** Ticker */
+            ticker: string | null;
+            /** Sector */
+            sector: string | null;
+            /** Country */
+            country: string | null;
+            /** Currency */
+            currency: string | null;
+            /** Weight In Fund */
+            weight_in_fund: number;
+            /** Portfolio Weight */
+            portfolio_weight: number;
+            /** Value Base */
+            value_base: number;
+        };
+        /** FundLookThrough */
+        FundLookThrough: {
+            /** Isin */
+            isin: string;
+            /** Label */
+            label: string;
+            /**
+             * Ticker
+             * @description The Trading212 ticker when the fund is held.
+             */
+            ticker: string | null;
+            /** Name */
+            name: string | null;
+            /** Provider */
+            provider: ("ishares" | "vanguard") | null;
+            /** Portfolio Id */
+            portfolio_id: string | null;
+            /** Held */
+            held: boolean;
+            /** Benchmark Proxy For */
+            benchmark_proxy_for: string[];
+            /** Value Base */
+            value_base: number;
+            /** Weight */
+            weight: number | null;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "ok" | "stale" | "missing" | "not_configured";
+            /** As Of */
+            as_of: string | null;
+            /** Fetched At */
+            fetched_at: string | null;
+            /** Source */
+            source: string | null;
+            /** Source Label */
+            source_label: string | null;
+            /** Tier */
+            tier: number | null;
+            /** Tier Label */
+            tier_label: string | null;
+            /**
+             * Fallback
+             * @description cached: the latest fetch failed and this stored snapshot is shown; spreadsheet: read from the iShares full-fund download (no country, no ISIN).
+             */
+            fallback: ("cached" | "spreadsheet") | null;
+            last_attempt: components["schemas"]["LastAttempt"] | null;
+            /** Country Basis */
+            country_basis: string | null;
+            /** Currency Basis */
+            currency_basis: string | null;
+            /** Equity Share */
+            equity_share: number | null;
+            /** Holdings Count */
+            holdings_count: number | null;
+            /** Warnings */
+            warnings: string[];
+            /** Top Holdings */
+            top_holdings: components["schemas"]["FundHolding"][];
+        };
+        /** FundValuation */
+        FundValuation: {
+            /** Key */
+            key: string;
+            /** Label */
+            label: string;
+            /** Provider */
+            provider: string;
+            /** Provider Label */
+            provider_label: string;
+            /**
+             * As Of
+             * Format: date
+             */
+            as_of: string;
+            /** Pe */
+            pe: number | null;
+            /** Pb */
+            pb: number | null;
+            /** Index Label */
+            index_label: string | null;
+            /** Index Pe */
+            index_pe: number | null;
+            /** Index Pb */
+            index_pb: number | null;
+            /**
+             * Dividend Yield
+             * @description Fraction.
+             */
+            dividend_yield: number | null;
+            /** Dividend Yield Kind */
+            dividend_yield_kind: string | null;
+            /** Methodology */
+            methodology: string | null;
+            /** Source Url */
+            source_url: string;
+            /**
+             * Fetched At
+             * Format: date-time
+             */
+            fetched_at: string;
+            /**
+             * Stale
+             * @description As of more than 45 days ago.
+             */
+            stale: boolean;
+        };
+        /**
+         * FundValuationSource
+         * @description Where an ETF's fund-level P/E and P/B are published (they stand in for its index).
+         */
+        FundValuationSource: {
+            /**
+             * Key
+             * @example CSPX
+             */
+            key: string;
+            /** Label */
+            label: string;
+            /**
+             * Provider
+             * @enum {string}
+             */
+            provider: "ishares" | "vanguard";
+            /**
+             * Url
+             * Format: uri
+             * @description iShares: the product page (its embedded JSON carries the figures). Vanguard: the product-data GraphQL endpoint (e.g. https://www.vanguard.co.uk/gpx/graphql).
+             */
+            url: string;
+            /**
+             * Port Id
+             * @description Vanguard only: the fund's port id (9679 = FTSE All-World UCITS ETF Acc).
+             */
+            port_id?: string | null;
+            /**
+             * Consumer Id
+             * @description Vanguard only: the site's x-consumer-id header (uk0 for vanguard.co.uk).
+             * @default uk0
+             */
+            consumer_id: string;
+            /**
+             * Tickers
+             * @description Holdings whose valuation is this fund's.
+             */
+            tickers?: string[];
+            /**
+             * Index Label
+             * @description The index the fund tracks, e.g. 'S&P 500'.
+             * @default
+             */
+            index_label: string;
+            /**
+             * Benchmark Symbols
+             * @description Benchmark symbols (Prices config) this fund's figures stand in for.
+             */
+            benchmark_symbols?: string[];
+        };
+        /**
+         * FundamentalFactRef
+         * @description One input fact, as filed.
+         */
+        FundamentalFactRef: {
+            /** Concept */
+            concept: string;
+            /** Start */
+            start: string | null;
+            /**
+             * End
+             * Format: date
+             */
+            end: string;
+            /** Value */
+            value: number;
+            /** Unit */
+            unit: string;
+            /**
+             * Source
+             * @description sec (companyfacts), sec_instance (the filing's XBRL instance) or esef (filings.xbrl.org).
+             */
+            source: string;
+            /**
+             * Ref
+             * @description Accession number or filings.xbrl.org filing id.
+             */
+            ref: string;
+            /** Form */
+            form: string | null;
+            /** Filed */
+            filed: string | null;
+            /** Url */
+            url: string | null;
+        };
+        /** FundamentalsSource */
+        FundamentalsSource: {
+            /**
+             * Source
+             * @enum {string}
+             */
+            source: "sec" | "esef" | "manual";
+            /** Source Label */
+            source_label: string;
+            /** Basis */
+            basis: string | null;
+            /** Eps Kind */
+            eps_kind: string;
+            /** Document Ref */
+            document_ref: string | null;
+            /** Document Url */
+            document_url: string | null;
+            /** Fetched At */
+            fetched_at: string | null;
+            /**
+             * As Of
+             * @description Manual figures: the date they were entered for.
+             */
+            as_of: string | null;
+            /** Notes */
+            notes: string[];
+            /** Last Error */
+            last_error: string | null;
+        };
+        /** FxExposure */
+        FxExposure: {
+            /** Base Currency */
+            base_currency: string;
+            /**
+             * Foreign Share
+             * @description Share of known-currency value (securities looked through plus cash) in currencies other than the base currency.
+             */
+            foreign_share: number | null;
+            /**
+             * Known Share
+             * @description Share of total value whose currency is known.
+             */
+            known_share: number;
+            /** Benchmark Foreign Share */
+            benchmark_foreign_share: number | null;
+            /** Benchmark Label */
+            benchmark_label: string | null;
+            /** Rows */
+            rows: components["schemas"]["FxRow"][];
+        };
+        /** FxQuote */
+        FxQuote: {
+            /** Currency */
+            currency: string;
+            /** Base Currency */
+            base_currency: string;
+            /**
+             * Source
+             * @description Whose reference rates: ČNB or the ECB.
+             * @enum {string}
+             */
+            source: "cnb" | "ecb";
+            /**
+             * Rate
+             * @description Base-currency units per one unit of `currency`.
+             */
+            rate: number | null;
+            /** Rate Date */
+            rate_date: string | null;
+            /**
+             * Previous Rate
+             * @description The published rate before `rate_date`.
+             */
+            previous_rate: number | null;
+            /** Previous Rate Date */
+            previous_rate_date: string | null;
+            /**
+             * Change Pct
+             * @description Fraction (0.012 = +1.2 %) of the latest against the previous value.
+             */
+            change_pct: number | null;
+        };
         /** FxRateUsed */
         FxRateUsed: {
             /** Currency */
@@ -4016,6 +5151,41 @@ export interface components {
             rate: number;
             /** Rate Date */
             rate_date: string | null;
+        };
+        /** FxRow */
+        FxRow: {
+            /** Currency */
+            currency: string;
+            /**
+             * Weight
+             * @description Share of the portfolio's known-currency value.
+             */
+            weight: number;
+            /** Benchmark Weight */
+            benchmark_weight: number | null;
+        };
+        /** GoldenAccuracy */
+        GoldenAccuracy: {
+            /**
+             * Value
+             * @description Matched labelled figures / all labelled figures (0..1).
+             */
+            value: number;
+            /**
+             * Target
+             * @description The evals gate's target for the component (0..1).
+             */
+            target: number;
+            /**
+             * Evaluated At
+             * @description When the baseline file was last written by a passing live run.
+             */
+            evaluated_at: string | null;
+            /**
+             * Model
+             * @description The extraction model the run measured.
+             */
+            model: string | null;
         };
         /**
          * GoogleNewsLocale
@@ -4059,6 +5229,11 @@ export interface components {
             name: string | null;
             /** Isin */
             isin: string | null;
+            /**
+             * Security Type
+             * @description OpenFIGI's security type (e.g. 'Common Stock', 'ETP'); null until the reference-data job has resolved the instrument.
+             */
+            security_type: string | null;
             /** Quantity */
             quantity: number;
             /** Avg Price */
@@ -4145,8 +5320,16 @@ export interface components {
             earnings_last_check: string | null;
             /** Earnings Last Status */
             earnings_last_status: string | null;
-            /** Price Symbol */
+            /**
+             * Price Symbol
+             * @description Symbol of the daily series in use (Stooq's, or Yahoo's when Stooq has none).
+             */
             price_symbol: string | null;
+            /**
+             * Prices Source
+             * @description Stooq or Yahoo.
+             */
+            prices_source?: string | null;
             /** Prices Last Date */
             prices_last_date: string | null;
             /**
@@ -4252,6 +5435,87 @@ export interface components {
             /** @description Tier 3: community-edited. */
             wikidata: components["schemas"]["WikidataSummary"] | null;
         };
+        /** HoldingIntraday */
+        HoldingIntraday: {
+            /** Ticker */
+            ticker: string;
+            /**
+             * Symbol
+             * @description Yahoo symbol; null when none is known.
+             */
+            symbol: string | null;
+            /**
+             * Enabled
+             * @description Intraday prices are on (Config -> Jobs -> Prices).
+             */
+            enabled: boolean;
+            /**
+             * Available
+             * @description Intraday bars or a last price are stored.
+             */
+            available: boolean;
+            /**
+             * Source
+             * @default Yahoo Finance (unofficial)
+             */
+            source: string;
+            /**
+             * Kind
+             * @description intraday: a last trade during the session; close: the session's close.
+             */
+            kind: ("intraday" | "close") | null;
+            /** Last Price */
+            last_price: number | null;
+            /**
+             * Last Trade At
+             * @description Time of the last price (UTC).
+             */
+            last_trade_at: string | null;
+            /**
+             * Last Trade Time
+             * @description Time of the last price, exchange time.
+             */
+            last_trade_time: string | null;
+            /** Exchange Tz */
+            exchange_tz: string | null;
+            /** Exchange Name */
+            exchange_name: string | null;
+            /**
+             * Currency
+             * @description Quote currency as Yahoo reports it (GBp = pence).
+             */
+            currency: string | null;
+            /**
+             * Session Date
+             * @description Exchange-local day of the last price.
+             */
+            session_date: string | null;
+            /** Previous Close */
+            previous_close: number | null;
+            /** Change */
+            change: number | null;
+            /**
+             * Change Pct
+             * @description Fraction against the previous close.
+             */
+            change_pct: number | null;
+            /** Delay Note */
+            delay_note: string | null;
+            /** Fetched At */
+            fetched_at: string | null;
+            /**
+             * Bars
+             * @description The session's 5-minute bars, oldest first.
+             */
+            bars: components["schemas"]["IntradayBarOut"][];
+            /**
+             * Note
+             * @description Why intraday prices are missing or stale (the page shows daily closes).
+             */
+            note: string | null;
+            /** @description The latest stored daily close. */
+            daily: components["schemas"]["DailyFallback"] | null;
+        };
         /** HoldingOwnership */
         HoldingOwnership: {
             /** Ticker */
@@ -4269,10 +5533,76 @@ export interface components {
              */
             top_holders: components["schemas"]["TopHolder"][];
             /**
+             * Top Holders Previous Period
+             * @description The period each top holder's prev_shares is from.
+             */
+            top_holders_previous_period?: string | null;
+            /**
              * Source
              * @default SEC Form 13F data sets
              */
             source: string;
+            /**
+             * Applicable
+             * @description False for holdings Form 13F cannot cover (non-US listings).
+             * @default true
+             */
+            applicable: boolean;
+            /** Not Applicable Reason */
+            not_applicable_reason?: string | null;
+            /** @description The denominator of the % figures, with its source. */
+            shares_outstanding?: components["schemas"]["SharesOutstandingOut"] | null;
+            /**
+             * Pct Of Shares Outstanding
+             * @description Aggregate institutional %: the latest period's figure.
+             */
+            pct_of_shares_outstanding?: number | null;
+            /**
+             * Basis Label
+             * @description What the % measures, e.g. "US 13F filers' holdings of the US line - a floor" for ADRs.
+             */
+            basis_label?: string | null;
+        };
+        /** HoldingPrices */
+        HoldingPrices: {
+            /** Ticker */
+            ticker: string;
+            /** Name */
+            name: string | null;
+            /**
+             * Symbol
+             * @description Symbol of the daily series (Stooq's, or Yahoo's when Stooq has none); null when none is known.
+             */
+            symbol: string | null;
+            /**
+             * Source
+             * @description Whose daily closes; null when none are stored.
+             */
+            source?: ("Stooq" | "Yahoo") | null;
+            /**
+             * As Of
+             * @description Date of the latest stored close.
+             */
+            as_of: string | null;
+            /** Last Close */
+            last_close: number | null;
+            /**
+             * Previous Close
+             * @description The stored close before `as_of`.
+             */
+            previous_close: number | null;
+            /**
+             * Day Change Pct
+             * @description Fraction (0.012 = +1.2 %) of the latest against the previous value.
+             */
+            day_change_pct: number | null;
+            /**
+             * Bars
+             * @description Daily closes from `days` before `as_of` to `as_of`, oldest first; empty when no prices are stored.
+             */
+            bars: components["schemas"]["PricePoint"][];
+            /** @description The latest intraday quote when intraday prices are on and one is stored (it may be newer than `as_of`). */
+            intraday?: components["schemas"]["IntradayQuote"] | null;
         };
         /** HoldingProfile */
         HoldingProfile: {
@@ -4335,10 +5665,24 @@ export interface components {
              */
             price_symbol?: string | null;
             /**
+             * Yahoo Symbol
+             * @description Yahoo Finance symbol (intraday prices, and daily prices when Stooq has none) when the one derived from the listing is wrong or missing (e.g. 'NOVO-B.CO').
+             */
+            yahoo_symbol?: string | null;
+            /**
              * Reporting Currency
              * @description Currency the company reports in; figures in another are held.
              */
             reporting_currency?: string | null;
+            /**
+             * Valuation Source
+             * @description Which fundamentals the valuation uses: 'auto' takes the freshest automatic source (SEC XBRL, then ESEF) and the manual figures only when there is none; 'sec', 'esef' or 'manual' force one.
+             * @default auto
+             * @enum {string}
+             */
+            valuation_source: "auto" | "sec" | "esef" | "manual";
+            /** @description Hand-entered per-share figures for holdings without an automatic source. */
+            manual_fundamentals?: components["schemas"]["ManualFundamentals"] | null;
             /** Competitors */
             competitors?: string[];
             /** Suppliers */
@@ -4349,6 +5693,12 @@ export interface components {
             watch_topics?: string[];
             /** Exposures */
             exposures?: components["schemas"]["Exposure"][];
+            share_basis?: components["schemas"]["ShareBasis"];
+            /**
+             * Manual Segments
+             * @description Revenue by region / segment / product entered by hand; shown only when no SEC XBRL breakdown exists for the holding.
+             */
+            manual_segments?: components["schemas"]["ManualSegmentRow"][];
         };
         /**
          * HoldingProfilesConfig
@@ -4376,6 +5726,116 @@ export interface components {
             /** Note */
             note: string | null;
             body: components["schemas"]["HoldingProfilesConfig"];
+        };
+        /** HoldingSegments */
+        HoldingSegments: {
+            /** Ticker */
+            ticker: string;
+            /**
+             * Basis
+             * @description The period basis shown.
+             */
+            basis: ("annual" | "quarter") | null;
+            /** Available Bases */
+            available_bases: ("annual" | "quarter")[];
+            period: components["schemas"]["SegmentPeriod"] | null;
+            /** Currency */
+            currency: string | null;
+            /** Geographic */
+            geographic: components["schemas"]["SegmentRow"][];
+            /** Segment */
+            segment: components["schemas"]["SegmentRow"][];
+            /** Product */
+            product: components["schemas"]["SegmentRow"][];
+            /**
+             * Total Revenue
+             * @description The filing's undimensioned revenue for the period (a breakdown can sum to less: hedging gains, unallocated items).
+             */
+            total_revenue: number | string | null;
+            /**
+             * History
+             * @description Per breakdown, the same-basis periods stored, oldest first (at most 8).
+             */
+            history: {
+                [key: string]: components["schemas"]["SegmentHistoryPoint"][];
+            };
+            source: components["schemas"]["SegmentSource"] | null;
+            /**
+             * As Of
+             * @description Filing date (SEC) or period end (manual).
+             */
+            as_of: string | null;
+            /** Notes */
+            notes?: string[];
+        };
+        /** HoldingValuation */
+        HoldingValuation: {
+            /** Ticker */
+            ticker: string;
+            /** Name */
+            name: string | null;
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "stock" | "fund";
+            price: components["schemas"]["ValuationPrice"] | null;
+            pe: components["schemas"]["ValuationRatio"];
+            pb: components["schemas"]["ValuationRatio"];
+            /** @description Fraction (0.012 = 1.2 %). */
+            dividend_yield: components["schemas"]["ValuationRatio"];
+            eps_ttm: components["schemas"]["PerShareFigure"] | null;
+            book_value_per_share: components["schemas"]["PerShareFigure"] | null;
+            dividend_per_share: components["schemas"]["PerShareFigure"] | null;
+            /**
+             * Ads Ratio
+             * @description Home-market shares one priced share represents (TSMC's ADS = 5); per-share figures are multiplied by it.
+             */
+            ads_ratio: number;
+            /**
+             * Ads Ratio Source
+             * @description Where the ratio comes from: the holding profile's share basis, the ratio the 20-F states (SEC XBRL job), the documented default, or 1.
+             */
+            ads_ratio_source: string;
+            /** @description The figures the ratios use. */
+            fundamentals: components["schemas"]["FundamentalsSource"] | null;
+            /**
+             * Alternatives
+             * @description Other sources or accounting bases, for comparison (not used).
+             */
+            alternatives: components["schemas"]["ValuationAlternative"][];
+            cross_check: components["schemas"]["ValuationCrossCheck"] | null;
+            /** @description ETFs: the provider's fund figures. */
+            fund: components["schemas"]["FundValuation"] | null;
+            /**
+             * Pe History
+             * @description Weekly P/E over two years: each close over the EPS TTM in force then (from the first filing of each period); empty when it cannot be built.
+             */
+            pe_history: components["schemas"]["PePoint"][];
+            /**
+             * Errors
+             * @description The last refresh's error per source, if any.
+             */
+            errors: {
+                [key: string]: string;
+            };
+            /**
+             * Checked At
+             * @description When the refresh job last ran for it.
+             */
+            checked_at: string | null;
+            /** Method */
+            method: string;
+        };
+        /** HoldingsPrices */
+        HoldingsPrices: {
+            /** Days */
+            days: number;
+            /**
+             * Holdings
+             * @description Every open position of the latest snapshot, by value descending.
+             */
+            holdings: components["schemas"]["HoldingPrices"][];
         };
         /** HoldingsResponse */
         HoldingsResponse: {
@@ -4429,6 +5889,54 @@ export interface components {
              */
             unchanged: string[];
         };
+        /** IndexQuote */
+        IndexQuote: {
+            /** Symbol */
+            symbol: string;
+            /** Label */
+            label: string;
+            /**
+             * Yahoo Symbol
+             * @description Yahoo's symbol of the index.
+             */
+            yahoo_symbol?: string | null;
+            /**
+             * Last Close
+             * @description The latest value: a close, or the intraday value when `kind` is intraday.
+             */
+            last_close: number | null;
+            /**
+             * As Of
+             * @description Day of the latest value (exchange-local).
+             */
+            as_of: string | null;
+            /**
+             * As Of Time
+             * @description When the latest value was computed (UTC), when known.
+             */
+            as_of_time?: string | null;
+            /** Exchange Tz */
+            exchange_tz?: string | null;
+            /**
+             * Kind
+             * @description intraday: a value during the session; close: a close.
+             */
+            kind?: ("intraday" | "close") | null;
+            /**
+             * Source
+             * @description Where the latest value is from.
+             */
+            source?: ("Stooq" | "Yahoo" | "Prague Stock Exchange") | null;
+            /** Previous Close */
+            previous_close: number | null;
+            /** Previous Date */
+            previous_date: string | null;
+            /**
+             * Change Pct
+             * @description Fraction (0.012 = +1.2 %) of the latest against the previous value.
+             */
+            change_pct: number | null;
+        };
         /** InstrumentInfo */
         InstrumentInfo: {
             /** Name */
@@ -4447,6 +5955,97 @@ export interface components {
             last_report_date: string | null;
             /** Report Date Checked At */
             report_date_checked_at: string | null;
+        };
+        /** IntradayBarOut */
+        IntradayBarOut: {
+            /**
+             * Ts
+             * Format: date-time
+             * @description Start of the 5-minute bar (UTC).
+             */
+            ts: string;
+            /**
+             * Time
+             * @description Start of the bar in exchange time, HH:MM.
+             */
+            time: string;
+            /** Open */
+            open: number | null;
+            /** High */
+            high: number | null;
+            /** Low */
+            low: number | null;
+            /** Close */
+            close: number;
+            /** Volume */
+            volume: number | null;
+        };
+        /**
+         * IntradayQuote
+         * @description The latest stored Yahoo quote of a holding's listing (Yahoo Finance, unofficial).
+         */
+        IntradayQuote: {
+            /** Symbol */
+            symbol: string;
+            /**
+             * Source
+             * @default Yahoo Finance (unofficial)
+             */
+            source: string;
+            /**
+             * Kind
+             * @description intraday: a last trade during the session; close: the session's close.
+             * @enum {string}
+             */
+            kind: "intraday" | "close";
+            /** Price */
+            price: number;
+            /**
+             * Price Time
+             * Format: date-time
+             * @description When the price traded (UTC).
+             */
+            price_time: string;
+            /**
+             * Time Local
+             * @description HH:MM in the exchange's time zone.
+             */
+            time_local: string;
+            /** Exchange Tz */
+            exchange_tz: string | null;
+            /**
+             * Session Date
+             * Format: date
+             * @description Exchange-local day of the price.
+             */
+            session_date: string;
+            /** Previous Close */
+            previous_close: number | null;
+            /**
+             * Change Pct
+             * @description Fraction (0.012 = +1.2 %) of the latest against the previous value.
+             */
+            change_pct: number | null;
+            /** Currency */
+            currency: string | null;
+            /** Delay Note */
+            delay_note: string;
+            /**
+             * Fetched At
+             * Format: date-time
+             */
+            fetched_at: string;
+        };
+        /**
+         * IssuerGroup
+         * @description Securities of one issuer counted together in the top underlying holdings (an ADR and
+         *     its ordinary share, two share classes).
+         */
+        IssuerGroup: {
+            /** Label */
+            label: string;
+            /** Isins */
+            isins: string[];
         };
         /** ItemLink */
         ItemLink: {
@@ -4485,6 +6084,11 @@ export interface components {
             params: {
                 [key: string]: unknown;
             };
+            /**
+             * Attempts
+             * @description Times the runner started this job, a resumed run included; above 1 means it was retried. 0 = never started.
+             */
+            attempts: number;
             /** Steps */
             steps: components["schemas"]["JobStepOut"][];
         };
@@ -4526,6 +6130,11 @@ export interface components {
             params: {
                 [key: string]: unknown;
             };
+            /**
+             * Attempts
+             * @description Times the runner started this job, a resumed run included; above 1 means it was retried. 0 = never started.
+             */
+            attempts: number;
             /**
              * Cost Usd
              * @description Sum of the run's step costs; null if none.
@@ -4682,6 +6291,12 @@ export interface components {
             monthly_review?: components["schemas"]["JobSchedule"];
             /** @description Load new SEC Form 13F data sets (published quarterly). Default: the 5th of each month, 05:00. */
             ownership_13f?: components["schemas"]["JobSchedule"];
+            /** @description Fundamentals (SEC XBRL, ESEF) of holdings that filed since the last read (all of them weekly) and the ETF providers' fund P/E and P/B. Default: daily 07:45. */
+            valuation_refresh?: components["schemas"]["JobSchedule"];
+            /** @description ETF look-through: the funds' holdings from iShares and Vanguard, skipped when the as-of date has not moved. Default: Saturdays 06:40. */
+            etf_look_through?: components["schemas"]["JobSchedule"];
+            /** @description Shares outstanding and revenue by region / segment from the holdings' latest SEC XBRL filings; only filings not parsed yet are downloaded. Default: Tuesdays 05:40. */
+            sec_xbrl?: components["schemas"]["JobSchedule"];
             earnings_check?: components["schemas"]["EarningsCheckSettings"];
             earnings_calendar_settings?: components["schemas"]["EarningsCalendarSettings"];
             news?: components["schemas"]["NewsSettings"];
@@ -4695,6 +6310,9 @@ export interface components {
             chat?: components["schemas"]["ChatSettings"];
             review?: components["schemas"]["ReviewSettings"];
             ownership?: components["schemas"]["OwnershipSettings"];
+            valuation?: components["schemas"]["ValuationSettings"];
+            look_through?: components["schemas"]["LookThroughSettings"];
+            xbrl?: components["schemas"]["XbrlSettings"];
         };
         /** JobsConfigVersion */
         JobsConfigVersion: {
@@ -4744,6 +6362,22 @@ export interface components {
              * @description Latest verdict per period, newest first.
              */
             history: components["schemas"]["VerdictOut"][];
+        };
+        /** LastAttempt */
+        LastAttempt: {
+            /**
+             * Checked At
+             * Format: date-time
+             */
+            checked_at: string;
+            /** Ok */
+            ok: boolean;
+            /** Outcome */
+            outcome: string | null;
+            /** Error */
+            error: string | null;
+            /** Fallback */
+            fallback: string | null;
         };
         /** LegalEntityOut */
         LegalEntityOut: {
@@ -4807,6 +6441,152 @@ export interface components {
             /** Home */
             home: boolean;
         };
+        /**
+         * LookThroughFund
+         * @description A fund whose holdings are read from its issuer. Matched to a position by ISIN.
+         */
+        LookThroughFund: {
+            /**
+             * Isin
+             * @example IE00B5BMR087
+             */
+            isin: string;
+            /**
+             * Label
+             * @example CSPX
+             */
+            label: string;
+            /**
+             * Provider
+             * @enum {string}
+             */
+            provider: "ishares" | "vanguard";
+            /**
+             * Portfolio Id
+             * @description The issuer's fund id: the iShares product/portfolio id (CSPX 253743) or the Vanguard Europe port id (VWCE 9679).
+             */
+            portfolio_id: string;
+        };
+        /** LookThroughReport */
+        LookThroughReport: {
+            /** Snapshot Date */
+            snapshot_date: string | null;
+            /** Base Currency */
+            base_currency: string | null;
+            /**
+             * Available
+             * @description At least one held fund is looked through.
+             */
+            available: boolean;
+            /** Method */
+            method: string;
+            coverage: components["schemas"]["Coverage"] | null;
+            /** Exposures */
+            exposures: components["schemas"]["ExposureDimension"][];
+            /** Top Holdings */
+            top_holdings: components["schemas"]["UnderlyingHolding"][];
+            concentration: components["schemas"]["Concentration"] | null;
+            /** @description The primary benchmark. */
+            benchmark: components["schemas"]["BenchmarkLookThrough"] | null;
+            /** Benchmarks */
+            benchmarks: components["schemas"]["BenchmarkLookThrough"][];
+            fx: components["schemas"]["FxExposure"] | null;
+            /** Funds */
+            funds: components["schemas"]["FundLookThrough"][];
+            /** Notes */
+            notes: string[];
+        };
+        /**
+         * LookThroughSettings
+         * @description ETF look-through: holdings of the funds the portfolio holds, from the issuers'
+         *     (undocumented) data endpoints, stored weekly as dated snapshots.
+         */
+        LookThroughSettings: {
+            /**
+             * Enabled
+             * @description Fetch from the issuers (off: stored snapshots are still shown).
+             * @default true
+             */
+            enabled: boolean;
+            /**
+             * Funds
+             * @description Funds looked through, by ISIN: provider and the issuer's fund id.
+             */
+            funds?: components["schemas"]["LookThroughFund"][];
+            /**
+             * Benchmark Proxies
+             * @description The benchmark's constituents are proxied by this fund's holdings (equity lines renormalised to 100%). A proxy fund is fetched even when it is not held.
+             */
+            benchmark_proxies?: components["schemas"]["BenchmarkProxy"][];
+            /**
+             * Issuer Groups
+             * @description ISINs of one issuer counted together in the top underlying holdings.
+             */
+            issuer_groups?: components["schemas"]["IssuerGroup"][];
+            /**
+             * Direct Sectors
+             * @description Sector of a directly held stock when no fund holds the same ISIN and the strategy's sector bucket is not a GICS sector.
+             */
+            direct_sectors?: {
+                [key: string]: "Information Technology" | "Financials" | "Health Care" | "Consumer Discretionary" | "Communication Services" | "Industrials" | "Consumer Staples" | "Energy" | "Utilities" | "Materials" | "Real Estate";
+            };
+            /**
+             * Direct Countries
+             * @description Country of a directly held stock, overriding its home market.
+             */
+            direct_countries?: {
+                [key: string]: string;
+            };
+            /**
+             * Ishares Api Url
+             * @default https://www.blackrock.com/varnish-api/uk-retail01-product-data/product-data
+             */
+            ishares_api_url: string;
+            /**
+             * Ishares Site
+             * @default ishares-uk
+             */
+            ishares_site: string;
+            /**
+             * Ishares Locale
+             * @default en_GB
+             */
+            ishares_locale: string;
+            /**
+             * Ishares Spreadsheet Fallback
+             * @description When the holdings JSON fails and no recent snapshot is stored, read the full-fund download (no country or ISIN column).
+             * @default true
+             */
+            ishares_spreadsheet_fallback: boolean;
+            /**
+             * Vanguard Graphql Url
+             * @default https://www.ie.vanguard/gpx/graphql
+             */
+            vanguard_graphql_url: string;
+            /**
+             * Vanguard Consumer Id
+             * @default ie0
+             */
+            vanguard_consumer_id: string;
+            /**
+             * Cached Fallback Days
+             * @description On a failed fetch, a stored snapshot this recent is kept in use instead of trying the spreadsheet fallback.
+             * @default 45
+             */
+            cached_fallback_days: number;
+            /**
+             * Stale After Days
+             * @description A snapshot older than this is labelled stale (Vanguard publishes month-end data a few weeks late).
+             * @default 60
+             */
+            stale_after_days: number;
+            /**
+             * Keep Snapshots
+             * @description Snapshots kept per fund.
+             * @default 12
+             */
+            keep_snapshots: number;
+        };
         /** MacroFigure */
         MacroFigure: {
             /** Series Id */
@@ -4854,6 +6634,11 @@ export interface components {
             fred?: components["schemas"]["FredSeries"][];
             /** Ecb */
             ecb?: components["schemas"]["EcbSeries"][];
+            /**
+             * Cnb
+             * @description ČNB rates. CZEONIA is the risk-free rate of the Sharpe ratio (series key 'czeonia'); the repo rate's changes are ČNB decisions.
+             */
+            cnb?: components["schemas"]["CnbSeries"][];
         };
         /** ManagerChange */
         ManagerChange: {
@@ -4886,6 +6671,88 @@ export interface components {
             /** Accession */
             accession: string;
         };
+        /**
+         * ManualFundamentals
+         * @description Per-share figures entered by hand, for a holding no automatic source covers (e.g.
+         *     Prague listings, whose filings are not machine-readable). Shown as "entered manually".
+         */
+        ManualFundamentals: {
+            /**
+             * Eps Ttm
+             * @description Diluted earnings per share over the trailing twelve months (or the latest full year), per ordinary share.
+             */
+            eps_ttm?: number | null;
+            /**
+             * Book Value Per Share
+             * @description Equity attributable to shareholders per ordinary share.
+             */
+            book_value_per_share?: number | null;
+            /**
+             * Dividend Per Share
+             * @description Dividends per ordinary share paid over the last year.
+             */
+            dividend_per_share?: number | null;
+            /**
+             * Currency
+             * @description Currency of the per-share figures.
+             * @example CZK
+             */
+            currency: string;
+            /**
+             * As Of
+             * Format: date
+             * @description Period end (or date) the figures are for.
+             */
+            as_of: string;
+            /**
+             * Source Note
+             * @description Where the figures come from, e.g. 'Annual report 2025, p. 112'.
+             * @default
+             */
+            source_note: string;
+        };
+        /**
+         * ManualSegmentRow
+         * @description Revenue for one region, segment or product, entered by hand from an annual report
+         *     (for issuers whose filings carry no machine-readable breakdown, e.g. CEZ and KB).
+         */
+        ManualSegmentRow: {
+            /**
+             * Label
+             * @example Czech Republic
+             */
+            label: string;
+            /**
+             * Axis
+             * @enum {string}
+             */
+            axis: "geographic" | "segment" | "product";
+            /**
+             * Value
+             * @description Revenue in `currency` for the period.
+             */
+            value: number;
+            /**
+             * Currency
+             * @example CZK
+             */
+            currency: string;
+            /**
+             * Period Start
+             * Format: date
+             */
+            period_start: string;
+            /**
+             * Period End
+             * Format: date
+             */
+            period_end: string;
+            /**
+             * Source
+             * @description Where the figure comes from, e.g. 'Annual Report 2025, segment note, p. 212'.
+             */
+            source: string;
+        };
         /** MarketHoliday */
         MarketHoliday: {
             /** Calendar */
@@ -4897,6 +6764,42 @@ export interface components {
             date: string;
             /** Name */
             name: string;
+        };
+        /** MarketStrip */
+        MarketStrip: {
+            /**
+             * Base Currency
+             * @description The latest snapshot's base currency (the active strategy's before the first sync).
+             */
+            base_currency: string | null;
+            /**
+             * Fx
+             * @description Each currency held in the latest snapshot (positions and the account) other than the base currency, by code.
+             */
+            fx: components["schemas"]["FxQuote"][];
+            /**
+             * Indices
+             * @description The Jobs config's `prices.market_strip`, in its order.
+             */
+            indices: components["schemas"]["IndexQuote"][];
+        };
+        /** MarketStripItem */
+        MarketStripItem: {
+            /**
+             * Symbol
+             * @example ^spx
+             */
+            symbol: string;
+            /**
+             * Label
+             * @example S&P 500
+             */
+            label: string;
+            /**
+             * Yahoo Symbol
+             * @description Yahoo Finance symbol of the same index (^GSPC, ^STOXX): intraday values, and closes when Stooq has none. Empty: the known counterpart of the Stooq symbol.
+             */
+            yahoo_symbol?: string | null;
         };
         /** MessageOut */
         MessageOut: {
@@ -5224,6 +7127,36 @@ export interface components {
             note: string | null;
             body: components["schemas"]["NewsSourcesConfig"];
         };
+        /** NewsStats */
+        NewsStats: {
+            /** Days */
+            days: number;
+            /**
+             * Total
+             * @description Stories first published in the window (repeats excluded).
+             */
+            total: number;
+            /**
+             * Unclassified
+             * @description Of those, stories not yet classified.
+             */
+            unclassified: number;
+            /**
+             * Per Day
+             * @description Every UTC day of the window, oldest first.
+             */
+            per_day: components["schemas"]["SeverityDay"][];
+            /**
+             * By Event Type
+             * @description Classified stories per event type, most first.
+             */
+            by_event_type: components["schemas"]["EventTypeCount"][];
+            /**
+             * Disputed Count
+             * @description Stories in the window whose sources contradict each other (status disputed, including ones the owner has since marked false).
+             */
+            disputed_count: number;
+        };
         /** NoteSentence */
         NoteSentence: {
             /** Text */
@@ -5354,6 +7287,11 @@ export interface components {
             new_holders: number | null;
             /** Exited Holders */
             exited_holders: number | null;
+            /**
+             * Pct Of Shares Outstanding
+             * @description All 13F holders' shares (x ads_ratio) / shares outstanding, as a fraction.
+             */
+            pct_of_shares_outstanding?: number | null;
         };
         /**
          * OwnershipSettings
@@ -5394,6 +7332,40 @@ export interface components {
              */
             top_holders: number;
         };
+        /** PePoint */
+        PePoint: {
+            /**
+             * Date
+             * Format: date
+             */
+            date: string;
+            /** Pe */
+            pe: number;
+            /** Eps */
+            eps: number;
+        };
+        /** PerShareFigure */
+        PerShareFigure: {
+            /** Value */
+            value: number;
+            /** Currency */
+            currency: string;
+            /** Period Start */
+            period_start: string | null;
+            /** Period End */
+            period_end: string | null;
+            /** Method */
+            method: string;
+            /** Annual Only */
+            annual_only: boolean;
+            /**
+             * Stale
+             * @description The period ended more than 200 days ago.
+             */
+            stale: boolean;
+            /** Inputs */
+            inputs?: components["schemas"]["FundamentalFactRef"][];
+        };
         /** PlausibilityCheck */
         PlausibilityCheck: {
             /**
@@ -5401,8 +7373,20 @@ export interface components {
              * Format: date
              */
             date: string;
-            /** Stooq Close */
+            /**
+             * Stooq Close
+             * @description The stored close compared (named for Stooq, kept for older clients; `source` says whose close it is).
+             */
             stooq_close: number;
+            /** Close */
+            close?: number | null;
+            /**
+             * Source
+             * @description Stooq or Yahoo.
+             */
+            source?: string | null;
+            /** Symbol */
+            symbol?: string | null;
             /** Trading212 Price */
             trading212_price: number;
             /** Difference Pct */
@@ -5459,6 +7443,101 @@ export interface components {
              * @description Why there is no portfolio history, when there is none.
              */
             gap: string | null;
+            /**
+             * Values Currency
+             * @description Currency of `values`: the latest snapshot's base currency; null before the first sync.
+             */
+            values_currency: string | null;
+            /**
+             * Values
+             * @description Absolute figures of every day snapshot in the window, oldest first, in `values_currency` (snapshots taken in another base currency are left out). Unlike `points` these include deposits and withdrawals.
+             */
+            values: components["schemas"]["SnapshotValues"][];
+        };
+        /** PortfolioIntraday */
+        PortfolioIntraday: {
+            /**
+             * Day
+             * @description UTC day of the path (the latest with bars).
+             */
+            day: string | null;
+            /** Base Currency */
+            base_currency: string | null;
+            /** Fx Source */
+            fx_source: ("cnb" | "ecb") | null;
+            /**
+             * Fx Rate Date
+             * @description Oldest reference rate used.
+             */
+            fx_rate_date: string | null;
+            /**
+             * Positions As Of
+             * @description Snapshot whose quantities are used.
+             */
+            positions_as_of: string | null;
+            /**
+             * Source
+             * @default Yahoo Finance (unofficial)
+             */
+            source: string;
+            /** Enabled */
+            enabled: boolean;
+            /**
+             * Points
+             * @description Every 5-minute timestamp any covered holding traded at, oldest first. A holding counts at its previous close before its first bar of the day.
+             */
+            points: components["schemas"]["PortfolioIntradayPoint"][];
+            /**
+             * Previous Value
+             * @description Covered holdings at their previous closes (base currency).
+             */
+            previous_value: number | null;
+            /** Last Value */
+            last_value: number | null;
+            /**
+             * Change Pct
+             * @description Fraction, last value against previous.
+             */
+            change_pct: number | null;
+            coverage: components["schemas"]["PortfolioIntradayCoverage"];
+            /** Note */
+            note: string | null;
+        };
+        /** PortfolioIntradayCoverage */
+        PortfolioIntradayCoverage: {
+            /**
+             * Holdings
+             * @description Positions in the latest snapshot.
+             */
+            holdings: number;
+            /**
+             * Covered
+             * @description Positions with intraday bars on `day`.
+             */
+            covered: number;
+            /**
+             * Covered Weight
+             * @description Share of the snapshot's value (base currency) the covered positions hold.
+             */
+            covered_weight: number | null;
+            /**
+             * Missing
+             * @description Tickers without intraday bars on `day`.
+             */
+            missing: string[];
+        };
+        /** PortfolioIntradayPoint */
+        PortfolioIntradayPoint: {
+            /**
+             * Ts
+             * Format: date-time
+             */
+            ts: string;
+            /**
+             * Value
+             * @description Covered holdings' value in the base currency.
+             */
+            value: number;
         };
         /** PortfolioOverview */
         PortfolioOverview: {
@@ -5480,6 +7559,45 @@ export interface components {
             drift: components["schemas"]["DriftReport"] | null;
             /** Fx Rates */
             fx_rates: components["schemas"]["FxRateUsed"][];
+        };
+        /** PortfolioRisk */
+        PortfolioRisk: {
+            /** As Of */
+            as_of: string | null;
+            /** Days */
+            days: number;
+            /** Base Currency */
+            base_currency: string | null;
+            /** Method */
+            method: string;
+            risk_free: components["schemas"]["RiskFree"] | null;
+            portfolio: components["schemas"]["SharpeStats"];
+            /** Benchmark Symbol */
+            benchmark_symbol: string | null;
+            /** @description The same figures for the benchmark, converted to the base currency; null without a configured benchmark. */
+            benchmark: components["schemas"]["SharpeStats"] | null;
+        };
+        /** PortfolioValuation */
+        PortfolioValuation: {
+            /**
+             * As Of
+             * @description The snapshot the weights come from.
+             */
+            as_of: string | null;
+            /** Base Currency */
+            base_currency: string | null;
+            portfolio: components["schemas"]["ValuationAggregate"];
+            /** @description The Prices config's first benchmark, via the fund configured for it. */
+            benchmark: components["schemas"]["BenchmarkValuation"] | null;
+            /**
+             * Comparisons
+             * @description Every configured fund's (and, where published, its index's) figures.
+             */
+            comparisons: components["schemas"]["BenchmarkValuation"][];
+            /** Holdings */
+            holdings: components["schemas"]["ValuationContribution"][];
+            /** Method */
+            method: string;
         };
         /** PositionCountRule */
         PositionCountRule: {
@@ -5504,6 +7622,12 @@ export interface components {
              * @default
              */
             description: string;
+            /**
+             * Enabled
+             * @description A disabled rule is kept in the config (and still validated) but never evaluated: no breach, no review compliance row, not offered to the AI.
+             * @default true
+             */
+            enabled: boolean;
             /**
              * @description discriminator enum property added by openapi-typescript
              * @enum {string}
@@ -5586,6 +7710,12 @@ export interface components {
              */
             description: string;
             /**
+             * Enabled
+             * @description A disabled rule is kept in the config (and still validated) but never evaluated: no breach, no review compliance row, not offered to the AI.
+             * @default true
+             */
+            enabled: boolean;
+            /**
              * @description discriminator enum property added by openapi-typescript
              * @enum {string}
              */
@@ -5600,6 +7730,27 @@ export interface components {
             message: components["schemas"]["MessageOut"];
             /** Job Id */
             job_id: number;
+        };
+        /**
+         * PriceBarOut
+         * @description A stored daily bar. Stooq's open, high, low and volume are null when it gave none.
+         */
+        PriceBarOut: {
+            /**
+             * Date
+             * Format: date
+             */
+            date: string;
+            /** Close */
+            close: number;
+            /** Open */
+            open: number | null;
+            /** High */
+            high: number | null;
+            /** Low */
+            low: number | null;
+            /** Volume */
+            volume: number | null;
         };
         /** PriceGap */
         PriceGap: {
@@ -5622,14 +7773,27 @@ export interface components {
         PriceHistory: {
             /** Ticker */
             ticker: string;
-            /** Symbol */
+            /**
+             * Symbol
+             * @description Symbol of the series shown (the Stooq symbol when nothing is stored).
+             */
             symbol: string | null;
             /**
              * Source
+             * @description Whose daily closes: Stooq (the source of record) or Yahoo Finance (unofficial; the fallback when Stooq has none).
              * @default Stooq
-             * @constant
+             * @enum {string}
              */
-            source: "Stooq";
+            source: "Stooq" | "Yahoo";
+            /** Stooq Symbol */
+            stooq_symbol?: string | null;
+            /** Yahoo Symbol */
+            yahoo_symbol?: string | null;
+            /**
+             * Fallback Reason
+             * @description Why Stooq's closes are not the ones shown.
+             */
+            fallback_reason?: string | null;
             /**
              * As Of
              * @description Date of the latest stored close.
@@ -5638,9 +7802,11 @@ export interface components {
             /** Fetched At */
             fetched_at: string | null;
             /** Bars */
-            bars: components["schemas"]["PricePoint"][];
+            bars: components["schemas"]["PriceBarOut"][];
             /** Benchmark Symbol */
             benchmark_symbol: string | null;
+            /** Benchmark Source */
+            benchmark_source?: ("Stooq" | "Yahoo") | null;
             /** Benchmark */
             benchmark: components["schemas"]["PricePoint"][];
             risk: components["schemas"]["RiskCard"] | null;
@@ -5654,7 +7820,7 @@ export interface components {
              * @description Why there is no price history, when there is none.
              */
             gap: string | null;
-            /** @description Latest Stooq close vs Trading212's price on a sync day. */
+            /** @description Latest stored close vs Trading212's price on a sync day. */
             plausibility: components["schemas"]["PlausibilityCheck"] | null;
         };
         /** PricePoint */
@@ -5669,7 +7835,8 @@ export interface components {
         };
         /**
          * PriceSettings
-         * @description Daily price history (Stooq) and the risk figures computed from it.
+         * @description Daily price history (Stooq, Yahoo as the fallback), intraday prices (Yahoo) and the
+         *     risk figures computed from the daily closes.
          */
         PriceSettings: {
             /**
@@ -5688,6 +7855,42 @@ export interface components {
              * @default 1
              */
             plausibility_tolerance_pct: number;
+            /**
+             * Market Strip
+             * @description Index quotes on the market strip: Stooq symbols (collected with the benchmarks), the label shown and optionally the Yahoo symbol of the same index. Stooq's close first; else Yahoo's; for PX (^px) the Prague Stock Exchange's page, read once a day. An index no source has data for shows as empty.
+             */
+            market_strip?: components["schemas"]["MarketStripItem"][];
+            /**
+             * Yahoo Daily Fallback
+             * @description Daily closes from Yahoo Finance (unofficial) for a symbol Stooq refuses, cannot be reached for or has no symbol for. Stooq stays the source of record.
+             * @default true
+             */
+            yahoo_daily_fallback: boolean;
+            /**
+             * Intraday Enabled
+             * @description Intraday prices (Yahoo Finance, unofficial): 5-minute bars about 15 minutes delayed, polled only while each listing's market is open, and fetched when a holding page opens. Unofficial: it may rate-limit or break without notice; pages then fall back to daily closes with a note.
+             * @default true
+             */
+            intraday_enabled: boolean;
+            /**
+             * Intraday Interval Minutes
+             * @description How often intraday prices are polled while a market is open (minutes).
+             * @default 15
+             * @enum {integer}
+             */
+            intraday_interval_minutes: 5 | 10 | 15 | 20 | 30 | 60;
+            /**
+             * Intraday Retention Days
+             * @description Days of 5-minute bars kept.
+             * @default 5
+             */
+            intraday_retention_days: number;
+            /**
+             * Intraday Cache Seconds
+             * @description A holding page re-fetches its intraday prices when the stored ones are older than this during trading hours.
+             * @default 120
+             */
+            intraday_cache_seconds: number;
         };
         /** PromptDefault */
         PromptDefault: {
@@ -6123,6 +8326,16 @@ export interface components {
              * @description When the next report of this kind is scheduled: this one is current until then. Null for unscheduled kinds or a disabled schedule.
              */
             next_due_at?: string | null;
+            /**
+             * Story Count
+             * @description Digests: the stories across its sections (sections[].stories). Null for report kinds without stories.
+             */
+            story_count?: number | null;
+            /**
+             * Citation Count
+             * @description Digests: the distinct sources it cites, counted by URL across its news sources (sources[].url) and the filings of its cited facts (fact_sources[].source_url); several facts from one filing count once. Null for report kinds without a source list.
+             */
+            citation_count?: number | null;
         };
         /** ReportingExceptionOut */
         ReportingExceptionOut: {
@@ -6481,6 +8694,38 @@ export interface components {
              */
             holder_drop_flag_pct: number;
         };
+        /** ReviewStats */
+        ReviewStats: {
+            /** Days */
+            days: number;
+            /**
+             * Pending
+             * @description Facts held or quarantined now, waiting for the owner.
+             */
+            pending: number;
+            /**
+             * Blocking Verdict
+             * @description Pending facts whose metric feeds a configured thesis KPI of the same holding (the KPI's metric or a component it is derived from, same basis).
+             */
+            blocking_verdict: number;
+            /**
+             * Reviewed Count
+             * @description Owner decisions (accept, correct, reject) in window.
+             */
+            reviewed_count: number;
+            /**
+             * Reviewed Per Day
+             * @description Every UTC day, oldest first.
+             */
+            reviewed_per_day: components["schemas"]["DayCount"][];
+            /**
+             * Marked Wrong
+             * @description Distinct facts the owner marked wrong in the window.
+             */
+            marked_wrong: number;
+            /** @description The last recorded live golden-set run of the earnings extraction; null when none is recorded. */
+            golden_accuracy: components["schemas"]["GoldenAccuracy"] | null;
+        };
         /** RiskCard */
         RiskCard: {
             /**
@@ -6508,6 +8753,38 @@ export interface components {
             /** Observations */
             observations: number;
         };
+        /** RiskFree */
+        RiskFree: {
+            /**
+             * Series Id
+             * @description macro_series id, e.g. 'czeonia'.
+             */
+            series_id: string;
+            /**
+             * Source
+             * @description macro_series source, e.g. 'cnb'.
+             */
+            source: string;
+            /** Label */
+            label: string;
+            /**
+             * Latest Rate
+             * @description Latest stored value, as a fraction.
+             */
+            latest_rate: number | null;
+            /**
+             * Latest Date
+             * @description The day the latest value is for.
+             */
+            latest_date: string | null;
+            /** Url */
+            url: string | null;
+            /**
+             * Fallback
+             * @description True when the preferred series (CZEONIA for CZK) has nothing stored and a policy rate stands in.
+             */
+            fallback: boolean;
+        };
         /** RuleMatch */
         RuleMatch: {
             /**
@@ -6528,6 +8805,108 @@ export interface components {
              */
             tickers?: string[];
         };
+        /** ScorePoint */
+        ScorePoint: {
+            /**
+             * Date
+             * Format: date
+             */
+            date: string;
+            /** Score */
+            score: number;
+        };
+        /** SegmentHistoryPoint */
+        SegmentHistoryPoint: {
+            period: components["schemas"]["SegmentPeriod"];
+            /** Rows */
+            rows: components["schemas"]["SegmentRow"][];
+        };
+        /** SegmentPeriod */
+        SegmentPeriod: {
+            /**
+             * Start
+             * Format: date
+             */
+            start: string;
+            /**
+             * End
+             * Format: date
+             */
+            end: string;
+            /** Months */
+            months: number;
+            /** Basis */
+            basis: ("annual" | "quarter") | null;
+            /**
+             * Label
+             * @description "FY2025" for a fiscal year, else "3M to 30 Jun 2026".
+             */
+            label: string;
+        };
+        /** SegmentRow */
+        SegmentRow: {
+            /**
+             * Label
+             * @description As the filing labels the member.
+             */
+            label: string;
+            /**
+             * Member
+             * @description XBRL member (e.g. country:US); null when manual.
+             */
+            member: string | null;
+            /** Value */
+            value: number | string;
+            /**
+             * Share
+             * @description Fraction of the breakdown's sum (subtotals excluded); null for a subtotal.
+             */
+            share: number | null;
+            /**
+             * Subtotal
+             * @description The sum of other members shown (e.g. a region group).
+             * @default false
+             */
+            subtotal: boolean;
+            /** Concept */
+            concept?: string | null;
+            /**
+             * Label Source
+             * @default filing
+             * @enum {string}
+             */
+            label_source: "filing" | "derived" | "manual";
+        };
+        /** SegmentSource */
+        SegmentSource: {
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "sec_xbrl" | "manual";
+            /**
+             * Tier
+             * @description Provenance label for the UI.
+             */
+            tier: string;
+            /** Form */
+            form?: string | null;
+            /** Accession */
+            accession?: string | null;
+            /** Filed */
+            filed?: string | null;
+            /** Instance Url */
+            instance_url?: string | null;
+            /** Label Url */
+            label_url?: string | null;
+            /** Filing Url */
+            filing_url?: string | null;
+            /**
+             * Note
+             * @description Manual rows: where they come from.
+             */
+            note?: string | null;
+        };
         /** Sentence */
         Sentence: {
             /** Text */
@@ -6544,6 +8923,26 @@ export interface components {
             /** Check Reason */
             check_reason?: string | null;
         };
+        /** SeverityDay */
+        SeverityDay: {
+            /**
+             * Date
+             * Format: date
+             */
+            date: string;
+            /**
+             * By Severity
+             * @description Stories first published that UTC day, per severity; keys '0'-'3', always all four.
+             */
+            by_severity: {
+                [key: string]: number;
+            };
+            /**
+             * Unclassified
+             * @description Stories that day with no severity yet.
+             */
+            unclassified: number;
+        };
         /** SeverityOverride */
         SeverityOverride: {
             /**
@@ -6558,6 +8957,182 @@ export interface components {
             event_type: "guidance_change" | "m_and_a" | "dividend_cut" | "earnings_release" | "management_change" | "regulatory_legal" | "capital_allocation" | "credit_rating" | "central_bank" | "macro_surprise" | "insider_transaction" | "product_business" | "sector_competitor" | "index_change" | "analyst_rating" | "delisting" | "entity_status" | "other";
             /** Severity */
             severity: number;
+        };
+        /**
+         * ShareBasis
+         * @description How a holding's 13F figures (shares of its US line) compare with shares outstanding.
+         *
+         *     Defaults when a field is empty (steward.fundamentals.shares.DEFAULT_BASIS_BY_CIK): one US
+         *     share represents one home-market share, except TSM (1 ADS = 5 common shares, as its
+         *     20-F states); where a filing tags shares outstanding per class, every class is counted
+         *     (Alphabet A+B+C, Novo Nordisk A+B). Narrow it to the class the US line is, e.g. GOOGL
+         *     us-gaap:CommonClassAMember or NVO nvo:BShareCapitalMember.
+         */
+        ShareBasis: {
+            /**
+             * Ads Ratio
+             * @description Home-market shares represented by one share of the US-listed line (ADS ratio). Empty: the default (TSM 5, others 1).
+             */
+            ads_ratio?: number | null;
+            /**
+             * Share Classes
+             * @description Share-class members counted in the denominator when the filing tags shares outstanding per class, e.g. us-gaap:CommonClassAMember. Empty (the default): all classes.
+             */
+            share_classes?: string[];
+            /**
+             * Manual Shares Outstanding
+             * @description Shares outstanding entered by hand, for issuers that do not file XBRL with the SEC (e.g. Prague-listed companies). Used only when no SEC figure exists.
+             */
+            manual_shares_outstanding?: number | null;
+            /**
+             * Manual As Of
+             * @description Date the manual figure is for.
+             */
+            manual_as_of?: string | null;
+            /**
+             * Manual Source
+             * @description Where the manual figure comes from, e.g. 'CEZ shareholder structure page'.
+             * @default
+             */
+            manual_source: string;
+        };
+        /** ShareClassOut */
+        ShareClassOut: {
+            /** Member */
+            member: string;
+            /** Label */
+            label: string;
+            /** Shares */
+            shares: number | string;
+            /** Counted */
+            counted: boolean;
+        };
+        /** SharesOutstandingOut */
+        SharesOutstandingOut: {
+            /**
+             * Shares
+             * @description Home-market shares outstanding (the denominator).
+             */
+            shares: number | string;
+            /**
+             * As Of
+             * Format: date
+             */
+            as_of: string;
+            /** Method */
+            method: string;
+            /** Method Label */
+            method_label: string;
+            /**
+             * Classes
+             * @description Per class when the filing tags classes.
+             */
+            classes?: components["schemas"]["ShareClassOut"][];
+            /**
+             * Denominator Label
+             * @description e.g. "all share classes (A + B + C)".
+             */
+            denominator_label: string;
+            /** Accession */
+            accession: string | null;
+            /** Form */
+            form: string | null;
+            /** Filed */
+            filed: string | null;
+            /** Source Url */
+            source_url: string | null;
+            /** Source Tier */
+            source_tier: string;
+            /**
+             * Ads Ratio
+             * @description Home-market shares per US-listed share applied.
+             */
+            ads_ratio: number | string;
+            /**
+             * Ads Ratio Source
+             * @enum {string}
+             */
+            ads_ratio_source: "profile" | "default";
+            /**
+             * Ads Ratio Reported
+             * @description The ratio the latest 20-F states, when read.
+             */
+            ads_ratio_reported?: number | string | null;
+            /** Ads Ratio Text */
+            ads_ratio_text?: string | null;
+            /**
+             * Foreign Issuer
+             * @description Files a 20-F / 40-F (its US line is an ADR/NYRS).
+             */
+            foreign_issuer: boolean;
+            /** Notes */
+            notes?: string[];
+        };
+        /** SharpeStats */
+        SharpeStats: {
+            /** Sharpe */
+            sharpe: number | null;
+            /**
+             * Annualised Volatility
+             * @description Sample stdev of the daily returns x sqrt(252), fraction.
+             */
+            annualised_volatility: number | null;
+            /**
+             * Annualised Return
+             * @description Mean daily return x 252, fraction.
+             */
+            annualised_return: number | null;
+            /**
+             * Mean Excess Return
+             * @description Mean daily excess return x 252, fraction.
+             */
+            mean_excess_return: number | null;
+            /**
+             * Risk Free Average
+             * @description Mean daily risk-free rate x 252 over the observations, fraction.
+             */
+            risk_free_average: number | null;
+            /** Observations */
+            observations: number;
+            /** Window Start */
+            window_start: string | null;
+            /** Window End */
+            window_end: string | null;
+            /**
+             * Currency
+             * @description Currency the returns are measured in.
+             */
+            currency: string | null;
+            /**
+             * Reason
+             * @description Why `sharpe` is null, when it is.
+             */
+            reason: string | null;
+        };
+        /** SnapshotValues */
+        SnapshotValues: {
+            /**
+             * Date
+             * Format: date
+             */
+            date: string;
+            /**
+             * Total
+             * @description Invested plus cash.
+             */
+            total: number;
+            /**
+             * Invested
+             * @description Market value of the open positions.
+             */
+            invested: number;
+            /** Cash */
+            cash: number;
+            /**
+             * Unrealised
+             * @description Trading212's unrealised P/L, converted from the account currency at the snapshot's own account-to-base rate.
+             */
+            unrealised: number;
         };
         /** Source */
         Source: {
@@ -6598,6 +9173,50 @@ export interface components {
             /** As Of */
             as_of?: string | null;
         };
+        /** SourceHealth */
+        SourceHealth: {
+            /** Id */
+            id: string;
+            /** Name */
+            name: string;
+            /**
+             * Type
+             * @enum {string}
+             */
+            type: "rss" | "page" | "edgar" | "finnhub" | "google_news" | "rns" | "eqs" | "edgar_fts";
+            /**
+             * Host
+             * @description The feed's host; null for per-holding sources (EDGAR, Finnhub, ...).
+             */
+            host: string | null;
+            /**
+             * Tier
+             * @enum {integer}
+             */
+            tier: 1 | 2 | 3;
+            /** Enabled */
+            enabled: boolean;
+            /**
+             * Last Fetched At
+             * @description Null: never fetched.
+             */
+            last_fetched_at: string | null;
+            /**
+             * Last Item Count
+             * @description Items the last fetch returned.
+             */
+            last_item_count: number | null;
+            /**
+             * Last Error
+             * @description The last fetch's error, or its note when empty.
+             */
+            last_error: string | null;
+            /**
+             * Healthy
+             * @description healthy = enabled, last fetched within the Jobs config's monitoring.news_coverage_hours, and that fetch recorded no error or note
+             */
+            healthy: boolean;
+        };
         /** SourceTrustOut */
         SourceTrustOut: {
             /** Host */
@@ -6618,6 +9237,22 @@ export interface components {
              * Format: date-time
              */
             updated_at: string;
+        };
+        /** SourcesHealth */
+        SourcesHealth: {
+            /**
+             * Rule
+             * @description How `healthy` is decided.
+             * @default healthy = enabled, last fetched within the Jobs config's monitoring.news_coverage_hours, and that fetch recorded no error or note
+             */
+            rule: string;
+            /** Window Hours */
+            window_hours: number;
+            /**
+             * Sources
+             * @description Every configured source, in config order.
+             */
+            sources: components["schemas"]["SourceHealth"][];
         };
         /** StoryOut */
         StoryOut: {
@@ -6852,6 +9487,24 @@ export interface components {
             as_of: string | null;
             /** Rows */
             rows: components["schemas"]["BoardRow"][];
+            /**
+             * Score Method
+             * @description How score and portfolio_score are computed.
+             * @default score = round_half_up(100 x mean of s_k over the holding's KPIs that have a verdict); s_k = 1.0 pass, 0.5 unknown or stale (judged under an older theses config), 0.0 breach; KPIs never judged are left out, and a holding with none judged has no score. History: the score as of the end of each UTC day a verdict was recorded. Portfolio score: mean of held holdings' scores weighted by current position weight, rounded half up. State: unjudged (no score), intact (no KPI breaching), watch (one), at_risk (two or more).
+             */
+            score_method: string;
+            /**
+             * Portfolio Score
+             * @description Mean of held rows' scores weighted by current position weight, over held rows with a score and a weight. Null when there is none.
+             */
+            portfolio_score?: number | null;
+            /**
+             * Portfolio Score History
+             * @description portfolio_score recomputed as of the end of each UTC day any held row had a verdict recorded (latest 12 such days, oldest first), with today's weights.
+             */
+            portfolio_score_history?: components["schemas"]["ScorePoint"][];
+            /** @description Verdict records over the last 30 UTC days, today included. */
+            verdicts_30d: components["schemas"]["VerdictActivity"];
         };
         /** ThesisChange */
         ThesisChange: {
@@ -6963,6 +9616,21 @@ export interface components {
              * @description The filing the position is read from.
              */
             accession: string;
+            /**
+             * Prev Shares
+             * @description The same manager's shares in the previous report period loaded (`top_holders_previous_period`); null when it held none then or no earlier period is loaded.
+             */
+            prev_shares?: number | string | null;
+            /**
+             * Shares Change Pct
+             * @description (shares - prev_shares) / prev_shares, as a fraction (0.125 = +12.5 %); null when prev_shares is null or zero.
+             */
+            shares_change_pct?: number | null;
+            /**
+             * Pct Of Shares Outstanding
+             * @description shares x ads_ratio / shares outstanding, as a fraction; null without a shares-outstanding figure.
+             */
+            pct_of_shares_outstanding?: number | null;
         };
         /** TotalByCurrency */
         TotalByCurrency: {
@@ -6989,6 +9657,27 @@ export interface components {
             cik: string;
             /** Name */
             name: string;
+        };
+        /** TransactionFeeOut */
+        TransactionFeeOut: {
+            /**
+             * Name
+             * @description Trading212's name, e.g. CURRENCY_CONVERSION_FEE.
+             */
+            name: string;
+            /**
+             * Category
+             * @description fx: FX conversion; tax: taxes & levies.
+             * @enum {string}
+             */
+            category: "fx" | "tax";
+            /**
+             * Amount
+             * @description abs(quantity) as Trading212 reported it, in `currency`.
+             */
+            amount: number;
+            /** Currency */
+            currency: string | null;
         };
         /** TransactionOut */
         TransactionOut: {
@@ -7021,6 +9710,21 @@ export interface components {
              * Format: date-time
              */
             occurred_at: string;
+            /**
+             * Fees
+             * @description Orders: the fill's fees and taxes (walletImpact.taxes).
+             */
+            fees?: components["schemas"]["TransactionFeeOut"][];
+            /**
+             * Fees Captured
+             * @description Orders: whether the sync has read this fill's fees yet (false: stored before fee capture; the one-time order-history re-read fills it in). Null for dividends and cash.
+             */
+            fees_captured?: boolean | null;
+            /**
+             * Fee Basis
+             * @description Orders with fees: whether `amount` (walletImpact.netValue) already includes them; unknown is read as excluded, Trading212's documented behaviour.
+             */
+            fee_basis?: ("excluded" | "included" | "unknown") | null;
         };
         /** TransactionsPage */
         TransactionsPage: {
@@ -7046,6 +9750,8 @@ export interface components {
              * @description Pass as `cursor` for the next (older) page; null on the last page.
              */
             next_cursor: string | null;
+            /** @description Fees and taxes over every matching row, converted to the base currency. */
+            fees: components["schemas"]["FeeTotals"];
         };
         /**
          * TrustSettings
@@ -7070,6 +9776,36 @@ export interface components {
              * @default 0.6
              */
             demote_below: number;
+        };
+        /** UnderlyingHolding */
+        UnderlyingHolding: {
+            /** Key */
+            key: string;
+            /** Name */
+            name: string;
+            /** Isin */
+            isin: string | null;
+            /** Isins */
+            isins: string[];
+            /** Ticker */
+            ticker: string | null;
+            /** Sector */
+            sector: string | null;
+            /** Country */
+            country: string | null;
+            /** Currency */
+            currency: string | null;
+            /**
+             * Weight
+             * @description Share of total portfolio value, direct plus via funds.
+             */
+            weight: number;
+            /** Value Base */
+            value_base: number;
+            /** Via */
+            via: components["schemas"]["Via"][];
+            /** Benchmark Weight */
+            benchmark_weight: number | null;
         };
         /** ValidationError */
         ValidationError: {
@@ -7098,6 +9834,221 @@ export interface components {
             source_ids: string[];
             /** Note */
             note?: string | null;
+        };
+        /** ValuationAggregate */
+        ValuationAggregate: {
+            /** Pe */
+            pe: number | null;
+            /** Pb */
+            pb: number | null;
+            /**
+             * Dividend Yield
+             * @description Fraction.
+             */
+            dividend_yield: number | null;
+            coverage: components["schemas"]["ValuationCoverage"];
+        };
+        /** ValuationAlternative */
+        ValuationAlternative: {
+            /**
+             * Source
+             * @enum {string}
+             */
+            source: "sec" | "esef" | "manual";
+            /** Source Label */
+            source_label: string;
+            /** Basis */
+            basis: string | null;
+            /** Eps Ttm */
+            eps_ttm: number | null;
+            /** Currency */
+            currency: string | null;
+            /** Period End */
+            period_end: string | null;
+            /** Method */
+            method: string | null;
+            /** Pe */
+            pe: number | null;
+        };
+        /** ValuationContribution */
+        ValuationContribution: {
+            /** Ticker */
+            ticker: string;
+            /** Name */
+            name: string | null;
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "stock" | "fund";
+            /**
+             * Weight
+             * @description Share of invested value (cash excluded), 0..1.
+             */
+            weight: number;
+            /**
+             * Pe
+             * @description As used: capped at 60; null when excluded or missing.
+             */
+            pe: number | null;
+            /** Pe Raw */
+            pe_raw: number | null;
+            /** Pe Note */
+            pe_note: string | null;
+            /** Pb */
+            pb: number | null;
+            /** Pb Raw */
+            pb_raw: number | null;
+            /** Pb Note */
+            pb_note: string | null;
+            /** Dividend Yield */
+            dividend_yield: number | null;
+            /** Source Label */
+            source_label: string | null;
+            /** Stale */
+            stale: boolean;
+        };
+        /** ValuationCoverage */
+        ValuationCoverage: {
+            /**
+             * Pe
+             * @description Share of invested value (0..1) with a P/E (incl. excluded n/m).
+             */
+            pe: number;
+            /** Pb */
+            pb: number;
+            /** Dividend Yield */
+            dividend_yield: number;
+        };
+        /** ValuationCrossCheck */
+        ValuationCrossCheck: {
+            /**
+             * Source
+             * @default finnhub
+             */
+            source: string;
+            /**
+             * Source Label
+             * @default Finnhub basic financials (tier 2)
+             */
+            source_label: string;
+            /** Symbol */
+            symbol: string | null;
+            /** Pe */
+            pe: number | null;
+            /** Pb */
+            pb: number | null;
+            /** Eps Ttm */
+            eps_ttm: number | null;
+            /** Dividend Yield */
+            dividend_yield: number | null;
+            /**
+             * Fetched At
+             * Format: date-time
+             */
+            fetched_at: string;
+        };
+        /** ValuationPrice */
+        ValuationPrice: {
+            /** Symbol */
+            symbol: string;
+            /** Close */
+            close: number;
+            /** Currency */
+            currency: string | null;
+            /**
+             * Date
+             * Format: date
+             */
+            date: string;
+            /**
+             * Source
+             * @default Stooq daily close
+             */
+            source: string;
+            /** Stale */
+            stale: boolean;
+        };
+        /** ValuationRatio */
+        ValuationRatio: {
+            /**
+             * Value
+             * @description Null when it cannot be computed (see reason).
+             */
+            value: number | null;
+            /**
+             * Reason
+             * @description Why the value is null, e.g. 'n/m: negative earnings'.
+             */
+            reason: string | null;
+        };
+        /** ValuationRefreshRequest */
+        ValuationRefreshRequest: {
+            /**
+             * Ticker
+             * @description One holding, or all when null.
+             */
+            ticker?: string | null;
+            /**
+             * Force
+             * @description Re-read even when nothing new was filed.
+             * @default false
+             */
+            force: boolean;
+        };
+        /**
+         * ValuationSettings
+         * @description P/E, P/B and dividend yield: fundamentals from SEC XBRL and ESEF, fund figures from
+         *     the ETF providers.
+         */
+        ValuationSettings: {
+            /**
+             * Enabled
+             * @description Off: the scheduled run does nothing.
+             * @default true
+             */
+            enabled: boolean;
+            /**
+             * Full Refresh Days
+             * @description Each run re-reads a holding's fundamentals when the issuer filed a new report since the last read, and in any case after this many days.
+             * @default 7
+             */
+            full_refresh_days: number;
+            /**
+             * Esef Max Age Months
+             * @description ESEF filings (filings.xbrl.org) with an older period end are ignored.
+             * @default 18
+             */
+            esef_max_age_months: number;
+            /**
+             * Finnhub Cross Check
+             * @description Also read Finnhub's basic financials (P/E, P/B, EPS) as a tier-2 cross-check. Needs FINNHUB_API_KEY; never required.
+             * @default true
+             */
+            finnhub_cross_check: boolean;
+            /**
+             * Funds
+             * @description ETFs whose fund-level P/E and P/B are read from the provider.
+             */
+            funds?: components["schemas"]["FundValuationSource"][];
+        };
+        /** VerdictActivity */
+        VerdictActivity: {
+            /**
+             * Count
+             * @description Verdict records created in the window (a verdict is recorded only when its outcome, figures or config changed).
+             */
+            count: number;
+            /**
+             * Fact Count
+             * @description Distinct facts those verdicts cite.
+             */
+            fact_count: number;
+            /**
+             * Per Day
+             * @description Every UTC day of the window, oldest first.
+             */
+            per_day: components["schemas"]["DayCount"][];
         };
         /** VerdictOut */
         VerdictOut: {
@@ -7208,6 +10159,22 @@ export interface components {
             note: string | null;
             body: components["schemas"]["VerificationConfig"];
         };
+        /** Via */
+        Via: {
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "direct" | "fund";
+            /** Ticker */
+            ticker: string | null;
+            /** Label */
+            label: string;
+            /** Weight */
+            weight: number;
+            /** Value Base */
+            value_base: number;
+        };
         /** WikidataSummary */
         WikidataSummary: {
             /** Qid */
@@ -7232,6 +10199,50 @@ export interface components {
              * Format: date-time
              */
             fetched_at: string;
+        };
+        /** XbrlRunRequest */
+        XbrlRunRequest: {
+            /**
+             * Ticker
+             * @description One holding, or all when null.
+             */
+            ticker?: string | null;
+            /**
+             * Force
+             * @description Parse the latest filings again.
+             * @default false
+             */
+            force: boolean;
+        };
+        /**
+         * XbrlSettings
+         * @description SEC XBRL fundamentals: shares outstanding and revenue by region / segment / product,
+         *     read from each holding's latest 10-K / 10-Q / 20-F XBRL instance.
+         */
+        XbrlSettings: {
+            /**
+             * Enabled
+             * @default true
+             */
+            enabled: boolean;
+            /**
+             * Quarterly
+             * @description Also parse the latest 10-Q when it is newer than the annual report (US issuers; 20-F filers publish annual XBRL only).
+             * @default true
+             */
+            quarterly: boolean;
+            /**
+             * Read Ads Ratio
+             * @description For 20-F filers, read the ADS ratio the annual report states ('each ADS represents five common shares') to check the configured share basis. Downloads the report's main document (up to about 10 MB) once per new 20-F.
+             * @default true
+             */
+            read_ads_ratio: boolean;
+            /**
+             * Max Document Mb
+             * @description Largest filing document downloaded.
+             * @default 40
+             */
+            max_document_mb: number;
         };
     };
     responses: never;
@@ -7550,6 +10561,255 @@ export interface operations {
             };
         };
     };
+    get_holdings_prices: {
+        parameters: {
+            query?: {
+                days?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HoldingsPrices"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_market_strip: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MarketStrip"];
+                };
+            };
+        };
+    };
+    get_holding_intraday: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                ticker: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HoldingIntraday"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_portfolio_intraday: {
+        parameters: {
+            query?: {
+                /** @description Latest bar time considered (default now); the path covers its UTC day. */
+                until?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PortfolioIntraday"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_portfolio_look_through: {
+        parameters: {
+            query?: {
+                top?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LookThroughReport"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    run_etf_look_through: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["JobSummary"];
+                };
+            };
+        };
+    };
+    get_holding_valuation: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                ticker: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HoldingValuation"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_portfolio_valuation: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PortfolioValuation"];
+                };
+            };
+        };
+    };
+    run_valuation_refresh: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ValuationRefreshRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["JobSummary"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     get_portfolio_overview: {
         parameters: {
             query?: never;
@@ -7652,11 +10912,44 @@ export interface operations {
             };
         };
     };
+    get_portfolio_risk: {
+        parameters: {
+            query?: {
+                days?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PortfolioRisk"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     get_portfolio_transactions: {
         parameters: {
             query?: {
                 /** @description Any of these. */
                 type?: ("order" | "dividend" | "cash")[] | null;
+                /** @description Any of these, as Trading212 names them (BUY, SELL, DEPOSIT, ...). */
+                subtype?: string[] | null;
                 ticker?: string | null;
                 /** @description On or after. */
                 from?: string | null;
@@ -8033,6 +11326,37 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ReviewItem"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_review_stats: {
+        parameters: {
+            query?: {
+                days?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReviewStats"];
                 };
             };
             /** @description Validation Error */
@@ -9012,6 +12336,104 @@ export interface operations {
             };
         };
     };
+    get_escalation_stats: {
+        parameters: {
+            query?: {
+                /** @description Window length, today included. */
+                days?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EscalationStats"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_escalation: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                report_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EscalationOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_escalation: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                report_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["EscalationStatusUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EscalationOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     get_news: {
         parameters: {
             query?: {
@@ -9048,6 +12470,57 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_news_stats: {
+        parameters: {
+            query?: {
+                days?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NewsStats"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_news_sources_health: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SourcesHealth"];
                 };
             };
         };
@@ -9273,6 +12746,7 @@ export interface operations {
             query?: {
                 ticker?: string | null;
                 limit?: number;
+                status?: ("open" | "acknowledged" | "resolved") | null;
             };
             header?: never;
             path?: never;
@@ -9287,37 +12761,6 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["EscalationOut"][];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    get_escalation: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                report_id: number;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["EscalationOut"];
                 };
             };
             /** @description Validation Error */
@@ -10353,6 +13796,73 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ActionOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_holding_segments: {
+        parameters: {
+            query?: {
+                /** @description annual or quarter */
+                basis?: ("annual" | "quarter") | null;
+            };
+            header?: never;
+            path: {
+                ticker: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HoldingSegments"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    run_sec_xbrl: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["XbrlRunRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["JobSummary"];
                 };
             };
             /** @description Validation Error */

@@ -30,6 +30,7 @@ import { mergeErrors } from "@/lib/config/strategy-form";
 import { configSaveQuery, useConfigEditor } from "@/lib/hooks/use-config-editor";
 import { DEPTHS, RESEARCH_SECTIONS, sectionLabel, VALUATION_METHODS, WRITTEN_BY } from "@/lib/research/report";
 import { cn } from "@/lib/utils";
+import { BlueprintCorners } from "@/components/ui/blueprint";
 
 const api = () => getBrowserApiClient();
 const EFFORT_OPTIONS = EFFORTS.map((e) => ({ value: e, label: e }));
@@ -77,7 +78,7 @@ export function ResearchProfilesEditor() {
           next run.
         </p>
         <p>
-          <Link href="/research" className="text-accent underline-offset-4 hover:underline">
+          <Link href="/research" className="text-accent-ink underline-offset-4 hover:underline">
             Start research
           </Link>{" "}
           with any profile.
@@ -99,7 +100,8 @@ export function ResearchProfilesEditor() {
 
       {form ? (
         <>
-          <section aria-labelledby="default-profile-heading" className="space-y-2 rounded-lg border border-border bg-surface-raised p-4">
+          <section aria-labelledby="default-profile-heading" className="space-y-2 blueprint p-5">
+            <BlueprintCorners />
             <h2 id="default-profile-heading" className="font-medium">
               Default profile
             </h2>
@@ -203,9 +205,10 @@ function ProfileCard({
   const own = errorsAt(errors, path);
   const label = p.name || p.id || `profile ${i + 1}`;
   return (
-    <section aria-labelledby={headingId} className="space-y-4 rounded-lg border border-border bg-surface-raised p-4">
+    <section aria-labelledby={headingId} className="space-y-4 blueprint p-5">
+      <BlueprintCorners />
       <div className="flex flex-wrap items-start justify-between gap-2">
-        <h2 id={headingId} className="flex flex-wrap items-center gap-2 text-lg font-semibold">
+        <h2 id={headingId} className="flex flex-wrap items-center gap-2 text-[22px] leading-tight font-semibold">
           <FlaskConicalIcon aria-hidden="true" className="size-4 text-text-muted" />
           {p.name || "(no name)"} <span className="font-mono text-sm font-normal text-text-muted">{p.id}</span>
           {isDefault ? (

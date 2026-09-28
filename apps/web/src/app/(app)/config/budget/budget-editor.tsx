@@ -26,8 +26,9 @@ import {
   type JobCapRow,
   type PriceRow,
 } from "./budget-form";
+import { BlueprintCorners } from "@/components/ui/blueprint";
 
-const SECTION = "space-y-3 rounded-lg border border-border bg-surface-raised p-4";
+const SECTION = "blueprint space-y-3 p-5";
 const JOB_OPTIONS = JOB_TYPES.map((t) => ({
   value: t,
   label: JOB_TYPE_LABELS[t],
@@ -110,7 +111,8 @@ export function BudgetEditor() {
       {form ? (
         <>
           <section aria-labelledby="cap-heading" className={SECTION}>
-            <h2 id="cap-heading" className="text-lg font-semibold">
+            <BlueprintCorners />
+            <h2 id="cap-heading" className="text-[22px] leading-tight font-semibold">
               Monthly cap
             </h2>
             <p className="max-w-prose text-sm text-text-muted">
@@ -168,7 +170,9 @@ export function BudgetEditor() {
           </section>
 
           <section aria-labelledby="run-caps-heading" className={SECTION}>
-            <h2 id="run-caps-heading" className="text-lg font-semibold">
+
+            <BlueprintCorners />
+            <h2 id="run-caps-heading" className="text-[22px] leading-tight font-semibold">
               Caps per run
             </h2>
             <p className="max-w-prose text-sm text-text-muted">
@@ -211,7 +215,9 @@ export function BudgetEditor() {
           </section>
 
           <section aria-labelledby="prices-heading" className={SECTION}>
-            <h2 id="prices-heading" className="text-lg font-semibold">
+
+            <BlueprintCorners />
+            <h2 id="prices-heading" className="text-[22px] leading-tight font-semibold">
               Prices
             </h2>
             <p className="max-w-prose text-sm text-text-muted">

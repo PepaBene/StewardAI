@@ -302,7 +302,7 @@ async def compliance(
         "Investment strategy",
         app_path="/config/strategy",
         tier=1,
-        snippet=f"Rules: {'; '.join(f'{r.id}: {r.description}' for r in strategy.rules)}",
+        snippet=f"Rules: {'; '.join(f'{r.id}: {r.description}' for r in strategy.enabled_rules)}",
     )
     snapshot_sid = (
         reg.add(
@@ -320,7 +320,7 @@ async def compliance(
     ids = [i for i in (strategy_sid, snapshot_sid) if i]
     findings = evaluate(drift, strategy) if drift is not None else []
     rows: list[ComplianceRow] = []
-    for rule in strategy.rules:
+    for rule in strategy.enabled_rules:
         hits = [f for f in findings if f.key.startswith(f"rule:{rule.id}:")]
         limit = f"{rule.operator} {getattr(rule, 'value', '')}"
         description = rule.description or f"{rule.type} {limit}"
@@ -523,7 +523,7 @@ def review_material(body: ReviewBody, strategy: StrategyConfig) -> str:
             "theses_due_for_review": body.reviews_due,
             "flags": [f.text for f in body.flags],
             "citable": {
-                "rule_ids": [r.id for r in strategy.rules],
+                "rule_ids": [r.id for r in strategy.enabled_rules],
                 "kpis": [k.ref for k in body.kpis],
             },
         },
@@ -597,7 +597,7 @@ async def build_review(
             notes.append(f"Actions not proposed: {note}.")
         else:
             body.actions, body.dropped_actions = keep_cited(
-                draft, {r.id for r in strategy.rules}, {k.ref for k in kpis}
+                draft, {r.id for r in strategy.enabled_rules}, {k.ref for k in kpis}
             )
             body.model = usage.model
     breaches = sum(1 for r in rows if r.status == "breach")

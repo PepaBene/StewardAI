@@ -23,6 +23,7 @@ import asyncpg
 from pydantic import BaseModel, Field
 
 from steward.earnings.read import FACT_COLUMNS, FactOut, fact_columns, fact_out
+from steward.earnings.source_tier import load_source_tiers
 
 ReviewAction = Literal["accept", "correct", "reject"]
 
@@ -164,16 +165,17 @@ async def review_queue(pool: asyncpg.Pool, ticker: str | None = None) -> list[Re
         " and ($1::text is null or f.ticker = $1) order by f.ticker, f.id",
         ticker,
     )
+    tiers = await load_source_tiers(pool) if rows else None
     items = []
     for row in rows:
-        fact = fact_out(row)
+        fact = fact_out(row, row["ticker"], tiers)
         restates = None
         if fact.restates_fact_id is not None:
             prior = await pool.fetchrow(
                 f"select {FACT_COLUMNS} from public.fact where id = $1",  # noqa: S608
                 fact.restates_fact_id,
             )
-            restates = fact_out(prior) if prior else None
+            restates = fact_out(prior, row["ticker"], tiers) if prior else None
         recon = await pool.fetch(
             "select concept, accession, form, period_end, derivation, xbrl_value, difference,"
             " outcome, detail, checked_at from public.fact_reconciliation where fact_id = $1"

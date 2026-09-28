@@ -13,6 +13,7 @@ import { domainFromName, domainLabel, historyHref } from "@/lib/config/domains";
 import { groupByDomain, listErrors, type ListedError } from "@/lib/config/history";
 import { exportFileName, parseImportFile } from "@/lib/config/transfer";
 import { formatDateTime } from "@/lib/format";
+import { BlueprintCorners } from "@/components/ui/blueprint";
 
 const api = () => getBrowserApiClient();
 
@@ -33,7 +34,7 @@ function DomainLink({ name, id }: { name: string; id?: number }) {
   const label = domainLabel(name);
   if (!slug) return <>{label}</>;
   return (
-    <Link href={historyHref(slug)} className="text-accent hover:underline">
+    <Link href={historyHref(slug)} className="text-accent-ink hover:underline">
       {label}
       {id !== undefined ? <span className="num"> #{id}</span> : null}
     </Link>
@@ -111,9 +112,10 @@ export function ConfigTransfer() {
   const chosen = state.kind === "chosen" || state.kind === "busy" ? state : null;
 
   return (
-    <section aria-labelledby="transfer-heading" className="space-y-4 rounded-lg border border-border bg-surface-raised p-4">
+    <section aria-labelledby="transfer-heading" className="space-y-4 blueprint p-5">
+      <BlueprintCorners />
       <div>
-        <h2 id="transfer-heading" className="text-lg font-semibold">
+        <h2 id="transfer-heading" className="text-[22px] leading-tight font-semibold">
           Export and import
         </h2>
         <p className="max-w-prose text-sm text-text-muted">

@@ -13,6 +13,7 @@ import Link from "next/link";
 import { useCallback, useState } from "react";
 
 import { AlertMessage } from "@/components/alert-message";
+import { Blueprint, PanelHeading } from "@/components/ui/blueprint";
 import { Button } from "@/components/ui/button";
 import { getBrowserApiClient, type PriceHistory } from "@/lib/api/client";
 import { formatDate, formatDateTime, formatPrice, gainLossTone } from "@/lib/format";
@@ -54,11 +55,9 @@ export function PriceRiskSection({ ticker, currency }: { ticker: string; currenc
   const data = state.kind === "ok" ? state.data : state.kind === "error" ? state.previous : null;
 
   return (
-    <section aria-labelledby="prices-heading" className="space-y-3">
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <h2 id="prices-heading" className="text-lg font-semibold">
-          Price and risk
-        </h2>
+    <Blueprint aria-labelledby="prices-heading" className="space-y-3 px-[22px] py-5">
+      <div className="flex flex-wrap items-end justify-between gap-2">
+        <PanelHeading kicker="Price & risk details" title={<span id="prices-heading">Against the benchmark</span>} />
         <RangeSelector value={range} onChange={setRange} />
       </div>
       {state.kind === "loading" ? (
@@ -77,13 +76,13 @@ export function PriceRiskSection({ ticker, currency }: { ticker: string; currenc
         </AlertMessage>
       ) : null}
       {data ? <PriceContent data={data} ticker={ticker} currency={currency ?? null} onQueued={reload} /> : null}
-    </section>
+    </Blueprint>
   );
 }
 
 function RangeSelector({ value, onChange }: { value: PriceRangeId; onChange: (id: PriceRangeId) => void }) {
   return (
-    <div role="group" aria-label="Chart range" className="inline-flex rounded-md border border-border bg-surface-raised p-0.5">
+    <div role="group" aria-label="Chart range" className="inline-flex border border-border">
       {PRICE_RANGES.map((r) => (
         <button
           key={r.id}
@@ -91,7 +90,7 @@ function RangeSelector({ value, onChange }: { value: PriceRangeId; onChange: (id
           aria-pressed={value === r.id}
           onClick={() => onChange(r.id)}
           className={cn(
-            "rounded-sm px-2.5 py-1 text-xs font-medium",
+            "px-2.5 py-1 text-xs font-semibold [&:not(:first-child)]:border-l [&:not(:first-child)]:border-border",
             value === r.id ? "bg-accent text-accent-foreground" : "text-text-muted hover:bg-surface-muted hover:text-text",
           )}
         >
@@ -334,7 +333,7 @@ function Correlations({ data }: { data: PriceHistory }) {
             {rows.map((r) => (
               <tr key={r.ticker} className="border-b border-border last:border-0">
                 <th scope="row" className="py-1 text-left font-normal">
-                  <Link href={`/holdings/${encodeURIComponent(r.ticker)}`} className="font-mono hover:text-accent hover:underline">
+                  <Link href={`/holdings/${encodeURIComponent(r.ticker)}`} className="font-mono hover:text-accent-ink hover:underline">
                     {r.ticker}
                   </Link>
                 </th>

@@ -30,7 +30,7 @@ from steward.settings import get_settings
 
 # Job types whose schedule is watched for missed runs (the monitor watches itself only
 # through the external uptime check).
-UNWATCHED = {"monitor"}
+UNWATCHED = {"monitor", "intraday_prices"}
 # Collectors that have nothing to collect when the markets are closed.
 MARKET_JOBS = {"portfolio_sync", "price_history"}
 SLOT_LOOKBACK = dt.timedelta(hours=48)

@@ -3,6 +3,9 @@ import type { Metadata } from "next";
 import Link from "next/link";
 
 import type { ConfigDomainSlug } from "@/lib/api/client";
+import { PageHeader } from "@/components/page-header";
+import { Blueprint } from "@/components/ui/blueprint";
+import { Button } from "@/components/ui/button";
 import { historyHref } from "@/lib/config/domains";
 
 import { ConfigTransfer } from "./config-transfer";
@@ -81,50 +84,53 @@ const DOMAINS: { slug: ConfigDomainSlug; href: string; title: string; body: stri
 export default function ConfigPage() {
   return (
     <div className="space-y-6">
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight">Config</h1>
-          <p className="mt-1 max-w-prose text-sm text-text-muted">
-            Every preference is versioned config: each save is a new version, validated by the
-            backend before it is stored, and used from the next run with no deploy. Any version
-            can be compared with another or rolled back.
+      <PageHeader
+        kicker="Config"
+        title="Configuration"
+        description={
+          <p className="max-w-prose">
+            Every preference is versioned config: each save is a new version, validated by the backend before it is
+            stored, and used from the next run with no deploy. Any version can be compared with another or rolled back.
           </p>
-        </div>
-        <Link href="/config/history" className="inline-flex items-center gap-1 text-sm text-accent hover:underline">
-          <HistoryIcon aria-hidden="true" className="size-4" />
-          Version history
-        </Link>
-      </div>
-      <ul className="grid gap-3 sm:grid-cols-2">
+        }
+        aside={
+          <Button asChild variant="outline" size="sm">
+            <Link href="/config/history">
+              <HistoryIcon aria-hidden="true" />
+              History &amp; export
+            </Link>
+          </Button>
+        }
+      />
+      <ul className="grid gap-5 sm:grid-cols-2 xl:grid-cols-3">
         {DOMAINS.map((d) => (
-          <li key={d.href} className="flex h-full flex-col rounded-lg border border-border bg-surface-raised transition-colors hover:border-accent">
-            <Link href={d.href} className="block flex-1 rounded-t-lg p-4 pb-2">
-              <span className="font-medium text-text">{d.title}</span>
+          <Blueprint as="li" key={d.href} className="flex h-full flex-col transition-colors hover:border-accent">
+            <Link href={d.href} className="block flex-1 p-5 pb-2">
+              <span className="font-heading text-[20px] leading-tight font-semibold text-text">{d.title}</span>
               <span className="mt-1 block text-sm text-text-muted">{d.body}</span>
             </Link>
             <Link
               href={historyHref(d.slug)}
-              className="inline-flex items-center gap-1 self-start rounded-sm px-4 pb-3 text-xs text-text-muted hover:text-text hover:underline"
+              className="inline-flex items-center gap-1 self-start px-5 pb-4 text-xs text-text-muted hover:text-text hover:underline"
             >
               <HistoryIcon aria-hidden="true" className="size-3.5" />
               {d.title} history
             </Link>
-          </li>
+          </Blueprint>
         ))}
+        <Blueprint as="li" className="flex h-full flex-col transition-colors hover:border-accent">
+          <Link href="/config/calendar" className="flex flex-1 items-start gap-3 p-5">
+            <CalendarDaysIcon aria-hidden="true" className="mt-0.5 size-5 shrink-0 text-text-muted" />
+            <span>
+              <span className="font-heading text-[20px] leading-tight font-semibold text-text">Exchange calendar</span>
+              <span className="mt-1 block text-sm text-text-muted">
+                Confirm which public holidays close each holding&rsquo;s exchange. Confirmed closures are saved to the
+                Jobs config.
+              </span>
+            </span>
+          </Link>
+        </Blueprint>
       </ul>
-      <Link
-        href="/config/calendar"
-        className="flex items-start gap-3 rounded-lg border border-border bg-surface-raised p-4 transition-colors hover:border-accent"
-      >
-        <CalendarDaysIcon aria-hidden="true" className="mt-0.5 size-5 shrink-0 text-text-muted" />
-        <span>
-          <span className="font-medium text-text">Exchange calendar</span>
-          <span className="mt-1 block text-sm text-text-muted">
-            Confirm which public holidays close each holding&rsquo;s exchange. Confirmed closures are saved to the Jobs
-            config.
-          </span>
-        </span>
-      </Link>
       <ConfigTransfer />
     </div>
   );

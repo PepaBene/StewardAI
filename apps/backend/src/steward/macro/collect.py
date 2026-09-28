@@ -8,6 +8,10 @@
   value was first published; it is stored as the release date because the job runs daily and
   a new period is first seen on (or just after) its release day.
 - ECB Data Portal (no key): the policy rates; a new daily value is dated the day it is seen.
+- ČNB (no key, steward.sources.cnb): CZEONIA, the CZK overnight rate (daily, released the
+  next business day; the risk-free rate of the portfolio's Sharpe ratio, never evaluated
+  for surprises), and the 2-week repo rate's change history (a policy rate: each new
+  change is a central-bank decision).
 
 A series' first run backfills `history_years` of history; later runs fetch only the recent
 observations (and the gap since the last stored one after an outage).
@@ -33,11 +37,19 @@ import httpx
 
 from steward import __version__
 from steward.config.event_rules import EventRulesConfig
-from steward.config.jobs import EcbSeries, EurostatSeries, FredSeries, JobsConfig, MacroSettings
+from steward.config.jobs import (
+    CnbSeries,
+    EcbSeries,
+    EurostatSeries,
+    FredSeries,
+    JobsConfig,
+    MacroSettings,
+)
 from steward.config.store import load_active
 from steward.jobs.runner import JobContext
 from steward.news.synthetic import SyntheticEvent, SyntheticSource, raise_events
 from steward.settings import get_settings
+from steward.sources import cnb
 
 EUROSTAT_URL = "https://ec.europa.eu/eurostat/api/dissemination/statistics/1.0/data/{dataset}"
 EUROSTAT_PAGE = "https://ec.europa.eu/eurostat/databrowser/view/{dataset}/default/table"
@@ -47,7 +59,14 @@ FRED_MAX_LIMIT = 100000  # the documented maximum `limit` of series/observations
 ECB_URL = "https://data-api.ecb.europa.eu/service/data/{flow_key}"
 ECB_PAGE = "https://data.ecb.europa.eu/data/datasets/{flow}/{key}"
 
-MACRO_SOURCE = SyntheticSource("macro-data", "Macro releases (FRED, ECB, Eurostat)", "macro")
+MACRO_SOURCE = SyntheticSource("macro-data", "Macro releases (FRED, ECB, Eurostat, ČNB)", "macro")
+# Per `Observation.source`: the outlet host and name a macro event cites.
+OUTLETS: dict[str, tuple[str, str]] = {
+    "eurostat": ("ec.europa.eu", "Eurostat"),
+    "fred": ("stlouisfed.org", "FRED"),
+    "ecb": ("ecb.europa.eu", "ECB Data Portal"),
+    "cnb": ("cnb.cz", "Czech National Bank"),
+}
 AREA_NAMES = {"EA21": "Euro area", "EA20": "Euro area", "EA": "Euro area", "EU27_2020": "EU"}
 
 
@@ -257,6 +276,54 @@ async def fetch_ecb_series(
     return parse_ecb_series(response.text, series, today)
 
 
+def _next_business_day(day: dt.date) -> dt.date:
+    nxt = day + dt.timedelta(days=1)
+    while nxt.weekday() >= 5:
+        nxt += dt.timedelta(days=1)
+    return nxt
+
+
+def cnb_observations(
+    series: CnbSeries, points: list[cnb.RatePoint], today: dt.date
+) -> list[Observation]:
+    """ČNB rate points as observations. CZEONIA is published the business day after the
+    day it is for (ČNB publishes D+1 by about 9:30), which is its release date. A repo
+    rate row is the day a new rate became valid; its release date is that day, or the day
+    it was first seen when the file lists it in advance."""
+    url = cnb.CZEONIA_PAGE if series.series == "czeonia" else cnb.REPO_RATE_URL
+    return [
+        Observation(
+            series_id=series.key,
+            key=series.key,
+            source="cnb",
+            period=p.date,
+            period_label=p.date.isoformat(),
+            value=p.rate,
+            label=series.label,
+            unit=series.unit,
+            release_date=_next_business_day(p.date)
+            if series.series == "czeonia"
+            else min(p.date, today),
+            url=url,
+            policy_rate=series.policy_rate,
+        )
+        for p in points
+    ]
+
+
+async def fetch_cnb_series(
+    http: httpx.AsyncClient, series: CnbSeries, today: dt.date, since: dt.date | None = None
+) -> list[Observation]:
+    """CZEONIA: the current year (or every year from `since`). Repo rate: the one history
+    file, cut to `since`, or its last 5 changes."""
+    if series.series == "czeonia":
+        points = await cnb.fetch_czeonia(http, today, since)
+    else:
+        points = await cnb.fetch_repo_rate(http)
+        points = [p for p in points if p.date >= since] if since else points[-5:]
+    return cnb_observations(series, points, today)
+
+
 # Called with `since=` a date (fetch from there) or None (only the recent observations).
 Fetch = Callable[..., Awaitable[list[Observation]]]
 
@@ -340,10 +407,8 @@ def surprise(
         summary=summary,
         url=f"{new.url}#{new.series_id}:{new.period_label}",
         event_date=new.release_date,
-        outlet={"eurostat": "ec.europa.eu", "fred": "stlouisfed.org", "ecb": "ecb.europa.eu"}[
-            new.source
-        ],
-        outlet_name={"eurostat": "Eurostat", "fred": "FRED", "ecb": "ECB Data Portal"}[new.source],
+        outlet=OUTLETS[new.source][0],
+        outlet_name=OUTLETS[new.source][1],
     )
 
 
@@ -448,6 +513,7 @@ async def run_macro_collect(ctx: JobContext, deps: MacroDeps) -> None:
             [s.key for s in settings.eurostat]
             + [s.key for s in settings.fred]
             + [s.key for s in settings.ecb]
+            + [s.key for s in settings.cnb]
         )
     events: list[SyntheticEvent] = []
     for series in settings.eurostat:
@@ -507,6 +573,27 @@ async def run_macro_collect(ctx: JobContext, deps: MacroDeps) -> None:
             count, found = await store_and_evaluate(pool, obs, bands)
             events += found
             step.detail.update(observations=len(obs), new=count, surprises=len(found))
+    for cnb_series in settings.cnb:
+        async with ctx.step(f"cnb:{cnb_series.key}") as step:
+            try:
+                obs = await collect_window(
+                    pool,
+                    "cnb",
+                    [cnb_series.key],
+                    partial(fetch_cnb_series, deps.http, cnb_series, today),
+                    today,
+                    settings.history_years,
+                    step.detail,
+                )
+            except (cnb.CnbError, httpx.HTTPError) as exc:
+                # A ČNB outage never fails the job: the step says so and the rest runs.
+                step.detail["error"] = str(exc)[:300]
+                continue
+            count, found = await store_and_evaluate(pool, obs, bands)
+            events += found
+            step.detail.update(observations=len(obs), new=count, surprises=len(found))
+            if obs:
+                step.detail["latest"] = {"period": obs[-1].period, "value": obs[-1].value}
     async with ctx.step("surprises") as step:
         created = await raise_events(pool, MACRO_SOURCE, events, now, ctx.job_id)
         step.detail.update(events=[e.headline for e in events], created=created)

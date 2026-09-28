@@ -212,7 +212,7 @@ export function FeedbackControl({
               onClick={(e) => (opened ? close() : start(rating, e.currentTarget))}
               className={cn(
                 "inline-flex size-6 items-center justify-center rounded-sm border text-text-muted transition-colors outline-none hover:text-text focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-focus",
-                active ? "border-accent bg-surface-muted text-text" : "border-transparent hover:border-border",
+                active ? "border-accent bg-accent-soft text-accent-ink" : "border-transparent hover:border-border",
               )}
             >
               <Icon aria-hidden="true" className={cn("size-3.5", active && "fill-current")} />
@@ -240,17 +240,17 @@ export function FeedbackControl({
           onKeyDown={onKeyDown}
           noValidate
           style={position ? { top: position.top, left: position.left } : { top: 0, left: 0, visibility: "hidden" }}
-          className="fixed z-40 w-80 max-w-[calc(100vw-1rem)] space-y-2 rounded-lg border border-border bg-surface-raised p-3 text-left text-sm font-normal text-text shadow-lg"
+          className="fixed z-40 w-80 max-w-[calc(100vw-1rem)] space-y-2.5 border border-border border-t-2 border-t-accent bg-surface-raised p-3.5 text-left text-sm font-normal text-text shadow-lg"
         >
           <fieldset>
-            <legend className="mb-1 text-xs font-medium text-text-muted">Mark {label} as</legend>
+            <legend className="kicker mb-1.5">Mark {label} as</legend>
             <div className="flex flex-wrap gap-1">
               {RATINGS.map((rating) => (
                 <label
                   key={rating}
                   className={cn(
                     "inline-flex cursor-pointer items-center gap-1 rounded-md border px-2 py-0.5 text-xs has-focus-visible:ring-2 has-focus-visible:ring-focus",
-                    draft.rating === rating ? "border-accent bg-surface-muted font-medium" : "border-border text-text-muted",
+                    draft.rating === rating ? "border-accent bg-accent-soft font-medium text-accent-ink" : "border-border text-text-muted hover:text-text",
                   )}
                 >
                   <input
@@ -442,7 +442,7 @@ function Effects({ mark }: { mark: FeedbackOut }) {
         <span key={p.text}>
           {i > 0 ? "; " : ""}
           {p.href ? (
-            <Link href={p.href} className="text-accent hover:underline">
+            <Link href={p.href} className="text-accent-ink hover:underline">
               {p.text}
             </Link>
           ) : (

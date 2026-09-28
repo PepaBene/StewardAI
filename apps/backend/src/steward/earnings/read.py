@@ -11,9 +11,26 @@ from pydantic import BaseModel, Field
 from steward.config.holding_profiles import HoldingProfile, HoldingProfilesConfig
 from steward.config.store import load_active
 from steward.config.thesis import ThesesConfig, ThesisConfig, ThesisKPI
+from steward.daily import DayCount, per_day, window_bounds, window_days
 from steward.documents.fetch import Document
 from steward.documents.text import contains
 from steward.earnings.periods import sort_key
+from steward.earnings.scores import (
+    HISTORY_POINTS,
+    THESIS_SCORE_METHOD,
+    Judgement,
+    ThesisState,
+    VerdictPoint,
+    day_end,
+    portfolio_history,
+    score_as_of,
+    score_history,
+    thesis_score,
+    thesis_state,
+    verdict_days,
+    weighted_score,
+)
+from steward.earnings.source_tier import SourceTiers, load_source_tiers
 from steward.portfolio.read import Freshness, Holding, JobSummary, portfolio_holdings
 
 # The four labels of the Design and UI section.
@@ -82,6 +99,21 @@ class FactOut(BaseModel):
         description="owner: a correction the owner entered; it wins over the extracted value."
     )
     confidence: Confidence
+    check_score: float | None = Field(
+        description="Passed checks / all checks stored with the figure (0..1): the share of "
+        "the validator's checks it passed (`checks`). Null when no check ran."
+    )
+    source_tier: int | None = Field(
+        description="Trust tier (1 best, 3 weakest) of the host the figure was read from: 1 "
+        "for the holding's own IR or results domains, else the news_sources config's domain "
+        "tier; one tier lower while the owner's feedback has the host's trust below the "
+        "verification config's demote_below. Null when the host has no configured tier."
+    )
+
+
+def check_score(checks: list[FactCheck]) -> float | None:
+    """Passed checks / all checks; None when there are none."""
+    return sum(c.ok for c in checks) / len(checks) if checks else None
 
 
 class VerdictOut(BaseModel):
@@ -162,13 +194,16 @@ class EvidenceLink(BaseModel):
     context: str | None = Field(description="The archived text around the snippet.")
 
 
-def fact_out(row: asyncpg.Record) -> FactOut:
+def fact_out(row: asyncpg.Record, ticker: str, tiers: SourceTiers | None) -> FactOut:
+    """A fact row as served; `tiers` resolves `source_tier` (None: unknown)."""
     data = {k: row[k] for k in FACT_COLUMN_NAMES}
-    checks = json.loads(data.pop("checks") or "[]")
+    checks = [FactCheck(**c) for c in json.loads(data.pop("checks") or "[]")]
     return FactOut(
         **data,
-        checks=[FactCheck(**c) for c in checks],
+        checks=checks,
         confidence=FACT_CONFIDENCE[row["status"]],
+        check_score=check_score(checks),
+        source_tier=tiers.tier(ticker, row["source_url"]) if tiers else None,
     )
 
 
@@ -233,7 +268,8 @@ async def holding_detail(pool: asyncpg.Pool, ticker: str) -> HoldingDetail | Non
 
     holdings = await portfolio_holdings(pool)
     position = next((h for h in holdings.holdings if h.ticker == ticker), None)
-    facts = [fact_out(r) for r in fact_rows]
+    tiers = await load_source_tiers(pool)
+    facts = [fact_out(r, ticker, tiers) for r in fact_rows]
     facts.sort(key=lambda f: (sort_key(f.fiscal_year, f.fiscal_period), f.id), reverse=True)
     fact_status = {f.id: f.status for f in facts}
 
@@ -318,6 +354,11 @@ async def verdicts_by_kpi(
     return out
 
 
+class ScorePoint(BaseModel):
+    date: dt.date
+    score: int
+
+
 class BoardKpi(BaseModel):
     kpi: ThesisKPI
     status: Literal["pass", "breach", "unknown"] = Field(
@@ -340,20 +381,107 @@ class BoardRow(BaseModel):
     counts: dict[str, int]
     kpis: list[BoardKpi]
     open_review_items: int = Field(description="Held or quarantined facts for this holding.")
+    score: int | None = Field(
+        description="0-100: 100 x mean s_k over KPIs with a verdict, rounded half up; s_k = 1 "
+        "pass, 0.5 unknown or stale, 0 breach. Null when no KPI has been judged. See "
+        "score_method."
+    )
+    score_history: list[ScorePoint] = Field(
+        description="The score as of the end of each UTC day a verdict for one of this "
+        "holding's KPIs was recorded (latest 12 such days, oldest first)."
+    )
+    state: ThesisState = Field(
+        description="unjudged: no score. Else by breaching KPIs (current verdict breach): "
+        "intact none, watch one, at_risk two or more."
+    )
+
+
+class VerdictActivity(BaseModel):
+    count: int = Field(
+        description="Verdict records created in the window (a verdict is "
+        "recorded only when its outcome, figures or config changed)."
+    )
+    fact_count: int = Field(description="Distinct facts those verdicts cite.")
+    per_day: list[DayCount] = Field(description="Every UTC day of the window, oldest first.")
 
 
 class ThesisBoard(BaseModel):
     theses_config_version_id: int | None
     as_of: dt.datetime | None = Field(description="Newest verdict shown.")
     rows: list[BoardRow]
+    score_method: str = Field(
+        default=THESIS_SCORE_METHOD, description="How score and portfolio_score are computed."
+    )
+    portfolio_score: int | None = Field(
+        default=None,
+        description="Mean of held rows' scores weighted by current position weight, over held "
+        "rows with a score and a weight. Null when there is none.",
+    )
+    portfolio_score_history: list[ScorePoint] = Field(
+        default_factory=list,
+        description="portfolio_score recomputed as of the end of each UTC day any held row had "
+        "a verdict recorded (latest 12 such days, oldest first), with today's weights.",
+    )
+    verdicts_30d: VerdictActivity = Field(
+        description="Verdict records over the last 30 UTC days, today included."
+    )
 
 
-async def thesis_board(pool: asyncpg.Pool, today: dt.date) -> ThesisBoard:
+async def verdict_activity(pool: asyncpg.Pool, now: dt.datetime, days: int = 30) -> VerdictActivity:
+    window = window_days(now, days)
+    start, end = window_bounds(window)
+    rows = await pool.fetch(
+        "select (created_at at time zone 'UTC')::date as day, count(*) as n"
+        " from public.verdict where created_at >= $1 and created_at < $2 group by 1",
+        start,
+        end,
+    )
+    facts = await pool.fetchval(
+        "select count(distinct f) from public.verdict v, unnest(v.fact_ids) f"
+        " where v.created_at >= $1 and v.created_at < $2",
+        start,
+        end,
+    )
+    by_day = {r["day"]: r["n"] for r in rows}
+    return VerdictActivity(
+        count=sum(by_day.values()), fact_count=facts or 0, per_day=per_day(window, by_day)
+    )
+
+
+async def _verdict_points(pool: asyncpg.Pool, tickers: list[str]) -> dict[str, list[VerdictPoint]]:
+    out: dict[str, list[VerdictPoint]] = {}
+    for r in await pool.fetch(
+        "select id, ticker, kpi_id, fiscal_year, fiscal_period, status, config_version_id,"
+        " created_at from public.verdict where ticker = any($1::text[]) order by id",
+        tickers,
+    ):
+        data = dict(r)
+        out.setdefault(data.pop("ticker"), []).append(VerdictPoint(**data))
+    return out
+
+
+async def thesis_board(
+    pool: asyncpg.Pool, today: dt.date, now: dt.datetime | None = None
+) -> ThesisBoard:
+    """The board, with each holding's thesis score (see steward.earnings.scores)."""
+    now = now or dt.datetime.now(dt.UTC)
     theses = await load_active(pool, "theses", ThesesConfig)
     if theses is None:
-        return ThesisBoard(theses_config_version_id=None, as_of=None, rows=[])
+        return ThesisBoard(
+            theses_config_version_id=None,
+            as_of=None,
+            rows=[],
+            verdicts_30d=await verdict_activity(pool, now),
+        )
     tickers = [t.ticker for t in theses.body.theses]
     verdicts = await verdicts_by_kpi(pool, tickers, theses.id)
+    points = await _verdict_points(pool, tickers)
+    versions = [
+        (r["id"], r["created_at"])
+        for r in await pool.fetch(
+            "select id, created_at from public.config_version where domain = 'theses'"
+        )
+    ]
     names = {
         r["t212_ticker"]: r["name"]
         for r in await pool.fetch(
@@ -374,11 +502,13 @@ async def thesis_board(pool: asyncpg.Pool, today: dt.date) -> ThesisBoard:
     for thesis in theses.body.theses:
         kpis = []
         counts = {"pass": 0, "breach": 0, "unknown": 0}
+        judgements: list[Judgement | None] = []
         for kpi in thesis.kpis:
             current = kpi_status(kpi, verdicts.get((thesis.ticker, kpi.id), [])).current
             status: Literal["pass", "breach", "unknown"] = current.status if current else "unknown"
             counts[status] += 1
             kpis.append(BoardKpi(kpi=kpi, status=status, verdict=current))
+            judgements.append(Judgement(current.status, current.stale) if current else None)
             if current is not None and (newest is None or current.created_at > newest):
                 newest = current.created_at
         overall: Literal["breach", "unknown", "pass", "no_kpis"] = (
@@ -391,6 +521,12 @@ async def thesis_board(pool: asyncpg.Pool, today: dt.date) -> ThesisBoard:
             else "pass"
         )
         position = held.get(thesis.ticker)
+        score = thesis_score(judgements)
+        kpi_ids = [k.id for k in thesis.kpis]
+        rows_points = points.get(thesis.ticker, [])
+        history = score_history(
+            rows_points, kpi_ids, versions, verdict_days(rows_points, kpi_ids)[-HISTORY_POINTS:]
+        )
         rows.append(
             BoardRow(
                 ticker=thesis.ticker,
@@ -404,11 +540,37 @@ async def thesis_board(pool: asyncpg.Pool, today: dt.date) -> ThesisBoard:
                 counts=counts,
                 kpis=kpis,
                 open_review_items=open_items.get(thesis.ticker, 0),
+                score=score,
+                score_history=[ScorePoint(date=d, score=v) for d, v in history],
+                state=thesis_state(score, counts["breach"]),
             )
         )
     order = {"breach": 0, "unknown": 1, "no_kpis": 2, "pass": 3}
     rows.sort(key=lambda r: (order[r.overall], -(r.weight or 0), r.ticker))
-    return ThesisBoard(theses_config_version_id=theses.id, as_of=newest, rows=rows)
+
+    held_rows = [r for r in rows if r.held]
+    kpi_ids_of = {t.ticker: [k.id for k in t.kpis] for t in theses.body.theses}
+    days = sorted(
+        {d for r in held_rows for d in verdict_days(points.get(r.ticker, []), kpi_ids_of[r.ticker])}
+    )[-HISTORY_POINTS:]
+    scores_at = {
+        r.ticker: {
+            d: score_as_of(points.get(r.ticker, []), kpi_ids_of[r.ticker], versions, day_end(d))
+            for d in days
+        }
+        for r in held_rows
+    }
+    weights = {r.ticker: r.weight for r in held_rows}
+    return ThesisBoard(
+        theses_config_version_id=theses.id,
+        as_of=newest,
+        rows=rows,
+        portfolio_score=weighted_score((r.score, r.weight) for r in held_rows),
+        portfolio_score_history=[
+            ScorePoint(date=d, score=v) for d, v in portfolio_history(scores_at, weights, days)
+        ],
+        verdicts_30d=await verdict_activity(pool, now),
+    )
 
 
 def snippet_context(text: str, snippet: str, lines_around: int = 4) -> str | None:

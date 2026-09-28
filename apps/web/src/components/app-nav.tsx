@@ -14,9 +14,9 @@ import { CLUSTERS, isClusterActive, isPageActive } from "@/lib/nav";
 import { cn } from "@/lib/utils";
 
 const TAB =
-  "inline-flex h-10 items-center gap-1 border-b-2 px-3 text-sm transition-colors";
+  "inline-flex h-11 items-center gap-[5px] border-b-2 px-3.5 text-sm transition-colors";
 const TAB_ACTIVE = "border-accent font-semibold text-text";
-const TAB_INACTIVE = "border-transparent text-text-muted hover:text-text";
+const TAB_INACTIVE = "border-transparent font-normal text-text-muted hover:text-text";
 
 /**
  * The five-cluster IA (Ledger_Design_System_Redesign_Proposal.md section 3): Portfolio,

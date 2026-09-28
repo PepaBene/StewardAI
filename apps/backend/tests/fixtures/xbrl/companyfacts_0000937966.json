@@ -1,0 +1,85 @@
+{
+ "cik": 937966,
+ "entityName": "ASML HOLDING NV",
+ "facts": {
+  "dei": {
+   "EntityCommonStockSharesOutstanding": {
+    "label": "Entity Common Stock, Shares Outstanding",
+    "description": "Indicate number of shares or other units outstanding of each of registrant's classes of capital or common stock or other ownership interests, if and as stated on cover of related periodic report. Where multiple classes or units exist define each class/interest by adding class of stock items such as Common Class A [Member], Common Class B [Member] or Partnership Interest [Member] onto the Instrument [Domain] of the Entity Listings, Instrument.",
+    "units": {
+     "shares": [
+      {
+       "end": "2023-12-31",
+       "val": 393421721,
+       "accn": "0000937966-24-000008",
+       "fy": 2023,
+       "fp": "FY",
+       "form": "20-F",
+       "filed": "2024-02-14",
+       "frame": "CY2023Q4I"
+      },
+      {
+       "end": "2024-12-31",
+       "val": 393283720,
+       "accn": "0000937966-25-000009",
+       "fy": 2024,
+       "fp": "FY",
+       "form": "20-F",
+       "filed": "2025-03-05",
+       "frame": "CY2024Q4I"
+      },
+      {
+       "end": "2025-12-31",
+       "val": 385417665,
+       "accn": "0001628280-26-011378",
+       "fy": 2025,
+       "fp": "FY",
+       "form": "20-F",
+       "filed": "2026-02-25",
+       "frame": "CY2025Q4I"
+      }
+     ]
+    }
+   }
+  },
+  "us-gaap": {
+   "CommonStockSharesOutstanding": {
+    "label": "Common Stock, Shares, Outstanding",
+    "description": "Number of shares of common stock outstanding. Common stock represent the ownership interest in a corporation.",
+    "units": {
+     "shares": [
+      {
+       "end": "2024-12-31",
+       "val": 393283720,
+       "accn": "0000937966-25-000009",
+       "fy": 2024,
+       "fp": "FY",
+       "form": "20-F",
+       "filed": "2025-03-05"
+      },
+      {
+       "end": "2024-12-31",
+       "val": 393283720,
+       "accn": "0001628280-26-011378",
+       "fy": 2025,
+       "fp": "FY",
+       "form": "20-F",
+       "filed": "2026-02-25",
+       "frame": "CY2024Q4I"
+      },
+      {
+       "end": "2025-12-31",
+       "val": 385417665,
+       "accn": "0001628280-26-011378",
+       "fy": 2025,
+       "fp": "FY",
+       "form": "20-F",
+       "filed": "2026-02-25",
+       "frame": "CY2025Q4I"
+      }
+     ]
+    }
+   }
+  }
+ }
+}

@@ -1,32 +1,41 @@
 "use client";
 
 import { LoaderCircleIcon, RefreshCwIcon } from "lucide-react";
-import Link from "next/link";
+import { useMemo, useState } from "react";
 
 import { AlertMessage } from "@/components/alert-message";
 import { EmptyState } from "@/components/empty-state";
-import { AllocationBars, type AllocationItem } from "@/components/portfolio/allocation-bars";
-import { AllocationDonut } from "@/components/portfolio/allocation-donut";
-import { AllocationStackedBar } from "@/components/portfolio/allocation-stacked-bar";
-import { ConcentrationScale } from "@/components/portfolio/concentration-scale";
+import { PageHeader } from "@/components/page-header";
+import type { AllocationItem } from "@/components/portfolio/allocation-bars";
+import { AllocationPanel } from "@/components/portfolio/allocation-panel";
+import { CashFlowPanel } from "@/components/portfolio/cash-flow-panel";
+import { ConcentrationCompliance } from "@/components/portfolio/concentration-compliance";
 import { ContributionCard } from "@/components/portfolio/contribution-card";
-import { DriftBar } from "@/components/portfolio/drift-bar";
-import { DriftChart, type DriftChartRow } from "@/components/portfolio/drift-chart";
-import { DriftStatusBadge, isOutOfBand } from "@/components/portfolio/drift-status-badge";
+import { DriftPanel, DriftTable } from "@/components/portfolio/drift-panel";
+import { ExposurePanel } from "@/components/portfolio/exposure-panel";
+import { useLookThrough } from "@/components/portfolio/look-through-exposure";
 import { FreshnessLabel } from "@/components/portfolio/freshness-label";
-import { PerformanceCard } from "@/components/portfolio/performance-card";
-import { PerformanceStatCard } from "@/components/portfolio/performance-stat-card";
-import { StatCard } from "@/components/portfolio/stat-card";
+import { OverviewHero, type HistoryLoad } from "@/components/portfolio/overview-hero";
+import { ReturnsHeatmap } from "@/components/portfolio/returns-heatmap";
+import { RiskPanel } from "@/components/portfolio/risk-panel";
+import { RiskStatTile } from "@/components/portfolio/risk-stat-tile";
+import { StatTile } from "@/components/portfolio/stat-tile";
+import { fetchValuation, ValuationBenchmarkPanel } from "@/components/portfolio/valuation-benchmark-panel";
 import { useSyncStatus } from "@/components/sync/sync-status-provider";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { getBrowserApiClient, type PortfolioOverview } from "@/lib/api/client";
-import { formatDate, formatMoney, formatPercent, formatPp, gainLossTone } from "@/lib/format";
+import { getBrowserApiClient, type PortfolioHistory, type PortfolioOverview } from "@/lib/api/client";
+import { formatDate, formatMoney, formatPercent, gainLossTone } from "@/lib/format";
 import { useApiResource } from "@/lib/hooks/use-api-resource";
-import { concentrationScalePosition, effectiveHoldings, herfindahlIndex } from "@/lib/portfolio/concentration";
+import { VALUATION_SCALE, valuationAxis } from "@/lib/portfolio/valuation";
+import { herfindahlIndex } from "@/lib/portfolio/concentration";
+import { lookThroughRisk } from "@/lib/portfolio/look-through";
+import { formatCompactMoney, formatSignedPct } from "@/lib/portfolio/money";
+import { DEFAULT_HERO_RANGE, HISTORY_DAYS, rangeStart, sliceFrom, trailingRisk, type HeroRangeId } from "@/lib/portfolio/performance";
+import { foreignCurrencyShare, riskAxes } from "@/lib/portfolio/risk-profile";
 import { cn } from "@/lib/utils";
 
 const fetchOverview = () => getBrowserApiClient().GET("/portfolio/overview");
+const fetchHistory = () => getBrowserApiClient().GET("/portfolio/history", { params: { query: { days: HISTORY_DAYS } } });
 
 const TONE_CLASS = { gain: "text-gain", loss: "text-loss", flat: "" };
 
@@ -65,22 +74,21 @@ export function OverviewView() {
   );
 }
 
-function PageHeader({ data }: { data: PortfolioOverview }) {
+function Header({ data }: { data: PortfolioOverview }) {
   return (
-    <div className="flex flex-wrap items-end justify-between gap-2">
-      <div>
-        <h1 className="text-2xl font-semibold tracking-tight">Overview</h1>
-        <p className="mt-1 text-sm text-text-muted">
-          Portfolio value, allocation and drift from target weights.
-        </p>
-      </div>
-      {data.freshness ? (
-        <FreshnessLabel
-          syncedAt={data.freshness.synced_at}
-          snapshotDate={data.freshness.snapshot_date}
-        />
-      ) : null}
-    </div>
+    <PageHeader
+      kicker="Portfolio"
+      title="Overview"
+      description="Portfolio value, allocation and drift from target weights."
+      aside={
+        data.freshness ? (
+          <>
+            <FreshnessLabel syncedAt={data.freshness.synced_at} snapshotDate={data.freshness.snapshot_date} />
+            {data.base ? <span>· {data.base.fx_source === "cnb" ? "ČNB" : "ECB"} rates · Trading212</span> : null}
+          </>
+        ) : null
+      }
+    />
   );
 }
 
@@ -98,24 +106,31 @@ function SyncFailureNotice({ data }: { data: PortfolioOverview }) {
   );
 }
 
+function historyLoad(state: ReturnType<typeof useApiResource<PortfolioHistory>>["state"]): HistoryLoad {
+  if (state.kind === "loading") return { kind: "loading" };
+  if (state.kind === "error") return state.previous ? { kind: "ok", data: state.previous } : { kind: "error", message: state.title };
+  return { kind: "ok", data: state.data };
+}
+
 function Overview({ data }: { data: PortfolioOverview }) {
   const { startSync, starting, view } = useSyncStatus();
+  const history = historyLoad(useApiResource(fetchHistory).state);
+  const [range, setRange] = useState<HeroRangeId>(DEFAULT_HERO_RANGE);
+  const h = history.kind === "ok" && !history.data.gap ? history.data : null;
+  const risk = useMemo(() => (h ? trailingRisk(h.points, h.benchmark) : null), [h]);
+  const lookThrough = useLookThrough().report;
+  const valuation = useApiResource(fetchValuation).state;
+  const valuationData = valuation.kind === "ok" ? valuation.data : valuation.kind === "error" ? valuation.previous : null;
+  const valuationRadar = valuationAxis(valuationData);
 
   if (!data.freshness || !data.account || !data.base) {
     return (
       <div className="space-y-6">
-        <PageHeader data={data} />
+        <Header data={data} />
         <SyncFailureNotice data={data} />
         <EmptyState title="No portfolio snapshot yet">
-          <p>
-            The first Trading212 sync creates one. It runs every evening on schedule, or start
-            one now.
-          </p>
-          <Button
-            className="mt-4"
-            onClick={() => void startSync()}
-            disabled={starting || view.kind === "active"}
-          >
+          <p>The first Trading212 sync creates one. It runs every evening on schedule, or start one now.</p>
+          <Button className="mt-4" onClick={() => void startSync()} disabled={starting || view.kind === "active"}>
             <RefreshCwIcon aria-hidden="true" className={cn(starting && "animate-spin")} />
             Sync now
           </Button>
@@ -137,293 +152,143 @@ function Overview({ data }: { data: PortfolioOverview }) {
     weight: slice.weight,
     muted: slice.key === "CASH",
   }));
+  const positionValues = allocationItems.filter((i) => !i.muted).map((i) => i.value);
+  const invested = positionValues.reduce((s, v) => s + v, 0);
+  const hhi = invested > 0 ? herfindahlIndex(positionValues.map((v) => v / invested)) : null;
+  const fxShare = foreignCurrencyShare(drift?.categories.find((c) => c.dimension === "currency")?.buckets, baseCcy, base.total);
+  const axes = riskAxes({
+    volatility: risk?.volatility ?? null,
+    beta: risk?.beta ?? null,
+    maxDrawdown: risk?.maxDrawdown ?? null,
+    hhi,
+    positions: positionValues.length,
+    fxShare,
+    benchmarkVolatility: risk?.benchmarkVolatility,
+    benchmarkMaxDrawdown: risk?.benchmarkMaxDrawdown,
+    lookThrough: lookThroughRisk(lookThrough),
+    valuation: { portfolio: valuationRadar.portfolio, benchmark: valuationRadar.benchmark, rim: `P/E ${VALUATION_SCALE.pe}` },
+  });
+
+  // Tile sparklines follow the hero's range (absolute values in the history's currency).
+  const asOf = h?.points.at(-1)?.date ?? null;
+  const start = asOf ? rangeStart(range, asOf) : null;
+  const sameCcy = h?.values_currency === baseCcy;
+  const values = h && sameCcy ? sliceFrom(h.values, start) : [];
+  const indexSpark = h ? sliceFrom(h.points, start).map((p) => p.close) : [];
+  const rangeLabel = range === "max" ? "all history" : range.toUpperCase();
+  const cash = drift?.cash;
+  const today = data.freshness.snapshot_date;
 
   return (
-    <div className="space-y-6">
-      <PageHeader data={data} />
+    <div className="space-y-5">
+      <Header data={data} />
       <SyncFailureNotice data={data} />
       {data.base_currency_mismatch ? (
         <AlertMessage tone="info" title="Base currency changed">
-          <p>
-            These figures are in {baseCcy}. The strategy now uses a different base currency; the
-            next sync converts to it.
-          </p>
+          <p>These figures are in {baseCcy}. The strategy now uses a different base currency; the next sync converts to it.</p>
         </AlertMessage>
       ) : null}
 
-      <PerformanceCard />
-      <ContributionCard />
-
-      <section aria-label="Totals" className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-5">
-        <StatCard
-          label={`Total value (${baseCcy})`}
-          value={formatMoney(base.total, baseCcy)}
-          sub={
-            <>
-              Trading212 reports {formatMoney(account.total_value, account.account_currency)}
-            </>
+      <div className="grid grid-cols-1 gap-5 xl:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
+        <OverviewHero
+          total={base.total}
+          currency={baseCcy}
+          subline={
+            account.account_currency !== baseCcy || Math.abs(account.total_value - base.total) > 0.5
+              ? <>Trading212 reports {formatMoney(account.total_value, account.account_currency)}</>
+              : <>Trading212 reports the same total in {account.account_currency}</>
           }
+          history={history}
+          range={range}
+          onRange={setRange}
         />
-        <StatCard
-          label="Invested"
-          value={formatMoney(base.invested, baseCcy)}
-          sub={<>{formatPercent(base.total ? base.invested / base.total : null)} of total</>}
-        />
-        <StatCard
-          label="Cash"
-          value={formatMoney(base.cash, baseCcy)}
-          sub={<>{formatPercent(base.total ? base.cash / base.total : null)} of total</>}
-        />
-        <StatCard
-          label={`Unrealised P/L (${account.account_currency})`}
-          value={formatMoney(account.unrealized_ppl, account.account_currency, { signed: true })}
-          valueClassName={TONE_CLASS[pplTone]}
-          trend={pplTone}
-          sub={<>{formatPercent(pplPct, { signed: true })} on cost · Trading212 figure</>}
-        />
-        <PerformanceStatCard />
-      </section>
-
-      <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-        <Card>
-          <CardHeader>
-            <CardTitle>Allocation</CardTitle>
-            <CardDescription>
-              By holding, in {baseCcy} at {base.fx_source === "cnb" ? "ČNB" : "ECB"} reference
-              rates.
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="flex flex-col gap-4 sm:flex-row sm:items-center">
-            <div className="min-w-0 flex-1">
-              <AllocationBars items={allocationItems} currency={baseCcy} label="Allocation by holding" />
-            </div>
-            <div className="w-full shrink-0 sm:w-48">
-              <AllocationDonut items={allocationItems} currency={baseCcy} label="Allocation by holding, as a donut" />
-            </div>
-          </CardContent>
-        </Card>
-        <DriftCard data={data} />
+        <section aria-label="Totals" className="grid grid-cols-1 gap-5 sm:grid-cols-2">
+          <StatTile
+            label="Invested"
+            value={formatCompactMoney(base.invested, baseCcy)}
+            sub={<>{formatPercent(base.total ? base.invested / base.total : null)} of total</>}
+            spark={values.map((v) => v.invested)}
+            sparkNote={`Invested value, ${rangeLabel}`}
+          />
+          <StatTile
+            label="Cash"
+            value={formatCompactMoney(base.cash, baseCcy)}
+            sub={
+              <>
+                {formatPercent(base.total ? base.cash / base.total : null)}
+                {cash && cash.target_weight !== null ? <> · target {formatPercent(cash.target_weight)}</> : " of total"}
+              </>
+            }
+            spark={values.map((v) => v.cash)}
+            sparkNote={`Cash, ${rangeLabel}`}
+          />
+          <StatTile
+            label={`Unrealised P/L${account.account_currency !== baseCcy ? ` (${account.account_currency})` : ""}`}
+            value={<span className={TONE_CLASS[pplTone]}>{formatCompactMoney(account.unrealized_ppl, account.account_currency, { signed: true })}</span>}
+            sub={
+              <>
+                <span aria-hidden="true">{pplTone === "gain" ? "▲ " : pplTone === "loss" ? "▼ " : ""}</span>
+                {formatSignedPct(pplPct)} on cost · Trading212 figure
+              </>
+            }
+            subClassName={TONE_CLASS[pplTone]}
+            spark={values.map((v) => v.unrealised)}
+            sparkNote={`Unrealised P/L, ${rangeLabel}`}
+          />
+          <RiskStatTile
+            figures={risk}
+            historyLoading={history.kind === "loading"}
+            spark={indexSpark}
+            sparkNote={`Flow-adjusted performance index, ${rangeLabel}`}
+          />
+        </section>
       </div>
 
-      <ConcentrationCard items={allocationItems} />
+      <div className="grid grid-cols-1 gap-5 lg:grid-cols-2 xl:grid-cols-3">
+        <AllocationPanel items={allocationItems} currency={baseCcy} fxSource={base.fx_source} />
+        <DriftPanel data={data} />
+        <RiskPanel
+          figures={risk}
+          axes={axes}
+          fxShare={fxShare}
+          benchmarkSymbol={h?.benchmark_symbol ?? null}
+          loading={history.kind === "loading"}
+          lookThrough={lookThrough}
+        />
+      </div>
 
-      {drift ? <CategoryCards data={data} /> : null}
+      <div className="grid grid-cols-1 gap-5 xl:grid-cols-[minmax(0,1.45fr)_minmax(0,1fr)]">
+        <ReturnsHeatmap points={h?.points ?? []} loading={history.kind === "loading"} />
+        <ConcentrationCompliance positions={positionValues} drift={drift} hasStrategy={data.strategy_config_version_id !== null} />
+      </div>
+
+      <div className="grid grid-cols-1 gap-5 xl:grid-cols-[minmax(0,1.45fr)_minmax(0,1fr)]">
+        <CashFlowPanel year={Number(today.slice(0, 4))} today={today} />
+        {drift ? <ExposurePanel drift={drift} currency={baseCcy} lookThrough={lookThrough} /> : null}
+      </div>
+
+      <div className="grid grid-cols-1 items-start gap-5 xl:grid-cols-2">
+        <ContributionCard />
+        <DriftTable data={data} />
+      </div>
+
+      <ValuationBenchmarkPanel state={valuation} />
 
       <FxFootnote data={data} />
     </div>
   );
 }
 
-/**
- * Diversification/concentration (§5.3): a stat and a marker on a neutral scale, computed
- * client-side from the same by-holding weights the allocation cards already show — over
- * invested positions only, cash excluded, matching the standard "effective number of
- * stocks" concept. One level up from the sector/currency cards below: they show *what* the
- * exposure is, this shows *how concentrated* it is as a single number.
- */
-function ConcentrationCard({ items }: { items: AllocationItem[] }) {
-  const positions = items.filter((i) => !i.muted);
-  if (positions.length === 0) return null;
-  const invested = positions.reduce((sum, i) => sum + i.value, 0);
-  const weights = invested > 0 ? positions.map((i) => i.value / invested) : positions.map(() => 0);
-  const hhi = herfindahlIndex(weights);
-  const effective = effectiveHoldings(hhi);
-  return (
-    <Card>
-      <CardHeader>
-        <CardTitle>Concentration</CardTitle>
-        <CardDescription>How spread out the invested positions are, not whether that&rsquo;s good or bad.</CardDescription>
-      </CardHeader>
-      <CardContent className="space-y-2">
-        <p className="num text-2xl font-semibold text-text">
-          {effective.toFixed(1)} <span className="text-sm font-normal text-text-muted">of {positions.length} positions</span>
-        </p>
-        <ConcentrationScale position={concentrationScalePosition(hhi, positions.length)} />
-        <p className="flex justify-between text-xs text-text-muted">
-          <span>Evenly spread</span>
-          <span>One position</span>
-        </p>
-      </CardContent>
-    </Card>
-  );
-}
-
-function DriftCard({ data }: { data: PortfolioOverview }) {
-  const drift = data.drift;
-  const targeted = drift?.positions.filter((p) => p.status !== "no_target") ?? [];
-  const untargeted = drift?.positions.filter((p) => p.status === "no_target") ?? [];
-  const cash = drift?.cash;
-  const cashRow = cash && cash.status !== "no_target" ? cash : null;
-  const chartRows: DriftChartRow[] = [
-    ...targeted.filter((p) => p.drift !== null).map((p) => ({ key: p.ticker, label: p.ticker, drift: p.drift! })),
-    ...(cashRow?.drift !== null && cashRow ? [{ key: "cash", label: "Cash", drift: cashRow.drift }] : []),
-  ];
-
-  return (
-    <Card>
-      <CardHeader>
-        <CardTitle>Drift</CardTitle>
-        <CardDescription>
-          {drift && drift.out_of_band > 0
-            ? `${drift.out_of_band} outside their band.`
-            : "Weight against each target and its band."}{" "}
-          Weights are of {drift?.weight_basis === "invested" ? "invested value" : "total value incl. cash"}.
-        </CardDescription>
-      </CardHeader>
-      <CardContent>
-        {data.strategy_config_version_id === null ? (
-          <AlertMessage tone="info" title="No strategy saved yet">
-            <p>
-              Drift needs target weights from the strategy config.{" "}
-              <Link href="/config/strategy" className="text-accent hover:underline">
-                Set targets in the strategy editor
-              </Link>
-              .
-            </p>
-          </AlertMessage>
-        ) : targeted.length === 0 && !cashRow ? (
-          <p className="text-sm text-text-muted">The strategy sets no position or cash targets.</p>
-        ) : (
-          <div className="space-y-4">
-            <DriftChart rows={chartRows} label="Drift from target, by holding" />
-            <div className="-mx-6 overflow-x-auto px-6">
-              <table className="w-full text-sm">
-                <caption className="sr-only">Drift from target weights</caption>
-                <thead>
-                  <tr className="border-b border-border text-left text-text-muted">
-                    <th scope="col" className="py-2 pr-3 font-medium">Holding</th>
-                    <th scope="col" className="py-2 px-3 text-right font-medium">Weight</th>
-                    <th scope="col" className="py-2 px-3 text-right font-medium">Target</th>
-                    <th scope="col" className="py-2 px-3 text-right font-medium">Drift</th>
-                    <th scope="col" className="py-2 pl-3 font-medium">Status</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {targeted.map((p) => (
-                    <tr key={p.ticker} className="border-b border-border last:border-0">
-                      <th scope="row" className="py-2 pr-3 text-left font-mono text-xs font-normal">
-                        {p.ticker}
-                        {p.held ? null : <span className="ml-1 font-sans text-text-muted">(not held)</span>}
-                      </th>
-                      <td className="num whitespace-nowrap py-2 px-3 text-right">{formatPercent(p.weight)}</td>
-                      <td className="num whitespace-nowrap py-2 px-3 text-right text-text-muted">
-                        {formatPercent(p.target_weight)}
-                        <span className="block text-xs">
-                          {formatPercent(p.lower)}–{formatPercent(p.upper)}
-                        </span>
-                      </td>
-                      <td className={cn("num whitespace-nowrap py-2 px-3 text-right", isOutOfBand(p.status) && "font-semibold")}>
-                        <span className="inline-flex items-center gap-2">
-                          <DriftBar drift={p.drift} />
-                          {formatPp(p.drift)}
-                        </span>
-                      </td>
-                      <td className="py-2 pl-3">
-                        <DriftStatusBadge status={p.status} />
-                      </td>
-                    </tr>
-                  ))}
-                  {cashRow ? (
-                    <tr>
-                      <th scope="row" className="py-2 pr-3 text-left font-normal">Cash</th>
-                      <td className="num whitespace-nowrap py-2 px-3 text-right">{formatPercent(cashRow.weight)}</td>
-                      <td className="num whitespace-nowrap py-2 px-3 text-right text-text-muted">
-                        {formatPercent(cashRow.target_weight)}
-                        <span className="block text-xs">
-                          {formatPercent(cashRow.lower)}–{formatPercent(cashRow.upper)}
-                        </span>
-                      </td>
-                      <td className="num whitespace-nowrap py-2 px-3 text-right">
-                        <span className="inline-flex items-center gap-2">
-                          <DriftBar drift={cashRow.drift} />
-                          {formatPp(cashRow.drift)}
-                        </span>
-                      </td>
-                      <td className="py-2 pl-3">
-                        <DriftStatusBadge status={cashRow.status} />
-                      </td>
-                    </tr>
-                  ) : null}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        )}
-        {untargeted.length > 0 && data.strategy_config_version_id !== null ? (
-          <p className="mt-3 text-xs text-text-muted">
-            No target set for {untargeted.map((p) => p.ticker).join(", ")}.{" "}
-            <Link href="/holdings" className="text-accent underline-offset-4 hover:underline">
-              See all holdings
-            </Link>
-          </p>
-        ) : null}
-      </CardContent>
-    </Card>
-  );
-}
-
-function CategoryCards({ data }: { data: PortfolioOverview }) {
-  const baseCcy = data.base!.base_currency;
-  const dimensions = (data.drift?.categories ?? []).filter((c) =>
-    c.buckets.some((b) => b.bucket !== "Unclassified" || b.target_weight !== null),
-  );
-  if (dimensions.length === 0) return null;
-  return (
-    <section aria-label="Allocation by category" className="grid grid-cols-1 gap-6 md:grid-cols-2 xl:grid-cols-3">
-      {dimensions.map((dimension) => {
-        const items: AllocationItem[] = dimension.buckets.map((b) => ({
-          key: b.bucket,
-          label: b.bucket,
-          value: b.value_base,
-          weight: b.weight,
-          muted: b.bucket === "Unclassified",
-        }));
-        return (
-          <Card key={dimension.dimension}>
-            <CardHeader>
-              <CardTitle className="capitalize">{dimension.dimension.replaceAll("_", " ")}</CardTitle>
-              {dimension.dimension === "currency" ? (
-                <CardDescription>From each instrument&apos;s trading currency.</CardDescription>
-              ) : null}
-            </CardHeader>
-            <CardContent className="space-y-3">
-              <AllocationStackedBar items={items} label={`Allocation by ${dimension.dimension}, as a single bar`} />
-              <AllocationBars currency={baseCcy} label={`Allocation by ${dimension.dimension}`} items={items} />
-              {dimension.buckets.some((b) => b.status !== "no_target") ? (
-                <ul className="space-y-1 text-xs">
-                  {dimension.buckets
-                    .filter((b) => b.status !== "no_target")
-                    .map((b) => (
-                      <li key={b.bucket} className="flex items-center justify-between gap-2">
-                        <span className="inline-flex items-center gap-2">
-                          <DriftBar drift={b.drift} scale={0.05} />
-                          {b.bucket}: target {formatPercent(b.target_weight)}, drift{" "}
-                          <span className="num">{formatPp(b.drift)}</span>
-                        </span>
-                        <DriftStatusBadge status={b.status} />
-                      </li>
-                    ))}
-                </ul>
-              ) : null}
-            </CardContent>
-          </Card>
-        );
-      })}
-    </section>
-  );
-}
-
 function FxFootnote({ data }: { data: PortfolioOverview }) {
   const base = data.base!;
-  const rates = data.fx_rates.filter((r) => r.rate_date !== null);
+  const rates = data.fx_rates.filter((r) => r.rate_date !== null && r.currency !== base.base_currency);
   if (rates.length === 0) return null;
   return (
     <p className="text-xs text-text-muted">
       {base.fx_source === "cnb" ? "ČNB" : "ECB"} reference rates used:{" "}
       {rates.map((r, i) => (
         <span key={r.currency} className="num">
-          {i > 0 ? "; " : null}1 {r.currency} = {r.rate.toFixed(4)} {base.base_currency} (
-          {formatDate(r.rate_date!)})
+          {i > 0 ? "; " : null}1 {r.currency} = {r.rate.toFixed(4)} {base.base_currency} ({formatDate(r.rate_date!)})
         </span>
       ))}
       .

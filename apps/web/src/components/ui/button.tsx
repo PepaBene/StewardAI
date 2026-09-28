@@ -5,20 +5,21 @@ import { cva, type VariantProps } from "class-variance-authority";
 import { cn } from "@/lib/utils";
 
 const buttonVariants = cva(
-  "inline-flex shrink-0 items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium transition-colors outline-hidden focus-visible:outline-2 focus-visible:outline-solid focus-visible:outline-offset-2 focus-visible:outline-focus disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4",
+  "inline-flex shrink-0 items-center justify-center gap-2 whitespace-nowrap font-heading text-[15px] font-semibold transition-colors outline-hidden focus-visible:outline-2 focus-visible:outline-solid focus-visible:outline-offset-2 focus-visible:outline-focus disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4",
   {
     variants: {
       variant: {
-        default: "bg-accent text-accent-foreground hover:bg-accent/90",
+        default:
+          "border border-accent bg-accent text-accent-foreground hover:border-accent-strong hover:bg-accent-strong",
         outline:
-          "border border-border bg-surface-raised text-text hover:bg-surface-muted",
-        ghost: "text-text hover:bg-surface-muted",
-        link: "text-accent underline-offset-4 hover:underline",
+          "border border-border bg-transparent text-text hover:bg-border-soft active:bg-accent-soft",
+        ghost: "text-text hover:bg-border-soft active:bg-accent-soft",
+        link: "font-sans text-sm font-medium text-accent-ink underline-offset-4 hover:underline",
       },
       size: {
         default: "h-9 px-4 py-2",
-        sm: "h-8 rounded-md px-3",
-        lg: "h-10 rounded-md px-6",
+        sm: "h-8 px-3 text-sm",
+        lg: "h-10 px-6",
         icon: "size-9",
       },
     },

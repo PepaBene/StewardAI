@@ -15,7 +15,7 @@ import { jobHref } from "@/lib/jobs/job-detail";
 import { normaliseTicker, profileOptions, researchHref, type ProfileOption } from "@/lib/research/report";
 
 const SELECT =
-  "h-9 w-full rounded-md border border-border bg-surface-raised px-3 py-1 text-base text-text shadow-xs outline-none md:text-sm focus-visible:border-focus focus-visible:ring-2 focus-visible:ring-focus/30";
+  "h-9 w-full border border-border bg-surface-raised px-3 py-1 text-base text-text shadow-xs outline-none md:text-sm focus-visible:border-focus focus-visible:ring-2 focus-visible:ring-focus/30";
 
 /** The research profiles to offer: the saved ones, or the backend defaults on a 404. */
 export function useResearchProfiles(): { options: ProfileOption[]; defaultId: string; saved: boolean | null } {
@@ -150,25 +150,25 @@ export function ResearchStarter({
         <p id={`${id}-ticker-hint`} className="text-xs text-text-muted">
           Any ticker, owned or not; a Trading212 ticker gives the richest data.{" "}
           {profiles.saved === false ? "No profiles saved yet: the defaults (standard, quick) apply." : null}{" "}
-          <Link href="/config/research-profiles" className="text-accent hover:underline">
+          <Link href="/config/research-profiles" className="text-accent-ink hover:underline">
             Edit profiles
           </Link>
         </p>
       )}
       {error ? <AlertMessage title="Research not started">{error}</AlertMessage> : null}
       {queued && watched ? (
-        <div role="status" className="flex flex-wrap items-center gap-2 rounded-md border border-border bg-surface-muted p-2 text-sm">
+        <div role="status" className="flex flex-wrap items-center gap-2 border border-border bg-surface-muted p-2 text-sm">
           <span>
             Research on <span className="font-mono">{queued.ticker}</span> ({chosen}):
           </span>
           <JobStatusBadge status={watched.status} />
-          <Link href={jobHref(queued.job.id)} className="text-accent hover:underline">
+          <Link href={jobHref(queued.job.id)} className="text-accent-ink hover:underline">
             job #{queued.job.id}
           </Link>
           {watched.status === "failed" && watched.error ? <span className="text-text">{watched.error}</span> : null}
           {watched.gaveUp ? <span className="text-text-muted">Still not finished; follow the job page.</span> : null}
           {report ? (
-            <Link href={researchHref(report.id)} className="inline-flex items-center gap-1 font-medium text-accent hover:underline">
+            <Link href={researchHref(report.id)} className="inline-flex items-center gap-1 font-medium text-accent-ink hover:underline">
               <FileTextIcon aria-hidden="true" className="size-4" />
               Open the new report
             </Link>

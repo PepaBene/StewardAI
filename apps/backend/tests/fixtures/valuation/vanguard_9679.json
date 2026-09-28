@@ -1,0 +1,79 @@
+{
+ "data": {
+  "funds": [
+   {
+    "profile": {
+     "fundFullName": "Vanguard FTSE All-World UCITS ETF (USD) Accumulating",
+     "shareClassName": "ETF"
+    }
+   }
+  ],
+  "polarisAnalyticsHistory": [
+   {
+    "portId": "9679",
+    "monthly": {
+     "analytics": {
+      "portfolioStatistics": {
+       "items": [
+        {
+         "codes": {
+          "CSTOCK": {
+           "analyticValue": 3784,
+           "effectiveDate": "2026-08-31"
+          }
+         }
+        }
+       ]
+      },
+      "fund": {
+       "items": [
+        {
+         "codes": {
+          "PERATIO": {
+           "analyticValue": "21.0149600000",
+           "effectiveDate": "2026-08-31"
+          },
+          "PBRATIO": {
+           "analyticValue": "3.5613400000",
+           "effectiveDate": "2026-08-31"
+          }
+         }
+        }
+       ]
+      },
+      "benchmark": {
+       "items": [
+        {
+         "codes": {
+          "PERATIOBMK": {
+           "analyticValue": "20.9986900000",
+           "effectiveDate": "2026-08-31"
+          },
+          "PBRATIOBMK": {
+           "analyticValue": "3.5641700000",
+           "effectiveDate": "2026-08-31"
+          }
+         }
+        }
+       ]
+      }
+     },
+     "yields": {
+      "fund": {
+       "items": [
+        {
+         "codes": {
+          "FRCDIVYLD": {
+           "asOfDate": "2026-08-31",
+           "statValue": "1.5272100000"
+          }
+         }
+        }
+       ]
+      }
+     }
+    }
+   }
+  ]
+ }
+}

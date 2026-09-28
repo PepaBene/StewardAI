@@ -4,6 +4,7 @@ import { CircleCheckIcon, CircleDashedIcon, LoaderCircleIcon } from "lucide-reac
 import Link from "next/link";
 
 import { AlertMessage } from "@/components/alert-message";
+import { BlueprintCorners } from "@/components/ui/blueprint";
 import { getBrowserApiClient } from "@/lib/api/client";
 import { describeCorrected, EVAL_KIND_LABELS, evalTarget, EXPORT_COMMAND } from "@/lib/activity/activity";
 import { formatDateTime } from "@/lib/format";
@@ -17,9 +18,10 @@ export function EvalCandidatesPanel() {
   const rows = state.kind === "ok" ? state.data : state.kind === "error" ? state.previous : null;
   const pending = rows?.filter((r) => !r.exported_at).length ?? 0;
   return (
-    <section id="eval-candidates" aria-labelledby="eval-heading" className="scroll-mt-24 space-y-3">
+    <section id="eval-candidates" aria-labelledby="eval-heading" className="blueprint scroll-mt-24 space-y-3 px-5 py-5">
+      <BlueprintCorners />
       <div>
-        <h2 id="eval-heading" className="text-lg font-semibold">
+        <h2 id="eval-heading" className="text-[22px] leading-tight font-semibold">
           Evaluation candidates
         </h2>
         <p className="max-w-prose text-sm text-text-muted">
@@ -43,7 +45,7 @@ export function EvalCandidatesPanel() {
           <p className="text-sm" role="status">
             <span className="num font-medium">{pending}</span> waiting for export · <span className="num">{rows.length - pending}</span> exported
           </p>
-          <div className="overflow-x-auto rounded-lg border border-border bg-surface-raised">
+          <div className="relative overflow-x-auto border border-border">
             <table className="w-full min-w-[48rem] text-sm">
               <caption className="sr-only">Evaluation candidates, newest first</caption>
               <thead className="bg-surface-muted">
@@ -65,7 +67,7 @@ export function EvalCandidatesPanel() {
                       </th>
                       <td className="px-3 py-2">
                         {target.href ? (
-                          <Link href={target.href} className="text-accent hover:underline">
+                          <Link href={target.href} className="text-accent-ink hover:underline">
                             {target.label}
                           </Link>
                         ) : (

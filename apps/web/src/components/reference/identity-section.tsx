@@ -18,6 +18,7 @@ import { useCallback, useEffect, useState, type ReactNode } from "react";
 
 import { AlertMessage } from "@/components/alert-message";
 import { EmptyState } from "@/components/empty-state";
+import { Blueprint, PanelHeading } from "@/components/ui/blueprint";
 import { Button } from "@/components/ui/button";
 import {
   getBrowserApiClient,
@@ -62,12 +63,16 @@ type Decision = { action: "confirm" | "reject"; result: RelationshipDecision };
  * Holding page, identity and structure (Phase 2b): identifiers, listings, liquidity, the
  * legal entity, GLEIF group structure, and relationships waiting for the owner's decision.
  */
-export function IdentitySection({ ticker }: { ticker: string }) {
+export function useHoldingIdentity(ticker: string) {
   const fetcher = useCallback(
     () => getBrowserApiClient().GET("/holdings/{ticker}/identity", { params: { path: { ticker } } }),
     [ticker],
   );
-  const { state, reload } = useApiResource(fetcher);
+  return useApiResource(fetcher);
+}
+
+export function IdentitySection({ ticker, resource }: { ticker: string; resource: ReturnType<typeof useHoldingIdentity> }) {
+  const { state, reload } = resource;
   const data = state.kind === "ok" ? state.data : state.kind === "error" ? state.previous : null;
   const notFound = state.kind === "error" && state.status === 404;
 
@@ -85,12 +90,10 @@ export function IdentitySection({ ticker }: { ticker: string }) {
   }, [refreshing, refresh, reload]);
 
   return (
-    <section aria-labelledby="identity-heading" className="space-y-3">
-      <div className="flex flex-wrap items-center justify-between gap-2">
+    <Blueprint aria-labelledby="identity-heading" className="space-y-3 px-[22px] py-5">
+      <div className="flex flex-wrap items-end justify-between gap-2">
         <div>
-          <h2 id="identity-heading" className="text-lg font-semibold">
-            Identity and structure
-          </h2>
+          <PanelHeading kicker="Identity & structure" title={<span id="identity-heading">Identifiers, listings and group</span>} />
           {resolvedAt ? (
             <p className="flex items-center gap-1.5 text-xs text-text-muted">
               <ClockIcon aria-hidden="true" className="size-3.5" />
@@ -132,7 +135,7 @@ export function IdentitySection({ ticker }: { ticker: string }) {
         </AlertMessage>
       ) : null}
       {data ? <IdentityContent identity={data} reload={reload} /> : null}
-    </section>
+    </Blueprint>
   );
 }
 
@@ -329,7 +332,7 @@ function CompositeListings({ identity }: { identity: HoldingIdentity }) {
       {rows.length === 0 ? (
         <p className="text-sm text-text-muted">No OpenFIGI listings resolved.</p>
       ) : (
-        <div className="overflow-x-auto">
+        <div className="relative overflow-x-auto">
           <table className="w-full min-w-[40rem] text-sm">
             <thead>
               <tr className="border-b border-border text-text-muted">
@@ -388,7 +391,7 @@ function VenueListings({ listings }: { listings: ListingOut[] }) {
       {rows.length === 0 ? (
         <p className="text-sm text-text-muted">No FIRDS records (not admitted to an EU venue, or not yet resolved).</p>
       ) : (
-        <div className="overflow-x-auto">
+        <div className="relative overflow-x-auto">
           <table className="w-full min-w-[40rem] text-sm">
             <thead>
               <tr className="border-b border-border text-text-muted">

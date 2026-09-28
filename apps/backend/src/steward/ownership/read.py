@@ -20,6 +20,8 @@ from decimal import Decimal
 import asyncpg
 from pydantic import BaseModel, Field
 
+from steward.fundamentals.read import SharesOutstandingOut, latest_shares
+
 EFFECTIVE = """
 with f as (
   select * from public.form13f_filing where period = $1
@@ -43,6 +45,22 @@ class TopHolder(BaseModel):
     shares: Decimal
     value_usd: Decimal | None
     accession: str = Field(description="The filing the position is read from.")
+    prev_shares: Decimal | None = Field(
+        default=None,
+        description="The same manager's shares in the previous report period loaded "
+        "(`top_holders_previous_period`); null when it held none then or no earlier period "
+        "is loaded.",
+    )
+    shares_change_pct: float | None = Field(
+        default=None,
+        description="(shares - prev_shares) / prev_shares, as a fraction (0.125 = +12.5 %); "
+        "null when prev_shares is null or zero.",
+    )
+    pct_of_shares_outstanding: float | None = Field(
+        default=None,
+        description="shares x ads_ratio / shares outstanding, as a fraction; null without a "
+        "shares-outstanding figure.",
+    )
 
 
 class OwnershipPeriod(BaseModel):
@@ -55,6 +73,10 @@ class OwnershipPeriod(BaseModel):
     shares_change: Decimal | None
     new_holders: int | None
     exited_holders: int | None
+    pct_of_shares_outstanding: float | None = Field(
+        default=None,
+        description="All 13F holders' shares (x ads_ratio) / shares outstanding, as a fraction.",
+    )
 
 
 class HoldingOwnership(BaseModel):
@@ -62,7 +84,64 @@ class HoldingOwnership(BaseModel):
     cusips: list[str]
     periods: list[OwnershipPeriod] = Field(description="Newest first.")
     top_holders: list[TopHolder] = Field(description="Largest positions, latest period.")
+    top_holders_previous_period: dt.date | None = Field(
+        default=None, description="The period each top holder's prev_shares is from."
+    )
     source: str = "SEC Form 13F data sets"
+    applicable: bool = Field(
+        default=True, description="False for holdings Form 13F cannot cover (non-US listings)."
+    )
+    not_applicable_reason: str | None = None
+    shares_outstanding: SharesOutstandingOut | None = Field(
+        default=None, description="The denominator of the % figures, with its source."
+    )
+    pct_of_shares_outstanding: float | None = Field(
+        default=None, description="Aggregate institutional %: the latest period's figure."
+    )
+    basis_label: str | None = Field(
+        default=None,
+        description="What the % measures, e.g. \"US 13F filers' holdings of the US line - a "
+        'floor" for ADRs.',
+    )
+
+
+US_BASIS = "13F filers only (managers above USD 100 M); smaller holders are not counted"
+ADR_BASIS = "US 13F filers' holdings of the US line — a floor"
+ETF_TYPES = {"ETP", "ETF", "FUND"}
+
+
+def pct_of(shares: Decimal | None, ratio: Decimal, outstanding: Decimal) -> float | None:
+    if shares is None or outstanding <= 0:
+        return None
+    return float(shares * ratio / outstanding)
+
+
+async def not_applicable_reason(pool: asyncpg.Pool, ticker: str) -> str | None:
+    """Why Form 13F cannot cover a holding with no 13F positions loaded: a UCITS ETF, or a
+    company listed only outside the US. None when 13F could cover it (not loaded yet)."""
+    inst = await pool.fetchrow(
+        "select isin, cik, security_type from public.instrument where t212_ticker = $1",
+        ticker,
+    )
+    if inst is None:
+        return None
+    country = (inst["isin"] or "")[:2]
+    if (inst["security_type"] or "").upper() in ETF_TYPES and country not in ("US", "CA"):
+        return (
+            f"Not applicable: an ETF domiciled in {country or 'Europe'}. Form 13F covers only "
+            "Section 13(f) securities (US-listed shares), which this fund is not."
+        )
+    sec_filer = inst["cik"] is not None or await pool.fetchval(
+        "select exists (select 1 from public.shares_outstanding where ticker = $1"
+        " and method <> 'manual')",
+        ticker,
+    )
+    if not sec_filer and country and country not in ("US", "CA"):
+        return (
+            f"Not applicable: listed only outside the US ({country}) and not an SEC registrant. "
+            "Form 13F covers only Section 13(f) securities (US-listed shares)."
+        )
+    return None
 
 
 async def _period_figures(
@@ -135,10 +214,42 @@ async def holding_ownership(
             cusips,
             top,
         )
+    previous = found[1] if len(found) > 1 else None
+    prev_shares: dict[str, Decimal] = {}
+    if previous is not None and top_rows:
+        prev_shares = {
+            r["cik"]: r["shares"]
+            for r in await pool.fetch(
+                EFFECTIVE  # noqa: S608 - constant SQL, values bound as parameters
+                + " select e.cik, sum(h.shares) as shares from effective e"
+                " join public.institutional_holding h on h.accession = e.accession"
+                " where h.cusip = any($2::text[]) and h.shares_type = 'SH'"
+                " and h.put_call is null and e.cik = any($3::text[]) group by e.cik",
+                previous,
+                cusips,
+                [r["cik"] for r in top_rows],
+            )
+        }
+    outstanding = await latest_shares(pool, ticker)
+    counted = outstanding is not None and outstanding.method != "manual"
+    ratio = outstanding.ads_ratio if outstanding else Decimal(1)
+    denominator = outstanding.shares if outstanding else Decimal(0)
+    if counted:
+        for p in out:
+            p.pct_of_shares_outstanding = pct_of(p.shares, ratio, denominator)
+    reason = None if cusips else await not_applicable_reason(pool, ticker)
+    basis_label = None
+    if counted and out and outstanding is not None:
+        basis_label = ADR_BASIS if outstanding.foreign_issuer or ratio != 1 else US_BASIS
     return HoldingOwnership(
         ticker=ticker,
         cusips=cusips,
         periods=out,
+        applicable=reason is None,
+        not_applicable_reason=reason,
+        shares_outstanding=outstanding,
+        pct_of_shares_outstanding=out[0].pct_of_shares_outstanding if out else None,
+        basis_label=basis_label,
         top_holders=[
             TopHolder(
                 cik=r["cik"],
@@ -146,10 +257,23 @@ async def holding_ownership(
                 shares=r["shares"],
                 value_usd=r["value"],
                 accession=r["accession"],
+                prev_shares=prev_shares.get(r["cik"]),
+                shares_change_pct=share_change(r["shares"], prev_shares.get(r["cik"])),
+                pct_of_shares_outstanding=(
+                    pct_of(r["shares"], ratio, denominator) if counted else None
+                ),
             )
             for r in top_rows
         ],
+        top_holders_previous_period=previous,
     )
+
+
+def share_change(shares: Decimal, prev: Decimal | None) -> float | None:
+    """(shares - prev) / prev as a fraction; None without a positive previous position."""
+    if prev is None or prev <= 0:
+        return None
+    return float((shares - prev) / prev)
 
 
 class ManagerChange(BaseModel):

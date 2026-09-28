@@ -1,10 +1,12 @@
 "use client";
 
-import { ExternalLinkIcon, LandmarkIcon, LoaderCircleIcon } from "lucide-react";
+import { ExternalLinkIcon, LoaderCircleIcon } from "lucide-react";
 import { useCallback } from "react";
 
 import { AlertMessage } from "@/components/alert-message";
 import { EmptyState } from "@/components/empty-state";
+import { OutstandingNote } from "@/components/reference/outstanding-note";
+import { Blueprint, PanelHeading } from "@/components/ui/blueprint";
 import { getBrowserApiClient } from "@/lib/api/client";
 import { formatDate } from "@/lib/format";
 import { useApiResource } from "@/lib/hooks/use-api-resource";
@@ -17,6 +19,7 @@ import {
   ownershipState,
   periodLabel,
 } from "@/lib/reference/ownership";
+import { formatOutstandingPct } from "@/lib/reference/shares-outstanding";
 
 function Change({ value }: { value: number | string | null }) {
   const c = formatChange(value);
@@ -33,23 +36,24 @@ function Change({ value }: { value: number | string | null }) {
  * per quarter (newest first) with the change against the quarter before, and the largest
  * holders of the latest quarter. Every figure is dated by its quarter end and filing date.
  */
-export function OwnershipSection({ ticker }: { ticker: string }) {
+export function useHoldingOwnership(ticker: string) {
   const fetcher = useCallback(
     () => getBrowserApiClient().GET("/holdings/{ticker}/ownership", { params: { path: { ticker } } }),
     [ticker],
   );
-  const { state } = useApiResource(fetcher);
+  return useApiResource(fetcher);
+}
+
+export function OwnershipSection({ resource }: { resource: ReturnType<typeof useHoldingOwnership> }) {
+  const { state } = resource;
   const data = state.kind === "ok" ? state.data : state.kind === "error" ? state.previous : null;
   const view = data ? ownershipState(data) : null;
 
   return (
-    <section aria-labelledby="ownership-heading" className="space-y-3">
+    <Blueprint aria-labelledby="ownership-heading" className="space-y-3 px-[22px] py-5">
       <div>
-        <h2 id="ownership-heading" className="flex items-center gap-1.5 text-lg font-semibold">
-          <LandmarkIcon aria-hidden="true" className="size-4 text-text-muted" />
-          Institutional ownership
-        </h2>
-        <p className="text-xs text-text-muted">{OWNERSHIP_NOTE}</p>
+        <PanelHeading kicker="Ownership details" title={<span id="ownership-heading">Institutional ownership by quarter</span>} />
+        <p className="mt-1 text-xs text-text-muted">{OWNERSHIP_NOTE}</p>
       </div>
       {state.kind === "loading" ? (
         <p className="flex items-center gap-2 text-sm text-text-muted" role="status">
@@ -58,17 +62,29 @@ export function OwnershipSection({ ticker }: { ticker: string }) {
         </p>
       ) : null}
       {state.kind === "error" ? <AlertMessage title={`13F ownership: ${state.title}`}>{state.detail}</AlertMessage> : null}
-      {view?.kind === "empty" ? <EmptyState title="No 13F ownership">{view.reason}</EmptyState> : null}
+      {view?.kind === "empty" ? (
+        <EmptyState title={data?.applicable === false ? "13F ownership: not applicable" : "No 13F ownership"}>
+          {data?.applicable === false ? data.not_applicable_reason : view.reason}
+        </EmptyState>
+      ) : null}
       {data && view?.kind === "ok" ? (
         <>
           <p className="num text-sm">
             <span className="font-medium">{view.latest.holders}</span> managers held{" "}
             <span className="font-medium">{formatShares(view.latest.shares)}</span> shares worth{" "}
             <span className="font-medium">{formatUsdCompact(view.latest.value_usd)}</span>
+            {typeof view.latest.pct_of_shares_outstanding === "number" ? (
+              <>
+                {" "}
+                — <span className="font-medium">{formatOutstandingPct(view.latest.pct_of_shares_outstanding)}</span> of
+                shares outstanding
+              </>
+            ) : null}
             <span className="text-text-muted"> · {periodLabel(view.latest, formatDate)}</span>
           </p>
-          <div className="overflow-x-auto rounded-lg border border-border bg-surface-raised">
-            <table className="w-full min-w-[40rem] text-sm">
+          <OutstandingNote data={data} />
+          <div className="relative overflow-x-auto border border-border">
+            <table className="w-full min-w-[46rem] text-sm">
               <caption className="px-3 pt-2 text-left text-xs text-text-muted">
                 Per quarter, newest first; changes are against the quarter before it.
               </caption>
@@ -82,6 +98,7 @@ export function OwnershipSection({ ticker }: { ticker: string }) {
                   <th scope="col" className="px-3 py-2 text-right font-medium">Shares</th>
                   <th scope="col" className="px-3 py-2 text-right font-medium">Change</th>
                   <th scope="col" className="px-3 py-2 text-right font-medium">Value</th>
+                  <th scope="col" className="px-3 py-2 text-right font-medium">% of shares out.</th>
                 </tr>
               </thead>
               <tbody>
@@ -105,6 +122,7 @@ export function OwnershipSection({ ticker }: { ticker: string }) {
                     <td className="num px-3 py-2 text-right" title={`${p.value_usd} USD`}>
                       {formatUsdCompact(p.value_usd)}
                     </td>
+                    <td className="num px-3 py-2 text-right">{formatOutstandingPct(p.pct_of_shares_outstanding)}</td>
                   </tr>
                 ))}
               </tbody>
@@ -127,6 +145,9 @@ export function OwnershipSection({ ticker }: { ticker: string }) {
                       <span className="num flex flex-wrap items-center gap-3 text-text-muted">
                         <span>{formatShares(h.shares)} shares</span>
                         <span>{formatUsdCompact(h.value_usd)}</span>
+                        {typeof h.pct_of_shares_outstanding === "number" ? (
+                          <span title="of shares outstanding">{formatOutstandingPct(h.pct_of_shares_outstanding)}</span>
+                        ) : null}
                         {filing ? (
                           <a href={filing} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-xs text-accent hover:underline">
                             filing
@@ -146,6 +167,6 @@ export function OwnershipSection({ ticker }: { ticker: string }) {
           <p className="text-xs text-text-muted">Source: {data.source}.</p>
         </>
       ) : null}
-    </section>
+    </Blueprint>
   );
 }

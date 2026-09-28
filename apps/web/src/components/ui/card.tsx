@@ -1,17 +1,19 @@
 import * as React from "react";
 
+import { BlueprintCorners } from "@/components/ui/blueprint";
 import { cn } from "@/lib/utils";
 
-function Card({ className, ...props }: React.ComponentProps<"div">) {
+/** A blueprint frame: transparent, square, hairline-bordered, registration marks. */
+function Card({ className, children, ...props }: React.ComponentProps<"div">) {
   return (
     <div
       data-slot="card"
-      className={cn(
-        "flex flex-col gap-6 rounded-lg border border-border bg-surface-raised py-6 text-text shadow-sm",
-        className,
-      )}
+      className={cn("blueprint flex flex-col gap-5 py-6 text-text", className)}
       {...props}
-    />
+    >
+      <BlueprintCorners />
+      {children}
+    </div>
   );
 }
 
@@ -29,7 +31,7 @@ function CardTitle({ className, ...props }: React.ComponentProps<"div">) {
   return (
     <div
       data-slot="card-title"
-      className={cn("leading-none font-semibold", className)}
+      className={cn("font-heading text-[22px] leading-tight font-semibold", className)}
       {...props}
     />
   );

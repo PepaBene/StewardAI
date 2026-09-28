@@ -18,11 +18,16 @@ from api.budget_routes import router as budget_router
 from api.chat_routes import router as chat_router
 from api.config_history_routes import router as config_history_router
 from api.db import close_pool, get_pool_or_error
+from api.escalation_routes import router as escalation_router
+from api.fundamentals_routes import router as fundamentals_router
+from api.lookthrough_routes import router as lookthrough_router
+from api.market_routes import router as market_router
 from api.news_routes import router as news_router
 from api.prompts_routes import router as prompts_router
 from api.reference_routes import router as reference_router
 from api.research_routes import router as research_router
 from api.routes import router
+from api.valuation_routes import router as valuation_router
 from api.verify_routes import router as verify_router
 from steward import __version__
 from steward.config import StrategyConfig, ThesesConfig
@@ -151,7 +156,7 @@ def create_app() -> FastAPI:
     app.add_middleware(
         CORSMiddleware,
         allow_origins=settings.cors_origins,
-        allow_methods=["GET", "POST", "PUT", "DELETE"],
+        allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE"],
         allow_headers=["Authorization", "Content-Type"],
     )
 
@@ -210,14 +215,19 @@ def create_app() -> FastAPI:
         return body
 
     app.include_router(config_history_router)
+    app.include_router(market_router)
+    app.include_router(lookthrough_router)
+    app.include_router(valuation_router)
     app.include_router(router)
     app.include_router(prompts_router)
     app.include_router(budget_router)
     app.include_router(research_router)  # before news: /reports/search vs /reports/{id}
+    app.include_router(escalation_router)  # before news: /escalations/stats vs /{id}
     app.include_router(news_router)
     app.include_router(reference_router)
     app.include_router(verify_router)
     app.include_router(chat_router)
+    app.include_router(fundamentals_router)
     return app
 
 

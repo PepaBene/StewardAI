@@ -1,0 +1,395 @@
+<?xml version="1.0" encoding="utf-8"?>
+<xbrl
+  xml:lang="en-US"
+  xmlns="http://www.xbrl.org/2003/instance"
+  xmlns:country="http://xbrl.sec.gov/country/2025"
+  xmlns:currency="http://xbrl.sec.gov/currency/2025"
+  xmlns:cyd="http://xbrl.sec.gov/cyd/2025"
+  xmlns:dei="http://xbrl.sec.gov/dei/2025"
+  xmlns:ecd="http://xbrl.sec.gov/ecd/2025"
+  xmlns:ifrs-full="https://xbrl.ifrs.org/taxonomy/2025-03-27/ifrs-full"
+  xmlns:iso4217="http://www.xbrl.org/2003/iso4217"
+  xmlns:link="http://www.xbrl.org/2003/linkbase"
+  xmlns:srt="http://fasb.org/srt/2025"
+  xmlns:tsm="http://www.tsmc.com/20251231"
+  xmlns:xbrldi="http://xbrl.org/2006/xbrldi"
+  xmlns:xlink="http://www.w3.org/1999/xlink">
+    <link:schemaRef xlink:href="tsm-20251231.xsd" xlink:type="simple"/>
+    <context id="c-1">
+        <entity>
+            <identifier scheme="http://www.sec.gov/CIK">0001046179</identifier>
+        </entity>
+        <period>
+            <startDate>2025-01-01</startDate>
+            <endDate>2025-12-31</endDate>
+        </period>
+    </context>
+<context id="c-3">
+        <entity>
+            <identifier scheme="http://www.sec.gov/CIK">0001046179</identifier>
+        </entity>
+        <period>
+            <instant>2025-12-31</instant>
+        </period>
+    </context>
+<context id="c-4">
+        <entity>
+            <identifier scheme="http://www.sec.gov/CIK">0001046179</identifier>
+        </entity>
+        <period>
+            <instant>2024-12-31</instant>
+        </period>
+    </context>
+<context id="c-5">
+        <entity>
+            <identifier scheme="http://www.sec.gov/CIK">0001046179</identifier>
+        </entity>
+        <period>
+            <startDate>2023-01-01</startDate>
+            <endDate>2023-12-31</endDate>
+        </period>
+    </context>
+<context id="c-6">
+        <entity>
+            <identifier scheme="http://www.sec.gov/CIK">0001046179</identifier>
+        </entity>
+        <period>
+            <startDate>2024-01-01</startDate>
+            <endDate>2024-12-31</endDate>
+        </period>
+    </context>
+<context id="c-663">
+        <entity>
+            <identifier scheme="http://www.sec.gov/CIK">0001046179</identifier>
+        </entity>
+        <period>
+            <startDate>2023-01-01</startDate>
+            <endDate>2023-03-31</endDate>
+        </period>
+    </context>
+<context id="c-664">
+        <entity>
+            <identifier scheme="http://www.sec.gov/CIK">0001046179</identifier>
+        </entity>
+        <period>
+            <startDate>2023-04-01</startDate>
+            <endDate>2023-06-30</endDate>
+        </period>
+    </context>
+<context id="c-665">
+        <entity>
+            <identifier scheme="http://www.sec.gov/CIK">0001046179</identifier>
+        </entity>
+        <period>
+            <startDate>2023-07-01</startDate>
+            <endDate>2023-09-30</endDate>
+        </period>
+    </context>
+<context id="c-666">
+        <entity>
+            <identifier scheme="http://www.sec.gov/CIK">0001046179</identifier>
+        </entity>
+        <period>
+            <startDate>2023-10-01</startDate>
+            <endDate>2023-12-31</endDate>
+        </period>
+    </context>
+<context id="c-675">
+        <entity>
+            <identifier scheme="http://www.sec.gov/CIK">0001046179</identifier>
+        </entity>
+        <period>
+            <startDate>2024-01-01</startDate>
+            <endDate>2024-03-31</endDate>
+        </period>
+    </context>
+<context id="c-676">
+        <entity>
+            <identifier scheme="http://www.sec.gov/CIK">0001046179</identifier>
+        </entity>
+        <period>
+            <startDate>2024-04-01</startDate>
+            <endDate>2024-06-30</endDate>
+        </period>
+    </context>
+<context id="c-677">
+        <entity>
+            <identifier scheme="http://www.sec.gov/CIK">0001046179</identifier>
+        </entity>
+        <period>
+            <startDate>2024-07-01</startDate>
+            <endDate>2024-09-30</endDate>
+        </period>
+    </context>
+<context id="c-678">
+        <entity>
+            <identifier scheme="http://www.sec.gov/CIK">0001046179</identifier>
+        </entity>
+        <period>
+            <startDate>2024-10-01</startDate>
+            <endDate>2024-12-31</endDate>
+        </period>
+    </context>
+<context id="c-687">
+        <entity>
+            <identifier scheme="http://www.sec.gov/CIK">0001046179</identifier>
+        </entity>
+        <period>
+            <startDate>2025-01-01</startDate>
+            <endDate>2025-03-31</endDate>
+        </period>
+    </context>
+<context id="c-688">
+        <entity>
+            <identifier scheme="http://www.sec.gov/CIK">0001046179</identifier>
+        </entity>
+        <period>
+            <startDate>2025-04-01</startDate>
+            <endDate>2025-06-30</endDate>
+        </period>
+    </context>
+<context id="c-689">
+        <entity>
+            <identifier scheme="http://www.sec.gov/CIK">0001046179</identifier>
+        </entity>
+        <period>
+            <startDate>2025-07-01</startDate>
+            <endDate>2025-09-30</endDate>
+        </period>
+    </context>
+<context id="c-690">
+        <entity>
+            <identifier scheme="http://www.sec.gov/CIK">0001046179</identifier>
+        </entity>
+        <period>
+            <startDate>2025-10-01</startDate>
+            <endDate>2025-12-31</endDate>
+        </period>
+    </context>
+<context id="c-7">
+        <entity>
+            <identifier scheme="http://www.sec.gov/CIK">0001046179</identifier>
+            <segment>
+                <xbrldi:explicitMember dimension="ifrs-full:ClassesOfShareCapitalAxis">tsm:AmericanDepositarySharesMember</xbrldi:explicitMember>
+            </segment>
+        </entity>
+        <period>
+            <startDate>2023-01-01</startDate>
+            <endDate>2023-12-31</endDate>
+        </period>
+    </context>
+<context id="c-8">
+        <entity>
+            <identifier scheme="http://www.sec.gov/CIK">0001046179</identifier>
+            <segment>
+                <xbrldi:explicitMember dimension="ifrs-full:ClassesOfShareCapitalAxis">tsm:AmericanDepositarySharesMember</xbrldi:explicitMember>
+            </segment>
+        </entity>
+        <period>
+            <startDate>2024-01-01</startDate>
+            <endDate>2024-12-31</endDate>
+        </period>
+    </context>
+<context id="c-9">
+        <entity>
+            <identifier scheme="http://www.sec.gov/CIK">0001046179</identifier>
+            <segment>
+                <xbrldi:explicitMember dimension="ifrs-full:ClassesOfShareCapitalAxis">tsm:AmericanDepositarySharesMember</xbrldi:explicitMember>
+            </segment>
+        </entity>
+        <period>
+            <startDate>2025-01-01</startDate>
+            <endDate>2025-12-31</endDate>
+        </period>
+    </context>
+<context id="c-2">
+        <entity>
+            <identifier scheme="http://www.sec.gov/CIK">0001046179</identifier>
+            <segment>
+                <xbrldi:explicitMember dimension="dei:EntityAddressesAddressTypeAxis">dei:BusinessContactMember</xbrldi:explicitMember>
+            </segment>
+        </entity>
+        <period>
+            <startDate>2025-01-01</startDate>
+            <endDate>2025-12-31</endDate>
+        </period>
+    </context>
+<unit id="shares">
+        <measure>shares</measure>
+    </unit>
+<unit id="twd">
+        <measure>iso4217:TWD</measure>
+    </unit>
+<unit id="usd">
+        <measure>iso4217:USD</measure>
+    </unit>
+<unit id="twdPerShare">
+        <divide>
+            <unitNumerator>
+                <measure>iso4217:TWD</measure>
+            </unitNumerator>
+            <unitDenominator>
+                <measure>shares</measure>
+            </unitDenominator>
+        </divide>
+    </unit>
+<unit id="usdPerShare">
+        <divide>
+            <unitNumerator>
+                <measure>iso4217:USD</measure>
+            </unitNumerator>
+            <unitDenominator>
+                <measure>shares</measure>
+            </unitDenominator>
+        </divide>
+    </unit>
+<unit id="number">
+        <measure>pure</measure>
+    </unit>
+<unit id="jpy">
+        <measure>iso4217:JPY</measure>
+    </unit>
+<unit id="vote">
+        <measure>tsm:vote</measure>
+    </unit>
+<unit id="patent">
+        <measure>tsm:patent</measure>
+    </unit>
+<unit id="segment">
+        <measure>tsm:segment</measure>
+    </unit>
+<ifrs-full:DilutedEarningsLossPerShare
+      contextRef="c-5"
+      decimals="2"
+      id="f-386"
+      unitRef="twdPerShare">32.85</ifrs-full:DilutedEarningsLossPerShare>
+<ifrs-full:DilutedEarningsLossPerShare
+      contextRef="c-6"
+      decimals="2"
+      id="f-387"
+      unitRef="twdPerShare">44.67</ifrs-full:DilutedEarningsLossPerShare>
+<ifrs-full:DilutedEarningsLossPerShare
+      contextRef="c-1"
+      decimals="2"
+      id="f-388"
+      unitRef="twdPerShare">65.47</ifrs-full:DilutedEarningsLossPerShare>
+<ifrs-full:DilutedEarningsLossPerShare
+      contextRef="c-1"
+      decimals="2"
+      id="f-389"
+      unitRef="usdPerShare">2.09</ifrs-full:DilutedEarningsLossPerShare>
+<ifrs-full:DilutedEarningsLossPerShare
+      contextRef="c-7"
+      decimals="2"
+      id="f-394"
+      unitRef="twdPerShare">164.24</ifrs-full:DilutedEarningsLossPerShare>
+<ifrs-full:DilutedEarningsLossPerShare
+      contextRef="c-8"
+      decimals="2"
+      id="f-395"
+      unitRef="twdPerShare">223.37</ifrs-full:DilutedEarningsLossPerShare>
+<ifrs-full:DilutedEarningsLossPerShare
+      contextRef="c-9"
+      decimals="2"
+      id="f-396"
+      unitRef="twdPerShare">327.34</ifrs-full:DilutedEarningsLossPerShare>
+<ifrs-full:DilutedEarningsLossPerShare
+      contextRef="c-9"
+      decimals="2"
+      id="f-397"
+      unitRef="usdPerShare">10.43</ifrs-full:DilutedEarningsLossPerShare>
+<ifrs-full:DilutedEarningsLossPerShare
+      contextRef="c-5"
+      decimals="2"
+      id="f-2840"
+      unitRef="twdPerShare">32.85</ifrs-full:DilutedEarningsLossPerShare>
+<ifrs-full:DilutedEarningsLossPerShare
+      contextRef="c-6"
+      decimals="2"
+      id="f-2841"
+      unitRef="twdPerShare">44.67</ifrs-full:DilutedEarningsLossPerShare>
+<ifrs-full:DilutedEarningsLossPerShare
+      contextRef="c-1"
+      decimals="2"
+      id="f-2842"
+      unitRef="twdPerShare">65.47</ifrs-full:DilutedEarningsLossPerShare>
+<ifrs-full:DilutedEarningsLossPerShare
+      contextRef="c-5"
+      decimals="2"
+      id="f-2864"
+      unitRef="twdPerShare">32.85</ifrs-full:DilutedEarningsLossPerShare>
+<ifrs-full:DilutedEarningsLossPerShare
+      contextRef="c-6"
+      decimals="2"
+      id="f-2865"
+      unitRef="twdPerShare">44.67</ifrs-full:DilutedEarningsLossPerShare>
+<ifrs-full:DilutedEarningsLossPerShare
+      contextRef="c-1"
+      decimals="2"
+      id="f-2866"
+      unitRef="twdPerShare">65.47</ifrs-full:DilutedEarningsLossPerShare>
+<ifrs-full:EquityAttributableToOwnersOfParent contextRef="c-4" decimals="-5" id="f-218" unitRef="twd">4244266500000</ifrs-full:EquityAttributableToOwnersOfParent>
+<ifrs-full:EquityAttributableToOwnersOfParent contextRef="c-3" decimals="-5" id="f-219" unitRef="twd">5355038700000</ifrs-full:EquityAttributableToOwnersOfParent>
+<ifrs-full:EquityAttributableToOwnersOfParent contextRef="c-3" decimals="-5" id="f-220" unitRef="usd">170705700000</ifrs-full:EquityAttributableToOwnersOfParent>
+<dei:EntityCommonStockSharesOutstanding contextRef="c-3" decimals="0" id="f-28" unitRef="shares">25932524521</dei:EntityCommonStockSharesOutstanding>
+<ifrs-full:DividendsRecognisedAsDistributionsToOwnersPerShare
+      contextRef="c-663"
+      decimals="2"
+      id="f-2222"
+      unitRef="twdPerShare">3.00</ifrs-full:DividendsRecognisedAsDistributionsToOwnersPerShare>
+<ifrs-full:DividendsRecognisedAsDistributionsToOwnersPerShare
+      contextRef="c-664"
+      decimals="2"
+      id="f-2223"
+      unitRef="twdPerShare">3.00</ifrs-full:DividendsRecognisedAsDistributionsToOwnersPerShare>
+<ifrs-full:DividendsRecognisedAsDistributionsToOwnersPerShare
+      contextRef="c-665"
+      decimals="2"
+      id="f-2224"
+      unitRef="twdPerShare">3.50</ifrs-full:DividendsRecognisedAsDistributionsToOwnersPerShare>
+<ifrs-full:DividendsRecognisedAsDistributionsToOwnersPerShare
+      contextRef="c-666"
+      decimals="2"
+      id="f-2225"
+      unitRef="twdPerShare">3.50</ifrs-full:DividendsRecognisedAsDistributionsToOwnersPerShare>
+<ifrs-full:DividendsRecognisedAsDistributionsToOwnersPerShare
+      contextRef="c-675"
+      decimals="2"
+      id="f-2234"
+      unitRef="twdPerShare">4.00</ifrs-full:DividendsRecognisedAsDistributionsToOwnersPerShare>
+<ifrs-full:DividendsRecognisedAsDistributionsToOwnersPerShare
+      contextRef="c-676"
+      decimals="2"
+      id="f-2235"
+      unitRef="twdPerShare">4.00</ifrs-full:DividendsRecognisedAsDistributionsToOwnersPerShare>
+<ifrs-full:DividendsRecognisedAsDistributionsToOwnersPerShare
+      contextRef="c-677"
+      decimals="2"
+      id="f-2236"
+      unitRef="twdPerShare">4.50</ifrs-full:DividendsRecognisedAsDistributionsToOwnersPerShare>
+<ifrs-full:DividendsRecognisedAsDistributionsToOwnersPerShare
+      contextRef="c-678"
+      decimals="2"
+      id="f-2237"
+      unitRef="twdPerShare">4.50</ifrs-full:DividendsRecognisedAsDistributionsToOwnersPerShare>
+<ifrs-full:DividendsRecognisedAsDistributionsToOwnersPerShare
+      contextRef="c-687"
+      decimals="2"
+      id="f-2246"
+      unitRef="twdPerShare">5.00</ifrs-full:DividendsRecognisedAsDistributionsToOwnersPerShare>
+<ifrs-full:DividendsRecognisedAsDistributionsToOwnersPerShare
+      contextRef="c-688"
+      decimals="2"
+      id="f-2247"
+      unitRef="twdPerShare">5.00</ifrs-full:DividendsRecognisedAsDistributionsToOwnersPerShare>
+<ifrs-full:DividendsRecognisedAsDistributionsToOwnersPerShare
+      contextRef="c-689"
+      decimals="2"
+      id="f-2248"
+      unitRef="twdPerShare">6.00</ifrs-full:DividendsRecognisedAsDistributionsToOwnersPerShare>
+<ifrs-full:DividendsRecognisedAsDistributionsToOwnersPerShare
+      contextRef="c-690"
+      decimals="2"
+      id="f-2249"
+      unitRef="twdPerShare">6.00</ifrs-full:DividendsRecognisedAsDistributionsToOwnersPerShare>
+</xbrl>

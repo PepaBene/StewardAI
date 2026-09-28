@@ -27,7 +27,10 @@ export type SettingsKey =
   | "calendar"
   | "chat"
   | "review"
-  | "ownership";
+  | "ownership"
+  | "valuation"
+  | "look_through"
+  | "xbrl";
 type Settings<S extends SettingsKey> = NonNullable<JobsConfig[S]>;
 
 /** Labels and the backend's default cron per known schedule (apps/backend/src/steward/config/jobs.py). */
@@ -64,7 +67,7 @@ export const SCHEDULES: Record<ScheduleKey, { label: string; description: string
   },
   price_history: {
     label: "Price history",
-    description: "Daily prices from Stooq and FX history after the close.",
+    description: "Daily prices (Stooq, Yahoo as the fallback), the PX close and FX history after the close.",
     cron: "15 23 * * 1-5",
   },
   holiday_refresh: {
@@ -74,7 +77,7 @@ export const SCHEDULES: Record<ScheduleKey, { label: string; description: string
   },
   macro_collect: {
     label: "Macro data",
-    description: "FRED, ECB and Eurostat macro series; macro surprises on release days.",
+    description: "FRED, ECB, Eurostat and ČNB macro series (CZEONIA is the Sharpe ratio’s risk-free rate); macro surprises on release days.",
     cron: "30 11 * * *",
   },
   monitor: {
@@ -107,6 +110,23 @@ export const SCHEDULES: Record<ScheduleKey, { label: string; description: string
     label: "Institutional ownership (13F)",
     description: "Load new SEC Form 13F data sets (published quarterly, about 100 MB each).",
     cron: "0 5 5 * *",
+  },
+  valuation_refresh: {
+    label: "Valuation fundamentals",
+    description:
+      "EPS, book value and dividends per share from SEC XBRL and ESEF for holdings that filed since the last read (all of them weekly), and the ETF providers' fund P/E and P/B.",
+    cron: "45 7 * * *",
+  },
+  etf_look_through: {
+    label: "ETF look-through",
+    description: "The funds' holdings from iShares and Vanguard (skipped when the as-of date has not moved).",
+    cron: "40 6 * * 6",
+  },
+  sec_xbrl: {
+    label: "SEC XBRL fundamentals",
+    description:
+      "Shares outstanding (the 13F % denominator) and revenue by region / segment from the holdings' latest 10-K, 10-Q and 20-F XBRL. Only filings not parsed yet are downloaded.",
+    cron: "40 5 * * 2",
   },
 };
 export const SCHEDULE_KEYS = Object.keys(SCHEDULES) as ScheduleKey[];
@@ -188,6 +208,10 @@ export const DEFAULT_JOBS: JobsConfig = {
     ecb: [
       { key: "ecb_deposit_rate", label: "ECB deposit facility rate", flow_key: "FM/D.U2.EUR.4F.KR.DFR.LEV", unit: "%", policy_rate: true },
     ],
+    cnb: [
+      { key: "czeonia", label: "CZEONIA (CZK overnight rate)", series: "czeonia", unit: "%", policy_rate: false },
+      { key: "cnb_repo_2w", label: "ČNB 2-week repo rate", series: "repo_2w", unit: "%", policy_rate: true },
+    ],
   },
   monitoring: {
     alert_failed_jobs: [
@@ -210,7 +234,21 @@ export const DEFAULT_JOBS: JobsConfig = {
     max_subsidiary_aliases: 50,
     wikidata_languages: ["en", "de", "cs"],
   },
-  prices: { benchmark_symbols: ["^spx"], history_years: 2, plausibility_tolerance_pct: 1 },
+  prices: {
+    benchmark_symbols: ["^spx"],
+    history_years: 2,
+    plausibility_tolerance_pct: 1,
+    market_strip: [
+      { symbol: "^spx", label: "S&P 500", yahoo_symbol: "^GSPC" },
+      { symbol: "^stoxx", label: "STOXX Europe 600", yahoo_symbol: "^STOXX" },
+      { symbol: "^px", label: "PX" },
+    ],
+    yahoo_daily_fallback: true,
+    intraday_enabled: true,
+    intraday_interval_minutes: 15,
+    intraday_retention_days: 5,
+    intraday_cache_seconds: 120,
+  },
   calendar: { holiday_countries: ["CZ", "US", "DE", "GB"], exchange_closures: [] },
   chat: { model: "claude-sonnet-5", effort: null, max_steps: 30, max_searches: 15, history_messages: 100, source_tiers: [1, 2] },
   review: {
@@ -230,6 +268,26 @@ export const DEFAULT_JOBS: JobsConfig = {
     tracked_managers: [],
     top_holders: 10,
   },
+  valuation: {
+    enabled: true,
+    full_refresh_days: 7,
+    esef_max_age_months: 18,
+    finnhub_cross_check: true,
+  },
+  // Funds, benchmark proxies and issuer groups: the backend's defaults (CSPX 253743, VWCE 9679).
+  look_through: {
+    enabled: true,
+    ishares_api_url: "https://www.blackrock.com/varnish-api/uk-retail01-product-data/product-data",
+    ishares_site: "ishares-uk",
+    ishares_locale: "en_GB",
+    ishares_spreadsheet_fallback: true,
+    vanguard_graphql_url: "https://www.ie.vanguard/gpx/graphql",
+    vanguard_consumer_id: "ie0",
+    cached_fallback_days: 45,
+    stale_after_days: 60,
+    keep_snapshots: 12,
+  },
+  xbrl: { enabled: true, quarterly: true, read_ads_ratio: true, max_document_mb: 40 },
 };
 
 /** Model ids offered as suggestions; any `claude-…` id is accepted. */
@@ -273,6 +331,7 @@ export type SettingField<S extends SettingsKey> = {
     | "int-list"
     | "severity"
     | "lines"
+    | "symbol-lines"
     | "codes"
     | "words"
     | "tiers";
@@ -382,11 +441,18 @@ export const SETTINGS: { [S in SettingsKey]: { title: string; description: strin
   },
   prices: {
     title: "Prices",
-    description: "Daily closes from Stooq, and the risk figures computed from them.",
+    description:
+      "Daily closes from Stooq (Yahoo Finance as the fallback) and the risk figures computed from them; intraday prices from Yahoo Finance (unofficial).",
     fields: [
       { key: "benchmark_symbols", label: "Benchmark symbols", kind: "lines", hint: "Stooq symbols, one per line: ^spx S&P 500, ^dax DAX, ^ukx FTSE 100. The first is used for beta and the holding charts." },
       { key: "history_years", label: "Years of history", kind: "int", min: 1, max: 10 },
       { key: "plausibility_tolerance_pct", label: "Plausibility tolerance (%)", kind: "number", hint: "Largest gap between Stooq's close and Trading212's price on a sync day before it is flagged. Above 0, up to 20." },
+      { key: "market_strip", label: "Market strip indices", kind: "symbol-lines", hint: "One per line: the Stooq symbol, a space, the label shown in the header, and optionally \" | \" and the Yahoo symbol of the same index, e.g. ^spx S&P 500 | ^GSPC. Stooq's close first, else Yahoo's (intraday while the market is open); PX (^px) falls back to the Prague Stock Exchange's page, read once a day. An index no source has shows as empty." },
+      { key: "yahoo_daily_fallback", label: "Daily closes from Yahoo Finance when Stooq has none", kind: "bool", hint: "Unofficial source, used only for a symbol Stooq refuses, cannot be reached for or does not know. Stooq stays the source of record." },
+      { key: "intraday_enabled", label: "Intraday prices (Yahoo Finance, unofficial)", kind: "bool", hint: "5-minute bars, about 15 minutes delayed, polled only while each listing's market is open and fetched when a holding page opens. Unofficial: it may rate-limit or break without notice; pages then fall back to daily closes with a note." },
+      { key: "intraday_interval_minutes", label: "Intraday poll interval (minutes)", kind: "int", min: 5, max: 60, hint: "While a market is open: 5, 10, 15, 20, 30 or 60. Every 15 minutes is about 800 requests a day." },
+      { key: "intraday_retention_days", label: "Intraday bars kept (days)", kind: "int", min: 1, max: 14 },
+      { key: "intraday_cache_seconds", label: "Holding page refetch after (seconds)", kind: "int", min: 30, max: 900, hint: "During trading hours, a holding page asks Yahoo again once its stored prices are this old." },
     ],
   },
   calendar: {
@@ -442,15 +508,61 @@ export const SETTINGS: { [S in SettingsKey]: { title: string; description: strin
       { key: "top_holders", label: "Largest holders shown", kind: "int", min: 1, max: 50 },
     ],
   },
+  valuation: {
+    title: "Valuation",
+    description:
+      "P/E, P/B and dividend yield: fundamentals from SEC XBRL (with the filing's own instance when companyfacts lags) and ESEF reports on filings.xbrl.org; fund-level figures from the ETF providers (the funds list is kept as saved).",
+    fields: [
+      { key: "enabled", label: "Refresh valuation fundamentals", kind: "bool", hint: "Off: the scheduled run does nothing." },
+      { key: "full_refresh_days", label: "Re-read every holding every (days)", kind: "int", min: 1, max: 90, hint: "A holding that filed a new report is re-read on the next run anyway." },
+      { key: "esef_max_age_months", label: "Ignore ESEF reports older than (months)", kind: "int", min: 3, max: 60 },
+      { key: "finnhub_cross_check", label: "Finnhub cross-check (tier 2)", kind: "bool", hint: "Only with FINNHUB_API_KEY; never required." },
+    ],
+  },
+  look_through: {
+    title: "ETF look-through",
+    description:
+      "Holdings of the funds you hold, from the issuers' own undocumented endpoints (iShares product-data JSON, Vanguard GraphQL), stored weekly as dated snapshots. Funds, benchmark proxies (^spx → CSPX holdings) and issuer groups are kept as saved; edit them through Config export/import.",
+    fields: [
+      { key: "enabled", label: "Fetch from the issuers", kind: "bool", hint: "Off: stored snapshots are still shown." },
+      { key: "ishares_spreadsheet_fallback", label: "iShares: fall back to the full-fund download", kind: "bool", hint: "When the JSON fails and no recent snapshot is stored. It has no country or ISIN column." },
+      { key: "cached_fallback_days", label: "Keep using a stored snapshot for (days)", kind: "int", min: 1, max: 400, hint: "After a failed fetch, before trying the spreadsheet fallback." },
+      { key: "stale_after_days", label: "Label a snapshot stale after (days)", kind: "int", min: 7, max: 400, hint: "Vanguard publishes month-end data a few weeks late." },
+      { key: "keep_snapshots", label: "Snapshots kept per fund", kind: "int", min: 1, max: 200 },
+      { key: "vanguard_consumer_id", label: "Vanguard X-Consumer-ID", kind: "text", hint: "ie0 for www.ie.vanguard (uk0 for vanguard.co.uk, de0 for de.vanguard)." },
+    ],
+  },
+  xbrl: {
+    title: "SEC XBRL fundamentals",
+    description:
+      "Shares outstanding and revenue by region / segment / product from each holding's latest XBRL filing (SEC EDGAR, official).",
+    fields: [
+      { key: "enabled", label: "Read SEC XBRL filings", kind: "bool", hint: "Off: the scheduled run does nothing." },
+      { key: "quarterly", label: "Also parse the latest 10-Q", kind: "bool", hint: "US issuers; 20-F filers publish annual XBRL only." },
+      {
+        key: "read_ads_ratio",
+        label: "Read the ADS ratio from 20-F text",
+        kind: "bool",
+        hint: "Checks the share basis against what the annual report states (one download per new 20-F).",
+      },
+      { key: "max_document_mb", label: "Largest document (MB)", kind: "int", min: 1, max: 200 },
+    ],
+  },
 };
 export const SETTINGS_KEYS = Object.keys(SETTINGS) as SettingsKey[];
 
-/** The macro series lists (`macro.eurostat`, `macro.fred`, `macro.ecb`), edited as rows. */
-export type MacroSource = "eurostat" | "fred" | "ecb";
+/** The macro series lists (`macro.eurostat`, `macro.fred`, `macro.ecb`, `macro.cnb`), edited as rows. */
+export type MacroSource = "eurostat" | "fred" | "ecb" | "cnb";
 export const MACRO_SOURCES: readonly { value: MacroSource; label: string; ref: string; refHint: string }[] = [
   { value: "eurostat", label: "Eurostat", ref: "Dataset", refHint: "Dataset code, e.g. prc_hicp_minr." },
   { value: "fred", label: "FRED (US)", ref: "Series id", refHint: "FRED series id, e.g. CPIAUCSL." },
   { value: "ecb", label: "ECB Data Portal", ref: "Flow/key", refHint: "Flow and key, e.g. FM/D.U2.EUR.4F.KR.DFR.LEV." },
+  {
+    value: "cnb",
+    label: "ČNB (Czech National Bank)",
+    ref: "Series",
+    refHint: "czeonia (CZK overnight rate, daily; key it “czeonia” for the Sharpe ratio) or repo_2w (2-week repo rate changes).",
+  },
 ];
 export type FredUnits = "lin" | "pch" | "pc1" | "chg";
 export const FRED_UNITS: readonly { value: FredUnits; label: string }[] = [
@@ -465,18 +577,18 @@ export type MacroSeriesForm = {
   /** The series key used in digests and surprise bands (e.g. "hicp"). */
   key: string;
   label: string;
-  /** Eurostat dataset, FRED series id or ECB flow/key. */
+  /** Eurostat dataset, FRED series id, ECB flow/key or ČNB series (czeonia | repo_2w). */
   ref: string;
   /** Eurostat only: "dimension=value" per line. */
   filters: string;
   /** FRED only. */
   units: FredUnits;
   unit: string;
-  /** FRED and ECB: a policy rate (any change is a surprise). */
+  /** FRED, ECB and ČNB: a policy rate (any change is a surprise). */
   policy_rate: boolean;
   rest: Record<string, unknown>;
 };
-const MACRO_REF: Record<MacroSource, string> = { eurostat: "dataset", fred: "series_id", ecb: "flow_key" };
+export const MACRO_REF: Record<MacroSource, string> = { eurostat: "dataset", fred: "series_id", ecb: "flow_key", cnb: "series" };
 
 export type ScheduleForm = { name: string; enabled: boolean; cron: string; timezone: string; rest: Record<string, unknown> };
 export type SettingsForm = { values: Record<string, string | boolean>; rest: Record<string, unknown> };
@@ -610,6 +722,8 @@ export function jobsFromBody(body: JobsConfig | null): JobsForm {
         values[field.key] =
           field.kind === "bool"
             ? Boolean(v)
+            : field.kind === "symbol-lines"
+              ? symbolLinesText(v)
             : Array.isArray(v)
               ? v.join(field.kind === "lines" ? "\n" : ", ")
               : v == null
@@ -647,6 +761,32 @@ export function jobsFromBody(body: JobsConfig | null): JobsForm {
   return { catchUpOnStart, schedules, settings, closures, managers, macroSeries, rest };
 }
 
+/** `[{symbol, label, yahoo_symbol}]` as editable lines: "^spx S&P 500 | ^GSPC". */
+function symbolLinesText(value: unknown): string {
+  if (!Array.isArray(value)) return "";
+  return value
+    .map((item: { symbol?: unknown; label?: unknown; yahoo_symbol?: unknown }) => {
+      const line = `${String(item.symbol ?? "")} ${String(item.label ?? "")}`.trim();
+      return item.yahoo_symbol ? `${line} | ${String(item.yahoo_symbol)}` : line;
+    })
+    .join("\n");
+}
+
+/**
+ * Lines of "symbol label[ | yahoo symbol]" back to `[{symbol, label, yahoo_symbol?}]`; a bare
+ * symbol is its own label. Without " | " no Yahoo symbol is sent (the backend then uses the
+ * known counterpart of the Stooq symbol, if any).
+ */
+export function parseSymbolLines(text: string): { symbol: string; label: string; yahoo_symbol?: string }[] {
+  return list(text, /\n/).map((line) => {
+    const [main, yahoo] = line.split("|", 2).map((part) => part.trim());
+    const [symbol, ...label] = main.split(/\s+/);
+    const item: { symbol: string; label: string; yahoo_symbol?: string } = { symbol, label: label.join(" ") || symbol };
+    if (yahoo) item.yahoo_symbol = yahoo.toUpperCase();
+    return item;
+  });
+}
+
 function list(text: string, separator: RegExp): string[] {
   return text
     .split(separator)
@@ -668,6 +808,7 @@ export function jobsToBody(form: JobsForm): JobsConfig {
       else if (field.kind === "int" || field.kind === "severity") out[field.key] = numberOrText(String(v));
       else if (field.kind === "number") out[field.key] = numberOrText(String(v).replace(",", "."));
       else if (field.kind === "lines") out[field.key] = list(String(v), /\n/);
+      else if (field.kind === "symbol-lines") out[field.key] = parseSymbolLines(String(v));
       else if (field.kind === "codes") out[field.key] = list(String(v), /[\s,;]+/).map((c) => c.toUpperCase());
       else if (field.kind === "words") out[field.key] = list(String(v), /[\s,;]+/);
       else if (field.kind === "effort-optional") out[field.key] = String(v).trim() || null;

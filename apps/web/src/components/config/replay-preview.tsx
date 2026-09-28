@@ -117,7 +117,7 @@ export function ReplayPreviewDialog<B>({
       {open ? (
         <div className="space-y-4 p-5">
           <div>
-            <h2 id="replay-title" className="text-lg font-semibold">
+            <h2 id="replay-title" className="text-[22px] leading-tight font-semibold">
               Before you save: what this change would have done
             </h2>
             <p className="text-sm text-text-muted">

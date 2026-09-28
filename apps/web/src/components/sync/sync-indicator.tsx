@@ -2,7 +2,6 @@
 
 import {
   CircleAlertIcon,
-  CircleCheckIcon,
   CircleDashedIcon,
   LoaderCircleIcon,
   RefreshCwIcon,
@@ -45,7 +44,7 @@ export function SyncIndicator() {
       tone = "text-text";
     } else if (view.lastSuccessAt) {
       const at = new Date(view.lastSuccessAt);
-      icon = <CircleCheckIcon aria-hidden="true" className="size-4" />;
+      icon = <span aria-hidden="true" className="size-[7px] rounded-full bg-gain" />;
       text = `Synced ${formatTime(at)} · ${formatRelative(at, now)}`;
       title = at.toLocaleString();
     }
@@ -63,7 +62,7 @@ export function SyncIndicator() {
         role="status"
         aria-live="polite"
         title={title}
-        className={cn("flex items-center gap-1.5 text-sm", tone)}
+        className={cn("flex items-center gap-[7px] text-[13px]", tone)}
       >
         {icon}
         <span className="hidden md:inline num">{text}</span>

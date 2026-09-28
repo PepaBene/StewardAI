@@ -507,7 +507,10 @@ async def test_prices_risk_and_visible_gaps(
     assert history.plausibility is not None and history.plausibility.flagged is True
 
     gap = await price_history(backend_pool, "ZZZ_EQ", 365)
-    assert gap.bars == [] and gap.gap == "Stooq has no data for zzz.de"
+    # Stooq has nothing; the Yahoo fallback (ZZZ.DE, derived from the Stooq symbol) neither.
+    assert gap.bars == [] and gap.gap == (
+        "Stooq has no data for zzz.de; Yahoo has no data for ZZZ.DE"
+    )
 
     # FX history: backfilled once from Frankfurter without overwriting portal rates.
     backfilled = await backend_pool.fetchval(

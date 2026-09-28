@@ -9,6 +9,8 @@ import { ConfidenceBadge } from "@/components/evidence/confidence-badge";
 import { EvidenceRelationBadge } from "@/components/evidence/evidence-relation-badge";
 import { ProvenanceTag } from "@/components/evidence/provenance-tag";
 import { FeedbackControl } from "@/components/feedback/feedback-control";
+import { PageHeader } from "@/components/page-header";
+import { Blueprint, PanelHeading } from "@/components/ui/blueprint";
 import { Button } from "@/components/ui/button";
 import { getBrowserApiClient, type EvidenceLink } from "@/lib/api/client";
 import { humanizeMetric } from "@/lib/evidence/confidence";
@@ -54,50 +56,58 @@ export function EvidenceView({ factId }: { factId: number }) {
 function Evidence({ link }: { link: EvidenceLink }) {
   return (
     <div className="space-y-6">
-      <div>
-        <p className="text-sm text-text-muted">
-          <Link href={`/holdings/${encodeURIComponent(link.ticker)}`} className="hover:text-text hover:underline">
-            {link.ticker}
-          </Link>{" "}
-          / evidence #{link.fact_id}
-        </p>
-        <h1 className="flex flex-wrap items-center gap-2 text-2xl font-semibold tracking-tight">
-          {humanizeMetric(link.metric)} {link.period}
-          <span className="num font-mono text-xl">{link.value_as_written}</span>
-          <ConfidenceBadge confidence={link.confidence} />
-          <EvidenceRelationBadge relation={link.relation} />
-          <ProvenanceTag provenance={factProvenance(link)} />
-        </h1>
-        <p className="mt-2 flex flex-wrap items-center gap-2 text-sm text-text-muted">
-          Is this figure right?
-          <FeedbackControl target={{ kind: "fact", id: link.fact_id }} label={`figure ${humanizeMetric(link.metric)} ${link.period}`} />
-        </p>
+      <PageHeader
+        kicker={
+          <>
+            <Link href={`/holdings/${encodeURIComponent(link.ticker)}`} className="font-mono hover:underline">
+              {link.ticker}
+            </Link>{" "}
+            · Evidence <span className="num">#{link.fact_id}</span>
+          </>
+        }
+        title={
+          <>
+            {humanizeMetric(link.metric)} {link.period}{" "}
+            <span className="num font-mono text-[0.55em] font-medium tracking-normal">{link.value_as_written}</span>
+          </>
+        }
+        description={
+          <div className="mt-1 space-y-2">
+            <p className="flex flex-wrap items-center gap-2">
+              <ConfidenceBadge confidence={link.confidence} />
+              <EvidenceRelationBadge relation={link.relation} />
+              <ProvenanceTag provenance={factProvenance(link)} />
+            </p>
+            <p className="flex flex-wrap items-center gap-2">
+              Is this figure right?
+              <FeedbackControl target={{ kind: "fact", id: link.fact_id }} label={`figure ${humanizeMetric(link.metric)} ${link.period}`} />
+            </p>
+          </div>
+        }
+      />
+
+      <div className="grid items-start gap-5 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.4fr)]">
+        <Blueprint aria-labelledby="quote-heading" className="space-y-3 p-5">
+          <PanelHeading level={2} kicker="Snippet" title={<span id="quote-heading">Quoted from the source</span>} />
+          <blockquote className="border-l-2 border-accent bg-surface-muted p-3 font-mono text-sm break-words">
+            {link.snippet}
+            {link.unit_snippet ? <span className="mt-2 block text-text-muted">{link.unit_snippet}</span> : null}
+          </blockquote>
+        </Blueprint>
+
+        <Blueprint aria-labelledby="context-heading" className="space-y-3 p-5">
+          <PanelHeading level={2} kicker="Archive" title={<span id="context-heading">In the archived document</span>} />
+          {link.context ? (
+            <pre className="max-h-[32rem] overflow-auto border border-border bg-surface-muted p-3 text-xs leading-relaxed whitespace-pre-wrap">
+              {link.context}
+            </pre>
+          ) : (
+            <AlertMessage title="Snippet not located in the archived text">
+              The archived copy is linked below; the snippet may span a page break.
+            </AlertMessage>
+          )}
+        </Blueprint>
       </div>
-
-      <section aria-labelledby="quote-heading" className="space-y-2">
-        <h2 id="quote-heading" className="text-sm font-medium text-text-muted">
-          Quoted from the source
-        </h2>
-        <blockquote className="rounded-md border border-border bg-surface-raised p-3 font-mono text-sm break-words">
-          {link.snippet}
-          {link.unit_snippet ? <span className="mt-2 block text-text-muted">{link.unit_snippet}</span> : null}
-        </blockquote>
-      </section>
-
-      <section aria-labelledby="context-heading" className="space-y-2">
-        <h2 id="context-heading" className="text-sm font-medium text-text-muted">
-          In the archived document
-        </h2>
-        {link.context ? (
-          <pre className="overflow-x-auto rounded-md border border-border bg-surface-muted p-3 text-xs leading-relaxed whitespace-pre-wrap">
-            {link.context}
-          </pre>
-        ) : (
-          <AlertMessage title="Snippet not located in the archived text">
-            The archived copy is linked below; the snippet may span a page break.
-          </AlertMessage>
-        )}
-      </section>
 
       <div className="flex flex-wrap items-center gap-2">
         {isExternalUrl(link.evidence_url) ? (

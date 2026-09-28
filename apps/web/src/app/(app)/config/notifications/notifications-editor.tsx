@@ -30,6 +30,7 @@ import {
 import { formatTime } from "@/lib/format";
 import { configSaveQuery, useConfigEditor } from "@/lib/hooks/use-config-editor";
 import { EVENT_LABELS, EVENT_TYPES, SEVERITY } from "@/lib/news/labels";
+import { BlueprintCorners } from "@/components/ui/blueprint";
 
 const api = () => getBrowserApiClient();
 const EVENT_OPTIONS = EVENT_TYPES.map((t) => ({ value: t, label: EVENT_LABELS[t] }));
@@ -107,7 +108,7 @@ export function NotificationsEditor() {
       {form ? (
         <>
           <section aria-labelledby="rules-heading" className="space-y-3">
-            <h2 id="rules-heading" className="text-lg font-semibold">
+            <h2 id="rules-heading" className="text-[22px] leading-tight font-semibold">
               Rules
             </h2>
             {form.rules.map((rule, index) => (
@@ -128,8 +129,9 @@ export function NotificationsEditor() {
             </Button>
           </section>
 
-          <section aria-labelledby="quiet-heading" className="space-y-3 rounded-lg border border-border bg-surface-raised p-4">
-            <h2 id="quiet-heading" className="text-lg font-semibold">
+          <section aria-labelledby="quiet-heading" className="space-y-3 blueprint p-5">
+            <BlueprintCorners />
+            <h2 id="quiet-heading" className="text-[22px] leading-tight font-semibold">
               Quiet hours and limits
             </h2>
             <CheckboxField label="Quiet hours" checked={form.quiet_enabled} onChange={(v) => set({ quiet_enabled: v })} />
@@ -249,7 +251,8 @@ function RuleCard({
 }) {
   const path = `rules.${index}`;
   return (
-    <div className="space-y-3 rounded-lg border border-border bg-surface-raised p-4" aria-label={`Rule ${index + 1}`} role="group">
+    <div className="space-y-3 blueprint p-5" aria-label={`Rule ${index + 1}`} role="group">
+      <BlueprintCorners />
       <div className="flex flex-wrap items-start gap-3">
         <span className="mt-7 font-mono text-sm text-text-muted">{index + 1}.</span>
         <TextField className="w-60" label="Rule id" path={`${path}.id`} errors={errors} value={rule.id} onChange={(v) => onChange({ id: v })} placeholder="instant-severity-3" />
@@ -307,8 +310,9 @@ function TestAlertPanel({ dirty }: { dirty: boolean }) {
   }
 
   return (
-    <section aria-labelledby="test-heading" className="space-y-3 rounded-lg border border-border bg-surface-raised p-4">
-      <h2 id="test-heading" className="text-lg font-semibold">
+    <section aria-labelledby="test-heading" className="space-y-3 blueprint p-5">
+      <BlueprintCorners />
+      <h2 id="test-heading" className="text-[22px] leading-tight font-semibold">
         Send a test alert
       </h2>
       <p className="max-w-prose text-sm text-text-muted">
