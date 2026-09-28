@@ -494,7 +494,7 @@ function FactDetail({
     <article aria-labelledby={titleId} className="blueprint flex min-w-0 flex-col gap-5 px-5 py-6 md:px-[26px]">
       <BlueprintCorners />
       <header className="flex flex-wrap items-start justify-between gap-5">
-        <div className="min-w-0 flex-1 space-y-1">
+        <div className="min-w-0 flex-1 basis-[20rem] space-y-1">
           <p className="font-mono text-[13px] text-text-muted">
             <Link href={`/holdings/${encodeURIComponent(item.ticker)}`} className="hover:text-text hover:underline" title={name}>
               {shortTicker(item.ticker)}
