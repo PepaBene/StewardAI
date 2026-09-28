@@ -64,7 +64,14 @@ type RollbackState =
  * version against its parent), read a version's JSON, and roll back to an old version (its
  * body saved as a new active version, after a confirm step).
  */
-export function VersionHistory({ domain }: { domain: ConfigDomainSlug }) {
+export function VersionHistory({
+  domain,
+  initialVersion = null,
+}: {
+  domain: ConfigDomainSlug;
+  /** Select this version first (e.g. "View diff" from an editor), when it is in the list. */
+  initialVersion?: number | null;
+}) {
   const info = CONFIG_DOMAINS[domain];
   const [versions, setVersions] = useState<Load<ConfigVersionMeta[]>>({ kind: "loading" });
   const [selected, setSelected] = useState<number | null>(null);
@@ -83,14 +90,15 @@ export function VersionHistory({ domain }: { domain: ConfigDomainSlug }) {
           return;
         }
         setVersions({ kind: "ok", data });
-        const pick = select ?? initialSelection(data);
+        const pick =
+          select ?? (initialVersion !== null && data.some((v) => v.id === initialVersion) ? initialVersion : initialSelection(data));
         setSelected(pick);
         setFromId(pick === null ? null : defaultFrom(data, pick));
       } catch (err) {
         setVersions({ kind: "error", message: errorMessage(err) });
       }
     },
-    [domain],
+    [domain, initialVersion],
   );
 
   useEffect(() => {
