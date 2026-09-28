@@ -11,6 +11,7 @@ import { FeedbackControl } from "@/components/feedback/feedback-control";
 import { SeverityBadge } from "@/components/news/severity-badge";
 import { SeverityDot } from "@/components/news/severity-timeline";
 import { Button } from "@/components/ui/button";
+import { BlueprintCorners } from "@/components/ui/blueprint";
 import { getBrowserApiClient, type AlertOut } from "@/lib/api/client";
 import { ALERT_KIND_LABELS, alertEventLabel, alertHeadline, alertOutcome } from "@/lib/activity/activity";
 import { CHANNEL_LABELS } from "@/lib/config/news-forms";
@@ -64,7 +65,8 @@ export function AlertsPanel() {
     );
 
   return (
-    <section id="alerts" aria-labelledby="alerts-heading" className="scroll-mt-24 space-y-3">
+    <section id="alerts" aria-labelledby="alerts-heading" className="blueprint scroll-mt-24 space-y-3 px-5 py-5">
+      <BlueprintCorners />
       <div className="flex flex-wrap items-end justify-between gap-2">
         <div>
           <h2 id="alerts-heading" className="text-[22px] leading-tight font-semibold">
@@ -73,7 +75,7 @@ export function AlertsPanel() {
           <p className="text-sm text-text-muted">
             The monitor checks every 15 minutes for failed jobs, missed scheduled runs and holdings with no news coverage;
             each condition alerts once. Their severity and routing are in{" "}
-            <Link href="/config/notifications" className="text-accent hover:underline">
+            <Link href="/config/notifications" className="text-accent-ink hover:underline">
               Config: Notifications
             </Link>
             .
@@ -108,7 +110,7 @@ export function AlertsPanel() {
         </EmptyState>
       ) : null}
       {load.kind === "ok" && load.alerts.length > 0 ? (
-        <ul className="divide-y divide-border rounded-lg border border-border bg-surface-raised" aria-label={all ? "All alerts" : "Monitoring alerts"}>
+        <ul className="divide-y divide-border-soft border border-border" aria-label={all ? "All alerts" : "Monitoring alerts"}>
           {load.alerts.map((a) => (
             <li key={a.id} className="flex flex-wrap items-start justify-between gap-3 p-3 text-sm">
               <div className="min-w-0 flex-1 space-y-1">
@@ -118,7 +120,7 @@ export function AlertsPanel() {
                   <span className="font-medium">{alertEventLabel(a)}</span>
                   {a.kind !== "system" ? <span className="text-xs text-text-muted">{ALERT_KIND_LABELS[a.kind]}</span> : null}
                   {a.ticker ? (
-                    <Link href={`/holdings/${encodeURIComponent(a.ticker)}`} className="font-mono text-xs text-accent hover:underline">
+                    <Link href={`/holdings/${encodeURIComponent(a.ticker)}`} className="font-mono text-xs text-accent-ink hover:underline">
                       {a.ticker}
                     </Link>
                   ) : null}
@@ -131,7 +133,7 @@ export function AlertsPanel() {
                   <span>· {CHANNEL_LABELS[a.channel] ?? a.channel}</span>
                   <span>· {alertOutcome(a)}</span>
                   {a.cluster_id !== null ? (
-                    <Link href={`/news?story=${a.cluster_id}`} className="text-accent hover:underline">
+                    <Link href={`/news?story=${a.cluster_id}`} className="text-accent-ink hover:underline">
                       · the story
                     </Link>
                   ) : null}

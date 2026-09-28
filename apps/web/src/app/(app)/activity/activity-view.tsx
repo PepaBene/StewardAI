@@ -3,14 +3,17 @@
 import { ActivityIcon } from "lucide-react";
 import Link from "next/link";
 
+import { PageHeader } from "@/components/page-header";
+
 import { AlertsPanel } from "./alerts-panel";
 import { CoveragePanel } from "./coverage-panel";
 import { EvalCandidatesPanel } from "./eval-candidates-panel";
 import { JobLog } from "./job-log";
+import { CoverageRings, JobGridPanel, SpendPanel } from "./overview-panels";
 import { TrustPanel } from "./trust-panel";
 
 const SECTIONS = [
-  { id: "coverage", label: "Coverage" },
+  { id: "coverage", label: "Coverage per holding" },
   { id: "alerts", label: "Alerts" },
   { id: "job-log", label: "Job log" },
   { id: "source-trust", label: "Source trust" },
@@ -18,31 +21,38 @@ const SECTIONS = [
 ] as const;
 
 /**
- * Activity: what ran, what it cost and what it missed. Coverage gaps and monitoring alerts
- * come first because they are what needs attention; the job log, source trust and the
- * evaluation candidates added from feedback follow.
+ * Activity: whether every job ran, what it cost and what it covered. The overview (coverage
+ * rings, the 21-day run grid, the month's AI spend) comes first; then the per-holding
+ * coverage table, monitoring alerts, the job log, source trust and the evaluation
+ * candidates added from feedback.
  */
 export function ActivityView() {
   return (
-    <div className="space-y-8">
-      <div className="flex flex-wrap items-end justify-between gap-3">
-        <div>
-          <h1 className="page-title">Activity</h1>
-          <p className="mt-1 max-w-prose text-sm text-text-muted">
-            Per-holding coverage gaps, missed runs and failed jobs, the job log with cost, how far each source is trusted
-            after your feedback, and the items you added to the evaluation sets.
-          </p>
-        </div>
-        <Link href="/status" className="inline-flex items-center gap-1 text-sm text-accent hover:underline">
-          <ActivityIcon aria-hidden="true" className="size-4" />
-          API health and reference data gaps
-        </Link>
+    <div className="flex flex-col gap-5">
+      <PageHeader
+        kicker="Oversight"
+        title="Activity"
+        description="Whether every job ran, what it cost and what it covered: coverage gaps, missed and failed runs, source trust after your feedback, and the items you added to the evaluation sets."
+        aside={
+          <Link href="/status" className="inline-flex items-center gap-1 text-sm text-accent-ink hover:underline">
+            <ActivityIcon aria-hidden="true" className="size-4" />
+            API health and reference data gaps
+          </Link>
+        }
+      />
+
+      <CoverageRings />
+
+      <div className="grid grid-cols-1 items-start gap-5 xl:grid-cols-[minmax(0,1.9fr)_minmax(0,1fr)]">
+        <JobGridPanel />
+        <SpendPanel />
       </div>
-      <nav aria-label="On this page">
-        <ul className="flex flex-wrap gap-x-4 gap-y-1 text-sm">
+
+      <nav aria-label="On this page" className="border-y border-border-soft py-2">
+        <ul className="flex flex-wrap gap-x-5 gap-y-1 text-sm">
           {SECTIONS.map((s) => (
             <li key={s.id}>
-              <a href={`#${s.id}`} className="text-accent hover:underline">
+              <a href={`#${s.id}`} className="text-accent-ink hover:underline">
                 {s.label}
               </a>
             </li>
