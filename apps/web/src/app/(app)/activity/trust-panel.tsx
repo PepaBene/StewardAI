@@ -41,7 +41,7 @@ export function TrustPanel() {
       {state.kind === "error" ? <AlertMessage title={`Could not load source trust: ${state.title}`}>{state.detail}</AlertMessage> : null}
       {rows && rows.length === 0 ? <p className="text-sm text-text-muted">No feedback has moved any source yet.</p> : null}
       {rows && rows.length > 0 ? (
-        <div className="overflow-x-auto border border-border">
+        <div className="relative overflow-x-auto border border-border">
           <table className="w-full min-w-[36rem] text-sm">
             <caption className="sr-only">Source trust scores, lowest first</caption>
             <thead className="bg-surface-muted">

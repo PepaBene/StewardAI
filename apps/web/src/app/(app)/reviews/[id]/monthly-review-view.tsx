@@ -167,7 +167,7 @@ function Review({ report }: { report: ReviewReportOut }) {
         </AlertMessage>
       ) : null}
 
-      <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_18rem]">
+      <div className="grid grid-cols-1 gap-5 xl:grid-cols-[minmax(0,1fr)_18rem]">
         <article className="flex flex-col gap-5">
           <section aria-labelledby="compliance-heading" className={SECTION}>
             <BlueprintCorners />
@@ -182,7 +182,7 @@ function Review({ report }: { report: ReviewReportOut }) {
             {body.compliance.length === 0 ? (
               <p className="text-sm text-text-muted">The strategy had no rules, hard limits or target bands to check.</p>
             ) : (
-              <div className="overflow-x-auto">
+              <div className="relative overflow-x-auto">
                 <table className="w-full min-w-[36rem] text-sm">
                   <thead>
                     <tr className="border-b border-border text-text-muted">
@@ -229,7 +229,7 @@ function Review({ report }: { report: ReviewReportOut }) {
             {body.kpis.length === 0 ? (
               <p className="text-sm text-text-muted">No thesis KPIs to report.</p>
             ) : (
-              <div className="overflow-x-auto">
+              <div className="relative overflow-x-auto">
                 <table className="w-full min-w-[34rem] text-sm">
                   <thead>
                     <tr className="border-b border-border text-text-muted">

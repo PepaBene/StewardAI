@@ -321,7 +321,7 @@ function Digest({ report }: { report: ReportOut }) {
         />
       </Blueprint>
 
-      <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_20rem]">
+      <div className="grid grid-cols-1 gap-5 lg:grid-cols-[minmax(0,1fr)_20rem]">
         <AskAboutSelection>
           <article className="flex flex-col gap-5" aria-label="Stories and status">
             {(body.sections ?? []).some((s) => (s.stories ?? []).length > 0 || (s.verdicts ?? []).length > 0) ? (
@@ -727,7 +727,7 @@ function StatusSections({ body, facts }: { body: DigestBody; facts: Map<number, 
             Macro figures
           </h2>
           <p className="text-xs text-text-muted">The latest value of each collected series, with its period, release date and source.</p>
-          <div className="overflow-x-auto">
+          <div className="relative overflow-x-auto">
             <table className="w-full min-w-[32rem] text-sm">
               <thead>
                 <tr className="border-b border-border text-text-muted">

@@ -129,7 +129,7 @@ export function ReportsShell({
           ) : null}
           {items && items.length === 0 ? <div className="p-4 text-sm text-text-muted">{emptyList}</div> : null}
           {items && items.length > 0 ? (
-            <ul className="m-0 max-h-[70rem] list-none overflow-y-auto p-0">
+            <ul className="m-0 max-h-[26rem] list-none overflow-y-auto p-0 lg:max-h-[70rem]">
               {items.map((item) => {
                 const selected = item.id === selectedId;
                 const spark = history ? historyUpTo(history, localDay(item.at)) : [];

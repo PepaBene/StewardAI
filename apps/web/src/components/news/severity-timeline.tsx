@@ -48,7 +48,7 @@ export function SeverityTimeline({ columns, height = 150 }: { columns: readonly 
   if (columns.length === 0 || max === 0) return <ChartEmpty label="No stories in this window" minHeight={height} />;
   const px = (n: number) => (n / max) * height;
   return (
-    <div className="flex flex-col gap-2">
+    <div className="relative flex flex-col gap-2 overflow-hidden">
       <Legend items={BANDS.map((b) => ({ label: b.label, className: b.className }))} />
       <div aria-hidden="true" className="flex items-end gap-1.5" style={{ height }}>
         {columns.map((c) => (

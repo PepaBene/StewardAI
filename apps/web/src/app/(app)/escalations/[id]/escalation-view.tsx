@@ -111,7 +111,7 @@ function Escalation({ initial }: { initial: EscalationOut }) {
         <EscalationActions escalation={e} onUpdated={setE} />
       </Blueprint>
 
-      <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_20rem]">
+      <div className="grid grid-cols-1 gap-5 lg:grid-cols-[minmax(0,1fr)_20rem]">
         <article className="flex flex-col gap-5">
           <section aria-label="What triggered it" className="space-y-1 border border-border bg-surface-muted px-5 py-4 text-sm">
             {body.trigger === "story" && body.cluster_id !== null ? (

@@ -197,7 +197,7 @@ export function JobLog() {
         </EmptyState>
       ) : null}
       {load.kind === "ok" && load.jobs.length > 0 ? (
-        <div className="overflow-x-auto border border-border">
+        <div className="relative overflow-x-auto border border-border">
           <table className="w-full min-w-[56rem] text-sm">
             <caption className="sr-only">Job runs, newest first</caption>
             <thead className="bg-surface-muted">

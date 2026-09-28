@@ -75,7 +75,7 @@ export function CoveragePanel() {
           {rows.length === 0 ? (
             <EmptyState title="No open holdings">Coverage is listed once a portfolio sync has recorded positions.</EmptyState>
           ) : (
-            <div className="overflow-x-auto border border-border">
+            <div className="relative overflow-x-auto border border-border">
               <table className="w-full min-w-[48rem] text-sm">
                 <caption className="sr-only">Coverage per holding; holdings with gaps first</caption>
                 <thead className="bg-surface-muted">

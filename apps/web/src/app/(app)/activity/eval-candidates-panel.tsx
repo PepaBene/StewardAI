@@ -45,7 +45,7 @@ export function EvalCandidatesPanel() {
           <p className="text-sm" role="status">
             <span className="num font-medium">{pending}</span> waiting for export · <span className="num">{rows.length - pending}</span> exported
           </p>
-          <div className="overflow-x-auto border border-border">
+          <div className="relative overflow-x-auto border border-border">
             <table className="w-full min-w-[48rem] text-sm">
               <caption className="sr-only">Evaluation candidates, newest first</caption>
               <thead className="bg-surface-muted">

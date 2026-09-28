@@ -174,12 +174,12 @@ export function EscalationsView() {
             </nav>
           </div>
           <div className="flex flex-wrap items-center gap-3 border-b border-border-soft px-5 py-2.5">
-            <label className="flex items-center gap-2 text-sm">
+            <label className="flex min-w-0 items-center gap-2 text-sm">
               <span className="kicker">Holding</span>
               <select
                 value={ticker ?? ""}
                 onChange={(e) => replaceQuery({ ticker: e.target.value || null })}
-                className="h-8 border border-border bg-surface-raised px-2 text-sm text-text"
+                className="h-8 min-w-0 max-w-full border border-border bg-surface-raised px-2 text-sm text-text"
               >
                 <option value="">All holdings</option>
                 {ticker && !holdings.some((h) => h.ticker === ticker) ? <option value={ticker}>{ticker}</option> : null}
@@ -243,7 +243,7 @@ function EscalationRow({ escalation: e, now, onUpdated }: { escalation: Escalati
   const sev = e.body.severity;
   return (
     <li className="border-b border-border-soft last:border-0">
-      <div className="grid grid-cols-[3.5rem_4px_minmax(0,1fr)_auto] items-start gap-x-4 gap-y-1 px-5 py-3.5 hover:bg-border-soft md:grid-cols-[3.5rem_4px_6.5rem_minmax(0,1fr)_auto_auto]">
+      <div className="grid grid-cols-[3rem_4px_minmax(0,1fr)] items-start gap-x-4 gap-y-1 px-5 py-3.5 hover:bg-border-soft md:grid-cols-[3.5rem_4px_6.5rem_minmax(0,1fr)_auto_auto]">
         <span className="num pt-0.5 font-mono text-xs text-text-muted">E-{e.id}</span>
         <span
           aria-hidden="true"
@@ -297,7 +297,7 @@ function EscalationRow({ escalation: e, now, onUpdated }: { escalation: Escalati
           <EscalationActions escalation={e} onUpdated={onUpdated} className="justify-end" />
           <EscalationStateBadge status={e.status} />
         </span>
-        <span className="flex items-center gap-1 pt-0.5">
+        <span className="col-start-3 flex items-center gap-1 pt-0.5 md:col-start-auto">
           <span className="md:hidden">
             <EscalationStateBadge status={e.status} />
           </span>
@@ -343,11 +343,13 @@ function WeeklyPanel({ stats }: { stats: EscalationStats | null }) {
             <span>{shortDay(new Date(`${weeks[0].start}T12:00:00Z`))}</span>
             <span>{shortDay(new Date(`${weeks[weeks.length - 1].start}T12:00:00Z`))}</span>
           </div>
-          <SrTable
-            caption="Escalations opened and acknowledged per week"
+          <div className="relative overflow-hidden">
+            <SrTable
+              caption="Escalations opened and acknowledged per week"
             columns={["Week of", "Opened", "Acknowledged"]}
-            rows={weeks.map((w) => [w.start, w.opened, w.acknowledged])}
-          />
+              rows={weeks.map((w) => [w.start, w.opened, w.acknowledged])}
+            />
+          </div>
         </>
       )}
     </Blueprint>
