@@ -331,7 +331,8 @@ function VersionList({
   onSelect: (id: number) => void;
 }) {
   return (
-    <div className="overflow-hidden border border-border">
+    <div className="blueprint">
+      <BlueprintCorners />
       <table className="w-full text-sm">
         <caption className="sr-only">Saved versions, newest first. Choose one to see its changes.</caption>
         <thead className="bg-surface-muted text-[11px] tracking-[0.08em] uppercase">

@@ -7,6 +7,8 @@ import { useCallback, useEffect, useState } from "react";
 
 import { ChatThread } from "@/components/chat/chat-thread";
 import { AlertMessage } from "@/components/alert-message";
+import { PageHeader } from "@/components/page-header";
+import { Blueprint } from "@/components/ui/blueprint";
 import { Button } from "@/components/ui/button";
 import { getBrowserApiClient, type ConversationOut } from "@/lib/api/client";
 import { chatHref } from "@/lib/chat/chat";
@@ -41,18 +43,23 @@ export function ChatView() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="page-title">Chat</h1>
-        <p className="mt-1 max-w-prose text-sm text-text-muted">
-          Ask about the portfolio, a holding, the news or any report. Answers read the app&rsquo;s own records (and
-          tier-1/2 outlets when needed); every sentence links to the same evidence and holding pages as the rest of the app.
-          The chat is also a panel on every page (Chat in the header, or &ldquo;Open chat&rdquo; in the command palette).
-        </p>
-      </div>
-      <div className="grid gap-6 lg:grid-cols-[18rem_minmax(0,1fr)]">
-        <nav aria-label="Conversations" className="space-y-2">
+      <PageHeader
+        kicker="Ask Steward"
+        title="Chat"
+        description={
+          <p className="max-w-prose">
+            Ask about the portfolio, a holding, the news or any report. Answers read the app&rsquo;s own records (and
+            tier-1/2 outlets when needed); every sentence links to the same evidence and holding pages as the rest of the
+            app. The chat is also a panel on every page (Ask Steward in the header, ⌘J, or &ldquo;Open chat&rdquo; in the
+            command palette).
+          </p>
+        }
+      />
+      <div className="grid items-start gap-5 lg:grid-cols-[19rem_minmax(0,1fr)]">
+        <Blueprint as="div" className="space-y-3 p-4">
+          <nav aria-label="Conversations" className="space-y-3">
           <div className="flex items-center justify-between gap-2">
-            <h2 className="text-sm font-medium text-text-muted">Conversations</h2>
+            <h2 className="text-[20px] leading-tight font-semibold">Conversations</h2>
             <span className="flex gap-1">
               <Button variant="ghost" size="icon" aria-label="Reload the conversations" onClick={refresh}>
                 <RefreshCwIcon aria-hidden="true" />
@@ -81,8 +88,8 @@ export function ChatView() {
                     href={chatHref(c.id)}
                     aria-current={c.id === conversationId ? "page" : undefined}
                     className={cn(
-                      "block space-y-0.5 rounded-md border px-3 py-2 text-sm",
-                      c.id === conversationId ? "border-accent bg-surface-muted" : "border-transparent hover:bg-surface-muted",
+                      "block space-y-0.5 border-l-2 px-3 py-2 text-sm",
+                      c.id === conversationId ? "border-accent bg-accent-soft" : "border-transparent hover:bg-border-soft",
                     )}
                   >
                     <span className="flex items-center gap-1.5 font-medium">
@@ -98,8 +105,9 @@ export function ChatView() {
               ))}
             </ul>
           ) : null}
-        </nav>
-        <section aria-label="Conversation" className="flex h-[70vh] min-h-96 flex-col rounded-lg border border-border bg-surface-raised p-4">
+          </nav>
+        </Blueprint>
+        <Blueprint aria-label="Conversation" className="flex h-[72vh] min-h-96 flex-col">
           <ChatThread
             key={conversationId ?? "new"}
             className="min-h-0 flex-1"
@@ -110,7 +118,7 @@ export function ChatView() {
             }}
             onChanged={refresh}
           />
-        </section>
+        </Blueprint>
       </div>
     </div>
   );
