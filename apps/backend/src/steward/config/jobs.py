@@ -639,6 +639,27 @@ class OwnershipSettings(ConfigModel):
     top_holders: int = Field(default=10, ge=1, le=50)
 
 
+class XbrlSettings(ConfigModel):
+    """SEC XBRL fundamentals: shares outstanding and revenue by region / segment / product,
+    read from each holding's latest 10-K / 10-Q / 20-F XBRL instance."""
+
+    enabled: bool = True
+    quarterly: bool = Field(
+        default=True,
+        description="Also parse the latest 10-Q when it is newer than the annual report "
+        "(US issuers; 20-F filers publish annual XBRL only).",
+    )
+    read_ads_ratio: bool = Field(
+        default=True,
+        description="For 20-F filers, read the ADS ratio the annual report states ('each ADS "
+        "represents five common shares') to check the configured share basis. Downloads the "
+        "report's main document (up to about 10 MB) once per new 20-F.",
+    )
+    max_document_mb: int = Field(
+        default=40, ge=1, le=200, description="Largest filing document downloaded."
+    )
+
+
 class JobsConfig(ConfigModel):
     """Schedules for the worker's timed jobs. Stored as `config_version` rows, domain `jobs`.
 
@@ -720,6 +741,12 @@ class JobsConfig(ConfigModel):
         description="Load new SEC Form 13F data sets (published quarterly). Default: the 5th "
         "of each month, 05:00.",
     )
+    sec_xbrl: JobSchedule = Field(
+        default_factory=lambda: JobSchedule(cron="40 5 * * 2"),
+        description="Shares outstanding and revenue by region / segment from the holdings' "
+        "latest SEC XBRL filings; only filings not parsed yet are downloaded. Default: "
+        "Tuesdays 05:40.",
+    )
     earnings_check: EarningsCheckSettings = Field(default_factory=EarningsCheckSettings)
     earnings_calendar_settings: EarningsCalendarSettings = Field(
         default_factory=EarningsCalendarSettings
@@ -735,6 +762,7 @@ class JobsConfig(ConfigModel):
     chat: ChatSettings = Field(default_factory=ChatSettings)
     review: ReviewSettings = Field(default_factory=ReviewSettings)
     ownership: OwnershipSettings = Field(default_factory=OwnershipSettings)
+    xbrl: XbrlSettings = Field(default_factory=XbrlSettings)
 
     def schedules(self) -> dict[str, JobSchedule]:
         return {
@@ -753,6 +781,7 @@ class JobsConfig(ConfigModel):
             "weekly_digest": self.weekly_digest,
             "monthly_review": self.monthly_review,
             "ownership_13f": self.ownership_13f,
+            "sec_xbrl": self.sec_xbrl,
         }
 
     def next_run_after(self, job_type: str, moment: dt.datetime) -> dt.datetime | None:

@@ -19,6 +19,7 @@ from api.chat_routes import router as chat_router
 from api.config_history_routes import router as config_history_router
 from api.db import close_pool, get_pool_or_error
 from api.escalation_routes import router as escalation_router
+from api.fundamentals_routes import router as fundamentals_router
 from api.market_routes import router as market_router
 from api.news_routes import router as news_router
 from api.prompts_routes import router as prompts_router
@@ -222,6 +223,7 @@ def create_app() -> FastAPI:
     app.include_router(reference_router)
     app.include_router(verify_router)
     app.include_router(chat_router)
+    app.include_router(fundamentals_router)
     return app
 
 
