@@ -36,6 +36,7 @@ const FULL: JobsConfig = {
   weekly_digest: { enabled: false, cron: "0 18 * * sun", timezone: "Europe/London" },
   monthly_review: { enabled: true, cron: "0 8 1-3 * *", timezone: "Europe/Prague" },
   ownership_13f: { enabled: false, cron: "0 6 10 * *", timezone: "America/New_York" },
+  etf_look_through: { enabled: true, cron: "0 7 * * 0", timezone: "UTC" },
   earnings_check: {
     extraction_model: "claude-opus-5-5",
     locate_model: "claude-sonnet-5",
@@ -124,6 +125,23 @@ const FULL: JobsConfig = {
       { cik: "0001350694", name: "Bridgewater Associates, LP" },
     ],
     top_holders: 25,
+  },
+  look_through: {
+    enabled: false,
+    funds: [{ isin: "IE00B5BMR087", label: "CSPX", provider: "ishares", portfolio_id: "253743" }],
+    benchmark_proxies: [{ symbol: "^spx", fund_isin: "IE00B5BMR087", label: "S&P 500" }],
+    issuer_groups: [],
+    direct_sectors: { TSM_US_EQ: "Information Technology" },
+    direct_countries: {},
+    ishares_api_url: "https://www.blackrock.com/varnish-api/uk-retail01-product-data/product-data",
+    ishares_site: "ishares-uk",
+    ishares_locale: "en_GB",
+    ishares_spreadsheet_fallback: false,
+    vanguard_graphql_url: "https://www.vanguard.co.uk/gpx/graphql",
+    vanguard_consumer_id: "uk0",
+    cached_fallback_days: 30,
+    stale_after_days: 90,
+    keep_snapshots: 4,
   },
 };
 

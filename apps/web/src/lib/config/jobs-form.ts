@@ -27,7 +27,8 @@ export type SettingsKey =
   | "calendar"
   | "chat"
   | "review"
-  | "ownership";
+  | "ownership"
+  | "look_through";
 type Settings<S extends SettingsKey> = NonNullable<JobsConfig[S]>;
 
 /** Labels and the backend's default cron per known schedule (apps/backend/src/steward/config/jobs.py). */
@@ -107,6 +108,11 @@ export const SCHEDULES: Record<ScheduleKey, { label: string; description: string
     label: "Institutional ownership (13F)",
     description: "Load new SEC Form 13F data sets (published quarterly, about 100 MB each).",
     cron: "0 5 5 * *",
+  },
+  etf_look_through: {
+    label: "ETF look-through",
+    description: "The funds' holdings from iShares and Vanguard (skipped when the as-of date has not moved).",
+    cron: "40 6 * * 6",
   },
 };
 export const SCHEDULE_KEYS = Object.keys(SCHEDULES) as ScheduleKey[];
@@ -238,6 +244,19 @@ export const DEFAULT_JOBS: JobsConfig = {
     history_datasets: 8,
     tracked_managers: [],
     top_holders: 10,
+  },
+  // Funds, benchmark proxies and issuer groups: the backend's defaults (CSPX 253743, VWCE 9679).
+  look_through: {
+    enabled: true,
+    ishares_api_url: "https://www.blackrock.com/varnish-api/uk-retail01-product-data/product-data",
+    ishares_site: "ishares-uk",
+    ishares_locale: "en_GB",
+    ishares_spreadsheet_fallback: true,
+    vanguard_graphql_url: "https://www.ie.vanguard/gpx/graphql",
+    vanguard_consumer_id: "ie0",
+    cached_fallback_days: 45,
+    stale_after_days: 60,
+    keep_snapshots: 12,
   },
 };
 
@@ -451,6 +470,19 @@ export const SETTINGS: { [S in SettingsKey]: { title: string; description: strin
       { key: "datasets_per_run", label: "Data sets per run", kind: "int", min: 1, max: 8, hint: "About 100 MB each." },
       { key: "history_datasets", label: "Data sets kept (history)", kind: "int", min: 1, max: 60, hint: "The newest this many quarterly sets (8 = two years). An empty database fills over successive runs." },
       { key: "top_holders", label: "Largest holders shown", kind: "int", min: 1, max: 50 },
+    ],
+  },
+  look_through: {
+    title: "ETF look-through",
+    description:
+      "Holdings of the funds you hold, from the issuers' own undocumented endpoints (iShares product-data JSON, Vanguard GraphQL), stored weekly as dated snapshots. Funds, benchmark proxies (^spx → CSPX holdings) and issuer groups are kept as saved; edit them through Config export/import.",
+    fields: [
+      { key: "enabled", label: "Fetch from the issuers", kind: "bool", hint: "Off: stored snapshots are still shown." },
+      { key: "ishares_spreadsheet_fallback", label: "iShares: fall back to the full-fund download", kind: "bool", hint: "When the JSON fails and no recent snapshot is stored. It has no country or ISIN column." },
+      { key: "cached_fallback_days", label: "Keep using a stored snapshot for (days)", kind: "int", min: 1, max: 400, hint: "After a failed fetch, before trying the spreadsheet fallback." },
+      { key: "stale_after_days", label: "Label a snapshot stale after (days)", kind: "int", min: 7, max: 400, hint: "Vanguard publishes month-end data a few weeks late." },
+      { key: "keep_snapshots", label: "Snapshots kept per fund", kind: "int", min: 1, max: 200 },
+      { key: "vanguard_consumer_id", label: "Vanguard X-Consumer-ID", kind: "text", hint: "ie0 for www.ie.vanguard (uk0 for vanguard.co.uk, de0 for de.vanguard)." },
     ],
   },
 };
