@@ -7,6 +7,7 @@ import { useMemo } from "react";
 import { AlertMessage } from "@/components/alert-message";
 import { EmptyState } from "@/components/empty-state";
 import { Button } from "@/components/ui/button";
+import { BlueprintCorners } from "@/components/ui/blueprint";
 import { getBrowserApiClient } from "@/lib/api/client";
 import { coverageRows, type CoverageCell } from "@/lib/activity/activity";
 import { formatDateTime } from "@/lib/format";
@@ -21,7 +22,8 @@ export function CoveragePanel() {
   const rows = useMemo(() => (data ? coverageRows(data) : []), [data]);
 
   return (
-    <section id="coverage" aria-labelledby="coverage-heading" className="scroll-mt-24 space-y-3">
+    <section id="coverage" aria-labelledby="coverage-heading" className="blueprint scroll-mt-24 space-y-3 px-5 py-5">
+      <BlueprintCorners />
       <div className="flex flex-wrap items-end justify-between gap-2">
         <div>
           <h2 id="coverage-heading" className="text-[22px] leading-tight font-semibold">
@@ -32,7 +34,7 @@ export function CoveragePanel() {
             covered it within the monitoring window
             {data ? ` (${data.news_window_hours} h)` : ""}, and a <strong className="font-medium text-text">price gap</strong>{" "}
             when its latest daily bar is more than 4 days old. The window is set in{" "}
-            <Link href="/config/jobs" className="text-accent hover:underline">
+            <Link href="/config/jobs" className="text-accent-ink hover:underline">
               Config: Jobs
             </Link>{" "}
             (monitoring).
@@ -73,11 +75,11 @@ export function CoveragePanel() {
           {rows.length === 0 ? (
             <EmptyState title="No open holdings">Coverage is listed once a portfolio sync has recorded positions.</EmptyState>
           ) : (
-            <div className="overflow-x-auto rounded-lg border border-border bg-surface-raised">
+            <div className="overflow-x-auto border border-border">
               <table className="w-full min-w-[48rem] text-sm">
                 <caption className="sr-only">Coverage per holding; holdings with gaps first</caption>
                 <thead className="bg-surface-muted">
-                  <tr className="border-b border-border text-text-muted">
+                  <tr className="border-b border-border text-[11px] tracking-[0.08em] text-text-muted uppercase">
                     <th scope="col" className="px-3 py-2 text-left font-medium">Holding</th>
                     <th scope="col" className="px-3 py-2 text-left font-medium">News</th>
                     <th scope="col" className="px-3 py-2 text-left font-medium">Prices</th>
@@ -88,14 +90,14 @@ export function CoveragePanel() {
                   {rows.map((r) => (
                     <tr key={r.ticker} data-gap={r.gaps > 0 || undefined} className="border-b border-border align-top last:border-0">
                       <th scope="row" className="px-3 py-2 text-left font-normal">
-                        <Link href={`/holdings/${encodeURIComponent(r.ticker)}`} className="font-medium hover:text-accent hover:underline">
+                        <Link href={`/holdings/${encodeURIComponent(r.ticker)}`} className="font-medium hover:text-accent-ink hover:underline">
                           {r.name}
                         </Link>
                         <span className="block font-mono text-xs text-text-muted">{r.ticker}</span>
                         {r.news.gap ? (
                           <Link
                             href={`/activity?type=news_ingest#job-log`}
-                            className="text-xs text-accent hover:underline"
+                            className="text-xs text-accent-ink hover:underline"
                           >
                             News runs
                           </Link>
@@ -109,7 +111,7 @@ export function CoveragePanel() {
                       </td>
                       <td className="px-3 py-2">
                         <Cell cell={r.earnings} />
-                        <Link href={`/activity?type=earnings_check&ticker=${encodeURIComponent(r.ticker)}#job-log`} className="text-xs text-accent hover:underline">
+                        <Link href={`/activity?type=earnings_check&ticker=${encodeURIComponent(r.ticker)}#job-log`} className="text-xs text-accent-ink hover:underline">
                           Its runs
                         </Link>
                       </td>
