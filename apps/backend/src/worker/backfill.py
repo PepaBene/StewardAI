@@ -43,6 +43,7 @@ DATA_SEQUENCE = [
     "macro_collect",
     "earnings_calendar_full",
     "ownership_13f",
+    "etf_look_through",
     "news_ingest",
 ]
 DEFAULT_SEQUENCE = [*DATA_SEQUENCE, "monitor"]
