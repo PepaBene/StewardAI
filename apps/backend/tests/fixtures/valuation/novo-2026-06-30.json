@@ -1,0 +1,297 @@
+{
+"documentInfo": {
+"documentType": "https://xbrl.org/2021/xbrl-json",
+"features": {
+"xbrl:canonicalValues": true
+},
+"namespaces": {
+"NOV": "http://xbrl.novonordisk.com/2026-06-30",
+"ifrs-full": "https://xbrl.ifrs.org/taxonomy/2024-03-27/ifrs-full",
+"iso4217": "http://www.xbrl.org/2003/iso4217",
+"scheme": "http://standards.iso.org/iso/17442",
+"xbrl": "https://xbrl.org/2021",
+"xbrli": "http://www.xbrl.org/2003/instance"
+},
+"taxonomy": [
+"http://xbrl.novonordisk.com/2026-06-30/NOVO-2026-06-30.xsd"
+]
+},
+"facts": {
+"f1__s2__3__20": {
+"value": "4.75",
+"decimals": 2,
+"dimensions": {
+"concept": "ifrs-full:DilutedEarningsLossPerShare",
+"entity": "scheme:549300DAQ1CVT6CXN342",
+"period": "2026-04-01T00:00:00/2026-07-01T00:00:00",
+"unit": "iso4217:DKK/xbrli:shares"
+}
+},
+"f1__s2__4__20": {
+"value": "5.96",
+"decimals": 2,
+"dimensions": {
+"concept": "ifrs-full:DilutedEarningsLossPerShare",
+"entity": "scheme:549300DAQ1CVT6CXN342",
+"period": "2025-04-01T00:00:00/2025-07-01T00:00:00",
+"unit": "iso4217:DKK/xbrli:shares"
+}
+},
+"f1__s2__5__20": {
+"value": "15.66",
+"decimals": 2,
+"dimensions": {
+"concept": "ifrs-full:DilutedEarningsLossPerShare",
+"entity": "scheme:549300DAQ1CVT6CXN342",
+"period": "2026-01-01T00:00:00/2026-07-01T00:00:00",
+"unit": "iso4217:DKK/xbrli:shares"
+}
+},
+"f1__s2__6__20": {
+"value": "12.49",
+"decimals": 2,
+"dimensions": {
+"concept": "ifrs-full:DilutedEarningsLossPerShare",
+"entity": "scheme:549300DAQ1CVT6CXN342",
+"period": "2025-01-01T00:00:00/2025-07-01T00:00:00",
+"unit": "iso4217:DKK/xbrli:shares"
+}
+},
+"f1__s5__3__32": {
+"value": "221277000000.0",
+"decimals": -6,
+"dimensions": {
+"concept": "ifrs-full:Equity",
+"entity": "scheme:549300DAQ1CVT6CXN342",
+"period": "2026-07-01T00:00:00",
+"unit": "iso4217:DKK"
+}
+},
+"f1__s5__4__32": {
+"value": "194047000000.0",
+"decimals": -6,
+"dimensions": {
+"concept": "ifrs-full:Equity",
+"entity": "scheme:549300DAQ1CVT6CXN342",
+"period": "2026-01-01T00:00:00",
+"unit": "iso4217:DKK"
+}
+},
+"f1__s6__3__5": {
+"value": "446000000.0",
+"decimals": -6,
+"dimensions": {
+"concept": "ifrs-full:Equity",
+"entity": "scheme:549300DAQ1CVT6CXN342",
+"period": "2026-01-01T00:00:00",
+"ifrs-full:ComponentsOfEquityAxis": "ifrs-full:IssuedCapitalMember",
+"unit": "iso4217:DKK"
+}
+},
+"f1__s6__4__5": {
+"value": "-2000000.0",
+"decimals": -6,
+"dimensions": {
+"concept": "ifrs-full:Equity",
+"entity": "scheme:549300DAQ1CVT6CXN342",
+"period": "2026-01-01T00:00:00",
+"ifrs-full:ComponentsOfEquityAxis": "ifrs-full:TreasurySharesMember",
+"unit": "iso4217:DKK"
+}
+},
+"f1__s6__5__5": {
+"value": "195298000000.0",
+"decimals": -6,
+"dimensions": {
+"concept": "ifrs-full:Equity",
+"entity": "scheme:549300DAQ1CVT6CXN342",
+"period": "2026-01-01T00:00:00",
+"ifrs-full:ComponentsOfEquityAxis": "ifrs-full:RetainedEarningsMember",
+"unit": "iso4217:DKK"
+}
+},
+"f1__s6__6__5": {
+"value": "-1695000000.0",
+"decimals": -6,
+"dimensions": {
+"concept": "ifrs-full:Equity",
+"entity": "scheme:549300DAQ1CVT6CXN342",
+"period": "2026-01-01T00:00:00",
+"ifrs-full:ComponentsOfEquityAxis": "ifrs-full:OtherReservesMember",
+"unit": "iso4217:DKK"
+}
+},
+"f1__s6__7__5": {
+"value": "194047000000.0",
+"decimals": -6,
+"dimensions": {
+"concept": "ifrs-full:Equity",
+"entity": "scheme:549300DAQ1CVT6CXN342",
+"period": "2026-01-01T00:00:00",
+"unit": "iso4217:DKK"
+}
+},
+"f1__s6__3__13": {
+"value": "446000000.0",
+"decimals": -6,
+"dimensions": {
+"concept": "ifrs-full:Equity",
+"entity": "scheme:549300DAQ1CVT6CXN342",
+"period": "2026-07-01T00:00:00",
+"ifrs-full:ComponentsOfEquityAxis": "ifrs-full:IssuedCapitalMember",
+"unit": "iso4217:DKK"
+}
+},
+"f1__s6__4__13": {
+"value": "-4000000.0",
+"decimals": -6,
+"dimensions": {
+"concept": "ifrs-full:Equity",
+"entity": "scheme:549300DAQ1CVT6CXN342",
+"period": "2026-07-01T00:00:00",
+"ifrs-full:ComponentsOfEquityAxis": "ifrs-full:TreasurySharesMember",
+"unit": "iso4217:DKK"
+}
+},
+"f1__s6__5__13": {
+"value": "224164000000.0",
+"decimals": -6,
+"dimensions": {
+"concept": "ifrs-full:Equity",
+"entity": "scheme:549300DAQ1CVT6CXN342",
+"period": "2026-07-01T00:00:00",
+"ifrs-full:ComponentsOfEquityAxis": "ifrs-full:RetainedEarningsMember",
+"unit": "iso4217:DKK"
+}
+},
+"f1__s6__6__13": {
+"value": "-3329000000.0",
+"decimals": -6,
+"dimensions": {
+"concept": "ifrs-full:Equity",
+"entity": "scheme:549300DAQ1CVT6CXN342",
+"period": "2026-07-01T00:00:00",
+"ifrs-full:ComponentsOfEquityAxis": "ifrs-full:OtherReservesMember",
+"unit": "iso4217:DKK"
+}
+},
+"f1__s6__7__13": {
+"value": "221277000000.0",
+"decimals": -6,
+"dimensions": {
+"concept": "ifrs-full:Equity",
+"entity": "scheme:549300DAQ1CVT6CXN342",
+"period": "2026-07-01T00:00:00",
+"unit": "iso4217:DKK"
+}
+},
+"f1__s6__3__19": {
+"value": "446000000.0",
+"decimals": -6,
+"dimensions": {
+"concept": "ifrs-full:Equity",
+"entity": "scheme:549300DAQ1CVT6CXN342",
+"period": "2025-01-01T00:00:00",
+"ifrs-full:ComponentsOfEquityAxis": "ifrs-full:IssuedCapitalMember",
+"unit": "iso4217:DKK"
+}
+},
+"f1__s6__4__19": {
+"value": "-2000000.0",
+"decimals": -6,
+"dimensions": {
+"concept": "ifrs-full:Equity",
+"entity": "scheme:549300DAQ1CVT6CXN342",
+"period": "2025-01-01T00:00:00",
+"ifrs-full:ComponentsOfEquityAxis": "ifrs-full:TreasurySharesMember",
+"unit": "iso4217:DKK"
+}
+},
+"f1__s6__5__19": {
+"value": "144448000000.0",
+"decimals": -6,
+"dimensions": {
+"concept": "ifrs-full:Equity",
+"entity": "scheme:549300DAQ1CVT6CXN342",
+"period": "2025-01-01T00:00:00",
+"ifrs-full:ComponentsOfEquityAxis": "ifrs-full:RetainedEarningsMember",
+"unit": "iso4217:DKK"
+}
+},
+"f1__s6__6__19": {
+"value": "-1406000000.0",
+"decimals": -6,
+"dimensions": {
+"concept": "ifrs-full:Equity",
+"entity": "scheme:549300DAQ1CVT6CXN342",
+"period": "2025-01-01T00:00:00",
+"ifrs-full:ComponentsOfEquityAxis": "ifrs-full:OtherReservesMember",
+"unit": "iso4217:DKK"
+}
+},
+"f1__s6__7__19": {
+"value": "143486000000.0",
+"decimals": -6,
+"dimensions": {
+"concept": "ifrs-full:Equity",
+"entity": "scheme:549300DAQ1CVT6CXN342",
+"period": "2025-01-01T00:00:00",
+"unit": "iso4217:DKK"
+}
+},
+"f1__s6__3__28": {
+"value": "446000000.0",
+"decimals": -6,
+"dimensions": {
+"concept": "ifrs-full:Equity",
+"entity": "scheme:549300DAQ1CVT6CXN342",
+"period": "2025-07-01T00:00:00",
+"ifrs-full:ComponentsOfEquityAxis": "ifrs-full:IssuedCapitalMember",
+"unit": "iso4217:DKK"
+}
+},
+"f1__s6__4__28": {
+"value": "-2000000.0",
+"decimals": -6,
+"dimensions": {
+"concept": "ifrs-full:Equity",
+"entity": "scheme:549300DAQ1CVT6CXN342",
+"period": "2025-07-01T00:00:00",
+"ifrs-full:ComponentsOfEquityAxis": "ifrs-full:TreasurySharesMember",
+"unit": "iso4217:DKK"
+}
+},
+"f1__s6__5__28": {
+"value": "164453000000.0",
+"decimals": -6,
+"dimensions": {
+"concept": "ifrs-full:Equity",
+"entity": "scheme:549300DAQ1CVT6CXN342",
+"period": "2025-07-01T00:00:00",
+"ifrs-full:ComponentsOfEquityAxis": "ifrs-full:RetainedEarningsMember",
+"unit": "iso4217:DKK"
+}
+},
+"f1__s6__6__28": {
+"value": "3169000000.0",
+"decimals": -6,
+"dimensions": {
+"concept": "ifrs-full:Equity",
+"entity": "scheme:549300DAQ1CVT6CXN342",
+"period": "2025-07-01T00:00:00",
+"ifrs-full:ComponentsOfEquityAxis": "ifrs-full:OtherReservesMember",
+"unit": "iso4217:DKK"
+}
+},
+"f1__s6__7__28": {
+"value": "168066000000.0",
+"decimals": -6,
+"dimensions": {
+"concept": "ifrs-full:Equity",
+"entity": "scheme:549300DAQ1CVT6CXN342",
+"period": "2025-07-01T00:00:00",
+"unit": "iso4217:DKK"
+}
+}
+}
+}

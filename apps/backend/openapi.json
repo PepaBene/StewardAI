@@ -653,6 +653,129 @@
         ]
       }
     },
+    "/holdings/{ticker}/valuation": {
+      "get": {
+        "tags": [
+          "holdings"
+        ],
+        "summary": "Get Holding Valuation",
+        "description": "P/E, P/B and dividend yield from the latest stored close and the stored fundamentals\n(SEC XBRL, ESEF, or the holding profile's manual figures), each with its source, period,\nbasis and staleness; an ETF's are its provider's fund figures. A ratio that cannot be\ncomputed is null with the reason (e.g. 'n/m: negative earnings').",
+        "operationId": "get_holding_valuation",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "ticker",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9._-]{1,32}$",
+              "title": "Ticker"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HoldingValuation"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/portfolio/valuation": {
+      "get": {
+        "tags": [
+          "portfolio"
+        ],
+        "summary": "Get Portfolio Valuation",
+        "description": "The portfolio's P/E, P/B and dividend yield (value-weighted, iShares' capping and\nexclusion rules; see `method`) with the share of value covered, against the benchmark's\nfund-level figures (the Prices config's first benchmark) and every configured fund.",
+        "operationId": "get_portfolio_valuation",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PortfolioValuation"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/jobs/valuation-refresh": {
+      "post": {
+        "tags": [
+          "jobs"
+        ],
+        "summary": "Run Valuation Refresh",
+        "description": "Refresh the fundamentals and fund figures behind the valuation now.",
+        "operationId": "run_valuation_refresh",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ValuationRefreshRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "202": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/JobSummary"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
     "/portfolio/overview": {
       "get": {
         "tags": [
@@ -6167,6 +6290,55 @@
         ],
         "title": "ActivityCoverage"
       },
+      "Aggregate": {
+        "properties": {
+          "pe": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pe"
+          },
+          "pb": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pb"
+          },
+          "dividend_yield": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Dividend Yield",
+            "description": "Fraction."
+          },
+          "coverage": {
+            "$ref": "#/components/schemas/Coverage"
+          }
+        },
+        "type": "object",
+        "required": [
+          "pe",
+          "pb",
+          "dividend_yield",
+          "coverage"
+        ],
+        "title": "Aggregate"
+      },
       "AlertOut": {
         "properties": {
           "id": {
@@ -6378,6 +6550,102 @@
         ],
         "title": "AllocationSlice"
       },
+      "AlternativeOut": {
+        "properties": {
+          "source": {
+            "type": "string",
+            "enum": [
+              "sec",
+              "esef",
+              "manual"
+            ],
+            "title": "Source"
+          },
+          "source_label": {
+            "type": "string",
+            "title": "Source Label"
+          },
+          "basis": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Basis"
+          },
+          "eps_ttm": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Eps Ttm"
+          },
+          "currency": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Currency"
+          },
+          "period_end": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Period End"
+          },
+          "method": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Method"
+          },
+          "pe": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pe"
+          }
+        },
+        "type": "object",
+        "required": [
+          "source",
+          "source_label",
+          "basis",
+          "eps_ttm",
+          "currency",
+          "period_end",
+          "method",
+          "pe"
+        ],
+        "title": "AlternativeOut"
+      },
       "AnnouncementRule": {
         "properties": {
           "service": {
@@ -6475,6 +6743,120 @@
           "invested"
         ],
         "title": "BaseTotals"
+      },
+      "BenchmarkValuation": {
+        "properties": {
+          "label": {
+            "type": "string",
+            "title": "Label",
+            "description": "What is compared: 'S&P 500', 'FTSE All-World'."
+          },
+          "symbol": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Symbol",
+            "description": "The Prices benchmark symbol it stands for."
+          },
+          "via": {
+            "type": "string",
+            "title": "Via",
+            "description": "Whose figures: 'CSPX fund figures (iShares)'."
+          },
+          "fund_key": {
+            "type": "string",
+            "title": "Fund Key"
+          },
+          "pe": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pe"
+          },
+          "pb": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pb"
+          },
+          "dividend_yield": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Dividend Yield"
+          },
+          "dividend_yield_kind": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Dividend Yield Kind"
+          },
+          "as_of": {
+            "type": "string",
+            "format": "date",
+            "title": "As Of"
+          },
+          "source_url": {
+            "type": "string",
+            "title": "Source Url"
+          },
+          "methodology": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Methodology"
+          },
+          "stale": {
+            "type": "boolean",
+            "title": "Stale"
+          }
+        },
+        "type": "object",
+        "required": [
+          "label",
+          "symbol",
+          "via",
+          "fund_key",
+          "pe",
+          "pb",
+          "dividend_yield",
+          "dividend_yield_kind",
+          "as_of",
+          "source_url",
+          "methodology",
+          "stale"
+        ],
+        "title": "BenchmarkValuation"
       },
       "BoardKpi": {
         "properties": {
@@ -6849,7 +7231,8 @@
                 "research",
                 "ownership_13f",
                 "monthly_review",
-                "chat"
+                "chat",
+                "valuation_refresh"
               ]
             },
             "type": "array",
@@ -6881,7 +7264,8 @@
                 "research",
                 "ownership_13f",
                 "monthly_review",
-                "chat"
+                "chat",
+                "valuation_refresh"
               ]
             },
             "type": "object",
@@ -8093,7 +8477,7 @@
           },
           "holdings": {
             "items": {
-              "$ref": "#/components/schemas/HoldingContribution"
+              "$ref": "#/components/schemas/steward__portfolio__read__HoldingContribution"
             },
             "type": "array",
             "title": "Holdings",
@@ -8326,6 +8710,114 @@
           "by_model"
         ],
         "title": "CostSummary"
+      },
+      "Coverage": {
+        "properties": {
+          "pe": {
+            "type": "number",
+            "title": "Pe",
+            "description": "Share of invested value (0..1) with a P/E (incl. excluded n/m)."
+          },
+          "pb": {
+            "type": "number",
+            "title": "Pb"
+          },
+          "dividend_yield": {
+            "type": "number",
+            "title": "Dividend Yield"
+          }
+        },
+        "type": "object",
+        "required": [
+          "pe",
+          "pb",
+          "dividend_yield"
+        ],
+        "title": "Coverage"
+      },
+      "CrossCheckOut": {
+        "properties": {
+          "source": {
+            "type": "string",
+            "title": "Source",
+            "default": "finnhub"
+          },
+          "source_label": {
+            "type": "string",
+            "title": "Source Label",
+            "default": "Finnhub basic financials (tier 2)"
+          },
+          "symbol": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Symbol"
+          },
+          "pe": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pe"
+          },
+          "pb": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pb"
+          },
+          "eps_ttm": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Eps Ttm"
+          },
+          "dividend_yield": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Dividend Yield"
+          },
+          "fetched_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Fetched At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "symbol",
+          "pe",
+          "pb",
+          "eps_ttm",
+          "dividend_yield",
+          "fetched_at"
+        ],
+        "title": "CrossCheckOut"
       },
       "DayCount": {
         "properties": {
@@ -10952,6 +11444,98 @@
         ],
         "title": "FactOut"
       },
+      "FactRef": {
+        "properties": {
+          "concept": {
+            "type": "string",
+            "title": "Concept"
+          },
+          "start": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Start"
+          },
+          "end": {
+            "type": "string",
+            "format": "date",
+            "title": "End"
+          },
+          "value": {
+            "type": "number",
+            "title": "Value"
+          },
+          "unit": {
+            "type": "string",
+            "title": "Unit"
+          },
+          "source": {
+            "type": "string",
+            "title": "Source",
+            "description": "sec (companyfacts), sec_instance (the filing's XBRL instance) or esef (filings.xbrl.org)."
+          },
+          "ref": {
+            "type": "string",
+            "title": "Ref",
+            "description": "Accession number or filings.xbrl.org filing id."
+          },
+          "form": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Form"
+          },
+          "filed": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Filed"
+          },
+          "url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Url"
+          }
+        },
+        "type": "object",
+        "required": [
+          "concept",
+          "start",
+          "end",
+          "value",
+          "unit",
+          "source",
+          "ref",
+          "form",
+          "filed",
+          "url"
+        ],
+        "title": "FactRef",
+        "description": "One input fact, as filed."
+      },
       "FactReview": {
         "properties": {
           "action": {
@@ -11258,6 +11842,73 @@
         ],
         "title": "FeedbackOut"
       },
+      "FigureOut": {
+        "properties": {
+          "value": {
+            "type": "number",
+            "title": "Value"
+          },
+          "currency": {
+            "type": "string",
+            "title": "Currency"
+          },
+          "period_start": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Period Start"
+          },
+          "period_end": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Period End"
+          },
+          "method": {
+            "type": "string",
+            "title": "Method"
+          },
+          "annual_only": {
+            "type": "boolean",
+            "title": "Annual Only"
+          },
+          "stale": {
+            "type": "boolean",
+            "title": "Stale",
+            "description": "The period ended more than 200 days ago."
+          },
+          "inputs": {
+            "items": {
+              "$ref": "#/components/schemas/FactRef"
+            },
+            "type": "array",
+            "title": "Inputs"
+          }
+        },
+        "type": "object",
+        "required": [
+          "value",
+          "currency",
+          "period_start",
+          "period_end",
+          "method",
+          "annual_only",
+          "stale"
+        ],
+        "title": "FigureOut"
+      },
       "FredSeries": {
         "properties": {
           "key": {
@@ -11333,6 +11984,359 @@
           "job_id"
         ],
         "title": "Freshness"
+      },
+      "FundValuationOut": {
+        "properties": {
+          "key": {
+            "type": "string",
+            "title": "Key"
+          },
+          "label": {
+            "type": "string",
+            "title": "Label"
+          },
+          "provider": {
+            "type": "string",
+            "title": "Provider"
+          },
+          "provider_label": {
+            "type": "string",
+            "title": "Provider Label"
+          },
+          "as_of": {
+            "type": "string",
+            "format": "date",
+            "title": "As Of"
+          },
+          "pe": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pe"
+          },
+          "pb": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pb"
+          },
+          "index_label": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Index Label"
+          },
+          "index_pe": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Index Pe"
+          },
+          "index_pb": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Index Pb"
+          },
+          "dividend_yield": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Dividend Yield",
+            "description": "Fraction."
+          },
+          "dividend_yield_kind": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Dividend Yield Kind"
+          },
+          "methodology": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Methodology"
+          },
+          "source_url": {
+            "type": "string",
+            "title": "Source Url"
+          },
+          "fetched_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Fetched At"
+          },
+          "stale": {
+            "type": "boolean",
+            "title": "Stale",
+            "description": "As of more than 45 days ago."
+          }
+        },
+        "type": "object",
+        "required": [
+          "key",
+          "label",
+          "provider",
+          "provider_label",
+          "as_of",
+          "pe",
+          "pb",
+          "index_label",
+          "index_pe",
+          "index_pb",
+          "dividend_yield",
+          "dividend_yield_kind",
+          "methodology",
+          "source_url",
+          "fetched_at",
+          "stale"
+        ],
+        "title": "FundValuationOut"
+      },
+      "FundValuationSource": {
+        "properties": {
+          "key": {
+            "type": "string",
+            "pattern": "^[A-Za-z0-9._-]{1,32}$",
+            "title": "Key",
+            "examples": [
+              "CSPX"
+            ]
+          },
+          "label": {
+            "type": "string",
+            "maxLength": 120,
+            "minLength": 1,
+            "title": "Label"
+          },
+          "provider": {
+            "type": "string",
+            "enum": [
+              "ishares",
+              "vanguard"
+            ],
+            "title": "Provider"
+          },
+          "url": {
+            "type": "string",
+            "minLength": 1,
+            "format": "uri",
+            "title": "Url",
+            "description": "iShares: the product page (its embedded JSON carries the figures). Vanguard: the product-data GraphQL endpoint (e.g. https://www.vanguard.co.uk/gpx/graphql)."
+          },
+          "port_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^[0-9]{1,10}$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Port Id",
+            "description": "Vanguard only: the fund's port id (9679 = FTSE All-World UCITS ETF Acc)."
+          },
+          "consumer_id": {
+            "type": "string",
+            "pattern": "^[a-z0-9]{1,10}$",
+            "title": "Consumer Id",
+            "description": "Vanguard only: the site's x-consumer-id header (uk0 for vanguard.co.uk).",
+            "default": "uk0"
+          },
+          "tickers": {
+            "items": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9._-]{1,32}$",
+              "examples": [
+                "AAPL_US_EQ"
+              ]
+            },
+            "type": "array",
+            "title": "Tickers",
+            "description": "Holdings whose valuation is this fund's."
+          },
+          "index_label": {
+            "type": "string",
+            "maxLength": 80,
+            "title": "Index Label",
+            "description": "The index the fund tracks, e.g. 'S&P 500'.",
+            "default": ""
+          },
+          "benchmark_symbols": {
+            "items": {
+              "type": "string",
+              "pattern": "^\\^?[a-z0-9._-]{1,24}$",
+              "examples": [
+                "^spx"
+              ]
+            },
+            "type": "array",
+            "title": "Benchmark Symbols",
+            "description": "Benchmark symbols (Prices config) this fund's figures stand in for."
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "key",
+          "label",
+          "provider",
+          "url"
+        ],
+        "title": "FundValuationSource",
+        "description": "Where an ETF's fund-level P/E and P/B are published (they stand in for its index)."
+      },
+      "FundamentalsOut": {
+        "properties": {
+          "source": {
+            "type": "string",
+            "enum": [
+              "sec",
+              "esef",
+              "manual"
+            ],
+            "title": "Source"
+          },
+          "source_label": {
+            "type": "string",
+            "title": "Source Label"
+          },
+          "basis": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Basis"
+          },
+          "eps_kind": {
+            "type": "string",
+            "title": "Eps Kind"
+          },
+          "document_ref": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Document Ref"
+          },
+          "document_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Document Url"
+          },
+          "fetched_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fetched At"
+          },
+          "as_of": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "As Of",
+            "description": "Manual figures: the date they were entered for."
+          },
+          "notes": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Notes"
+          },
+          "last_error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Error"
+          }
+        },
+        "type": "object",
+        "required": [
+          "source",
+          "source_label",
+          "basis",
+          "eps_kind",
+          "document_ref",
+          "document_url",
+          "fetched_at",
+          "as_of",
+          "notes",
+          "last_error"
+        ],
+        "title": "FundamentalsOut"
       },
       "FxQuote": {
         "properties": {
@@ -11743,50 +12747,6 @@
           "drift_status"
         ],
         "title": "Holding"
-      },
-      "HoldingContribution": {
-        "properties": {
-          "ticker": {
-            "type": "string",
-            "title": "Ticker"
-          },
-          "name": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Name"
-          },
-          "contribution_base": {
-            "type": "number",
-            "title": "Contribution Base",
-            "description": "The holding's organic gain over the period, in base currency — its value change with its own trading netted out."
-          },
-          "contribution_pct": {
-            "anyOf": [
-              {
-                "type": "number"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Contribution Pct",
-            "description": "contribution_base as a fraction of the portfolio's total value at the start of the period; null when that value was zero."
-          }
-        },
-        "type": "object",
-        "required": [
-          "ticker",
-          "name",
-          "contribution_base",
-          "contribution_pct"
-        ],
-        "title": "HoldingContribution"
       },
       "HoldingCoverage": {
         "properties": {
@@ -12572,6 +13532,43 @@
             "title": "Reporting Currency",
             "description": "Currency the company reports in; figures in another are held."
           },
+          "valuation_source": {
+            "type": "string",
+            "enum": [
+              "auto",
+              "sec",
+              "esef",
+              "manual"
+            ],
+            "title": "Valuation Source",
+            "description": "Which fundamentals the valuation uses: 'auto' takes the freshest automatic source (SEC XBRL, then ESEF) and the manual figures only when there is none; 'sec', 'esef' or 'manual' force one.",
+            "default": "auto"
+          },
+          "shares_per_listing": {
+            "anyOf": [
+              {
+                "type": "number",
+                "maximum": 1000.0,
+                "exclusiveMinimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Shares Per Listing",
+            "description": "Ordinary shares one priced unit represents, for depositary receipts (TSMC's ADS = 5 shares). Empty: 1."
+          },
+          "manual_fundamentals": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ManualFundamentals"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Hand-entered per-share figures for holdings without an automatic source."
+          },
           "competitors": {
             "items": {
               "type": "string",
@@ -12678,6 +13675,184 @@
           "body"
         ],
         "title": "HoldingProfilesConfigVersion"
+      },
+      "HoldingValuation": {
+        "properties": {
+          "ticker": {
+            "type": "string",
+            "title": "Ticker"
+          },
+          "name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "stock",
+              "fund"
+            ],
+            "title": "Kind"
+          },
+          "price": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/PriceOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "pe": {
+            "$ref": "#/components/schemas/RatioOut"
+          },
+          "pb": {
+            "$ref": "#/components/schemas/RatioOut"
+          },
+          "dividend_yield": {
+            "$ref": "#/components/schemas/RatioOut",
+            "description": "Fraction (0.012 = 1.2 %)."
+          },
+          "eps_ttm": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/FigureOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "book_value_per_share": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/FigureOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "dividend_per_share": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/FigureOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "shares_per_listing": {
+            "type": "number",
+            "title": "Shares Per Listing",
+            "description": "Ordinary shares per priced unit (depositary receipts)."
+          },
+          "fundamentals": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/FundamentalsOut"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The figures the ratios use."
+          },
+          "alternatives": {
+            "items": {
+              "$ref": "#/components/schemas/AlternativeOut"
+            },
+            "type": "array",
+            "title": "Alternatives",
+            "description": "Other sources or accounting bases, for comparison (not used)."
+          },
+          "cross_check": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/CrossCheckOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "fund": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/FundValuationOut"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "ETFs: the provider's fund figures."
+          },
+          "pe_history": {
+            "items": {
+              "$ref": "#/components/schemas/PePoint"
+            },
+            "type": "array",
+            "title": "Pe History",
+            "description": "Weekly P/E over two years: each close over the EPS TTM in force then (from the first filing of each period); empty when it cannot be built."
+          },
+          "errors": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "type": "object",
+            "title": "Errors",
+            "description": "The last refresh's error per source, if any."
+          },
+          "checked_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Checked At",
+            "description": "When the refresh job last ran for it."
+          },
+          "method": {
+            "type": "string",
+            "title": "Method"
+          }
+        },
+        "type": "object",
+        "required": [
+          "ticker",
+          "name",
+          "kind",
+          "price",
+          "pe",
+          "pb",
+          "dividend_yield",
+          "eps_ttm",
+          "book_value_per_share",
+          "dividend_per_share",
+          "shares_per_listing",
+          "fundamentals",
+          "alternatives",
+          "cross_check",
+          "fund",
+          "pe_history",
+          "errors",
+          "checked_at",
+          "method"
+        ],
+        "title": "HoldingValuation"
       },
       "HoldingsPrices": {
         "properties": {
@@ -13662,6 +14837,10 @@
             "$ref": "#/components/schemas/JobSchedule",
             "description": "Load new SEC Form 13F data sets (published quarterly). Default: the 5th of each month, 05:00."
           },
+          "valuation_refresh": {
+            "$ref": "#/components/schemas/JobSchedule",
+            "description": "Fundamentals (SEC XBRL, ESEF) of holdings that filed since the last read (all of them weekly) and the ETF providers' fund P/E and P/B. Default: daily 07:45."
+          },
           "earnings_check": {
             "$ref": "#/components/schemas/EarningsCheckSettings"
           },
@@ -13700,6 +14879,9 @@
           },
           "ownership": {
             "$ref": "#/components/schemas/OwnershipSettings"
+          },
+          "valuation": {
+            "$ref": "#/components/schemas/ValuationSettings"
           }
         },
         "additionalProperties": false,
@@ -14315,6 +15497,77 @@
           "accession"
         ],
         "title": "ManagerChange"
+      },
+      "ManualFundamentals": {
+        "properties": {
+          "eps_ttm": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Eps Ttm",
+            "description": "Diluted earnings per share over the trailing twelve months (or the latest full year), per ordinary share."
+          },
+          "book_value_per_share": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Book Value Per Share",
+            "description": "Equity attributable to shareholders per ordinary share."
+          },
+          "dividend_per_share": {
+            "anyOf": [
+              {
+                "type": "number",
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Dividend Per Share",
+            "description": "Dividends per ordinary share paid over the last year."
+          },
+          "currency": {
+            "type": "string",
+            "pattern": "^[A-Z]{3}$",
+            "title": "Currency",
+            "description": "Currency of the per-share figures.",
+            "examples": [
+              "CZK"
+            ]
+          },
+          "as_of": {
+            "type": "string",
+            "format": "date",
+            "title": "As Of",
+            "description": "Period end (or date) the figures are for."
+          },
+          "source_note": {
+            "type": "string",
+            "maxLength": 300,
+            "title": "Source Note",
+            "description": "Where the figures come from, e.g. 'Annual report 2025, p. 112'.",
+            "default": ""
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "currency",
+          "as_of"
+        ],
+        "title": "ManualFundamentals",
+        "description": "Per-share figures entered by hand, for a holding no automatic source covers (e.g.\nPrague listings, whose filings are not machine-readable). Shown as \"entered manually\"."
       },
       "MarketHoliday": {
         "properties": {
@@ -15635,6 +16888,30 @@
         "title": "OwnershipSettings",
         "description": "Form 13F institutional ownership from the SEC's quarterly data sets."
       },
+      "PePoint": {
+        "properties": {
+          "date": {
+            "type": "string",
+            "format": "date",
+            "title": "Date"
+          },
+          "pe": {
+            "type": "number",
+            "title": "Pe"
+          },
+          "eps": {
+            "type": "number",
+            "title": "Eps"
+          }
+        },
+        "type": "object",
+        "required": [
+          "date",
+          "pe",
+          "eps"
+        ],
+        "title": "PePoint"
+      },
       "PlausibilityCheck": {
         "properties": {
           "date": {
@@ -15930,6 +17207,78 @@
           "fx_rates"
         ],
         "title": "PortfolioOverview"
+      },
+      "PortfolioValuation": {
+        "properties": {
+          "as_of": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "As Of",
+            "description": "The snapshot the weights come from."
+          },
+          "base_currency": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Base Currency"
+          },
+          "portfolio": {
+            "$ref": "#/components/schemas/Aggregate"
+          },
+          "benchmark": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/BenchmarkValuation"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The Prices config's first benchmark, via the fund configured for it."
+          },
+          "comparisons": {
+            "items": {
+              "$ref": "#/components/schemas/BenchmarkValuation"
+            },
+            "type": "array",
+            "title": "Comparisons",
+            "description": "Every configured fund's (and, where published, its index's) figures."
+          },
+          "holdings": {
+            "items": {
+              "$ref": "#/components/schemas/steward__valuation__read__HoldingContribution"
+            },
+            "type": "array",
+            "title": "Holdings"
+          },
+          "method": {
+            "type": "string",
+            "title": "Method"
+          }
+        },
+        "type": "object",
+        "required": [
+          "as_of",
+          "base_currency",
+          "portfolio",
+          "benchmark",
+          "comparisons",
+          "holdings",
+          "method"
+        ],
+        "title": "PortfolioValuation"
       },
       "PositionCountRule": {
         "properties": {
@@ -16486,6 +17835,52 @@
         ],
         "title": "PriceHistory"
       },
+      "PriceOut": {
+        "properties": {
+          "symbol": {
+            "type": "string",
+            "title": "Symbol"
+          },
+          "close": {
+            "type": "number",
+            "title": "Close"
+          },
+          "currency": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Currency"
+          },
+          "date": {
+            "type": "string",
+            "format": "date",
+            "title": "Date"
+          },
+          "source": {
+            "type": "string",
+            "title": "Source",
+            "default": "Stooq daily close"
+          },
+          "stale": {
+            "type": "boolean",
+            "title": "Stale"
+          }
+        },
+        "type": "object",
+        "required": [
+          "symbol",
+          "close",
+          "currency",
+          "date",
+          "stale"
+        ],
+        "title": "PriceOut"
+      },
       "PricePoint": {
         "properties": {
           "date": {
@@ -16744,6 +18139,40 @@
         "additionalProperties": false,
         "type": "object",
         "title": "QuietHours"
+      },
+      "RatioOut": {
+        "properties": {
+          "value": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Value",
+            "description": "Null when it cannot be computed (see reason)."
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason",
+            "description": "Why the value is null, e.g. 'n/m: negative earnings'."
+          }
+        },
+        "type": "object",
+        "required": [
+          "value",
+          "reason"
+        ],
+        "title": "RatioOut"
       },
       "ReadinessResponse": {
         "properties": {
@@ -20536,6 +21965,79 @@
         ],
         "title": "Valuation"
       },
+      "ValuationRefreshRequest": {
+        "properties": {
+          "ticker": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^[A-Za-z0-9._-]{1,32}$",
+                "examples": [
+                  "AAPL_US_EQ"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ticker",
+            "description": "One holding, or all when null."
+          },
+          "force": {
+            "type": "boolean",
+            "title": "Force",
+            "description": "Re-read even when nothing new was filed.",
+            "default": false
+          }
+        },
+        "type": "object",
+        "title": "ValuationRefreshRequest"
+      },
+      "ValuationSettings": {
+        "properties": {
+          "enabled": {
+            "type": "boolean",
+            "title": "Enabled",
+            "description": "Off: the scheduled run does nothing.",
+            "default": true
+          },
+          "full_refresh_days": {
+            "type": "integer",
+            "maximum": 90.0,
+            "minimum": 1.0,
+            "title": "Full Refresh Days",
+            "description": "Each run re-reads a holding's fundamentals when the issuer filed a new report since the last read, and in any case after this many days.",
+            "default": 7
+          },
+          "esef_max_age_months": {
+            "type": "integer",
+            "maximum": 60.0,
+            "minimum": 3.0,
+            "title": "Esef Max Age Months",
+            "description": "ESEF filings (filings.xbrl.org) with an older period end are ignored.",
+            "default": 18
+          },
+          "finnhub_cross_check": {
+            "type": "boolean",
+            "title": "Finnhub Cross Check",
+            "description": "Also read Finnhub's basic financials (P/E, P/B, EPS) as a tier-2 cross-check. Needs FINNHUB_API_KEY; never required.",
+            "default": true
+          },
+          "funds": {
+            "items": {
+              "$ref": "#/components/schemas/FundValuationSource"
+            },
+            "type": "array",
+            "maxItems": 20,
+            "title": "Funds",
+            "description": "ETFs whose fund-level P/E and P/B are read from the provider."
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "ValuationSettings",
+        "description": "P/E, P/B and dividend yield: fundamentals from SEC XBRL and ESEF, fund figures from\nthe ETF providers."
+      },
       "VerdictActivity": {
         "properties": {
           "count": {
@@ -20875,6 +22377,192 @@
           "fetched_at"
         ],
         "title": "WikidataSummary"
+      },
+      "steward__portfolio__read__HoldingContribution": {
+        "properties": {
+          "ticker": {
+            "type": "string",
+            "title": "Ticker"
+          },
+          "name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
+          },
+          "contribution_base": {
+            "type": "number",
+            "title": "Contribution Base",
+            "description": "The holding's organic gain over the period, in base currency — its value change with its own trading netted out."
+          },
+          "contribution_pct": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Contribution Pct",
+            "description": "contribution_base as a fraction of the portfolio's total value at the start of the period; null when that value was zero."
+          }
+        },
+        "type": "object",
+        "required": [
+          "ticker",
+          "name",
+          "contribution_base",
+          "contribution_pct"
+        ],
+        "title": "HoldingContribution"
+      },
+      "steward__valuation__read__HoldingContribution": {
+        "properties": {
+          "ticker": {
+            "type": "string",
+            "title": "Ticker"
+          },
+          "name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "stock",
+              "fund"
+            ],
+            "title": "Kind"
+          },
+          "weight": {
+            "type": "number",
+            "title": "Weight",
+            "description": "Share of invested value (cash excluded), 0..1."
+          },
+          "pe": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pe",
+            "description": "As used: capped at 60; null when excluded or missing."
+          },
+          "pe_raw": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pe Raw"
+          },
+          "pe_note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pe Note"
+          },
+          "pb": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pb"
+          },
+          "pb_raw": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pb Raw"
+          },
+          "pb_note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pb Note"
+          },
+          "dividend_yield": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Dividend Yield"
+          },
+          "source_label": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Label"
+          },
+          "stale": {
+            "type": "boolean",
+            "title": "Stale"
+          }
+        },
+        "type": "object",
+        "required": [
+          "ticker",
+          "name",
+          "kind",
+          "weight",
+          "pe",
+          "pe_raw",
+          "pe_note",
+          "pb",
+          "pb_raw",
+          "pb_note",
+          "dividend_yield",
+          "source_label",
+          "stale"
+        ],
+        "title": "HoldingContribution"
       }
     },
     "securitySchemes": {
