@@ -809,6 +809,57 @@
         }
       }
     },
+    "/portfolio/risk": {
+      "get": {
+        "tags": [
+          "portfolio"
+        ],
+        "summary": "Get Portfolio Risk",
+        "description": "Sharpe ratio of the portfolio and of the first benchmark over the window: the\ntime-weighted daily returns of /portfolio/history (weekdays) in the base currency, in\nexcess of the forward-filled CZK risk-free rate (CZEONIA from the ČNB, /100/252 per\ntrading day), annualised by sqrt(252); with the annualised volatility, mean excess\nreturn, average risk-free rate, the window and the number of observations. `sharpe` is\nnull with a `reason` under 60 observations or without a stored risk-free rate.",
+        "operationId": "get_portfolio_risk",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "days",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 3700,
+              "minimum": 30,
+              "default": 365,
+              "title": "Days"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PortfolioRisk"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/portfolio/transactions": {
       "get": {
         "tags": [
@@ -7747,6 +7798,50 @@
         ],
         "title": "ClosureSuggestion"
       },
+      "CnbSeries": {
+        "properties": {
+          "key": {
+            "type": "string",
+            "pattern": "^[a-z0-9_]{1,40}$",
+            "title": "Key"
+          },
+          "label": {
+            "type": "string",
+            "maxLength": 100,
+            "minLength": 1,
+            "title": "Label"
+          },
+          "series": {
+            "type": "string",
+            "enum": [
+              "czeonia",
+              "repo_2w"
+            ],
+            "title": "Series",
+            "description": "czeonia: the CZK overnight reference rate, daily (yearly.txt/daily.txt; the portfolio's risk-free rate). repo_2w: the 2-week repo rate's change history."
+          },
+          "unit": {
+            "type": "string",
+            "maxLength": 20,
+            "title": "Unit",
+            "default": "%"
+          },
+          "policy_rate": {
+            "type": "boolean",
+            "title": "Policy Rate",
+            "default": false
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "key",
+          "label",
+          "series"
+        ],
+        "title": "CnbSeries",
+        "description": "A Czech National Bank rate from its keyless text files."
+      },
       "ComplianceRow": {
         "properties": {
           "id": {
@@ -11050,6 +11145,158 @@
         ],
         "title": "FailedCheck"
       },
+      "FeeNameTotal": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "category": {
+            "type": "string",
+            "enum": [
+              "fx",
+              "tax",
+              "account"
+            ],
+            "title": "Category"
+          },
+          "count": {
+            "type": "integer",
+            "title": "Count"
+          },
+          "amount": {
+            "type": "number",
+            "title": "Amount",
+            "description": "In the fee summary's `currency`."
+          }
+        },
+        "type": "object",
+        "required": [
+          "name",
+          "category",
+          "count",
+          "amount"
+        ],
+        "title": "FeeNameTotal"
+      },
+      "FeeTotals": {
+        "properties": {
+          "currency": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Currency",
+            "description": "Base currency the amounts are converted to; null before the first sync."
+          },
+          "fx_source": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "cnb",
+                  "ecb"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fx Source"
+          },
+          "fx_conversion": {
+            "type": "number",
+            "title": "Fx Conversion",
+            "description": "CURRENCY_CONVERSION_FEE on fills."
+          },
+          "taxes_levies": {
+            "type": "number",
+            "title": "Taxes Levies",
+            "description": "Every other fill charge (stamp duty, FTT, ...)."
+          },
+          "account_fees": {
+            "type": "number",
+            "title": "Account Fees",
+            "description": "Cash transactions of type FEE (abs(amount))."
+          },
+          "total": {
+            "type": "number",
+            "title": "Total"
+          },
+          "included_in_buys": {
+            "type": "number",
+            "title": "Included In Buys",
+            "description": "Part of the fill fees that buys' amounts already include (fee_basis 'included'): subtract it from buys before showing fees separately."
+          },
+          "included_in_sales": {
+            "type": "number",
+            "title": "Included In Sales",
+            "description": "Part of the fill fees already deducted from sales' amounts: add it back to sales before showing fees separately."
+          },
+          "by_name": {
+            "items": {
+              "$ref": "#/components/schemas/FeeNameTotal"
+            },
+            "type": "array",
+            "title": "By Name"
+          },
+          "unconverted": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Unconverted",
+            "description": "Currencies of fees left out of the sums for lack of a stored FX rate."
+          },
+          "fills": {
+            "type": "integer",
+            "title": "Fills",
+            "description": "Order rows matching the filters."
+          },
+          "fills_captured": {
+            "type": "integer",
+            "title": "Fills Captured",
+            "description": "Of those, fills whose fees the sync has read."
+          },
+          "fills_with_fees": {
+            "type": "integer",
+            "title": "Fills With Fees"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "captured",
+              "partial",
+              "not_captured",
+              "no_fills"
+            ],
+            "title": "Status",
+            "description": "not_captured: no fill in the filtered set has had its fees read yet (stored before fee capture; the next sync re-reads the order history)."
+          }
+        },
+        "type": "object",
+        "required": [
+          "currency",
+          "fx_source",
+          "fx_conversion",
+          "taxes_levies",
+          "account_fees",
+          "total",
+          "included_in_buys",
+          "included_in_sales",
+          "by_name",
+          "unconverted",
+          "fills",
+          "fills_captured",
+          "fills_with_fees",
+          "status"
+        ],
+        "title": "FeeTotals"
+      },
       "FeedbackIn": {
         "properties": {
           "target_kind": {
@@ -14239,6 +14486,14 @@
             },
             "type": "array",
             "title": "Ecb"
+          },
+          "cnb": {
+            "items": {
+              "$ref": "#/components/schemas/CnbSeries"
+            },
+            "type": "array",
+            "title": "Cnb",
+            "description": "ČNB rates. CZEONIA is the risk-free rate of the Sharpe ratio (series key 'czeonia'); the repo rate's changes are ČNB decisions."
           }
         },
         "additionalProperties": false,
@@ -15930,6 +16185,88 @@
           "fx_rates"
         ],
         "title": "PortfolioOverview"
+      },
+      "PortfolioRisk": {
+        "properties": {
+          "as_of": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "As Of"
+          },
+          "days": {
+            "type": "integer",
+            "title": "Days"
+          },
+          "base_currency": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Base Currency"
+          },
+          "method": {
+            "type": "string",
+            "title": "Method"
+          },
+          "risk_free": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/RiskFree"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "portfolio": {
+            "$ref": "#/components/schemas/SharpeStats"
+          },
+          "benchmark_symbol": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Benchmark Symbol"
+          },
+          "benchmark": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SharpeStats"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The same figures for the benchmark, converted to the base currency; null without a configured benchmark."
+          }
+        },
+        "type": "object",
+        "required": [
+          "as_of",
+          "days",
+          "base_currency",
+          "method",
+          "risk_free",
+          "portfolio",
+          "benchmark_symbol",
+          "benchmark"
+        ],
+        "title": "PortfolioRisk"
       },
       "PositionCountRule": {
         "properties": {
@@ -18674,6 +19011,76 @@
         ],
         "title": "RiskCard"
       },
+      "RiskFree": {
+        "properties": {
+          "series_id": {
+            "type": "string",
+            "title": "Series Id",
+            "description": "macro_series id, e.g. 'czeonia'."
+          },
+          "source": {
+            "type": "string",
+            "title": "Source",
+            "description": "macro_series source, e.g. 'cnb'."
+          },
+          "label": {
+            "type": "string",
+            "title": "Label"
+          },
+          "latest_rate": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Latest Rate",
+            "description": "Latest stored value, as a fraction."
+          },
+          "latest_date": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Latest Date",
+            "description": "The day the latest value is for."
+          },
+          "url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Url"
+          },
+          "fallback": {
+            "type": "boolean",
+            "title": "Fallback",
+            "description": "True when the preferred series (CZEONIA for CZK) has nothing stored and a policy rate stands in."
+          }
+        },
+        "type": "object",
+        "required": [
+          "series_id",
+          "source",
+          "label",
+          "latest_rate",
+          "latest_date",
+          "url",
+          "fallback"
+        ],
+        "title": "RiskFree"
+      },
       "RuleMatch": {
         "properties": {
           "severities": {
@@ -18894,6 +19301,135 @@
           "severity"
         ],
         "title": "SeverityOverride"
+      },
+      "SharpeStats": {
+        "properties": {
+          "sharpe": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sharpe"
+          },
+          "annualised_volatility": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Annualised Volatility",
+            "description": "Sample stdev of the daily returns x sqrt(252), fraction."
+          },
+          "annualised_return": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Annualised Return",
+            "description": "Mean daily return x 252, fraction."
+          },
+          "mean_excess_return": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Mean Excess Return",
+            "description": "Mean daily excess return x 252, fraction."
+          },
+          "risk_free_average": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Risk Free Average",
+            "description": "Mean daily risk-free rate x 252 over the observations, fraction."
+          },
+          "observations": {
+            "type": "integer",
+            "title": "Observations"
+          },
+          "window_start": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Window Start"
+          },
+          "window_end": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Window End"
+          },
+          "currency": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Currency",
+            "description": "Currency the returns are measured in."
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason",
+            "description": "Why `sharpe` is null, when it is."
+          }
+        },
+        "type": "object",
+        "required": [
+          "sharpe",
+          "annualised_volatility",
+          "annualised_return",
+          "mean_excess_return",
+          "risk_free_average",
+          "observations",
+          "window_start",
+          "window_end",
+          "currency",
+          "reason"
+        ],
+        "title": "SharpeStats"
       },
       "SnapshotValues": {
         "properties": {
@@ -20250,6 +20786,48 @@
         ],
         "title": "TrackedManager"
       },
+      "TransactionFeeOut": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "title": "Name",
+            "description": "Trading212's name, e.g. CURRENCY_CONVERSION_FEE."
+          },
+          "category": {
+            "type": "string",
+            "enum": [
+              "fx",
+              "tax"
+            ],
+            "title": "Category",
+            "description": "fx: FX conversion; tax: taxes & levies."
+          },
+          "amount": {
+            "type": "number",
+            "title": "Amount",
+            "description": "abs(quantity) as Trading212 reported it, in `currency`."
+          },
+          "currency": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Currency"
+          }
+        },
+        "type": "object",
+        "required": [
+          "name",
+          "category",
+          "amount",
+          "currency"
+        ],
+        "title": "TransactionFeeOut"
+      },
       "TransactionOut": {
         "properties": {
           "id": {
@@ -20340,6 +20918,43 @@
             "type": "string",
             "format": "date-time",
             "title": "Occurred At"
+          },
+          "fees": {
+            "items": {
+              "$ref": "#/components/schemas/TransactionFeeOut"
+            },
+            "type": "array",
+            "title": "Fees",
+            "description": "Orders: the fill's fees and taxes (walletImpact.taxes)."
+          },
+          "fees_captured": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fees Captured",
+            "description": "Orders: whether the sync has read this fill's fees yet (false: stored before fee capture; the one-time order-history re-read fills it in). Null for dividends and cash."
+          },
+          "fee_basis": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "excluded",
+                  "included",
+                  "unknown"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fee Basis",
+            "description": "Orders with fees: whether `amount` (walletImpact.netValue) already includes them; unknown is read as excluded, Trading212's documented behaviour."
           }
         },
         "type": "object",
@@ -20398,6 +21013,10 @@
             ],
             "title": "Next Cursor",
             "description": "Pass as `cursor` for the next (older) page; null on the last page."
+          },
+          "fees": {
+            "$ref": "#/components/schemas/FeeTotals",
+            "description": "Fees and taxes over every matching row, converted to the base currency."
           }
         },
         "type": "object",
@@ -20406,7 +21025,8 @@
           "total_count",
           "totals",
           "dividends",
-          "next_cursor"
+          "next_cursor",
+          "fees"
         ],
         "title": "TransactionsPage"
       },
