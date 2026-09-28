@@ -56,6 +56,7 @@ from steward.portfolio.read import (
     portfolio_holdings,
     portfolio_overview,
 )
+from steward.portfolio.risk import PortfolioRisk, portfolio_risk
 from steward.portfolio.transactions import (
     TransactionFilters,
     TransactionsPage,
@@ -113,6 +114,21 @@ async def get_portfolio_contribution(
     Empty (with `gap` set) before the first sync, or with no position snapshot in the
     window."""
     return await contribution_to_return(pool, days)
+
+
+@router.get("/portfolio/risk", tags=["portfolio"])
+async def get_portfolio_risk(
+    pool: Pool,
+    _owner: Owner,
+    days: Annotated[int, Query(ge=30, le=3700)] = 365,
+) -> PortfolioRisk:
+    """Sharpe ratio of the portfolio and of the first benchmark over the window: the
+    time-weighted daily returns of /portfolio/history (weekdays) in the base currency, in
+    excess of the forward-filled CZK risk-free rate (CZEONIA from the ČNB, /100/252 per
+    trading day), annualised by sqrt(252); with the annualised volatility, mean excess
+    return, average risk-free rate, the window and the number of observations. `sharpe` is
+    null with a `reason` under 60 observations or without a stored risk-free rate."""
+    return await portfolio_risk(pool, days)
 
 
 @router.get("/portfolio/transactions", tags=["portfolio"])

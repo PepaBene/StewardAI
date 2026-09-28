@@ -458,6 +458,19 @@ class EcbSeries(ConfigModel):
     policy_rate: bool = False
 
 
+class CnbSeries(ConfigModel):
+    """A Czech National Bank rate from its keyless text files."""
+
+    key: Annotated[str, Field(pattern=r"^[a-z0-9_]{1,40}$")]
+    label: str = Field(min_length=1, max_length=100)
+    series: Literal["czeonia", "repo_2w"] = Field(
+        description="czeonia: the CZK overnight reference rate, daily (yearly.txt/daily.txt; "
+        "the portfolio's risk-free rate). repo_2w: the 2-week repo rate's change history."
+    )
+    unit: str = Field(default="%", max_length=20)
+    policy_rate: bool = False
+
+
 def _eurostat_defaults() -> list[EurostatSeries]:
     rows = [
         ("hicp", "HICP inflation, annual rate", "prc_hicp_minr",
@@ -517,6 +530,17 @@ class MacroSettings(ConfigModel):
                 policy_rate=True,
             ),
         ]
+    )
+    cnb: list[CnbSeries] = Field(
+        default_factory=lambda: [
+            # Moves every business day: not a policy rate, and no surprise band.
+            CnbSeries(key="czeonia", label="CZEONIA (CZK overnight rate)", series="czeonia"),
+            CnbSeries(
+                key="cnb_repo_2w", label="ČNB 2-week repo rate", series="repo_2w", policy_rate=True
+            ),
+        ],
+        description="ČNB rates. CZEONIA is the risk-free rate of the Sharpe ratio (series key "
+        "'czeonia'); the repo rate's changes are ČNB decisions.",
     )
 
 

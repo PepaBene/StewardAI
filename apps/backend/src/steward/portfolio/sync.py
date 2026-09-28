@@ -26,11 +26,17 @@ from steward.fx.sources import FxSourceError, fetch_rates
 from steward.jobs.runner import JobContext, JobFailed
 from steward.portfolio.breaches import evaluate, record_breaches
 from steward.portfolio.drift import HoldingValue, compute_drift
+from steward.portfolio.fees import FeeBasis, FeeCharge, fee_basis, fee_charges
 from steward.portfolio.snapshot import Snapshot, build_snapshot, snapshot_date_for
 from steward.reference.calendar import fx_stale
 from steward.settings import get_settings
 from steward.trading212.client import Trading212Client
-from steward.trading212.models import HistoricalOrder, HistoryDividend, HistoryTransaction
+from steward.trading212.models import (
+    HistoricalOrder,
+    HistoryDividend,
+    HistoryTransaction,
+    T212Model,
+)
 
 JOB_TYPE = "portfolio_sync"
 
@@ -333,11 +339,32 @@ class TransactionRow:
     currency: str | None
     occurred_at: dt.datetime
     raw: dict[str, Any]
+    # Orders only: the fill's walletImpact.taxes, and whether netValue includes them.
+    fees: tuple[FeeCharge, ...] = ()
+    fee_basis: FeeBasis | None = None
 
 
 def _raw(item: BaseModel) -> dict[str, Any]:
+    """The response item exactly as Trading212 sent it; a re-dump of the parsed model only
+    for items that did not come through the client (never the case in the sync)."""
+    if isinstance(item, T212Model) and item.source_payload is not None:
+        return item.source_payload
     dumped: dict[str, Any] = item.model_dump(mode="json", by_alias=True, exclude_none=True)
     return dumped
+
+
+def json_exact(value: Any) -> str:
+    """JSON text for a payload parsed with Decimal numbers, writing each number exactly as
+    it was received (json.dumps cannot serialise Decimal, and float would round it)."""
+    if isinstance(value, Decimal):
+        return str(value) if value.is_finite() else "null"
+    if isinstance(value, dict):
+        return (
+            "{" + ",".join(f"{json.dumps(str(k))}:{json_exact(v)}" for k, v in value.items()) + "}"
+        )
+    if isinstance(value, list | tuple):
+        return "[" + ",".join(json_exact(v) for v in value) + "]"
+    return json.dumps(value)
 
 
 def order_row(item: HistoricalOrder) -> TransactionRow | None:
@@ -352,6 +379,16 @@ def order_row(item: HistoricalOrder) -> TransactionRow | None:
         amount = (fill.quantity or Decimal(0)) * (fill.price or Decimal(0))
         currency = order.currency
     ticker = order.ticker or (order.instrument.ticker if order.instrument else None)
+    fees = fee_charges(impact.taxes if impact else None, impact.currency if impact else None)
+    basis = fee_basis(
+        side=order.side,
+        quantity=fill.quantity,
+        price=fill.price,
+        fx_rate=impact.fx_rate if impact else None,
+        net_value=impact.net_value if impact else None,
+        # Only charges in netValue's own currency can be compared with it.
+        fees=sum((f.amount for f in fees if f.currency in (None, currency)), Decimal(0)),
+    )
     return TransactionRow(
         id=f"fill:{fill.id}",
         type="order",
@@ -363,6 +400,8 @@ def order_row(item: HistoricalOrder) -> TransactionRow | None:
         currency=currency,
         occurred_at=fill.filled_at,
         raw=_raw(item),
+        fees=tuple(fees),
+        fee_basis=basis,
     )
 
 
@@ -397,6 +436,79 @@ def cash_row(item: HistoryTransaction) -> TransactionRow:
     )
 
 
+# Bumped when a history kind must be re-read in full once (the next sync ignores its
+# backfill_complete flag, re-pages everything and upserts). orders 1: fee capture - fills
+# written before walletImpact.taxes was read get their original payload and their fees.
+HISTORY_STATE_VERSION: dict[str, int] = {"orders": 1}
+
+_INSERT = (
+    "insert into public.transaction (id, type, subtype, ticker, quantity, price, amount,"
+    " currency, occurred_at, raw, job_id, fees_captured_at, fee_basis)"
+    " values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10::jsonb, $11, $12, $13)"
+)
+# Orders are upserted: a re-read (the one-time fee backfill, or Trading212 adding a field)
+# refreshes the stored payload and fees. Nothing else of a stored fill changes, and an
+# unchanged row is not written at all. Returns true (inserted), false (updated) or no row.
+_UPSERT_ORDER = (
+    _INSERT + " on conflict (id) do update set raw = excluded.raw,"
+    " fees_captured_at = excluded.fees_captured_at, fee_basis = excluded.fee_basis"
+    " where transaction.raw is distinct from excluded.raw"
+    " or transaction.fees_captured_at is null"
+    " or transaction.fee_basis is distinct from excluded.fee_basis"
+    " returning (xmax = 0)"
+)
+_INSERT_OTHER = _INSERT + " on conflict (id) do nothing returning true"
+
+
+async def _store_row(
+    conn: asyncpg.Connection, row: TransactionRow, job_id: int, now: dt.datetime
+) -> bool | None:
+    """Write one row: true if inserted, false if a stored order was updated, None if it
+    was already stored unchanged. An order's fee rows are replaced with it."""
+    order = row.type == "order"
+    async with conn.transaction():
+        result: bool | None = await conn.fetchval(
+            _UPSERT_ORDER if order else _INSERT_OTHER,
+            row.id,
+            row.type,
+            row.subtype,
+            row.ticker,
+            row.quantity,
+            row.price,
+            row.amount,
+            row.currency,
+            row.occurred_at,
+            json_exact(row.raw),
+            job_id,
+            now if order else None,
+            row.fee_basis,
+        )
+        if order and result is not None:
+            await conn.execute(
+                "delete from public.transaction_fee where transaction_id = $1", row.id
+            )
+            await conn.executemany(
+                "insert into public.transaction_fee (transaction_id, seq, name, category,"
+                " amount, quantity, currency, charged_at, occurred_at)"
+                " values ($1, $2, $3, $4, $5, $6, $7, $8, $9)",
+                [
+                    (
+                        row.id,
+                        f.seq,
+                        f.name,
+                        f.category,
+                        f.amount,
+                        f.quantity,
+                        f.currency,
+                        f.charged_at,
+                        row.occurred_at,
+                    )
+                    for f in row.fees
+                ],
+            )
+    return result
+
+
 async def _sync_history_kind[M: BaseModel](
     pool: asyncpg.Pool,
     kind: str,
@@ -411,16 +523,23 @@ async def _sync_history_kind[M: BaseModel](
     the watermark: the newest item time seen by the last run that finished paging. A run
     that fails mid-paging does not move the watermark, so the next run keeps reading
     past pages it had already stored until it is back below the last clean pass.
+
+    A kind whose stored state is older than HISTORY_STATE_VERSION is read in full once
+    more, exactly like the first backfill; orders are upserted, so that pass refreshes
+    every stored fill (the one-time fee backfill). A failed pass is simply retried by the
+    next sync, since the state only moves once paging finishes.
     """
     state_key = f"trading212_history:{kind}"
     state_raw = await pool.fetchval("select value from public.sync_state where key = $1", state_key)
     state = json.loads(state_raw) if state_raw else {}
-    backfilled = bool(state.get("backfill_complete"))
+    version = HISTORY_STATE_VERSION.get(kind, 0)
+    backfilled = bool(state.get("backfill_complete")) and int(state.get("version", 0)) >= version
     # Absent for state written before the watermark existed: stop at the first known item.
     watermark = dt.datetime.fromisoformat(state["watermark"]) if state.get("watermark") else None
 
-    inserted = pages_read = 0
+    inserted = updated = pages_read = 0
     newest: dt.datetime | None = None
+    now = _utcnow()
     async for page in pages:
         pages_read += 1
         rows = [row for item in page if (row := to_row(item)) is not None]
@@ -428,24 +547,13 @@ async def _sync_history_kind[M: BaseModel](
             if newest is None or row.occurred_at > newest:
                 newest = row.occurred_at
         new = 0
-        for row in rows:
-            new += await pool.fetchval(
-                "with ins as (insert into public.transaction (id, type, subtype, ticker,"
-                " quantity, price, amount, currency, occurred_at, raw, job_id)"
-                " values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10::jsonb, $11)"
-                " on conflict (id) do nothing returning 1) select count(*) from ins",
-                row.id,
-                row.type,
-                row.subtype,
-                row.ticker,
-                row.quantity,
-                row.price,
-                row.amount,
-                row.currency,
-                row.occurred_at,
-                json.dumps(row.raw),
-                job_id,
-            )
+        async with pool.acquire() as conn:
+            for row in rows:
+                result = await _store_row(conn, row, job_id, now)
+                if result is True:
+                    new += 1
+                elif result is False:
+                    updated += 1
         inserted += new
         if (
             backfilled
@@ -457,18 +565,24 @@ async def _sync_history_kind[M: BaseModel](
     # Paging finished cleanly (an exception above leaves the state as it was).
     if watermark is not None and (newest is None or newest < watermark):
         newest = watermark
+    value: dict[str, Any] = {
+        "backfill_complete": True,
+        "watermark": newest.isoformat() if newest is not None else None,
+    }
+    if version:
+        value["version"] = version
     await pool.execute(
         "insert into public.sync_state (key, value) values ($1, $2::jsonb)"
         " on conflict (key) do update set value = excluded.value",
         state_key,
-        json.dumps(
-            {
-                "backfill_complete": True,
-                "watermark": newest.isoformat() if newest is not None else None,
-            }
-        ),
+        json.dumps(value),
     )
-    return {f"{kind}_new": inserted, f"{kind}_pages": pages_read}
+    detail: dict[str, int | bool] = {f"{kind}_new": inserted, f"{kind}_pages": pages_read}
+    if updated:
+        detail[f"{kind}_updated"] = updated
+    if not backfilled and state.get("backfill_complete"):
+        detail[f"{kind}_reread"] = True
+    return detail
 
 
 async def sync_transactions(
