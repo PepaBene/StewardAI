@@ -47,6 +47,7 @@ from steward.valuation.collect import (
 )
 from steward.valuation.fundamentals import (
     ALL_CONCEPTS,
+    EpsStep,
     Fact,
     companyfacts_facts,
     compute,
@@ -55,10 +56,13 @@ from steward.valuation.fundamentals import (
 )
 from steward.valuation.read import (
     PE_CAP,
+    FundamentalsSource,
     PerShareFigure,
     ValuationContribution,
     ValuationPrice,
+    _Chosen,
     aggregate,
+    merged_steps,
     ratio,
 )
 
@@ -714,3 +718,44 @@ async def test_valuation_before_anything_is_stored(api: httpx.AsyncClient) -> No
     assert body["holdings"] == []
     one = (await api.get("/holdings/MSFT_US_EQ/valuation")).json()
     assert one["pe"] == {"value": None, "reason": "no stored price"}
+
+
+def _chosen(source: str, steps: list[tuple[str, float]]) -> _Chosen:
+    return _Chosen(
+        fundamentals=FundamentalsSource(
+            source=source,
+            source_label=source,
+            basis="IFRS",
+            eps_kind="diluted",
+            document_ref=None,
+            document_url=None,
+            fetched_at=None,
+            as_of=None,
+            notes=[],
+            last_error=None,
+        ),
+        eps=_figure(1, "DKK"),
+        bvps=None,
+        dps=None,
+        steps=[
+            EpsStep(
+                effective=dt.date.fromisoformat(d),
+                period_end=dt.date.fromisoformat(d),
+                eps=e,
+                method="m",
+            )
+            for d, e in steps
+        ],
+    )
+
+
+def test_pe_history_starts_with_the_other_sources_older_steps() -> None:
+    esef = _chosen("esef", [("2026-03-04", 23.03), ("2026-09-02", 26.2)])
+    sec = _chosen("sec", [("2025-02-05", 22.63), ("2026-02-04", 23.03)])
+    merged = merged_steps(esef, [esef, sec])
+    assert [(s.effective.isoformat(), s.eps) for s in merged] == [
+        ("2025-02-05", 22.63),
+        ("2026-02-04", 23.03),
+        ("2026-03-04", 23.03),
+        ("2026-09-02", 26.2),
+    ]

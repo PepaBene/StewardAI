@@ -355,9 +355,9 @@ function ValuationFields({
           report; leave everything empty for none.
         </p>
         <div className="grid gap-3 sm:grid-cols-3 lg:grid-cols-6">
-          <TextField label="EPS, trailing 12 months" inputMode="decimal" {...manual("eps_ttm")} />
-          <TextField label="Book value per share" inputMode="decimal" {...manual("book_value_per_share")} />
-          <TextField label="Dividend per share (last year)" inputMode="decimal" {...manual("dividend_per_share")} />
+          <TextField label="EPS (TTM)" inputMode="decimal" {...manual("eps_ttm")} />
+          <TextField label="Book value / share" inputMode="decimal" {...manual("book_value_per_share")} />
+          <TextField label="Dividend / share (12 m)" inputMode="decimal" {...manual("dividend_per_share")} />
           <TextField label="Currency" placeholder="CZK" maxLength={3} {...manual("currency")} />
           <TextField label="As of" type="date" {...manual("as_of")} />
           <TextField className="sm:col-span-3 lg:col-span-6" label="Source" placeholder="Annual report 2025, p. 17" {...manual("source_note")} />
