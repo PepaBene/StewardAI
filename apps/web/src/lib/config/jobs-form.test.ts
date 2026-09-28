@@ -96,7 +96,17 @@ const FULL: JobsConfig = {
     max_subsidiary_aliases: 120,
     wikidata_languages: ["en", "fr"],
   },
-  prices: { benchmark_symbols: ["^spx", "^dax", "^ukx"], history_years: 5, plausibility_tolerance_pct: 1.5, market_strip: [{ symbol: "^spx", label: "S&P 500" }, { symbol: "^ndx", label: "Nasdaq 100" }] },
+  prices: {
+    benchmark_symbols: ["^spx", "^dax", "^ukx"],
+    history_years: 5,
+    plausibility_tolerance_pct: 1.5,
+    market_strip: [{ symbol: "^spx", label: "S&P 500", yahoo_symbol: "^GSPC" }, { symbol: "^ndx", label: "Nasdaq 100" }],
+    yahoo_daily_fallback: false,
+    intraday_enabled: false,
+    intraday_interval_minutes: 30,
+    intraday_retention_days: 3,
+    intraday_cache_seconds: 300,
+  },
   calendar: {
     holiday_countries: ["CZ", "US", "DE"],
     exchange_closures: [
@@ -356,14 +366,31 @@ describe("jobs form: optional effort, tiers and the other preferences", () => {
 });
 
 describe("jobs form: market strip", () => {
-  it("round-trips the market strip as symbol + label lines", () => {
+  it("round-trips the market strip as symbol + label [| Yahoo symbol] lines", () => {
     const form = jobsFromBody(null);
-    expect(form.settings.prices.values.market_strip).toBe("^spx S&P 500\n^stoxx STOXX Europe 600\n^px PX");
-    form.settings.prices.values.market_strip = "^dax DAX 40\n^px";
+    expect(form.settings.prices.values.market_strip).toBe(
+      "^spx S&P 500 | ^GSPC\n^stoxx STOXX Europe 600 | ^STOXX\n^px PX",
+    );
+    form.settings.prices.values.market_strip = "^dax DAX 40 | ^gdaxi\n^px";
     const body = jobsToBody(form) as unknown as { prices: { market_strip: unknown } };
     expect(body.prices.market_strip).toEqual([
-      { symbol: "^dax", label: "DAX 40" },
+      { symbol: "^dax", label: "DAX 40", yahoo_symbol: "^GDAXI" },
       { symbol: "^px", label: "^px" },
     ]);
+  });
+});
+
+describe("jobs form: intraday prices", () => {
+  it("edits the intraday flag, interval and the Yahoo fallback, on by default", () => {
+    const form = jobsFromBody(null);
+    expect(form.settings.prices.values).toMatchObject({
+      intraday_enabled: true,
+      intraday_interval_minutes: "15",
+      yahoo_daily_fallback: true,
+    });
+    form.settings.prices.values.intraday_enabled = false;
+    form.settings.prices.values.intraday_interval_minutes = "30";
+    const body = jobsToBody(form);
+    expect(body.prices).toMatchObject({ intraday_enabled: false, intraday_interval_minutes: 30, intraday_retention_days: 5 });
   });
 });

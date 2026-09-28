@@ -219,6 +219,13 @@ function ProfileCard({
           hint="Only when the derived symbol is wrong or has no data, e.g. sap.de, aapl.us, vod.uk. Lower case."
           {...text("price_symbol")}
         />
+        <TextField
+          label="Yahoo symbol"
+          placeholder="derived from the listing"
+          spellCheck={false}
+          hint="Intraday prices, and daily closes when Stooq has none (Yahoo Finance, unofficial). Only when the derived one is wrong, e.g. NOVO-B.CO, CEZ.PR, VWCE.DE."
+          {...text("yahoo_symbol")}
+        />
       </fieldset>
 
       <fieldset className="grid gap-3 lg:grid-cols-2">

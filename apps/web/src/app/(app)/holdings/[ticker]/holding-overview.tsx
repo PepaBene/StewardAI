@@ -14,6 +14,7 @@ import type {
   BoardRow,
   Holding,
   HoldingDetail,
+  HoldingIntraday,
   HoldingIdentity,
   HoldingOwnership,
   KpiStatus,
@@ -51,6 +52,8 @@ import {
 } from "@/lib/reference/holding-detail";
 import { isExternalUrl } from "@/lib/sources/sources";
 import { cn } from "@/lib/utils";
+
+import { HeaderIntradayPrice, IntradayChartBody } from "./holding-intraday";
 
 const TONE_CLASS = { gain: "text-gain", loss: "text-loss", flat: "" };
 
@@ -107,12 +110,15 @@ export function HoldingHeader({
   classes,
   row,
   bars,
+  intraday = null,
 }: {
   detail: HoldingDetail;
   identity: HoldingIdentity | null;
   classes: Record<string, string> | null;
   row: BoardRow | null;
   bars: PriceHistory["bars"];
+  /** Yahoo intraday data (unofficial); shown instead of the daily close when newer. */
+  intraday?: HoldingIntraday | null;
 }) {
   const name = detail.instrument?.name ?? detail.profile?.company_name ?? detail.ticker;
   const short = displayTicker(detail.ticker);
@@ -173,7 +179,9 @@ export function HoldingHeader({
           </div>
         </div>
         <div className="flex flex-wrap items-end gap-5">
-          {move && currency ? (
+          {intraday?.available && (!move || (intraday.session_date ?? "") >= move.date) ? (
+            <HeaderIntradayPrice intraday={intraday} dailyAsOf={move?.date ?? null} currency={currency} />
+          ) : move && currency ? (
             <div className="text-right">
               <div className="num font-heading text-[44px] leading-none font-semibold">{formatPrice(move.close, currency)}</div>
               <div className="text-sm">
@@ -209,10 +217,13 @@ export function HoldingHeader({
 
 // ----------------------------------------------------------------------------- candles
 
-function CandleRangeSwitch({ value, onChange }: { value: CandleRangeId; onChange: (id: CandleRangeId) => void }) {
+type ChartRangeId = CandleRangeId | "1d";
+const CHART_RANGES: readonly { id: ChartRangeId; label: string }[] = [{ id: "1d", label: "1D" }, ...CANDLE_RANGES];
+
+function CandleRangeSwitch({ value, onChange }: { value: ChartRangeId; onChange: (id: ChartRangeId) => void }) {
   return (
     <div role="group" aria-label="Chart range" className="inline-flex border border-border text-xs font-semibold">
-      {CANDLE_RANGES.map((r, i) => (
+      {CHART_RANGES.map((r, i) => (
         <button
           key={r.id}
           type="button"
@@ -268,13 +279,19 @@ export function CandlePanel({
   ticker,
   history,
   loading,
+  intraday,
 }: {
   ticker: string;
   history: PriceHistory | null;
   loading: boolean;
+  /** The holding's intraday resource (the 1D range); daily ranges need none. */
+  intraday?: ResourceState<HoldingIntraday>;
 }) {
-  const [range, setRange] = useState<CandleRangeId>(DEFAULT_CANDLE_RANGE);
+  const [range, setRange] = useState<ChartRangeId>(DEFAULT_CANDLE_RANGE);
   const render = (all: PriceHistory["bars"] | null, busy: boolean) => {
+    if (range === "1d") {
+      return <IntradayChartBody ticker={ticker} state={intraday} switcher={<CandleRangeSwitch value={range} onChange={setRange} />} />;
+    }
     const bars = all ? barsInRange(all, candleRangeDays(range)) : [];
     return (
       <>
@@ -305,14 +322,15 @@ export function CandlePanel({
           </div>
         )}
         <p className="text-xs text-text-muted">
-          Daily bars from {history?.source ?? "Stooq"}
+          Daily bars from {history?.source === "Yahoo" ? "Yahoo Finance (unofficial)" : (history?.source ?? "Stooq")}
           {history?.symbol ? (
             <>
               {" "}
               (<span className="font-mono">{history.symbol}</span>)
             </>
           ) : null}
-          ; no intraday data. MA 20 is the 20-session average close, drawn once 20 sessions are in view.
+          {history?.fallback_reason ? ` because Stooq had none (${history.fallback_reason})` : ""}. 1D shows 5-minute
+          bars. MA 20 is the 20-session average close, drawn once 20 sessions are in view.
         </p>
       </>
     );

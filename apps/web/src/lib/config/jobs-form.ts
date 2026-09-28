@@ -64,7 +64,7 @@ export const SCHEDULES: Record<ScheduleKey, { label: string; description: string
   },
   price_history: {
     label: "Price history",
-    description: "Daily prices from Stooq and FX history after the close.",
+    description: "Daily prices (Stooq, Yahoo as the fallback), the PX close and FX history after the close.",
     cron: "15 23 * * 1-5",
   },
   holiday_refresh: {
@@ -215,10 +215,15 @@ export const DEFAULT_JOBS: JobsConfig = {
     history_years: 2,
     plausibility_tolerance_pct: 1,
     market_strip: [
-      { symbol: "^spx", label: "S&P 500" },
-      { symbol: "^stoxx", label: "STOXX Europe 600" },
+      { symbol: "^spx", label: "S&P 500", yahoo_symbol: "^GSPC" },
+      { symbol: "^stoxx", label: "STOXX Europe 600", yahoo_symbol: "^STOXX" },
       { symbol: "^px", label: "PX" },
     ],
+    yahoo_daily_fallback: true,
+    intraday_enabled: true,
+    intraday_interval_minutes: 15,
+    intraday_retention_days: 5,
+    intraday_cache_seconds: 120,
   },
   calendar: { holiday_countries: ["CZ", "US", "DE", "GB"], exchange_closures: [] },
   chat: { model: "claude-sonnet-5", effort: null, max_steps: 30, max_searches: 15, history_messages: 100, source_tiers: [1, 2] },
@@ -392,12 +397,18 @@ export const SETTINGS: { [S in SettingsKey]: { title: string; description: strin
   },
   prices: {
     title: "Prices",
-    description: "Daily closes from Stooq, and the risk figures computed from them.",
+    description:
+      "Daily closes from Stooq (Yahoo Finance as the fallback) and the risk figures computed from them; intraday prices from Yahoo Finance (unofficial).",
     fields: [
       { key: "benchmark_symbols", label: "Benchmark symbols", kind: "lines", hint: "Stooq symbols, one per line: ^spx S&P 500, ^dax DAX, ^ukx FTSE 100. The first is used for beta and the holding charts." },
       { key: "history_years", label: "Years of history", kind: "int", min: 1, max: 10 },
       { key: "plausibility_tolerance_pct", label: "Plausibility tolerance (%)", kind: "number", hint: "Largest gap between Stooq's close and Trading212's price on a sync day before it is flagged. Above 0, up to 20." },
-      { key: "market_strip", label: "Market strip indices", kind: "symbol-lines", hint: "One per line: the Stooq symbol, a space, then the label shown in the header, e.g. ^spx S&P 500. Collected with the benchmarks; a symbol Stooq has no data for shows as empty." },
+      { key: "market_strip", label: "Market strip indices", kind: "symbol-lines", hint: "One per line: the Stooq symbol, a space, the label shown in the header, and optionally \" | \" and the Yahoo symbol of the same index, e.g. ^spx S&P 500 | ^GSPC. Stooq's close first, else Yahoo's (intraday while the market is open); PX (^px) falls back to the Prague Stock Exchange's page, read once a day. An index no source has shows as empty." },
+      { key: "yahoo_daily_fallback", label: "Daily closes from Yahoo Finance when Stooq has none", kind: "bool", hint: "Unofficial source, used only for a symbol Stooq refuses, cannot be reached for or does not know. Stooq stays the source of record." },
+      { key: "intraday_enabled", label: "Intraday prices (Yahoo Finance, unofficial)", kind: "bool", hint: "5-minute bars, about 15 minutes delayed, polled only while each listing's market is open and fetched when a holding page opens. Unofficial: it may rate-limit or break without notice; pages then fall back to daily closes with a note." },
+      { key: "intraday_interval_minutes", label: "Intraday poll interval (minutes)", kind: "int", min: 5, max: 60, hint: "While a market is open: 5, 10, 15, 20, 30 or 60. Every 15 minutes is about 800 requests a day." },
+      { key: "intraday_retention_days", label: "Intraday bars kept (days)", kind: "int", min: 1, max: 14 },
+      { key: "intraday_cache_seconds", label: "Holding page refetch after (seconds)", kind: "int", min: 30, max: 900, hint: "During trading hours, a holding page asks Yahoo again once its stored prices are this old." },
     ],
   },
   calendar: {
@@ -660,19 +671,29 @@ export function jobsFromBody(body: JobsConfig | null): JobsForm {
   return { catchUpOnStart, schedules, settings, closures, managers, macroSeries, rest };
 }
 
-/** `[{symbol, label}]` as editable lines: "^spx S&P 500". */
+/** `[{symbol, label, yahoo_symbol}]` as editable lines: "^spx S&P 500 | ^GSPC". */
 function symbolLinesText(value: unknown): string {
   if (!Array.isArray(value)) return "";
   return value
-    .map((item: { symbol?: unknown; label?: unknown }) => `${String(item.symbol ?? "")} ${String(item.label ?? "")}`.trim())
+    .map((item: { symbol?: unknown; label?: unknown; yahoo_symbol?: unknown }) => {
+      const line = `${String(item.symbol ?? "")} ${String(item.label ?? "")}`.trim();
+      return item.yahoo_symbol ? `${line} | ${String(item.yahoo_symbol)}` : line;
+    })
     .join("\n");
 }
 
-/** Lines of "symbol label" back to `[{symbol, label}]`; a bare symbol is its own label. */
-export function parseSymbolLines(text: string): { symbol: string; label: string }[] {
+/**
+ * Lines of "symbol label[ | yahoo symbol]" back to `[{symbol, label, yahoo_symbol?}]`; a bare
+ * symbol is its own label. Without " | " no Yahoo symbol is sent (the backend then uses the
+ * known counterpart of the Stooq symbol, if any).
+ */
+export function parseSymbolLines(text: string): { symbol: string; label: string; yahoo_symbol?: string }[] {
   return list(text, /\n/).map((line) => {
-    const [symbol, ...label] = line.split(/\s+/);
-    return { symbol, label: label.join(" ") || symbol };
+    const [main, yahoo] = line.split("|", 2).map((part) => part.trim());
+    const [symbol, ...label] = main.split(/\s+/);
+    const item: { symbol: string; label: string; yahoo_symbol?: string } = { symbol, label: label.join(" ") || symbol };
+    if (yahoo) item.yahoo_symbol = yahoo.toUpperCase();
+    return item;
   });
 }
 

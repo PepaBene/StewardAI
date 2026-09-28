@@ -20,6 +20,7 @@ const BODY: HoldingProfilesConfig = {
       sec_ticker: null,
       fiscal_year_end_month: 9,
       price_symbol: "aapl.us",
+      yahoo_symbol: null,
       reporting_currency: "USD",
       competitors: ["Samsung", "Alphabet"],
       suppliers: ["TSMC"],
@@ -41,11 +42,13 @@ describe("holding profiles form", () => {
     form.extra_domains = "GlobeNewswire.com\n\n";
     form.sec_ticker = "asml";
     form.price_symbol = " ASML.NL ";
+    form.yahoo_symbol = " novo-b.co ";
     const [profile] = profilesToBody([form]).profiles!;
     expect(profile.reporting_currency).toBe("EUR");
     expect(profile.extra_domains).toEqual(["globenewswire.com"]);
     expect(profile.sec_ticker).toBe("ASML");
     expect(profile.price_symbol).toBe("asml.nl");
+    expect(profile.yahoo_symbol).toBe("NOVO-B.CO");
     expect(profilesToBody([newProfile("X")]).profiles![0].price_symbol).toBeNull();
     expect(profile.ir_url).toBeNull();
     expect(profile.fiscal_year_end_month).toBe(12);

@@ -2,6 +2,7 @@
 
 import { getBrowserApiClient } from "@/lib/api/client";
 import { useApiResource } from "@/lib/hooks/use-api-resource";
+import { stripTooltip } from "@/lib/prices/intraday";
 import { cn } from "@/lib/utils";
 
 const fetchStrip = () => getBrowserApiClient().GET("/market/strip");
@@ -16,11 +17,13 @@ function signedPct(fraction: number): string {
 }
 
 /**
- * The header's market strip: the configured indices' last daily move (Config → Jobs →
- * Prices → Market strip) and the reference FX rates today's valuation uses. Every figure
- * is a stored daily close or reference rate, dated in its tooltip; an index with no data
- * yet is simply not shown. Hidden below xl — it is context, never the only place a figure
- * appears.
+ * The header's market strip: the configured indices' latest move (Config → Jobs → Prices →
+ * Market strip) and the reference FX rates today's valuation uses. Each index value comes
+ * through a source chain — Stooq's close, else Yahoo's (intraday while its market is open,
+ * unofficial), and for PX the Prague Stock Exchange's page — and its tooltip says which, and
+ * whether it is an intraday value (with its time) or a close (with its date). An index with
+ * no data yet is simply not shown. Hidden below xl — it is context, never the only place a
+ * figure appears.
  */
 export function MarketStrip() {
   const { state } = useApiResource(fetchStrip);
@@ -34,14 +37,18 @@ export function MarketStrip() {
       aria-label="Markets"
       className="ml-auto hidden items-center gap-[22px] font-mono text-xs whitespace-nowrap text-text-muted xl:flex"
     >
-      {shownIndices.map((i) => (
-        <li key={i.symbol} title={i.as_of ? `${i.label}: close of ${i.as_of} vs ${i.previous_date ?? "previous close"}` : undefined}>
-          {i.label}{" "}
-          <span className={cn("num", i.change_pct! > 0 ? "text-gain" : i.change_pct! < 0 ? "text-loss" : undefined)}>
-            {signedPct(i.change_pct!)}
-          </span>
-        </li>
-      ))}
+      {shownIndices.map((i) => {
+        const about = stripTooltip(i);
+        return (
+          <li key={i.symbol} title={about}>
+            {i.label}{" "}
+            <span className={cn("num", i.change_pct! > 0 ? "text-gain" : i.change_pct! < 0 ? "text-loss" : undefined)}>
+              {signedPct(i.change_pct!)}
+            </span>
+            <span className="sr-only">, {about}</span>
+          </li>
+        );
+      })}
       {fx.filter((r) => r.rate != null).map((r) => (
         <li key={r.currency} title={r.rate_date ? `${r.source.toUpperCase()} reference rate of ${r.rate_date}` : undefined}>
           {r.currency}/{base ?? r.base_currency} <span className="num">{rate.format(r.rate!)}</span>
