@@ -447,14 +447,17 @@ def _f(value: Decimal | None) -> float | None:
 
 def quote_kind(quote: Any, now: dt.datetime) -> QuoteKind:
     """close: the price is an earlier session's last (it traded before the trading period
-    Yahoo reported as current), or the session is over and the price is from its end; else
-    intraday (a price during the session, possibly one fetched mid-session and not since)."""
+    Yahoo reported as current), or it was fetched after its session ended (the last trade,
+    whenever it happened: Prague's last trade can be minutes before the period's end);
+    else intraday (a price during the session, possibly one fetched mid-session and not
+    refreshed since, which stays labelled with its time)."""
     price_time: dt.datetime = quote["price_time"]
     start: dt.datetime | None = quote["session_start"]
     end: dt.datetime | None = quote["session_end"]
+    fetched: dt.datetime | None = quote["fetched_at"]
     if start is not None and price_time < start:
         return "close"
-    if end is not None and now >= end and price_time >= end - dt.timedelta(minutes=10):
+    if end is not None and now >= end and fetched is not None and fetched >= end:
         return "close"
     return "intraday"
 

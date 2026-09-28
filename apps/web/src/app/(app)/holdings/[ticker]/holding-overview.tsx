@@ -51,6 +51,7 @@ import {
   type TimelineEntry,
 } from "@/lib/reference/holding-detail";
 import { isExternalUrl } from "@/lib/sources/sources";
+import { headerPrice } from "@/lib/prices/intraday";
 import { cn } from "@/lib/utils";
 
 import { HeaderIntradayPrice, IntradayChartBody } from "./holding-intraday";
@@ -179,7 +180,7 @@ export function HoldingHeader({
           </div>
         </div>
         <div className="flex flex-wrap items-end gap-5">
-          {intraday?.available && (!move || (intraday.session_date ?? "") >= move.date) ? (
+          {headerPrice(intraday, move?.date ?? null, (d) => formatDate(d)) ? (
             <HeaderIntradayPrice intraday={intraday} dailyAsOf={move?.date ?? null} currency={currency} />
           ) : move && currency ? (
             <div className="text-right">

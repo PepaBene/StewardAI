@@ -157,6 +157,10 @@ describe("headerPrice", () => {
     expect(headerPrice({ ...intraday, kind: "close" }, "2026-09-25", day)?.label).toBe(
       "close of day 2026-09-28 · Yahoo (unofficial)",
     );
+    // A daily close for the same day: the daily series stays the figure of record.
+    expect(headerPrice({ ...intraday, kind: "close" }, "2026-09-28", day)).toBeNull();
+    expect(headerPrice(intraday, "2026-09-28", day)).toBeNull();
+    expect(headerPrice(intraday, null, day)?.price).toBe(516.17);
     expect(headerPrice({ ...intraday, session_date: "2026-09-24" }, "2026-09-25", day)).toBeNull();
     expect(headerPrice({ ...intraday, available: false }, null, day)).toBeNull();
     expect(headerPrice(null, null, day)).toBeNull();

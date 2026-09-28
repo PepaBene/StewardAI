@@ -102,8 +102,8 @@ export function dayMove(p: HoldingPrices | undefined, formatDay: (iso: string) =
   return { value: null, kind: "none", stamp: null, title: "No stored closes" };
 }
 
-/** The holding header's price: intraday when a quote is stored and newer than (or as new
- * as) the latest daily close; else null (the page shows the daily close). */
+/** The holding header's price: intraday when a quote is stored and its session is newer
+ * than the latest daily close; else null (the page shows the daily close). */
 export type HeaderPrice = {
   price: number;
   change: number | null;
@@ -118,7 +118,8 @@ export function headerPrice(
   formatDay: (iso: string) => string,
 ): HeaderPrice | null {
   if (!intraday?.available || intraday.last_price == null || !intraday.session_date) return null;
-  if (dailyAsOf && intraday.session_date < dailyAsOf) return null;
+  // A daily close for the same day (collected after that session) stays the figure of record.
+  if (dailyAsOf && intraday.session_date <= dailyAsOf) return null;
   const label =
     intraday.kind === "intraday" && intraday.last_trade_time
       ? `${intraday.last_trade_time} exchange time · ${intraday.delay_note ?? "delayed"} · ${YAHOO_LABEL}`

@@ -190,17 +190,28 @@ def test_quote_kind_tells_a_close_from_an_intraday_price() -> None:
     start = dt.datetime(2026, 9, 28, 13, 30, tzinfo=UTC)
     end = dt.datetime(2026, 9, 28, 20, 0, tzinfo=UTC)
 
-    def q(price_time: dt.datetime) -> dict[str, Any]:
-        return {"price_time": price_time, "session_start": start, "session_end": end}
+    def q(price_time: dt.datetime, fetched: dt.datetime) -> dict[str, Any]:
+        return {
+            "price_time": price_time,
+            "session_start": start,
+            "session_end": end,
+            "fetched_at": fetched,
+        }
 
+    monday = dt.datetime(2026, 9, 28, 9, 0, tzinfo=UTC)
     friday_close = dt.datetime(2026, 9, 25, 20, 0, 1, tzinfo=UTC)
-    assert quote_kind(q(friday_close), dt.datetime(2026, 9, 28, 9, 0, tzinfo=UTC)) == "close"
+    assert quote_kind(q(friday_close, monday), monday) == "close"
     during = dt.datetime(2026, 9, 28, 15, 0, tzinfo=UTC)
-    assert quote_kind(q(during), dt.datetime(2026, 9, 28, 15, 20, tzinfo=UTC)) == "intraday"
+    fetched = during + dt.timedelta(minutes=5)
+    assert (
+        quote_kind(q(during, fetched), dt.datetime(2026, 9, 28, 15, 20, tzinfo=UTC)) == "intraday"
+    )
     # Fetched mid-session and never refreshed: still an intraday price, not a close.
-    assert quote_kind(q(during), dt.datetime(2026, 9, 28, 22, 0, tzinfo=UTC)) == "intraday"
-    final = dt.datetime(2026, 9, 28, 19, 59, tzinfo=UTC)
-    assert quote_kind(q(final), dt.datetime(2026, 9, 28, 21, 0, tzinfo=UTC)) == "close"
+    assert quote_kind(q(during, fetched), dt.datetime(2026, 9, 28, 22, 0, tzinfo=UTC)) == "intraday"
+    # Fetched after the end: the last trade is the close, even minutes before the end.
+    last = dt.datetime(2026, 9, 28, 19, 44, tzinfo=UTC)
+    after = dt.datetime(2026, 9, 28, 20, 15, tzinfo=UTC)
+    assert quote_kind(q(last, after), dt.datetime(2026, 9, 28, 21, 0, tzinfo=UTC)) == "close"
 
 
 def test_pse_px_detail_page() -> None:

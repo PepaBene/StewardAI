@@ -166,7 +166,7 @@ export function IntradayChartBody({
             (<span className="font-mono">{intraday.symbol}</span>)
           </>
         ) : null}
-        , times in exchange time{intraday?.exchange_tz ? ` (${intraday.exchange_tz})` : ""}
+        , times in exchange time{intraday?.exchange_tz ? ` (${intraday.exchange_tz.replace(/_/g, " ")})` : ""}
         {intraday?.delay_note ? `, ${intraday.delay_note}` : ""}. Unofficial: it can be late or stop without notice.
         {intraday?.fetched_at ? ` Fetched ${new Date(intraday.fetched_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}.` : ""}
       </p>
