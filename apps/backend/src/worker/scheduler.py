@@ -37,7 +37,9 @@ def apply_jobs_config(
 ) -> list[str]:
     """Make the scheduler's config jobs match `config`. Returns the job types scheduled."""
     wanted = {
-        job_type: schedule for job_type, schedule in config.schedules().items() if schedule.enabled
+        job_type: schedule
+        for job_type, schedule in config.worker_schedules().items()
+        if schedule.enabled
     }
     for job in scheduler.get_jobs():
         if job.id.startswith(CONFIG_JOB_PREFIX) and job.id[len(CONFIG_JOB_PREFIX) :] not in wanted:

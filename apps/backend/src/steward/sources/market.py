@@ -25,8 +25,12 @@ NAGER_URL = "https://date.nager.at/api/v3/PublicHolidays/{year}/{country}"
 
 
 # Quote currency of a Stooq symbol by market suffix (London quotes in pence, as Trading212
-# reports its GBX lines). Unknown suffixes give None.
-STOOQ_CURRENCY: dict[str, str] = {"us": "USD", "uk": "GBX", "de": "EUR", "jp": "JPY", "pl": "PLN"}
+# reports its GBX lines). Unknown suffixes give None. Amsterdam (nl), Copenhagen (dk) and
+# Prague (cz) follow Stooq's country-suffix scheme; see openfigi.STOOQ_SUFFIX.
+STOOQ_CURRENCY: dict[str, str] = {
+    "us": "USD", "uk": "GBX", "de": "EUR", "jp": "JPY", "pl": "PLN", "nl": "EUR", "dk": "DKK",
+    "cz": "CZK",
+}  # fmt: skip
 
 
 def stooq_currency(symbol: str) -> str | None:

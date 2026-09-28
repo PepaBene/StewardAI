@@ -25,7 +25,7 @@ from steward.portfolio.history import (
     position_organic_gain,
 )
 from steward.portfolio.snapshot import SNAPSHOT_TIMEZONE
-from steward.reference.read import PricePoint, load_series
+from steward.reference.read import PricePoint, index_series
 
 JobStatus = Literal["queued", "waiting", "running", "succeeded", "failed"]
 
@@ -479,7 +479,13 @@ async def portfolio_history(pool: asyncpg.Pool, days: int) -> PortfolioHistory:
     flows = await _cash_flows(pool, _period_start(snapshots[0]["snapshot_date"]))
     values = _daily_values(snapshots, flows)
     index = flow_adjusted_index(values)
-    bench = await load_series(pool, benchmark_symbol, since=since) if benchmark_symbol else []
+    _bench_ref, bench = (
+        await index_series(
+            pool, (jobs.body if jobs else JobsConfig()).prices, benchmark_symbol, since
+        )
+        if benchmark_symbol
+        else (None, [])
+    )
 
     stored = await load_active(pool, "strategy", StrategyConfig)
     base_currency = (stored.body.base_currency if stored else None) or snapshots[-1][

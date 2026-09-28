@@ -74,6 +74,12 @@ class HoldingProfile(ConfigModel):
         description="Stooq symbol for price history when the one derived from OpenFIGI is "
         "wrong or missing (e.g. 'sap.de').",
     )
+    yahoo_symbol: str | None = Field(
+        default=None,
+        pattern=r"^[A-Z0-9][A-Z0-9.=-]{0,23}$",
+        description="Yahoo Finance symbol (intraday prices, and daily prices when Stooq has "
+        "none) when the one derived from the listing is wrong or missing (e.g. 'NOVO-B.CO').",
+    )
     reporting_currency: CurrencyCode | None = Field(
         default=None, description="Currency the company reports in; figures in another are held."
     )

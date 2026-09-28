@@ -11,7 +11,10 @@ import json
 import asyncpg
 from pydantic import BaseModel, Field
 
+from steward.config.holding_profiles import HoldingProfilesConfig
 from steward.config.jobs import JobsConfig
+from steward.config.store import load_active
+from steward.reference.price_series import choose_series, holding_symbols, latest_dates
 
 PRICE_GAP_DAYS = 4  # a long weekend plus one missed run
 
@@ -52,7 +55,10 @@ class HoldingCoverage(BaseModel):
     news_gap: bool = Field(description="No successful news run covered it within the window.")
     earnings_last_check: dt.datetime | None
     earnings_last_status: str | None
-    price_symbol: str | None
+    price_symbol: str | None = Field(
+        description="Symbol of the daily series in use (Stooq's, or Yahoo's when Stooq has none)."
+    )
+    prices_source: str | None = Field(default=None, description="Stooq or Yahoo.")
     prices_last_date: dt.date | None
     prices_gap: bool = Field(
         description=f"A price symbol whose latest bar is more than {PRICE_GAP_DAYS} days old."
@@ -81,6 +87,12 @@ async def coverage(pool: asyncpg.Pool, jobs: JobsConfig, now: dt.datetime) -> Ac
         list(held),
     )
     by_ticker = {r["ticker"]: r for r in rows}
+    profiles = await load_active(pool, "holding_profiles", HoldingProfilesConfig)
+    symbols = await holding_symbols(
+        pool, sorted(held), profiles.body if profiles else HoldingProfilesConfig()
+    )
+    chosen = await choose_series(pool, symbols)
+    latest = await latest_dates(pool, [r for r in chosen.values() if r is not None])
     holdings = []
     for ticker in sorted(held):
         since = held[ticker]
@@ -91,8 +103,11 @@ async def coverage(pool: asyncpg.Pool, jobs: JobsConfig, now: dt.datetime) -> Ac
             and since <= now - window
             and (last is None or last < now - window)
         )
-        last_bar = row["last_bar"] if row else None
-        symbol = row["price_symbol"] if row else None
+        ref = chosen.get(ticker)
+        last_bar = latest.get(ref) if ref else None
+        symbol = ref.symbol if ref else (row["price_symbol"] if row else None)
+        if ref is None and ticker in symbols and symbols[ticker].yahoo and not symbol:
+            symbol = symbols[ticker].yahoo
         prices_gap = symbol is not None and (
             last_bar is None or (now.date() - last_bar).days > PRICE_GAP_DAYS
         )
@@ -106,6 +121,7 @@ async def coverage(pool: asyncpg.Pool, jobs: JobsConfig, now: dt.datetime) -> Ac
                 earnings_last_check=row["earnings_at"] if row else None,
                 earnings_last_status=row["earnings_status"] if row else None,
                 price_symbol=symbol,
+                prices_source=ref.name if ref else None,
                 prices_last_date=last_bar,
                 prices_gap=prices_gap,
             )

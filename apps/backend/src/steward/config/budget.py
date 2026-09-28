@@ -28,6 +28,7 @@ BudgetJobType = Literal[
     "fact_reconcile",
     "reference_data",
     "price_history",
+    "intraday_prices",
     "holiday_refresh",
     "macro_collect",
     "event_escalation",
