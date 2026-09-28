@@ -30,7 +30,7 @@ export const FEEDBACK_SURFACES: readonly FeedbackSurface[] = [
     kinds: ["story"],
   },
   { surface: "Evidence page", route: "/evidence/[factId]", file: "src/app/(app)/evidence/[factId]/evidence-view.tsx", kinds: ["fact"] },
-  { surface: "Thesis board: verdict panel", route: "/theses", file: "src/app/(app)/theses/thesis-board-view.tsx", kinds: ["verdict"] },
+  { surface: "Thesis board: verdict panel", route: "/theses", file: "src/app/(app)/theses/verdict-panel.tsx", kinds: ["verdict"] },
   { surface: "Review queue: held and quarantined figures", route: "/review", file: "src/app/(app)/review/review-view.tsx", kinds: ["fact"] },
   { surface: "News feed: stories, lead items and copies", route: "/news", file: "src/app/(app)/news/news-view.tsx", kinds: ["story", "news_item"] },
   {

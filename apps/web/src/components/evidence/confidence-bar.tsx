@@ -30,7 +30,7 @@ export function ConfidenceBar({
   const total = ORDER.reduce((sum, k) => sum + counts[k], 0);
   if (total === 0) {
     return (
-      <span className={cn("inline-block h-2 w-24 rounded-full border border-dashed border-border", className)} title={label} />
+      <span className={cn("inline-block h-2 w-24 border border-dashed border-border", className)} title={label} />
     );
   }
   return (
@@ -38,7 +38,7 @@ export function ConfidenceBar({
       {ORDER.filter((k) => counts[k] > 0).map((k) => (
         <span
           key={k}
-          className={cn("h-full first:rounded-l-full last:rounded-r-full", SEGMENT_CLASS[k])}
+          className={cn("h-full", SEGMENT_CLASS[k])}
           style={{ width: `${(counts[k] / total) * 100}%` }}
           title={`${counts[k]} ${CONFIDENCE[k].label.toLowerCase()}`}
         />

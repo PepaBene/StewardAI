@@ -14,7 +14,7 @@ export function VerdictStatusBadge({ status }: { status: VerdictStatus }) {
   return (
     <span
       className={cn(
-        "inline-flex items-center gap-1 rounded-sm border px-1.5 py-0.5 text-xs font-semibold whitespace-nowrap",
+        "inline-flex items-center gap-1 border px-1.5 py-0.5 text-xs font-semibold whitespace-nowrap",
         tone === "gain" && "border-gain/40 bg-gain-subtle text-gain",
         tone === "loss" && "border-loss/40 bg-loss-subtle text-loss",
         tone === "unknown" && "border-dashed border-border text-text-muted",

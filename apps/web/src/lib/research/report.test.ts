@@ -1,10 +1,15 @@
 import { describe, expect, it } from "vitest";
 
-import type { ResearchBody, Source } from "@/lib/api/client";
+import type { FactOut, KpiStatus, ResearchBody, Source } from "@/lib/api/client";
 import { chipsFor, primarySourceLink, sourceLinks, sourcePreview } from "@/lib/sources/sources";
 
 import {
+  claimTally,
+  conclusionSection,
   DEFAULT_PROFILE_OPTIONS,
+  factInKpiUnit,
+  keyFigures,
+  kpiFigure,
   normaliseTicker,
   profileOptions,
   RESEARCH_SECTIONS,
@@ -12,6 +17,8 @@ import {
   researchIndex,
   sectionLabel,
   SECTION_IDS,
+  stepLabel,
+  triggerLabel,
   valuationLabel,
   writtenBy,
 } from "./report";
@@ -164,5 +171,84 @@ describe("research labels and profiles", () => {
     expect(normaliseTicker(" AAPL_US_EQ ")).toBe("AAPL_US_EQ");
     expect(normaliseTicker("A B")).toBeNull();
     expect(normaliseTicker("")).toBeNull();
+  });
+});
+
+describe("research report page", () => {
+  const fact = (id: number, fiscal_period: string, period_end: string, value: number, over: Partial<FactOut> = {}): FactOut =>
+    ({
+      id,
+      metric: "china_system_sales_share",
+      basis: "reported",
+      status: "verified",
+      value,
+      value_units: value,
+      value_as_written: String(value),
+      scale: "units",
+      unit: "percent",
+      currency: null,
+      period: `FY2026 ${fiscal_period}`,
+      fiscal_year: 2026,
+      fiscal_period,
+      period_end,
+      ...over,
+    }) as FactOut;
+  const kpiDef = (metric: string, unit = "%") =>
+    ({ id: metric, metric, operator: "<=", threshold: 30, unit, basis: "reported", period: "quarter", description: "" }) as const;
+
+  it("labels steps, finds a conclusion section and tallies the claim check", () => {
+    expect(stepLabel("write_business")).toBe("Write business");
+    expect(stepLabel("gather")).toBe("Gather");
+    expect(conclusionSection([{ id: "business" }, { id: "summary" }])).toEqual({ id: "summary" });
+    expect(conclusionSection([{ id: "business" }])).toBeNull();
+    expect(claimTally({ supported: 13, unsupported: 0, unchecked: 2 })).toEqual({ supported: 13, total: 15 });
+    expect(claimTally({ supported: 0, unsupported: 0, unchecked: 0 })).toBeNull();
+    expect(claimTally(null)).toBeNull();
+    expect(triggerLabel("manual")).toBe("By hand");
+    expect(triggerLabel("earnings_check")).toBe("Earnings check");
+  });
+
+  it("lists each cited metric once with its stored history", () => {
+    const facts = [
+      fact(84, "Q2", "2026-06-30", 41),
+      fact(70, "Q1", "2026-03-31", 38),
+      fact(71, "Q1", "2026-03-31", 99, { status: "rejected" }),
+      fact(83, "Q2", "2026-06-30", 5.54, { metric: "net_bookings", unit: "currency", scale: "billions", currency: "EUR", value_as_written: "5.54", value_units: 5.54e9 }),
+    ];
+    const sources = [
+      { id: "S2", kind: "fact" as const, ref: "84" },
+      { id: "S9", kind: "fact" as const, ref: "70" },
+      { id: "S1", kind: "fact" as const, ref: "83" },
+      { id: "S3", kind: "price" as const, ref: "asml.nl" },
+      { id: "S4", kind: "fact" as const, ref: "999" },
+    ];
+    expect(keyFigures(sources, facts)).toEqual([
+      { sourceId: "S2", factId: 84, label: "China system sales share · FY2026 Q2", value: "41%", series: [38, 41] },
+      { sourceId: "S1", factId: 83, label: "Net bookings · FY2026 Q2", value: "EUR 5.54 bn", series: [5.54e9] },
+    ]);
+  });
+
+  it("charts a cited KPI with history against its threshold, breaching first", () => {
+    const facts = [
+      fact(84, "Q2", "2026-06-30", 41),
+      fact(70, "Q1", "2026-03-31", 38),
+      fact(60, "Q2", "2026-06-30", 53.7, { metric: "gross_margin" }),
+      fact(61, "Q1", "2026-03-31", 52, { metric: "gross_margin" }),
+    ];
+    const kpis = [
+      { kpi: kpiDef("gross_margin"), current: null },
+      { kpi: kpiDef("china_system_sales_share"), current: { status: "breach" } as KpiStatus["current"] },
+    ];
+    const fig = kpiFigure(kpis, facts, [84, 60]);
+    expect(fig?.kpi.metric).toBe("china_system_sales_share");
+    expect(fig?.status).toBe("breach");
+    expect(fig?.points).toEqual([
+      { label: "Q1·26", value: 38 },
+      { label: "Q2·26", value: 41 },
+    ]);
+    expect(kpiFigure(kpis, facts, [])).toBeNull();
+    expect(kpiFigure(kpis, [fact(84, "Q2", "2026-06-30", 41)], [84])).toBeNull();
+    expect(factInKpiUnit({ value: 5.54, value_units: 5.54e9, unit: "currency" }, "EUR bn")).toBeCloseTo(5.54);
+    expect(factInKpiUnit({ value: 180, value_units: 180e6, unit: "currency" }, "USD m")).toBeCloseTo(180);
   });
 });
