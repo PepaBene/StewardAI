@@ -1,10 +1,11 @@
 "use client";
 
-import { ExternalLinkIcon, LandmarkIcon, LoaderCircleIcon } from "lucide-react";
+import { ExternalLinkIcon, LoaderCircleIcon } from "lucide-react";
 import { useCallback } from "react";
 
 import { AlertMessage } from "@/components/alert-message";
 import { EmptyState } from "@/components/empty-state";
+import { Blueprint, PanelHeading } from "@/components/ui/blueprint";
 import { getBrowserApiClient } from "@/lib/api/client";
 import { formatDate } from "@/lib/format";
 import { useApiResource } from "@/lib/hooks/use-api-resource";
@@ -33,23 +34,24 @@ function Change({ value }: { value: number | string | null }) {
  * per quarter (newest first) with the change against the quarter before, and the largest
  * holders of the latest quarter. Every figure is dated by its quarter end and filing date.
  */
-export function OwnershipSection({ ticker }: { ticker: string }) {
+export function useHoldingOwnership(ticker: string) {
   const fetcher = useCallback(
     () => getBrowserApiClient().GET("/holdings/{ticker}/ownership", { params: { path: { ticker } } }),
     [ticker],
   );
-  const { state } = useApiResource(fetcher);
+  return useApiResource(fetcher);
+}
+
+export function OwnershipSection({ resource }: { resource: ReturnType<typeof useHoldingOwnership> }) {
+  const { state } = resource;
   const data = state.kind === "ok" ? state.data : state.kind === "error" ? state.previous : null;
   const view = data ? ownershipState(data) : null;
 
   return (
-    <section aria-labelledby="ownership-heading" className="space-y-3">
+    <Blueprint aria-labelledby="ownership-heading" className="space-y-3 px-[22px] py-5">
       <div>
-        <h2 id="ownership-heading" className="flex items-center gap-1.5 text-[22px] leading-tight font-semibold">
-          <LandmarkIcon aria-hidden="true" className="size-4 text-text-muted" />
-          Institutional ownership
-        </h2>
-        <p className="text-xs text-text-muted">{OWNERSHIP_NOTE}</p>
+        <PanelHeading kicker="Ownership details" title={<span id="ownership-heading">Institutional ownership by quarter</span>} />
+        <p className="mt-1 text-xs text-text-muted">{OWNERSHIP_NOTE}</p>
       </div>
       {state.kind === "loading" ? (
         <p className="flex items-center gap-2 text-sm text-text-muted" role="status">
@@ -146,6 +148,6 @@ export function OwnershipSection({ ticker }: { ticker: string }) {
           <p className="text-xs text-text-muted">Source: {data.source}.</p>
         </>
       ) : null}
-    </section>
+    </Blueprint>
   );
 }

@@ -157,7 +157,7 @@ type KpiLike = {
  */
 export function thesisRadar(
   kpis: readonly KpiLike[],
-  axisLabel: (metric: string) => string,
+  axisLabel: (metric: string, id: string) => string,
 ): { axes: string[]; now: number[]; previous: number[] | null; previousLabel: string | null } | null {
   const usable = kpis
     .map((k) => {
@@ -171,7 +171,7 @@ export function thesisRadar(
   const withPrev = usable.every((u) => u.prev !== null);
   const periods = [...new Set(usable.map((u) => u.prevPeriod))];
   return {
-    axes: usable.map((u) => axisLabel(u.k.kpi.metric)),
+    axes: usable.map((u) => axisLabel(u.k.kpi.metric, u.k.kpi.id)),
     now: usable.map((u) => radarValue(u.now)),
     previous: withPrev ? usable.map((u) => radarValue(u.prev as number)) : null,
     previousLabel: withPrev ? (periods.length === 1 && periods[0] ? `${periods[0]} verdict` : "Previous verdicts") : null,
