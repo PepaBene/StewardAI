@@ -26,7 +26,7 @@ def test_risk_limits_default_to_off() -> None:
 
 def test_unknown_risk_key_is_rejected() -> None:
     with pytest.raises(ValidationError):
-        RiskLimits.model_validate({"max_drawdown": 0.2})
+        RiskLimits.model_validate({"max_sharpe": 2})
 
 
 def test_each_limit_breaches_only_past_its_threshold() -> None:
@@ -66,3 +66,34 @@ def test_beta_needs_enough_days_and_a_moving_benchmark() -> None:
     assert beta(_returns([0.01] * 5), _returns([0.01] * 5)) is None
     n = MIN_OBSERVATIONS + 1
     assert beta(_returns([0.01] * n), _returns([0.0] * n)) is None
+
+
+def test_drawdown_is_measured_from_the_window_peak() -> None:
+    from steward.portfolio.risk import current_drawdown
+
+    d = dt.date(2026, 1, 1)
+    pts = [(d + dt.timedelta(i), v) for i, v in enumerate([100.0, 120.0, 90.0])]
+    assert current_drawdown(pts) == pytest.approx(0.25)
+    assert current_drawdown(pts[:2]) == 0
+    assert current_drawdown(pts[:1]) is None
+
+
+def test_drawdown_limit_breaches_past_the_ceiling_only() -> None:
+    limits = RiskLimits(max_drawdown=0.20)
+    assert evaluate_risk(RiskInputs(drawdown=0.20), limits) == []
+    (f,) = evaluate_risk(RiskInputs(drawdown=0.25), limits)
+    assert f.key == "risk:drawdown" and "not a reason to sell" in f.detail
+
+
+def test_correlation_needs_both_a_high_correlation_and_enough_weight() -> None:
+    from steward.portfolio.risk_limits import PairCorrelation
+
+    limits = RiskLimits(max_pair_correlation=0.85)
+    inputs = RiskInputs(
+        correlations=[
+            PairCorrelation("A", "B", 0.90, 0.30),  # breach
+            PairCorrelation("A", "C", 0.90, 0.05),  # too small to matter
+            PairCorrelation("B", "C", 0.80, 0.40),  # not correlated enough
+        ]
+    )
+    assert [f.key for f in evaluate_risk(inputs, limits)] == ["risk:correlation:A|B"]

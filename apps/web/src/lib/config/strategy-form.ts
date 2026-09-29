@@ -60,6 +60,9 @@ export const DEFAULT_STRATEGY: StrategyConfig = {
     max_beta: null,
     position_loss_review: null,
     max_look_through_weight: null,
+    max_drawdown: null,
+    max_pair_correlation: null,
+    correlation_min_combined_weight: 0.1,
     on_breach: "severity_2",
   },
   hard_limit_severity: "severity_3",
@@ -170,6 +173,9 @@ export type StrategyForm = {
   risk_max_beta: string;
   risk_position_loss_review: string;
   risk_max_look_through_weight: string;
+  risk_max_drawdown: string;
+  risk_max_pair_correlation: string;
+  risk_correlation_min_combined_weight: string;
   risk_on_breach: OnBreach;
   /** Severity of a position above its hard limit. */
   hard_limit_severity: OnBreach;
@@ -242,6 +248,9 @@ export function strategyFromBody(body: StrategyConfig | null): StrategyForm {
     risk_max_beta: b.risk?.max_beta == null ? "" : String(b.risk.max_beta),
     risk_position_loss_review: fractionToPercent(b.risk?.position_loss_review),
     risk_max_look_through_weight: fractionToPercent(b.risk?.max_look_through_weight),
+    risk_max_drawdown: fractionToPercent(b.risk?.max_drawdown),
+    risk_max_pair_correlation: b.risk?.max_pair_correlation == null ? "" : String(b.risk.max_pair_correlation),
+    risk_correlation_min_combined_weight: fractionToPercent(b.risk?.correlation_min_combined_weight ?? 0.1),
     risk_on_breach: b.risk?.on_breach ?? "severity_2",
     categories,
     classifications,
@@ -348,6 +357,9 @@ export function strategyToBody(form: StrategyForm): StrategyConfig {
       max_beta: optionalNumber(form.risk_max_beta) as number | null,
       position_loss_review: optionalPercent(form.risk_position_loss_review) as number | null,
       max_look_through_weight: optionalPercent(form.risk_max_look_through_weight) as number | null,
+      max_drawdown: optionalPercent(form.risk_max_drawdown) as number | null,
+      max_pair_correlation: optionalNumber(form.risk_max_pair_correlation) as number | null,
+      correlation_min_combined_weight: percentToFraction(form.risk_correlation_min_combined_weight) as number,
       on_breach: form.risk_on_breach,
     },
     hard_limit_severity: form.hard_limit_severity,

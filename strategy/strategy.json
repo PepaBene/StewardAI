@@ -5,7 +5,7 @@
   "weight_basis": "total",
   "goals": "Diversified portfolio across sectors, countries and risk tiers (core, growth, speculative). Every position is justified by a written thesis built from news, fundamentals and deep research.",
   "horizon_years": null,
-  "notes": "STRATEGY PRINCIPLES\n1. Diversification is enforced by caps, not target weights: max 10% per position, 35% per sector, 70% per country, at least 8 positions, cash 5% (max 20%).\n2. Every holding carries exactly one risk tier (dimension 'risk'): core (stable, established businesses; at least 30% of the portfolio), growth (at most 50%), speculative (at most 20%).\n3. No buy without a thesis. The thesis must be built from recent news, fundamentals and deep research, and must state why it is owned, its KPIs, and its exit conditions.\n4. Trades are driven by fundamentals and events only. A price move alone is never a reason to buy or sell.\n5. Review or exit triggers: a thesis KPI breach, a severity-3 news event (guidance cut, M&A, dividend cut), or a thesis review date that has passed.\n6. Risk limits (strategy `risk`): portfolio volatility at most 20% a year, a position down 25% or more from cost needs a thesis review, and no single company above 10% counting ETF holdings. A risk-limit breach only forces a review of the thesis; it is never a sell signal on its own.\n7. Propose new ideas so that they fill under-represented sectors, countries or risk tiers rather than adding to concentrations.",
+  "notes": "STRATEGY PRINCIPLES\n1. Diversification is enforced by caps, not target weights: max 10% per position, 35% per sector, 70% per country, at least 8 positions, cash 5% (max 20%).\n2. Every holding carries exactly one risk tier (dimension 'risk'): core (stable, established businesses; at least 30% of the portfolio), growth (at most 50%), speculative (at most 20%).\n3. No buy without a thesis. The thesis must be built from recent news, fundamentals and deep research, and must state why it is owned, its KPIs, and its exit conditions.\n4. Trades are driven by fundamentals and events only. A price move alone is never a reason to buy or sell.\n5. Review or exit triggers: a thesis KPI breach, a severity-3 news event (guidance cut, M&A, dividend cut), or a thesis review date that has passed.\n6. Risk limits (strategy `risk`): portfolio volatility at most 20% a year, a position down 25% or more from cost needs a thesis review, no single company above 10% counting ETF holdings, portfolio drawdown from its 1-year peak at most 20%, and no two holdings with return correlation above 0.85 that together weigh 10% or more. A risk-limit breach only forces a review of the thesis; it is never a sell signal on its own.\n7. Propose new ideas so that they fill under-represented sectors, countries or risk tiers rather than adding to concentrations.",
   "categories": [
     "sector",
     "geography",
@@ -98,6 +98,9 @@
     "max_beta": null,
     "position_loss_review": 0.25,
     "max_look_through_weight": 0.1,
-    "on_breach": "severity_2"
+    "on_breach": "severity_2",
+    "max_drawdown": 0.2,
+    "max_pair_correlation": 0.85,
+    "correlation_min_combined_weight": 0.1
   }
 }

@@ -742,6 +742,9 @@ function RiskPanel({ form, errors, set }: SectionProps) {
         <TextField label="Max beta" path="risk.max_beta" errors={errors} inputMode="decimal" value={form.risk_max_beta} onChange={(v) => set({ risk_max_beta: v })} hint="Against the benchmark, last year." />
         <TextField label="Review a position down (%)" path="risk.position_loss_review" errors={errors} inputMode="decimal" value={form.risk_position_loss_review} onChange={(v) => set({ risk_position_loss_review: v })} hint="Loss from cost that forces a thesis review." />
         <TextField label="Max overlap via funds (%)" path="risk.max_look_through_weight" errors={errors} inputMode="decimal" value={form.risk_max_look_through_weight} onChange={(v) => set({ risk_max_look_through_weight: v })} hint="One company, direct plus through ETFs." />
+        <TextField label="Max drawdown (%)" path="risk.max_drawdown" errors={errors} inputMode="decimal" value={form.risk_max_drawdown} onChange={(v) => set({ risk_max_drawdown: v })} hint="Fall from the highest level of the last year." />
+        <TextField label="Max pair correlation (0 to 1)" path="risk.max_pair_correlation" errors={errors} inputMode="decimal" value={form.risk_max_pair_correlation} onChange={(v) => set({ risk_max_pair_correlation: v })} hint="Two holdings that move together, last year." />
+        <TextField label="Correlation applies from combined weight (%)" path="risk.correlation_min_combined_weight" errors={errors} inputMode="decimal" value={form.risk_correlation_min_combined_weight} onChange={(v) => set({ risk_correlation_min_combined_weight: v })} hint="Of the invested value; smaller pairs are ignored." />
         <SelectField label="On breach" path="risk.on_breach" errors={errors} value={form.risk_on_breach} options={ON_BREACH} onChange={(v) => set({ risk_on_breach: v })} />
       </div>
     </Blueprint>

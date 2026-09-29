@@ -153,6 +153,15 @@ def beta(portfolio: Sequence[DailyReturn], benchmark: Sequence[DailyReturn]) -> 
     return cov / var
 
 
+def current_drawdown(points: Sequence[tuple[dt.date, float]]) -> float | None:
+    """How far the last level sits below the highest level in the window, as a positive
+    fraction (0.12 = 12 % below the peak); 0 at a new high. None with fewer than two points."""
+    levels = [v for _, v in points if v > 0]
+    if len(levels) < 2:
+        return None
+    return 1 - levels[-1] / max(levels)
+
+
 def _stdev(values: Sequence[float]) -> float:
     mean = sum(values) / len(values)
     return math.sqrt(sum((v - mean) ** 2 for v in values) / (len(values) - 1))
@@ -249,6 +258,10 @@ class PortfolioRisk(BaseModel):
         description="The same figures for the benchmark, converted to the base currency; null "
         "without a configured benchmark."
     )
+    current_drawdown: float | None = Field(
+        default=None,
+        description="Fall of the latest portfolio level below its peak in the window, fraction.",
+    )
     beta: float | None = Field(
         default=None,
         description="Portfolio beta against the benchmark (covariance of daily returns over the "
@@ -344,6 +357,7 @@ async def portfolio_risk(pool: asyncpg.Pool, days: int) -> PortfolioRisk:
     history = await portfolio_history(pool, days)
     base = history.values_currency or history.base_currency
     symbol = history.benchmark_symbol
+    drawdown = current_drawdown([(p.date, p.close) for p in history.points])
 
     def report(
         portfolio: SharpeStats,
@@ -361,6 +375,7 @@ async def portfolio_risk(pool: asyncpg.Pool, days: int) -> PortfolioRisk:
             benchmark_symbol=symbol,
             benchmark=benchmark,
             beta=beta_value,
+            current_drawdown=drawdown,
         )
 
     if history.gap or not history.points or base is None:

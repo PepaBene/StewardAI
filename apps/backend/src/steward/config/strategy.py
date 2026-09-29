@@ -123,6 +123,23 @@ class RiskLimits(ConfigModel):
         description="Ceiling on the effective weight of one underlying company reached "
         "through funds/ETFs (plus any direct holding of it): the overlap limit.",
     )
+    max_drawdown: Weight | None = Field(
+        default=None,
+        description="Ceiling on the portfolio's current drawdown: its fall from the highest "
+        "level of the last year (0.20 = 20 % below the peak), on the deposit- and "
+        "withdrawal-adjusted value.",
+    )
+    max_pair_correlation: Weight | None = Field(
+        default=None,
+        description="Ceiling on the correlation of two held positions' daily returns over the "
+        "last year (0.85). Only pairs weighing at least `correlation_min_combined_weight` "
+        "together are checked, so small positions do not raise noise.",
+    )
+    correlation_min_combined_weight: Weight = Field(
+        default=0.10,
+        description="Combined weight, of the invested value, a correlated pair must reach "
+        "before `max_pair_correlation` applies.",
+    )
     on_breach: Severity = Field(
         default="severity_2",
         description="Severity of a risk-limit breach (alerted when it opens).",

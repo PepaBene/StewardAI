@@ -7577,6 +7577,11 @@ export interface components {
             /** @description The same figures for the benchmark, converted to the base currency; null without a configured benchmark. */
             benchmark: components["schemas"]["SharpeStats"] | null;
             /**
+             * Current Drawdown
+             * @description Fall of the latest portfolio level below its peak in the window, fraction.
+             */
+            current_drawdown?: number | null;
+            /**
              * Beta
              * @description Portfolio beta against the benchmark (covariance of daily returns over the benchmark's variance); null without a benchmark or enough shared days.
              */
@@ -8818,6 +8823,22 @@ export interface components {
              * @description Ceiling on the effective weight of one underlying company reached through funds/ETFs (plus any direct holding of it): the overlap limit.
              */
             max_look_through_weight?: number | null;
+            /**
+             * Max Drawdown
+             * @description Ceiling on the portfolio's current drawdown: its fall from the highest level of the last year (0.20 = 20 % below the peak), on the deposit- and withdrawal-adjusted value.
+             */
+            max_drawdown?: number | null;
+            /**
+             * Max Pair Correlation
+             * @description Ceiling on the correlation of two held positions' daily returns over the last year (0.85). Only pairs weighing at least `correlation_min_combined_weight` together are checked, so small positions do not raise noise.
+             */
+            max_pair_correlation?: number | null;
+            /**
+             * Correlation Min Combined Weight
+             * @description Combined weight, of the invested value, a correlated pair must reach before `max_pair_correlation` applies.
+             * @default 0.1
+             */
+            correlation_min_combined_weight: number;
             /**
              * On Breach
              * @description Severity of a risk-limit breach (alerted when it opens).

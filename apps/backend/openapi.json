@@ -20011,6 +20011,18 @@
             ],
             "description": "The same figures for the benchmark, converted to the base currency; null without a configured benchmark."
           },
+          "current_drawdown": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Current Drawdown",
+            "description": "Fall of the latest portfolio level below its peak in the window, fraction."
+          },
           "beta": {
             "anyOf": [
               {
@@ -23075,6 +23087,42 @@
             ],
             "title": "Max Look Through Weight",
             "description": "Ceiling on the effective weight of one underlying company reached through funds/ETFs (plus any direct holding of it): the overlap limit."
+          },
+          "max_drawdown": {
+            "anyOf": [
+              {
+                "type": "number",
+                "maximum": 1.0,
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Max Drawdown",
+            "description": "Ceiling on the portfolio's current drawdown: its fall from the highest level of the last year (0.20 = 20 % below the peak), on the deposit- and withdrawal-adjusted value."
+          },
+          "max_pair_correlation": {
+            "anyOf": [
+              {
+                "type": "number",
+                "maximum": 1.0,
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Max Pair Correlation",
+            "description": "Ceiling on the correlation of two held positions' daily returns over the last year (0.85). Only pairs weighing at least `correlation_min_combined_weight` together are checked, so small positions do not raise noise."
+          },
+          "correlation_min_combined_weight": {
+            "type": "number",
+            "maximum": 1.0,
+            "minimum": 0.0,
+            "title": "Correlation Min Combined Weight",
+            "description": "Combined weight, of the invested value, a correlated pair must reach before `max_pair_correlation` applies.",
+            "default": 0.1
           },
           "on_breach": {
             "type": "string",
