@@ -19,6 +19,7 @@ export type PortfolioHistory = Schemas["PortfolioHistory"];
 export type ContributionReport = Schemas["ContributionReport"];
 export type HoldingContribution = Schemas["HoldingContribution"];
 export type HoldingsResponse = Schemas["HoldingsResponse"];
+export type WatchlistItem = Schemas["WatchlistItem"];
 export type Holding = Schemas["Holding"];
 export type JobSummary = Schemas["JobSummary"];
 export type DriftReport = Schemas["DriftReport"];

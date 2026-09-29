@@ -40,7 +40,12 @@ async def portfolio_cusips(pool: asyncpg.Pool) -> dict[str, str]:
 
 
 async def store_dataset(
-    pool: asyncpg.Pool, url: str, data: Dataset, tickers: dict[str, str], job_id: int | None
+    pool: asyncpg.Pool,
+    url: str,
+    data: Dataset,
+    tickers: dict[str, str],
+    job_id: int | None,
+    tracked_ciks: set[str] | None = None,
 ) -> tuple[int, int]:
     async with pool.acquire() as conn, conn.transaction():
         await conn.execute(
@@ -70,6 +75,15 @@ async def store_dataset(
                 for f in data.filings
             ],
         )
+        seen_ciks = {filing.cik for filing in data.filings} & {
+            cik.zfill(10) for cik in (tracked_ciks or set())
+        }
+        if seen_ciks:
+            await conn.executemany(
+                "insert into public.form13f_manager_dataset (cik, dataset_url) values ($1, $2)"
+                " on conflict do nothing",
+                [(cik, url) for cik in seen_ciks],
+            )
         await conn.executemany(
             "insert into public.institutional_holding (accession, infotable_sk, cusip, ticker,"
             " issuer_name, title_of_class, value_usd, shares, shares_type, put_call, discretion,"
@@ -126,13 +140,33 @@ async def collect(ctx: JobContext, http: httpx.AsyncClient, settings: OwnershipS
             older_not_loaded=len(links) - len(wanted),
         )
     tickers = await portfolio_cusips(pool)
-    for url in todo:
+    tracked_ciks = {manager.cik.zfill(10) for manager in settings.tracked_managers}
+    unprocessed = (
+        await pool.fetch(
+            "select distinct f.dataset_url as url from public.form13f_filing f"
+            " join public.form13f_dataset d on d.url=f.dataset_url"
+            " left join public.form13f_manager_dataset m"
+            " on m.cik=f.cik and m.dataset_url=f.dataset_url"
+            " where f.cik=any($1::text[]) and m.cik is null order by f.dataset_url",
+            list(tracked_ciks),
+        )
+        if tracked_ciks
+        else []
+    )
+    backfill = [row["url"] for row in unprocessed if row["url"] not in todo]
+    work = list(dict.fromkeys([*todo, *backfill[: max(0, settings.datasets_per_run - len(todo))]]))
+    for url in work:
         async with ctx.step(f"load:{url.rsplit('/', 1)[-1]}") as step:
             with tempfile.TemporaryDirectory() as tmp:
                 path = Path(tmp) / "form13f.zip"
                 await _download(http, url, path)
-                data = await asyncio.to_thread(parse_dataset, path, set(tickers))
-            filings, rows = await store_dataset(pool, url, data, tickers, ctx.job_id)
+                data = await asyncio.to_thread(
+                    parse_dataset,
+                    path,
+                    set(tickers),
+                    tracked_ciks,
+                )
+            filings, rows = await store_dataset(pool, url, data, tickers, ctx.job_id, tracked_ciks)
             step.detail.update(filings=filings, positions=rows, cusips=sorted(tickers))
 
 

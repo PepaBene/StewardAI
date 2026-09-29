@@ -65,6 +65,8 @@ class Settings(BaseSettings):
     sec_user_agent: str | None = None
     # Finnhub free tier: US earnings calendar.
     finnhub_api_key: SecretStr | None = None
+    # Alpha Vantage free tier: fallback valuation overview (25 requests per day).
+    alpha_vantage_api_key: SecretStr | None = None
     # FRED (St. Louis Fed) macro series need a free API key.
     fred_api_key: SecretStr | None = None
     # OpenFIGI works without a key; a key raises its rate limit.
@@ -115,6 +117,7 @@ class Settings(BaseSettings):
             self.anthropic_api_key,
             self.supabase_secret_key,
             self.finnhub_api_key,
+            self.alpha_vantage_api_key,
             self.openfigi_api_key,
             self.fred_api_key,
             self.stooq_api_key,

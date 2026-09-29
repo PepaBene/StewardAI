@@ -111,6 +111,11 @@ export const SCHEDULES: Record<ScheduleKey, { label: string; description: string
     description: "Load new SEC Form 13F data sets (published quarterly, about 100 MB each).",
     cron: "0 5 5 * *",
   },
+  insider_trades: {
+    label: "Insider transactions",
+    description: "Load structured SEC Forms 3, 4 and 5 for portfolio issuers.",
+    cron: "30 6 * * *",
+  },
   valuation_refresh: {
     label: "Valuation fundamentals",
     description:
@@ -273,6 +278,7 @@ export const DEFAULT_JOBS: JobsConfig = {
     full_refresh_days: 7,
     esef_max_age_months: 18,
     finnhub_cross_check: true,
+    alpha_vantage_fallback: true,
   },
   // Funds, benchmark proxies and issuer groups: the backend's defaults (CSPX 253743, VWCE 9679).
   look_through: {
@@ -517,6 +523,7 @@ export const SETTINGS: { [S in SettingsKey]: { title: string; description: strin
       { key: "full_refresh_days", label: "Re-read every holding every (days)", kind: "int", min: 1, max: 90, hint: "A holding that filed a new report is re-read on the next run anyway." },
       { key: "esef_max_age_months", label: "Ignore ESEF reports older than (months)", kind: "int", min: 3, max: 60 },
       { key: "finnhub_cross_check", label: "Finnhub cross-check (tier 2)", kind: "bool", hint: "Only with FINNHUB_API_KEY; never required." },
+      { key: "alpha_vantage_fallback", label: "Alpha Vantage fallback", kind: "bool", hint: "Only with ALPHA_VANTAGE_API_KEY; fills missing ratios, up to 25 lookups per UTC day." },
     ],
   },
   look_through: {

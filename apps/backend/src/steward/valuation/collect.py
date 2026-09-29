@@ -41,6 +41,7 @@ from steward.jobs.runner import JobContext
 from steward.reference.identity import holding_tickers
 from steward.reference.prices import symbols_for
 from steward.settings import get_settings
+from steward.sources.alphavantage import AlphaVantageError, company_overview
 from steward.sources.edgar import (
     EdgarClient,
     EdgarError,
@@ -79,6 +80,8 @@ from steward.valuation.fundamentals import (
 logger = logging.getLogger(__name__)
 
 STATUS_KEY = "valuation_status"
+ALPHA_VANTAGE_QUOTA_KEY = "alphavantage_quota"
+ALPHA_VANTAGE_DAILY_LIMIT = 25
 FINNHUB_FIELDS = (
     "peTTM",
     "peBasicExclExtraTTM",
@@ -97,6 +100,7 @@ class ValuationDeps:
     http: httpx.AsyncClient
     edgar: EdgarClient | None
     finnhub_key: str | None = None
+    alpha_vantage_key: str | None = None
     today: dt.date = field(default_factory=lambda: dt.datetime.now(dt.UTC).date())
 
 
@@ -418,6 +422,56 @@ def _summary(figures: SourceFigures) -> dict[str, Any]:
     }
 
 
+def _alpha_vantage_needed(stored: dict[str, asyncpg.Record]) -> bool:
+    """Request a single overview only when filings cannot supply at least one key ratio."""
+    sources = []
+    for name in ("sec", "esef"):
+        row = stored.get(name)
+        if row is not None:
+            try:
+                body = (
+                    json.loads(row["figures"])
+                    if isinstance(row["figures"], str)
+                    else row["figures"]
+                )
+                sources.append(SourceFigures.model_validate(body))
+            except (ValueError, TypeError):
+                continue
+    if not sources:
+        return True
+
+    def has(source: SourceFigures, name: str) -> bool:
+        if name == "eps_steps":
+            latest = max(source.eps_steps, key=lambda step: step.period_end, default=None)
+            return bool(
+                latest
+                and latest.eps > 0
+                and any(
+                    previous.eps > 0
+                    and 300 <= (latest.period_end - previous.period_end).days <= 430
+                    for previous in source.eps_steps
+                    if previous.period_end < latest.period_end
+                )
+            )
+        value = getattr(source, name, None)
+        return value is not None and getattr(value, "value", None) is not None
+
+    needed = (
+        ("eps_ttm",),
+        ("book_value_per_share",),
+        ("dividend_per_share",),
+        ("revenue_ttm", "shares_outstanding"),
+        ("revenue_ttm", "gross_profit_ttm"),
+        ("revenue_ttm", "operating_income_ttm"),
+        ("revenue_ttm", "net_income_ttm"),
+        ("net_income_ttm", "equity_value", "equity_previous_value"),
+        ("eps_steps",),
+    )
+    return any(
+        not any(all(has(source, key) for key in group) for source in sources) for group in needed
+    )
+
+
 # ---------------------------------------------------------------------------
 # ESEF
 # ---------------------------------------------------------------------------
@@ -574,6 +628,76 @@ async def refresh_finnhub(
     detail["finnhub"] = {"pe": body["pe"], "pb": body["pb"]}
 
 
+async def _reserve_alpha_vantage_request(pool: asyncpg.Pool, today: dt.date) -> bool:
+    """Reserve against Alpha Vantage's account-wide free 25-request daily quota.
+
+    Valuation jobs are serialized by job type using a database advisory lock, so this
+    sync-state counter cannot be incremented concurrently by two valuation runs.
+    """
+    raw = await pool.fetchval(
+        "select value from public.sync_state where key = $1", ALPHA_VANTAGE_QUOTA_KEY
+    )
+    state = (json.loads(raw) if isinstance(raw, str) else raw) if raw else {}
+    day = today.isoformat()
+    used = int(state.get("used", 0)) if state.get("date") == day else 0
+    if used >= ALPHA_VANTAGE_DAILY_LIMIT:
+        return False
+    await pool.execute(
+        "insert into public.sync_state (key, value) values ($1, $2::jsonb)"
+        " on conflict (key) do update set value = excluded.value",
+        ALPHA_VANTAGE_QUOTA_KEY,
+        json.dumps({"date": day, "used": used + 1}),
+    )
+    return True
+
+
+async def refresh_alpha_vantage(
+    tc: TickerContext,
+    deps: ValuationDeps,
+    settings: ValuationSettings,
+    force: bool,
+    detail: dict[str, Any],
+    pool: asyncpg.Pool,
+) -> None:
+    """Cache one Company Overview for ratio-level gap filling; SEC/ESEF remain primary."""
+    if not settings.alpha_vantage_fallback or not deps.alpha_vantage_key:
+        return
+    if tc.profile.valuation_source != "auto":
+        detail["alphavantage"] = "skipped: valuation source is forced in the holding profile"
+        return
+    symbol = tc.profile.alpha_vantage_symbol or tc.profile.edgar_ticker()
+    stored = tc.stored.get("alphavantage")
+    reason = _due(stored, None, settings, deps.today, force)
+    if reason is None:
+        detail["alphavantage"] = "cached"
+        return
+    if not await _reserve_alpha_vantage_request(pool, deps.today):
+        detail["alphavantage"] = "daily free-tier limit reached (25 requests)"
+        return
+    try:
+        data = await company_overview(deps.http, deps.alpha_vantage_key, symbol)
+        # Empty objects commonly mean that the symbol has no overview on the free plan.
+        if not data or not data.get("Symbol"):
+            detail["alphavantage"] = f"no Company Overview for {symbol}"
+            await store_fundamentals(
+                pool, tc.ticker, "alphavantage", {}, {"empty": True}, symbol,
+                f"https://www.alphavantage.co/query?function=OVERVIEW&symbol={symbol}",
+            )
+            return
+        await store_fundamentals(
+            pool, tc.ticker, "alphavantage", data, data, symbol,
+            f"https://www.alphavantage.co/query?function=OVERVIEW&symbol={symbol}",
+        )
+        detail["alphavantage"] = {"symbol": symbol, "as_of": data.get("LatestQuarter")}
+    except (AlphaVantageError, httpx.HTTPError) as exc:
+        detail["alphavantage_error"] = str(exc)[:300]
+        # Cache errors too, so invalid/missing exchange symbols do not consume a call daily.
+        await store_fundamentals(
+            pool, tc.ticker, "alphavantage", {}, {"error": str(exc)[:300]}, symbol,
+            f"https://www.alphavantage.co/query?function=OVERVIEW&symbol={symbol}",
+        )
+
+
 # ---------------------------------------------------------------------------
 # The job
 # ---------------------------------------------------------------------------
@@ -666,6 +790,14 @@ async def run_valuation(ctx: JobContext, deps: ValuationDeps) -> None:
                     await record_failure(pool, ticker, "esef", str(exc))
             else:
                 step.detail["esef"] = "no issuer LEI (reference data)"
+            tc.stored = await _stored(pool, ticker)
+            if _alpha_vantage_needed(tc.stored):
+                try:
+                    await refresh_alpha_vantage(tc, deps, settings, force, step.detail, pool)
+                except (AlphaVantageError, httpx.HTTPError) as exc:
+                    error = str(exc)[:300]
+                    step.detail["alphavantage_error"] = entry["errors"]["alphavantage"] = error
+            entry["alphavantage"] = step.detail.get("alphavantage")
             if deps.finnhub_key and settings.finnhub_cross_check:
                 try:
                     await refresh_finnhub(tc, deps, step.detail, pool)
@@ -680,6 +812,9 @@ async def run_valuation(ctx: JobContext, deps: ValuationDeps) -> None:
 async def valuation_refresh_handler(ctx: JobContext) -> None:
     settings = get_settings()
     finnhub = settings.finnhub_api_key.get_secret_value() if settings.finnhub_api_key else None
+    alpha_vantage = None
+    if settings.alpha_vantage_api_key:
+        alpha_vantage = settings.alpha_vantage_api_key.get_secret_value()
     async with httpx.AsyncClient(
         timeout=httpx.Timeout(60.0, read=120.0),
         headers={"User-Agent": f"StewardAI/{__version__} (personal portfolio tool)"},
@@ -691,4 +826,12 @@ async def valuation_refresh_handler(ctx: JobContext) -> None:
                 edgar = EdgarClient(http, settings.sec_user_agent)
             except EdgarError:
                 logger.warning("SEC_USER_AGENT has no contact address: SEC fundamentals skipped")
-        await run_valuation(ctx, ValuationDeps(http=http, edgar=edgar, finnhub_key=finnhub))
+        await run_valuation(
+            ctx,
+            ValuationDeps(
+                http=http,
+                edgar=edgar,
+                finnhub_key=finnhub,
+                alpha_vantage_key=alpha_vantage,
+            ),
+        )

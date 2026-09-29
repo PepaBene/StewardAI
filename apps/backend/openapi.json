@@ -6469,6 +6469,368 @@
           }
         ]
       }
+    },
+    "/watchlist": {
+      "get": {
+        "tags": [
+          "watchlist"
+        ],
+        "summary": "List Watchlist",
+        "operationId": "list_watchlist",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/WatchlistItem"
+                  },
+                  "type": "array",
+                  "title": "Response List Watchlist"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      },
+      "post": {
+        "tags": [
+          "watchlist"
+        ],
+        "summary": "Add Watchlist Item",
+        "operationId": "add_watchlist_item",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/WatchlistCreate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WatchlistItem"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/watchlist/{item_id}": {
+      "patch": {
+        "tags": [
+          "watchlist"
+        ],
+        "summary": "Update Watchlist Item",
+        "operationId": "update_watchlist_item",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "item_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "title": "Item Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/WatchlistUpdate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WatchlistItem"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "watchlist"
+        ],
+        "summary": "Delete Watchlist Item",
+        "operationId": "delete_watchlist_item",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "item_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "title": "Item Id"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/jobs/insider-trades": {
+      "post": {
+        "tags": [
+          "jobs"
+        ],
+        "summary": "Run Insider Trades",
+        "description": "Load structured insider filings for portfolio issuers now.",
+        "operationId": "run_insider_trades",
+        "responses": {
+          "202": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/JobSummary"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/holdings/{ticker}/insider-trades": {
+      "get": {
+        "tags": [
+          "holdings"
+        ],
+        "summary": "Get Insider Trades",
+        "description": "Reported insider transactions, newest first, from structured SEC ownership filings.",
+        "operationId": "get_insider_trades",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "ticker",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9._-]{1,32}$",
+              "title": "Ticker"
+            }
+          },
+          {
+            "name": "forms",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Forms"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 200,
+              "minimum": 1,
+              "default": 100,
+              "title": "Limit"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/InsiderTransactionOut"
+                  },
+                  "title": "Response Get Insider Trades"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/investors": {
+      "get": {
+        "tags": [
+          "investors"
+        ],
+        "summary": "Get Investors",
+        "description": "Configured managers and their latest stored 13F filing summary.",
+        "operationId": "get_investors",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/ManagerSummary"
+                  },
+                  "type": "array",
+                  "title": "Response Get Investors"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/investors/{cik}": {
+      "get": {
+        "tags": [
+          "investors"
+        ],
+        "summary": "Get Investor",
+        "description": "Largest common-stock positions from the manager's latest stored filing.",
+        "operationId": "get_investor",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "cik",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[0-9]{1,10}$",
+              "title": "Cik"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ManagerDetail"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
@@ -7609,6 +7971,7 @@
                 "weekly_digest",
                 "research",
                 "ownership_13f",
+                "insider_trades",
                 "etf_look_through",
                 "monthly_review",
                 "chat",
@@ -7645,6 +8008,7 @@
                 "weekly_digest",
                 "research",
                 "ownership_13f",
+                "insider_trades",
                 "etf_look_through",
                 "monthly_review",
                 "chat",
@@ -14968,6 +15332,19 @@
             "title": "Sec Ticker",
             "description": "Ticker as EDGAR and Finnhub list it, when it differs from the Trading212 ticker's prefix."
           },
+          "alpha_vantage_symbol": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^[A-Z0-9][A-Z0-9.\\-]{0,23}$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Alpha Vantage Symbol",
+            "description": "Alpha Vantage exchange symbol for fallback fundamentals (for example TSCO.LON or MBG.DEX). When empty, the EDGAR ticker is tried."
+          },
           "fiscal_year_end_month": {
             "type": "integer",
             "maximum": 12.0,
@@ -15354,6 +15731,27 @@
           "dividend_yield": {
             "$ref": "#/components/schemas/ValuationRatio",
             "description": "Fraction (0.012 = 1.2 %)."
+          },
+          "ps": {
+            "$ref": "#/components/schemas/ValuationRatio"
+          },
+          "peg": {
+            "$ref": "#/components/schemas/ValuationRatio"
+          },
+          "gross_margin": {
+            "$ref": "#/components/schemas/ValuationRatio"
+          },
+          "operating_margin": {
+            "$ref": "#/components/schemas/ValuationRatio"
+          },
+          "net_margin": {
+            "$ref": "#/components/schemas/ValuationRatio"
+          },
+          "roe": {
+            "$ref": "#/components/schemas/ValuationRatio"
+          },
+          "roic": {
+            "$ref": "#/components/schemas/ValuationRatio"
           },
           "eps_ttm": {
             "anyOf": [
@@ -15848,6 +16246,203 @@
           "change_pct"
         ],
         "title": "IndexQuote"
+      },
+      "InsiderTransactionOut": {
+        "properties": {
+          "accession": {
+            "type": "string",
+            "title": "Accession"
+          },
+          "form": {
+            "type": "string",
+            "title": "Form"
+          },
+          "filed": {
+            "type": "string",
+            "format": "date",
+            "title": "Filed"
+          },
+          "ticker": {
+            "type": "string",
+            "title": "Ticker"
+          },
+          "issuer_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Issuer Name"
+          },
+          "owner_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Owner Name"
+          },
+          "reporting_owner_cik": {
+            "type": "string",
+            "title": "Reporting Owner Cik"
+          },
+          "officer_title": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Officer Title"
+          },
+          "is_director": {
+            "type": "boolean",
+            "title": "Is Director"
+          },
+          "is_officer": {
+            "type": "boolean",
+            "title": "Is Officer"
+          },
+          "is_ten_percent_owner": {
+            "type": "boolean",
+            "title": "Is Ten Percent Owner"
+          },
+          "security_title": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Security Title"
+          },
+          "transaction_date": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Transaction Date"
+          },
+          "transaction_code": {
+            "type": "string",
+            "title": "Transaction Code"
+          },
+          "shares": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Shares"
+          },
+          "price_per_share": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Price Per Share"
+          },
+          "acquired_disposed": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Acquired Disposed"
+          },
+          "shares_owned_after": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Shares Owned After"
+          },
+          "direct_indirect": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Direct Indirect"
+          },
+          "derivative": {
+            "type": "boolean",
+            "title": "Derivative"
+          },
+          "source_url": {
+            "type": "string",
+            "title": "Source Url"
+          }
+        },
+        "type": "object",
+        "required": [
+          "accession",
+          "form",
+          "filed",
+          "ticker",
+          "issuer_name",
+          "owner_name",
+          "reporting_owner_cik",
+          "officer_title",
+          "is_director",
+          "is_officer",
+          "is_ten_percent_owner",
+          "security_title",
+          "transaction_date",
+          "transaction_code",
+          "shares",
+          "price_per_share",
+          "acquired_disposed",
+          "shares_owned_after",
+          "direct_indirect",
+          "derivative",
+          "source_url"
+        ],
+        "title": "InsiderTransactionOut"
       },
       "InstrumentInfo": {
         "properties": {
@@ -16765,6 +17360,10 @@
           "ownership_13f": {
             "$ref": "#/components/schemas/JobSchedule",
             "description": "Load new SEC Form 13F data sets (published quarterly). Default: the 5th of each month, 05:00."
+          },
+          "insider_trades": {
+            "$ref": "#/components/schemas/JobSchedule",
+            "description": "Load structured SEC Forms 3, 4 and 5 for portfolio issuers. Default: daily 06:30."
           },
           "valuation_refresh": {
             "$ref": "#/components/schemas/JobSchedule",
@@ -17822,6 +18421,262 @@
           "accession"
         ],
         "title": "ManagerChange"
+      },
+      "ManagerDetail": {
+        "properties": {
+          "cik": {
+            "type": "string",
+            "title": "Cik"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "period": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Period"
+          },
+          "filed": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Filed"
+          },
+          "reported_value_usd": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reported Value Usd"
+          },
+          "positions": {
+            "type": "integer",
+            "title": "Positions",
+            "default": 0
+          },
+          "previous_value_usd": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Previous Value Usd"
+          },
+          "earlier_period": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Earlier Period"
+          },
+          "positions_detail": {
+            "items": {
+              "$ref": "#/components/schemas/ManagerPosition"
+            },
+            "type": "array",
+            "title": "Positions Detail"
+          },
+          "performance_available": {
+            "type": "boolean",
+            "title": "Performance Available",
+            "default": false
+          },
+          "performance_note": {
+            "type": "string",
+            "title": "Performance Note",
+            "default": "13F quarter-end value changes are not investment returns. Historical prices and complete security mapping are not available to calculate comparable performance."
+          }
+        },
+        "type": "object",
+        "required": [
+          "cik",
+          "name",
+          "positions_detail"
+        ],
+        "title": "ManagerDetail"
+      },
+      "ManagerPosition": {
+        "properties": {
+          "cusip": {
+            "type": "string",
+            "title": "Cusip"
+          },
+          "issuer_name": {
+            "type": "string",
+            "title": "Issuer Name"
+          },
+          "title_of_class": {
+            "type": "string",
+            "title": "Title Of Class"
+          },
+          "value_usd": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Value Usd"
+          },
+          "shares": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Shares"
+          },
+          "shares_type": {
+            "type": "string",
+            "title": "Shares Type"
+          }
+        },
+        "type": "object",
+        "required": [
+          "cusip",
+          "issuer_name",
+          "title_of_class",
+          "value_usd",
+          "shares",
+          "shares_type"
+        ],
+        "title": "ManagerPosition"
+      },
+      "ManagerSummary": {
+        "properties": {
+          "cik": {
+            "type": "string",
+            "title": "Cik"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "period": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Period"
+          },
+          "filed": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Filed"
+          },
+          "reported_value_usd": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reported Value Usd"
+          },
+          "positions": {
+            "type": "integer",
+            "title": "Positions",
+            "default": 0
+          },
+          "previous_value_usd": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Previous Value Usd"
+          },
+          "earlier_period": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Earlier Period"
+          }
+        },
+        "type": "object",
+        "required": [
+          "cik",
+          "name"
+        ],
+        "title": "ManagerSummary"
       },
       "ManualFundamentals": {
         "properties": {
@@ -26194,6 +27049,18 @@
             ],
             "title": "Reason",
             "description": "Why the value is null, e.g. 'n/m: negative earnings'."
+          },
+          "source_label": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Label",
+            "description": "Provider used when this individual ratio is a fallback."
           }
         },
         "type": "object",
@@ -26261,6 +27128,12 @@
             "description": "Also read Finnhub's basic financials (P/E, P/B, EPS) as a tier-2 cross-check. Needs FINNHUB_API_KEY; never required.",
             "default": true
           },
+          "alpha_vantage_fallback": {
+            "type": "boolean",
+            "title": "Alpha Vantage Fallback",
+            "description": "Fill valuation metrics missing from SEC/ESEF with Alpha Vantage Company Overview. Needs ALPHA_VANTAGE_API_KEY; limited to 25 requests per UTC day.",
+            "default": true
+          },
           "funds": {
             "items": {
               "$ref": "#/components/schemas/FundValuationSource"
@@ -26274,7 +27147,7 @@
         "additionalProperties": false,
         "type": "object",
         "title": "ValuationSettings",
-        "description": "P/E, P/B and dividend yield: fundamentals from SEC XBRL and ESEF, fund figures from\nthe ETF providers."
+        "description": "Fundamentals from SEC XBRL and ESEF, with an optional Alpha Vantage ratio fallback."
       },
       "VerdictActivity": {
         "properties": {
@@ -26593,6 +27466,240 @@
           "value_base"
         ],
         "title": "Via"
+      },
+      "WatchlistCreate": {
+        "properties": {
+          "ticker": {
+            "type": "string",
+            "pattern": "^[A-Za-z0-9._-]{1,32}$",
+            "title": "Ticker"
+          },
+          "list_name": {
+            "type": "string",
+            "maxLength": 80,
+            "minLength": 1,
+            "title": "List Name",
+            "default": "Default"
+          },
+          "buy_target": {
+            "anyOf": [
+              {
+                "type": "number",
+                "exclusiveMinimum": 0.0
+              },
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Buy Target"
+          },
+          "sell_target": {
+            "anyOf": [
+              {
+                "type": "number",
+                "exclusiveMinimum": 0.0
+              },
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sell Target"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 2000
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
+          },
+          "note": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 5000
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note"
+          }
+        },
+        "type": "object",
+        "required": [
+          "ticker"
+        ],
+        "title": "WatchlistCreate"
+      },
+      "WatchlistItem": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "ticker": {
+            "type": "string",
+            "title": "Ticker"
+          },
+          "list_name": {
+            "type": "string",
+            "title": "List Name"
+          },
+          "buy_target": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Buy Target"
+          },
+          "sell_target": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sell Target"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
+          },
+          "note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note"
+          },
+          "created_at": {
+            "type": "string",
+            "title": "Created At"
+          },
+          "updated_at": {
+            "type": "string",
+            "title": "Updated At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "ticker",
+          "list_name",
+          "buy_target",
+          "sell_target",
+          "reason",
+          "note",
+          "created_at",
+          "updated_at"
+        ],
+        "title": "WatchlistItem"
+      },
+      "WatchlistUpdate": {
+        "properties": {
+          "list_name": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 80,
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "List Name"
+          },
+          "buy_target": {
+            "anyOf": [
+              {
+                "type": "number",
+                "exclusiveMinimum": 0.0
+              },
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Buy Target"
+          },
+          "sell_target": {
+            "anyOf": [
+              {
+                "type": "number",
+                "exclusiveMinimum": 0.0
+              },
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sell Target"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 2000
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
+          },
+          "note": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 5000
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "WatchlistUpdate"
       },
       "WikidataSummary": {
         "properties": {

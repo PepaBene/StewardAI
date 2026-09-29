@@ -25,6 +25,7 @@ import { VerdictStatusBadge } from "@/components/evidence/verdict-status-badge";
 import { FeedbackControl } from "@/components/feedback/feedback-control";
 import { HoldingNews, useHoldingNews } from "@/components/news/holding-news";
 import { IdentitySection, useHoldingIdentity } from "@/components/reference/identity-section";
+import { InsiderTradesSection } from "@/components/reference/insider-trades-section";
 import { OwnershipSection, useHoldingOwnership } from "@/components/reference/ownership-section";
 import { PriceRiskSection } from "@/components/reference/price-risk-section";
 import { ValuationPanel } from "@/components/reference/valuation-panel";
@@ -254,6 +255,9 @@ export function HoldingContent({
         <div className="flex min-w-0 flex-col gap-5">
           <PositionPanel position={detail.position} base={detail.base_currency ?? ""} drift={drift} />
           <ScorePanel row={row} kpis={detail.kpis} method={boardData?.score_method ?? null} loaded={board.kind !== "loading"} />
+          <div className="lg:sticky lg:top-3 lg:self-start">
+            <ValuationPanel ticker={ticker} compact />
+          </div>
         </div>
       </div>
 
@@ -268,7 +272,6 @@ export function HoldingContent({
         <HoldersPanel data={current(ownership.state)} loaded={ownership.state.kind !== "loading"} />
       </div>
 
-      <ValuationPanel ticker={ticker} />
       <SegmentsPanel ticker={ticker} />
 
       <Blueprint aria-labelledby="thesis-heading" className="space-y-5 px-[22px] py-5">
@@ -331,6 +334,8 @@ export function HoldingContent({
       <PriceRiskSection ticker={ticker} currency={detail.position?.instrument_currency} />
 
       <OwnershipSection resource={ownership} />
+
+      <InsiderTradesSection ticker={ticker} />
 
       <IdentitySection ticker={ticker} resource={identity} />
     </>

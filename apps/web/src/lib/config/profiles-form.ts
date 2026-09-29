@@ -54,6 +54,7 @@ export type ProfileForm = {
   extra_domains: string;
   sec_cik: string;
   sec_ticker: string;
+  alpha_vantage_symbol: string;
   fiscal_year_end_month: number;
   /** Stooq symbol override (e.g. "sap.de"); empty = derived from OpenFIGI. */
   price_symbol: string;
@@ -91,6 +92,7 @@ export function newProfile(ticker = ""): ProfileForm {
     extra_domains: "",
     sec_cik: "",
     sec_ticker: "",
+    alpha_vantage_symbol: "",
     fiscal_year_end_month: 12,
     price_symbol: "",
     yahoo_symbol: "",
@@ -121,6 +123,7 @@ export function profilesFromBody(body: HoldingProfilesConfig | null): ProfileFor
     extra_domains: joined(p.extra_domains),
     sec_cik: p.sec_cik ?? "",
     sec_ticker: p.sec_ticker ?? "",
+    alpha_vantage_symbol: p.alpha_vantage_symbol ?? "",
     fiscal_year_end_month: p.fiscal_year_end_month,
     price_symbol: p.price_symbol ?? "",
     yahoo_symbol: p.yahoo_symbol ?? "",
@@ -191,6 +194,7 @@ export function profilesToBody(forms: ProfileForm[]): HoldingProfilesConfig {
         extra_domains: lines(f.extra_domains).map((d) => d.toLowerCase()),
         sec_cik: orNull(f.sec_cik),
         sec_ticker: orNull(f.sec_ticker)?.toUpperCase() ?? null,
+        alpha_vantage_symbol: orNull(f.alpha_vantage_symbol)?.toUpperCase() ?? null,
         fiscal_year_end_month: f.fiscal_year_end_month,
         price_symbol: orNull(f.price_symbol)?.toLowerCase() ?? null,
         yahoo_symbol: orNull(f.yahoo_symbol)?.toUpperCase() ?? null,

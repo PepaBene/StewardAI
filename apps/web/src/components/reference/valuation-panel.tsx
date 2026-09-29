@@ -48,6 +48,7 @@ function Stat({ label, value, sub, title }: { label: string; value: string; sub?
 }
 
 function reasonOf(ratio: ValuationRatio): string | undefined {
+  if (ratio.source_label) return ratio.source_label;
   return ratio.value === null || ratio.value === undefined ? (ratio.reason ?? undefined) : undefined;
 }
 
@@ -76,7 +77,7 @@ export function useHoldingValuation(ticker: string) {
  * with its period, basis, source and staleness; the P/E over two years when the EPS history
  * allows. An ETF shows its provider's fund-level figures.
  */
-export function ValuationPanel({ ticker }: { ticker: string }) {
+export function ValuationPanel({ ticker, compact = false }: { ticker: string; compact?: boolean }) {
   const { state } = useHoldingValuation(ticker);
   const data = state.kind === "ok" ? state.data : state.kind === "error" ? state.previous : null;
 
@@ -84,7 +85,7 @@ export function ValuationPanel({ ticker }: { ticker: string }) {
     <Blueprint aria-labelledby="valuation-heading" className="flex min-w-0 flex-col gap-3 px-[22px] py-5">
       <PanelHeading
         kicker="Valuation"
-        title={<span id="valuation-heading">{data?.kind === "fund" ? "Fund P/E, P/B and yield" : "P/E, P/B and dividend yield"}</span>}
+        title={<span id="valuation-heading">{compact ? "Valuation snapshot" : data?.kind === "fund" ? "Fund P/E, P/B and yield" : "Company valuation and returns"}</span>}
         action={<RefreshControl ticker={ticker} />}
       />
       {data?.price ? (
@@ -101,7 +102,7 @@ export function ValuationPanel({ ticker }: { ticker: string }) {
         </p>
       ) : null}
       {state.kind === "error" && !data ? <p className="text-sm text-text-muted">Could not load the valuation: {state.title}</p> : null}
-      {data ? data.kind === "fund" ? <FundBody data={data} /> : <StockBody data={data} /> : null}
+      {data ? data.kind === "fund" ? <FundBody data={data} compact={compact} /> : <StockBody data={data} compact={compact} /> : null}
     </Blueprint>
   );
 }
@@ -144,20 +145,50 @@ function RefreshControl({ ticker }: { ticker: string }) {
   );
 }
 
-function StockBody({ data }: { data: HoldingValuation }) {
+function StockBody({ data, compact = false }: { data: HoldingValuation; compact?: boolean }) {
   const eps = data.eps_ttm;
   const manual = data.fundamentals?.source === "manual";
   const flags = figureFlags(eps);
   const nothing = !data.fundamentals && data.pe.value === null && data.pb.value === null;
   const history = data.pe_history.map((p) => ({ date: p.date, value: p.pe }));
   const errors = Object.entries(data.errors ?? {});
+  const unavailable: ValuationRatio = { value: null, reason: "not available for this security" };
+  const ratios = {
+    ps: data.ps ?? unavailable,
+    peg: data.peg ?? unavailable,
+    grossMargin: data.gross_margin ?? unavailable,
+    operatingMargin: data.operating_margin ?? unavailable,
+    netMargin: data.net_margin ?? unavailable,
+    roe: data.roe ?? unavailable,
+    roic: data.roic ?? unavailable,
+  };
 
+  if (compact) {
+    return (
+      <div className="space-y-3">
+        <dl className="grid grid-cols-2 gap-x-4 gap-y-3">
+          <Stat label="P/E (TTM)" value={ratioText(data.pe)} sub={reasonOf(data.pe)} />
+          <Stat label="P/B" value={ratioText(data.pb)} sub={reasonOf(data.pb)} />
+          <Stat label="P/S" value={ratioText(ratios.ps)} sub={reasonOf(ratios.ps)} />
+          <Stat label="PEG · 1Y EPS growth" value={ratioText(ratios.peg)} sub={reasonOf(ratios.peg)} />
+          <Stat label="Gross margin" value={ratioText(ratios.grossMargin, "yield")} sub={reasonOf(ratios.grossMargin)} />
+          <Stat label="Operating margin" value={ratioText(ratios.operatingMargin, "yield")} sub={reasonOf(ratios.operatingMargin)} />
+          <Stat label="Net margin" value={ratioText(ratios.netMargin, "yield")} sub={reasonOf(ratios.netMargin)} />
+          <Stat label="ROE" value={ratioText(ratios.roe, "yield")} sub={reasonOf(ratios.roe)} />
+          <Stat label="ROIC" value={ratioText(ratios.roic, "yield")} sub={reasonOf(ratios.roic)} />
+        </dl>
+        <p className="border-t border-border pt-2 text-[11px] leading-snug text-text-faint">TTM figures from {sourceLine(data) ?? "the latest available fundamentals"}. PEG uses the latest comparable annual EPS growth. Missing or stale source data stay marked as unavailable.</p>
+      </div>
+    );
+  }
   return (
     <div className={cn("grid grid-cols-1 gap-5", !manual && "lg:grid-cols-[minmax(0,1fr)_minmax(0,1.15fr)]")}>
       <div className="flex min-w-0 flex-col gap-3">
         <dl className="grid grid-cols-2 gap-x-4 gap-y-3 sm:grid-cols-4">
           <Stat label="P/E (TTM)" value={ratioText(data.pe)} sub={reasonOf(data.pe)} />
           <Stat label="P/B" value={ratioText(data.pb)} sub={reasonOf(data.pb)} />
+          <Stat label="P/S" value={ratioText(ratios.ps)} sub={reasonOf(ratios.ps)} />
+          <Stat label="PEG · 1Y EPS growth" value={ratioText(ratios.peg)} sub={reasonOf(ratios.peg)} />
           <Stat label="Dividend yield" value={ratioText(data.dividend_yield, "yield")} sub={reasonOf(data.dividend_yield)} />
           <Stat
             label={`EPS ${data.fundamentals?.eps_kind === "basic" ? "basic" : "diluted"}`}
@@ -165,6 +196,11 @@ function StockBody({ data }: { data: HoldingValuation }) {
             sub={periodLabel(eps) ?? undefined}
             title={eps?.method}
           />
+          <Stat label="Gross margin" value={ratioText(ratios.grossMargin, "yield")} sub={reasonOf(ratios.grossMargin)} />
+          <Stat label="Operating margin" value={ratioText(ratios.operatingMargin, "yield")} sub={reasonOf(ratios.operatingMargin)} />
+          <Stat label="Net margin" value={ratioText(ratios.netMargin, "yield")} sub={reasonOf(ratios.netMargin)} />
+          <Stat label="ROE" value={ratioText(ratios.roe, "yield")} sub={reasonOf(ratios.roe)} />
+          <Stat label="ROIC" value={ratioText(ratios.roic, "yield")} sub={reasonOf(ratios.roic)} />
         </dl>
         {nothing ? (
           <p className="text-sm text-text-muted">
@@ -273,7 +309,7 @@ function StockBody({ data }: { data: HoldingValuation }) {
   );
 }
 
-function FundBody({ data }: { data: HoldingValuation }) {
+function FundBody({ data, compact = false }: { data: HoldingValuation; compact?: boolean }) {
   const fund: FundValuation | null | undefined = data.fund;
   if (!fund) {
     return <p className="text-sm text-text-muted">No fund figures: {data.pe.reason ?? "not fetched yet"}.</p>;
@@ -292,13 +328,13 @@ function FundBody({ data }: { data: HoldingValuation }) {
           <Stat label={`${fund.index_label ?? "Index"} P/E`} value={formatMultiple(fund.index_pe)} sub={`P/B ${formatMultiple(fund.index_pb)}`} />
         ) : null}
       </dl>
-      <p className="flex flex-wrap items-center gap-1.5 border-t border-border pt-3 text-[12px] text-text-muted">
+      {!compact ? <p className="flex flex-wrap items-center gap-1.5 border-t border-border pt-3 text-[12px] text-text-muted">
         <SourceLink href={fund.source_url.includes("graphql") ? null : fund.source_url}>
           {fund.provider_label}, as of {formatDate(fund.as_of)}
         </SourceLink>
         {fund.stale ? <Flag>stale</Flag> : null}
-      </p>
-      {fund.methodology ? (
+      </p> : <p className="text-[11px] text-text-faint">As of {formatDate(fund.as_of)} · {fund.provider_label}{fund.stale ? " · stale" : ""}</p>}
+      {!compact && fund.methodology ? (
         <details className="text-[12px] text-text-muted">
           <summary className="cursor-pointer">Provider&rsquo;s methodology</summary>
           <p className="mt-1 leading-snug">{fund.methodology}</p>

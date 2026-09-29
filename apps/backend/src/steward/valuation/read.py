@@ -8,6 +8,7 @@ fund figures. Nothing is estimated; a ratio that cannot be computed is null with
 
 import datetime as dt
 import json
+import math
 from collections.abc import Iterable
 from decimal import Decimal
 from typing import Any, Literal
@@ -68,6 +69,9 @@ PORTFOLIO_METHOD = (
 class ValuationRatio(BaseModel):
     value: float | None = Field(description="Null when it cannot be computed (see reason).")
     reason: str | None = Field(description="Why the value is null, e.g. 'n/m: negative earnings'.")
+    source_label: str | None = Field(
+        default=None, description="Provider used when this individual ratio is a fallback."
+    )
 
 
 class ValuationPrice(BaseModel):
@@ -158,6 +162,27 @@ class HoldingValuation(BaseModel):
     pe: ValuationRatio
     pb: ValuationRatio
     dividend_yield: ValuationRatio = Field(description="Fraction (0.012 = 1.2 %).")
+    ps: ValuationRatio = Field(
+        default_factory=lambda: ValuationRatio(value=None, reason="not available for this security")
+    )
+    peg: ValuationRatio = Field(
+        default_factory=lambda: ValuationRatio(value=None, reason="not available for this security")
+    )
+    gross_margin: ValuationRatio = Field(
+        default_factory=lambda: ValuationRatio(value=None, reason="not available for this security")
+    )
+    operating_margin: ValuationRatio = Field(
+        default_factory=lambda: ValuationRatio(value=None, reason="not available for this security")
+    )
+    net_margin: ValuationRatio = Field(
+        default_factory=lambda: ValuationRatio(value=None, reason="not available for this security")
+    )
+    roe: ValuationRatio = Field(
+        default_factory=lambda: ValuationRatio(value=None, reason="not available for this security")
+    )
+    roic: ValuationRatio = Field(
+        default_factory=lambda: ValuationRatio(value=None, reason="not available for this security")
+    )
     eps_ttm: PerShareFigure | None
     book_value_per_share: PerShareFigure | None
     dividend_per_share: PerShareFigure | None
@@ -622,6 +647,166 @@ async def holding_valuation(
         missing if chosen is None else "no dividends per share in the figures",
     )
 
+    source_figures = raw_figures.get(chosen.fundamentals.source) if chosen else None
+    if source_figures is not None and chosen is not None and chosen.fundamentals.source == "manual":
+        source_figures = None
+    revenue = source_figures.revenue_ttm if source_figures else None
+    ps = ValuationRatio(value=None, reason="no revenue figure in the chosen source")
+    if price is None:
+        ps.reason = "no stored price"
+    elif revenue is not None and source_figures is not None:
+        if revenue.value <= 0:
+            ps.reason = "n/m: zero or negative revenue"
+        elif source_figures.shares_outstanding is None:
+            ps.reason = "no share count for market capitalization"
+        elif revenue.currency != (
+            chosen.eps.currency if chosen and chosen.eps else revenue.currency
+        ):
+            ps.reason = "revenue and per-share figures use different currencies"
+        else:
+            market_price, why = _convert(fx, price.close, price.currency, revenue.currency)
+            if market_price is None:
+                ps.reason = why or "cannot convert price to revenue currency"
+            else:
+                market_cap = market_price * source_figures.shares_outstanding * per_listing
+                ps = ValuationRatio(value=market_cap / revenue.value, reason=None)
+
+    def margin(numerator: Figure | None, label: str) -> ValuationRatio:
+        if numerator is None or revenue is None:
+            return ValuationRatio(value=None, reason=f"no {label} or revenue figure")
+        if numerator.currency != revenue.currency:
+            return ValuationRatio(value=None, reason="figures use different currencies")
+        if revenue.value <= 0:
+            return ValuationRatio(value=None, reason="n/m: zero or negative revenue")
+        return ValuationRatio(value=numerator.value / revenue.value, reason=None)
+
+    gross_margin = margin(
+        source_figures.gross_profit_ttm if source_figures else None, "gross profit"
+    )
+    operating_margin = margin(
+        source_figures.operating_income_ttm if source_figures else None, "operating income"
+    )
+    net_margin = margin(source_figures.net_income_ttm if source_figures else None, "net income")
+
+    roe = ValuationRatio(value=None, reason="no net income or balance-sheet equity figures")
+    roic = ValuationRatio(value=None, reason="no operating income or invested-capital figures")
+    if source_figures is not None:
+        net_income = source_figures.net_income_ttm
+        equity_now, equity_then = source_figures.equity_value, source_figures.equity_previous_value
+        if (
+            net_income
+            and equity_now
+            and equity_then
+            and len({net_income.currency, equity_now.currency, equity_then.currency}) == 1
+        ):
+            average_equity = (equity_now.value + equity_then.value) / 2
+            roe = ValuationRatio(
+                value=net_income.value / average_equity if average_equity > 0 else None,
+                reason=None if average_equity > 0 else "n/m: non-positive average equity",
+            )
+        elif net_income is not None:
+            roe.reason = "no comparable prior and current equity figures"
+
+        operating = source_figures.operating_income_ttm
+        debt, cash = source_figures.debt_value, source_figures.cash_value
+        equity = source_figures.equity_value
+        tax, pretax = source_figures.income_tax_ttm, source_figures.pretax_income_ttm
+        if (
+            operating
+            and equity
+            and debt
+            and cash
+            and len({operating.currency, equity.currency, debt.currency, cash.currency}) == 1
+        ):
+            invested = equity.value + debt.value - cash.value
+            if (
+                tax
+                and pretax
+                and pretax.value > 0
+                and tax.currency == operating.currency
+                and pretax.currency == operating.currency
+                and invested > 0
+            ):
+                tax_rate = min(1.0, max(0.0, tax.value / pretax.value))
+                roic = ValuationRatio(
+                    value=operating.value * (1.0 - tax_rate) / invested, reason=None
+                )
+            else:
+                roic.reason = (
+                    "no comparable tax, pre-tax income, or positive invested-capital figure"
+                )
+        elif operating is not None:
+            roic.reason = (
+                "equity, debt, cash and operating income must all be reported in one currency"
+            )
+
+    peg = ValuationRatio(value=None, reason="not enough positive EPS history to estimate growth")
+    eps_steps = merged_steps(chosen, candidates.values()) if chosen is not None else []
+    if pe.value is not None and len(eps_steps) >= 2:
+        latest_step = eps_steps[-1]
+        previous_steps = [
+            step
+            for step in eps_steps[:-1]
+            if 300 <= (latest_step.period_end - step.period_end).days <= 430
+        ]
+        if previous_steps:
+            previous_step = previous_steps[-1]
+            if previous_step.eps > 0 and latest_step.eps > 0:
+                span = (latest_step.period_end - previous_step.period_end).days
+                annual_growth = (latest_step.eps / previous_step.eps) ** (365 / span) - 1
+                if annual_growth > 0:
+                    peg = ValuationRatio(value=pe.value / (annual_growth * 100), reason=None)
+                else:
+                    peg.reason = "n/m: EPS did not grow over the available year"
+            else:
+                peg.reason = "n/m: non-positive EPS in the growth period"
+
+    # Alpha Vantage fills only gaps; computable SEC/ESEF ratios keep precedence.
+    alpha = (
+        _json(rows["alphavantage"]["figures"])
+        if profile.valuation_source == "auto" and "alphavantage" in rows
+        else {}
+    )
+
+    def alpha_number(key: str, *, positive: bool = False) -> float | None:
+        value = alpha.get(key)
+        if value is None:
+            return None
+        try:
+            parsed = float(value)
+        except (TypeError, ValueError):
+            return None
+        if not math.isfinite(parsed) or (positive and parsed <= 0):
+            return None
+        return parsed
+
+    def fill(ratio_value: ValuationRatio, key: str, *, positive: bool = False) -> ValuationRatio:
+        if ratio_value.value is not None or (ratio_value.reason or "").startswith("n/m:"):
+            return ratio_value
+        value = alpha_number(key, positive=positive)
+        return (
+            ValuationRatio(value=value, reason=None, source_label="Alpha Vantage Company Overview")
+            if value is not None
+            else ratio_value
+        )
+
+    pe = fill(pe, "PERatio", positive=True)
+    pb = fill(pb, "PriceToBookRatio", positive=True)
+    dy = fill(dy, "DividendYield")
+    ps = fill(ps, "PriceToSalesRatioTTM", positive=True)
+    peg = fill(peg, "PEGRatio", positive=True)
+    if gross_margin.value is None:
+        gross_profit, revenue_total = alpha_number("GrossProfitTTM"), alpha_number("RevenueTTM")
+        if gross_profit is not None and revenue_total is not None and revenue_total > 0:
+            gross_margin = ValuationRatio(
+                value=gross_profit / revenue_total,
+                reason=None,
+                source_label="Alpha Vantage Company Overview",
+            )
+    operating_margin = fill(operating_margin, "OperatingMarginTTM")
+    net_margin = fill(net_margin, "ProfitMargin")
+    roe = fill(roe, "ReturnOnEquityTTM")
+
     alternatives: list[ValuationAlternative] = []
     for key, candidate in candidates.items():
         if candidate is chosen:
@@ -668,6 +853,13 @@ async def holding_valuation(
         pe=pe,
         pb=pb,
         dividend_yield=dy,
+        ps=ps,
+        peg=peg,
+        gross_margin=gross_margin,
+        operating_margin=operating_margin,
+        net_margin=net_margin,
+        roe=roe,
+        roic=roic,
         eps_ttm=eps,
         book_value_per_share=bvps,
         dividend_per_share=dps,
