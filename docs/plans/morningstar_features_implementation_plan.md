@@ -1,6 +1,6 @@
 # StewardAI: Morningstar-style and additional analytics implementation plan
 
-Research snapshot: 29 September 2026. Prerequisite: [free data sources implementation plan](free_data_sources_implementation_plan.md). This plan starts **after** its data, entitlement and coverage gates are implemented. It uses only observations that the app may store, calculate from and display under the source-specific rules.
+Research snapshot: 29 September 2026. Prerequisites: [free data sources implementation plan](free_data_sources_implementation_plan.md) and the relevant parts of the [public-disclosure datasets plan](public_disclosure_datasets_implementation_plan.md). This is for the owner's personal, single-user app and starts **after** its data, free-access and coverage checks are implemented. The owner has confirmed permission for the intended use; licensing is not a feature blocker.
 
 ## Product goal and honest scope
 
@@ -16,7 +16,7 @@ Morningstar Investor's relevant workflow includes customizable stock/fund screen
 | Portfolio performance, risk and allocations | Yes for transaction/snapshot history that reconciles | Identify incomplete transaction history and unknown corporate actions. |
 | ETF look-through, fund overlap and weighted fund ratios | Yes for funds with issuer/N-PORT holdings | Unknown/stale fund weight stays explicit; no claim of complete global coverage. |
 | Broad global stock/fund screener | Only over the **measured covered universe** | Display universe count, markets and filter-specific coverage; no “all global stocks” claim. |
-| Forward analyst-consensus screens and surprise history | Limited to any free endpoint actually entitled and tested | Distinguish event-calendar estimate, management guidance and true consensus; no synthetic consensus. |
+| Forward analyst-consensus screens and surprise history | Limited to any free endpoint actually accessible and tested | Distinguish event-calendar estimate, management guidance and true consensus; no synthetic consensus. |
 | Historical index constituents, global ownership, full mutual-fund categories | Partial | Use dated issuer/regulatory snapshots or clear “unavailable”; no inferred historical membership. |
 | Morningstar star/moat/Medalist ratings or report text | No | Create original StewardAI assessment methods with evidence; do not duplicate proprietary outputs. |
 
@@ -26,7 +26,7 @@ Morningstar Investor's relevant workflow includes customizable stock/fund screen
 2. Return `value`, `unit`, `as_of`, `known_at`, `method_version`, `sources`, `coverage`, and `warnings` for every scored or aggregated output. `null` means unavailable; it is never replaced with zero or a guess.
 3. Keep security, issuer, listing, fund and index identities distinct. ADRs, share classes and fund holdings aggregate only at the explicitly chosen level.
 4. Retain an original result and methodology version for any saved report or decision. An updated source can produce a new result; it does not rewrite what the owner saw earlier.
-5. Treat free-tier rights as a runtime constraint. An attractive UI is not grounds to display FMP, Twelve Data, UN Comtrade or other restricted data beyond its entitlement.
+5. Treat free-tier endpoint access and quotas as runtime constraints. Display accessible FMP, Twelve Data, UN Comtrade and other data in the owner's app; a paid-only or failed endpoint is an access/coverage gap, not a licensing block.
 
 ### Build contract: data model, API and navigation
 
@@ -40,10 +40,10 @@ Use versioned migrations alongside `supabase/migrations/` and extend existing re
 | `analytics_result` | Subject, method/version, observation IDs or immutable input hash, value/unit/currency, period, `known_at`, coverage numerator/denominator, warnings and status. | All scored panels and reports. |
 | `valuation_scenario` | Issuer/security, owner, forecast years, growth/margin/reinvestment/tax/rate/terminal assumptions, diluted shares, net debt, provenance and saved result version. | Stock workbench, thesis and reverse DCF. |
 | `portfolio_ledger_entry` and `portfolio_valuation_day` | Broker source ID, event subtype, settlement/trade dates, security, signed units/cash, currency/FX, fees/taxes, cost-basis link, reconciliation status, position/cash/value and price coverage. Never invent a missing broker event. | Performance, gains and attribution. |
-| `fund_exposure_snapshot` | Fund/share-class ID, holdings date, normalized issuer weight, source, cash/derivatives/unknown residual and rights tag. Preserve original holding identifiers. | Fund compare and X-Ray. |
+| `fund_exposure_snapshot` | Fund/share-class ID, holdings date, normalized issuer weight, source, cash/derivatives/unknown residual and access state. Preserve original holding identifiers. | Fund compare and X-Ray. |
 | `decision_snapshot` | Owner, thesis version, selected scenario, known-at cutoff, cited evidence IDs, method versions, decision and review date. Later data do not rewrite it. | Journal and change feed. |
 
-Add owner-authenticated read routes in `apps/backend/src/api/` for candidate resources: `/discover/stocks`, `/discover/funds`, `/issuers/{id}/analysis`, `/funds/{id}/analysis`, `/portfolio/performance`, `/portfolio/xray`, `/portfolio/scenarios` and `/data/quality`. Add write routes only for saved screens, peer overrides, scenarios and journal entries; keep broker holdings read-only. Responses should expose a common `status` (`complete`, `partial`, `unavailable`, `not_entitled`, `disputed`) and an `explain` object with exclusions, formula version, citations and gaps. Use cursor pagination for discovery and bounded result sets for comparison. Update `apps/backend/openapi.json` and typed frontend clients through the existing repository workflow.
+Add owner-authenticated read routes in `apps/backend/src/api/` for candidate resources: `/discover/stocks`, `/discover/funds`, `/issuers/{id}/analysis`, `/funds/{id}/analysis`, `/portfolio/performance`, `/portfolio/xray`, `/portfolio/scenarios` and `/data/quality`. Add write routes only for saved screens, peer overrides, scenarios and journal entries; keep broker holdings read-only. Responses should expose a common `status` (`complete`, `partial`, `unavailable`, `paid_only`, `disputed`) and an `explain` object with exclusions, formula version, citations and gaps. Use cursor pagination for discovery and bounded result sets for comparison. Update `apps/backend/openapi.json` and typed frontend clients through the existing repository workflow.
 
 Proposed navigation: **Discover** (stock/fund screens and comparison tray), **Companies** (issuer analysis with listing selector), **Funds** (share-class research), **Portfolio** (performance, X-Ray, risk, scenarios), **Research** (reports, thesis and change feed) and **Data quality**. Route naming is an implementation detail; preserve the existing `/holdings/[ticker]`, watchlist, overview and research entry points and link them to the new views. Each chart and table must expose a data date, source link, missing/unknown share and a plain-language formula or definition.
 
@@ -83,7 +83,7 @@ These are required method specifications for `M0.2`, with golden examples indepe
 | A: reliable inputs | `D0–D4` | `M0–M2` | Search a covered issuer, compare verified peers and save an original valuation with evidence. |
 | B: fund and performance truth | `D3`, `D6`, reconciled Trading212 history | `M3–M5` | Explain portfolio return, a fund's holdings, direct/fund overlap and the unknown share. |
 | C: decisions | `D2`, `D5`, all prior analytics | `M6–M7` | Run a macro/FX scenario, inspect a verified change, record a thesis decision and receive a nonduplicative alert. |
-| D: release | All source and method gates | `M8` | Reproduce sampled figures and rights decisions from source observation to screen/export. |
+| D: release | All source and method checks | `M8` | Reproduce sampled figures and access states from source observation to screen/export. |
 
 Ship each slice behind feature flags for the owner, with old views available until the new result reconciles. A source's absence must not break portfolio sync, and a saved report must remain reproducible even after later revisions.
 
@@ -103,11 +103,11 @@ Ship each slice behind feature flags for the owner, with old views available unt
 
 **Dependencies:** Plan 1 identity (`D1`) and fundamentals/price/fund coverage (`D3`, `D4`, `D6`). **Outcome:** a Morningstar-style discovery workflow over the app's actual covered universe.
 
-- [ ] `M1.1` Add an `investment_universe` read model from canonical securities/listings. Include live/delisted status, exchange, country, currency, asset type, issuer, available history and source rights. Keep historical membership for point-in-time screens; do not remove delisted names from past universes.
+- [ ] `M1.1` Add an `investment_universe` read model from canonical securities/listings. Include live/delisted status, exchange, country, currency, asset type, issuer, available history and source access state. Keep historical membership for point-in-time screens; do not remove delisted names from past universes.
 - [ ] `M1.2` Build backend screening predicates for country, exchange, sector/industry, size, price/liquidity, dividend yield, 1/3/5Y return, volatility, growth, margins, ROIC, leverage, valuation and coverage. Filter on a metric only when its published definition and as-of period match the user's choice.
 - [ ] `M1.3` Add separate stock and fund screens. Fund filters: asset class, domicile, distribution policy, ongoing charge/expense ratio, fund size, benchmark, tracking difference where calculable, holdings date, concentration, sector/region and look-through coverage. Do not label unavailable fund NAV or fees as zero.
 - [ ] `M1.4` Build market/sector peer baselines from **covered securities**, with count and geographic scope in each result. Let the owner choose home-market peers, global peers or a saved peer set. Exclude stale or incomparable financial periods with reasons.
-- [ ] `M1.5` Add saved screens, named column sets, sorting, watchlist add, CSV export of **licensed/derived outputs only**, and a “why did this pass/fail?” detail for each screen row. Reuse the existing watchlist CRUD and owner-only access.
+- [ ] `M1.5` Add saved screens, named column sets, sorting, watchlist add, personal CSV export with source/provenance metadata, and a “why did this pass/fail?” detail for each screen row. Reuse the existing watchlist CRUD and owner-only access.
 - [ ] `M1.6` Build `/discover` or an equivalent research-cluster page: filter builder, result count, coverage by filter, data date, unknown bucket and a one-click comparison tray. Add a minimal screen for no-key users so absence of optional providers is understandable.
 - [ ] `M1.7` For historical screening/backtesting, freeze the universe, metrics and known-at cutoff at each rebalance date. Include delisted securities and transaction-cost assumptions; prohibit the current universe from being used retroactively.
 
@@ -123,7 +123,7 @@ Ship each slice behind feature flags for the owner, with old views available unt
 - [ ] `M2.4` Build peer compare with the same metrics and synchronized periods. Offer relative-to-first-period charts, currency conversion or native-currency view, peer median/range, fiscal-date distance, and a comparability warning for banks/insurers versus nonfinancial issuers.
 - [ ] `M2.5` Add original valuation models: trailing multiples, normalized earnings/FCF, peer multiples, DCF with explicit forecast years, terminal assumptions and discount-rate components, reverse DCF/implied growth, and scenario ranges. Show a margin-of-safety calculation only against a user-selected scenario, with sensitivity grids and source links. No single opaque “true value.”
 - [ ] `M2.6` Add an investment case: management guidance, company moat **evidence** (switching costs, scale, IP, network effects, regulation, or none), bull/bear drivers, customer/product concentration, capital allocation and key risks. Keep these as cited assessments separate from reported numbers. Avoid proprietary Morningstar rating names and scales.
-- [ ] `M2.7` Add estimates only where a verified free entitlement and a full metadata record exist. Present analyst count, range, vintage and period; distinguish Finnhub event-calendar estimates from forward consensus and company guidance. Suppress estimate surprise percentages if metric basis or fiscal period differs from the actual.
+- [ ] `M2.7` Add estimates where a tested free-access route and a full metadata record exist. Present analyst count, range, vintage and period; distinguish Finnhub event-calendar estimates from forward consensus and company guidance. Suppress estimate surprise percentages if metric basis or fiscal period differs from the actual.
 - [ ] `M2.8` Include patent and business-graph tabs from `D5`: technology mix, patent-family trends, evidence-linked acquisitions/partnerships/competitors, and changes since the previous thesis review. Show confidence and ownership-mapping caveats.
 - [ ] `M2.9` Generate a versioned “company report” using code-computed tables and model-written prose with sentence-level citations, conflict flags and an editable conclusion. Reuse the existing research/report verification pipeline.
 - [ ] `M2.10` Add a capital-allocation history: acquisitions/divestitures, reinvestment, dividends, buybacks, share dilution and debt changes. Reconcile announced actions to cash-flow statements and share count; separate a company's stated capital-allocation policy from the observed result. Show per-share growth beside aggregate growth.
@@ -138,7 +138,7 @@ Ship each slice behind feature flags for the owner, with old views available unt
 **Dependencies:** Plan 1 look-through/ownership (`D6`) and returns (`D3`). **Outcome:** research on funds as funds, beyond their ticker charts.
 
 - [ ] `M3.1` Build a fund identity/profile page for each covered share class: issuer, fund ISIN, domicile, benchmark, replication, distribution policy, currency, inception, assets, charge/expense ratio, factsheet date and source. Distinguish fund, share class, and exchange listing.
-- [ ] `M3.2` Present holdings with as-of date, asset class, sector, country, currency, issuer-normalized security and residual cash/derivative/unknown weight. Show top holdings and a downloadable **derived** exposure table only where source rights allow. Reuse existing `etf_snapshot` and `etf_holding` records.
+- [ ] `M3.2` Present holdings with as-of date, asset class, sector, country, currency, issuer-normalized security and residual cash/derivative/unknown weight. Show top holdings and a downloadable **derived** exposure table for the owner. Reuse existing `etf_snapshot` and `etf_holding` records.
 - [ ] `M3.3` Compute fund concentration and style proxies from available holdings and fundamentals: top-10 weight, effective number of issuers, market-cap mix, value/growth metric distribution and weighted profitability. Name the methods as StewardAI proxies; never imply they are Morningstar Style Box categories.
 - [ ] `M3.4` Compare fund price/NAV total return against its documented benchmark where suitable data exist. Show tracking difference, volatility and drawdown with the benchmark type, currency, dividend treatment and period alignment. If NAV or total-return benchmark is missing, limit the view to price performance.
 - [ ] `M3.5` Compare two to five funds on costs, holdings overlap, geography/sector, concentration, return and look-through completeness. Report overlap both as `min(weight_A, weight_B)` summed by issuer and as a list of shared holdings; identify stale holdings dates.
@@ -196,11 +196,11 @@ Ship each slice behind feature flags for the owner, with old views available unt
 - [ ] `M7.2` Add a “what changed?” feed that compares the last two verified states: fundamentals, estimate/guidance, ownership, price/valuation, competitor/deal graph, patent portfolio, macro/trade exposures and fund constituents. Sort by estimated portfolio relevance and cite the exact before/after observations.
 - [ ] `M7.3` Build a sector/industry map from the covered company universe: peers, growth/profitability distribution, valuation spread, top products, patent areas, trade dependencies and credit cycle signals. Show how many companies and which markets underpin each statistic.
 - [ ] `M7.4` Add event-to-portfolio impact paths: e.g. a supplier disruption -> confirmed supplier edge -> exposed issuer -> direct and ETF-held weight -> thesis KPI. Present uncertainty at each edge; only confirmed high-confidence paths may drive a high-severity alert.
-- [ ] `M7.5` Add a data-quality cockpit: identity conflicts, stale prices, missing actions, unbalanced fund weights, inconsistent filing concepts, estimate entitlement gaps, provider quota, macro revisions and research claims awaiting verification. Let the owner prioritize fixes by affected portfolio weight.
+- [ ] `M7.5` Add a data-quality cockpit: identity conflicts, stale prices, missing actions, unbalanced fund weights, inconsistent filing concepts, estimate access/coverage gaps, provider quota, macro revisions and research claims awaiting verification. Let the owner prioritize fixes by affected portfolio weight.
 - [ ] `M7.6` Extend chat/research tools to answer comparative questions using deterministic analytics: “why did I underperform?”, “which fund duplicates this stock?”, “what happens if EUR falls?”, “which holdings rely on Chinese exports?”. Return formulas, coverage and citations; say unavailable when inputs are absent.
-- [ ] `M7.7` Offer shareable/exportable owner reports only after the Phase 0 rights gate verifies that each included datum may leave the private app. Include an export manifest of sources, dates, licenses and calculation versions.
+- [ ] `M7.7` Offer personal exportable owner reports with a manifest of sources, dates, coverage and calculation versions. Keep reports private by default; no licensing gate is required under the owner's stated permission.
 
-**Exit checks:** a change item points to both old and new records; event-path confidence never exceeds its weakest edge; a blocked vendor datum cannot leak through PDF/CSV/chat/export.
+**Exit checks:** a change item points to both old and new records; event-path confidence never exceeds its weakest edge; paid-only or missing vendor data cannot appear as a fabricated value in PDF/CSV/chat/export.
 
 ## Phase 8 — Validation, release and measurement
 
@@ -210,7 +210,7 @@ Ship each slice behind feature flags for the owner, with old views available unt
 - [ ] `M8.2` Perform a manual source-to-screen audit on at least 20 securities across regions, five ETFs, three corporate-action histories and multiple portfolio cash-flow windows. Compare every displayed fact with its cited filing, issuer report or official statistical source.
 - [ ] `M8.3` Run a 30-day owner pilot. Measure feature usage, false alerts, coverage, stale/unknown weight, source failures, time to answer core research questions and owner corrections. Prioritize defects by portfolio value affected.
 - [ ] `M8.4` Add accessibility and responsive QA for dense comparison tables, charts and evidence drill-downs; preserve keyboard access and explicit text labels for confidence/stale states already used in the app.
-- [ ] `M8.5` Gate any public/commercial release on a fresh provider-rights audit and a zero-cost guarantee. Features whose core input has no permitted free source must stay labelled partial/unavailable; do not quietly substitute an unlicensed endpoint or proprietary Morningstar content.
+- [ ] `M8.5` Gate activation in the owner's personal app on tested free access, data quality and a zero-cost guarantee. Features whose core input has no accessible free source stay labelled partial/unavailable; do not quietly substitute a paid-only endpoint or invent proprietary Morningstar outputs.
 
 **Exit checks:** every marketed feature has a defined coverage denominator, reproducible method and successful sampled source audit; no paid data or provider overage is required to use the baseline product.
 
@@ -222,24 +222,24 @@ The phases are sequential on shared foundations, but each should ship a useful s
 2. **Understand funds and returns:** fund pages, reconciled performance and X-Ray/overlap (`M3–M5`).
 3. **Decide and monitor:** scenarios, rebalancing, decision journal, change feed and quality cockpit (`M6–M8`).
 
-Each slice should ship with its entitlement and coverage indicators. “Deep global coverage” should mean broad **measured** reach across markets and sources, alongside explicit gaps where the free data ecosystem cannot yet provide the same depth.
+Each slice should ship with its access and coverage indicators. “Deep global coverage” should mean broad **measured** reach across markets and sources, alongside explicit gaps where the free data ecosystem cannot yet provide the same depth.
 
 ## Explicit limits and next analytics backlog
 
-These are important to an “ultimate” analysis tool but cannot be represented as complete solely from Plan 1's free data. Implement the honest partial version first, then evaluate additional free primary sources through Plan 1's entitlement gate.
+These are important to an “ultimate” analysis tool but cannot be represented as complete solely from Plan 1's free data. Implement the honest partial version first, then evaluate additional free primary sources through Plan 1's access tests.
 
 | Capability | What to build now | What stays unavailable or narrow |
 | --- | --- | --- |
-| Analyst consensus/revision analytics | Event-estimate comparison and cited company guidance; optional fully entitled consensus only. | Broad global consensus, revisions and analyst-count trends without a verified feed. |
+| Analyst consensus/revision analytics | Event-estimate comparison and cited company guidance; accessible issuer/free consensus where available. | Broad global consensus, revisions and analyst-count trends without a verified feed. |
 | Fixed income research | Issuer-reported bond-fund characteristics and BIS/ECB credit-cycle context. | Security-level yield curves, covenant analysis, ratings and full bond-fund look-through without instrument terms/holdings. |
-| Options and derivative exposure | Show broker-reported cash/derivative residuals and user-entered scenario sensitivities. | Option Greeks, volatility surfaces and strategy P&L without an entitled contracts/quotes feed. |
+| Options and derivative exposure | Show broker-reported cash/derivative residuals and user-entered scenario sensitivities. | Option Greeks, volatility surfaces and strategy P&L without an accessible free contracts/quotes feed. |
 | Sustainability and controversy | Cite issuer disclosures and independently verified events in research. | Proprietary ESG ratings or a claim of consistent global emissions coverage. |
 | Tax planning | Lot-level gains, withholding and fee ledger with exportable evidence. | Jurisdiction-specific tax liability, wash-sale rules and filing calculations until jurisdiction and official rule data are scoped. |
 | Historical factor attribution | Transparent value/quality/size/momentum proxies on covered securities, with an observed universe and window. | Claims of institutional factor-model precision or unbiased global backtests without full point-in-time history. |
 | Private companies and deal intelligence | Dated Diffbot/PDL candidates, public announcements and patent links in the company graph. | Complete private-company financials, transaction values and cap tables. |
 | Broad portfolio optimization | Constraint-based hypothetical weights using covered returns, costs and owner risk limits. | “Optimal” trade recommendations when expected returns, covariance history or tax consequences are unreliable. |
 
-For each backlog item, capture the missing input, markets affected, rights status, current workaround, and a concrete activation test in the data-quality cockpit. Prioritize by affected portfolio value and owner decisions, not feature count.
+For each backlog item, capture the missing input, markets affected, access status, current workaround, and a concrete activation test in the data-quality cockpit. Prioritize by affected portfolio value and owner decisions, not feature count.
 
 ## Product references
 
