@@ -55,6 +55,16 @@ export const DEFAULT_STRATEGY: StrategyConfig = {
   target_positions: [],
   target_categories: [],
   rules: [],
+  risk: {
+    max_volatility: null,
+    max_beta: null,
+    position_loss_review: null,
+    max_look_through_weight: null,
+    max_drawdown: null,
+    max_pair_correlation: null,
+    correlation_min_combined_weight: 0.1,
+    on_breach: "severity_2",
+  },
   hard_limit_severity: "severity_3",
   band_breach_severity: "severity_1",
 };
@@ -97,6 +107,19 @@ export function percentToFraction(text: string): number | string {
   if (!/^[+-]?(\d+\.?\d*|\.\d+)$/.test(cleaned)) return text.trim();
   const shifted = shiftDecimal(cleaned, -2);
   return shifted === null ? text.trim() : Number(shifted);
+}
+
+/** Blank -> null (limit off); otherwise a percentage as a fraction. */
+function optionalPercent(text: string): number | string | null {
+  return text.trim() === "" ? null : percentToFraction(text);
+}
+
+/** Blank -> null (limit off); otherwise a plain number, or the text as typed for the backend to reject. */
+function optionalNumber(text: string): number | string | null {
+  const trimmed = text.trim().replace(",", ".");
+  if (trimmed === "") return null;
+  const n = Number(trimmed);
+  return Number.isFinite(n) ? n : trimmed;
 }
 
 function integerOrText(text: string): number | string {
@@ -145,6 +168,15 @@ export type StrategyForm = {
   target_positions: PositionTargetForm[];
   target_categories: CategoryTargetForm[];
   rules: RuleForm[];
+  /** Risk limits; blank means the limit is off. Percentages except the beta ceiling. */
+  risk_max_volatility: string;
+  risk_max_beta: string;
+  risk_position_loss_review: string;
+  risk_max_look_through_weight: string;
+  risk_max_drawdown: string;
+  risk_max_pair_correlation: string;
+  risk_correlation_min_combined_weight: string;
+  risk_on_breach: OnBreach;
   /** Severity of a position above its hard limit. */
   hard_limit_severity: OnBreach;
   /** Severity of a weight outside its band (1: digest only; 2 or 3 also alert). */
@@ -212,6 +244,14 @@ export function strategyFromBody(body: StrategyConfig | null): StrategyForm {
     notes: b.notes ?? "",
     hard_limit_severity: b.hard_limit_severity ?? "severity_3",
     band_breach_severity: b.band_breach_severity ?? "severity_1",
+    risk_max_volatility: fractionToPercent(b.risk?.max_volatility),
+    risk_max_beta: b.risk?.max_beta == null ? "" : String(b.risk.max_beta),
+    risk_position_loss_review: fractionToPercent(b.risk?.position_loss_review),
+    risk_max_look_through_weight: fractionToPercent(b.risk?.max_look_through_weight),
+    risk_max_drawdown: fractionToPercent(b.risk?.max_drawdown),
+    risk_max_pair_correlation: b.risk?.max_pair_correlation == null ? "" : String(b.risk.max_pair_correlation),
+    risk_correlation_min_combined_weight: fractionToPercent(b.risk?.correlation_min_combined_weight ?? 0.1),
+    risk_on_breach: b.risk?.on_breach ?? "severity_2",
     categories,
     classifications,
     cash_enabled: b.cash_target != null,
@@ -312,6 +352,16 @@ export function strategyToBody(form: StrategyForm): StrategyConfig {
       band: percentToFraction(c.band) as number,
     })),
     rules: form.rules.map(ruleToBody),
+    risk: {
+      max_volatility: optionalPercent(form.risk_max_volatility) as number | null,
+      max_beta: optionalNumber(form.risk_max_beta) as number | null,
+      position_loss_review: optionalPercent(form.risk_position_loss_review) as number | null,
+      max_look_through_weight: optionalPercent(form.risk_max_look_through_weight) as number | null,
+      max_drawdown: optionalPercent(form.risk_max_drawdown) as number | null,
+      max_pair_correlation: optionalNumber(form.risk_max_pair_correlation) as number | null,
+      correlation_min_combined_weight: percentToFraction(form.risk_correlation_min_combined_weight) as number,
+      on_breach: form.risk_on_breach,
+    },
     hard_limit_severity: form.hard_limit_severity,
     band_breach_severity: form.band_breach_severity,
   };

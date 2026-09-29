@@ -27,6 +27,7 @@ from steward.jobs.runner import JobContext, JobFailed
 from steward.portfolio.breaches import evaluate, record_breaches
 from steward.portfolio.drift import HoldingValue, compute_drift
 from steward.portfolio.fees import FeeBasis, FeeCharge, fee_basis, fee_charges
+from steward.portfolio.risk_limits import evaluate_risk, gather_risk_inputs
 from steward.portfolio.snapshot import Snapshot, build_snapshot, snapshot_date_for
 from steward.reference.calendar import fx_stale
 from steward.settings import get_settings
@@ -152,9 +153,12 @@ async def portfolio_sync(ctx: JobContext, deps: SyncDeps) -> None:
         )
 
     async with ctx.step("breaches") as step:
+        risk_inputs = await gather_risk_inputs(pool, strategy, list(snapshot.positions))
+        if risk_inputs.unavailable:
+            step.detail["risk_unavailable"] = risk_inputs.unavailable
         breaches = await record_breaches(
             pool,
-            evaluate(report, strategy),
+            [*evaluate(report, strategy), *evaluate_risk(risk_inputs, strategy.risk)],
             job_id=ctx.job_id,
             config_version_id=stored.id if stored else None,
             now=deps.now(),

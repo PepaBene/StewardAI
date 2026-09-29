@@ -94,6 +94,58 @@ StrategyRule = Annotated[
 ]
 
 
+class RiskLimits(ConfigModel):
+    """Portfolio risk limits, checked after each sync. Every limit is optional (null = off).
+
+    A breach here is a prompt for review, not an instruction to trade: the strategy decides
+    buys and sells on fundamentals and news, so a price-based limit only forces a thesis review.
+    """
+
+    max_volatility: Weight | None = Field(
+        default=None,
+        description="Ceiling on the portfolio's annualised volatility (0.20 = 20 %), measured "
+        "on the time-weighted daily returns over the last year.",
+    )
+    max_beta: float | None = Field(
+        default=None,
+        gt=0,
+        le=5,
+        description="Ceiling on the portfolio's beta against the configured benchmark, "
+        "measured on daily returns over the last year.",
+    )
+    position_loss_review: Weight | None = Field(
+        default=None,
+        description="A position down this fraction or more from its cost (0.25 = -25 %) needs "
+        "a thesis review. It never means 'sell'.",
+    )
+    max_look_through_weight: Weight | None = Field(
+        default=None,
+        description="Ceiling on the effective weight of one underlying company reached "
+        "through funds/ETFs (plus any direct holding of it): the overlap limit.",
+    )
+    max_drawdown: Weight | None = Field(
+        default=None,
+        description="Ceiling on the portfolio's current drawdown: its fall from the highest "
+        "level of the last year (0.20 = 20 % below the peak), on the deposit- and "
+        "withdrawal-adjusted value.",
+    )
+    max_pair_correlation: Weight | None = Field(
+        default=None,
+        description="Ceiling on the correlation of two held positions' daily returns over the "
+        "last year (0.85). Only pairs weighing at least `correlation_min_combined_weight` "
+        "together are checked, so small positions do not raise noise.",
+    )
+    correlation_min_combined_weight: Weight = Field(
+        default=0.10,
+        description="Combined weight, of the invested value, a correlated pair must reach "
+        "before `max_pair_correlation` applies.",
+    )
+    on_breach: Severity = Field(
+        default="severity_2",
+        description="Severity of a risk-limit breach (alerted when it opens).",
+    )
+
+
 class StrategyConfig(ConfigModel):
     """The owner's investment strategy.
 
@@ -135,6 +187,7 @@ class StrategyConfig(ConfigModel):
     target_positions: list[PositionTarget] = Field(default_factory=list)
     target_categories: list[CategoryTarget] = Field(default_factory=list)
     rules: list[StrategyRule] = Field(default_factory=list)
+    risk: RiskLimits = Field(default_factory=RiskLimits)
     hard_limit_severity: Severity = Field(
         default="severity_3",
         description="Severity of a position above its hard limit (alerted when it opens, "

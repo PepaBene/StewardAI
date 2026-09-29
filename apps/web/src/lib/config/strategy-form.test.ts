@@ -50,6 +50,16 @@ const FULL: StrategyConfig = {
     { id: "cash-floor", type: "cash_weight", operator: ">", value: 0.01, on_breach: "severity_2", description: "", enabled: true },
     { id: "diversified", type: "position_count", operator: ">=", value: 12, on_breach: "severity_1", description: "", enabled: true },
   ],
+  risk: {
+    max_volatility: 0.2,
+    max_beta: 1.2,
+    position_loss_review: 0.25,
+    max_look_through_weight: null,
+    max_drawdown: 0.2,
+    max_pair_correlation: 0.85,
+    correlation_min_combined_weight: 0.1,
+    on_breach: "severity_2",
+  },
   hard_limit_severity: "severity_2",
   band_breach_severity: "severity_2",
 };

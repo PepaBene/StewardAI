@@ -136,6 +136,32 @@ class SharpeResult:
     reason: str | None
 
 
+def beta(portfolio: Sequence[DailyReturn], benchmark: Sequence[DailyReturn]) -> float | None:
+    """Beta of the portfolio against the benchmark: cov(p, b) / var(b) over the days both have
+    a return ending on (sample statistics). None below MIN_OBSERVATIONS shared days or with a
+    benchmark that never moved."""
+    bench = {r.end: r.value for r in benchmark}
+    pairs = [(r.value, bench[r.end]) for r in portfolio if r.end in bench]
+    if len(pairs) < MIN_OBSERVATIONS:
+        return None
+    mp = sum(p for p, _ in pairs) / len(pairs)
+    mb = sum(b for _, b in pairs) / len(pairs)
+    var = sum((b - mb) ** 2 for _, b in pairs) / (len(pairs) - 1)
+    if var == 0:
+        return None
+    cov = sum((p - mp) * (b - mb) for p, b in pairs) / (len(pairs) - 1)
+    return cov / var
+
+
+def current_drawdown(points: Sequence[tuple[dt.date, float]]) -> float | None:
+    """How far the last level sits below the highest level in the window, as a positive
+    fraction (0.12 = 12 % below the peak); 0 at a new high. None with fewer than two points."""
+    levels = [v for _, v in points if v > 0]
+    if len(levels) < 2:
+        return None
+    return 1 - levels[-1] / max(levels)
+
+
 def _stdev(values: Sequence[float]) -> float:
     mean = sum(values) / len(values)
     return math.sqrt(sum((v - mean) ** 2 for v in values) / (len(values) - 1))
@@ -232,6 +258,15 @@ class PortfolioRisk(BaseModel):
         description="The same figures for the benchmark, converted to the base currency; null "
         "without a configured benchmark."
     )
+    current_drawdown: float | None = Field(
+        default=None,
+        description="Fall of the latest portfolio level below its peak in the window, fraction.",
+    )
+    beta: float | None = Field(
+        default=None,
+        description="Portfolio beta against the benchmark (covariance of daily returns over the "
+        "benchmark's variance); null without a benchmark or enough shared days.",
+    )
 
 
 def _stats(result: SharpeResult, currency: str | None) -> SharpeStats:
@@ -322,9 +357,13 @@ async def portfolio_risk(pool: asyncpg.Pool, days: int) -> PortfolioRisk:
     history = await portfolio_history(pool, days)
     base = history.values_currency or history.base_currency
     symbol = history.benchmark_symbol
+    drawdown = current_drawdown([(p.date, p.close) for p in history.points])
 
     def report(
-        portfolio: SharpeStats, benchmark: SharpeStats | None, rf: RiskFree | None
+        portfolio: SharpeStats,
+        benchmark: SharpeStats | None,
+        rf: RiskFree | None,
+        beta_value: float | None = None,
     ) -> PortfolioRisk:
         return PortfolioRisk(
             as_of=history.as_of,
@@ -335,6 +374,8 @@ async def portfolio_risk(pool: asyncpg.Pool, days: int) -> PortfolioRisk:
             portfolio=portfolio,
             benchmark_symbol=symbol,
             benchmark=benchmark,
+            beta=beta_value,
+            current_drawdown=drawdown,
         )
 
     if history.gap or not history.points or base is None:
@@ -354,6 +395,7 @@ async def portfolio_risk(pool: asyncpg.Pool, days: int) -> PortfolioRisk:
     portfolio = _stats(sharpe_ratio(returns, rates), base)
 
     bench_stats: SharpeStats | None = None
+    beta_value: float | None = None
     if symbol:
         quote = benchmark_currency(symbol)
         closes = [(p.date, p.close) for p in history.benchmark if p.date >= since]
@@ -372,5 +414,7 @@ async def portfolio_risk(pool: asyncpg.Pool, days: int) -> PortfolioRisk:
             if len(converted) < 2:
                 bench_stats = _no_stats(f"no {quote}/{base} reference rates for the window", base)
             else:
-                bench_stats = _stats(sharpe_ratio(trading_day_returns(converted), rates), base)
-    return report(portfolio, bench_stats, rf)
+                bench_returns = trading_day_returns(converted)
+                bench_stats = _stats(sharpe_ratio(bench_returns, rates), base)
+                beta_value = beta(returns, bench_returns)
+    return report(portfolio, bench_stats, rf, beta_value)
