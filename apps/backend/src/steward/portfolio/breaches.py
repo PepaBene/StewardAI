@@ -230,6 +230,8 @@ async def record_breaches(
         if f.severity < 1 or (f.kind == "band" and f.severity < 2):
             continue
         what = {"hard_limit": "hard limit", "band": "target band"}.get(f.kind, "strategy rule")
+        if f.key.startswith("risk:"):
+            what = "risk limit"
         lines = [f"[Severity {f.severity}] Portfolio: {what} breached", f.detail]
         if app_url:
             lines.append(f"{app_url.rstrip('/')}/")

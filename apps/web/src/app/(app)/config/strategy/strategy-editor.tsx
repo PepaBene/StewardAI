@@ -201,6 +201,7 @@ export function StrategyEditor() {
             <TargetsPanel form={form} body={body} errors={errors} set={set} holdings={holdings} drift={drift} />
             <div className="grid grid-cols-[minmax(0,1fr)] gap-5">
               <RulesPanel form={form} errors={errors} set={set} />
+              <RiskPanel form={form} errors={errors} set={set} />
               <HistoryPanel
                 versions={versions}
                 numbers={numbers}
@@ -723,6 +724,29 @@ function RulesPanel({ form, errors, set }: SectionProps) {
 // ---------------------------------------------------------------------------
 // Version history (inline)
 // ---------------------------------------------------------------------------
+
+function RiskPanel({ form, errors, set }: SectionProps) {
+  return (
+    <Blueprint aria-labelledby="risk-heading" className={PANEL}>
+      <div className="space-y-1">
+        <h2 id="risk-heading" className="text-[22px] leading-tight font-semibold">
+          Risk limits
+        </h2>
+        <p className="text-sm text-text-muted">
+          Checked after every sync; leave a field blank to switch that limit off. A breach asks for a thesis review, it
+          never means sell: trades follow fundamentals and news, not price.
+        </p>
+      </div>
+      <div className="grid gap-3 sm:grid-cols-2">
+        <TextField label="Max volatility (% a year)" path="risk.max_volatility" errors={errors} inputMode="decimal" value={form.risk_max_volatility} onChange={(v) => set({ risk_max_volatility: v })} hint="Portfolio volatility over the last year." />
+        <TextField label="Max beta" path="risk.max_beta" errors={errors} inputMode="decimal" value={form.risk_max_beta} onChange={(v) => set({ risk_max_beta: v })} hint="Against the benchmark, last year." />
+        <TextField label="Review a position down (%)" path="risk.position_loss_review" errors={errors} inputMode="decimal" value={form.risk_position_loss_review} onChange={(v) => set({ risk_position_loss_review: v })} hint="Loss from cost that forces a thesis review." />
+        <TextField label="Max overlap via funds (%)" path="risk.max_look_through_weight" errors={errors} inputMode="decimal" value={form.risk_max_look_through_weight} onChange={(v) => set({ risk_max_look_through_weight: v })} hint="One company, direct plus through ETFs." />
+        <SelectField label="On breach" path="risk.on_breach" errors={errors} value={form.risk_on_breach} options={ON_BREACH} onChange={(v) => set({ risk_on_breach: v })} />
+      </div>
+    </Blueprint>
+  );
+}
 
 function HistoryPanel({
   versions,

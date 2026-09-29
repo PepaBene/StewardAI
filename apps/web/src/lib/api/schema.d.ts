@@ -7576,6 +7576,11 @@ export interface components {
             benchmark_symbol: string | null;
             /** @description The same figures for the benchmark, converted to the base currency; null without a configured benchmark. */
             benchmark: components["schemas"]["SharpeStats"] | null;
+            /**
+             * Beta
+             * @description Portfolio beta against the benchmark (covariance of daily returns over the benchmark's variance); null without a benchmark or enough shared days.
+             */
+            beta?: number | null;
         };
         /** PortfolioValuation */
         PortfolioValuation: {
@@ -8785,6 +8790,42 @@ export interface components {
              */
             fallback: boolean;
         };
+        /**
+         * RiskLimits
+         * @description Portfolio risk limits, checked after each sync. Every limit is optional (null = off).
+         *
+         *     A breach here is a prompt for review, not an instruction to trade: the strategy decides
+         *     buys and sells on fundamentals and news, so a price-based limit only forces a thesis review.
+         */
+        RiskLimits: {
+            /**
+             * Max Volatility
+             * @description Ceiling on the portfolio's annualised volatility (0.20 = 20 %), measured on the time-weighted daily returns over the last year.
+             */
+            max_volatility?: number | null;
+            /**
+             * Max Beta
+             * @description Ceiling on the portfolio's beta against the configured benchmark, measured on daily returns over the last year.
+             */
+            max_beta?: number | null;
+            /**
+             * Position Loss Review
+             * @description A position down this fraction or more from its cost (0.25 = -25 %) needs a thesis review. It never means 'sell'.
+             */
+            position_loss_review?: number | null;
+            /**
+             * Max Look Through Weight
+             * @description Ceiling on the effective weight of one underlying company reached through funds/ETFs (plus any direct holding of it): the overlap limit.
+             */
+            max_look_through_weight?: number | null;
+            /**
+             * On Breach
+             * @description Severity of a risk-limit breach (alerted when it opens).
+             * @default severity_2
+             * @enum {string}
+             */
+            on_breach: "severity_1" | "severity_2" | "severity_3";
+        };
         /** RuleMatch */
         RuleMatch: {
             /**
@@ -9374,6 +9415,7 @@ export interface components {
             target_categories?: components["schemas"]["CategoryTarget"][];
             /** Rules */
             rules?: (components["schemas"]["PositionWeightRule"] | components["schemas"]["CategoryWeightRule"] | components["schemas"]["CashWeightRule"] | components["schemas"]["PositionCountRule"])[];
+            risk?: components["schemas"]["RiskLimits"];
             /**
              * Hard Limit Severity
              * @description Severity of a position above its hard limit (alerted when it opens, routed by the notification rules).
