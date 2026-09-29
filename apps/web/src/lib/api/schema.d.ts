@@ -2272,6 +2272,122 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/watchlist": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Watchlist */
+        get: operations["list_watchlist"];
+        put?: never;
+        /** Add Watchlist Item */
+        post: operations["add_watchlist_item"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/watchlist/{item_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Delete Watchlist Item */
+        delete: operations["delete_watchlist_item"];
+        options?: never;
+        head?: never;
+        /** Update Watchlist Item */
+        patch: operations["update_watchlist_item"];
+        trace?: never;
+    };
+    "/jobs/insider-trades": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Run Insider Trades
+         * @description Load structured insider filings for portfolio issuers now.
+         */
+        post: operations["run_insider_trades"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/holdings/{ticker}/insider-trades": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Insider Trades
+         * @description Reported insider transactions, newest first, from structured SEC ownership filings.
+         */
+        get: operations["get_insider_trades"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/investors": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Investors
+         * @description Configured managers and their latest stored 13F filing summary.
+         */
+        get: operations["get_investors"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/investors/{cik}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Investor
+         * @description Largest common-stock positions from the manager's latest stored filing.
+         */
+        get: operations["get_investor"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -2711,7 +2827,7 @@ export interface components {
              * Critical Job Types
              * @description Job types that run normally at the monthly cap.
              */
-            critical_job_types?: ("portfolio_sync" | "earnings_check" | "thesis_verdicts" | "earnings_calendar" | "earnings_calendar_full" | "earnings_due" | "fact_reconcile" | "reference_data" | "price_history" | "intraday_prices" | "holiday_refresh" | "macro_collect" | "event_escalation" | "monitor" | "news_ingest" | "daily_digest" | "weekly_digest" | "research" | "ownership_13f" | "etf_look_through" | "monthly_review" | "chat" | "sec_xbrl" | "valuation_refresh")[];
+            critical_job_types?: ("portfolio_sync" | "earnings_check" | "thesis_verdicts" | "earnings_calendar" | "earnings_calendar_full" | "earnings_due" | "fact_reconcile" | "reference_data" | "price_history" | "intraday_prices" | "holiday_refresh" | "macro_collect" | "event_escalation" | "monitor" | "news_ingest" | "daily_digest" | "weekly_digest" | "research" | "ownership_13f" | "insider_trades" | "etf_look_through" | "monthly_review" | "chat" | "sec_xbrl" | "valuation_refresh")[];
             /**
              * Per Job Cap Usd
              * @description Most AI spend of one run of a job type, in USD. A run over it fails.
@@ -5654,6 +5770,11 @@ export interface components {
              */
             sec_ticker?: string | null;
             /**
+             * Alpha Vantage Symbol
+             * @description Alpha Vantage exchange symbol for fallback fundamentals (for example TSCO.LON or MBG.DEX). When empty, the EDGAR ticker is tried.
+             */
+            alpha_vantage_symbol?: string | null;
+            /**
              * Fiscal Year End Month
              * @description Month the fiscal year ends in (Apple: 9, Microsoft: 6). Maps fiscal quarters to calendar periods.
              * @default 12
@@ -5784,6 +5905,13 @@ export interface components {
             pb: components["schemas"]["ValuationRatio"];
             /** @description Fraction (0.012 = 1.2 %). */
             dividend_yield: components["schemas"]["ValuationRatio"];
+            ps?: components["schemas"]["ValuationRatio"];
+            peg?: components["schemas"]["ValuationRatio"];
+            gross_margin?: components["schemas"]["ValuationRatio"];
+            operating_margin?: components["schemas"]["ValuationRatio"];
+            net_margin?: components["schemas"]["ValuationRatio"];
+            roe?: components["schemas"]["ValuationRatio"];
+            roic?: components["schemas"]["ValuationRatio"];
             eps_ttm: components["schemas"]["PerShareFigure"] | null;
             book_value_per_share: components["schemas"]["PerShareFigure"] | null;
             dividend_per_share: components["schemas"]["PerShareFigure"] | null;
@@ -5936,6 +6064,54 @@ export interface components {
              * @description Fraction (0.012 = +1.2 %) of the latest against the previous value.
              */
             change_pct: number | null;
+        };
+        /** InsiderTransactionOut */
+        InsiderTransactionOut: {
+            /** Accession */
+            accession: string;
+            /** Form */
+            form: string;
+            /**
+             * Filed
+             * Format: date
+             */
+            filed: string;
+            /** Ticker */
+            ticker: string;
+            /** Issuer Name */
+            issuer_name: string | null;
+            /** Owner Name */
+            owner_name: string | null;
+            /** Reporting Owner Cik */
+            reporting_owner_cik: string;
+            /** Officer Title */
+            officer_title: string | null;
+            /** Is Director */
+            is_director: boolean;
+            /** Is Officer */
+            is_officer: boolean;
+            /** Is Ten Percent Owner */
+            is_ten_percent_owner: boolean;
+            /** Security Title */
+            security_title: string | null;
+            /** Transaction Date */
+            transaction_date: string | null;
+            /** Transaction Code */
+            transaction_code: string;
+            /** Shares */
+            shares: number | string | null;
+            /** Price Per Share */
+            price_per_share: number | string | null;
+            /** Acquired Disposed */
+            acquired_disposed: string | null;
+            /** Shares Owned After */
+            shares_owned_after: number | string | null;
+            /** Direct Indirect */
+            direct_indirect: string | null;
+            /** Derivative */
+            derivative: boolean;
+            /** Source Url */
+            source_url: string;
         };
         /** InstrumentInfo */
         InstrumentInfo: {
@@ -6291,6 +6467,8 @@ export interface components {
             monthly_review?: components["schemas"]["JobSchedule"];
             /** @description Load new SEC Form 13F data sets (published quarterly). Default: the 5th of each month, 05:00. */
             ownership_13f?: components["schemas"]["JobSchedule"];
+            /** @description Load structured SEC Forms 3, 4 and 5 for portfolio issuers. Default: daily 06:30. */
+            insider_trades?: components["schemas"]["JobSchedule"];
             /** @description Fundamentals (SEC XBRL, ESEF) of holdings that filed since the last read (all of them weekly) and the ETF providers' fund P/E and P/B. Default: daily 07:45. */
             valuation_refresh?: components["schemas"]["JobSchedule"];
             /** @description ETF look-through: the funds' holdings from iShares and Vanguard, skipped when the as-of date has not moved. Default: Saturdays 06:40. */
@@ -6670,6 +6848,77 @@ export interface components {
             shares: number | string | null;
             /** Accession */
             accession: string;
+        };
+        /** ManagerDetail */
+        ManagerDetail: {
+            /** Cik */
+            cik: string;
+            /** Name */
+            name: string;
+            /** Period */
+            period?: string | null;
+            /** Filed */
+            filed?: string | null;
+            /** Reported Value Usd */
+            reported_value_usd?: number | string | null;
+            /**
+             * Positions
+             * @default 0
+             */
+            positions: number;
+            /** Previous Value Usd */
+            previous_value_usd?: number | string | null;
+            /** Earlier Period */
+            earlier_period?: string | null;
+            /** Positions Detail */
+            positions_detail: components["schemas"]["ManagerPosition"][];
+            /**
+             * Performance Available
+             * @default false
+             */
+            performance_available: boolean;
+            /**
+             * Performance Note
+             * @default 13F quarter-end value changes are not investment returns. Historical prices and complete security mapping are not available to calculate comparable performance.
+             */
+            performance_note: string;
+        };
+        /** ManagerPosition */
+        ManagerPosition: {
+            /** Cusip */
+            cusip: string;
+            /** Issuer Name */
+            issuer_name: string;
+            /** Title Of Class */
+            title_of_class: string;
+            /** Value Usd */
+            value_usd: number | string | null;
+            /** Shares */
+            shares: number | string | null;
+            /** Shares Type */
+            shares_type: string;
+        };
+        /** ManagerSummary */
+        ManagerSummary: {
+            /** Cik */
+            cik: string;
+            /** Name */
+            name: string;
+            /** Period */
+            period?: string | null;
+            /** Filed */
+            filed?: string | null;
+            /** Reported Value Usd */
+            reported_value_usd?: number | string | null;
+            /**
+             * Positions
+             * @default 0
+             */
+            positions: number;
+            /** Previous Value Usd */
+            previous_value_usd?: number | string | null;
+            /** Earlier Period */
+            earlier_period?: string | null;
         };
         /**
          * ManualFundamentals
@@ -10044,6 +10293,11 @@ export interface components {
              * @description Why the value is null, e.g. 'n/m: negative earnings'.
              */
             reason: string | null;
+            /**
+             * Source Label
+             * @description Provider used when this individual ratio is a fallback.
+             */
+            source_label?: string | null;
         };
         /** ValuationRefreshRequest */
         ValuationRefreshRequest: {
@@ -10061,8 +10315,7 @@ export interface components {
         };
         /**
          * ValuationSettings
-         * @description P/E, P/B and dividend yield: fundamentals from SEC XBRL and ESEF, fund figures from
-         *     the ETF providers.
+         * @description Fundamentals from SEC XBRL and ESEF, with an optional Alpha Vantage ratio fallback.
          */
         ValuationSettings: {
             /**
@@ -10089,6 +10342,12 @@ export interface components {
              * @default true
              */
             finnhub_cross_check: boolean;
+            /**
+             * Alpha Vantage Fallback
+             * @description Fill valuation metrics missing from SEC/ESEF with Alpha Vantage Company Overview. Needs ALPHA_VANTAGE_API_KEY; limited to 25 requests per UTC day.
+             * @default true
+             */
+            alpha_vantage_fallback: boolean;
             /**
              * Funds
              * @description ETFs whose fund-level P/E and P/B are read from the provider.
@@ -10237,6 +10496,58 @@ export interface components {
             weight: number;
             /** Value Base */
             value_base: number;
+        };
+        /** WatchlistCreate */
+        WatchlistCreate: {
+            /** Ticker */
+            ticker: string;
+            /**
+             * List Name
+             * @default Default
+             */
+            list_name: string;
+            /** Buy Target */
+            buy_target?: number | string | null;
+            /** Sell Target */
+            sell_target?: number | string | null;
+            /** Reason */
+            reason?: string | null;
+            /** Note */
+            note?: string | null;
+        };
+        /** WatchlistItem */
+        WatchlistItem: {
+            /** Id */
+            id: number;
+            /** Ticker */
+            ticker: string;
+            /** List Name */
+            list_name: string;
+            /** Buy Target */
+            buy_target: number | null;
+            /** Sell Target */
+            sell_target: number | null;
+            /** Reason */
+            reason: string | null;
+            /** Note */
+            note: string | null;
+            /** Created At */
+            created_at: string;
+            /** Updated At */
+            updated_at: string;
+        };
+        /** WatchlistUpdate */
+        WatchlistUpdate: {
+            /** List Name */
+            list_name?: string | null;
+            /** Buy Target */
+            buy_target?: number | string | null;
+            /** Sell Target */
+            sell_target?: number | string | null;
+            /** Reason */
+            reason?: string | null;
+            /** Note */
+            note?: string | null;
         };
         /** WikidataSummary */
         WikidataSummary: {
@@ -13926,6 +14237,228 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["JobSummary"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_watchlist: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WatchlistItem"][];
+                };
+            };
+        };
+    };
+    add_watchlist_item: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["WatchlistCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WatchlistItem"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_watchlist_item: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                item_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_watchlist_item: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                item_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["WatchlistUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WatchlistItem"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    run_insider_trades: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["JobSummary"];
+                };
+            };
+        };
+    };
+    get_insider_trades: {
+        parameters: {
+            query?: {
+                forms?: string[] | null;
+                limit?: number;
+            };
+            header?: never;
+            path: {
+                ticker: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["InsiderTransactionOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_investors: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ManagerSummary"][];
+                };
+            };
+        };
+    };
+    get_investor: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                cik: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ManagerDetail"];
                 };
             };
             /** @description Validation Error */

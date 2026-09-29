@@ -144,6 +144,7 @@ const FULL: JobsConfig = {
     full_refresh_days: 3,
     esef_max_age_months: 12,
     finnhub_cross_check: false,
+    alpha_vantage_fallback: true,
     funds: [
       {
         key: "CSPX",

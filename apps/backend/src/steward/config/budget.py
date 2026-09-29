@@ -38,6 +38,7 @@ BudgetJobType = Literal[
     "weekly_digest",
     "research",
     "ownership_13f",
+    "insider_trades",
     "etf_look_through",
     "monthly_review",
     "chat",

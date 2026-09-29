@@ -54,12 +54,60 @@ DPS_CONCEPTS: dict[str, list[str]] = {
     ],
     "ifrs-full": ["ifrs-full:DividendsRecognisedAsDistributionsToOwnersPerShare"],
 }
+FLOW_CONCEPTS: dict[str, dict[str, list[str]]] = {
+    "us-gaap": {
+        "revenue": [
+            "us-gaap:RevenueFromContractWithCustomerExcludingAssessedTax",
+            "us-gaap:Revenues",
+            "us-gaap:SalesRevenueNet",
+        ],
+        "gross_profit": ["us-gaap:GrossProfit"],
+        "operating_income": ["us-gaap:OperatingIncomeLoss"],
+        "net_income": ["us-gaap:NetIncomeLoss", "us-gaap:ProfitLoss"],
+        "pretax_income": [
+            "us-gaap:IncomeLossFromContinuingOperationsBeforeIncomeTaxesExtraordinaryItemsNoncontrollingInterest"
+        ],
+        "income_tax": ["us-gaap:IncomeTaxExpenseBenefit"],
+    },
+    "ifrs-full": {
+        "revenue": ["ifrs-full:Revenue", "ifrs-full:RevenueFromContractsWithCustomers"],
+        "gross_profit": ["ifrs-full:GrossProfit"],
+        "operating_income": ["ifrs-full:ProfitLossFromOperatingActivities"],
+        "net_income": ["ifrs-full:ProfitLoss"],
+        "pretax_income": ["ifrs-full:ProfitLossBeforeTax"],
+        "income_tax": ["ifrs-full:IncomeTaxExpenseContinuingOperations"],
+    },
+}
+BALANCE_CONCEPTS: dict[str, dict[str, list[str]]] = {
+    "us-gaap": {
+        "debt": [
+            "us-gaap:LongTermDebt",
+            "us-gaap:LongTermDebtAndFinanceLeaseObligationsCurrent",
+            "us-gaap:LongTermDebtCurrent",
+            "us-gaap:LongTermDebtNoncurrent",
+        ],
+        "cash": [
+            "us-gaap:CashAndCashEquivalentsAtCarryingValue",
+            "us-gaap:CashCashEquivalentsRestrictedCashAndRestrictedCashEquivalents",
+        ],
+    },
+    "ifrs-full": {
+        "debt": [
+            "ifrs-full:Borrowings",
+            "ifrs-full:BorrowingsCurrent",
+            "ifrs-full:BorrowingsNoncurrent",
+        ],
+        "cash": ["ifrs-full:CashAndCashEquivalents"],
+    },
+}
 ALL_CONCEPTS: set[str] = {
     *EPS_CONCEPTS,
     *EPS_BASIC_CONCEPTS,
     *SHARES_CONCEPTS,
     *(c for cs in EQUITY_CONCEPTS.values() for c in cs),
     *(c for cs in DPS_CONCEPTS.values() for c in cs),
+    *(c for source in FLOW_CONCEPTS.values() for cs in source.values() for c in cs),
+    *(c for source in BALANCE_CONCEPTS.values() for cs in source.values() for c in cs),
 }
 BASIS_LABEL = {"us-gaap": "US GAAP", "ifrs-full": "IFRS"}
 
@@ -149,6 +197,16 @@ class SourceFigures(BaseModel):
     shares_as_of: dt.date | None
     eps_steps: list[EpsStep] = Field(default_factory=list)
     notes: list[str] = Field(default_factory=list)
+    revenue_ttm: Figure | None = None
+    gross_profit_ttm: Figure | None = None
+    operating_income_ttm: Figure | None = None
+    net_income_ttm: Figure | None = None
+    pretax_income_ttm: Figure | None = None
+    income_tax_ttm: Figure | None = None
+    equity_value: Figure | None = None
+    debt_value: Figure | None = None
+    cash_value: Figure | None = None
+    equity_previous_value: Figure | None = None
     alternatives: list["SourceFigures"] = Field(
         default_factory=list, description="The same source on another accounting basis."
     )
@@ -418,6 +476,47 @@ def _figure(t: Ttm, currency: str) -> Figure:
     )
 
 
+def _flow_figure(
+    facts: Sequence[Fact], concepts: Sequence[str], preferred: Sequence[str]
+) -> Figure | None:
+    selected = _by_concept(facts, concepts)
+    selected = [fact for fact in selected if fact.start is not None and "/" not in fact.unit]
+    if not selected:
+        return None
+    currency = choose_currency({_currency(fact.unit) for fact in selected}, preferred)
+    if currency is None:
+        return None
+    result = ttm([fact for fact in selected if _currency(fact.unit) == currency])
+    return _figure(result, currency) if result is not None else None
+
+
+def _balance_figure(
+    facts: Sequence[Fact],
+    concepts: Sequence[str],
+    preferred: Sequence[str],
+    before: dt.date | None = None,
+) -> Figure | None:
+    selected = _by_concept([fact for fact in facts if fact.start is None], concepts)
+    selected = [
+        fact for fact in selected if "/" not in fact.unit and (before is None or fact.end < before)
+    ]
+    if not selected:
+        return None
+    currency = choose_currency({fact.unit for fact in selected}, preferred)
+    chosen = max(
+        (fact for fact in selected if fact.unit == currency),
+        key=lambda fact: (fact.end, fact.filed or dt.date.min),
+    )
+    return Figure(
+        value=float(chosen.value),
+        currency=chosen.unit,
+        period_start=None,
+        period_end=chosen.end,
+        method=f"reported balance at {chosen.end.isoformat()}",
+        inputs=[_ref(chosen)],
+    )
+
+
 def compute(
     source: str, facts: Sequence[Fact], preferred_currencies: Sequence[str], today: dt.date
 ) -> SourceFigures | None:
@@ -476,13 +575,27 @@ def _compute_basis(
         if "/" not in f.unit
     ]
     bvps: Figure | None = None
+    equity_value: Figure | None = None
+    equity_previous_value: Figure | None = None
     shares_value: float | None = None
     shares_as_of: dt.date | None = None
     if equity_all:
         eq_currency = choose_currency({f.unit for f in equity_all}, [currency or "", *preferred])
+        assert eq_currency is not None  # Non-empty equity facts always have a currency.
         equity = max(
             (f for f in equity_all if f.unit == eq_currency),
             key=lambda f: (f.end, f.filed or dt.date.min),
+        )
+        equity_value = Figure(
+            value=float(equity.value),
+            currency=equity.unit,
+            period_start=None,
+            period_end=equity.end,
+            method=f"reported equity at {equity.end.isoformat()}",
+            inputs=[_ref(equity)],
+        )
+        equity_previous_value = _balance_figure(
+            facts, EQUITY_CONCEPTS.get(taxonomy, []), [eq_currency], before=equity.end
         )
         shares = _shares_for(facts, equity.end)
         if shares is None:
@@ -531,6 +644,9 @@ def _compute_basis(
     else:
         notes.append("No dividends-per-share figure is tagged (the company may pay none).")
 
+    flow = FLOW_CONCEPTS.get(taxonomy, {})
+    balances = BALANCE_CONCEPTS.get(taxonomy, {})
+    financial_currency_order = [currency or "", *preferred]
     return SourceFigures(
         source=source,
         basis=BASIS_LABEL.get(taxonomy),
@@ -542,6 +658,22 @@ def _compute_basis(
         shares_as_of=shares_as_of,
         eps_steps=eps_steps(eps_in, today),
         notes=[n for n in notes if n],
+        revenue_ttm=_flow_figure(facts, flow.get("revenue", []), financial_currency_order),
+        gross_profit_ttm=_flow_figure(
+            facts, flow.get("gross_profit", []), financial_currency_order
+        ),
+        operating_income_ttm=_flow_figure(
+            facts, flow.get("operating_income", []), financial_currency_order
+        ),
+        net_income_ttm=_flow_figure(facts, flow.get("net_income", []), financial_currency_order),
+        pretax_income_ttm=_flow_figure(
+            facts, flow.get("pretax_income", []), financial_currency_order
+        ),
+        income_tax_ttm=_flow_figure(facts, flow.get("income_tax", []), financial_currency_order),
+        equity_value=equity_value,
+        equity_previous_value=equity_previous_value,
+        debt_value=_balance_figure(facts, balances.get("debt", []), financial_currency_order),
+        cash_value=_balance_figure(facts, balances.get("cash", []), financial_currency_order),
     )
 
 

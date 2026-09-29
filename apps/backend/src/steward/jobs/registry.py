@@ -23,6 +23,7 @@ from steward.news.digest import daily_digest_handler, weekly_digest_handler
 from steward.news.escalation import event_escalation_handler
 from steward.news.pipeline import news_ingest_handler
 from steward.ownership.collect import ownership_13f_handler
+from steward.ownership.insider_collect import insider_trades_handler
 from steward.portfolio.sync import portfolio_sync_handler
 from steward.reference.identity import reference_data_handler
 from steward.reference.intraday import intraday_prices_handler
@@ -51,6 +52,7 @@ JobType = Literal[
     "weekly_digest",
     "research",
     "ownership_13f",
+    "insider_trades",
     "etf_look_through",
     "monthly_review",
     "chat",
@@ -78,6 +80,7 @@ JOB_HANDLERS: dict[str, JobHandler] = {
     "weekly_digest": weekly_digest_handler,
     "research": research_handler,
     "ownership_13f": ownership_13f_handler,
+    "insider_trades": insider_trades_handler,
     "etf_look_through": etf_look_through_handler,
     "monthly_review": monthly_review_handler,
     "chat": chat_handler,

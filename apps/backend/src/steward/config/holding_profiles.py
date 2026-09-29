@@ -165,6 +165,15 @@ class HoldingProfile(ConfigModel):
         description="Ticker as EDGAR and Finnhub list it, when it differs from the "
         "Trading212 ticker's prefix.",
     )
+    alpha_vantage_symbol: str | None = Field(
+        default=None,
+        pattern=r"^[A-Z0-9][A-Z0-9.\-]{0,23}$",
+        description=(
+            "Alpha Vantage exchange symbol for fallback fundamentals "
+            "(for example TSCO.LON or MBG.DEX). "
+            "When empty, the EDGAR ticker is tried."
+        ),
+    )
     fiscal_year_end_month: int = Field(
         default=12,
         ge=1,

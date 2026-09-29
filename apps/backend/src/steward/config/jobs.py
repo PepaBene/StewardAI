@@ -789,8 +789,7 @@ def _default_fund_sources() -> list[FundValuationSource]:
 
 
 class ValuationSettings(ConfigModel):
-    """P/E, P/B and dividend yield: fundamentals from SEC XBRL and ESEF, fund figures from
-    the ETF providers."""
+    """Fundamentals from SEC XBRL and ESEF, with an optional Alpha Vantage ratio fallback."""
 
     enabled: bool = Field(default=True, description="Off: the scheduled run does nothing.")
     full_refresh_days: int = Field(
@@ -810,6 +809,13 @@ class ValuationSettings(ConfigModel):
         default=True,
         description="Also read Finnhub's basic financials (P/E, P/B, EPS) as a tier-2 "
         "cross-check. Needs FINNHUB_API_KEY; never required.",
+    )
+    alpha_vantage_fallback: bool = Field(
+        default=True,
+        description=(
+            "Fill valuation metrics missing from SEC/ESEF with Alpha Vantage Company Overview. "
+            "Needs ALPHA_VANTAGE_API_KEY; limited to 25 requests per UTC day."
+        ),
     )
     funds: list[FundValuationSource] = Field(
         default_factory=_default_fund_sources,
@@ -1071,6 +1077,12 @@ class JobsConfig(ConfigModel):
         description="Load new SEC Form 13F data sets (published quarterly). Default: the 5th "
         "of each month, 05:00.",
     )
+    insider_trades: JobSchedule = Field(
+        default_factory=lambda: JobSchedule(cron="30 6 * * *"),
+        description=(
+            "Load structured SEC Forms 3, 4 and 5 for portfolio issuers. Default: daily 06:30."
+        ),
+    )
     valuation_refresh: JobSchedule = Field(
         default_factory=lambda: JobSchedule(cron="45 7 * * *"),
         description="Fundamentals (SEC XBRL, ESEF) of holdings that filed since the last read "
@@ -1123,6 +1135,7 @@ class JobsConfig(ConfigModel):
             "weekly_digest": self.weekly_digest,
             "monthly_review": self.monthly_review,
             "ownership_13f": self.ownership_13f,
+            "insider_trades": self.insider_trades,
             "valuation_refresh": self.valuation_refresh,
             "etf_look_through": self.etf_look_through,
             "sec_xbrl": self.sec_xbrl,

@@ -127,9 +127,12 @@ def _member(archive: zipfile.ZipFile, name: str) -> str:
     raise KeyError(f"no {name} in the archive (has: {archive.namelist()})")
 
 
-def parse_dataset(source: Path | IO[bytes], cusips: set[str]) -> Dataset:
-    """Every holdings filing, and the positions in the wanted CUSIPs."""
+def parse_dataset(
+    source: Path | IO[bytes], cusips: set[str], tracked_ciks: set[str] | None = None
+) -> Dataset:
+    """Every holdings filing, and rows for portfolio CUSIPs or tracked managers."""
     wanted = {c.upper() for c in cusips}
+    managers = {c.zfill(10) for c in (tracked_ciks or set())}
     with zipfile.ZipFile(source) as archive:
         with archive.open(_member(archive, "SUBMISSION.tsv")) as f:
             submissions = {
@@ -137,13 +140,21 @@ def parse_dataset(source: Path | IO[bytes], cusips: set[str]) -> Dataset:
                 for r in _rows(f)
                 if r.get("SUBMISSIONTYPE", "").strip() in HOLDINGS_TYPES
             }
+        tracked_accessions = {
+            accession
+            for accession, row in submissions.items()
+            if row.get("CIK", "").strip().zfill(10) in managers
+        }
         with archive.open(_member(archive, "COVERPAGE.tsv")) as f:
             covers = {r["ACCESSION_NUMBER"]: r for r in _rows(f)}
         positions: list[Position13F] = []
         with archive.open(_member(archive, "INFOTABLE.tsv")) as f:
             for r in _rows(f):
                 cusip = r.get("CUSIP", "").strip().upper()
-                if cusip not in wanted or r["ACCESSION_NUMBER"] not in submissions:
+                accession = r["ACCESSION_NUMBER"]
+                if accession not in submissions or (
+                    cusip not in wanted and accession not in tracked_accessions
+                ):
                     continue
                 positions.append(
                     Position13F(

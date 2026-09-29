@@ -20,6 +20,8 @@ from api.config_history_routes import router as config_history_router
 from api.db import close_pool, get_pool_or_error
 from api.escalation_routes import router as escalation_router
 from api.fundamentals_routes import router as fundamentals_router
+from api.insider_routes import router as insider_router
+from api.investor_routes import router as investor_router
 from api.lookthrough_routes import router as lookthrough_router
 from api.market_routes import router as market_router
 from api.news_routes import router as news_router
@@ -29,6 +31,7 @@ from api.research_routes import router as research_router
 from api.routes import router
 from api.valuation_routes import router as valuation_router
 from api.verify_routes import router as verify_router
+from api.watchlist_routes import router as watchlist_router
 from steward import __version__
 from steward.config import StrategyConfig, ThesesConfig
 from steward.heartbeat import worker_status
@@ -228,6 +231,9 @@ def create_app() -> FastAPI:
     app.include_router(verify_router)
     app.include_router(chat_router)
     app.include_router(fundamentals_router)
+    app.include_router(watchlist_router)
+    app.include_router(insider_router)
+    app.include_router(investor_router)
     return app
 
 

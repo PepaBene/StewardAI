@@ -217,6 +217,12 @@ function ProfileCard({
         <TextField label="SEC CIK" placeholder="looked up from the ticker" inputMode="numeric" {...text("sec_cik")} />
         <TextField label="EDGAR / Finnhub symbol" placeholder="if not the ticker prefix" {...text("sec_ticker")} />
         <TextField
+          label="Alpha Vantage symbol"
+          placeholder="e.g. TSCO.LON, MBG.DEX"
+          hint="Use the exchange suffix for non-US listings. If empty, the EDGAR ticker is tried."
+          {...text("alpha_vantage_symbol")}
+        />
+        <TextField
           label="Stooq price symbol"
           placeholder="derived from OpenFIGI"
           spellCheck={false}
