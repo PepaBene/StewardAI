@@ -46,6 +46,7 @@ The desktop shell starts the UI server and API, waits for their health checks, t
 3. **API and UI lifecycle: app-managed local child processes.** Bind only to loopback, reserve or dynamically discover ports, verify readiness, and stop the child processes cleanly when the desktop app exits. They do not need to run while the UI is closed.
 4. **Cloud connection compatibility.** Prefer the Supabase session pooler when the Windows network has no IPv6 route to the project's direct database host. The existing setup documentation already flags the direct host's IPv6-only behavior.
 5. **Distribution is initially for one owner and one PC.** Do not ship a shared installer containing a database password, Supabase secret key, Trading212 key, or Anthropic key. The owner supplies their own values during first-run setup.
+6. **Update delivery: CI builds on `main`; production updates come from versioned releases.** GitHub Actions should automatically build Windows artifacts when changes land on `main`, but builds are not automatically installed. Publish user-facing update metadata and artifacts only for tagged/approved releases. Start with downloadable installer updates; add the Tauri in-app updater after signing, atomic installation, service coordination, and rollback are reliable. The app must not install arbitrary CI artifacts directly from branch builds.
 
 ## Implementation phases
 
@@ -134,6 +135,20 @@ The desktop shell starts the UI server and API, waits for their health checks, t
 
 **Exit criteria:** the installation completes the project's live-data sign-off and worker reliability checks on Windows, with clear recovery instructions for loss of connectivity, expired credentials and failed upgrades.
 
+### Phase 7 — Automated builds, releases and application updates
+
+- Add a Windows GitHub Actions workflow that builds the complete desktop distribution (Tauri shell, UI, API and worker) on pushes to `main`, and supports manually requested builds. Pin toolchain and dependency versions, use reproducible build inputs, and keep developer `.env` files and machine-specific credentials out of the workflow and artifacts.
+- Store branch-build artifacts for development review without presenting them as production updates. A `main` build must not silently update the installed app.
+- Add a tagged or explicitly approved release workflow that produces versioned, checksummed installer/update artifacts and release notes. Ensure the UI, API and worker share compatible version metadata. Make signing credentials available only to the protected release job; never put signing keys or application secrets in artifacts.
+- Begin with a manually downloaded installer from the release page as the supported update path. Document how to identify the installed version, back up local configuration, install the new version, and recover to the previous version.
+- After the release pipeline and upgrade behavior are dependable, add the Tauri updater. Publish signed update metadata and artifacts; configure the updater to verify signatures before applying an update and to use only the designated production release channel. Do not trust unsigned manifests or branch-build artifacts.
+- Make updates transactional across the desktop shell, UI, API and worker: stage new versioned files, stop the worker cleanly, switch the app/runtime to the new version, update or restart the worker, and confirm health. Preserve the previous known-good version and provide rollback if installation or health checks fail.
+- Preserve `%LOCALAPPDATA%\StewardAI` configuration, protected secrets, logs and user data during upgrades. Never overwrite user configuration with packaged defaults, and never require rebuilding to rotate credentials.
+- Define whether updates are notification-only, user-approved, or automatically installed. Default to notifying and requiring user approval for the initial in-app updater; support a later policy change only with explicit product requirements. Defer updates while jobs are active, and communicate when a worker restart is required.
+- Qualify the full path on clean Windows installations: branch build, tagged release, signature verification, in-app download, app and service shutdown/restart, interrupted update recovery, rollback, retained settings, and downgrade/compatibility behavior. Keep release artifacts and update metadata available for the supported Windows x64 version.
+
+**Exit criteria:** a push to `main` reliably produces a reviewable Windows build; only an approved, signed release can be offered to installed apps; updates preserve local configuration, coordinate the worker, verify health, and recover to the prior version on failure.
+
 ## Security and operational requirements
 
 - Loopback-only API and UI listeners; no LAN exposure by default.
@@ -141,6 +156,7 @@ The desktop shell starts the UI server and API, waits for their health checks, t
 - Treat local API access as a security boundary: require the Supabase bearer token for protected routes, reject unexpected origins, and add CSRF/origin protections for any cookie-authenticated local endpoints.
 - Never expose `SUPABASE_SECRET_KEY`, `DATABASE_URL`, Trading212 secrets or Anthropic keys to the Tauri webview or frontend environment.
 - Protect logs from secrets and financial account data where feasible; use restrictive ACLs and rotation.
+- Treat update signing keys and release credentials as high-value secrets. Restrict them to protected release workflows, verify signed updater metadata and packages, and do not embed private signing material in the app or installer.
 - The Windows worker is a single-user machine agent, not a public internet service. No inbound firewall rule should be installed.
 - Since the worker connects to the cloud database, it must have reliable outbound internet and access to the Supabase host/pooler. Use TLS and do not disable certificate validation.
 
@@ -171,6 +187,9 @@ The desktop shell starts the UI server and API, waits for their health checks, t
 4. Package the backend and worker runtimes for Windows.
 5. Add separate Windows service installation and the Task Scheduler alternative.
 6. Add first-run configuration and protected secret storage.
-7. Run cloud integration, recovery, upgrade and Windows sign-off checks; then produce the signed installer.
+7. Run cloud integration, recovery, upgrade and Windows sign-off checks.
+8. Add GitHub Actions builds on `main` and validate versioned installer artifacts.
+9. Publish approved signed releases with the manual installer update path.
+10. Add the signed Tauri in-app updater and validate worker coordination, interruption recovery and rollback before enabling it for regular use.
 
 Do not begin with a local database installer: the target is to retain the hosted Supabase database, and local Supabase would add migration, data-lifecycle and backup complexity without serving that requirement.
