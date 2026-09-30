@@ -24,6 +24,7 @@ reason in `instrument.identity_error` (shown on the Activity page) and the job c
 """
 
 import datetime as dt
+import hashlib
 import json
 import logging
 from collections import Counter
@@ -329,12 +330,34 @@ async def _esma(
         )
     }
     try:
-        records = await esma.firds(deps.http, isin)
+        records, history = await esma.firds_with_history(deps.http, isin)
         liquidity = await esma.fitrs(deps.http, isin)
     except (esma.EsmaError, httpx.HTTPError, ValueError) as exc:
         result.notes.append(f"ESMA registers: {exc}")
         return [], None, previous
     async with pool.acquire() as conn, conn.transaction():
+        known_at = deps.now()
+        for record in history:
+            encoded = json.dumps(record.raw, sort_keys=True, separators=(",", ":")).encode()
+            publication = esma._ts(record.raw.get("publication_date"))
+            await conn.execute(
+                """insert into public.listing_lifecycle_snapshot
+                   (isin,mic,publication_date,status,terminated_at,issuer_lei,currency,
+                    source_url,content_hash,known_at,raw)
+                   values($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11::jsonb)
+                   on conflict do nothing""",
+                record.isin,
+                record.mic,
+                publication.date() if publication else None,
+                record.status,
+                record.terminated_at,
+                record.issuer_lei,
+                record.currency,
+                f"{esma.FIRDS_URL}?q=isin:{isin}",
+                hashlib.sha256(encoded).hexdigest(),
+                known_at,
+                encoded.decode(),
+            )
         for r in records:
             await conn.execute(
                 "insert into public.listing (isin, mic, full_name, short_name, cfi, currency,"
@@ -441,6 +464,32 @@ async def _gleif(
         if entity is None:
             result.problems.append(f"GLEIF has no record for LEI {lei}")
             return None
+        raw_bytes = json.dumps(entity.raw, sort_keys=True, separators=(",", ":")).encode()
+        initial_registration = (entity.raw.get("attributes", {}).get("registration") or {}).get(
+            "initialRegistrationDate"
+        )
+        valid_from = None
+        if initial_registration:
+            parsed_date = esma._ts(initial_registration)
+            valid_from = parsed_date.date() if parsed_date else None
+        await pool.execute(
+            """insert into public.legal_entity_snapshot
+               (lei,known_at,valid_from,legal_name,other_names,entity_status,
+                registration_status,successor_lei,source_url,content_hash,raw)
+               values($1,$2,$3,$4,$5::jsonb,$6,$7,$8,$9,$10,$11::jsonb)
+               on conflict do nothing""",
+            lei,
+            deps.now(),
+            valid_from,
+            entity.legal_name,
+            json.dumps(entity.other_names),
+            entity.status,
+            entity.registration_status,
+            entity.successor_lei,
+            f"https://api.gleif.org/api/v1/lei-records/{lei}",
+            hashlib.sha256(raw_bytes).hexdigest(),
+            raw_bytes.decode(),
+        )
         direct = await deps.gleif.parent(lei, "direct")
         ultimate = await deps.gleif.parent(lei, "ultimate")
         children = await deps.gleif.children(lei)

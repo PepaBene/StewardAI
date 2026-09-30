@@ -10,6 +10,7 @@ from steward import __version__
 from steward.jobs.runner import JobContext
 from steward.ownership.insider import InsiderFiling, parse_ownership_xml
 from steward.settings import get_settings
+from steward.sources.documents import link_public_document
 from steward.sources.edgar import EdgarClient, EdgarError, Filing
 
 INSIDER_FORMS = {"3", "3/A", "4", "4/A", "5", "5/A"}
@@ -28,7 +29,12 @@ async def _issuers(pool: asyncpg.Pool) -> list[asyncpg.Record]:
 
 
 async def _upsert(
-    pool: asyncpg.Pool, ticker: str, filing: Filing, source_url: str, parsed: InsiderFiling
+    pool: asyncpg.Pool,
+    ticker: str,
+    filing: Filing,
+    source_url: str,
+    content: bytes,
+    parsed: InsiderFiling,
 ) -> None:
     async with pool.acquire() as conn, conn.transaction():
         await conn.execute(
@@ -47,6 +53,20 @@ async def _upsert(
             parsed.reporting_period,
             parsed.issuer_name,
             source_url,
+        )
+        document_version_id = await link_public_document(
+            conn,
+            regulator="sec",
+            external_id=filing.accession,
+            stable_url=source_url,
+            document_type=filing.form,
+            content=content,
+            known_at=dt.datetime.now(dt.UTC),
+            filed_at=filing.filing_date,
+            published_at=filing.filing_date,
+            domain_table="insider_filing",
+            record_key=filing.accession,
+            quote=parsed.issuer_name,
         )
         await conn.execute(
             "delete from public.insider_transaction where accession = $1", filing.accession
@@ -78,6 +98,15 @@ async def _upsert(
                     row.derivative,
                 )
                 for i, row in enumerate(parsed.rows)
+            ],
+        )
+        await conn.executemany(
+            """insert into public.source_record_evidence
+                 (domain_table,record_key,document_version_id,known_at)
+               values('insider_transaction',$1,$2,$3) on conflict do nothing""",
+            [
+                (f"{filing.accession}:{i}", document_version_id, dt.datetime.now(dt.UTC))
+                for i in range(len(parsed.rows))
             ],
         )
 
@@ -135,7 +164,7 @@ async def collect_insiders(ctx: JobContext) -> None:
                         continue
                     body, url = await _load_filing(edgar, filing)
                     parsed = parse_ownership_xml(body, filing)
-                    await _upsert(ctx.pool, ticker, filing, url, parsed)
+                    await _upsert(ctx.pool, ticker, filing, url, body, parsed)
                     imported += 1
             step.detail["filings_imported"] = imported
 

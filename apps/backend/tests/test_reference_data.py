@@ -84,6 +84,33 @@ def test_firds_and_fitrs() -> None:
     assert esma.home_country("XETA", SAP_ISIN) == "DE"
 
 
+def test_firds_history_keeps_cancelled_listing_versions() -> None:
+    raw = {
+        "response": {
+            "docs": [
+                {
+                    "isin": SAP_ISIN,
+                    "mic": "XETR",
+                    "status": "ACTIVE",
+                    "publication_date": "2024-01-01T00:00:00Z",
+                    "gnr_notional_curr_code": "EUR",
+                },
+                {
+                    "isin": SAP_ISIN,
+                    "mic": "XETR",
+                    "status": "CANC",
+                    "publication_date": "2025-01-01T00:00:00Z",
+                    "mrkt_trdng_trmination_date": "2025-01-01T00:00:00Z",
+                },
+            ]
+        }
+    }
+    history = esma.parse_firds_history(raw)
+    assert [record.status for record in history] == ["ACTIVE", "CANC"]
+    assert history[-1].terminated_at is not None
+    assert esma.parse_firds(raw) == history[:1]
+
+
 def test_gleif_level1_record() -> None:
     entity = parse_record(load("gleif_sap.json")["data"])
     assert (entity.lei, entity.legal_name, entity.jurisdiction) == (SAP_LEI, "SAP SE", "DE")

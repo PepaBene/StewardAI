@@ -587,6 +587,54 @@ class MacroSettings(ConfigModel):
                 flow_key="FM/D.U2.EUR.4F.KR.DFR.LEV",
                 policy_rate=True,
             ),
+            EcbSeries(
+                key="euro_area_private_credit",
+                label="Euro-area MFI loans to euro-area residents",
+                flow_key="BSI/M.U2.N.A.A20.A.1.U2.2300.Z01.E",
+                unit="EUR millions",
+            ),
+            EcbSeries(
+                key="euro_area_10y_yield",
+                label="Euro-area central government 10-year spot rate",
+                flow_key="YC/B.U2.EUR.4F.G_N_A.SV_C_YM.SR_10Y",
+                unit="%",
+            ),
+            EcbSeries(
+                key="euro_area_m3_growth",
+                label="Euro-area M3 annual growth rate",
+                flow_key="BSI/BSI.M.U2.Y.V.M30.A.I.U2.0000.Z01.A",
+                unit="%",
+            ),
+            EcbSeries(
+                key="euro_area_household_loan_rate",
+                label="Euro-area cost of borrowing for household house purchase",
+                flow_key="MIR/MIR.M.U2.B.A2C.AM.R.A.2250.EUR.N",
+                unit="% p.a.",
+            ),
+            EcbSeries(
+                key="euro_area_corporate_loan_rate",
+                label="Euro-area cost of borrowing for corporations",
+                flow_key="MIR/M.U2.B.A2I.AM.R.A.2240.EUR.N",
+                unit="% p.a.",
+            ),
+            EcbSeries(
+                key="ea_household_overnight_deposit_rate",
+                label="Euro-area overnight deposit rate for households",
+                flow_key="MIR/M.U2.B.L21.A.R.A.2250.EUR.N",
+                unit="% p.a.",
+            ),
+            EcbSeries(
+                key="ea_corporate_term_deposit_rate",
+                label="Euro-area agreed-maturity deposit rate for corporations",
+                flow_key="MIR/M.U2.B.L22.A.R.A.2240.EUR.N",
+                unit="% p.a.",
+            ),
+            EcbSeries(
+                key="ea_bls_enterprise_credit_standards",
+                label="Euro-area bank lending survey: enterprise credit standards",
+                flow_key="BLS/BLS.Q.U2.ALL.O.E.Z.B3.ST.S.WFNET",
+                unit="net % balance",
+            ),
         ]
     )
     cnb: list[CnbSeries] = Field(
@@ -600,6 +648,261 @@ class MacroSettings(ConfigModel):
         description="ČNB rates. CZEONIA is the risk-free rate of the Sharpe ratio (series key "
         "'czeonia'); the repo rate's changes are ČNB decisions.",
     )
+
+
+class ProviderJobSettings(ConfigModel):
+    """A free provider is opt-in until its account-specific endpoint audit passes."""
+
+    enabled: bool = False
+    refresh_hours: int = Field(default=168, ge=1, le=8760)
+    daily_quota: int | None = Field(default=None, ge=1)
+    monthly_quota: int | None = Field(default=None, ge=1)
+    reserve_credits: int = Field(default=1, ge=0)
+
+
+class WorldBankIndicator(ConfigModel):
+    key: str = Field(pattern=r"^[A-Z0-9.]{3,40}$")
+    label: str = Field(min_length=1, max_length=120)
+    unit: str = Field(min_length=1, max_length=40)
+    consumer: str = Field(min_length=1, max_length=160)
+
+
+class PublicSdmxSeries(ConfigModel):
+    provider: Literal["oecd", "bis"]
+    key: str = Field(pattern=r"^[a-z0-9_]{1,60}$")
+    label: str = Field(min_length=1, max_length=120)
+    base_url: AnyHttpUrl
+    flow: str = Field(min_length=1, max_length=160)
+    series_key: str = Field(min_length=1, max_length=300)
+    geography: str = Field(min_length=2, max_length=12)
+    unit: str = Field(min_length=1, max_length=40)
+    frequency: str = Field(min_length=1, max_length=20)
+    definition: str = Field(min_length=1, max_length=500)
+    consumer: str = Field(min_length=1, max_length=160)
+
+
+class ComtradeSlice(ConfigModel):
+    reporter: int = Field(ge=1, le=999)
+    partner: int = Field(default=0, ge=0, le=999)
+    hs_code: str = Field(pattern=r"^[0-9]{2,6}$")
+    flow_code: str = Field(default="X,M", pattern=r"^[A-Z,]+$")
+    history_years: int = Field(default=1, ge=1, le=10)
+    consumer: str = Field(min_length=1, max_length=160)
+
+
+def _world_bank_defaults() -> list[WorldBankIndicator]:
+    rows = [
+        ("NY.GDP.MKTP.CD", "Nominal GDP", "current USD"),
+        ("NY.GDP.MKTP.KD", "Real GDP", "constant 2015 USD"),
+        ("SP.POP.TOTL", "Population", "people"),
+        ("NY.GNP.PCAP.CD", "Income per capita", "current USD"),
+        ("GC.DOD.TOTL.GD.ZS", "Government debt", "% GDP"),
+        ("DT.DOD.DECT.CD", "External debt", "current USD"),
+        ("NV.IND.TOTL.ZS", "Industry value added", "% GDP"),
+        ("NE.TRD.GNFS.ZS", "Trade openness", "% GDP"),
+        ("EG.IMP.CONS.ZS", "Energy import dependence", "% energy use"),
+    ]
+    return [
+        WorldBankIndicator(key=k, label=label, unit=unit, consumer="country context")
+        for k, label, unit in rows
+    ]
+
+
+def _sdmx_defaults() -> list[PublicSdmxSeries]:
+    oecd = "https://sdmx.oecd.org/public/rest/v1"
+    bis = "https://stats.bis.org/api/v2"
+    rows = [
+        (
+            "oecd",
+            "inflation",
+            oecd,
+            "OECD.SDD.TPS,DSD_PRICES@DF_PRICES_ALL,1.0",
+            ".M.CPI.PC_CHGPP",
+            "US",
+            "%",
+            "monthly",
+            "Consumer-price inflation; OECD definition",
+        ),
+        (
+            "oecd",
+            "unemployment",
+            oecd,
+            "OECD.SDD.TPS,DSD_LFS@DF_IALFS_UNE_M,1.0",
+            ".M.Y_GE15.PS._T._T",
+            "US",
+            "%",
+            "monthly",
+            "Harmonised unemployment rate",
+        ),
+        (
+            "oecd",
+            "productivity",
+            oecd,
+            "OECD.SDD.PDB,DSD_PDB@DF_PDB_LV,",
+            ".A....",
+            "US",
+            "index",
+            "annual",
+            "Labour productivity; configured OECD measure",
+        ),
+        (
+            "oecd",
+            "wages",
+            oecd,
+            "OECD.SDD.TPS,DSD_EARNINGS@DF_EARNINGS,",
+            ".Q....",
+            "US",
+            "index",
+            "quarterly",
+            "Earnings index; configured OECD measure",
+        ),
+        (
+            "oecd",
+            "consumer_confidence",
+            oecd,
+            "OECD.SDD.STES,DSD_STES@DF_CLI,",
+            ".M.CSCICP03",
+            "US",
+            "index",
+            "monthly",
+            "Consumer confidence indicator",
+        ),
+        (
+            "oecd",
+            "business_confidence",
+            oecd,
+            "OECD.SDD.STES,DSD_STES@DF_CLI,",
+            ".M.BSCICP03",
+            "US",
+            "index",
+            "monthly",
+            "Business confidence indicator",
+        ),
+        (
+            "oecd",
+            "housing",
+            oecd,
+            "OECD.SDD.TPS,DSD_RHPI@DF_RHPI,",
+            ".Q.RHPI",
+            "US",
+            "index",
+            "quarterly",
+            "Residential property price index",
+        ),
+        (
+            "bis",
+            "total_credit",
+            bis,
+            "BIS,WS_TC,2.0",
+            ".Q.P.A.M.770.A",
+            "US",
+            "% GDP",
+            "quarterly",
+            "Credit to non-financial sector by borrower residence",
+        ),
+        (
+            "bis",
+            "debt_service",
+            bis,
+            "BIS,WS_DSR,1.0",
+            ".Q.P.N",
+            "US",
+            "% income",
+            "quarterly",
+            "Private non-financial-sector debt service ratio",
+        ),
+        (
+            "bis",
+            "banking_claims",
+            bis,
+            "BIS,WS_LBS_D_PUB,1.0",
+            ".Q.S.A.TO1",
+            "US",
+            "USD",
+            "quarterly",
+            "International banking claims by residence",
+        ),
+        (
+            "bis",
+            "debt_securities",
+            bis,
+            "BIS,WS_DEBT_SEC2_PUB,1.0",
+            ".Q.C.1",
+            "US",
+            "USD",
+            "quarterly",
+            "International debt securities outstanding",
+        ),
+        (
+            "bis",
+            "global_liquidity",
+            bis,
+            "BIS,WS_GLI,1.0",
+            ".Q.US",
+            "US",
+            "USD",
+            "quarterly",
+            "Global liquidity indicator",
+        ),
+        (
+            "bis",
+            "property_prices",
+            bis,
+            "BIS,WS_LONG_CPI,1.0",
+            ".Q.R",
+            "US",
+            "index",
+            "quarterly",
+            "Residential property price index",
+        ),
+    ]
+    return [
+        PublicSdmxSeries(
+            provider=provider,
+            key=key,
+            label=key.replace("_", " ").title(),
+            base_url=url,
+            flow=flow,
+            series_key=series_key,
+            geography=geo,
+            unit=unit,
+            frequency=frequency,
+            definition=definition,
+            consumer="holding country context",
+        )
+        for provider, key, url, flow, series_key, geo, unit, frequency, definition in rows
+    ]
+
+
+class PublicDataSettings(ConfigModel):
+    """Curated Phase-2 requests. Every series names a product consumer."""
+
+    countries: list[str] = Field(default_factory=lambda: ["CA", "CZ", "DE", "US", "CN", "IN"])
+    world_bank: list[WorldBankIndicator] = Field(default_factory=_world_bank_defaults)
+    sdmx: list[PublicSdmxSeries] = Field(default_factory=_sdmx_defaults)
+    comtrade: list[ComtradeSlice] = Field(default_factory=list)
+
+
+def _provider_defaults() -> dict[str, ProviderJobSettings]:
+    quotas = {
+        "alpha_vantage": (25, None),
+        "eodhd": (20, None),
+        "fmp": (250, None),
+        "un_comtrade": (500, None),
+        "diffbot": (None, 10_000),
+        "people_data_labs": (None, 100),
+        "twelve_data": (None, None),
+        "finnhub": (None, None),
+        "world_bank": (None, None),
+        "oecd": (None, None),
+        "bis": (None, None),
+        "ecb": (None, None),
+        "epo_ops": (None, None),
+    }
+    return {
+        name: ProviderJobSettings(daily_quota=daily, monthly_quota=monthly)
+        for name, (daily, monthly) in quotas.items()
+    }
 
 
 class MonitorSettings(ConfigModel):
@@ -1008,6 +1311,12 @@ class JobsConfig(ConfigModel):
         description="On worker start, run the data jobs that never succeeded or missed their "
         "last scheduled run, one at a time in dependency order.",
     )
+    providers: dict[str, ProviderJobSettings] = Field(
+        default_factory=_provider_defaults,
+        description="Per-provider switch, refresh interval and hard free-tier budgets. All new "
+        "providers default off until their sample audit passes.",
+    )
+    public_data: PublicDataSettings = Field(default_factory=PublicDataSettings)
     portfolio_sync: JobSchedule = Field(
         default_factory=lambda: JobSchedule(cron="30 22 * * *"),
         description="Trading212 sync, FX rates and drift. Default: daily at 22:30 Prague time.",
@@ -1049,6 +1358,16 @@ class JobsConfig(ConfigModel):
         default_factory=lambda: JobSchedule(cron="30 11 * * *"),
         description="FRED, ECB and Eurostat macro series; macro surprises on release days. "
         "Default: daily 11:30 (after Eurostat's 11:00 releases).",
+    )
+    public_data_collect: JobSchedule = Field(
+        default_factory=lambda: JobSchedule(enabled=False, cron="0 4 * * 0"),
+        description="Curated World Bank, OECD, BIS and UN Comtrade releases. Disabled until "
+        "the corresponding provider audit gate passes.",
+    )
+    source_audit: JobSchedule = Field(
+        default_factory=lambda: JobSchedule(enabled=False, cron="0 3 1 * *"),
+        description="Repeat the endpoint-level free-access audit. Disabled until test-account "
+        "credentials are configured.",
     )
     monitor: JobSchedule = Field(
         default_factory=lambda: JobSchedule(cron="*/15 * * * *"),
@@ -1129,6 +1448,8 @@ class JobsConfig(ConfigModel):
             "price_history": self.price_history,
             "holiday_refresh": self.holiday_refresh,
             "macro_collect": self.macro_collect,
+            "public_data_collect": self.public_data_collect,
+            "source_audit": self.source_audit,
             "monitor": self.monitor,
             "news_ingest": self.news_ingest,
             "daily_digest": self.daily_digest,

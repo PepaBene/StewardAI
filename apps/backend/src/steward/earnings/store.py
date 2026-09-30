@@ -1,5 +1,6 @@
 """Database writes for the earnings pipeline: archived evidence and validated facts."""
 
+import datetime as dt
 import json
 from dataclasses import dataclass, field
 from decimal import Decimal
@@ -9,6 +10,7 @@ import asyncpg
 from steward.documents.fetch import Document
 from steward.earnings.periods import period_label
 from steward.earnings.validate import FactKey, KnownFact, RejectedFact, ValidatedFigure
+from steward.sources.documents import link_public_document
 from steward.storage import EvidenceStore, evidence_path
 
 
@@ -121,13 +123,13 @@ async def store_facts(
             value: Decimal = Decimal(0) if v.value is None else v.value
             # Rejected before the number could be read: value 0, the claim kept as text.
             value_note = None if v.value is not None else f"unreadable {f.value_as_written!r}"
-            await conn.execute(
+            fact_id = await conn.fetchval(
                 "insert into public.fact (ticker, metric, basis, fiscal_year, fiscal_period,"
                 " period, period_end, value, value_as_written, scale, unit, currency,"
                 " source_url, snippet, unit_snippet, evidence_sha256, evidence_path, status,"
                 " status_reason, checks, restates_fact_id, job_id, config_version_ids)"
                 " values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15,"
-                " $16, $17, $18, $19, $20::jsonb, $21, $22, $23)",
+                " $16, $17, $18, $19, $20::jsonb, $21, $22, $23) returning id",
                 ticker,
                 f.metric,
                 f.basis,
@@ -154,6 +156,32 @@ async def store_facts(
                 job_id,
                 config_version_ids,
             )
+            if fact_id is not None:
+                amends_version_id = (
+                    await conn.fetchval(
+                        """select document_version_id from public.source_record_evidence
+                           where domain_table='fact' and record_key=$1
+                           order by known_at desc limit 1""",
+                        str(v.restates),
+                    )
+                    if v.restates is not None
+                    else None
+                )
+                await link_public_document(
+                    conn,
+                    regulator="issuer_or_regulator",
+                    external_id=evidence.sha256,
+                    stable_url=evidence.url,
+                    document_type="financial_fact_source",
+                    content=b"",
+                    content_hash=evidence.sha256,
+                    raw_location=evidence.path,
+                    amends_version_id=amends_version_id,
+                    known_at=dt.datetime.now(dt.UTC),
+                    domain_table="fact",
+                    record_key=fact_id,
+                    quote=f.figure.source_snippet,
+                )
             summary.inserted[status] += 1
             if v.reason:
                 summary.reasons.append(

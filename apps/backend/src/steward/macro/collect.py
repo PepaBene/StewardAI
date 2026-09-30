@@ -25,7 +25,9 @@ release date and the source URL; digests take every macro number from `macro_ser
 
 import csv
 import datetime as dt
+import hashlib
 import io
+import json
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
 from decimal import Decimal, InvalidOperation
@@ -47,9 +49,12 @@ from steward.config.jobs import (
 )
 from steward.config.store import load_active
 from steward.jobs.runner import JobContext
+from steward.macro.providers import parse_fred_vintages
 from steward.news.synthetic import SyntheticEvent, SyntheticSource, raise_events
 from steward.settings import get_settings
 from steward.sources import cnb
+from steward.sources.base import AccessResult, AccessState
+from steward.sources.store import CoverageUpdate, update_coverage
 
 EUROSTAT_URL = "https://ec.europa.eu/eurostat/api/dissemination/statistics/1.0/data/{dataset}"
 EUROSTAT_PAGE = "https://ec.europa.eu/eurostat/databrowser/view/{dataset}/default/table"
@@ -154,6 +159,8 @@ async def fetch_eurostat(
     geos: list[str],
     last_periods: int = 3,
     since: dt.date | None = None,
+    pool: asyncpg.Pool | None = None,
+    known_at: dt.datetime | None = None,
 ) -> list[Observation]:
     """The last `last_periods` periods, or with `since` every period from that year on
     (`sinceTimePeriod` takes a bare year for monthly, quarterly and annual datasets alike)."""
@@ -165,7 +172,21 @@ async def fetch_eurostat(
     response = await http.get(EUROSTAT_URL.format(dataset=series.dataset), params=params)
     if response.status_code != 200:
         raise MacroError(f"Eurostat {series.dataset} returned HTTP {response.status_code}")
-    return parse_jsonstat(response.json(), series)
+    body = response.json()
+    retrieved_at = known_at or dt.datetime.now(dt.UTC)
+    if pool is not None:
+        encoded = json.dumps(body, sort_keys=True, separators=(",", ":")).encode()
+        await pool.execute(
+            """insert into public.macro_payload_archive
+               (source,dataset,content_hash,known_at,source_url,payload)
+               values('eurostat',$1,$2,$3,$4,$5::jsonb) on conflict do nothing""",
+            series.dataset,
+            hashlib.sha256(encoded).hexdigest(),
+            retrieved_at,
+            str(response.url),
+            encoded.decode(),
+        )
+    return parse_jsonstat(body, series)
 
 
 def parse_fred(body: dict[str, Any], series: FredSeries) -> list[Observation]:
@@ -234,6 +255,60 @@ async def fetch_fred(
         if got == 0 or offset >= int(body.get("count") or 0):
             return out
         params["offset"] = str(offset)
+
+
+async def store_fred_vintages(
+    pool: asyncpg.Pool,
+    http: httpx.AsyncClient,
+    series: FredSeries,
+    api_key: str,
+    today: dt.date,
+    history_years: int,
+) -> int:
+    """Append actual ALFRED real-time windows; never rewrite an earlier vintage."""
+    start = dt.date(today.year - history_years, 1, 1)
+    response = await http.get(
+        FRED_URL,
+        params={
+            "series_id": series.series_id,
+            "api_key": api_key,
+            "file_type": "json",
+            "output_type": "4",
+            "observation_start": start.isoformat(),
+            "realtime_start": start.isoformat(),
+            "realtime_end": today.isoformat(),
+            "limit": str(FRED_MAX_LIMIT),
+        },
+    )
+    if response.status_code != 200:
+        raise MacroError(f"ALFRED {series.series_id} returned HTTP {response.status_code}")
+    points = parse_fred_vintages(
+        response.json(),
+        series_id=series.key,
+        unit=series.unit,
+        source_url=FRED_PAGE.format(series_id=series.series_id),
+    )
+    inserted = 0
+    for point in points:
+        result = await pool.execute(
+            """insert into public.macro_observation
+               (series_id,source,geography,period,value,unit,frequency,release_at,known_at,
+                vintage,source_url,metadata)
+               values($1,'alfred',$2,$3,$4,$5,$6,$7,$7,$8,$9,$10::jsonb)
+               on conflict do nothing""",
+            point.series_id,
+            point.geography,
+            point.period,
+            point.value,
+            point.unit,
+            point.frequency,
+            point.release_at,
+            point.vintage,
+            point.source_url,
+            json.dumps(point.metadata),
+        )
+        inserted += result.endswith("1")
+    return inserted
 
 
 def parse_ecb_series(text: str, series: EcbSeries, seen_on: dt.date) -> list[Observation]:
@@ -413,17 +488,38 @@ def surprise(
 
 
 async def store_and_evaluate(
-    pool: asyncpg.Pool, observations: list[Observation], bands: dict[str, float]
+    pool: asyncpg.Pool,
+    observations: list[Observation],
+    bands: dict[str, float],
+    known_at: dt.datetime | None = None,
 ) -> tuple[int, list[SyntheticEvent]]:
     """Insert new observations (revisions update the value but are never evaluated) and
     return (new count, surprise events). A series with nothing stored yet is only stored."""
     events: list[SyntheticEvent] = []
     new_count = 0
+    known_at = known_at or dt.datetime.now(dt.UTC)
     by_series: dict[str, list[Observation]] = {}
     for o in observations:
         by_series.setdefault(o.series_id, []).append(o)
     for series_id, obs in by_series.items():
         obs.sort(key=lambda o: o.period)
+        geography = (
+            series_id.rsplit(":", 1)[1]
+            if ":" in series_id
+            else {"fred": "US", "ecb": "EA", "cnb": "CZ"}.get(obs[0].source, "unknown")
+        )
+        await update_coverage(
+            pool,
+            CoverageUpdate(
+                provider=obs[0].source,
+                dataset=obs[0].key,
+                entity_key=geography,
+                access=AccessResult(AccessState.AVAILABLE),
+                available_periods=len({item.period for item in obs}),
+                earliest_period=min(item.period for item in obs),
+                latest_period=max(item.period for item in obs),
+            ),
+        )
         # A series' first run stores the backfilled history as the baseline: comparing
         # those old observations with each other would raise false surprises.
         baseline = not await pool.fetchval(
@@ -433,6 +529,44 @@ async def store_and_evaluate(
             obs[0].source,
         )
         for o in obs:
+            geography = (
+                o.series_id.rsplit(":", 1)[1]
+                if ":" in o.series_id
+                else {"fred": "US", "ecb": "EA", "cnb": "CZ"}.get(o.source, "unknown")
+            )
+            frequency = (
+                "quarterly"
+                if "-Q" in o.period_label
+                else "monthly"
+                if len(o.period_label) == 7
+                else "annual"
+                if len(o.period_label) == 4
+                else "daily"
+            )
+            release_at = (
+                dt.datetime.combine(o.release_date, dt.time(), dt.UTC)
+                if o.release_date is not None and o.source != "fred"
+                else None
+            )
+            await pool.execute(
+                """insert into public.macro_observation
+                   (series_id,source,geography,period,value,unit,frequency,release_at,
+                    known_at,vintage,source_url,metadata)
+                   values($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12::jsonb)
+                   on conflict do nothing""",
+                o.key,
+                o.source,
+                geography,
+                o.period,
+                o.value,
+                o.unit,
+                frequency,
+                release_at,
+                known_at,
+                known_at.isoformat(),
+                o.url,
+                json.dumps({"label": o.label, "period_label": o.period_label}),
+            )
             inserted = await pool.fetchval(
                 "insert into public.macro_series (series_id, source, period, value, label, unit,"
                 " release_date, url) values ($1, $2, $3, $4, $5, $6, $7, $8)"
@@ -482,6 +616,26 @@ async def store_and_evaluate(
     return new_count, events
 
 
+async def mark_macro_coverage(
+    pool: asyncpg.Pool,
+    provider: str,
+    dataset: str,
+    geographies: list[str],
+    state: AccessState,
+    reason: str,
+) -> None:
+    for geography in geographies:
+        await update_coverage(
+            pool,
+            CoverageUpdate(
+                provider=provider,
+                dataset=dataset,
+                entity_key=geography,
+                access=AccessResult(state, reason),
+            ),
+        )
+
+
 def _label(period: dt.date, like: Observation) -> str:
     if "-Q" in like.period_label:
         return f"{period.year}-Q{(period.month - 1) // 3 + 1}"
@@ -523,21 +677,44 @@ async def run_macro_collect(ctx: JobContext, deps: MacroDeps) -> None:
                     pool,
                     "eurostat",
                     [f"{series.key}:{geo}" for geo in settings.geos],
-                    partial(fetch_eurostat, deps.http, series, settings.geos),
+                    partial(
+                        fetch_eurostat,
+                        deps.http,
+                        series,
+                        settings.geos,
+                        pool=pool,
+                        known_at=now,
+                    ),
                     today,
                     settings.history_years,
                     step.detail,
                 )
             except (MacroError, httpx.HTTPError, KeyError, ValueError) as exc:
                 step.detail["error"] = str(exc)[:300]
+                await mark_macro_coverage(
+                    pool,
+                    "eurostat",
+                    series.key,
+                    settings.geos,
+                    AccessState.TEMPORARILY_FAILED,
+                    type(exc).__name__,
+                )
                 continue
-            count, found = await store_and_evaluate(pool, obs, bands)
+            count, found = await store_and_evaluate(pool, obs, bands, known_at=now)
             events += found
             step.detail.update(observations=len(obs), new=count, surprises=len(found))
     for fred in settings.fred:
         async with ctx.step(f"fred:{fred.key}") as step:
             if not deps.fred_key:
                 step.detail["skipped"] = "FRED_API_KEY is not set"
+                await mark_macro_coverage(
+                    pool,
+                    "fred",
+                    fred.key,
+                    ["US"],
+                    AccessState.ACCESS_UNVERIFIED,
+                    "FRED_API_KEY is not set",
+                )
                 continue
             try:
                 obs = await collect_window(
@@ -551,10 +728,23 @@ async def run_macro_collect(ctx: JobContext, deps: MacroDeps) -> None:
                 )
             except (MacroError, httpx.HTTPError, KeyError, ValueError) as exc:
                 step.detail["error"] = str(exc)[:300]
+                await mark_macro_coverage(
+                    pool,
+                    "fred",
+                    fred.key,
+                    ["US"],
+                    AccessState.TEMPORARILY_FAILED,
+                    type(exc).__name__,
+                )
                 continue
-            count, found = await store_and_evaluate(pool, obs, bands)
+            count, found = await store_and_evaluate(pool, obs, bands, known_at=now)
             events += found
-            step.detail.update(observations=len(obs), new=count, surprises=len(found))
+            vintages = await store_fred_vintages(
+                pool, deps.http, fred, deps.fred_key, today, settings.history_years
+            )
+            step.detail.update(
+                observations=len(obs), new=count, surprises=len(found), vintages=vintages
+            )
     for ecb in settings.ecb:
         async with ctx.step(f"ecb:{ecb.key}") as step:
             try:
@@ -569,8 +759,16 @@ async def run_macro_collect(ctx: JobContext, deps: MacroDeps) -> None:
                 )
             except (MacroError, httpx.HTTPError) as exc:
                 step.detail["error"] = str(exc)[:300]
+                await mark_macro_coverage(
+                    pool,
+                    "ecb",
+                    ecb.key,
+                    ["EA"],
+                    AccessState.TEMPORARILY_FAILED,
+                    type(exc).__name__,
+                )
                 continue
-            count, found = await store_and_evaluate(pool, obs, bands)
+            count, found = await store_and_evaluate(pool, obs, bands, known_at=now)
             events += found
             step.detail.update(observations=len(obs), new=count, surprises=len(found))
     for cnb_series in settings.cnb:
@@ -588,8 +786,16 @@ async def run_macro_collect(ctx: JobContext, deps: MacroDeps) -> None:
             except (cnb.CnbError, httpx.HTTPError) as exc:
                 # A ČNB outage never fails the job: the step says so and the rest runs.
                 step.detail["error"] = str(exc)[:300]
+                await mark_macro_coverage(
+                    pool,
+                    "cnb",
+                    cnb_series.key,
+                    ["CZ"],
+                    AccessState.TEMPORARILY_FAILED,
+                    type(exc).__name__,
+                )
                 continue
-            count, found = await store_and_evaluate(pool, obs, bands)
+            count, found = await store_and_evaluate(pool, obs, bands, known_at=now)
             events += found
             step.detail.update(observations=len(obs), new=count, surprises=len(found))
             if obs:

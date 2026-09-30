@@ -31,6 +31,8 @@ BudgetJobType = Literal[
     "intraday_prices",
     "holiday_refresh",
     "macro_collect",
+    "public_data_collect",
+    "source_audit",
     "event_escalation",
     "monitor",
     "news_ingest",

@@ -84,6 +84,7 @@ from steward.notify.channels import Channel, channels_from_settings
 from steward.notify.route import AlertRequest
 from steward.reference.identity import object_key, upsert_relationship
 from steward.settings import get_settings
+from steward.sources.documents import link_public_document
 from steward.sources.edgar import EdgarClient
 from steward.verify.trust import TrustTable, load_trust
 
@@ -584,6 +585,24 @@ async def store_items(
             if item_id is None:
                 stats.duplicate += 1
                 continue
+            evidence_text = json.dumps(
+                {"headline": item.headline, "summary": item.summary},
+                ensure_ascii=False,
+                sort_keys=True,
+            ).encode("utf-8")
+            await link_public_document(
+                conn,
+                regulator=item.outlet_host or host_of(url) or "publisher",
+                external_id=url,
+                stable_url=url,
+                document_type="news_item",
+                content=evidence_text,
+                known_at=now,
+                published_at=published,
+                domain_table="news_item",
+                record_key=item_id,
+                quote=item.headline,
+            )
             await refresh_cluster_sources(conn, cluster_id, now)
         members.append(ClusterMember(cluster_id, fingerprint))
         stats.stored += 1

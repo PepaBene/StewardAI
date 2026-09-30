@@ -838,6 +838,548 @@
         ]
       }
     },
+    "/macro/context/{ticker}": {
+      "get": {
+        "tags": [
+          "macro"
+        ],
+        "summary": "Get Macro Context",
+        "description": "Latest point-in-time country context, ranges, provenance and mapped exposure.",
+        "operationId": "get_macro_context",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "ticker",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Ticker"
+            }
+          },
+          {
+            "name": "as_of",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date-time"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "As Of"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MacroContext"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/macro/coverage/portfolio": {
+      "get": {
+        "tags": [
+          "macro"
+        ],
+        "summary": "Get Portfolio Macro Coverage",
+        "description": "Measure mapped versus unknown portfolio value and country-series coverage.",
+        "operationId": "get_portfolio_macro_coverage",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PortfolioMacroCoverage"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/macro/exposures": {
+      "get": {
+        "tags": [
+          "macro"
+        ],
+        "summary": "List Exposures",
+        "operationId": "list_exposures",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/ExposureResult"
+                  },
+                  "type": "array",
+                  "title": "Response List Exposures"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      },
+      "post": {
+        "tags": [
+          "macro"
+        ],
+        "summary": "Create Exposure",
+        "operationId": "create_exposure",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ExposureInput"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExposureResult"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/macro/exposures/{mapping_id}": {
+      "delete": {
+        "tags": [
+          "macro"
+        ],
+        "summary": "Delete Exposure",
+        "operationId": "delete_exposure",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "mapping_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "maximum": 9223372036854775807,
+              "minimum": 1,
+              "title": "Mapping Id"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/jobs/public-data": {
+      "post": {
+        "tags": [
+          "jobs"
+        ],
+        "summary": "Run Public Data",
+        "operationId": "run_public_data",
+        "responses": {
+          "202": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/JobSummary"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/sources/status": {
+      "get": {
+        "tags": [
+          "sources"
+        ],
+        "summary": "Source Status",
+        "operationId": "source_status",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/ProviderStatus"
+                  },
+                  "type": "array",
+                  "title": "Response Source Status"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/macro/trade/{reporter}/{hs_code}": {
+      "get": {
+        "tags": [
+          "macro"
+        ],
+        "summary": "Get Trade Context",
+        "description": "Product value plus reporter-wide trade metrics; no issuer contract is inferred.",
+        "operationId": "get_trade_context",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "reporter",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Reporter"
+            }
+          },
+          {
+            "name": "hs_code",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Hs Code"
+            }
+          },
+          {
+            "name": "partner",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Partner"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TradeContext"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/jobs/source-audit": {
+      "post": {
+        "tags": [
+          "jobs"
+        ],
+        "summary": "Run Source Audit",
+        "operationId": "run_source_audit",
+        "responses": {
+          "202": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/JobSummary"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/sources/access": {
+      "get": {
+        "tags": [
+          "sources"
+        ],
+        "summary": "Get Source Access",
+        "operationId": "get_source_access",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/SourceAccess"
+                  },
+                  "type": "array",
+                  "title": "Response Get Source Access"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/sources/usage": {
+      "get": {
+        "tags": [
+          "sources"
+        ],
+        "summary": "Get Source Usage",
+        "operationId": "get_source_usage",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "since",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date-time"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Since"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/SourceUsage"
+                  },
+                  "title": "Response Get Source Usage"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/data/coverage": {
+      "get": {
+        "tags": [
+          "data"
+        ],
+        "summary": "Get Data Coverage",
+        "operationId": "get_data_coverage",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "provider",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Provider"
+            }
+          },
+          {
+            "name": "dataset",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Dataset"
+            }
+          },
+          {
+            "name": "entity_key",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Entity Key"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/DataCoverage"
+                  },
+                  "title": "Response Get Data Coverage"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/holdings/{ticker}/valuation": {
       "get": {
         "tags": [
@@ -5238,6 +5780,237 @@
         ]
       }
     },
+    "/reference/listings/{isin}/history": {
+      "get": {
+        "tags": [
+          "reference"
+        ],
+        "summary": "Listing History",
+        "operationId": "listing_history",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "isin",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[A-Z0-9]{12}$",
+              "title": "Isin"
+            }
+          },
+          {
+            "name": "as_of",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date-time"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "As Of"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/ListingLifecyclePoint"
+                  },
+                  "title": "Response Listing History"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/reference/legal-entities/{lei}/history": {
+      "get": {
+        "tags": [
+          "reference"
+        ],
+        "summary": "Legal Entity History",
+        "operationId": "legal_entity_history",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "lei",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[A-Z0-9]{20}$",
+              "title": "Lei"
+            }
+          },
+          {
+            "name": "as_of",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date-time"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "As Of"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/LegalEntitySnapshot"
+                  },
+                  "title": "Response Legal Entity History"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/reference/identity-decisions": {
+      "get": {
+        "tags": [
+          "reference"
+        ],
+        "summary": "Identity Decisions",
+        "operationId": "identity_decisions",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "additionalProperties": true,
+                    "type": "object"
+                  },
+                  "type": "array",
+                  "title": "Response Identity Decisions"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/reference/identity/{ticker}/override": {
+      "post": {
+        "tags": [
+          "reference"
+        ],
+        "summary": "Override Identity",
+        "operationId": "override_identity",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "ticker",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9._-]{1,32}$",
+              "title": "Ticker"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/IdentityOverride"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": {
+                    "type": "integer"
+                  },
+                  "title": "Response Override Identity"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/holdings/{ticker}/identity": {
       "get": {
         "tags": [
@@ -7964,6 +8737,8 @@
                 "intraday_prices",
                 "holiday_refresh",
                 "macro_collect",
+                "public_data_collect",
+                "source_audit",
                 "event_escalation",
                 "monitor",
                 "news_ingest",
@@ -8001,6 +8776,8 @@
                 "intraday_prices",
                 "holiday_refresh",
                 "macro_collect",
+                "public_data_collect",
+                "source_audit",
                 "event_escalation",
                 "monitor",
                 "news_ingest",
@@ -8974,6 +9751,55 @@
         ],
         "title": "ComplianceRow"
       },
+      "ComtradeSlice": {
+        "properties": {
+          "reporter": {
+            "type": "integer",
+            "maximum": 999.0,
+            "minimum": 1.0,
+            "title": "Reporter"
+          },
+          "partner": {
+            "type": "integer",
+            "maximum": 999.0,
+            "minimum": 0.0,
+            "title": "Partner",
+            "default": 0
+          },
+          "hs_code": {
+            "type": "string",
+            "pattern": "^[0-9]{2,6}$",
+            "title": "Hs Code"
+          },
+          "flow_code": {
+            "type": "string",
+            "pattern": "^[A-Z,]+$",
+            "title": "Flow Code",
+            "default": "X,M"
+          },
+          "history_years": {
+            "type": "integer",
+            "maximum": 10.0,
+            "minimum": 1.0,
+            "title": "History Years",
+            "default": 1
+          },
+          "consumer": {
+            "type": "string",
+            "maxLength": 160,
+            "minLength": 1,
+            "title": "Consumer"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "reporter",
+          "hs_code",
+          "consumer"
+        ],
+        "title": "ComtradeSlice"
+      },
       "Concentration": {
         "properties": {
           "hhi": {
@@ -9263,6 +10089,149 @@
           "changes"
         ],
         "title": "ConfigVersionMeta"
+      },
+      "ContextPoint": {
+        "properties": {
+          "series_id": {
+            "type": "string",
+            "title": "Series Id"
+          },
+          "source": {
+            "type": "string",
+            "title": "Source"
+          },
+          "geography": {
+            "type": "string",
+            "title": "Geography"
+          },
+          "value": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Value"
+          },
+          "unit": {
+            "type": "string",
+            "title": "Unit"
+          },
+          "period": {
+            "type": "string",
+            "format": "date",
+            "title": "Period"
+          },
+          "release_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Release At"
+          },
+          "known_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Known At"
+          },
+          "source_url": {
+            "type": "string",
+            "title": "Source Url"
+          },
+          "five_year_low": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Five Year Low"
+          },
+          "five_year_high": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Five Year High"
+          },
+          "ten_year_low": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ten Year Low"
+          },
+          "ten_year_high": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ten Year High"
+          },
+          "access_state": {
+            "type": "string",
+            "title": "Access State"
+          }
+        },
+        "type": "object",
+        "required": [
+          "series_id",
+          "source",
+          "geography",
+          "value",
+          "unit",
+          "period",
+          "release_at",
+          "known_at",
+          "source_url",
+          "five_year_low",
+          "five_year_high",
+          "ten_year_low",
+          "ten_year_high",
+          "access_state"
+        ],
+        "title": "ContextPoint"
       },
       "ContributionReport": {
         "properties": {
@@ -9626,6 +10595,114 @@
           "source"
         ],
         "title": "DailyFallback"
+      },
+      "DataCoverage": {
+        "properties": {
+          "provider": {
+            "type": "string",
+            "title": "Provider"
+          },
+          "dataset": {
+            "type": "string",
+            "title": "Dataset"
+          },
+          "entity_key": {
+            "type": "string",
+            "title": "Entity Key"
+          },
+          "state": {
+            "type": "string",
+            "title": "State"
+          },
+          "expected_periods": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Expected Periods"
+          },
+          "available_periods": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Available Periods"
+          },
+          "earliest_period": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Earliest Period"
+          },
+          "latest_period": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Latest Period"
+          },
+          "last_good_observation_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Good Observation Id"
+          },
+          "checked_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Checked At"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
+          }
+        },
+        "type": "object",
+        "required": [
+          "provider",
+          "dataset",
+          "entity_key",
+          "state",
+          "expected_periods",
+          "available_periods",
+          "earliest_period",
+          "latest_period",
+          "last_good_observation_id",
+          "checked_at",
+          "reason"
+        ],
+        "title": "DataCoverage"
       },
       "DayCount": {
         "properties": {
@@ -12045,6 +13122,213 @@
           "buckets"
         ],
         "title": "ExposureDimension"
+      },
+      "ExposureInput": {
+        "properties": {
+          "issuer_id": {
+            "type": "integer",
+            "maximum": 9.223372036854776e+18,
+            "minimum": 1.0,
+            "title": "Issuer Id"
+          },
+          "segment": {
+            "type": "string",
+            "maxLength": 160,
+            "minLength": 1,
+            "title": "Segment"
+          },
+          "geography": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^[A-Z0-9]{2,5}$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Geography"
+          },
+          "hs_revision": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 20
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Hs Revision"
+          },
+          "hs_code": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^[0-9]{2,6}$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Hs Code"
+          },
+          "basis": {
+            "type": "string",
+            "enum": [
+              "reported",
+              "estimated",
+              "user_assigned"
+            ],
+            "title": "Basis"
+          },
+          "weight": {
+            "anyOf": [
+              {
+                "type": "number",
+                "maximum": 1.0,
+                "minimum": 0.0
+              },
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              }
+            ],
+            "title": "Weight"
+          },
+          "valid_from": {
+            "type": "string",
+            "format": "date",
+            "title": "Valid From"
+          },
+          "valid_to": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Valid To"
+          }
+        },
+        "type": "object",
+        "required": [
+          "issuer_id",
+          "segment",
+          "basis",
+          "weight",
+          "valid_from"
+        ],
+        "title": "ExposureInput"
+      },
+      "ExposureResult": {
+        "properties": {
+          "issuer_id": {
+            "type": "integer",
+            "maximum": 9.223372036854776e+18,
+            "minimum": 1.0,
+            "title": "Issuer Id"
+          },
+          "segment": {
+            "type": "string",
+            "maxLength": 160,
+            "minLength": 1,
+            "title": "Segment"
+          },
+          "geography": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^[A-Z0-9]{2,5}$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Geography"
+          },
+          "hs_revision": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 20
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Hs Revision"
+          },
+          "hs_code": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^[0-9]{2,6}$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Hs Code"
+          },
+          "basis": {
+            "type": "string",
+            "enum": [
+              "reported",
+              "estimated",
+              "user_assigned"
+            ],
+            "title": "Basis"
+          },
+          "weight": {
+            "anyOf": [
+              {
+                "type": "number",
+                "maximum": 1.0,
+                "minimum": 0.0
+              },
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              }
+            ],
+            "title": "Weight"
+          },
+          "valid_from": {
+            "type": "string",
+            "format": "date",
+            "title": "Valid From"
+          },
+          "valid_to": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Valid To"
+          },
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          }
+        },
+        "type": "object",
+        "required": [
+          "issuer_id",
+          "segment",
+          "basis",
+          "weight",
+          "valid_from",
+          "id"
+        ],
+        "title": "ExposureResult"
       },
       "FactCheck": {
         "properties": {
@@ -14498,6 +15782,97 @@
         ],
         "title": "HoldingDetail"
       },
+      "HoldingEffect": {
+        "properties": {
+          "ticker": {
+            "type": "string",
+            "title": "Ticker"
+          },
+          "issuer_id": {
+            "type": "integer",
+            "title": "Issuer Id"
+          },
+          "segment": {
+            "type": "string",
+            "title": "Segment"
+          },
+          "basis": {
+            "type": "string",
+            "title": "Basis"
+          },
+          "weight": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              }
+            ],
+            "title": "Weight"
+          },
+          "geography": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Geography"
+          },
+          "hs_code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Hs Code"
+          },
+          "unknown_weight": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              }
+            ],
+            "title": "Unknown Weight"
+          },
+          "related_series": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Related Series"
+          },
+          "explanation": {
+            "type": "string",
+            "title": "Explanation"
+          }
+        },
+        "type": "object",
+        "required": [
+          "ticker",
+          "issuer_id",
+          "segment",
+          "basis",
+          "weight",
+          "geography",
+          "hs_code",
+          "unknown_weight",
+          "related_series",
+          "explanation"
+        ],
+        "title": "HoldingEffect"
+      },
       "HoldingIdentity": {
         "properties": {
           "ticker": {
@@ -16069,6 +17444,63 @@
         ],
         "title": "IdentityGap"
       },
+      "IdentityOverride": {
+        "properties": {
+          "issuer_id": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 1.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Issuer Id"
+          },
+          "security_id": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 1.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Security Id"
+          },
+          "listing_id": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 1.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Listing Id"
+          },
+          "decision": {
+            "type": "string",
+            "pattern": "^(confirmed|rejected|unresolved)$",
+            "title": "Decision"
+          },
+          "reason": {
+            "type": "string",
+            "maxLength": 500,
+            "minLength": 1,
+            "title": "Reason"
+          }
+        },
+        "type": "object",
+        "required": [
+          "decision",
+          "reason"
+        ],
+        "title": "IdentityOverride"
+      },
       "ImportResult": {
         "properties": {
           "saved": {
@@ -17301,6 +18733,17 @@
             "description": "On worker start, run the data jobs that never succeeded or missed their last scheduled run, one at a time in dependency order.",
             "default": true
           },
+          "providers": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/ProviderJobSettings"
+            },
+            "type": "object",
+            "title": "Providers",
+            "description": "Per-provider switch, refresh interval and hard free-tier budgets. All new providers default off until their sample audit passes."
+          },
+          "public_data": {
+            "$ref": "#/components/schemas/PublicDataSettings"
+          },
           "portfolio_sync": {
             "$ref": "#/components/schemas/JobSchedule",
             "description": "Trading212 sync, FX rates and drift. Default: daily at 22:30 Prague time."
@@ -17336,6 +18779,14 @@
           "macro_collect": {
             "$ref": "#/components/schemas/JobSchedule",
             "description": "FRED, ECB and Eurostat macro series; macro surprises on release days. Default: daily 11:30 (after Eurostat's 11:00 releases)."
+          },
+          "public_data_collect": {
+            "$ref": "#/components/schemas/JobSchedule",
+            "description": "Curated World Bank, OECD, BIS and UN Comtrade releases. Disabled until the corresponding provider audit gate passes."
+          },
+          "source_audit": {
+            "$ref": "#/components/schemas/JobSchedule",
+            "description": "Repeat the endpoint-level free-access audit. Disabled until test-account credentials are configured."
           },
           "monitor": {
             "$ref": "#/components/schemas/JobSchedule",
@@ -17741,6 +19192,112 @@
         ],
         "title": "LegalEntityOut"
       },
+      "LegalEntitySnapshot": {
+        "properties": {
+          "lei": {
+            "type": "string",
+            "title": "Lei"
+          },
+          "known_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Known At"
+          },
+          "valid_from": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Valid From"
+          },
+          "valid_to": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Valid To"
+          },
+          "legal_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Legal Name"
+          },
+          "other_names": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Other Names"
+          },
+          "entity_status": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Entity Status"
+          },
+          "registration_status": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Registration Status"
+          },
+          "successor_lei": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Successor Lei"
+          },
+          "source_url": {
+            "type": "string",
+            "title": "Source Url"
+          }
+        },
+        "type": "object",
+        "required": [
+          "lei",
+          "known_at",
+          "valid_from",
+          "valid_to",
+          "legal_name",
+          "other_names",
+          "entity_status",
+          "registration_status",
+          "successor_lei",
+          "source_url"
+        ],
+        "title": "LegalEntitySnapshot"
+      },
       "LiquidityOut": {
         "properties": {
           "liquid": {
@@ -17821,6 +19378,92 @@
           "period_to"
         ],
         "title": "LiquidityOut"
+      },
+      "ListingLifecyclePoint": {
+        "properties": {
+          "mic": {
+            "type": "string",
+            "title": "Mic"
+          },
+          "publication_date": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Publication Date"
+          },
+          "status": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Status"
+          },
+          "terminated_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Terminated At"
+          },
+          "issuer_lei": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Issuer Lei"
+          },
+          "currency": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Currency"
+          },
+          "source_url": {
+            "type": "string",
+            "title": "Source Url"
+          },
+          "known_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Known At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "mic",
+          "publication_date",
+          "status",
+          "terminated_at",
+          "issuer_lei",
+          "currency",
+          "source_url",
+          "known_at"
+        ],
+        "title": "ListingLifecyclePoint"
       },
       "ListingOut": {
         "properties": {
@@ -18232,6 +19875,172 @@
         "type": "object",
         "title": "LookThroughSettings",
         "description": "ETF look-through: holdings of the funds the portfolio holds, from the issuers'\n(undocumented) data endpoints, stored weekly as dated snapshots."
+      },
+      "MacroComparison": {
+        "properties": {
+          "series_id": {
+            "type": "string",
+            "title": "Series Id"
+          },
+          "source": {
+            "type": "string",
+            "title": "Source"
+          },
+          "geography": {
+            "type": "string",
+            "title": "Geography"
+          },
+          "value": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Value"
+          },
+          "unit": {
+            "type": "string",
+            "title": "Unit"
+          },
+          "period": {
+            "type": "string",
+            "format": "date",
+            "title": "Period"
+          },
+          "release_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Release At"
+          },
+          "known_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Known At"
+          },
+          "source_url": {
+            "type": "string",
+            "title": "Source Url"
+          }
+        },
+        "type": "object",
+        "required": [
+          "series_id",
+          "source",
+          "geography",
+          "value",
+          "unit",
+          "period",
+          "release_at",
+          "known_at",
+          "source_url"
+        ],
+        "title": "MacroComparison"
+      },
+      "MacroContext": {
+        "properties": {
+          "as_of": {
+            "type": "string",
+            "format": "date-time",
+            "title": "As Of"
+          },
+          "observations": {
+            "items": {
+              "$ref": "#/components/schemas/ContextPoint"
+            },
+            "type": "array",
+            "title": "Observations"
+          },
+          "coverage": {
+            "items": {
+              "$ref": "#/components/schemas/MacroCoverage"
+            },
+            "type": "array",
+            "title": "Coverage"
+          },
+          "effects": {
+            "items": {
+              "$ref": "#/components/schemas/HoldingEffect"
+            },
+            "type": "array",
+            "title": "Effects"
+          },
+          "comparisons": {
+            "items": {
+              "$ref": "#/components/schemas/MacroComparison"
+            },
+            "type": "array",
+            "title": "Comparisons"
+          }
+        },
+        "type": "object",
+        "required": [
+          "as_of",
+          "observations",
+          "coverage",
+          "effects",
+          "comparisons"
+        ],
+        "title": "MacroContext"
+      },
+      "MacroCoverage": {
+        "properties": {
+          "provider": {
+            "type": "string",
+            "title": "Provider"
+          },
+          "dataset": {
+            "type": "string",
+            "title": "Dataset"
+          },
+          "geography": {
+            "type": "string",
+            "title": "Geography"
+          },
+          "state": {
+            "type": "string",
+            "title": "State"
+          },
+          "checked_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Checked At"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
+          }
+        },
+        "type": "object",
+        "required": [
+          "provider",
+          "dataset",
+          "geography",
+          "state",
+          "checked_at",
+          "reason"
+        ],
+        "title": "MacroCoverage"
       },
       "MacroFigure": {
         "properties": {
@@ -20699,6 +22508,107 @@
         ],
         "title": "PortfolioIntradayPoint"
       },
+      "PortfolioMacroCoverage": {
+        "properties": {
+          "as_of": {
+            "type": "string",
+            "format": "date",
+            "title": "As Of"
+          },
+          "base_currency": {
+            "type": "string",
+            "title": "Base Currency"
+          },
+          "total_value": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              }
+            ],
+            "title": "Total Value"
+          },
+          "mapped_value": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              }
+            ],
+            "title": "Mapped Value"
+          },
+          "unknown_value": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              }
+            ],
+            "title": "Unknown Value"
+          },
+          "mapped_weight": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              }
+            ],
+            "title": "Mapped Weight"
+          },
+          "unknown_weight": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              }
+            ],
+            "title": "Unknown Weight"
+          },
+          "by_exposure": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "type": "array",
+            "title": "By Exposure"
+          },
+          "gaps": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Gaps"
+          }
+        },
+        "type": "object",
+        "required": [
+          "as_of",
+          "base_currency",
+          "total_value",
+          "mapped_value",
+          "unknown_value",
+          "mapped_weight",
+          "unknown_weight",
+          "by_exposure",
+          "gaps"
+        ],
+        "title": "PortfolioMacroCoverage"
+      },
       "PortfolioOverview": {
         "properties": {
           "freshness": {
@@ -21853,6 +23763,287 @@
           "kpis"
         ],
         "title": "ProposedAction"
+      },
+      "ProviderJobSettings": {
+        "properties": {
+          "enabled": {
+            "type": "boolean",
+            "title": "Enabled",
+            "default": false
+          },
+          "refresh_hours": {
+            "type": "integer",
+            "maximum": 8760.0,
+            "minimum": 1.0,
+            "title": "Refresh Hours",
+            "default": 168
+          },
+          "daily_quota": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 1.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Daily Quota"
+          },
+          "monthly_quota": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 1.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Monthly Quota"
+          },
+          "reserve_credits": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Reserve Credits",
+            "default": 1
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "ProviderJobSettings",
+        "description": "A free provider is opt-in until its account-specific endpoint audit passes."
+      },
+      "ProviderStatus": {
+        "properties": {
+          "provider": {
+            "type": "string",
+            "title": "Provider"
+          },
+          "endpoint": {
+            "type": "string",
+            "title": "Endpoint"
+          },
+          "state": {
+            "type": "string",
+            "title": "State"
+          },
+          "hard_blocked": {
+            "type": "boolean",
+            "title": "Hard Blocked"
+          },
+          "quota": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Quota"
+          },
+          "quota_period": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Quota Period"
+          },
+          "last_success_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Success At"
+          },
+          "retry_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Retry At"
+          },
+          "day_credits": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              }
+            ],
+            "title": "Day Credits"
+          },
+          "month_credits": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              }
+            ],
+            "title": "Month Credits"
+          }
+        },
+        "type": "object",
+        "required": [
+          "provider",
+          "endpoint",
+          "state",
+          "hard_blocked",
+          "quota",
+          "quota_period",
+          "last_success_at",
+          "retry_at",
+          "day_credits",
+          "month_credits"
+        ],
+        "title": "ProviderStatus"
+      },
+      "PublicDataSettings": {
+        "properties": {
+          "countries": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Countries"
+          },
+          "world_bank": {
+            "items": {
+              "$ref": "#/components/schemas/WorldBankIndicator"
+            },
+            "type": "array",
+            "title": "World Bank"
+          },
+          "sdmx": {
+            "items": {
+              "$ref": "#/components/schemas/PublicSdmxSeries"
+            },
+            "type": "array",
+            "title": "Sdmx"
+          },
+          "comtrade": {
+            "items": {
+              "$ref": "#/components/schemas/ComtradeSlice"
+            },
+            "type": "array",
+            "title": "Comtrade"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "PublicDataSettings",
+        "description": "Curated Phase-2 requests. Every series names a product consumer."
+      },
+      "PublicSdmxSeries": {
+        "properties": {
+          "provider": {
+            "type": "string",
+            "enum": [
+              "oecd",
+              "bis"
+            ],
+            "title": "Provider"
+          },
+          "key": {
+            "type": "string",
+            "pattern": "^[a-z0-9_]{1,60}$",
+            "title": "Key"
+          },
+          "label": {
+            "type": "string",
+            "maxLength": 120,
+            "minLength": 1,
+            "title": "Label"
+          },
+          "base_url": {
+            "type": "string",
+            "minLength": 1,
+            "format": "uri",
+            "title": "Base Url"
+          },
+          "flow": {
+            "type": "string",
+            "maxLength": 160,
+            "minLength": 1,
+            "title": "Flow"
+          },
+          "series_key": {
+            "type": "string",
+            "maxLength": 300,
+            "minLength": 1,
+            "title": "Series Key"
+          },
+          "geography": {
+            "type": "string",
+            "maxLength": 12,
+            "minLength": 2,
+            "title": "Geography"
+          },
+          "unit": {
+            "type": "string",
+            "maxLength": 40,
+            "minLength": 1,
+            "title": "Unit"
+          },
+          "frequency": {
+            "type": "string",
+            "maxLength": 20,
+            "minLength": 1,
+            "title": "Frequency"
+          },
+          "definition": {
+            "type": "string",
+            "maxLength": 500,
+            "minLength": 1,
+            "title": "Definition"
+          },
+          "consumer": {
+            "type": "string",
+            "maxLength": 160,
+            "minLength": 1,
+            "title": "Consumer"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "provider",
+          "key",
+          "label",
+          "base_url",
+          "flow",
+          "series_key",
+          "geography",
+          "unit",
+          "frequency",
+          "definition",
+          "consumer"
+        ],
+        "title": "PublicSdmxSeries"
       },
       "QuietHours": {
         "properties": {
@@ -25003,6 +27194,168 @@
         ],
         "title": "Source"
       },
+      "SourceAccess": {
+        "properties": {
+          "provider": {
+            "type": "string",
+            "title": "Provider"
+          },
+          "endpoint": {
+            "type": "string",
+            "title": "Endpoint"
+          },
+          "account_tier": {
+            "type": "string",
+            "title": "Account Tier"
+          },
+          "state": {
+            "type": "string",
+            "title": "State"
+          },
+          "quota": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Quota"
+          },
+          "quota_period": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Quota Period"
+          },
+          "reset_timezone": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reset Timezone"
+          },
+          "request_weight": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              }
+            ],
+            "title": "Request Weight"
+          },
+          "tested_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tested At"
+          },
+          "retry_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Retry At"
+          },
+          "last_success_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Success At"
+          },
+          "hard_blocked": {
+            "type": "boolean",
+            "title": "Hard Blocked"
+          },
+          "detail": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Detail"
+          },
+          "last_denial_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Denial At"
+          },
+          "last_denial_state": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Denial State"
+          }
+        },
+        "type": "object",
+        "required": [
+          "provider",
+          "endpoint",
+          "account_tier",
+          "state",
+          "quota",
+          "quota_period",
+          "reset_timezone",
+          "request_weight",
+          "tested_at",
+          "retry_at",
+          "last_success_at",
+          "hard_blocked",
+          "detail",
+          "last_denial_at",
+          "last_denial_state"
+        ],
+        "title": "SourceAccess"
+      },
       "SourceHealth": {
         "properties": {
           "id": {
@@ -25149,6 +27502,59 @@
           "updated_at"
         ],
         "title": "SourceTrustOut"
+      },
+      "SourceUsage": {
+        "properties": {
+          "provider": {
+            "type": "string",
+            "title": "Provider"
+          },
+          "endpoint": {
+            "type": "string",
+            "title": "Endpoint"
+          },
+          "window_kind": {
+            "type": "string",
+            "title": "Window Kind"
+          },
+          "window_start": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Window Start"
+          },
+          "window_end": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Window End"
+          },
+          "credits": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              }
+            ],
+            "title": "Credits"
+          },
+          "requests": {
+            "type": "integer",
+            "title": "Requests"
+          }
+        },
+        "type": "object",
+        "required": [
+          "provider",
+          "endpoint",
+          "window_kind",
+          "window_start",
+          "window_end",
+          "credits",
+          "requests"
+        ],
+        "title": "SourceUsage"
       },
       "SourcesHealth": {
         "properties": {
@@ -26233,6 +28639,129 @@
           "name"
         ],
         "title": "TrackedManager"
+      },
+      "TradeContext": {
+        "properties": {
+          "reporter": {
+            "type": "string",
+            "title": "Reporter"
+          },
+          "hs_code": {
+            "type": "string",
+            "title": "Hs Code"
+          },
+          "hs_revision": {
+            "type": "string",
+            "title": "Hs Revision"
+          },
+          "partner": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Partner"
+          },
+          "periods": {
+            "type": "integer",
+            "title": "Periods"
+          },
+          "latest_period": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Latest Period"
+          },
+          "latest_value": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Latest Value"
+          },
+          "latest_value_currency": {
+            "type": "string",
+            "title": "Latest Value Currency",
+            "default": "USD"
+          },
+          "metrics": {
+            "additionalProperties": {
+              "anyOf": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "string",
+                  "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "type": "object",
+            "title": "Metrics"
+          },
+          "source_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Url"
+          },
+          "known_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Known At"
+          },
+          "notice": {
+            "type": "string",
+            "title": "Notice",
+            "default": "National trade statistics do not establish an issuer contract."
+          }
+        },
+        "type": "object",
+        "required": [
+          "reporter",
+          "hs_code",
+          "hs_revision",
+          "partner",
+          "periods",
+          "latest_period",
+          "latest_value",
+          "metrics",
+          "source_url",
+          "known_at"
+        ],
+        "title": "TradeContext"
       },
       "TransactionFeeOut": {
         "properties": {
@@ -27904,6 +30433,42 @@
           "fetched_at"
         ],
         "title": "WikidataSummary"
+      },
+      "WorldBankIndicator": {
+        "properties": {
+          "key": {
+            "type": "string",
+            "pattern": "^[A-Z0-9.]{3,40}$",
+            "title": "Key"
+          },
+          "label": {
+            "type": "string",
+            "maxLength": 120,
+            "minLength": 1,
+            "title": "Label"
+          },
+          "unit": {
+            "type": "string",
+            "maxLength": 40,
+            "minLength": 1,
+            "title": "Unit"
+          },
+          "consumer": {
+            "type": "string",
+            "maxLength": 160,
+            "minLength": 1,
+            "title": "Consumer"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "key",
+          "label",
+          "unit",
+          "consumer"
+        ],
+        "title": "WorldBankIndicator"
       },
       "XbrlRunRequest": {
         "properties": {

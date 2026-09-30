@@ -23,12 +23,14 @@ from api.fundamentals_routes import router as fundamentals_router
 from api.insider_routes import router as insider_router
 from api.investor_routes import router as investor_router
 from api.lookthrough_routes import router as lookthrough_router
+from api.macro_routes import router as macro_router
 from api.market_routes import router as market_router
 from api.news_routes import router as news_router
 from api.prompts_routes import router as prompts_router
 from api.reference_routes import router as reference_router
 from api.research_routes import router as research_router
 from api.routes import router
+from api.source_routes import router as source_router
 from api.valuation_routes import router as valuation_router
 from api.verify_routes import router as verify_router
 from api.watchlist_routes import router as watchlist_router
@@ -220,6 +222,8 @@ def create_app() -> FastAPI:
     app.include_router(config_history_router)
     app.include_router(market_router)
     app.include_router(lookthrough_router)
+    app.include_router(macro_router)
+    app.include_router(source_router)
     app.include_router(valuation_router)
     app.include_router(router)
     app.include_router(prompts_router)

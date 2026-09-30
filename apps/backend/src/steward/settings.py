@@ -67,6 +67,14 @@ class Settings(BaseSettings):
     finnhub_api_key: SecretStr | None = None
     # Alpha Vantage free tier: fallback valuation overview (25 requests per day).
     alpha_vantage_api_key: SecretStr | None = None
+    eodhd_api_key: SecretStr | None = None
+    fmp_api_key: SecretStr | None = None
+    twelve_data_api_key: SecretStr | None = None
+    un_comtrade_api_key: SecretStr | None = None
+    people_data_labs_api_key: SecretStr | None = None
+    diffbot_api_key: SecretStr | None = None
+    epo_ops_client_id: SecretStr | None = None
+    epo_ops_client_secret: SecretStr | None = None
     # FRED (St. Louis Fed) macro series need a free API key.
     fred_api_key: SecretStr | None = None
     # OpenFIGI works without a key; a key raises its rate limit.
@@ -118,6 +126,14 @@ class Settings(BaseSettings):
             self.supabase_secret_key,
             self.finnhub_api_key,
             self.alpha_vantage_api_key,
+            self.eodhd_api_key,
+            self.fmp_api_key,
+            self.twelve_data_api_key,
+            self.un_comtrade_api_key,
+            self.people_data_labs_api_key,
+            self.diffbot_api_key,
+            self.epo_ops_client_id,
+            self.epo_ops_client_secret,
             self.openfigi_api_key,
             self.fred_api_key,
             self.stooq_api_key,

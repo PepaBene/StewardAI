@@ -2,6 +2,7 @@
 price history and risk, reference-data gaps, the exchange calendar, and on-demand runs."""
 
 import datetime as dt
+import json
 from typing import Annotated
 
 from fastapi import APIRouter, HTTPException, Path, Query, status
@@ -14,6 +15,7 @@ from steward.config.common import Ticker
 from steward.config.jobs import ExchangeClosure
 from steward.ownership.read import HoldingOwnership, holding_ownership
 from steward.portfolio.read import JobSummary
+from steward.reference.matching import Match, record_match_decision
 from steward.reference.read import (
     ExchangeCalendar,
     HoldingIdentity,
@@ -32,6 +34,129 @@ from steward.reference.read import (
 router = APIRouter()
 
 TickerPath = Annotated[str, Path(pattern=r"^[A-Za-z0-9._-]{1,32}$")]
+
+
+class IdentityOverride(BaseModel):
+    issuer_id: int | None = Field(default=None, ge=1)
+    security_id: int | None = Field(default=None, ge=1)
+    listing_id: int | None = Field(default=None, ge=1)
+    decision: str = Field(pattern=r"^(confirmed|rejected|unresolved)$")
+    reason: str = Field(min_length=1, max_length=500)
+
+
+class ListingLifecyclePoint(BaseModel):
+    mic: str
+    publication_date: dt.date | None
+    status: str | None
+    terminated_at: dt.datetime | None
+    issuer_lei: str | None
+    currency: str | None
+    source_url: str
+    known_at: dt.datetime
+
+
+class LegalEntitySnapshot(BaseModel):
+    lei: str
+    known_at: dt.datetime
+    valid_from: dt.date | None
+    valid_to: dt.date | None
+    legal_name: str | None
+    other_names: list[str]
+    entity_status: str | None
+    registration_status: str | None
+    successor_lei: str | None
+    source_url: str
+
+
+@router.get("/reference/listings/{isin}/history", tags=["reference"])
+async def listing_history(
+    isin: Annotated[str, Path(pattern=r"^[A-Z0-9]{12}$")],
+    pool: Pool,
+    _owner: Owner,
+    as_of: Annotated[dt.datetime | None, Query()] = None,
+) -> list[ListingLifecyclePoint]:
+    rows = await pool.fetch(
+        """select distinct on (mic,publication_date,content_hash) mic,publication_date,
+                  status,terminated_at,issuer_lei,currency,source_url,known_at
+           from public.listing_lifecycle_snapshot
+           where isin=$1 and ($2::timestamptz is null or known_at <= $2)
+           order by mic,publication_date,content_hash,known_at desc""",
+        isin,
+        as_of,
+    )
+    return [ListingLifecyclePoint(**dict(row)) for row in rows]
+
+
+@router.get("/reference/legal-entities/{lei}/history", tags=["reference"])
+async def legal_entity_history(
+    lei: Annotated[str, Path(pattern=r"^[A-Z0-9]{20}$")],
+    pool: Pool,
+    _owner: Owner,
+    as_of: Annotated[dt.datetime | None, Query()] = None,
+) -> list[LegalEntitySnapshot]:
+    rows = await pool.fetch(
+        """select lei,known_at,valid_from,valid_to,legal_name,other_names,entity_status,
+                  registration_status,successor_lei,source_url
+           from public.legal_entity_snapshot
+           where lei=$1 and ($2::timestamptz is null or known_at <= $2)
+           order by known_at desc""",
+        lei,
+        as_of,
+    )
+    return [
+        LegalEntitySnapshot(
+            **{
+                **dict(row),
+                "other_names": json.loads(row["other_names"])
+                if isinstance(row["other_names"], str)
+                else row["other_names"],
+            }
+        )
+        for row in rows
+    ]
+
+
+@router.get("/reference/identity-decisions", tags=["reference"])
+async def identity_decisions(pool: Pool, _owner: Owner) -> list[dict[str, object]]:
+    rows = await pool.fetch(
+        """select id,instrument_ticker,candidate_issuer_id,candidate_security_id,
+                  candidate_listing_id,decision,score,reasons,decided_at,decided_by
+           from public.identity_match_decision order by decided_at desc limit 500"""
+    )
+    return [dict(row) for row in rows]
+
+
+@router.post("/reference/identity/{ticker}/override", tags=["reference"])
+async def override_identity(
+    ticker: TickerPath, body: IdentityOverride, pool: Pool, owner: Owner
+) -> dict[str, int]:
+    match = Match(None, 1 if body.decision == "confirmed" else 0, body.decision, (body.reason,))
+    decision_id = await record_match_decision(
+        pool,
+        match,
+        instrument_ticker=ticker,
+        issuer_id=body.issuer_id,
+        security_id=body.security_id,
+        listing_id=body.listing_id,
+        decided_by=owner.user_id,
+    )
+    await pool.execute(
+        """insert into public.instrument_security_link
+           (ticker,security_id,listing_id,status,score,evidence,decided_at,decided_by)
+           values($1,$2,$3,$4,$5,jsonb_build_object('reason',$6),now(),$7)
+           on conflict(ticker) do update set security_id=excluded.security_id,
+             listing_id=excluded.listing_id,status=excluded.status,score=excluded.score,
+             evidence=excluded.evidence,decided_at=excluded.decided_at,
+             decided_by=excluded.decided_by,updated_at=now()""",
+        ticker,
+        body.security_id,
+        body.listing_id,
+        body.decision,
+        1 if body.decision == "confirmed" else 0,
+        body.reason,
+        owner.user_id,
+    )
+    return {"decision_id": decision_id}
 
 
 @router.get("/holdings/{ticker}/identity", tags=["holdings"])

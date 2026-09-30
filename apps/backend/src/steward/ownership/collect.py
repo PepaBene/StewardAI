@@ -9,6 +9,9 @@ filings and positions are keyed by accession number and information-table row.
 """
 
 import asyncio
+import datetime as dt
+import hashlib
+import json
 import tempfile
 from pathlib import Path
 
@@ -20,6 +23,7 @@ from steward.config.jobs import JobsConfig, OwnershipSettings
 from steward.config.store import load_active
 from steward.jobs.runner import JobContext, JobFailed
 from steward.settings import get_settings
+from steward.sources.documents import link_public_document
 from steward.sources.form13f import Dataset, cusip_of_isin, dataset_links, parse_dataset
 
 
@@ -46,6 +50,7 @@ async def store_dataset(
     tickers: dict[str, str],
     job_id: int | None,
     tracked_ciks: set[str] | None = None,
+    source_hash: str | None = None,
 ) -> tuple[int, int]:
     async with pool.acquire() as conn, conn.transaction():
         await conn.execute(
@@ -75,6 +80,60 @@ async def store_dataset(
                 for f in data.filings
             ],
         )
+        known_at = dt.datetime.now(dt.UTC)
+        version_by_accession: dict[str, int] = {}
+        for filing in data.filings:
+            archive_url = (
+                "https://www.sec.gov/Archives/edgar/data/"
+                f"{int(filing.cik)}/{filing.accession.replace('-', '')}/"
+            )
+            amends_version_id = None
+            if filing.submission_type.endswith("/A"):
+                prior_accession = await conn.fetchval(
+                    """select accession from public.form13f_filing
+                       where cik=$1 and period=$2 and submission_type='13F-HR'
+                         and filed <= $3 order by filed desc limit 1""",
+                    filing.cik,
+                    filing.period,
+                    filing.filed,
+                )
+                if prior_accession:
+                    amends_version_id = await conn.fetchval(
+                        """select v.id from public.source_document d
+                           join public.source_document_version v on v.document_id=d.id
+                           where d.regulator='sec' and d.external_id=$1
+                           order by v.known_at desc limit 1""",
+                        prior_accession,
+                    )
+            version_by_accession[filing.accession] = await link_public_document(
+                conn,
+                regulator="sec",
+                external_id=filing.accession,
+                stable_url=archive_url,
+                document_type=filing.submission_type,
+                content=json.dumps(
+                    {
+                        "accession": filing.accession,
+                        "cik": filing.cik,
+                        "period": filing.period.isoformat(),
+                        "filed": filing.filed.isoformat(),
+                        "submission_type": filing.submission_type,
+                        "amendment_type": filing.amendment_type,
+                        "manager_name": filing.manager_name,
+                    },
+                    ensure_ascii=False,
+                    sort_keys=True,
+                ).encode("utf-8"),
+                content_hash=source_hash,
+                raw_location=url,
+                amends_version_id=amends_version_id,
+                known_at=known_at,
+                filed_at=filing.filed,
+                published_at=filing.filed,
+                domain_table="form13f_filing",
+                record_key=filing.accession,
+                quote=filing.manager_name,
+            )
         seen_ciks = {filing.cik for filing in data.filings} & {
             cik.zfill(10) for cik in (tracked_ciks or set())
         }
@@ -109,6 +168,20 @@ async def store_dataset(
                 for p in data.positions
             ],
         )
+        await conn.executemany(
+            """insert into public.source_record_evidence
+                 (domain_table,record_key,document_version_id,known_at)
+               values('institutional_holding',$1,$2,$3) on conflict do nothing""",
+            [
+                (
+                    f"{position.accession}:{position.infotable_sk}",
+                    version_by_accession[position.accession],
+                    known_at,
+                )
+                for position in data.positions
+                if position.accession in version_by_accession
+            ],
+        )
     return len(data.filings), len(data.positions)
 
 
@@ -118,6 +191,11 @@ async def _download(http: httpx.AsyncClient, url: str, target: Path) -> None:
         with target.open("wb") as out:
             async for chunk in response.aiter_bytes(1 << 20):
                 out.write(chunk)
+
+
+def _sha256_file(path: Path) -> str:
+    with path.open("rb") as source:
+        return hashlib.file_digest(source, "sha256").hexdigest()
 
 
 async def collect(ctx: JobContext, http: httpx.AsyncClient, settings: OwnershipSettings) -> None:
@@ -166,7 +244,16 @@ async def collect(ctx: JobContext, http: httpx.AsyncClient, settings: OwnershipS
                     set(tickers),
                     tracked_ciks,
                 )
-            filings, rows = await store_dataset(pool, url, data, tickers, ctx.job_id, tracked_ciks)
+                source_hash = await asyncio.to_thread(_sha256_file, path)
+            filings, rows = await store_dataset(
+                pool,
+                url,
+                data,
+                tickers,
+                ctx.job_id,
+                tracked_ciks,
+                source_hash,
+            )
             step.detail.update(filings=filings, positions=rows, cusips=sorted(tickers))
 
 

@@ -67,23 +67,35 @@ def parse_firds(body: dict[str, Any]) -> list[FirdsRecord]:
             current.get("publication_date", "")
         ):
             latest[doc["mic"]] = doc
-    return [
-        FirdsRecord(
-            isin=d["isin"],
-            mic=d["mic"],
-            full_name=d.get("gnr_full_name"),
-            short_name=d.get("gnr_short_name"),
-            cfi=d.get("gnr_cfi_code"),
-            currency=d.get("gnr_notional_curr_code"),
-            issuer_lei=d.get("lei"),
-            admitted_at=_ts(d.get("mrkt_issr_trdng_pprvl_date") or d.get("mrkt_trdng_rqst_date")),
-            first_trade_at=_ts(d.get("mrkt_trdng_start_date")),
-            terminated_at=_ts(d.get("mrkt_trdng_trmination_date")),
-            status=d.get("status"),
-            raw=d,
-        )
-        for d in sorted(latest.values(), key=lambda d: d["mic"])
+    return [_firds_record(d) for d in sorted(latest.values(), key=lambda d: d["mic"])]
+
+
+def _firds_record(doc: dict[str, Any]) -> FirdsRecord:
+    return FirdsRecord(
+        isin=doc["isin"],
+        mic=doc["mic"],
+        full_name=doc.get("gnr_full_name"),
+        short_name=doc.get("gnr_short_name"),
+        cfi=doc.get("gnr_cfi_code"),
+        currency=doc.get("gnr_notional_curr_code"),
+        issuer_lei=doc.get("lei"),
+        admitted_at=_ts(doc.get("mrkt_issr_trdng_pprvl_date") or doc.get("mrkt_trdng_rqst_date")),
+        first_trade_at=_ts(doc.get("mrkt_trdng_start_date")),
+        terminated_at=_ts(doc.get("mrkt_trdng_trmination_date")),
+        status=doc.get("status"),
+        raw=doc,
+    )
+
+
+def parse_firds_history(body: dict[str, Any]) -> list[FirdsRecord]:
+    """All published record states, including cancelled records, in publication order."""
+    documents = [
+        doc
+        for doc in body.get("response", {}).get("docs", [])
+        if doc.get("mic") and doc.get("isin")
     ]
+    documents.sort(key=lambda doc: str(doc.get("publication_date", "")))
+    return [_firds_record(doc) for doc in documents]
 
 
 def parse_fitrs(body: dict[str, Any]) -> FitrsRecord | None:
@@ -141,6 +153,13 @@ async def _solr(http: httpx.AsyncClient, url: str, isin: str, rows: int) -> dict
 
 async def firds(http: httpx.AsyncClient, isin: str) -> list[FirdsRecord]:
     return parse_firds(await _solr(http, FIRDS_URL, isin, PAGE_ROWS))
+
+
+async def firds_with_history(
+    http: httpx.AsyncClient, isin: str
+) -> tuple[list[FirdsRecord], list[FirdsRecord]]:
+    body = await _solr(http, FIRDS_URL, isin, PAGE_ROWS)
+    return parse_firds(body), parse_firds_history(body)
 
 
 async def fitrs(http: httpx.AsyncClient, isin: str) -> FitrsRecord | None:

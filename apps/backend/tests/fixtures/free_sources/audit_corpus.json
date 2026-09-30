@@ -1,0 +1,186 @@
+{
+  "as_of": "2026-09-29",
+  "securities": [
+    {
+      "symbol": "AAPL",
+      "country": "US",
+      "case": "ordinary"
+    },
+    {
+      "symbol": "MSFT",
+      "country": "US",
+      "case": "ordinary"
+    },
+    {
+      "symbol": "BRK.B",
+      "country": "US",
+      "case": "ordinary"
+    },
+    {
+      "symbol": "SHOP.TO",
+      "country": "CA",
+      "case": "ordinary"
+    },
+    {
+      "symbol": "SHOP",
+      "country": "US",
+      "case": "dual_listing"
+    },
+    {
+      "symbol": "ASML.AS",
+      "country": "NL",
+      "case": "ordinary"
+    },
+    {
+      "symbol": "ASML",
+      "country": "US",
+      "case": "adr"
+    },
+    {
+      "symbol": "SAP.DE",
+      "country": "DE",
+      "case": "ordinary"
+    },
+    {
+      "symbol": "SAP",
+      "country": "US",
+      "case": "adr"
+    },
+    {
+      "symbol": "NESN.SW",
+      "country": "CH",
+      "case": "ordinary"
+    },
+    {
+      "symbol": "7203.T",
+      "country": "JP",
+      "case": "ordinary"
+    },
+    {
+      "symbol": "TSM",
+      "country": "TW",
+      "case": "adr"
+    },
+    {
+      "symbol": "0700.HK",
+      "country": "HK",
+      "case": "ordinary"
+    },
+    {
+      "symbol": "RELIANCE.NS",
+      "country": "IN",
+      "case": "ordinary"
+    },
+    {
+      "symbol": "VALE3.SA",
+      "country": "BR",
+      "case": "ordinary"
+    },
+    {
+      "symbol": "NPN.JO",
+      "country": "ZA",
+      "case": "ordinary"
+    },
+    {
+      "symbol": "CBA.AX",
+      "country": "AU",
+      "case": "ordinary"
+    },
+    {
+      "symbol": "NOVO-B.CO",
+      "country": "DK",
+      "case": "ordinary"
+    },
+    {
+      "symbol": "SHEL.L",
+      "country": "GB",
+      "case": "ordinary"
+    },
+    {
+      "symbol": "SHEL",
+      "country": "US",
+      "case": "adr"
+    },
+    {
+      "symbol": "CEZ.PR",
+      "country": "CZ",
+      "case": "ordinary"
+    },
+    {
+      "symbol": "PKN.WA",
+      "country": "PL",
+      "case": "ordinary"
+    },
+    {
+      "symbol": "VOW3.DE",
+      "country": "DE",
+      "case": "ordinary"
+    },
+    {
+      "symbol": "META",
+      "country": "US",
+      "case": "ordinary"
+    },
+    {
+      "symbol": "PLTR",
+      "country": "US",
+      "case": "ordinary_smallcap_fixture"
+    },
+    {
+      "symbol": "VWCE.DE",
+      "country": "IE",
+      "case": "ucits_etf"
+    },
+    {
+      "symbol": "CSPX.L",
+      "country": "IE",
+      "case": "ucits_etf"
+    },
+    {
+      "symbol": "SPY",
+      "country": "US",
+      "case": "us_etf"
+    },
+    {
+      "symbol": "TWTR",
+      "country": "US",
+      "case": "delisted_renamed"
+    },
+    {
+      "symbol": "GOOG",
+      "country": "US",
+      "case": "dual_share_class"
+    },
+    {
+      "symbol": "GOOGL",
+      "country": "US",
+      "case": "dual_share_class"
+    }
+  ],
+  "countries": [
+    "US",
+    "CA",
+    "CZ",
+    "DE",
+    "NL",
+    "GB",
+    "JP",
+    "CN",
+    "IN",
+    "BR",
+    "ZA",
+    "AU"
+  ],
+  "hs_products": [
+    "27",
+    "30",
+    "39",
+    "72",
+    "84",
+    "85",
+    "87",
+    "90",
+    "10",
+    "61"
+  ]
+}
