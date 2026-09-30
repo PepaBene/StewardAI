@@ -10,6 +10,10 @@ The product is the owner's personal, single-user, self-hosted app. Its data is f
 
 **Definition of done:** a dataset must have an evidence-backed schema, dated coverage and uncertainty, an owner-visible use in a screen or alert, an as-of query, offline fixtures, an access record, and measurable accuracy. Ingesting a document alone is not completion.
 
+## Frontend visualization contract
+
+Use the established web app bespoke SVG chart system in `apps/web/src/components/charts/` and `lib/charts/`, alongside existing evidence, provenance, freshness and coverage patterns. Reuse a treemap, Sankey, heatmap, candlestick, line/bar or timeline primitive only when it matches the data; build specialized views for ownership rank-flow, disclosure lifecycles or dependency networks where needed. Pair every chart with an accessible semantic table/list, exact source/evidence drill-through and visible units, denominator, fiscal period, known-at date and coverage. Missing data is not zero; suggested/inferred, reported and confirmed values must have distinct encoding. Keep control, institutional ownership, fund look-through and insider transactions in separate visual channels.
+
 ## What StewardAI already has and what this plan extends
 
 | Existing path | Current useful base | Extension here |
@@ -97,6 +101,13 @@ Every owner-only read API returns `source`, `published_at`, `known_at`, `as_of`,
 
 **Dependency:** Free data plan D0 and identity baseline. **Exit:** every pilot source has a tested free route or a documented technical/paid-only gap; no production collector is enabled from a marketing claim.
 
+
+**Frontend**
+- [ ] Deliver this phase frontend in parallel with backend work, using fixture-backed typed contracts so UI implementation does not wait for live endpoints.
+- No production chart is needed during source feasibility. Capture the planned user-facing coverage states and provenance fields in sample fixtures so frontend work can begin against stable examples while access checks proceed.
+
+
+**Backend**
 - [ ] `P0.1` Create `docs/data/public-disclosure-source-registry.md` with each specific form, API endpoint or issuer page, jurisdiction, registration/authentication method, cost, rate limit, document formats, publication lag, tested date, responsible owner and technical stop condition. Link to the access table in D0.1/D0.7 and record the owner's permission as the shared assumption.
 - [ ] `P0.2` Assemble a reproducible 45-issuer corpus: at least 15 US, 10 ESEF Europe, 5 UK, 5 Japan, 5 Canada and 5 other jurisdictions; include an ADR, dual listing, fund, delisted issuer, renamed issuer, conglomerate and a company with a material disclosed customer. Use documents from distinct years and amendments. Map to existing held/watchlist identifiers without storing personal transactions in fixtures.
 - [ ] `P0.3` Capture 10 samples each for 13F amendment, 13D/G group, Form 4 purchase/sale and non-discretionary activity, N-PORT, 8-K deal/exhibit, XBRL note, ESEF block note, SEDAR+ Canadian filing, issuer consensus version and relationship disclosure. Record exact expected parsed fields, published dates and manual ground truth.
@@ -104,10 +115,18 @@ Every owner-only read API returns `source`, `published_at`, `known_at`, `as_of`,
 - [ ] `P0.5` Inventory current SEC/ESEF/ownership/insider/news tables and API consumers. Draw a migration map that identifies which existing row is extended, which new record is shared evidence, and which old suggestion must remain unverified. Baseline current dataset coverage and known false-positive rate.
 - [ ] `P0.6` Define release thresholds before coding: required evidence precision, identity match precision, numerical reconciliation, freshness and accessible-source coverage for each dataset; assign manual adjudication samples and an explicit zero-dollar cost check.
 
+
 ## Phase P1 — Filing corpus, identity and point-in-time foundation
 
 **Dependency:** P0. **Exit:** a filing, a later amendment and a restatement can be queried at three historical cutoffs without future knowledge appearing.
 
+
+**Frontend**
+- [ ] Deliver this phase frontend in parallel with backend work, using fixture-backed typed contracts so UI implementation does not wait for live endpoints.
+- Create the disclosure evidence browser as a searchable filing timeline with filing date versus accepted/published/known-at markers, amendment/supersession links and a coverage ribbon by issuer and period. A filing opens the exact cited page/table/span. Show source status and historical-known-at cutoff clearly.
+
+
+**Backend**
 - [ ] `P1.1` Add additive Supabase migrations for the shared schema above, with unique document/version keys, indexes for `(issuer_id, known_at)` and `(subject_id, object_id, valid_from)`, owner RLS and migration tests. Retain old IDs and foreign keys; use references/backfills, not a breaking rewrite of held-ticker tables.
 - [ ] `P1.2` Implement the source registry and fetch governor under `sources/`: free-access and authentication check before requests, request budget, user agent, retry-after, incremental cursors, checksum deduplication, failure classification and observability. Archive fetched original documents and link them to their source URL/hash for point-in-time replay.
 - [ ] `P1.3` Build document discovery for SEC submissions and targeted archive exhibits, then ESEF/issuer IR pilot. Parse filing index, primary document, exhibit list and XBRL package. Store accepted, filed, published, first-seen and retrieved dates separately; missing dates stay null with an explanation.
@@ -116,10 +135,18 @@ Every owner-only read API returns `source`, `published_at`, `known_at`, `as_of`,
 - [ ] `P1.6` Implement `as_of` repository methods and a provenance read endpoint. Query one selected issuer at pre-filing, post-filing and post-amendment cutoffs; verify values, relationships and events match contemporaneous knowledge. Show source version and evidence span in the review UI.
 - [ ] `P1.7` Add a reviewer queue for low-confidence parsing, entity ambiguity, contradictions and source-format changes. Decisions record the original candidate, reviewer and reason; a denied or superseded claim is auditable and excluded from authoritative calculations.
 
+
 ## Phase P2 — Point-in-time financial statements and notes
 
 **Dependency:** P1; free data plan D4.1/D4.8/D4.9. **Exit:** reconciled US statements and a smaller ESEF pilot support historical valuation without restatement leakage.
 
+
+**Frontend**
+- [ ] Deliver this phase frontend in parallel with backend work, using fixture-backed typed contracts so UI implementation does not wait for live endpoints.
+- Use statement line-item small multiples for as-filed trends, with restatement/version overlays; a cash-flow waterfall to explain operating cash → capex → free cash flow; and a debt/lease maturity timeline stacked by year and currency. Segment revenue/profit should be a treemap or mosaic with reported totals and eliminations retained. Put note values beside the cited source passage and never silently combine incompatible fiscal periods or dimensions.
+
+
+**Backend**
 - [ ] `P2.1` Define versioned metric taxonomy and accounting basis: revenue, gross/operating/net income, cash flows, cash/debt, shares, capex, tax, working capital, lease obligations, debt maturities, repurchases, dilution and pension/commitments. Store fiscal start/end, instant versus duration, original concept and taxonomy version.
 - [ ] `P2.2` Backfill SEC companyfacts and targeted filed instances for the corpus. Parse context IDs, units/scales, dimensions and issuer extensions; use the SEC Financial Statement and Notes datasets for targeted historical comparison. Link every chosen fact to the filing available on the as-of date.
 - [ ] `P2.3` Extract segment revenue, profit, assets, capex and geography/product facts with axes/members intact. Flag segment redefinitions and recast history. Do not sum overlapping geography and product axes, and show unknown/eliminations explicitly.
@@ -129,10 +156,18 @@ Every owner-only read API returns `source`, `published_at`, `known_at`, `as_of`,
 - [ ] `P2.7` Expose as-filed statement history, segment bridge and selected note drill-down in company analysis. Recompute margins, ROIC, debt maturity and cash conversion with input citations, coverage denominator and formula version; allow the owner to choose as-of date for a past investment decision.
 - [ ] `P2.8` Test restatement, amended filing, changed segment taxonomy, negative cash flow, unit multiplier, fiscal-year change and missing note. Require statement/segment arithmetic within documented tolerances before a value feeds a valuation or screener.
 
+
 ## Phase P3 — Institutional and major ownership
 
 **Dependency:** P1 identity and existing 13F collector; P0 national-source access tests. **Exit:** 13F, beneficial stakes and fund holdings are separate dated layers with useful change signals.
 
+
+**Frontend**
+- [ ] Deliver this phase frontend in parallel with backend work, using fixture-backed typed contracts so UI implementation does not wait for live endpoints.
+- Show ownership as separate aligned lanes: 13F institutional positions, 13D/G reported stakes, N-PORT fund exposure and national voting-rights/control disclosures. Use a quarter-by-quarter holder rank-flow/alluvial view for 13F change and a dated stake timeline for control filings; annotate filing lag, amendments, denominator and reported-vs-calculated basis. Add coverage/unknown remainder and never sum overlapping ownership systems.
+
+
+**Backend**
 - [ ] `P3.1` Extend 13F coverage from held CUSIPs to prioritized watchlist names/managers, including amendments, confidential-treatment indicators and manager identity changes. Reconcile totals, option put/call and voting/investment-discretion fields; do not call a 13F position a beneficial stake.
 - [ ] `P3.2` Ingest Schedule 13D/G and amendments for the pilot issuers. Capture filer and group members, class, shares/percentage, reported voting/dispositive power, purpose of transaction, agreement/exhibit links and measurement/filing times. Link later amendments and compute a *reported* stake delta only for the same class and comparable basis.
 - [ ] `P3.3` Pilot public N-PORT holdings for matched US funds, report date, filing date, securities and derivatives. Compare to issuer fund files; attribute differing dates, share classes, cash and derivatives. Never combine a fund holding with its manager's 13F as if they were two independent owners.
@@ -141,10 +176,18 @@ Every owner-only read API returns `source`, `published_at`, `known_at`, `as_of`,
 - [ ] `P3.6` Add company ownership view: 13F manager trends, reported 13D/G control stakes, fund holdings, sources/as-of dates, top changes and an unknown remainder. Add watchlist alerts for a verified major-holder filing or material stake amendment; avoid interpreting quarter-to-quarter 13F movement as trading intent.
 - [ ] `P3.7` Test 13F amendment replacement, same-manager name changes, CUSIP reuse, ADR/ordinary class, group aggregation, conflicting share denominators, N-PORT lag and non-US threshold differences. Sample manually before publishing any “top owners” or control alert.
 
+
 ## Phase P4 — Insider economic activity
 
 **Dependency:** P1; existing Forms 3/4/5 pipeline. **Exit:** a reader can distinguish discretionary open-market activity from mechanical compensation and tax events.
 
+
+**Frontend**
+- [ ] Deliver this phase frontend in parallel with backend work, using fixture-backed typed contracts so UI implementation does not wait for live endpoints.
+- Use a transaction event strip around filing dates, with distinct visual encodings for open-market P/S, awards, option exercises, tax withholding, gifts and unknown activity. Add a zero-centered diverging net-purchase chart by role and 30/90/365-day window only for classified discretionary transactions; show gross transactions, linked exercise-sale bundles, post-trade ownership and plan/derivative caveats in an evidence-linked detail table. Do not imply motive.
+
+
+**Backend**
 - [ ] `P4.1` Backfill existing US insider rows with exact filing/evidence IDs, issuer/insider identifiers, officer/director/10% owner roles, transaction date versus filing date, direct/indirect ownership, security class, price, shares, post-transaction holdings and amendment lineage.
 - [ ] `P4.2` Parse Form 4/5 footnotes and derivative table links, with referenced conversion/exercise price and expiry when disclosed. Retain original transaction code and reported 10b5-1 or non-10b5-1 plan indicator where the form provides it; never infer a plan from recurring dates alone.
 - [ ] `P4.3` Implement a documented economic classifier: open-market `P` purchase, `S` sale, `M` option exercise, `A` grant/award, `F` tax withholding, `G` gift, and other/unknown. Treat linked exercise-and-sale bundles together; discretionary net buying excludes grants, gifts, taxes, transfers and unknowns. Let reviewers override a misclassified filing with reason.
@@ -152,10 +195,18 @@ Every owner-only read API returns `source`, `published_at`, `known_at`, `as_of`,
 - [ ] `P4.5` Build insider analysis: open-market net shares/value by role and 30/90/365-day window, clusters of independent insiders, ownership after trade, market-cap/float context and plan/derivative caveats. Link to dilution, buybacks and earnings/deal windows without assigning motive.
 - [ ] `P4.6` Alert only on material verified open-market activity with deduplication by filing/amendment. Test corrections, split-adjusted shares, zero-price grants, derivative conversion, option exercise plus same-day sale and indirect trust holdings against reviewed examples.
 
+
 ## Phase P5 — Customer, supplier and revenue-dependency network
 
 **Dependency:** P1/P2 and existing `news/regulatory.py` suggestions. **Exit:** every confirmed edge has a cited passage, direction, dates and named/anonymous status.
 
+
+**Frontend**
+- [ ] Deliver this phase frontend in parallel with backend work, using fixture-backed typed contracts so UI implementation does not wait for live endpoints.
+- Use a directional, time-aware dependency graph for named entities and a separate concentration view for reported dependencies: ranked bars for named/anonymous customer shares, with an explicit unknown remainder, plus a portfolio exposure Sankey for confirmed edges only. A bounded scenario view may propagate only numeric disclosed/owner-assigned weights, show coverage at each hop and lower/upper bounds, and label qualitative edges as non-quantified. Suggested edges need a review state and source passage.
+
+
+**Backend**
 - [ ] `P5.1` Audit all existing SEC keyword-generated relationship suggestions. Fetch their exact passages and label true relationship, historical-only, hypothetical, negated, unrelated third party or ambiguous. Establish a precision baseline; do not auto-promote prior suggestions.
 - [ ] `P5.2` Build structured-first extractors for 10-K/20-F/10-Q/6-K customer concentration, segment notes, material agreements and exhibits; then issuer releases/IR and procurement notices. Capture section and paragraph/table offsets, contract term, exclusivity, minimum purchase and termination if actually disclosed.
 - [ ] `P5.3` Represent named buyer/supplier, anonymized “Customer A” or “three customers,” and industry/geography-only exposure as different claim shapes. Store reporter, counterparty, economic direction, product/service, fiscal period, revenue or purchases percentage/amount and denominator. Do not assign an anonymous label to a guessed real entity.
@@ -165,10 +216,18 @@ Every owner-only read API returns `source`, `published_at`, `known_at`, `as_of`,
 - [ ] `P5.7` Calculate customer concentration, largest disclosed dependency and portfolio network exposure using only reported percentages or clearly labeled owner-assigned weights. Keep an unknown remainder. Run a shock scenario through one or two confirmed hops, with dates and lower/upper coverage; avoid numerical propagation from qualitative-only edges.
 - [ ] `P5.8` Add company network and portfolio concentration views, change alerts for new/ended material relationships, and a review affordance for suggested edges. A user can trace each edge and percentage to the exact filing paragraph or table.
 
+
 ## Phase P6 — Public deal, financing and corporate-action terms
 
 **Dependency:** P1/P2/P5. **Exit:** material public transactions have an evidence-linked lifecycle and quantified portfolio implications where terms permit.
 
+
+**Frontend**
+- [ ] Deliver this phase frontend in parallel with backend work, using fixture-backed typed contracts so UI implementation does not wait for live endpoints.
+- Render deals as a lifecycle timeline with state transitions, dated term versions and filing links; pair it with a consideration bridge (cash/stock/debt/earnout) and a scenario waterfall for supportable portfolio or dilution impact. Distinguish announced terms, management projections, owner scenarios and unknown terms; show unaffected-price date and state evidence on hover/detail.
+
+
+**Backend**
 - [ ] `P6.1` Define an event taxonomy: acquisition, merger, divestiture/asset sale, IPO, follow-on, debt issuance/refinancing, spin-off, joint venture, strategic investment, buyback, tender offer and material commercial agreement. Define required/optional fields and state transitions per type.
 - [ ] `P6.2` Discover SEC 8-K/6-K items and cited exhibits, S-4/proxy/registration statements, 10-K/10-Q subsequent-event notes and issuer notices; cluster documents by parties, announced date and transaction identifier. Add non-US announcement adapters only after the P0 gate.
 - [ ] `P6.3` Extract announced price, cash/stock mix, exchange ratio, stake, financing and debt, earnout, closing conditions, termination fee, expected synergies and announced dates when stated. Store a typed unknown for absent terms; never fill gaps from an unsourced headline.
@@ -178,10 +237,18 @@ Every owner-only read API returns `source`, `published_at`, `known_at`, `as_of`,
 - [ ] `P6.7` Build a deal timeline, transaction-comparison filters and event alerts on holdings/watchlist. Show participant, state, latest terms, original and amended documents, scenario impact, confidence and explicit missing fields.
 - [ ] `P6.8` Test a withdrawn deal, multiple bids, cash-plus-stock consideration, spin-off share distribution, buyback authorization versus actual purchases, large debt refinancing and same-party simultaneous asset deal. Manually verify amounts/currencies/units and state chronology.
 
+
 ## Phase P7 — Public consensus, revisions and segment estimates
 
 **Dependency:** P1/P2; free data plan D4.5/D4.10. **Exit:** a small historical issuer consensus set produces reproducible actual comparisons and compatible revision history.
 
+
+**Frontend**
+- [ ] Deliver this phase frontend in parallel with backend work, using fixture-backed typed contracts so UI implementation does not wait for live endpoints.
+- Use estimate range/fan charts by fiscal period with mean/median/high/low and panel size, then revision slopegraphs across only comparable snapshots. At earnings, pair pre-release estimate with reported actual and a clearly defined surprise bridge; segment estimates get aligned small multiples with taxonomy/recast breaks marked. Put published consensus, named analyst estimates, company guidance, event-calendar estimates and owner scenarios in separate lanes.
+
+
+**Backend**
 - [ ] `P7.1` Create issuer IR consensus registry: URL/discovery method, publisher, whether values originate from third-party brokers, accessible format, authentication, update cadence and sample files. Use at least two issuers with reliably retrievable historical versions for the pilot; record missing files or incompatible definitions as coverage gaps, not licensing blocks.
 - [ ] `P7.2` Fetch accessible HTML/PDF/XLSX files with version hashes and publication timestamps. Extract headings, footnotes, panel size, fiscal-year/quarter definitions, currency, reported versus adjusted basis, mean/median/high/low and metric/segment taxonomy. Archive source versions for historical replay.
 - [ ] `P7.3` Keep `company_guidance`, `published_analyst_consensus`, `named_individual_estimate`, `owner_scenario` and `event_calendar_estimate` separate. Record if the publisher supplies consensus only for selected metrics or brokers. A management target never becomes an analyst estimate; a vendor event estimate is not a full historical consensus panel.
@@ -191,22 +258,38 @@ Every owner-only read API returns `source`, `published_at`, `known_at`, `as_of`,
 - [ ] `P7.7` Build company estimate timeline and event comparison: prior/latest accessible snapshot, revision markers, reported actual, surprise formula, panel-size/basis warnings and linked IR file. Use estimate snapshots known before earnings release; a later archived file cannot be used to score the earlier surprise.
 - [ ] `P7.8` Test fiscal-calendar roll, company restatement, changed adjusted definition, currency restatement, panel replacement, segment recast, missing analyst count and corrected IR file. Review at least 20 snapshot pairs before enabling revision alerts or factor-like screens.
 
+
 ## Phase P8 — Product integration and cross-dataset analytics
 
 **Dependency:** Published outputs from P2–P7. **Exit:** each dataset changes a decision or explicitly records why it cannot.
 
+
+**Frontend**
+- [ ] Deliver this phase frontend in parallel with backend work, using fixture-backed typed contracts so UI implementation does not wait for live endpoints.
+- Integrate company evidence views into existing holding/research pages and portfolio surfaces: filing timeline, statements/notes, ownership lanes, insider activity, dependency network, deal lifecycle and estimate timeline. Provide a portfolio concentration network and screening controls with covered/uncovered universe counts. Every chart mark drills into its evidence and carries period, unit, known-at date, source, method, confidence and coverage denominator; provide accessible data tables and honest empty/stale/error states.
+
+
+**Backend**
 - [ ] `P8.1` Add owner-only read APIs under `apps/backend/src/api/` for `company/{id}/disclosures`, `/ownership`, `/insiders`, `/dependencies`, `/deals`, `/estimates`, `/financials?as_of=` and `/data/coverage`. Support date, period, source, verified-only and pagination filters; return provenance, access state and confidence without exposing API keys or unnecessary raw payloads. Update OpenAPI and generated web types.
-- [ ] `P8.2` Extend existing holding/research pages with tabs or sections, rather than parallel profiles: as-filed financials/notes, control and institutional ownership, classified insider trades, dependency graph, deal timeline and estimates. Each numeric card has unit, fiscal period, as-of/known-at, source, method and coverage state.
+- [ ] `P8.2` Define stable response models for as-filed financials/notes, separate control and institutional ownership, classified insider trades, dependency claims, deal timeline and estimates. Include unit, fiscal period, as-of/known-at, source, method and coverage state.
 - [ ] `P8.3` Extend portfolio look-through and risk: aggregate direct and fund exposures to confirmed issuer relationships, major transaction impacts and concentrated customers; preserve unknown weights, mixed as-of dates and fund reporting lag. Calculate totals only over covered market value and show the denominator.
 - [ ] `P8.4` Add screening and peer criteria based on verified fields: cash conversion, debt maturity, insider discretionary buys, stake change, customer concentration, segment surprise and deal exposure. Show universe size and excluded securities; avoid ranking missing data as a zero score.
 - [ ] `P8.5` Feed confirmed changes into existing thesis/monitor/news flow: new controlling stake, material insider buy cluster, customer loss, deal state transition, debt maturity change and estimate revision. Deduplicate by evidence/event ID, throttle alerts and display why the rule fired. Suggested edges and unverified estimates generate review tasks, not high-confidence breach alerts.
 - [ ] `P8.6` Add an evidence-aware research answer path: retrieve verified stored claims and their passage links; have the model explain them with dates and uncertainty. The model must not calculate authoritative totals or invent undisclosed customer identities/consensus.
-- [ ] `P8.7` Add historical decision replay: select a past date, reconstruct holdings and only the filings/estimates/deals known then, show what later changed, and prevent future filings or revised macro observations from leaking into the old analysis.
+- [ ] `P8.7` Add historical decision-replay API support: reconstruct holdings and only filings/estimates/deals known at the requested date, return later changes separately, and prevent future filings or revised macro observations from leaking into the historical result.
+
 
 ## Phase P9 — Verification, rollout and operations
 
 **Dependency:** P0–P8. **Exit:** phased release with measured coverage, accuracy, technical access and zero paid cost.
 
+
+**Frontend**
+- [ ] Deliver this phase frontend in parallel with backend work, using fixture-backed typed contracts so UI implementation does not wait for live endpoints.
+- Visually verify dense and sparse issuers, amended/restated histories, mixed jurisdictions, unknown denominators and provider failure. Reconcile every chart total to the backend/API and cited filing; check as-of replay excludes later filings and revisions. Release charts only after domain review confirms their encodings do not conflate control, holdings, reported estimates or inferred relationships.
+
+
+**Backend**
 - [ ] `P9.1` Add offline parser and migration tests for every enabled adapter; include malformed XML/XBRL, HTML table shifts, PDF layout variation, amendments, rate limits, authentication denial, duplicate documents and delayed publication. CI uses fixtures and no paid or private API keys.
 - [ ] `P9.2` Run a 30-day shadow collection for held/watchlist issuers and the P0 corpus. Compare new outputs with current SEC/13F/insider/graph cards, measure incremental decision-critical coverage, request volume, parsing failures, entity match precision and technical access gaps. Keep low-value sources dormant.
 - [ ] `P9.3` Manually adjudicate samples for each published dataset: 100 relationship claims; 50 owner/stake matches; 50 insider economic classifications; 30 deal states/terms; 20 consensus revision pairs; and 30 financial note values. Set and meet domain-specific precision targets from P0; report both numerator and denominator.
@@ -214,6 +297,7 @@ Every owner-only read API returns `source`, `published_at`, `known_at`, `as_of`,
 - [ ] `P9.5` Check portfolio math with split/FX/currency/share-class cases and disclosed versus unknown exposure. Test failure of each optional source: retain last verified fact with stale label, show unavailable where needed, and avoid alerting on collection failure.
 - [ ] `P9.6` Validate backup/restore, retention and deletion by source, reviewer audit, RLS, secret handling, provider shutdown and migration rollback. Keep SEDAR+ and broker-estimate adapters active as pilots under the owner's permission; classify only authentication, retrieval, paid-only and data-coverage failures as gaps.
 - [ ] `P9.7` Publish a coverage and quality report by dataset, jurisdiction, issuer and time period, including known blind spots, free-tier cost ledger ($0), sampled error rates and first/last known dates. Release screens in order: verified SEC/PIT foundation → ownership/insiders → relationships/deals → accessible estimates → additional jurisdictions.
+
 
 ## Dependencies on the two companion plans
 

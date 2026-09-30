@@ -40,6 +40,10 @@ This is a code audit, not a claim that every field in a filing is already collec
 
 The biggest immediate wins are **SEC note/dimensional XBRL, actual passage validation of existing customer/supplier suggestions, 13D/G beside 13F, economically classified Form 4, issuer-published consensus, and true macro vintages**. Include SEDAR+ in the Canadian filing discovery pilot under the owner's stated permission; test its authentication, retrieval method, stability and throughput alongside issuer-hosted Canadian disclosures. Do not mark it blocked solely because of licensing.
 
+## Frontend visualization contract
+
+The existing web app favors purpose-built SVG/data components under `apps/web/src/components/charts/` and `lib/charts/`, paired with provenance-rich detail panels (for example portfolio look-through, risk, price and ownership). Extend those conventions rather than introducing generic dashboard charts: use a chart only when its visual encoding answers a decision question, and keep exact values accessible through a semantic table/list equivalent. Reuse the existing treemap, Sankey, heatmap, candlestick, radar, line/bar and shared chart primitives where their semantics fit; add a new bespoke chart only for a distinct analytic task. Charts must distinguish missing from zero, show denominator and units, preserve uncertainty/coverage, and link marks to evidence. Avoid maps or networks as decoration; include ranked or tabular alternatives for precise comparisons.
+
 ## Provider allocation and actual use
 
 | Provider | Maximum useful free role | Product-facing use after verification | Boundary to retain |
@@ -132,6 +136,13 @@ These are proposed *release targets*, not claims about what free sources can pro
 
 **Dependency:** none. **Outcome:** a tested, zero-cost source matrix and a representative symbol/country corpus.
 
+
+**Frontend**
+- [ ] Deliver this phase frontend in parallel with backend work, using fixture-backed typed contracts so UI implementation does not wait for live endpoints.
+- No new charts are required in the access spike. Specify the shared frontend states that later phases must support: verified value, stale last-good value, partial coverage, not covered, paid-only, quota exhausted, access unverified, disputed and temporarily unavailable. Show source, as-of date and coverage denominator wherever a view consumes new data.
+
+
+**Backend**
 - [ ] `D0.1` Create `docs/data/provider-access.md` with one row per **endpoint**, not merely provider: free account/key type, authentication, quota/reset timezone, market/history scope, rate limit, tested date, working request, observed response and paid-only denial if applicable. Record the owner's permission as the shared project assumption. Include all 13 named providers.
 - [ ] `D0.2` Register free keys only for selected test accounts. Store actual keys in the existing backend secret settings; put only variable names and empty placeholders in `.env.example`. Never log keys or expose them to the browser. Use a zero spending cap where supported; otherwise avoid a payment method and disable upgrades/overages. Confirm a paid-tier denial is a typed `paid_only` result.
 - [ ] `D0.3` Build a reproducible fixture of at least 30 securities: US and non-US ordinary shares including a Canadian issuer, an ADR, dual listings, a delisted/renamed line, small caps, and UCITS/US ETFs; add at least 12 countries across OECD and non-OECD regions and 10 HS products. Include current holdings and watchlist items without copying secrets or personal transactions into fixtures.
@@ -142,10 +153,18 @@ These are proposed *release targets*, not claims about what free sources can pro
 
 **Exit checks:** the matrix has no unknown access state for a production endpoint; every source has a tested free route, a paid-only response or an explicit technical gap; a disabled/missing key never breaks the existing app.
 
+
 ## Phase 1 — Shared identity, provenance, quotas and availability
 
 **Dependency:** Phase 0. **Outcome:** every later adapter writes through one governed pipeline.
 
+
+**Frontend**
+- [ ] Deliver this phase frontend in parallel with backend work, using fixture-backed typed contracts so UI implementation does not wait for live endpoints.
+- Extend the existing reference gaps, job status and freshness patterns into a source-coverage view: a matrix of provider × dataset × held/watchlist entity, with freshness and access state, plus a compact request-budget burn chart and drill-through to the failed endpoint/job. Preserve the current value while a refresh fails. Provide accessible table equivalents and source/evidence links.
+
+
+**Backend**
 - [ ] `D1.1` Add versioned migrations alongside `supabase/migrations/` for canonical `issuer`, `security`, `security_listing`, `provider_identifier`, `provider_access`, `source_observation`, `source_conflict`, and `coverage_status` records. Link existing `instrument`/`instrument_identifier` rows; migrate without replacing Trading212's ticker-based foreign keys in one step. Keep owner-only RLS, explicit `app_backend` privileges and safe indices.
 - [ ] `D1.2` Implement a match service using ISIN/LEI/FIGI/CIK/MIC, then names and domains only as suggestions. Score candidates, reject conflicting currencies/share classes, expose unresolved matches in the existing reference-gap UI, and allow an owner override with history.
 - [ ] `D1.3` Add an adapter protocol under `apps/backend/src/steward/sources/`: `discover`, `fetch`, `normalize`, `validate`, `coverage`, and `access`. A source returns `available`, `not_covered`, `paid_only`, `access_unverified`, `quota_exhausted`, `temporarily_failed`, or `disputed`; it must not return an empty success for a 403/429.
@@ -158,10 +177,18 @@ These are proposed *release targets*, not claims about what free sources can pro
 
 **Exit checks:** an ADR/ordinary share pair stays distinct but shares an issuer; a provider 403/429 cannot erase the last good public observation; all new tables pass owner/non-owner/anon RLS tests; historical as-of queries exclude later revisions.
 
+
 ## Phase 2 — Global macro, financial cycle and trade
 
 **Dependency:** Phase 1. **Sources:** World Bank, OECD, BIS, ECB, UN Comtrade. **Outcome:** country and sector exposure can be explained with dated, comparable data.
 
+
+**Frontend**
+- [ ] Deliver this phase frontend in parallel with backend work, using fixture-backed typed contracts so UI implementation does not wait for live endpoints.
+- For macro, use aligned small-multiple time series with release/revision markers and selectable first-release versus latest-vintage values; compare countries with indexed lines or a ranked slopegraph, not a mixed-unit shared axis. For country exposure use a choropleth only as an overview with a ranked bar/table for precise comparison. For Comtrade, use a bilateral flow Sankey for product→partner mix, paired with a concentration trend and an explicit unknown/unmapped share. Only show issuer impact after an evidence-backed segment/product→country/HS mapping; label reported, estimated and owner-assigned weights differently.
+
+
+**Backend**
 - [ ] `D2.1` Extend `macro_series` or add a versioned observation table so its current source check admits the new providers and stores frequency, seasonal adjustment, unit multiplier, geography, release time and revision/vintage. Do not overwrite earlier published values on update.
 - [ ] `D2.2` Add World Bank Indicators API adapter for a curated set: nominal/real GDP, population, income level, government debt, external debt, industry/value-added mix, trade openness and energy dependence. Cache annual releases, surface missing years, and retain indicator metadata and provenance.
 - [ ] `D2.3` Add OECD SDMX adapter for inflation, unemployment, productivity, wages, consumer/business confidence, housing and selected industry series. Store code lists and exact transformation definitions; compare overlapping ECB/Eurostat/World Bank observations without assuming they are identical concepts.
@@ -175,10 +202,18 @@ These are proposed *release targets*, not claims about what free sources can pro
 
 **Exit checks:** one recession/credit example, one currency/rate example and one HS trade example can be traced from source observation through exposure mapping to an affected holding; zero-exposure and unknown-exposure paths do not manufacture a company effect. UN Comtrade data appears after its free API access and quota behavior pass the Phase 0 test.
 
+
 ## Phase 3 — Price coverage and corporate-action truth
 
 **Dependency:** Phase 1. **Sources:** EODHD, Alpha Vantage, Twelve Data, Finnhub, existing Stooq/Yahoo/Trading212. **Outcome:** defensible price and return history for the investable portfolio.
 
+
+**Frontend**
+- [ ] Deliver this phase frontend in parallel with backend work, using fixture-backed typed contracts so UI implementation does not wait for live endpoints.
+- Extend price/risk views with a candlestick/volume chart and corporate-action/event markers; use an event-study panel around splits/dividends only after adjusted/raw series are reconciled. Show cross-holding correlations as a clustered diverging heatmap with selectable windows and shared-observation counts. Surface venue-session coverage as a calendar/coverage strip so genuine missing trading days stand out from holidays. All views retain currency, adjustment basis, source and as-of context.
+
+
+**Backend**
 - [ ] `D3.1` Expand the existing `price_bar` source constraint and metadata with canonical listing, raw versus adjusted type, quote unit (`GBP` versus `GBX`), MIC, exchange-local session date, UTC fetch time, source timestamp, and access state. Never splice differently adjusted series under one symbol.
 - [ ] `D3.2` Use EODHD's free one-year EOD data only for high-value unresolved held/watchlist listings, after its exchange symbol list confirms the suffix. Spend no more than its free 20-call daily budget. Use it as fallback/corroboration, not the historical source for a global screener.
 - [ ] `D3.3` Evaluate Alpha Vantage daily OHLCV and available commodity/FX series within its 25-call daily budget. Assign calls first to holdings without a usable primary price, then to source disagreements. Retain the existing Company Overview job's share of that budget.
@@ -192,10 +227,18 @@ These are proposed *release targets*, not claims about what free sources can pro
 
 **Exit checks:** split/dividend fixtures preserve economic value across the action; GBX/GBP and ADR-ratio fixtures cannot create 100× errors; 1Y return from a fallback source is reproducible; unsupported global markets are labelled, not backfilled from trial symbols.
 
+
 ## Phase 4 — Fundamentals, sectors and the estimates boundary
 
 **Dependency:** Phases 1 and 3. **Sources:** SEC/ESEF baseline, Alpha Vantage, Finnhub, FMP, issuer reports. **Outcome:** comparable company histories and honest forward-looking fields.
 
+
+**Frontend**
+- [ ] Deliver this phase frontend in parallel with backend work, using fixture-backed typed contracts so UI implementation does not wait for live endpoints.
+- Build an as-filed financial explorer with statement line-item small multiples and period/version selectors; use a cash-to-earnings waterfall for cash conversion, a debt-maturity timeline/stacked bars by year and currency, and a segment treemap (area = reported revenue, color = margin/growth only when definitions align). For estimates, use a dated fan/range chart with mean/median/range and analyst count, plus revision slope between comparable snapshots. Separate actual, guidance, consensus and scenario visually and expose restatements and missing coverage.
+
+
+**Backend**
 - [ ] `D4.1` Expand the existing `fundamentals`/`valuation` models from latest per-share figures to a periodized statement fact store: income, cash flow, balance sheet, shares, segments, basis (US GAAP/IFRS), fiscal period, currency, restatement lineage and filing publication time. Reuse SEC/ESEF parsers; never mix reported and adjusted figures in one ratio.
 - [ ] `D4.2` Add Alpha Vantage statement/overview probes behind the Phase 0 endpoint gates. Use successful free responses to fill specific missing fields or challenge SEC/ESEF-derived values; preserve provenance and source confidence. Reserve budget for the existing overview fallback.
 - [ ] `D4.3` Retain Finnhub basic metrics as a second-source cross-check and earnings calendar as an event source. Evaluate free peers and last-four-quarter surprise data for candidate peers and earnings history. Mark global standardized statements, forward estimates, fund ownership, ETF/index constituents as unavailable on its free plan.
@@ -209,10 +252,18 @@ These are proposed *release targets*, not claims about what free sources can pro
 
 **Exit checks:** sample GAAP/IFRS peers cannot be compared without an explicit common metric definition; a restatement changes the current view but does not change an old as-of report; a premium-only forward estimate never appears as an inferred free value.
 
+
 ## Phase 5 — Company graph, leadership and patents
 
 **Dependency:** Phases 1 and 4. **Sources:** Diffbot, PDL, EPO OPS, existing GLEIF/Wikidata/EDGAR. **Outcome:** a sourced business and technology map that can affect a thesis.
 
+
+**Frontend**
+- [ ] Deliver this phase frontend in parallel with backend work, using fixture-backed typed contracts so UI implementation does not wait for live endpoints.
+- Represent legal structure as a time-aware entity graph with edge type, evidence tier and valid dates; keep consolidation/control distinct from ownership. Use a patent landscape matrix (technology class × year, size = families, color = citations or legal status) and a ranked peer/leadership comparison rather than a decorative network. Alias/peer suggestions remain visually distinct from confirmed facts and open the source passage.
+
+
+**Backend**
 - [ ] `D5.1` Add Diffbot organization matching by website/domain and resolved legal name, with one monthly credit pool for holdings/watchlist before wider discovery. Pull competitor, acquisition, funding, leadership, product and parent candidates plus source URLs and dates; spend Extract/NLP calls on relevant primary pages rather than exporting entire graph neighborhoods.
 - [ ] `D5.2` Extend `entity_relationship` without weakening the existing GLEIF parent definition. Add typed `partner`, `acquirer`, `acquired`, `investor`, `investment`, `product`, `technology`, and `executive` edges in a new normalized edge model if the old constraint cannot represent them. Include start/end validity, evidence, direction and `suggested`/`confirmed`/`rejected` status. Accounting parent and commercial relationship remain separate types.
 - [ ] `D5.3` Use PDL's small free company allowance only where identity, headcount trend or funding remains unresolved. Avoid personal-contact enrichment because it does not serve company analysis. Compare headcount and funding to company filings/announcements; store dated observations and a retrieval audit.
@@ -227,10 +278,18 @@ These are proposed *release targets*, not claims about what free sources can pro
 
 **Exit checks:** a subsidiary patent is not attributed to a parent without a dated ownership path; a same-name company match stays suggested; a rejected Diffbot edge does not reappear unchanged; a confirmed deal cites primary evidence.
 
+
 ## Phase 6 — Funds, indices, institutional ownership and look-through
 
 **Dependency:** Phases 1, 3 and 4. **Sources:** existing issuer holdings/SEC 13F, Finnhub/FMP free probes, public fund filings. **Outcome:** transparent portfolio exposure rather than claimed full global fund coverage.
 
+
+**Frontend**
+- [ ] Deliver this phase frontend in parallel with backend work, using fixture-backed typed contracts so UI implementation does not wait for live endpoints.
+- Extend portfolio X-Ray using a nested treemap for issuer/sector/geography and a Sankey from portfolio position → fund → underlying issuer, sized by look-through weight; preserve cash, unlooked-through funds and unknown remainder. For ownership, show quarter-by-quarter holder breadth and share changes with a zero-centered diverging bar or slopegraph, and a top-holder rank-flow chart; annotate quarter end and filing lag. Never stack/sum 13F, N-PORT, issuer fund holdings or control stakes as if they were disjoint ownership.
+
+
+**Backend**
 - [ ] `D6.1` Extend `lookthrough/` beyond configured CSPX/VWCE where issuer-published holdings are accessible. Record fund ISIN/share class, holdings as-of date, assets, expense ratio, cash/derivative remainder, coverage and look-through basis. Do not equate an ETF proxy's constituents with an official index history.
 - [ ] `D6.2` Test Finnhub ETF profile/holdings, index constituents and institutional ownership plus FMP ETF/ownership endpoints under actual free keys. Their documented premium features remain disabled when denied. Preserve provider adapters as opt-in probes, not required dependencies.
 - [ ] `D6.3` Use SEC N-PORT data for US fund-holdings gaps and existing Form 13F for US institutional ownership. Keep distinct reporting lags, investor thresholds and the difference between fund positions and beneficial ownership. Map CUSIP/ISIN/issuer carefully.
@@ -243,24 +302,40 @@ These are proposed *release targets*, not claims about what free sources can pro
 
 **Exit checks:** fund holdings weights plus cash/derivatives/unclassified reconcile to the published snapshot within tolerance; duplicate ADR and ordinary-share exposure is merged at issuer level but traceable to both securities; stale fund holdings are visibly stale.
 
+
 ## Phase 7 — Make the new data usable throughout the app
 
 **Dependency:** Phases 2–6. **Outcome:** every accessible source has a concrete consumer; missing data has an honest UI.
 
-- [ ] `D7.1` Add `/data/coverage` and `/sources/access` owner-only read APIs and frontend panels in Activity/Config. Show coverage by security, geography, metric, period and source; quota headroom, freshness and last denial; never show API keys.
-- [ ] `D7.2` Extend holdings with sections for global financial history, country/trade exposure, business network, patents, and source disagreements. Hide no-data cards only after showing a clear gap link; label vendor-derived versus primary values.
+
+**Frontend**
+- [ ] Deliver this phase frontend in parallel with backend work, using fixture-backed typed contracts so UI implementation does not wait for live endpoints.
+- Integrate these views into existing holding, research, Overview, portfolio, digest and Activity surfaces instead of creating parallel dashboards. Add a filterable coverage atlas by dataset/entity/period and a screen builder with universe size, excluded count and missing-data treatment. Every chart needs a plain-language takeaway, units/denominator, source/as-of, freshness, coverage state, keyboard access and a table/list equivalent; clicking a mark drills to evidence.
+
+
+**Backend**
+- [ ] `D7.1` Add `/data/coverage` and `/sources/access` owner-only read APIs with coverage by security, geography, metric, period and source; quota headroom, freshness and last denial. Never return API keys.
+- [ ] `D7.2` Extend holding read models with global financial history, country/trade exposure, business network, patents and source disagreements, including explicit gaps and primary-versus-vendor provenance.
 - [ ] `D7.3` Extend the portfolio overview with aggregate macro sensitivities (weighted, reported versus inferred), country and product concentration, adjusted-return coverage and fund overlap. Roll up only mapped/covered holdings; display the denominator beside every percentage.
 - [ ] `D7.4` Add read-only research APIs for country/industry/company context so deep research and chat cite stored observations. Let AI explain links and uncertainty; keep numeric aggregations in deterministic code. Add “known as of” dates to every report claim.
 - [ ] `D7.5` Add event rules for credit stress, trade exposure changes, material patent/legal-status changes and significant confirmed company-graph events. Throttle and deduplicate alerts using existing `news/` and `monitor` machinery. Show a decision trail to the owner.
 - [ ] `D7.6` Update backend README, setup guide, OpenAPI and web README with exact source setup, user-visible scope, expected data delays and removal/disable behavior.
-- [ ] `D7.7` Expose the audited-source additions in existing company, ownership, portfolio and research views: filed-note drill-down, control versus institutional positions, classified insider activity, validated dependency graph, deal timeline and public consensus with publication vintage. Every derived figure links to the source passage and known-at date; missing or technically inaccessible data shows an explicit coverage reason.
+- [ ] `D7.7` Expose stable read models for filed-note evidence, separate control/institutional positions, classified insider activity, validated dependencies, deal states and public consensus vintages. Every derived figure carries source passage, known-at date and explicit coverage reason.
 
 **Exit checks:** each of the 13 providers has a documented user-facing or internal quality-control consumer and an access status; owner can follow a portfolio-level insight back to the underlying source; removing any optional key degrades coverage but does not fail portfolio sync.
+
 
 ## Phase 8 — Verification, operations and zero-cost access gate
 
 **Dependency:** all prior phases. **Outcome:** repeatable, auditable operation under free limits.
 
+
+**Frontend**
+- [ ] Deliver this phase frontend in parallel with backend work, using fixture-backed typed contracts so UI implementation does not wait for live endpoints.
+- Run visual acceptance against representative desktop and narrow layouts, dense and sparse coverage, stale/error states and keyboard/screen-reader navigation. Compare chart aggregates against API totals and source-linked records; ensure legends, units, denominators and partial coverage are visible. Record which screens remain unavailable when optional keys/providers are disabled.
+
+
+**Backend**
 - [ ] `D8.1` Add parser fixtures and contract tests for every adapter, including empty/partial responses, schema drift, revised data, 403/429 and quota reset. Use live tests sparingly against an explicit test budget; CI must not need third-party keys.
 - [ ] `D8.2` Run a 30-day shadow collection on held/watchlist securities and representative countries. Measure metric coverage, source disagreement, false matches, freshness, quota consumption, failed jobs and value added over existing sources. Publish a sign-off report; keep low-value adapters as dormant, documented gap-fill options rather than spending their free quotas routinely.
 - [ ] `D8.3` Reconcile sampled prices, corporate actions, financial statements, fund weights, macro releases and patent families manually against primary sources. Set domain-specific error thresholds before enabling any new alert or valuation conclusion.
@@ -269,6 +344,7 @@ These are proposed *release targets*, not claims about what free sources can pro
 - [ ] `D8.6` Add audit-specific fixtures and review samples for filing amendments/restatements, XBRL dimension collisions, SEC notes, 13D/G groups, Form 4 non-discretionary codes, false customer/supplier mentions, anonymous customer percentages, deal reversals and stale consensus. Require sampled evidence precision and point-in-time correctness before publishing each derived signal; report measured coverage by jurisdiction and metric.
 
 **Exit checks:** provider spend is $0; no accidental premium endpoint or overage is reachable; coverage and uncertainty are visible; a source outage never changes a previously verified fact into an unsupported claim.
+
 
 ## Handoff to the feature plan
 
