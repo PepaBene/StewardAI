@@ -478,7 +478,8 @@ def test_ledger_flags_proxy_unknown_total_return_and_unmapped_funds() -> None:
     )
     by_key = {(e.subject_kind, e.subject_key): e for e in entries}
     assert by_key[("fund", CSPX_ISIN)].tier == "issuer_downloadable"
-    assert by_key[("fund", CSPX_ISIN)].historical_constituents is True
+    # Three retained snapshots are not a constituent history (audit C-low): unknown, not True.
+    assert by_key[("fund", CSPX_ISIN)].historical_constituents is None
     assert by_key[("fund", "IE0000000009")].tier == "unavailable"
     spx = by_key[("index", "^spx")]
     assert spx.tier == "proxy_fund" and "not the official index history" in spx.reason
@@ -647,10 +648,35 @@ async def test_expense_ratio_lookup_skips_nulls_and_respects_as_of(
         ManualFactsheet(CSPX_ISIN, dt.date(2026, 9, 1), expense_ratio=Decimal("0.0005")),
     )
     await store_manual_factsheet(backend_pool, ManualFactsheet(CSPX_ISIN, dt.date(2026, 9, 20)))
+    # Point in time is `fetched_at` (B39), not the holdings date the factsheet describes: the
+    # three rows above were fetched just now, so date them to when each was really known.
+    for as_of, fetched in (
+        (dt.date(2026, 3, 1), dt.datetime(2026, 3, 2, 9, tzinfo=dt.UTC)),
+        (dt.date(2026, 9, 1), dt.datetime(2026, 9, 2, 9, tzinfo=dt.UTC)),
+    ):
+        await backend_pool.execute(
+            "update fund_factsheet set fetched_at = $2"
+            " where fund_isin = $1 and as_of = $3",
+            CSPX_ISIN,
+            fetched,
+            as_of,
+        )
+    await backend_pool.execute(
+        "update fund_factsheet set fetched_at = '2026-09-21'::timestamptz"
+        " where fund_isin = $1 and as_of = '2026-09-20'",
+        CSPX_ISIN,
+    )
     assert (await latest_expense_ratios(backend_pool, [CSPX_ISIN]))[CSPX_ISIN] == Decimal("0.0005")
     early = await latest_expense_ratios(backend_pool, [CSPX_ISIN], dt.date(2026, 6, 1))
     assert early[CSPX_ISIN] == Decimal("0.0007")
     assert await latest_expense_ratios(backend_pool, [CSPX_ISIN], dt.date(2026, 1, 1)) == {}
+    # Fetched on the as-of day counts; fetched the day after does not.
+    assert (await latest_expense_ratios(backend_pool, [CSPX_ISIN], dt.date(2026, 9, 2)))[
+        CSPX_ISIN
+    ] == Decimal("0.0005")
+    assert (await latest_expense_ratios(backend_pool, [CSPX_ISIN], dt.date(2026, 9, 1)))[
+        CSPX_ISIN
+    ] == Decimal("0.0007")
 
 
 async def test_api_aggregate_shows_unknown_weight_and_dates(

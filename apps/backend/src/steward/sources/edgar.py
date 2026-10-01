@@ -253,26 +253,72 @@ def parse_index(text: str) -> list[tuple[str, str]]:
 
 
 PERIODIC_FORMS = ("10-K", "10-Q", "20-F", "40-F", "10-K/A", "20-F/A")
-ANNUAL_FORMS = ("10-K", "20-F", "40-F", "10-K/A", "20-F/A")
+ANNUAL_FORMS = ("10-K", "20-F", "40-F", "10-K/A", "20-F/A", "40-F/A")
+QUARTER_FORMS = ("10-Q", "10-Q/A")
 
 
-def latest_periodic(filings: list[Filing]) -> tuple[Filing | None, Filing | None]:
-    """The latest annual report (10-K / 20-F / 40-F) and the latest 10-Q filed after it."""
-    ordered = sorted(filings, key=lambda f: (f.filing_date, f.accession), reverse=True)
-    annual = next((f for f in ordered if f.form in ANNUAL_FORMS), None)
+def is_amendment(form: str) -> bool:
+    return form.upper().endswith("/A")
+
+
+def _sort_key(f: Filing) -> tuple[dt.date, str]:
+    return (f.filing_date, f.accession)
+
+
+def latest_periodic(
+    filings: list[Filing], full_amendments: frozenset[str] | set[str] = frozenset()
+) -> tuple[Filing | None, Filing | None]:
+    """The latest annual report (10-K / 20-F / 40-F) and the latest 10-Q filed after it.
+
+    An amendment (10-K/A) is usually Part III only: it carries the cover page, not the
+    financial statements, so taking it as "the annual report" would hide the original from
+    every parser (B28). An amendment counts only when its accession is in `full_amendments`
+    (the caller read its instance and found the full financial statements, i.e. a
+    restatement); otherwise the latest original wins."""
+    ordered = sorted(filings, key=_sort_key, reverse=True)
+
+    def usable(f: Filing) -> bool:
+        return not is_amendment(f.form) or f.accession in full_amendments
+
+    annual = next((f for f in ordered if f.form in ANNUAL_FORMS and usable(f)), None)
     quarter = next(
         (
             f
             for f in ordered
-            if f.form in ("10-Q", "10-Q/A")
-            and (
-                annual is None
-                or (f.filing_date, f.accession) > (annual.filing_date, annual.accession)
-            )
+            if f.form in QUARTER_FORMS
+            and usable(f)
+            and (annual is None or _sort_key(f) > _sort_key(annual))
         ),
         None,
     )
     return annual, quarter
+
+
+def amendments_to_check(filings: list[Filing]) -> list[Filing]:
+    """Periodic-report amendments filed after the latest original of their kind: the ones
+    whose instance must be read to know whether they restate the statements."""
+    ordered = sorted(filings, key=_sort_key, reverse=True)
+    out: list[Filing] = []
+    for forms in (ANNUAL_FORMS, QUARTER_FORMS):
+        original = next((f for f in ordered if f.form in forms and not is_amendment(f.form)), None)
+        out += [
+            f
+            for f in ordered
+            if f.form in forms
+            and is_amendment(f.form)
+            and (original is None or _sort_key(f) > _sort_key(original))
+        ]
+    return out
+
+
+def amended_filing(filings: list[Filing], amendment: Filing) -> Filing | None:
+    """The filing an amendment amends: the latest earlier original of the base form for the
+    same report date (else the latest earlier original of that form)."""
+    base = amendment.form.upper().removesuffix("/A")
+    earlier = [f for f in filings if f.form.upper() == base and _sort_key(f) < _sort_key(amendment)]
+    same_period = [f for f in earlier if f.report_date and f.report_date == amendment.report_date]
+    pool = same_period or earlier
+    return max(pool, key=_sort_key) if pool else None
 
 
 def _after(a: Filing, b: Filing) -> bool:

@@ -770,6 +770,21 @@ async def seed_evidence(p: asyncpg.Pool) -> None:
     )
 
     # Deals: announced (confirmed), closed (only suggested), approved (confirmed, later).
+    # A confirmed event must carry evidence (company_event_confirmed_needs_evidence).
+    deal_doc = await p.fetchval(
+        "insert into public.source_document (regulator,external_id,stable_url)"
+        " values ('sec','0000111111-26-000099','https://example.test/8k') returning id"
+    )
+    deal_version = await p.fetchval(
+        "insert into public.source_document_version (document_id,content_hash,known_at)"
+        " values ($1,'deal-h1','2026-08-01') returning id",
+        deal_doc,
+    )
+    deal_evidence = await p.fetchval(
+        "insert into public.source_evidence (document_version_id,quote)"
+        " values ($1,'The parties entered into a merger agreement.') returning id",
+        deal_version,
+    )
     for state, status, known, effective in (
         ("announced", "confirmed", "2026-08-01", None),
         ("closed", "suggested", "2026-09-01", "2026-09-01"),
@@ -777,14 +792,15 @@ async def seed_evidence(p: asyncpg.Pool) -> None:
     ):
         await p.execute(
             "insert into public.company_event (ticker,event_type,event_state,announced_at,"
-            " effective_at,known_at,source,source_url,counterparty_key,status,detail) values"
-            " ('EXM_US_EQ','deal',$1,'2026-08-01',$2,$3,'sec_xbrl',$4,'target-1',$5,"
-            '  \'{"passage": "The parties entered into a merger agreement."}\'::jsonb)',
+            " effective_at,known_at,source,source_url,counterparty_key,status,detail,evidence_id)"
+            " values ('EXM_US_EQ','deal',$1,'2026-08-01',$2,$3,'sec_xbrl',$4,'target-1',$5,"
+            '  \'{"passage": "The parties entered into a merger agreement."}\'::jsonb, $6)',
             state,
             dt.date.fromisoformat(effective) if effective else None,
             at(known),
             f"https://example.test/deal/{state}",
             status,
+            deal_evidence if status == "confirmed" else None,
         )
 
     # Consensus: two vintages of one series, and a provider estimate that is NOT consensus.
@@ -794,17 +810,17 @@ async def seed_evidence(p: asyncpg.Pool) -> None:
     ):
         await p.execute(
             "insert into public.forward_observation (ticker,kind,provider,metric,fiscal_period,"
-            " value,analyst_count,vintage,known_at,source_url) values ('EXM_US_EQ',"
-            " 'published_analyst_consensus','issuer_ir','eps','FY2026',$1,12,$2,$3,"
-            " 'https://example.test/consensus')",
+            " value,analyst_count,vintage,known_at,source_url,observation_key) values"
+            " ('EXM_US_EQ','published_analyst_consensus','issuer_ir','eps','FY2026',$1,12,$2,$3,"
+            " 'https://example.test/consensus', md5('consensus' || $2))",
             Decimal(value),
             vintage,
             at(known),
         )
     await p.execute(
         "insert into public.forward_observation (ticker,kind,provider,metric,fiscal_period,value,"
-        " known_at,source_url) values ('EXM_US_EQ','event_calendar_estimate','finnhub','eps',"
-        " 'FY2026',9,'2026-09-01','u')"
+        " known_at,source_url,observation_key) values ('EXM_US_EQ','event_calendar_estimate',"
+        " 'finnhub','eps','FY2026',9,'2026-09-01','u', md5('calendar'))"
     )
 
 

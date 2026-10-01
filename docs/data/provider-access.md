@@ -1,51 +1,62 @@
 # Free provider access register
 
-Test snapshot: **2026-09-29**. The owner has confirmed permission for this personal,
-single-user, self-hosted use. That permission is a project assumption, not an endpoint access
-result. Production remains disabled until the configured account repeats a probe successfully;
-no payment method or overage is permitted. Requests below contain placeholders, never secrets.
+Register written **2026-09-29**, corrected **2026-10-05**. The owner has confirmed permission
+for this personal, single-user, self-hosted use. That permission is a project assumption, not an
+endpoint access result. Production remains disabled until the configured account records a
+successful request; no payment method or overage is permitted. Requests below contain
+placeholders, never secrets.
 
-States have operational meaning: `available` is a successful free response, `paid_only` is an
-observed plan denial, and `access_unverified`/`temporarily_failed` is a visible technical gap.
-An empty response is `not_covered`, never success. Quotas are provider-published ceilings and
+**Nothing in this repository has been observed against a live account.** The "Seed state" columns
+below are what migrations seed into `provider_access` and what the documentation says to expect;
+they are not probe results. A row is `available` only once a request or audit probe actually
+succeeded (`provider_access.last_success_at` is set); every row that claimed `available` without
+one was changed to `access_unverified` by migration `20261005100000` (the previous values are kept
+in `provider_access_state_backup`).
+
+States have operational meaning. `provider_access.state` is the *durable* verdict:
+`available` (a successful free response was recorded), `paid_only` (an observed plan denial),
+`access_unverified` (never confirmed, or the credential was rejected) and `disputed` (a probe
+returned another entity). A transient outcome (429, 5xx, timeout, empty 2xx) never changes it: it
+is kept as `last_attempt_state`, with `consecutive_failures` and the provider's `retry_at`. An
+empty response is `not_covered`, never success. Quotas are provider-published ceilings and
 must be confirmed in `provider_access` during the account-specific probe.
 
-| Provider | Endpoint / working request (secret redacted) | Auth / free quota and reset | Scope | Test result (2026-09-29) | Weight / rate |
+| Provider | Endpoint / request shape (secret redacted) | Auth / free quota and reset | Scope | Seed state (not a probe result) | Weight / rate |
 |---|---|---|---|---|---|
-| Alpha Vantage | `query?function=OVERVIEW&symbol=IBM&apikey=$ALPHA_VANTAGE_API_KEY` | key; 25 standard requests/day, provider reset | company overview | `available` 200 JSON with Symbol | 1 |
+| Alpha Vantage | `query?function=OVERVIEW&symbol=IBM&apikey=$ALPHA_VANTAGE_API_KEY` | key; 25 standard requests/day, provider reset | company overview | seeded `access_unverified` until the first success; the OVERVIEW response is expected to carry `Symbol` | 1 |
 | Alpha Vantage | `query?function=NEWS_SENTIMENT&tickers=IBM&apikey=…` | same shared daily budget | recent articles | `access_unverified` pending owner-key probe | endpoint-dependent |
 | EODHD | `api/eod/AAPL.US?from=2025-09-29&api_token=$EODHD_API_KEY&fmt=json` | key; 20/day | free-plan symbols, one year | `access_unverified` pending account probe | 1 |
-| World Bank | `api.worldbank.org/v2/country/CA/indicator/NY.GDP.MKTP.CD?format=json` | none | annual country indicators | `available` 200 observations | unmetered; courteous pacing |
-| OECD | `sdmx.oecd.org/public/rest/v1/data/OECD.SDD.STES,DSD_STES@DF_FINMARK,/.M.IR3TIB…` | none | SDMX public datasets | `available` 200 SDMX | rate limited; Retry-After |
+| World Bank | `api.worldbank.org/v2/country/CA/indicator/NY.GDP.MKTP.CD?format=json` | none | annual country indicators | seeded `access_unverified` (keyless; becomes `available` on the first collector success) | unmetered; courteous pacing |
+| OECD | `sdmx.oecd.org/public/rest/v1/data/OECD.SDD.STES,DSD_STES@DF_FINMARK,/.M.IR3TIB…` | none | SDMX public datasets | seeded `access_unverified` (keyless) | rate limited; Retry-After |
 | FMP | `stable/profile?symbol=AAPL&apikey=$FMP_API_KEY` | key; Basic 250/day | US profile | `access_unverified` account probe required | 1 |
-| FMP | `stable/analyst-estimates?symbol=AAPL&apikey=…` | key | analyst estimates | `access_unverified`; owner-key probe required, documentation is not an observed denial | 1; hard-block until probe |
+| FMP | `stable/analyst-estimates?symbol=AAPL&apikey=…` | key | analyst estimates | `access_unverified`; owner-key probe required, documentation is not an observed denial | 1; not blocked, the first request is the probe |
 | Diffbot | `v3/article?token=$DIFFBOT_API_KEY&url=<url>` | key; 10,000 credits/month | source-page extraction | `access_unverified`; off by default | varies; KG export ~25 |
 | People Data Labs | `v5/company/enrich?website=example.com` | key; about 100 company enrichments/month | company only; no personal contacts | `access_unverified`; off by default | 1 |
 | EPO OPS | `3.2/rest-services/published-data/publication/epodoc/EP1000000/biblio` | OAuth client credentials; 4 GB/week | patents/families/legal status | `access_unverified` credentials absent | bytes |
-| Finnhub | `api/v1/calendar/earnings?token=$FINNHUB_API_KEY` | key; free account limits | US earnings calendar | `available` in existing collector | 1 |
-| Finnhub | `api/v1/stock/ownership?symbol=AAPL&token=…` | key | ownership | `access_unverified`; owner-key probe required | 1; hard-block until probe |
+| Finnhub | `api/v1/calendar/earnings?token=$FINNHUB_API_KEY` | key; free account limits | US earnings calendar | seeded `access_unverified` until the existing collector succeeds | 1 |
+| Finnhub | `api/v1/stock/ownership?symbol=AAPL&token=…` | key | ownership | `access_unverified`; owner-key probe required | 1; not blocked, the first request is the probe |
 | Twelve Data | `time_series?symbol=AAPL&interval=1day&apikey=$TWELVE_DATA_API_KEY` | key; Basic credit/minute/day limits | US plus trial symbols | `access_unverified` owner-key probe required | endpoint credits |
 | Twelve Data | `dividends?symbol=AAPL&apikey=…` and `splits?...` | key | corporate actions | `access_unverified`; owner-key probe required | no retry after observed denial |
-| BIS | `stats.bis.org/api/v2/data/dataflow/BIS/WS_TC/2.0/.?startPeriod=2020` | none | public SDMX financial cycle | `available` public response | Retry-After |
-| ECB | `data-api.ecb.europa.eu/service/data/FM/D.U2.EUR.4F.KR.DFR.LEV?format=csvdata` | none | public SDMX, revision history | `available` existing collector | courteous pacing |
-| UN Comtrade | `comtradeapi.un.org/public/v1/preview/C/A/HS?reporterCode=124&period=2025&cmdCode=27` | preview keyless; subscription key for free registered quota (500/day, 100k rows/call) | selected reporter/partner/HS slices | `available` preview; registered production `access_unverified` | 1 call |
+| BIS | `stats.bis.org/api/v2/data/dataflow/BIS/WS_TC/2.0/.?startPeriod=2020` | none | public SDMX financial cycle | seeded `access_unverified` (keyless) | Retry-After |
+| ECB | `data-api.ecb.europa.eu/service/data/FM/D.U2.EUR.4F.KR.DFR.LEV?format=csvdata` | none | public SDMX, revision history | seeded `access_unverified` until the existing collector succeeds | courteous pacing |
+| UN Comtrade | `comtradeapi.un.org/public/v1/preview/C/A/HS?reporterCode=124&period=2025&cmdCode=27` | preview keyless; subscription key for free registered quota (500/day, 100k rows/call) | selected reporter/partner/HS slices | seeded `access_unverified`; the collector calls `/data/v1/get/C/A/HS` with the registered key (the keyless preview route is not used) | 1 call |
 
 ## Existing public disclosure and reference routes
 
-| Source | Tested read route | Auth / lag / history | State |
+| Source | Documented read route | Auth / lag / history | Seed state (not a probe result) |
 |---|---|---|---|
-| SEC submissions/companyfacts/archive | `data.sec.gov/submissions/CIK0000320193.json`; `data.sec.gov/api/xbrl/companyfacts/CIK0000320193.json`; Archives accession URLs | descriptive `SEC_USER_AGENT`; filing-time; amendments retained | `available` |
-| SEC statement-and-notes datasets | `sec.gov/files/dera/data/financial-statement-and-notes-data-sets/2026q2_notes.zip` | none; quarterly bulk/versioned by archive | `available` |
-| SEC 13F, Forms 3–5, 13D/G, N-PORT, proxy | issuer submissions plus accession documents | same UA; filing lag and amendments | `available` discovery; form-specific parsing coverage varies |
-| ESEF / filings.xbrl.org | `filings.xbrl.org/api/entities/5493001KJTIIGC8Y1R12.json` | none; as filed | `available` |
-| GLEIF | `api.gleif.org/api/v1/lei-records?filter[lei]=…` | none; current and relationship records | `available` |
-| ESMA FIRDS/FITRS | ESMA register downloads | none; publication lag; cancelled records must be retained | `available` |
-| Eurostat / FRED / ECB / ČNB | dissemination API; FRED observations/vintages; ECB Data Portal; ČNB ARAD files | FRED key only; Eurostat live API has no old vintages | `available`; pre-activation Eurostat `vintage_unavailable` |
-| ETF issuer files / issuer IR | configured iShares/Vanguard downloads and issuer URLs | none; undocumented endpoints/parser drift | `available` for configured funds |
+| SEC submissions/companyfacts/archive | `data.sec.gov/submissions/CIK0000320193.json`; `data.sec.gov/api/xbrl/companyfacts/CIK0000320193.json`; Archives accession URLs | descriptive `SEC_USER_AGENT`; filing-time; amendments retained | documented route; no `provider_access` row, never probed |
+| SEC statement-and-notes datasets | `sec.gov/files/dera/data/financial-statement-and-notes-data-sets/2026q2_notes.zip` | none; quarterly bulk/versioned by archive | documented route; no `provider_access` row, never probed |
+| SEC 13F, Forms 3–5, 13D/G, N-PORT, proxy | issuer submissions plus accession documents | same UA; filing lag and amendments | documented discovery route; form-specific parsing coverage varies; never probed |
+| ESEF / filings.xbrl.org | `filings.xbrl.org/api/entities/5493001KJTIIGC8Y1R12.json` | none; as filed | documented route; no `provider_access` row, never probed |
+| GLEIF | `api.gleif.org/api/v1/lei-records?filter[lei]=…` | none; current and relationship records | documented route; no `provider_access` row, never probed |
+| ESMA FIRDS/FITRS | ESMA register downloads | none; publication lag; cancelled records must be retained | documented route; no `provider_access` row, never probed |
+| Eurostat / FRED / ECB / ČNB | dissemination API; FRED observations/vintages; ECB Data Portal; ČNB ARAD files | FRED key only; Eurostat live API has no old vintages | documented routes; seeded `access_unverified` in `provider_access`; pre-activation Eurostat `vintage_unavailable` |
+| ETF issuer files / issuer IR | configured iShares/Vanguard downloads and issuer URLs | none; undocumented endpoints/parser drift | documented for configured funds; never probed |
 | FCA NSM | `data.fca.org.uk/#/nsm/nationalstoragemechanism` public search/download UI | no general extraction API verified; PIP API is write-only | `temporarily_failed` automation gap, not licensing |
 | EDINET | public EDINET API document list/download | API key registration; filings retained | `access_unverified` until key |
 | Companies House | public company filing-history API | free API key; statutory filings | `access_unverified` until key |
-| TED | `api.ted.europa.eu/v3/notices/search` | public API; EU notices | `available` |
+| TED | `api.ted.europa.eu/v3/notices/search` | public API; EU notices | documented route; no `provider_access` row, never probed |
 | SEDAR+ | public search UI and issuer-hosted Canadian filings pilot | interactive retrieval; stability/throughput unresolved | `temporarily_failed` automated route under active pilot |
 
 ## Source setup per provider (environment variables)
@@ -55,11 +66,12 @@ are backend-only secrets (never `NEXT_PUBLIC_*`); restart the API and worker aft
 one. "Delay" is the provider's publication delay or cadence as documented by the provider; none
 of the live behaviour below has been verified against a live account from this repository
 (fixtures are built from documented formats), so every row stays `access_unverified` until the
-Source audit (`POST /jobs/source-audit`) has recorded a probe for your account.
+Source audit (`POST /jobs/source-audit`) or the first successful collector request has recorded
+success for your account.
 
 | Provider | Variables | How to get it | Free ceiling (provider-published) | User-visible scope in the app | Expected data delay |
 |---|---|---|---|---|---|
-| SEC EDGAR | `SEC_USER_AGENT` (descriptive text with a contact email) | no key; the SEC requires the header | fair-access rate limit | Form 13F holders, Forms 3/4/5 insider trades and activity, Schedule 13D/G control stakes, N-PORT fund positions, XBRL fundamentals, segments, shares outstanding, valuation inputs | filing time for 8-K/Forms 3-5; 13D/G within days of the event (structured XML only from Dec 2024); 13F up to 45 days after quarter end (data sets quarterly); N-PORT public about 60 days after quarter end |
+| SEC EDGAR | `SEC_USER_AGENT` (descriptive text with a contact email) | no key; the SEC requires the header | fair-access rate limit | Form 13F holders, Forms 3/4/5 insider trades and activity, Schedule 13D/G control stakes, N-PORT fund positions, XBRL fundamentals, segments, shares outstanding, valuation inputs | filing time for 8-K/Forms 3-5; 13D/G within days of the event (structured XML only from Dec 2024); 13F up to 45 days after quarter end (data sets quarterly); N-PORT public about 60 days after the report date (fiscal calendar, not calendar quarters) |
 | Stooq | `STOOQ_API_KEY` | captcha page `stooq.com/q/d/?s=aapl.us&get_apikey` | n/a | daily prices, returns, risk, benchmarks | end of day |
 | Alpha Vantage | `ALPHA_VANTAGE_API_KEY` | alphavantage.co free key | 25 requests/day, one budget shared by every use | price-gap fallback in `price_history`, valuation `OVERVIEW` fallback, the `alpha_vantage` news source (when enabled in the news-sources config; sentiment is a hint, never a verified fact), owner-triggered exposure context and statement history (`POST /holdings/{ticker}/exposure-context/alpha-vantage`, `.../financial-history/alpha-vantage/{statement}`) | daily bars end of day; fundamentals lag the filing |
 | EODHD | `EODHD_API_KEY` | eodhd.com free plan | 20 requests/day, one year of history | last-resort price-gap fallback in `price_history` only | end of day |
@@ -67,7 +79,7 @@ Source audit (`POST /jobs/source-audit`) has recorded a probe for your account.
 | FMP | `FMP_API_KEY` | financialmodelingprep.com | Basic 250 requests/day | access probes only (`source_audit`, `fund_probes`); no data consumer reads FMP rows except the probed fund records | n/a |
 | Twelve Data | `TWELVE_DATA_API_KEY` | twelvedata.com | credit/minute/day limits | access probes only (`source_audit`); no consumer yet | n/a |
 | FRED / ALFRED | `FRED_API_KEY` | fredaccount.stlouisfed.org | generous; key required | US CPI, unemployment, Fed funds in `macro_collect` and vintage history (`alfred` rows) | release day; revisions kept as new vintages |
-| UN Comtrade | `UN_COMTRADE_API_KEY` | comtradedeveloper.un.org (free registered subscription key) | 500 calls/day, 100k rows/call | reporter/partner/HS trade slices in `public_data_collect` (needs provider enabled, key, and an `available` audit gate), mapped exposure trade alerts | annual slice (the collector requests `/C/A/HS`), published months after year end |
+| UN Comtrade | `UN_COMTRADE_API_KEY` | comtradedeveloper.un.org (free registered subscription key) | 500 calls/day, 100k rows/call | reporter/partner/HS trade slices in `public_data_collect` (needs provider enabled, key, and an open provider gate), mapped exposure trade alerts | annual slice (the collector requests `/C/A/HS`), published months after year end |
 | EPO OPS | `EPO_OPS_CLIENT_ID`, `EPO_OPS_CLIENT_SECRET` | developers.epo.org OAuth client | about 4 GB/week | owner-triggered patent family refresh, patent trends, legal-status alerts | publication about 18 months after filing; legal status as EPO updates it |
 | Diffbot | `DIFFBOT_API_KEY` | diffbot.com | about 10,000 credits/month | owner-triggered company research (`POST /holdings/{ticker}/company-research/diffbot`), off by default | on demand |
 | People Data Labs | `PEOPLE_DATA_LABS_API_KEY` | peopledatalabs.com | about 100 company enrichments/month | owner-triggered company-only enrichment (`.../company-research/pdl`), no personal data, off by default | on demand |
@@ -82,12 +94,19 @@ Source audit (`POST /jobs/source-audit`) has recorded a probe for your account.
    provider; edit in `/config/jobs` or `PUT /config/jobs`) with its `daily_quota`/`monthly_quota`
    reserve (defaults: Alpha Vantage 25/day, EODHD 20/day, FMP 250/day, Comtrade 500/day,
    Diffbot 10,000/month, PDL 100/month).
-3. **Audit gate**: `provider_access` must hold `available` for the endpoint. The `source_audit`
-   job (schedule disabled by default) or `POST /jobs/source-audit` probes the endpoint with your
-   credential. `public_data_collect` (World Bank, OECD, BIS, Comtrade) skips any series whose
-   provider is disabled or whose gate is not `available`; its schedule is also disabled by
-   default (Sundays 04:00 when switched on). Owner-triggered POST routes return `409` when their
-   key is missing.
+3. **Provider gate**: `public.provider_gate_open(provider, endpoint)` (Python:
+   `steward.sources.store.provider_gate`) is true when the `provider_access` row is not
+   hard-blocked, its durable state is `available` or `access_unverified`, and no provider
+   Retry-After window (`retry_at`) is pending. `access_unverified` is open on purpose: the first
+   real request is the probe, and its success records `available`. `paid_only` and `disputed`
+   close the gate, as does a hard block (a 402, an explicit plan denial, or a 401/403 on a
+   credential); a changed credential lifts the hard block at the next `source_audit`. A 429, 5xx,
+   timeout or empty 2xx never closes the gate by itself, except for the Retry-After window the
+   provider named, which the request governor enforces. The `source_audit` job (schedule
+   disabled by default) or `POST /jobs/source-audit` probes the endpoint with your credential.
+   `public_data_collect` (World Bank, OECD, BIS, Comtrade) skips any series whose provider is
+   disabled or whose gate is closed; its schedule is also disabled by default (Sundays 04:00 when
+   switched on). Owner-triggered POST routes return `409` when their key is missing.
 
 ### Removal and disable behaviour
 
@@ -174,8 +193,12 @@ counted in the job step.
    bytes, request id and credits in `provider_access`/`provider_quota_usage`.
 2. Compare identifiers to primary filings/factsheets, prices to Trading212, and statistics to
    the official table. Record mismatch and incremental valid coverage—not vendor catalog size.
-3. A missing key returns `access_unverified`; 401 returns `access_unverified`, 402/403 plan
-   denial `paid_only`, 429 `quota_exhausted`, empty 2xx `not_covered`, and 5xx
-   `temporarily_failed`. Preserve the last good observation in every case.
+3. A missing key returns `access_unverified`; 401 returns `access_unverified` (hard-blocked until
+   the credential changes); 402 is `paid_only`; 403 is `paid_only` only when the body names the
+   plan boundary, else `access_unverified`; a 402/403/200 whose body reports an exhausted
+   allowance ("rate limit", "quota", "limit reached") is `quota_exhausted` even if it also says
+   "upgrade"; 429 is `quota_exhausted`; empty 2xx `not_covered`; 5xx `temporarily_failed`. Only
+   `available`, `paid_only`, `access_unverified` and `disputed` change the durable
+   `provider_access.state`. Preserve the last good observation in every case.
 4. Never retry a paid/authentication denial until configuration changes. Redact query keys and
    headers from logs and evidence.

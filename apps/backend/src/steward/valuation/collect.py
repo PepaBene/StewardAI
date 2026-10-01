@@ -23,6 +23,7 @@ Figures and the verbatim source facts go to `fundamentals`; fund figures to
 """
 
 import datetime as dt
+import hashlib
 import json
 import logging
 from dataclasses import dataclass, field
@@ -37,6 +38,15 @@ from steward.config.holding_profiles import HoldingProfile, HoldingProfilesConfi
 from steward.config.jobs import FundValuationSource, JobsConfig, ValuationSettings
 from steward.config.store import load_active
 from steward.earnings.check import resolve_cik
+from steward.fundamentals.statements import (
+    FilingMeta,
+    apply_reconciliation,
+    esef_statement_facts,
+    filing_evidence,
+    internal_checks,
+    resolve_issuer_id,
+    store_statement_facts,
+)
 from steward.jobs.runner import JobContext
 from steward.reference.identity import holding_tickers
 from steward.reference.prices import symbols_for
@@ -49,7 +59,14 @@ from steward.sources.edgar import (
     latest_periodic,
     xbrl_documents,
 )
-from steward.sources.esef import EsefFiling, esef_document, esef_filings, parse_xbrl_json
+from steward.sources.esef import (
+    EsefFact,
+    EsefFiling,
+    amended_esef,
+    esef_document,
+    esef_filings,
+    parse_xbrl_json,
+)
 from steward.sources.finnhub import FinnhubError, basic_financials
 from steward.sources.fund_characteristics import (
     FundDataError,
@@ -188,8 +205,8 @@ async def store_fund(pool: asyncpg.Pool, key: str, figures: FundFigures) -> None
 
 async def _stored(pool: asyncpg.Pool, ticker: str) -> dict[str, asyncpg.Record]:
     rows = await pool.fetch(
-        "select source, document_ref, fetched_at, figures from public.fundamentals"
-        " where ticker = $1",
+        "select source, document_ref, fetched_at, figures, last_attempt_at, last_error"
+        " from public.fundamentals where ticker = $1",
         ticker,
     )
     return {r["source"]: r for r in rows}
@@ -585,7 +602,21 @@ async def refresh_esef(
             for x in parsed
             if x.value is not None and not x.dimensions and x.concept in ALL_CONCEPTS
         ]
-        await _store_esef_statement_facts(pool, tc.ticker, filing, parsed)
+        await _store_esef_statement_facts(
+            pool,
+            tc.ticker,
+            filing,
+            parsed,
+            content_hash=hashlib.sha256(
+                json.dumps(doc, sort_keys=True, default=str).encode()
+            ).hexdigest(),
+            amends=amended_esef(filings, filing),
+            year_end_month=(
+                tc.profile.fiscal_year_end_month
+                if "fiscal_year_end_month" in tc.profile.model_fields_set
+                else None
+            ),
+        )
         raw["filings"].append({**filing.raw, "json_url": filing.json_url})
         raw["facts"] += [{**x.raw, "filing": filing.id} for x in parsed]
     if not any(f.concept in SHARES_CONCEPTS for f in facts):
@@ -604,74 +635,55 @@ async def _store_esef_statement_facts(
     pool: asyncpg.Pool,
     ticker: str,
     filing: EsefFiling,
-    facts: list[Any],
-) -> None:
-    """Keep the filing's numeric dimensional facts and cited note blocks point in time."""
-    rows = []
-    for fact in facts:
-        local = fact.concept.split(":", 1)[-1].lower()
-        statement = (
-            "segment"
-            if fact.dimensions
-            else "income"
-            if any(
-                token in local
-                for token in ("revenue", "income", "expense", "profit", "loss", "earnings")
-            )
-            else "cash_flow"
-            if any(
-                token in local
-                for token in ("cashflow", "cashflows", "payments", "proceeds", "repayments")
-            )
-            else "shares"
-            if "sharesoutstanding" in local
-            else "balance_sheet"
-            if any(token in local for token in ("assets", "liabilities", "equity", "debt", "cash"))
-            else "note"
-        )
-        unit = str(fact.unit)
-        currency = unit.upper() if len(unit) == 3 and unit.isalpha() else None
-        rows.append(
-            (
-                ticker,
-                filing.id,
-                "ESEF",
-                filing.report_url or filing.json_url,
-                fact.concept,
-                statement,
-                fact.start,
-                fact.end,
-                str(fact.end.year),
-                "IFRS",
-                fact.value,
-                unit,
-                currency,
-                json.dumps({"members": fact.dimensions}),
-                "esef",
-                filing.report_url or filing.json_url,
-                filing.added,
-                filing.added or dt.datetime.now(dt.UTC),
-                fact.text[:20000] if fact.text else None,
-                json.dumps({"xbrl_json_fact": fact.raw.get("id"), "reviewed": False}),
-            )
-        )
+    facts: list[EsefFact],
+    *,
+    content_hash: str,
+    amends: EsefFiling | None = None,
+    year_end_month: int | None = None,
+) -> dict[str, int]:
+    """Keep the filing's numeric dimensional facts and cited note blocks point in time.
+
+    `known_at` is the date filings.xbrl.org added the report; when it gives none, the moment
+    this filing was first stored (carried over on every later run, never reset)."""
+    first_seen = dt.datetime.now(dt.UTC)
     async with pool.acquire() as conn, conn.transaction():
-        await conn.execute(
-            "delete from public.financial_statement_fact "
-            "where ticker=$1 and accession=$2 and source='esef'",
-            ticker,
-            filing.id,
+        known_at = filing.added or first_seen
+        url = filing.report_url or filing.json_url
+        evidence_id = await filing_evidence(
+            conn,
+            regulator="filings.xbrl.org",
+            external_id=filing.id,
+            stable_url=url,
+            document_type="ESEF",
+            content_hash=content_hash,
+            filed_at=filing.added,
+            accepted_at=None,
+            known_at=known_at,
+            quote=f"ESEF report {filing.id} for the period ending {filing.period_end}: {ticker}",
+            amends_external_id=amends.id if amends else None,
         )
-        if rows:
-            await conn.executemany(
-                """insert into public.financial_statement_fact
-                   (ticker,accession,form,filing_url,concept,statement,period_start,period_end,
-                    fiscal_period,basis,value,unit,currency,dimensions,source,source_url,
-                    published_at,known_at,text_block,validation)
-                   values($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14::jsonb,
-                          $15,$16,$17,$18,$19,$20::jsonb)""",
-                rows,
-            )
+        meta = FilingMeta(
+            ticker=ticker,
+            accession=filing.id,
+            form="ESEF",
+            filing_date=(filing.added or first_seen).date(),
+            filing_url=url,
+            source_url=url,
+            accepted_at=None,
+            cik=None,
+            issuer_id=await resolve_issuer_id(conn, ticker, None),
+            evidence_id=evidence_id,
+            amends_accession=amends.id if amends else None,
+        )
+        rows = esef_statement_facts(
+            facts,
+            meta,
+            year_end_month=year_end_month,
+            published_at=filing.added,
+            known_at=known_at,
+        )
+        rows = apply_reconciliation(rows, internal_checks(rows))
+        return await store_statement_facts(conn, ticker, "esef", filing.id, rows)
 
 
 # ---------------------------------------------------------------------------
@@ -732,6 +744,64 @@ async def _reserve_alpha_vantage_request(pool: asyncpg.Pool, today: dt.date) -> 
     return True
 
 
+def _has_overview(stored: asyncpg.Record | None) -> bool:
+    """Whether the stored Alpha Vantage row holds an actual Company Overview."""
+    if stored is None:
+        return False
+    figures = stored["figures"]
+    if isinstance(figures, str):
+        try:
+            figures = json.loads(figures)
+        except ValueError:
+            return False
+    return isinstance(figures, dict) and bool(figures.get("Symbol"))
+
+
+def _transient(exc: Exception) -> bool:
+    """A failure that says nothing about the symbol: network, quota, 5xx, premium message."""
+    if isinstance(exc, httpx.HTTPError):
+        return True
+    if isinstance(exc, AlphaVantageError):
+        return (
+            not exc.provider_charged
+            or exc.state is not None
+            or (exc.status_code is not None and exc.status_code >= 429)
+        )
+    return False
+
+
+async def _alpha_vantage_failed(
+    pool: asyncpg.Pool,
+    tc: TickerContext,
+    symbol: str,
+    error: str,
+    detail: dict[str, Any],
+    *,
+    transient: bool = False,
+) -> None:
+    """A failed or empty overview never replaces a good one (B31). With good data stored the
+    failure is only recorded on the row (the figures and `fetched_at` stay, so the cache keeps
+    serving them). With none stored, a transient failure writes nothing (the next run asks
+    again) and a failure about the symbol itself (unknown to Alpha Vantage) is cached, so the
+    symbol is not requested again every day."""
+    detail["alphavantage_error"] = error[:300]
+    if _has_overview(tc.stored.get("alphavantage")):
+        await record_failure(pool, tc.ticker, "alphavantage", error)
+        return
+    if transient:
+        return
+    await store_fundamentals(
+        pool,
+        tc.ticker,
+        "alphavantage",
+        {},
+        {"error": error[:300]},
+        symbol,
+        f"https://www.alphavantage.co/query?function=OVERVIEW&symbol={symbol}",
+    )
+    await record_failure(pool, tc.ticker, "alphavantage", error)
+
+
 async def refresh_alpha_vantage(
     tc: TickerContext,
     deps: ValuationDeps,
@@ -752,46 +822,32 @@ async def refresh_alpha_vantage(
     if reason is None:
         detail["alphavantage"] = "cached"
         return
+    if (
+        not force
+        and stored is not None
+        and stored["last_error"]
+        and stored["last_attempt_at"].date() >= deps.today
+    ):
+        detail["alphavantage"] = "failed today: retried tomorrow"
+        return
     if not await _reserve_alpha_vantage_request(pool, deps.today):
         detail["alphavantage"] = "daily free-tier limit reached (25 requests)"
         return
+    url = f"https://www.alphavantage.co/query?function=OVERVIEW&symbol={symbol}"
     try:
         data = await company_overview(deps.http, deps.alpha_vantage_key, symbol)
-        # Empty objects commonly mean that the symbol has no overview on the free plan.
-        if not data or not data.get("Symbol"):
-            detail["alphavantage"] = f"no Company Overview for {symbol}"
-            await store_fundamentals(
-                pool,
-                tc.ticker,
-                "alphavantage",
-                {},
-                {"empty": True},
-                symbol,
-                f"https://www.alphavantage.co/query?function=OVERVIEW&symbol={symbol}",
-            )
-            return
-        await store_fundamentals(
-            pool,
-            tc.ticker,
-            "alphavantage",
-            data,
-            data,
-            symbol,
-            f"https://www.alphavantage.co/query?function=OVERVIEW&symbol={symbol}",
-        )
-        detail["alphavantage"] = {"symbol": symbol, "as_of": data.get("LatestQuarter")}
     except (AlphaVantageError, httpx.HTTPError) as exc:
-        detail["alphavantage_error"] = str(exc)[:300]
-        # Cache errors too, so invalid/missing exchange symbols do not consume a call daily.
-        await store_fundamentals(
-            pool,
-            tc.ticker,
-            "alphavantage",
-            {},
-            {"error": str(exc)[:300]},
-            symbol,
-            f"https://www.alphavantage.co/query?function=OVERVIEW&symbol={symbol}",
+        await _alpha_vantage_failed(pool, tc, symbol, str(exc), detail, transient=_transient(exc))
+        return
+    # Empty objects commonly mean that the symbol has no overview on the free plan.
+    if not data or not data.get("Symbol"):
+        detail["alphavantage"] = f"no Company Overview for {symbol}"
+        await _alpha_vantage_failed(
+            pool, tc, symbol, f"no Company Overview returned for {symbol}", detail
         )
+        return
+    await store_fundamentals(pool, tc.ticker, "alphavantage", data, data, symbol, url)
+    detail["alphavantage"] = {"symbol": symbol, "as_of": data.get("LatestQuarter")}
 
 
 # ---------------------------------------------------------------------------
@@ -872,7 +928,13 @@ async def run_valuation(ctx: JobContext, deps: ValuationDeps) -> None:
             if cik is not None:
                 try:
                     await refresh_sec(tc, deps, settings, cik, force, step.detail, pool)
-                except (EdgarError, XbrlError, httpx.HTTPError, ValueError) as exc:
+                except (
+                    EdgarError,
+                    XbrlError,
+                    httpx.HTTPError,
+                    ValueError,
+                    asyncpg.PostgresError,
+                ) as exc:
                     step.detail["sec_error"] = entry["errors"]["sec"] = str(exc)[:300]
                     await record_failure(pool, ticker, "sec", str(exc))
             elif deps.edgar is not None:
@@ -881,7 +943,12 @@ async def run_valuation(ctx: JobContext, deps: ValuationDeps) -> None:
             if tc.lei:
                 try:
                     await refresh_esef(tc, deps, settings, force, step.detail, pool)
-                except (XbrlError, httpx.HTTPError, ValueError) as exc:
+                except (
+                    XbrlError,
+                    httpx.HTTPError,
+                    ValueError,
+                    asyncpg.PostgresError,
+                ) as exc:
                     step.detail["esef_error"] = entry["errors"]["esef"] = str(exc)[:300]
                     await record_failure(pool, ticker, "esef", str(exc))
             else:
@@ -890,14 +957,16 @@ async def run_valuation(ctx: JobContext, deps: ValuationDeps) -> None:
             if _alpha_vantage_needed(tc.stored):
                 try:
                     await refresh_alpha_vantage(tc, deps, settings, force, step.detail, pool)
-                except (AlphaVantageError, httpx.HTTPError) as exc:
+                except (AlphaVantageError, httpx.HTTPError, asyncpg.PostgresError) as exc:
                     error = str(exc)[:300]
                     step.detail["alphavantage_error"] = entry["errors"]["alphavantage"] = error
+            if "alphavantage_error" in step.detail:
+                entry["errors"].setdefault("alphavantage", step.detail["alphavantage_error"])
             entry["alphavantage"] = step.detail.get("alphavantage")
             if deps.finnhub_key and settings.finnhub_cross_check:
                 try:
                     await refresh_finnhub(tc, deps, step.detail, pool)
-                except (FinnhubError, httpx.HTTPError) as exc:
+                except (FinnhubError, httpx.HTTPError, asyncpg.PostgresError) as exc:
                     step.detail["finnhub_error"] = entry["errors"]["finnhub"] = str(exc)[:300]
             entry["sec"] = step.detail.get("sec")
             entry["esef"] = step.detail.get("esef")

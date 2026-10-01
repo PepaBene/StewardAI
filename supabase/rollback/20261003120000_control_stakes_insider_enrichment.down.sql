@@ -6,7 +6,13 @@
 -- first. The migration file itself is never edited.
 -- DATA LOSS: drops these tables and every row in them: control_stake_change, control_stake_filing, control_stake_holder, control_stake_issuer_link.
 -- DATA LOSS: drops these columns and their values: insider_filing.aff10b5_one, insider_filing.amendment_link_status, insider_filing.amends_accession, insider_filing.enriched_at, insider_filing.footnotes, insider_filing.is_amendment, insider_filing.joint_owner_count, insider_filing.original_submission_date, insider_filing.remarks, insider_filing.reporting_owner_cik, insider_filing.superseded_by_accession, insider_transaction.classification_basis, insider_transaction.deemed_execution_date, insider_transaction.economic_class, insider_transaction.equity_swap_involved, insider_transaction.exercisable_date, insider_transaction.exercise_price, insider_transaction.expiration_date, insider_transaction.footnote_ids, insider_transaction.footnote_text, insider_transaction.rule_10b5_1_adopted, insider_transaction.rule_10b5_1_basis, insider_transaction.rule_10b5_1_plan, insider_transaction.underlying_security_title, insider_transaction.underlying_shares.
+-- PRECONDITION: no row may use a value the restored CHECK constraint (source_record_evidence_domain_table_check) forbids; the rollback stops with a clear error before changing anything if one does.
 
+do $$ begin
+  if exists (select 1 from public.source_record_evidence where not ((domain_table = ANY (ARRAY['fact'::text, 'form13f_filing'::text, 'insider_filing'::text, 'insider_transaction'::text, 'institutional_holding'::text, 'news_item'::text, 'nport_filing'::text, 'nport_holding'::text])))) then
+    raise exception 'rollback precondition failed: public.source_record_evidence holds rows that violate the restored constraint source_record_evidence_domain_table_check; delete or migrate those rows first (select * from public.source_record_evidence where not ((domain_table = ANY (ARRAY[''fact''::text, ''form13f_filing''::text, ''insider_filing''::text, ''insider_transaction''::text, ''institutional_holding''::text, ''news_item''::text, ''nport_filing''::text, ''nport_holding''::text]))))';
+  end if;
+end $$;
 alter table public.insider_filing drop constraint if exists insider_filing_amendment_link_status_check;
 alter table public.insider_filing drop constraint if exists insider_filing_amends_accession_fkey;
 alter table public.insider_filing drop constraint if exists insider_filing_reporting_owner_cik_check;

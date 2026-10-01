@@ -28,9 +28,10 @@ import datetime as dt
 import hashlib
 import io
 import json
+import logging
 from collections.abc import Awaitable, Callable
-from dataclasses import dataclass
-from decimal import Decimal, InvalidOperation
+from dataclasses import dataclass, replace
+from decimal import Decimal
 from functools import partial
 from typing import Any
 
@@ -49,7 +50,14 @@ from steward.config.jobs import (
 )
 from steward.config.store import load_active
 from steward.jobs.runner import JobContext
-from steward.macro.providers import parse_fred_vintages
+from steward.macro.providers import (
+    finite_decimal,
+    frequency_of,
+    parse_fred_vintages,
+    parse_period,
+    sdmx_unit_multiplier,
+)
+from steward.macro.store import MacroRow, store_macro_rows, upsert_series_metadata
 from steward.news.synthetic import SyntheticEvent, SyntheticSource, raise_events
 from steward.settings import get_settings
 from steward.sources import cnb
@@ -73,6 +81,41 @@ OUTLETS: dict[str, tuple[str, str]] = {
     "cnb": ("cnb.cz", "Czech National Bank"),
 }
 AREA_NAMES = {"EA21": "Euro area", "EA20": "Euro area", "EA": "Euro area", "EU27_2020": "EU"}
+log = logging.getLogger(__name__)
+
+# D2.1 semantics, written beside every observation. Release calendars name the publisher's
+# calendar (the exact dates are the provider's); nothing here is inferred from the data.
+RELEASE_CALENDARS = {
+    "eurostat": "Eurostat euro indicators release calendar; dataset `updated` = release date",
+    "fred": "FRED release calendar for the series' release; fetch date = first sight",
+    "ecb": "ECB statistical calendar; release date = day first seen (unknown for backfills)",
+    "cnb": "CNB: CZEONIA on the next business day (about 09:30); repo rate on decision days",
+}
+EUROSTAT_TRANSFORMATION = {
+    "RCH_A": "annual rate of change",
+    "RCH_M": "monthly rate of change",
+    "CLV_PCH_PRE": "chain-linked volumes, change on previous period",
+    "PCH_PRE": "change on previous period",
+    "PCH_SM": "change on same period of previous year",
+}
+EUROSTAT_ADJUSTMENT = {
+    "SA": "seasonally adjusted",
+    "NSA": "not seasonally adjusted",
+    "SCA": "seasonally and calendar adjusted",
+    "CA": "calendar adjusted",
+}
+FRED_TRANSFORMATION = {
+    "pch": "percent change",
+    "pc1": "percent change from year ago",
+    "chg": "change",
+}
+GEOGRAPHY_DEFINITIONS = {
+    "EA21": "Euro area, 21 members (Eurostat aggregate, from 2026)",
+    "EA20": "Euro area, 20 members (Eurostat aggregate)",
+    "EU27_2020": "European Union, 27 members (Eurostat aggregate)",
+    "US": "United States (national series)",
+    "CZ": "Czechia (national series)",
+}
 
 
 class MacroError(Exception):
@@ -92,19 +135,13 @@ class Observation:
     release_date: dt.date | None
     url: str
     policy_rate: bool = False
-
-
-def parse_period(text: str) -> dt.date:
-    """'2026-08' -> 1 Aug 2026; '2026-Q2' -> 1 Apr 2026; '2026' -> 1 Jan 2026; dates as-is."""
-    if "-Q" in text:
-        year, quarter = text.split("-Q")
-        return dt.date(int(year), 3 * int(quarter) - 2, 1)
-    parts = text.split("-")
-    if len(parts) == 1:
-        return dt.date(int(parts[0]), 1, 1)
-    if len(parts) == 2:
-        return dt.date(int(parts[0]), int(parts[1]), 1)
-    return dt.date.fromisoformat(text)
+    # The provider's own vintage label (Eurostat `updated`, FRED `realtime_start`), if any.
+    vintage: str | None = None
+    unit_multiplier: Decimal = Decimal(1)
+    seasonal_adjustment: str | None = None
+    transformation: str | None = None
+    release_calendar: str | None = None
+    geography_definition: str | None = None
 
 
 def area_name(geo: str) -> str:
@@ -124,6 +161,7 @@ def parse_jsonstat(body: dict[str, Any], series: EurostatSeries) -> list[Observa
             index[d] = {code: i for i, code in enumerate(index[d])}
     updated = body.get("updated")
     release = dt.date.fromisoformat(updated[:10]) if updated else None
+    filters = series.filters
     values: dict[str, float] = {str(k): v for k, v in (body.get("value") or {}).items()}
     strides = [1] * len(ids)
     for i in range(len(ids) - 2, -1, -1):
@@ -133,8 +171,8 @@ def parse_jsonstat(body: dict[str, Any], series: EurostatSeries) -> list[Observa
     for geo, gi in index["geo"].items():
         for period, ti in index["time"].items():
             flat = gi * strides[geo_pos] + ti * strides[time_pos]
-            raw = values.get(str(flat))
-            if raw is None:
+            value = finite_decimal(values.get(str(flat)))
+            if value is None:
                 continue
             out.append(
                 Observation(
@@ -143,11 +181,16 @@ def parse_jsonstat(body: dict[str, Any], series: EurostatSeries) -> list[Observa
                     source="eurostat",
                     period=parse_period(period),
                     period_label=period,
-                    value=Decimal(str(raw)),
+                    value=value,
                     label=f"{area_name(geo)} {series.label}",
                     unit=series.unit,
                     release_date=release,
                     url=EUROSTAT_PAGE.format(dataset=series.dataset),
+                    vintage=updated,
+                    seasonal_adjustment=EUROSTAT_ADJUSTMENT.get(filters.get("s_adj", "")),
+                    transformation=EUROSTAT_TRANSFORMATION.get(filters.get("unit", "")),
+                    release_calendar=RELEASE_CALENDARS["eurostat"],
+                    geography_definition=GEOGRAPHY_DEFINITIONS.get(geo, f"Eurostat geo code {geo}"),
                 )
             )
     return out
@@ -192,9 +235,8 @@ async def fetch_eurostat(
 def parse_fred(body: dict[str, Any], series: FredSeries) -> list[Observation]:
     out = []
     for row in body.get("observations", []):
-        try:
-            value = Decimal(row["value"])
-        except (InvalidOperation, KeyError):
+        value = finite_decimal(row.get("value"))
+        if value is None:
             continue  # FRED writes "." for a missing value
         out.append(
             Observation(
@@ -213,6 +255,10 @@ def parse_fred(body: dict[str, Any], series: FredSeries) -> list[Observation]:
                 else None,
                 url=FRED_PAGE.format(series_id=series.series_id),
                 policy_rate=series.policy_rate,
+                vintage=row.get("realtime_start"),
+                transformation=FRED_TRANSFORMATION.get(series.units),
+                release_calendar=RELEASE_CALENDARS["fred"],
+                geography_definition=GEOGRAPHY_DEFINITIONS["US"],
             )
         )
     return out
@@ -265,7 +311,12 @@ async def store_fred_vintages(
     today: dt.date,
     history_years: int,
 ) -> int:
-    """Append actual ALFRED real-time windows; never rewrite an earlier vintage."""
+    """Append actual ALFRED real-time windows; never rewrite an earlier vintage.
+
+    `output_type=1` returns one row per observation and real-time window (value, start, end),
+    which is what holds revisions; `output_type=4` is *initial release only* and would never
+    show one. The same `units` as the current-vintage request is sent, so a transformed series
+    (`us_cpi`, `pc1`) is not stored as index levels under a `%` unit."""
     start = dt.date(today.year - history_years, 1, 1)
     response = await http.get(
         FRED_URL,
@@ -273,7 +324,8 @@ async def store_fred_vintages(
             "series_id": series.series_id,
             "api_key": api_key,
             "file_type": "json",
-            "output_type": "4",
+            "output_type": "1",
+            "units": series.units,
             "observation_start": start.isoformat(),
             "realtime_start": start.isoformat(),
             "realtime_end": today.isoformat(),
@@ -282,57 +334,75 @@ async def store_fred_vintages(
     )
     if response.status_code != 200:
         raise MacroError(f"ALFRED {series.series_id} returned HTTP {response.status_code}")
+    skipped: list[str] = []
     points = parse_fred_vintages(
         response.json(),
         series_id=series.key,
         unit=series.unit,
         source_url=FRED_PAGE.format(series_id=series.series_id),
+        skipped=skipped,
     )
-    inserted = 0
-    for point in points:
-        result = await pool.execute(
-            """insert into public.macro_observation
-               (series_id,source,geography,period,value,unit,frequency,release_at,known_at,
-                vintage,source_url,metadata)
-               values($1,'alfred',$2,$3,$4,$5,$6,$7,$7,$8,$9,$10::jsonb)
-               on conflict do nothing""",
-            point.series_id,
-            point.geography,
-            point.period,
-            point.value,
-            point.unit,
-            point.frequency,
-            point.release_at,
-            point.vintage,
-            point.source_url,
-            json.dumps(point.metadata),
-        )
-        inserted += result.endswith("1")
-    return inserted
+    if skipped:
+        log.warning("ALFRED %s: skipped %d unparseable rows", series.series_id, len(skipped))
+    result = await store_macro_rows(
+        pool,
+        [
+            MacroRow.from_point(
+                replace(point, transformation=FRED_TRANSFORMATION.get(series.units)),
+                point.release_at or dt.datetime.now(dt.UTC),
+            )
+            for point in points
+        ],
+        vintage_keyed=True,
+    )
+    return result.inserted
 
 
-def parse_ecb_series(text: str, series: EcbSeries, seen_on: dt.date) -> list[Observation]:
+ECB_ADJUSTMENT_COLUMNS = ("SEASONAL_ADJUSTMENT", "ADJUSTMENT", "ADJUSTMENT_INDICATOR")
+
+
+def parse_ecb_series(
+    text: str,
+    series: EcbSeries,
+    seen_on: dt.date | None,
+    skipped: list[str] | None = None,
+) -> list[Observation]:
+    """Rows of the Data Portal's `csvdata` format. TIME_PERIOD may be daily (`2026-07-01`),
+    monthly (`2026-07`), quarterly (`2026-Q2`), half-yearly, weekly or annual. A row whose
+    period or value cannot be read is appended to `skipped` instead of vanishing.
+    `seen_on` is the release date to record (None: unknown, as for a backfill)."""
     flow, key = series.flow_key.split("/", 1)
     out = []
     for row in csv.DictReader(io.StringIO(text)):
+        label = (row.get("TIME_PERIOD") or "").strip()
+        value = finite_decimal(row.get("OBS_VALUE"))
         try:
-            value = Decimal(row["OBS_VALUE"])
-            period = dt.date.fromisoformat(row["TIME_PERIOD"])
-        except (InvalidOperation, KeyError, ValueError):
+            period = parse_period(label)
+        except ValueError:
+            period = None
+        if period is None or value is None:
+            if skipped is not None:
+                skipped.append(f"{label or '?'}: {row.get('OBS_VALUE')!r}")
             continue
+        adjustment = next((row[c] for c in ECB_ADJUSTMENT_COLUMNS if row.get(c)), None)
         out.append(
             Observation(
                 series_id=series.key,
                 key=series.key,
                 source="ecb",
                 period=period,
-                period_label=row["TIME_PERIOD"],
+                period_label=label,
                 value=value,
                 label=series.label,
                 unit=series.unit,
                 release_date=seen_on,
                 url=ECB_PAGE.format(flow=flow, key=f"{flow}.{key}"),
                 policy_rate=series.policy_rate,
+                unit_multiplier=sdmx_unit_multiplier(row.get("UNIT_MULT")),
+                seasonal_adjustment=adjustment,
+                transformation=row.get("TRANSFORMATION") or None,
+                release_calendar=RELEASE_CALENDARS["ecb"],
+                geography_definition="Euro area (ECB REF_AREA U2: changing composition)",
             )
         )
     return out
@@ -341,14 +411,33 @@ def parse_ecb_series(text: str, series: EcbSeries, seen_on: dt.date) -> list[Obs
 async def fetch_ecb_series(
     http: httpx.AsyncClient, series: EcbSeries, today: dt.date, since: dt.date | None = None
 ) -> list[Observation]:
-    """The last 5 observations, or with `since` every observation from that date on."""
+    """The last 5 observations, or with `since` every observation from that date on.
+
+    The Data Portal gives no release date. A new observation is dated the day it is first
+    seen, but a backfill or gap fill is history already published: its release date is
+    unknown (None), not the day the job happened to run."""
     window = {"startPeriod": since.isoformat()} if since else {"lastNObservations": "5"}
     response = await http.get(
         ECB_URL.format(flow_key=series.flow_key), params={**window, "format": "csvdata"}
     )
     if response.status_code != 200:
         raise MacroError(f"ECB {series.flow_key} returned HTTP {response.status_code}")
-    return parse_ecb_series(response.text, series, today)
+    skipped: list[str] = []
+    out = parse_ecb_series(response.text, series, None if since else today, skipped)
+    if skipped:
+        log.warning(
+            "ECB %s: skipped %d row(s), kept %d (first skipped: %s)",
+            series.flow_key,
+            len(skipped),
+            len(out),
+            skipped[0],
+        )
+        if not out:
+            raise MacroError(
+                f"ECB {series.flow_key}: all {len(skipped)} rows were skipped "
+                f"(first: {skipped[0]}); the payload format is not understood"
+            )
+    return out
 
 
 def _next_business_day(day: dt.date) -> dt.date:
@@ -487,14 +576,25 @@ def surprise(
     )
 
 
+def _geography(series_id: str, source: str) -> str:
+    if ":" in series_id:
+        return series_id.rsplit(":", 1)[1]
+    return {"fred": "US", "ecb": "EA", "cnb": "CZ"}.get(source, "unknown")
+
+
 async def store_and_evaluate(
     pool: asyncpg.Pool,
     observations: list[Observation],
     bands: dict[str, float],
     known_at: dt.datetime | None = None,
 ) -> tuple[int, list[SyntheticEvent]]:
-    """Insert new observations (revisions update the value but are never evaluated) and
-    return (new count, surprise events). A series with nothing stored yet is only stored."""
+    """Store observations and return (new count, surprise events).
+
+    `macro_series` keeps the current value per period; `macro_observation` keeps every
+    distinct value (a repeated fetch of the same value inserts nothing, a changed one is the
+    next revision). A surprise is evaluated only for a period newer than everything stored for
+    the series: a revision never is, nor is an older period filled in late. A series with
+    nothing stored yet is only stored (its backfill is the baseline)."""
     events: list[SyntheticEvent] = []
     new_count = 0
     known_at = known_at or dt.datetime.now(dt.UTC)
@@ -503,15 +603,12 @@ async def store_and_evaluate(
         by_series.setdefault(o.series_id, []).append(o)
     for series_id, obs in by_series.items():
         obs.sort(key=lambda o: o.period)
-        geography = (
-            series_id.rsplit(":", 1)[1]
-            if ":" in series_id
-            else {"fred": "US", "ecb": "EA", "cnb": "CZ"}.get(obs[0].source, "unknown")
-        )
+        source = obs[0].source
+        geography = _geography(series_id, source)
         await update_coverage(
             pool,
             CoverageUpdate(
-                provider=obs[0].source,
+                provider=source,
                 dataset=obs[0].key,
                 entity_key=geography,
                 access=AccessResult(AccessState.AVAILABLE),
@@ -520,89 +617,90 @@ async def store_and_evaluate(
                 latest_period=max(item.period for item in obs),
             ),
         )
+        stored = {
+            r["period"]: r
+            for r in await pool.fetch(
+                "select period, value, unit from public.macro_series where series_id = $1"
+                " and source = $2",
+                series_id,
+                source,
+            )
+        }
         # A series' first run stores the backfilled history as the baseline: comparing
         # those old observations with each other would raise false surprises.
-        baseline = not await pool.fetchval(
-            "select exists (select 1 from public.macro_series where series_id = $1"
-            " and source = $2)",
-            series_id,
-            obs[0].source,
+        baseline = not stored
+        newest_stored = max(stored) if stored else None
+        await store_macro_rows(
+            pool,
+            [
+                MacroRow(
+                    o.key,
+                    o.source,
+                    _geography(o.series_id, o.source),
+                    o.period,
+                    o.value,
+                    o.unit,
+                    frequency_of(o.period_label),
+                    dt.datetime.combine(o.release_date, dt.time(), dt.UTC)
+                    if o.release_date is not None and o.source != "fred"
+                    else None,
+                    known_at,
+                    o.vintage or known_at.date().isoformat(),
+                    o.url,
+                    {"label": o.label, "period_label": o.period_label},
+                    o.unit_multiplier,
+                    o.seasonal_adjustment,
+                    o.transformation,
+                )
+                for o in obs
+            ],
         )
+        await pool.executemany(
+            "insert into public.macro_series (series_id, source, period, value, label, unit,"
+            " release_date, url) values ($1, $2, $3, $4, $5, $6, $7, $8)"
+            " on conflict (series_id, source, period) do update set value = excluded.value,"
+            " fetched_at = now()",
+            [
+                (series_id, o.source, o.period, o.value, o.label, o.unit, o.release_date, o.url)
+                for o in obs
+            ],
+        )
+        await upsert_series_metadata(
+            pool,
+            source=source,
+            series_id=obs[0].key,
+            label=obs[0].label,
+            definition=obs[0].label,
+            frequency=frequency_of(obs[0].period_label),
+            unit=obs[0].unit,
+            consumer="macro digests and surprise events",
+            unit_multiplier=obs[0].unit_multiplier,
+            seasonal_adjustment=obs[0].seasonal_adjustment,
+            transformation=obs[0].transformation,
+            geography_definition=obs[0].geography_definition,
+            release_calendar=obs[0].release_calendar,
+        )
+        history = sorted((p, r["value"], r["unit"]) for p, r in stored.items())
         for o in obs:
-            geography = (
-                o.series_id.rsplit(":", 1)[1]
-                if ":" in o.series_id
-                else {"fred": "US", "ecb": "EA", "cnb": "CZ"}.get(o.source, "unknown")
-            )
-            frequency = (
-                "quarterly"
-                if "-Q" in o.period_label
-                else "monthly"
-                if len(o.period_label) == 7
-                else "annual"
-                if len(o.period_label) == 4
-                else "daily"
-            )
-            release_at = (
-                dt.datetime.combine(o.release_date, dt.time(), dt.UTC)
-                if o.release_date is not None and o.source != "fred"
-                else None
-            )
-            await pool.execute(
-                """insert into public.macro_observation
-                   (series_id,source,geography,period,value,unit,frequency,release_at,
-                    known_at,vintage,source_url,metadata)
-                   values($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12::jsonb)
-                   on conflict do nothing""",
-                o.key,
-                o.source,
-                geography,
-                o.period,
-                o.value,
-                o.unit,
-                frequency,
-                release_at,
-                known_at,
-                known_at.isoformat(),
-                o.url,
-                json.dumps({"label": o.label, "period_label": o.period_label}),
-            )
-            inserted = await pool.fetchval(
-                "insert into public.macro_series (series_id, source, period, value, label, unit,"
-                " release_date, url) values ($1, $2, $3, $4, $5, $6, $7, $8)"
-                " on conflict (series_id, source, period) do update set value = excluded.value,"
-                " fetched_at = now() returning (xmax = 0)",
-                series_id,
-                o.source,
-                o.period,
-                o.value,
-                o.label,
-                o.unit,
-                o.release_date,
-                o.url,
-            )
-            if not inserted:
-                continue
+            if o.period in stored:
+                continue  # a revision of a stored period
             new_count += 1
-            if baseline:
+            earlier = [h for h in history if h[0] < o.period]
+            history.append((o.period, o.value, o.unit))
+            history.sort()
+            if baseline or (newest_stored is not None and o.period < newest_stored):
                 continue
-            prev = await pool.fetchrow(
-                "select period, value, unit from public.macro_series where series_id = $1"
-                " and source = $2 and period < $3 order by period desc limit 1",
-                series_id,
-                o.source,
-                o.period,
-            )
+            prev = earlier[-1] if earlier else None
             previous = (
                 Observation(
                     series_id,
                     o.key,
                     o.source,
-                    prev["period"],
-                    _label(prev["period"], o),
-                    prev["value"],
+                    prev[0],
+                    _label(prev[0], o),
+                    prev[1],
                     o.label,
-                    prev["unit"] or o.unit,
+                    prev[2] or o.unit,
                     None,
                     o.url,
                     o.policy_rate,
@@ -637,10 +735,18 @@ async def mark_macro_coverage(
 
 
 def _label(period: dt.date, like: Observation) -> str:
-    if "-Q" in like.period_label:
+    frequency = frequency_of(like.period_label)
+    if frequency == "quarterly":
         return f"{period.year}-Q{(period.month - 1) // 3 + 1}"
-    if len(like.period_label) == 7:
+    if frequency == "semiannual":
+        return f"{period.year}-S{1 if period.month < 7 else 2}"
+    if frequency == "weekly":
+        iso = period.isocalendar()
+        return f"{iso.year}-W{iso.week:02d}"
+    if frequency == "monthly":
         return f"{period.year}-{period.month:02d}"
+    if frequency == "annual":
+        return str(period.year)
     return period.isoformat()
 
 
@@ -670,6 +776,14 @@ async def run_macro_collect(ctx: JobContext, deps: MacroDeps) -> None:
             + [s.key for s in settings.cnb]
         )
     events: list[SyntheticEvent] = []
+    created = 0
+
+    async def raise_now(found: list[SyntheticEvent]) -> None:
+        """Raise a series' events right after it is stored: a later failure (another series,
+        ALFRED) can then never lose them - they are not re-derived on the next run."""
+        nonlocal created
+        created += len(await raise_events(pool, MACRO_SOURCE, found, now, ctx.job_id))
+
     for series in settings.eurostat:
         async with ctx.step(f"eurostat:{series.key}") as step:
             try:
@@ -702,6 +816,7 @@ async def run_macro_collect(ctx: JobContext, deps: MacroDeps) -> None:
                 continue
             count, found = await store_and_evaluate(pool, obs, bands, known_at=now)
             events += found
+            await raise_now(found)
             step.detail.update(observations=len(obs), new=count, surprises=len(found))
     for fred in settings.fred:
         async with ctx.step(f"fred:{fred.key}") as step:
@@ -739,12 +854,22 @@ async def run_macro_collect(ctx: JobContext, deps: MacroDeps) -> None:
                 continue
             count, found = await store_and_evaluate(pool, obs, bands, known_at=now)
             events += found
-            vintages = await store_fred_vintages(
-                pool, deps.http, fred, deps.fred_key, today, settings.history_years
-            )
-            step.detail.update(
-                observations=len(obs), new=count, surprises=len(found), vintages=vintages
-            )
+            await raise_now(found)
+            step.detail.update(observations=len(obs), new=count, surprises=len(found))
+            try:
+                step.detail["vintages"] = await store_fred_vintages(
+                    pool, deps.http, fred, deps.fred_key, today, settings.history_years
+                )
+            except (
+                MacroError,
+                httpx.HTTPError,
+                ValueError,
+                KeyError,
+                asyncpg.PostgresError,
+            ) as exc:
+                # The current-vintage numbers and their events are already stored and
+                # raised; an ALFRED failure is reported on the step, not as a job failure.
+                step.detail["vintage_error"] = f"{type(exc).__name__}: {str(exc)[:200]}"
     for ecb in settings.ecb:
         async with ctx.step(f"ecb:{ecb.key}") as step:
             try:
@@ -770,6 +895,7 @@ async def run_macro_collect(ctx: JobContext, deps: MacroDeps) -> None:
                 continue
             count, found = await store_and_evaluate(pool, obs, bands, known_at=now)
             events += found
+            await raise_now(found)
             step.detail.update(observations=len(obs), new=count, surprises=len(found))
     for cnb_series in settings.cnb:
         async with ctx.step(f"cnb:{cnb_series.key}") as step:
@@ -797,11 +923,11 @@ async def run_macro_collect(ctx: JobContext, deps: MacroDeps) -> None:
                 continue
             count, found = await store_and_evaluate(pool, obs, bands, known_at=now)
             events += found
+            await raise_now(found)
             step.detail.update(observations=len(obs), new=count, surprises=len(found))
             if obs:
                 step.detail["latest"] = {"period": obs[-1].period, "value": obs[-1].value}
     async with ctx.step("surprises") as step:
-        created = await raise_events(pool, MACRO_SOURCE, events, now, ctx.job_id)
         step.detail.update(events=[e.headline for e in events], created=created)
 
 

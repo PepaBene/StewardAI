@@ -15,6 +15,10 @@ payload *shape fingerprint* and the issuer's stated exclusion/capping rules
                       figures are not compared and raise no value alert (needs_parser_review)
 
 `alert` is true only for real changes (value_change, methodology_change).
+
+Growth: the job runs daily, so an `unchanged` verdict is not stored every time. A row is
+written when something changed, and as a heartbeat when the newest stored row is at least
+`HEARTBEAT_DAYS` old (so "checked and still the same" stays visible, one row a week).
 """
 
 import datetime as dt
@@ -41,6 +45,7 @@ Verdict = Literal[
 ]
 ALERT_VERDICTS: set[str] = {"value_change", "methodology_change"}
 DEFAULT_THRESHOLD = Decimal("0.15")
+HEARTBEAT_DAYS = 7
 
 METRICS = ("pe", "pb", "index_pe", "index_pb")
 
@@ -51,6 +56,7 @@ class Prior:
     rules: dict[str, Any]
     as_of: dt.date
     values: dict[str, Decimal | None]
+    observed_at: dt.datetime | None = None
 
 
 @dataclass
@@ -58,6 +64,7 @@ class Classification:
     verdict: Verdict
     alert: bool
     detail: dict[str, Any] = field(default_factory=dict)
+    recorded: bool = True  # False when an unchanged observation was not stored
 
 
 def _values(figures: FundFigures) -> dict[str, Decimal | None]:
@@ -120,7 +127,7 @@ def classify_observation(
 
 async def latest_prior(pool: asyncpg.Pool, fund_key: str) -> Prior | None:
     row = await pool.fetchrow(
-        "select fingerprint, rules, as_of, pe, pb, index_pe, index_pb"
+        "select fingerprint, rules, as_of, pe, pb, index_pe, index_pb, observed_at"
         " from public.fund_characteristic_audit where fund_key = $1"
         " order by observed_at desc, id desc limit 1",
         fund_key,
@@ -133,6 +140,7 @@ async def latest_prior(pool: asyncpg.Pool, fund_key: str) -> Prior | None:
         rules=dict(rules or {}),
         as_of=row["as_of"],
         values={m: (Decimal(row[m]) if row[m] is not None else None) for m in METRICS},
+        observed_at=row["observed_at"],
     )
 
 
@@ -145,6 +153,14 @@ async def record_observation(
 ) -> Classification:
     prior = await latest_prior(pool, fund_key)
     result = classify_observation(prior, figures, threshold=threshold)
+    if (
+        result.verdict == "unchanged"
+        and prior is not None
+        and prior.observed_at is not None
+        and dt.datetime.now(dt.UTC) - prior.observed_at < dt.timedelta(days=HEARTBEAT_DAYS)
+    ):
+        result.recorded = False
+        return result
     await pool.execute(
         "insert into public.fund_characteristic_audit (fund_key, provider, as_of, fingerprint,"
         " shape, rules, basis, pe, pb, index_pe, index_pb, verdict, alert, detail)"
@@ -210,5 +226,8 @@ async def fund_characteristics_audit_handler(ctx: JobContext) -> None:
                     continue
                 result = await record_observation(ctx.pool, fund.key, figures)
                 step.detail.update(
-                    outcome=result.verdict, alert=result.alert, as_of=figures.as_of.isoformat()
+                    outcome=result.verdict,
+                    alert=result.alert,
+                    as_of=figures.as_of.isoformat(),
+                    recorded=result.recorded,
                 )

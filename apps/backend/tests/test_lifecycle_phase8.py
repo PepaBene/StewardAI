@@ -9,6 +9,7 @@ import secrets
 from collections.abc import AsyncIterator
 from dataclasses import fields
 from decimal import Decimal
+from pathlib import Path
 
 import asyncpg
 import pytest
@@ -23,6 +24,7 @@ from steward.verify_sources.lifecycle import (
     catalog_snapshot,
     diff_snapshots,
     free_source_migrations,
+    latest_migration_prefix,
     missing_rollbacks,
     prune_raw_payloads,
     rollback_notes,
@@ -37,7 +39,27 @@ NOW = dt.datetime(2026, 10, 4, 12, 0, tzinfo=dt.UTC)
 # ---------------------------------------------------------------------------------------
 # Rollback files
 # ---------------------------------------------------------------------------------------
-def test_every_phase_0_to_6_free_source_migration_has_a_documented_rollback() -> None:
+def test_rollback_range_follows_the_newest_migration(tmp_path: Path) -> None:
+    (tmp_path / "m").mkdir()
+    for name in (
+        "20260930182226_a.sql",
+        "20261001100000_transaction_fees.sql",
+        "20291231235959_z.sql",
+    ):
+        (tmp_path / "m" / name).write_text("select 1;")
+    (tmp_path / "r").mkdir()
+    assert latest_migration_prefix(tmp_path / "m") == "20291231235959"
+    assert missing_rollbacks(tmp_path / "m", tmp_path / "r") == [
+        "20260930182226_a.sql",
+        "20291231235959_z.sql",
+    ]
+    (tmp_path / "r" / "20291231235959_z.down.sql").write_text("select 1;")
+    assert missing_rollbacks(tmp_path / "m", tmp_path / "r") == ["20260930182226_a.sql"]
+
+
+def test_every_free_source_migration_has_a_documented_rollback() -> None:
+    # `free_source_migrations` discovers the newest migration instead of stopping at a fixed
+    # timestamp, so ANY migration landing without a rollback file fails here (B50).
     assert missing_rollbacks(MIGRATIONS_DIR, ROLLBACK_DIR) == []
     assert (ROLLBACK_DIR / "20261004120000_free_sources_verification.down.sql").exists()
     for migration in free_source_migrations(MIGRATIONS_DIR):
@@ -78,7 +100,6 @@ async def test_each_rollback_restores_the_schema_its_migration_changed(
     and require the catalog fingerprint to equal the one from just before the migration,
     then re-apply it.  The end state must equal a straight application."""
     tracked = {m.name for m in free_source_migrations(MIGRATIONS_DIR)}
-    tracked.add("20261004120000_free_sources_verification.sql")
     conn = await asyncpg.connect(stepwise_url)
     try:
         await conn.execute(SHIM.read_text())

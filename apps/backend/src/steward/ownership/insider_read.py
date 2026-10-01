@@ -18,6 +18,7 @@ import asyncpg
 from pydantic import BaseModel, Field
 
 from steward.ownership.insider_classify import INTERPRETATION
+from steward.ownership.pdmr_read import pdmr_access_from_db
 from steward.sources.base import AccessResult
 from steward.sources.pdmr_uk import pdmr_access
 
@@ -118,6 +119,11 @@ class NetDiscretionary(BaseModel):
     plan_status_unknown_rows: int = Field(
         description="Counted rows whose Rule 10b5-1 status the form does not state."
     )
+    plan_possible_rows: int = Field(
+        default=0,
+        description="Counted rows whose filing ticks the Rule 10b5-1 check box: some "
+        "transaction in the filing was planned, the form does not say which.",
+    )
     pre_planned_bought_shares: Decimal
     pre_planned_sold_shares: Decimal
     by_insider: list[InsiderNetBreakdown]
@@ -193,7 +199,7 @@ def summarise(
     """Net discretionary activity over already-windowed rows; second value flags each row."""
     bought = sold = Decimal(0)
     bought_value = sold_value = Decimal(0)
-    buy_rows = sell_rows = unknown_plan = 0
+    buy_rows = sell_rows = unknown_plan = possible_plan = 0
     priced = True
     planned_bought = planned_sold = Decimal(0)
     by_insider: dict[tuple[str, str], dict[str, Any]] = {}
@@ -217,6 +223,8 @@ def summarise(
         buy = cls == "open_market_buy"
         if row["rule_10b5_1_plan"] is None:
             unknown_plan += 1
+            if row.get("rule_10b5_1_basis") == "form_checkbox":
+                possible_plan += 1
         price = row["price_per_share"]
         if price is None or price <= 0:
             priced = False
@@ -270,6 +278,7 @@ def summarise(
         net_value=(bought_value - sold_value) if priced and (buy_rows or sell_rows) else None,
         value_complete=priced,
         plan_status_unknown_rows=unknown_plan,
+        plan_possible_rows=possible_plan,
         pre_planned_bought_shares=planned_bought,
         pre_planned_sold_shares=planned_sold,
         by_insider=breakdown,
@@ -313,6 +322,7 @@ async def holding_insider_activity(
     amendments that would have restated rows, are treated as not yet known."""
     until = until or dt.date.today()
     since = since or until - dt.timedelta(days=365)
+    uk_access = await pdmr_access_from_db(pool)
     records = await pool.fetch(
         """select f.accession, f.form, f.filed, f.source_url,
                   case when $4::date is null or sup.filed <= $4::date
@@ -320,7 +330,9 @@ async def holding_insider_activity(
                   f.amendment_link_status, t.*
            from public.insider_filing f join public.insider_transaction t using (accession)
            left join public.insider_filing sup on sup.accession = f.superseded_by_accession
-           where f.ticker = $1 and coalesce(t.transaction_date, f.filed) between $2 and $3
+           where (f.ticker = $1 or exists (select 1 from public.insider_filing_ticker l
+                                           where l.accession = f.accession and l.ticker = $1))
+             and coalesce(t.transaction_date, f.filed) between $2 and $3
              and ($4::date is null or f.filed <= $4::date)
            order by coalesce(t.transaction_date, f.filed) desc, f.filed desc,
                     f.accession desc, t.row_index""",
@@ -385,6 +397,6 @@ async def holding_insider_activity(
         ticker=ticker,
         net_discretionary=summary,
         transactions=out,
-        jurisdiction_coverage=coverage(),
+        jurisdiction_coverage=coverage(uk_access),
         limitations=list(LIMITATIONS),
     )

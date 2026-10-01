@@ -40,6 +40,7 @@ from steward.lookthrough.read import (
     FUND_CASH,
     NOT_LOOKED,
     UNCLASSIFIED,
+    UNKNOWN_FUND,
     PortfolioIn,
     PositionIn,
     RowIn,
@@ -50,7 +51,6 @@ from steward.lookthrough.read import (
     load_snapshots,
 )
 
-UNKNOWN_FUND = "__unknown_fund_weight__"
 Dimension = Literal["country", "region", "sector", "currency"]
 DIMENSIONS: tuple[Dimension, ...] = ("country", "region", "sector", "currency")
 SPECIAL_LABELS = {
@@ -204,6 +204,9 @@ class IssuerRef:
     label: str
 
 
+UNIDENTIFIED_ISSUER = IssuerRef("unidentified", "Unidentified rows (no ISIN and no name)")
+
+
 def _slug(text: str) -> str:
     return re.sub(r"[^a-z0-9]+", "-", text.lower()).strip("-")
 
@@ -342,6 +345,7 @@ def aggregate_exposure(
     unknown_by_fund: dict[str, float] = {}
     residual_total = over_total = not_looked_total = 0.0
     direct_value = fund_value = 0.0
+    unidentified_weight = 0.0
 
     def add_security(
         *,
@@ -354,11 +358,17 @@ def aggregate_exposure(
         via: tuple[str, str | None, str | None, str],
         weight: float,
     ) -> None:
-        ref = issuer_for(isin, name, groups, reg)
-        if ref is None or weight == 0:
+        nonlocal unidentified_weight
+        if weight == 0:
             return
+        ref = issuer_for(isin, name, groups, reg)
+        if ref is None:
+            # A row with neither ISIN nor name cannot be tied to any issuer; its weight is
+            # kept in one labelled bucket (never merged into a real issuer) and counted.
+            unidentified_weight += weight
+            ref = UNIDENTIFIED_ISSUER
         acc = issuers.setdefault(ref.key, _IssuerAcc(ref))
-        sec_key = isin or ("name:" + (name or ""))
+        sec_key = isin or ("name:" + (name or "") if name else f"unidentified:{ticker or ''}")
         sec = acc.securities.setdefault(sec_key, _SecAcc(isin, name or isin or "—", ticker))
         if via[0] == "direct" and ticker:
             sec.ticker = ticker
@@ -407,7 +417,7 @@ def aggregate_exposure(
         fee = float(ratio) * w if ratio is not None else None
         if snap is None:
             not_looked_total += w
-            unknown_by_fund[p.isin or p.ticker] = w
+            unknown_by_fund[p.isin or p.ticker] = unknown_by_fund.get(p.isin or p.ticker, 0.0) + w
             for d in DIMENSIONS:
                 buckets[d].add(NOT_LOOKED, w, direct=False)
             funds_out.append(
@@ -446,7 +456,9 @@ def aggregate_exposure(
         over = w * max(-residual, 0.0)
         residual_total += unknown_w
         over_total += over
-        unknown_by_fund[p.isin or p.ticker] = unknown_w
+        unknown_by_fund[p.isin or p.ticker] = (
+            unknown_by_fund.get(p.isin or p.ticker, 0.0) + unknown_w
+        )
         lag = (as_of - snap.as_of).days
         stale = lag > settings.stale_after_days
         reconciles = abs(residual) <= tol
@@ -643,6 +655,11 @@ def aggregate_exposure(
         notes.append(
             f"{unknown_total:.1%} of portfolio value is unknown fund weight; it is shown as its "
             "own bucket and not spread over known holdings."
+        )
+    if unidentified_weight > 0:
+        notes.append(
+            f"{unidentified_weight:.2%} of portfolio value sits in published rows with neither "
+            "an ISIN nor a name: kept as one 'unidentified' line, not merged into any issuer."
         )
     if any(e.merged_securities > 1 for e in exposures_out):
         notes.append("Issuers with several securities (ADR/ordinary, share classes) are merged.")

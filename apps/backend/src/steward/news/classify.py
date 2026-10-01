@@ -15,7 +15,7 @@ import json
 import re
 from collections.abc import Sequence
 from dataclasses import dataclass, field
-from typing import Protocol, cast
+from typing import Literal, Protocol, cast
 
 import anthropic
 from anthropic.types import MessageParam
@@ -25,7 +25,6 @@ from steward.ai import Usage
 from steward.config.event_rules import (
     CLASSIFIABLE_EVENT_TYPES,
     EVENT_DESCRIPTIONS,
-    EventType,
 )
 from steward.config.jobs import effort_kwargs
 
@@ -37,9 +36,15 @@ class ClassificationError(Exception):
         self.usage = usage
 
 
+# The schema enum the model is constrained to: the classifiable types only. The system-raised
+# types (credit_stress, trade_exposure, patent_status) are raised by code from stored data, so
+# a model label of one of them is rejected by the schema, not just left out of the prompt.
+ClassifiableEventType = Literal[CLASSIFIABLE_EVENT_TYPES]  # type: ignore[valid-type]
+
+
 class ItemLabel(BaseModel):
     index: int
-    event_type: EventType
+    event_type: ClassifiableEventType
     affected_ticker: str | None = Field(
         description="The holding (one of the item's candidates) the event is about or affects; "
         "null for macro and central-bank items or when none is affected."

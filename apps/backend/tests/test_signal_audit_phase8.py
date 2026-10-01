@@ -44,7 +44,10 @@ def ts(value: str) -> dt.datetime:
 
 
 # ---------------------------------------------------------------------------------------
-# Review samples (each runs real code where the app has it, an oracle otherwise)
+# Review samples whose standard is pinned by a reference ORACLE.  The checks against the real
+# extractors/readers live in tests/test_audit_scenarios_phase8.py; AUDIT_SCENARIOS says which
+# scenario has which basis.  Tests below that call an oracle prove only that the oracle matches
+# the reviewer's labels - they say nothing about the system.
 # ---------------------------------------------------------------------------------------
 @pytest.mark.parametrize("sample", SAMPLES["filing_amendments"], ids=lambda s: s["id"])
 def test_amendments_and_restatements_are_point_in_time(sample: dict[str, Any]) -> None:
@@ -191,6 +194,7 @@ def decision(**over: Any) -> Any:
         "pit_violations": 0,
         "audited_at": NOW - dt.timedelta(days=10),
         "now": NOW,
+        "reviewer": "owner",
     }
     return evaluate_requirement("deal_state", SIGNAL_REQUIREMENTS["deal_state"], **(args | over))
 
@@ -208,6 +212,9 @@ def test_requirement_passes_only_when_everything_holds() -> None:
         ({"pit_checked": 5}, "point-in-time checks"),
         ({"pit_violations": 1}, "point-in-time violations"),
         ({"audited_at": NOW - dt.timedelta(days=400)}, "re-sample"),
+        ({"audited_at": NOW + dt.timedelta(days=3)}, "in the future"),
+        ({"reviewer": None}, "no reviewer"),
+        ({"reviewer": "  "}, "no reviewer"),
     ],
 )
 def test_requirement_blocks_with_the_specific_reason(over: dict[str, Any], fragment: str) -> None:
@@ -251,18 +258,24 @@ async def test_recorded_audit_authorises_publication_until_it_goes_stale(
 async def test_latest_audit_wins_and_a_bad_resample_blocks_again(
     backend_pool: asyncpg.Pool,
 ) -> None:
+    now = dt.datetime.now(dt.UTC)
     pool = backend_pool
     await record_audit_result(
-        pool, "insider_net_discretionary", observations(40), audited_at=NOW - dt.timedelta(days=30)
+        pool,
+        "insider_net_discretionary",
+        observations(40),
+        reviewer="owner",
+        audited_at=now - dt.timedelta(days=30),
     )
-    assert (await publish_gate(pool, "insider_net_discretionary", now=NOW)).allowed
+    assert (await publish_gate(pool, "insider_net_discretionary", now=now)).allowed
     await record_audit_result(
         pool,
         "insider_net_discretionary",
         observations(40, wrong=6, pit_bad=1),
-        audited_at=NOW - dt.timedelta(days=1),
+        reviewer="owner",
+        audited_at=now - dt.timedelta(days=1),
     )
-    d = await publish_gate(pool, "insider_net_discretionary", now=NOW)
+    d = await publish_gate(pool, "insider_net_discretionary", now=now)
     assert not d.allowed
     assert d.pit_violations == 1 and d.precision == Decimal("0.85")
     details = await pool.fetchval(
@@ -278,20 +291,22 @@ async def test_latest_audit_wins_and_a_bad_resample_blocks_again(
 async def test_jurisdiction_only_rows_do_not_authorise_publication(
     backend_pool: asyncpg.Pool,
 ) -> None:
+    now = dt.datetime.now(dt.UTC)
     await record_audit_result(
         backend_pool,
         "segment_revenue",
         observations(40),
+        reviewer="owner",
         jurisdiction="US",
-        audited_at=NOW - dt.timedelta(days=1),
+        audited_at=now - dt.timedelta(days=1),
     )
-    assert not (await publish_gate(backend_pool, "segment_revenue", now=NOW)).allowed
+    assert not (await publish_gate(backend_pool, "segment_revenue", now=now)).allowed
 
 
 @pytest.mark.db
 async def test_unknown_signal_cannot_be_recorded(backend_pool: asyncpg.Pool) -> None:
     with pytest.raises(ValueError, match="unknown signal"):
-        await record_audit_result(backend_pool, "made_up_signal", observations(3))
+        await record_audit_result(backend_pool, "made_up_signal", observations(3), reviewer="owner")
 
 
 # ---------------------------------------------------------------------------------------
@@ -331,3 +346,152 @@ async def test_coverage_report_is_measured_and_empty_when_nothing_exists(
     assert by[("US", "fundamentals", "revenue")]["unknown_values"] == 0  # text value present
     assert by[("CZ", "macro", "cpi")]["unknown_values"] == 1  # unknown stays unknown, not zero
     assert ("DE", "fundamentals", "revenue") not in by
+
+
+# ---------------------------------------------------------------------------------------
+# B47: dates, reviewers and scoped audits
+# ---------------------------------------------------------------------------------------
+@pytest.mark.db
+async def test_audit_needs_a_reviewer_and_cannot_be_dated_in_the_future(
+    backend_pool: asyncpg.Pool,
+) -> None:
+    with pytest.raises(ValueError, match="reviewed"):
+        await record_audit_result(backend_pool, "deal_state", observations(40), reviewer=None)
+    with pytest.raises(ValueError, match="reviewed"):
+        await record_audit_result(backend_pool, "deal_state", observations(40), reviewer=" ")
+    with pytest.raises(ValueError, match="future"):
+        await record_audit_result(
+            backend_pool,
+            "deal_state",
+            observations(40),
+            reviewer="owner",
+            audited_at=dt.datetime.now(dt.UTC) + dt.timedelta(days=2),
+        )
+    # the table refuses the same rows when written around the helper
+    for reviewer, when in (("null", "now()"), ("'owner'", "now() + interval '2 days'")):
+        with pytest.raises(asyncpg.CheckViolationError):
+            await backend_pool.execute(
+                "insert into public.signal_audit_result(signal_name,sample_size,evidence_correct,"
+                f"pit_checked,pit_violations,reviewer,audited_at) values('deal_state',40,40,40,0,"
+                f"{reviewer},{when})"
+            )
+    assert await backend_pool.fetchval("select count(*) from public.signal_audit_result") == 0
+
+
+@pytest.mark.db
+async def test_gate_ignores_an_audit_dated_after_now(backend_pool: asyncpg.Pool) -> None:
+    real_now = dt.datetime.now(dt.UTC)
+    await record_audit_result(
+        backend_pool,
+        "deal_state",
+        observations(40),
+        reviewer="owner",
+        audited_at=real_now - dt.timedelta(days=1),
+    )
+    assert (await publish_gate(backend_pool, "deal_state", now=real_now)).allowed
+    # evaluated "as of" a moment before the audit existed, it is a future audit: ignored
+    earlier = await publish_gate(backend_pool, "deal_state", now=real_now - dt.timedelta(days=3))
+    assert not earlier.allowed
+    assert any("never audited" in r for r in earlier.reasons)
+    assert any("dated in the future" in r for r in earlier.reasons)
+
+
+@pytest.mark.db
+async def test_legacy_audit_without_a_reviewer_cannot_authorise(
+    backend_pool: asyncpg.Pool, migrated_db: Any
+) -> None:
+    admin = await asyncpg.connect(migrated_db.admin_url)
+    try:
+        await admin.execute(
+            "alter table public.signal_audit_result"
+            " drop constraint signal_audit_result_reviewer_named"
+        )
+        await admin.execute(
+            "insert into public.signal_audit_result(signal_name,sample_size,evidence_correct,"
+            "pit_checked,pit_violations,reviewer,audited_at) values('deal_state',40,40,40,0,"
+            "null, now() - interval '1 day')"
+        )
+    finally:
+        await admin.close()
+    decision = await publish_gate(backend_pool, "deal_state")
+    assert not decision.allowed and any("no reviewer" in r for r in decision.reasons)
+
+
+@pytest.mark.db
+async def test_a_newer_failing_scoped_audit_blocks_an_older_passing_overall_audit(
+    backend_pool: asyncpg.Pool,
+) -> None:
+    pool = backend_pool
+    now = dt.datetime.now(dt.UTC)
+    await record_audit_result(
+        pool,
+        "deal_state",
+        observations(40),
+        reviewer="owner",
+        audited_at=now - dt.timedelta(days=20),
+    )
+    assert (await publish_gate(pool, "deal_state")).allowed
+    # an older scoped failure was already superseded by the overall audit: no effect
+    await record_audit_result(
+        pool,
+        "deal_state",
+        observations(10, wrong=4),
+        reviewer="owner",
+        jurisdiction="CZ",
+        audited_at=now - dt.timedelta(days=30),
+    )
+    assert (await publish_gate(pool, "deal_state")).allowed
+    # a newer scoped audit that fails blocks, even though its sample is small
+    await record_audit_result(
+        pool,
+        "deal_state",
+        observations(10, wrong=4),
+        reviewer="owner",
+        jurisdiction="CZ",
+        audited_at=now - dt.timedelta(days=5),
+    )
+    blocked = await publish_gate(pool, "deal_state")
+    assert not blocked.allowed
+    assert any("jurisdiction=CZ" in r and "precision" in r for r in blocked.reasons)
+    # a newer pit-violating metric audit blocks too
+    await record_audit_result(
+        pool,
+        "deal_state",
+        observations(10, pit_bad=1),
+        reviewer="owner",
+        metric="revenue",
+        audited_at=now - dt.timedelta(days=4),
+    )
+    reasons = (await publish_gate(pool, "deal_state")).reasons
+    assert any("metric=revenue" in r and "point-in-time" in r for r in reasons)
+    # a newer passing re-sample of the failing slice clears that slice
+    await record_audit_result(
+        pool,
+        "deal_state",
+        observations(10),
+        reviewer="owner",
+        jurisdiction="CZ",
+        audited_at=now - dt.timedelta(days=2),
+    )
+    reasons = (await publish_gate(pool, "deal_state")).reasons
+    assert not any("jurisdiction=CZ" in r for r in reasons)
+    assert any("metric=revenue" in r for r in reasons)
+    # a fresh overall audit supersedes every older scoped result
+    await record_audit_result(
+        pool,
+        "deal_state",
+        observations(40),
+        reviewer="owner",
+        audited_at=now - dt.timedelta(hours=1),
+    )
+    assert (await publish_gate(pool, "deal_state")).allowed
+
+
+def test_every_audit_scenario_states_whether_it_runs_against_a_real_extractor() -> None:
+    from steward.verify_sources.signal_audit import AUDIT_SCENARIOS
+
+    assert set(AUDIT_SCENARIOS) == set(SAMPLES)
+    oracle_only = {k for k, v in AUDIT_SCENARIOS.items() if v.kind == "oracle"}
+    assert oracle_only == {"false_mentions", "anonymous_customers"}
+    for name, basis in AUDIT_SCENARIOS.items():
+        assert basis.target and (basis.kind == "real" or basis.note), name

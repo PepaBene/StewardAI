@@ -8,8 +8,13 @@ days of snapshots into a markdown + JSON sign-off report with a dormant/low-valu
 recommendation list.
 
 Nothing is estimated: a provider with no snapshot rows is reported as "not measured", a ratio with a
-zero denominator is null, and `sign_off_ready` stays false until the full window of daily
-snapshots exists.
+zero denominator is null, and `sign_off_ready` stays false until a window of at least 30 days
+exists in which EVERY day has a real daily snapshot.  A snapshot is real when it was recorded
+by the daily run shortly after its day ended (`detail.mode == "daily"`); one produced later by
+`backfill_shadow_snapshots` (or a late re-run) is marked `backfill`: its observation counts are
+re-measured from `known_at` and stay valid, but `coverage_available/total` read the CURRENT
+coverage ledger, so they describe the state at backfill time, not that day
+(`detail.coverage_basis == "current_state"`).  Backfilled days are reported and block sign-off.
 
     python -m steward.verify_sources.shadow --days 30 --out ./shadow-report
 """
@@ -30,6 +35,8 @@ from typing import Any
 import asyncpg
 
 WINDOW_DAYS = 30
+# A snapshot recorded more than this long after its day ended is a backfill, not a daily run.
+DAILY_RECORDING_GRACE = dt.timedelta(hours=36)
 MIN_DAYS_FOR_RECOMMENDATION = 7
 LOW_VALUE_UNIQUE_RATIO = 0.05  # adds fewer than 5 % observations nobody else provides
 UNRELIABLE_FAILURE_RATE = 0.5
@@ -69,12 +76,22 @@ class _Provider:
     endpoints: dict[str, dict[str, Any]] = field(default_factory=dict)
 
 
-async def record_shadow_snapshot(pool: asyncpg.Pool, day: dt.date) -> int:
+async def record_shadow_snapshot(
+    pool: asyncpg.Pool,
+    day: dt.date,
+    *,
+    backfill: bool = False,
+    now: dt.datetime | None = None,
+) -> int:
     """Measure `day` (UTC) and upsert one row per provider; returns the providers recorded.
 
     Re-running a day replaces that day's rows, so a late-arriving observation is picked up
-    by running the recorder again."""
+    by running the recorder again.  The rows are marked ``mode = "daily"`` when recorded within
+    `DAILY_RECORDING_GRACE` of the day's end and not asked to backfill, else ``"backfill"``
+    with ``coverage_basis = "current_state"`` (see the module docstring)."""
     start, end = _day_bounds(day)
+    recorded_now = now or dt.datetime.now(dt.UTC)
+    mode = "backfill" if backfill or recorded_now > end + DAILY_RECORDING_GRACE else "daily"
     providers: dict[str, _Provider] = defaultdict(_Provider)
 
     for r in await pool.fetch(
@@ -289,6 +306,10 @@ async def record_shadow_snapshot(pool: asyncpg.Pool, day: dt.date) -> int:
                         "metrics": sorted(p.metrics)[:500],
                         "geographies": sorted(p.geographies)[:250],
                         "endpoints": p.endpoints,
+                        "mode": mode,
+                        "coverage_basis": (
+                            "recorded_at_day_end" if mode == "daily" else "current_state"
+                        ),
                     }
                 ),
             )
@@ -316,7 +337,7 @@ async def backfill_shadow_snapshots(pool: asyncpg.Pool, end: dt.date, days: int)
     """Record `days` days ending at `end` (inclusive); used to seed or repair a window."""
     total = 0
     for offset in range(days):
-        total += await record_shadow_snapshot(pool, end - dt.timedelta(days=offset))
+        total += await record_shadow_snapshot(pool, end - dt.timedelta(days=offset), backfill=True)
     return total
 
 
@@ -421,7 +442,12 @@ async def generate_shadow_report(
     window_days: int = WINDOW_DAYS,
     persist: bool = True,
 ) -> dict[str, Any]:
-    """Build (and optionally store) the sign-off report for the window ending `window_end`."""
+    """Build (and optionally store) the sign-off report for the window ending `window_end`.
+
+    Sign-off needs `window_days >= WINDOW_DAYS` and a real daily snapshot on every day of the
+    window; a shorter window can still be reported, but never signed off."""
+    if window_days < 1:
+        raise ValueError("window_days must be at least 1")
     window_start = window_end - dt.timedelta(days=window_days - 1)
     rows = await pool.fetch(
         """select * from public.source_shadow_snapshot
@@ -455,6 +481,13 @@ async def generate_shadow_report(
     for r in rows:
         by_provider[r["provider"]].append(r)
     snapshot_days = sorted({r["snapshot_date"] for r in rows})
+    modes_by_day: dict[dt.date, set[str]] = defaultdict(set)
+    for r in rows:
+        detail = r["detail"] if isinstance(r["detail"], dict) else json.loads(r["detail"])
+        modes_by_day[r["snapshot_date"]].add(str(detail.get("mode", "unattested")))
+    real_days = sorted(d for d, modes in modes_by_day.items() if modes == {"daily"})
+    backfilled_days = sorted(d for d, modes in modes_by_day.items() if "backfill" in modes)
+    unattested_days = sorted(d for d, modes in modes_by_day.items() if "unattested" in modes)
 
     providers: list[dict[str, Any]] = []
     for name, items in sorted(by_provider.items()):
@@ -501,6 +534,7 @@ async def generate_shadow_report(
             "coverage_available": last["coverage_available"],
             "coverage_total": last["coverage_total"],
             "coverage_ratio": _ratio(last["coverage_available"], last["coverage_total"]),
+            "coverage_basis": _coverage_basis(last),
             "scope_securities_with_data": scope_coverage.get(name, 0),
         }
         rec = classify_provider(summary, window_days)
@@ -518,12 +552,28 @@ async def generate_shadow_report(
         for r in job_rows
     ]
     blockers: list[str] = []
+    if window_days < WINDOW_DAYS:
+        blockers.append(
+            f"the window is {window_days} days; sign-off needs at least {WINDOW_DAYS} "
+            "(this report is informational only)"
+        )
     if not snapshot_days:
         blockers.append("no daily snapshots are recorded: the shadow collection has not run")
     elif len(snapshot_days) < window_days:
         blockers.append(
             f"{len(snapshot_days)} of {window_days} daily snapshots recorded "
             f"({window_start}..{window_end}); sign-off needs the full window"
+        )
+    if backfilled_days:
+        blockers.append(
+            f"{len(backfilled_days)} of the window's days were backfilled "
+            f"({backfilled_days[0]}..{backfilled_days[-1]}): their coverage columns describe the "
+            "state at backfill time, not that day, so they are not real daily snapshots"
+        )
+    if unattested_days:
+        blockers.append(
+            f"{len(unattested_days)} snapshot days carry no recording mode and cannot be "
+            "shown to be real daily snapshots"
         )
     if scope["scope_tickers"] == 0:
         blockers.append("no held or watchlist securities to measure against")
@@ -544,6 +594,8 @@ async def generate_shadow_report(
         "window_end": window_end.isoformat(),
         "window_days": window_days,
         "days_observed": len(snapshot_days),
+        "real_daily_snapshots": len(real_days),
+        "backfilled_days": [d.isoformat() for d in backfilled_days],
         "sign_off_ready": not blockers,
         "blockers": blockers,
         "scope": scope,
@@ -565,6 +617,8 @@ async def generate_shadow_report(
             "value from another source at ingestion time (a lower bound if other sources "
             "arrive later).",
             "A provider absent from this report produced no snapshot rows and is not measured.",
+            "Coverage columns of a backfilled day read the current coverage ledger "
+            "(coverage_basis = current_state), not that day's.",
         ],
     }
     markdown = render_markdown(report)
@@ -584,16 +638,22 @@ async def generate_shadow_report(
     return report
 
 
+def _coverage_basis(row: asyncpg.Record) -> str:
+    detail = row["detail"] if isinstance(row["detail"], dict) else json.loads(row["detail"])
+    return str(detail.get("coverage_basis", "unattested"))
+
+
 def _pct(value: float | None) -> str:
     return "n/a" if value is None else f"{value:.1%}"
 
 
 def render_markdown(report: dict[str, Any]) -> str:
     lines = [
-        "# Free data sources - 30-day shadow collection sign-off",
+        "# Free data sources - shadow collection sign-off",
         "",
         f"Window: {report['window_start']} to {report['window_end']} "
-        f"({report['days_observed']} of {report['window_days']} daily snapshots recorded)",
+        f"({report['days_observed']} of {report['window_days']} daily snapshots recorded, "
+        f"{report['real_daily_snapshots']} of them real daily runs)",
         "",
         f"**Sign-off ready: {'yes' if report['sign_off_ready'] else 'no'}**",
         "",

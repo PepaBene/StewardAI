@@ -15,8 +15,11 @@ from dataclasses import dataclass, field
 from decimal import Decimal, InvalidOperation
 from typing import Any
 
-# Public availability: N-PORT is filed within 60 days after the fiscal quarter end and the
-# last month of each quarter is made public then (SEC Form N-PORT general instructions).
+from steward.sources.ciks import ten_digit_cik
+from steward.sources.xml_guard import safe_fromstring
+
+# Public availability: N-PORT is filed within 60 days after the fiscal quarter end and made
+# public then (SEC Form N-PORT general instructions); counted from the report date.
 PUBLIC_LAG_DAYS = 60
 
 NULL_TOKENS = {"", "N/A", "NA", "NONE", "000000000", "0"}
@@ -202,13 +205,7 @@ def _holding(index: int, node: ET.Element) -> NportHolding:
 
 def parse_nport(xml: bytes) -> NportReport:
     """Parse one NPORT-P / NPORT-P/A primary document."""
-    head = xml[:4096].upper()
-    if b"<!DOCTYPE" in head or b"<!ENTITY" in xml.upper():
-        raise NportError("N-PORT XML with DTD or entity declarations is not accepted")
-    try:
-        root = ET.fromstring(xml)  # noqa: S314 - DTD/entities rejected above
-    except ET.ParseError as exc:
-        raise NportError(f"malformed N-PORT XML: {exc}") from exc
+    root = safe_fromstring(xml, NportError)
     if _local(root.tag) != "edgarSubmission":
         raise NportError("not an EDGAR N-PORT submission")
     header = _child(root, "headerData")
@@ -257,7 +254,7 @@ def parse_nport(xml: bytes) -> NportReport:
     )
     return NportReport(
         submission_type=_text(header, "submissionType"),
-        registrant_cik=cik.zfill(10) if cik and cik.isdigit() else None,
+        registrant_cik=ten_digit_cik(cik),
         registrant_name=_text(gen, "regName"),
         registrant_lei=_identifier(_text(gen, "regLei")),
         series_id=series_id,
@@ -278,11 +275,17 @@ def parse_nport(xml: bytes) -> NportReport:
 
 
 def public_after(report_period_end: dt.date) -> dt.date:
-    """Earliest date the report's quarter is public: quarter end plus 60 days."""
-    quarter_month = ((report_period_end.month - 1) // 3 + 1) * 3
-    first_next = (
-        dt.date(report_period_end.year + (quarter_month // 12), quarter_month % 12 + 1, 1)
-        if quarter_month < 12
-        else dt.date(report_period_end.year + 1, 1, 1)
-    )
-    return first_next - dt.timedelta(days=1) + dt.timedelta(days=PUBLIC_LAG_DAYS)
+    """Earliest date a report is expected to be public: report date plus 60 days.
+
+    N-PORT is filed within 60 days after the end of the fund's *fiscal* quarter and made
+    public from then on. The report date is a month end of the fund's own fiscal calendar, so
+    adding the lag to it never assumes calendar quarters (the old quarter-end rounding
+    overstated the date by up to two months for a fund with a non-calendar fiscal year)."""
+    return report_period_end + dt.timedelta(days=PUBLIC_LAG_DAYS)
+
+
+def fiscal_quarter_end_months(fiscal_year_end: dt.date | None) -> frozenset[int]:
+    """Calendar months in which the fund's fiscal quarters end, from its fiscal year end
+    (`repPdEnd`). Without it the calendar quarters are the only thing that can be said."""
+    anchor = fiscal_year_end.month if fiscal_year_end is not None else 12
+    return frozenset(((anchor - 1 - 3 * k) % 12) + 1 for k in range(4))

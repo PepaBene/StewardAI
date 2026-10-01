@@ -12,57 +12,47 @@ from pydantic import BaseModel, Field
 
 Provenance = Literal["primary", "vendor", "owner", "community", "unclassified"]
 
-PRIMARY_MARKERS = (
-    "sec",
-    "edgar",
-    "xbrl",
-    "esef",
-    "esma",
-    "pse",
-    "gleif",
-    "cnb",
-    "ecb",
-    "fred",
-    "alfred",
-    "eurostat",
-    "world_bank",
-    "oecd",
-    "bis",
-    "comtrade",
-    "epo",
-    "issuer",
-    "ir_release",
-    "form13f",
-    "nport",
-    "regulator",
-)
-VENDOR_MARKERS = (
-    "alpha",
-    "finnhub",
-    "fmp",
-    "eodhd",
-    "twelve",
-    "diffbot",
-    "pdl",
-    "people_data",
-    "yahoo",
-    "stooq",
-    "openfigi",
-)
+# Exact source / provider names (as the collectors store them), not substrings: "sec" must
+# not match "sector_feed", nor "bis" a name like "bistro_data". A family prefix (`sec_xbrl`,
+# `epo_ops`) counts only when the prefix is followed by an underscore.
+PRIMARY_SOURCES = frozenset(
+    {
+        "sec", "edgar", "xbrl", "esef", "esma", "firds", "pse", "gleif", "cnb", "ecb", "fred",
+        "alfred", "eurostat", "world_bank", "oecd", "bis", "un_comtrade", "comtrade", "epo",
+        "epo_ops", "issuer", "issuer_ir", "ir_release", "form13f", "form4", "nport",
+        "schedule13", "regulator", "public_macro", "filing",
+    }
+)  # fmt: skip
+PRIMARY_PREFIXES = (
+    "sec_", "edgar_", "esef_", "esma_", "epo_", "oecd_", "ecb_", "fred_", "bis_", "eurostat_",
+    "world_bank_", "gleif_", "cnb_", "issuer_", "regulator_",
+)  # fmt: skip
+VENDOR_SOURCES = frozenset(
+    {
+        "alpha_vantage", "alphavantage", "finnhub", "fmp", "eodhd", "twelve_data", "diffbot",
+        "pdl", "people_data_labs", "yahoo", "stooq", "openfigi",
+    }
+)  # fmt: skip
+VENDOR_PREFIXES = (
+    "alpha_vantage_", "finnhub_", "fmp_", "eodhd_", "twelve_data_", "diffbot_", "pdl_",
+    "people_data_labs_", "yahoo_", "stooq_", "openfigi_",
+)  # fmt: skip
+OWNER_SOURCES = frozenset({"owner", "owner_review", "owner_entered", "manual"})
 
 
 def provenance_of(source: str | None) -> Provenance:
-    """Primary (regulator, central bank, issuer) versus vendor (aggregator) by source name."""
+    """Primary (regulator, central bank, issuer) versus vendor (aggregator) by exact source
+    name; anything not recognised is `unclassified`, never guessed from a substring."""
     if not source:
         return "unclassified"
-    name = source.casefold().replace("-", "_").replace(" ", "_")
-    if name in {"owner", "owner_review", "owner_entered", "manual"} or name.startswith("owner"):
+    name = source.casefold().replace("-", "_").replace(" ", "_").split(":", 1)[0]
+    if name in OWNER_SOURCES or name.startswith("owner_"):
         return "owner"
-    if "wikidata" in name:
+    if name == "wikidata" or name.startswith("wikidata_"):
         return "community"
-    if any(marker in name for marker in VENDOR_MARKERS):
+    if name in VENDOR_SOURCES or name.startswith(VENDOR_PREFIXES):
         return "vendor"
-    if any(marker in name for marker in PRIMARY_MARKERS):
+    if name in PRIMARY_SOURCES or name.startswith(PRIMARY_PREFIXES):
         return "primary"
     return "unclassified"
 

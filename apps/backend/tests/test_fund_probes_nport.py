@@ -104,10 +104,13 @@ def test_parser_rejects_entities_and_foreign_documents() -> None:
 
 def test_isin_checksum_and_public_lag() -> None:
     assert valid_isin("US0378331005") and not valid_isin("US0378331006")
-    # Quarter end 2026-06-30 + 60 days; a mid-quarter month maps to its quarter end.
+    # Report date + 60 days (B40). The old rule rounded to a calendar quarter end first, which
+    # put a 2026-04-30 report at 2026-08-29 and overstated it by two months for a fund with a
+    # non-calendar fiscal year.
     assert public_after(dt.date(2026, 6, 30)) == dt.date(2026, 8, 29)
-    assert public_after(dt.date(2026, 4, 30)) == dt.date(2026, 8, 29)
+    assert public_after(dt.date(2026, 4, 30)) == dt.date(2026, 6, 29)
     assert public_after(dt.date(2026, 12, 31)) == dt.date(2027, 3, 1)
+    assert public_after(dt.date(2026, 11, 30)) == dt.date(2027, 1, 29)  # Oct fiscal year end
 
 
 def _filing(report: dt.date | None, filed: dt.date = dt.date(2026, 8, 26)) -> Filing:
@@ -281,14 +284,18 @@ async def test_free_success_is_stored_and_premium_denials_disable_the_endpoint(
     states = {
         (r["provider"], r["endpoint"]): r
         for r in await backend_pool.fetch(
-            "select provider,endpoint,state,hard_blocked,retry_at from public.provider_access"
+            "select provider,endpoint,state,last_attempt_state,hard_blocked,retry_at"
+            " from public.provider_access"
             " where endpoint in ('etf_profile','etf_holdings','index_constituents',"
             "'institutional_ownership','etf_info')"
         )
     }
     assert states[("finnhub", "etf_profile")]["state"] == "paid_only"
     assert states[("finnhub", "etf_profile")]["hard_blocked"]
-    assert states[("finnhub", "index_constituents")]["state"] == "quota_exhausted"
+    # A quota answer is a transient outcome (A6): it is recorded beside the durable verdict and
+    # a Retry-After window, it never replaces `state` or hard-blocks the endpoint (B36).
+    quota = states[("finnhub", "index_constituents")]
+    assert quota["last_attempt_state"] == "quota_exhausted" and not quota["hard_blocked"]
     assert states[("finnhub", "index_constituents")]["retry_at"] is not None
     assert states[("finnhub", "etf_holdings")]["state"] == "available"
     assert states[("fmp", "etf_info")]["state"] == "available"

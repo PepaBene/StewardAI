@@ -27,10 +27,13 @@ CHANNEL_ENV = (
 
 @pytest.fixture(autouse=True)
 def _no_channel_credentials(monkeypatch: pytest.MonkeyPatch) -> Iterator[None]:
-    from steward.settings import get_settings
+    from steward.settings import Settings, get_settings
 
     for name in CHANNEL_ENV:
         monkeypatch.delenv(name, raising=False)
+    # The developer's repo-level .env must not feed Settings during tests (B49).  Tests that
+    # want a value pass it explicitly or set the environment variable.
+    monkeypatch.setitem(Settings.model_config, "env_file", None)
     get_settings.cache_clear()
     yield
     get_settings.cache_clear()
@@ -42,8 +45,13 @@ def _no_channel_credentials(monkeypatch: pytest.MonkeyPatch) -> Iterator[None]:
 # unix sockets (the test Postgres, in-process ASGI) stay allowed. Set STEWARD_ALLOW_NETWORK=1
 # for an explicit, budgeted live check run by hand.
 # ---------------------------------------------------------------------------------------
-class NetworkAccessBlocked(AssertionError):
-    pass
+class NetworkAccessBlocked(BaseException):
+    """Raised by the offline guard.
+
+    A BaseException on purpose: adapters and collectors commonly wrap provider calls in
+    `except Exception` and turn the failure into a typed "temporarily failed" result, which
+    would silently hide a test that reached the real network.  `except Exception` cannot catch
+    this; only `pytest.raises(NetworkAccessBlocked)` or `except BaseException` can."""
 
 
 def _is_local_host(host: object) -> bool:
@@ -89,12 +97,29 @@ PROVIDER_KEY_ENV = (
 )
 
 
+# A configured proxy (even a loopback one) can carry a request to the real internet, and the
+# guard only sees the loopback connect.  Clear every spelling.
+PROXY_ENV = (
+    "HTTP_PROXY",
+    "HTTPS_PROXY",
+    "ALL_PROXY",
+    "NO_PROXY",
+    "http_proxy",
+    "https_proxy",
+    "all_proxy",
+    "no_proxy",
+    "REQUESTS_CA_BUNDLE",
+    "SSL_CERT_FILE",
+    "CURL_CA_BUNDLE",
+)
+
+
 @pytest.fixture(autouse=True)
 def _no_real_network(monkeypatch: pytest.MonkeyPatch) -> Iterator[None]:
     if os.environ.get("STEWARD_ALLOW_NETWORK") == "1":
         yield
         return
-    for name in PROVIDER_KEY_ENV:
+    for name in PROVIDER_KEY_ENV + PROXY_ENV:
         monkeypatch.delenv(name, raising=False)
     real_connect = socket.socket.connect
     real_connect_ex = socket.socket.connect_ex

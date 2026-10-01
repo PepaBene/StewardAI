@@ -29,7 +29,7 @@ from steward.documents.fetch import FetchError, default_headers, fetch_document
 from steward.news.normalize import clean_text, host_of
 from steward.sources.base import AccessResult, AccessState
 from steward.sources.edgar import EdgarClient, EdgarError, Filing
-from steward.sources.free_market import alpha_news_sentiment, parse_alpha_news
+from steward.sources.free_market import FreeSourceError, alpha_news_sentiment, parse_alpha_news
 from steward.sources.governor import Budget, PostgresRequestGovernor, QuotaExceeded
 from steward.sources.store import record_access
 
@@ -104,11 +104,12 @@ async def collect_alpha_vantage_news(
             parsed = parse_alpha_news(payload, symbol)
             for article in parsed:
                 publisher_url = article.raw.get("url")
-                published = (
-                    dt.datetime.combine(article.published_at, dt.time.min, tzinfo=dt.UTC)
-                    if article.published_at
-                    else None
-                )
+                # The article's own timestamp (UTC to the second), never midnight of its day.
+                published = parse_alpha_time(article.raw.get("time_published"))
+                if published is None and article.published_at:
+                    published = dt.datetime.combine(
+                        article.published_at, dt.time.min, tzinfo=dt.UTC
+                    )
                 items.append(
                     RawItem(
                         source_id=source_id,
@@ -140,6 +141,20 @@ async def collect_alpha_vantage_news(
             )
             errors.append(f"{holding.ticker}: Alpha Vantage shared daily budget exhausted")
             break
+        except FreeSourceError as exc:
+            # A typed denial ("premium endpoint", "25 requests per day", an invalid key) is
+            # recorded as what it is, not as a transient failure that will be retried forever.
+            state = alpha_denial_state(exc)
+            await record_access(
+                pool,
+                "alpha_vantage",
+                "news_sentiment",
+                AccessResult(state, "news sentiment request denied or failed"),
+                status_code=exc.status_code,
+            )
+            errors.append(f"{holding.ticker}: Alpha Vantage {state.value}")
+            if state in {AccessState.QUOTA_EXHAUSTED, AccessState.PAID_ONLY}:
+                break  # the same denial would repeat for every remaining holding
         except Exception as exc:
             await record_access(
                 pool,
@@ -149,6 +164,30 @@ async def collect_alpha_vantage_news(
             )
             errors.append(f"{holding.ticker}: {type(exc).__name__}")
     return items, errors
+
+
+def parse_alpha_time(value: object) -> dt.datetime | None:
+    """Alpha Vantage `time_published` ("20260930T140000", UTC) as an aware datetime."""
+    if not isinstance(value, str):
+        return None
+    for fmt in ("%Y%m%dT%H%M%S", "%Y%m%dT%H%M"):
+        try:
+            return dt.datetime.strptime(value.strip(), fmt).replace(tzinfo=dt.UTC)
+        except ValueError:
+            continue
+    return None
+
+
+def alpha_denial_state(exc: FreeSourceError) -> AccessState:
+    """The typed outcome of an Alpha Vantage failure: the provider's own message when it was
+    unambiguous, else the HTTP status."""
+    if exc.state is not None:
+        return exc.state
+    if exc.status_code == 429:
+        return AccessState.QUOTA_EXHAUSTED
+    if exc.status_code in (401, 403):
+        return AccessState.ACCESS_UNVERIFIED
+    return AccessState.TEMPORARILY_FAILED
 
 
 @dataclass

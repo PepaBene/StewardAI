@@ -31,6 +31,7 @@ from steward.free_source_reads import (
     forward_rows,
     patent_trend_rows,
 )
+from steward.geo_codes import has_iso_columns, reporter_codes, reporter_match_sql, to_iso
 from steward.macro.read import MacroContext, context_for_holding
 
 ROW_LIMIT = 300
@@ -70,7 +71,11 @@ class FinancialHistory(BaseModel):
 
 class TradeRow(BaseModel):
     reporter: str
+    reporter_iso: str | None = Field(
+        default=None, description="ISO alpha-2 of the reporter (Comtrade stores M49 numbers)."
+    )
     partner: str
+    partner_iso: str | None = None
     flow: str
     hs_revision: str
     hs_code: str
@@ -195,27 +200,36 @@ async def trade_exposure(
 ) -> list[TradeExposure]:
     out: list[TradeExposure] = []
     seen: set[tuple[str | None, str]] = set()
+    has_iso = await has_iso_columns(pool)
     for effect in effects:
         if not effect.hs_code or (effect.geography, effect.hs_code) in seen:
             continue
         seen.add((effect.geography, effect.hs_code))
+        # The exposure geography is ISO alpha-2; Comtrade stores M49 numbers (US = 842).
+        codes = reporter_codes(effect.geography) if effect.geography else None
+        reporter_filter = reporter_match_sql(has_iso, 2) if codes else "$2::text[] is null"
         rows = await pool.fetch(
-            """with latest as (
+            f"""with latest as (
                  select distinct on (reporter,partner,flow,hs_revision,hs_code,period)
                         reporter,partner,flow,hs_revision,hs_code,period,trade_value,quantity,
                         quantity_unit,known_at,source_url
                  from public.trade_observation
-                 where hs_code=$1 and ($2::text is null or reporter=$2) and known_at <= $3
+                 where hs_code=$1 and ({reporter_filter}) and known_at <= $3
                  order by reporter,partner,flow,hs_revision,hs_code,period,known_at desc
                )
                select * from latest
                where period=(select max(period) from latest)
-               order by trade_value desc nulls last,reporter,partner,flow limit 20""",
+               order by trade_value desc nulls last,reporter,partner,flow limit 20""",  # noqa: S608 - the filter is built from constants
             effect.hs_code,
-            effect.geography,
+            codes,
             as_of,
         )
-        trade_rows = [TradeRow(**dict(r)) for r in rows]
+        trade_rows = [
+            TradeRow(
+                **dict(r), reporter_iso=to_iso(r["reporter"]), partner_iso=to_iso(r["partner"])
+            )
+            for r in rows
+        ]
         out.append(
             TradeExposure(
                 hs_code=effect.hs_code,
@@ -276,13 +290,19 @@ async def source_disagreements(
     ]
 
 
-async def coverage_entries(pool: asyncpg.Pool, keys: list[str]) -> list[CoverageEntry]:
+async def coverage_entries(
+    pool: asyncpg.Pool, keys: list[str], as_of: dt.datetime | None = None
+) -> list[CoverageEntry]:
+    """Coverage-ledger entries checked by the cutoff. The ledger keeps only the latest check
+    of each entry, so an entry first checked after the cutoff did not exist then."""
     rows = await pool.fetch(
         """select provider,dataset,entity_key,state,latest_period,expected_periods,
                   available_periods,checked_at,reason
            from public.coverage_status where entity_key=any($1::text[])
+             and ($2::timestamptz is null or checked_at <= $2)
            order by provider,dataset,entity_key""",
         keys,
+        as_of,
     )
     return [CoverageEntry(**dict(r)) for r in rows]
 
@@ -393,8 +413,8 @@ async def holding_data_context(
         # reader's unfiltered fallback is not shown as the holding's exposure.
         macro = macro.model_copy(update={"observations": [], "comparisons": []})
     trade = await trade_exposure(pool, macro.effects, when)
-    network = await business_network_payload(pool, ticker, when)
-    patents = await patent_trend_rows(pool, ticker)
+    network = await business_network_payload(pool, ticker, when, historical=as_of is not None)
+    patents = await patent_trend_rows(pool, ticker, when)
     forward = await forward_rows(pool, ticker, when)
     research = await company_research_rows(pool, ticker, when)
     issuer_id = identity["issuer_id"]
@@ -409,7 +429,7 @@ async def holding_data_context(
     symbol = identity.get("price_symbol")
     if isinstance(symbol, str):
         keys.append(symbol)
-    coverage = await coverage_entries(pool, keys)
+    coverage = await coverage_entries(pool, keys, when)
     # `identity` carries internal ids only; `price_symbol` is a public symbol.
     return HoldingDataContext(
         ticker=ticker,

@@ -1,0 +1,68 @@
+{
+ "response": {
+  "numFound": 5,
+  "start": 0,
+  "docs": [
+   {
+    "isin": "DE000OLDC001",
+    "mic": "XETR",
+    "status": "NEWF",
+    "publication_date": "2024-01-10T06:00:00Z",
+    "gnr_full_name": "OLDCO HOLDINGS AG O.N.",
+    "gnr_short_name": "OLDCO HOLDIN",
+    "gnr_cfi_code": "ESVUFR",
+    "gnr_notional_curr_code": "EUR",
+    "lei": "5299000OLDCO00000001",
+    "mrkt_trdng_trmination_date": null
+   },
+   {
+    "isin": "DE000OLDC001",
+    "mic": "XFRA",
+    "status": "NEWF",
+    "publication_date": "2025-02-01T06:00:00Z",
+    "gnr_full_name": "OLDCO HOLDINGS AG O.N.",
+    "gnr_short_name": "OLDCO HOLDIN",
+    "gnr_cfi_code": "ESVUFR",
+    "gnr_notional_curr_code": "EUR",
+    "lei": "5299000OLDCO00000001",
+    "mrkt_trdng_trmination_date": null
+   },
+   {
+    "isin": "DE000OLDC001",
+    "mic": "XFRA",
+    "status": "CANC",
+    "publication_date": "2025-03-01T06:00:00Z",
+    "gnr_full_name": "OLDCO HOLDINGS AG O.N.",
+    "gnr_short_name": "OLDCO HOLDIN",
+    "gnr_cfi_code": "ESVUFR",
+    "gnr_notional_curr_code": "EUR",
+    "lei": null,
+    "mrkt_trdng_trmination_date": null
+   },
+   {
+    "isin": "DE000OLDC001",
+    "mic": "XETR",
+    "status": "MODF",
+    "publication_date": "2025-06-01T06:00:00Z",
+    "gnr_full_name": "NEWCO GROUP SE O.N.",
+    "gnr_short_name": "NEWCO GROUP ",
+    "gnr_cfi_code": "ESVUFR",
+    "gnr_notional_curr_code": "EUR",
+    "lei": "5299000OLDCO00000001",
+    "mrkt_trdng_trmination_date": null
+   },
+   {
+    "isin": "DE000OLDC001",
+    "mic": "XETR",
+    "status": "TERM",
+    "publication_date": "2026-02-01T06:00:00Z",
+    "gnr_full_name": "NEWCO GROUP SE O.N.",
+    "gnr_short_name": "NEWCO GROUP ",
+    "gnr_cfi_code": "ESVUFR",
+    "gnr_notional_curr_code": "EUR",
+    "lei": "5299000OLDCO00000001",
+    "mrkt_trdng_trmination_date": "2026-01-31T23:59:59Z"
+   }
+  ]
+ }
+}

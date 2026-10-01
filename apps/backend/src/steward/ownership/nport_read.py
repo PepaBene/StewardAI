@@ -1,7 +1,7 @@
 """Latest SEC N-PORT fund positions in a holding, with reporting lag and coverage state.
 
 These are positions that registered funds report owning. They are NOT beneficial ownership of
-the issuer, they lag the quarter end (public ~60 days after it), and they cover only the funds
+the issuer, they lag the report date (public ~60 days after it), and they cover only the funds
 the portfolio tracks. Nothing here is summed across funds or combined with Form 13F figures.
 """
 
@@ -26,7 +26,7 @@ class FundPosition(BaseModel):
     report_period_end: dt.date = Field(description="The date the positions are as of.")
     filed: dt.date
     public_after: dt.date = Field(
-        description="Quarter end + 60 days: earliest the report is expected to be public."
+        description="Report date + 60 days: earliest the report is expected to be public."
     )
     lag_days: int = Field(description="Filing date minus report date, in days.")
     age_days: int = Field(description="As-of date minus report date, in days.")
@@ -68,7 +68,7 @@ class HoldingFundPositions(BaseModel):
     basis: Literal["fund_position"] = "fund_position"
     notice: str = (
         "Fund positions from SEC N-PORT: what each fund reports holding at the report date, "
-        f"public about {PUBLIC_LAG_DAYS} days after quarter end. Not beneficial ownership; "
+        f"public about {PUBLIC_LAG_DAYS} days after the report date. Not beneficial ownership; "
         "do not add to Form 13F holders, 13D/G stakes or issuer-published fund holdings."
     )
     as_of: dt.date

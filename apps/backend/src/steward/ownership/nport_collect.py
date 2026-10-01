@@ -370,21 +370,26 @@ async def collect_fund(
            where series_id=$1 and reconcile_status='confirmed'""",
         fund.series_id,
     )
-    if latest is not None and (today - latest).days <= FRESH_DAYS:
-        return {"skipped": "stored report is current", "latest": latest.isoformat()}
-    since = today - dt.timedelta(days=LOOKBACK_DAYS)
+    fresh = latest is not None and (today - latest).days <= FRESH_DAYS
+    # A fresh period needs no full scan, but an amendment (NPORT-P/A) of the latest period, or
+    # a newer period, can still arrive within the freshness window: look from the stored report
+    # date forward rather than skipping the fund for 100 days (B40).
+    since = latest if fresh and latest is not None else today - dt.timedelta(days=LOOKBACK_DAYS)
     candidates = sorted(
         (f for f in await edgar.filings(fund.registrant_cik, since=since) if f.form in NPORT_FORMS),
         key=lambda f: (f.report_date or f.filing_date, f.filing_date, f.accession),
         reverse=True,
     )
     stats: dict[str, Any] = {"candidates": len(candidates), "scanned": 0, "stored": 0}
-    found_period: dt.date | None = None
+    if fresh and latest is not None:
+        stats["rescan"] = f"stored report {latest.isoformat()} is current: looked for amendments"
+    found_period: dt.date | None = latest if fresh else None
     for filing in candidates[:MAX_SCAN_PER_FUND]:
         if found_period and filing.report_date and filing.report_date < found_period:
             break  # older periods are not needed once the latest one is stored
         if await ctx.pool.fetchval(
-            "select exists(select 1 from public.nport_filing where accession=$1)",
+            "select exists(select 1 from public.nport_filing where accession=$1)"
+            " or exists(select 1 from public.nport_ignored_filing where accession=$1)",
             filing.accession,
         ):
             found_period = found_period or filing.report_date
@@ -397,7 +402,19 @@ async def collect_fund(
             stats.setdefault("errors", []).append(f"{filing.accession}: {exc}")
             continue
         if report.series_id != fund.series_id:
-            continue  # another series of the same registrant: not this fund
+            # Another series of the same registrant: not this fund. Remembered so the
+            # amendment rescan of a current fund does not download it again every run.
+            await ctx.pool.execute(
+                "insert into public.nport_ignored_filing"
+                " (accession, registrant_cik, series_id, report_period_end, filed)"
+                " values ($1,$2,$3,$4,$5) on conflict do nothing",
+                filing.accession,
+                fund.registrant_cik,
+                report.series_id,
+                report.report_period_end,
+                filing.filing_date,
+            )
+            continue
         status, detail = reconcile(report, filing, fund)
         await store_report(ctx.pool, report, filing, content, url, fund, status, detail)
         stats["stored"] += 1

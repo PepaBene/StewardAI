@@ -23,9 +23,13 @@ items, and the announcement body is parsed here.
 Status of retrieval (an honest gap): the announcement headlines come from the Investegate
 company page the news pipeline already reads, but the announcement *body* page has not been
 shown to be retrievable and parseable without a browser. Nothing here has been run against
-the live site, and there is no stored table or read route for PDMR rows. `fetch_pdmr`
-therefore returns a typed `PdmrFetchResult`: a retrieved page that does not contain the
-template is `access_unverified`, a 401/403 is `access_unverified`, a 429 is
+the live site. Parsed notifications are persisted (`pdmr_notification` / `pdmr_transaction`)
+by `ownership.pdmr_collect` from the RNS stream and read back by
+`/holdings/{ticker}/pdmr-notifications`; every retrieval attempt, failed ones included, is
+recorded, and `ownership.pdmr_read.pdmr_access_from_db` derives the standing status from
+those attempts, so "available" only appears once a notification was really parsed.
+`fetch_pdmr` returns a typed `PdmrFetchResult`: a retrieved page that does not contain the
+template is `no_template` (access unverified), a 401/403 is `access_unverified`, a 429 is
 `quota_exhausted`; it never turns a failed fetch into an empty list of transactions. The
 nature of each transaction is mapped to the same economic classes as the US Form 4 pipeline;
 a purchase or sale counts as open-market only when the stated place of the transaction is a
@@ -90,6 +94,7 @@ class PdmrNotification:
 class PdmrFetchResult:
     access: AccessResult
     notification: PdmrNotification | None = None
+    no_template: bool = False  # page retrieved, but it is not the MAR template
 
 
 def pdmr_access() -> AccessResult:
@@ -97,8 +102,9 @@ def pdmr_access() -> AccessResult:
     return AccessResult(
         AccessState.ACCESS_UNVERIFIED,
         "UK PDMR notifications: the MAR Article 19 template parser is implemented and tested "
-        "on a fixture, but retrieval of announcement bodies is not demonstrated offline and "
-        "no PDMR rows are stored, so UK insider activity is not available.",
+        "on a fixture and parsed notifications are stored, but retrieval of announcement "
+        "bodies is not demonstrated against the live site: until a notification has "
+        "been parsed, UK insider activity is not available.",
     )
 
 
@@ -166,20 +172,23 @@ def classify_nature(nature: str | None, venue: str | None) -> tuple[str, str]:
     text = (nature or "").lower()
     if not text:
         return "other", "no nature of transaction stated"
-    if re.search(r"exercise", text):
+    # Word boundaries: a bare substring would read "invested" as a vesting and "cisa" as ISA.
+    if re.search(r"\bexercis", text):
         return "option_exercise", "nature states an exercise"
-    if re.search(r"award|grant|vest|allot|incentive|ltip|nil[- ]cost|share plan|bonus", text):
+    if re.search(r"\b(?:award|grant|vest|allot|incentive|ltip|nil[- ]cost|share plan|bonus)", text):
         return "grant_award", "nature states an award, grant or vesting"
     if re.search(r"\bgift", text):
         return "gift", "nature states a gift"
-    if re.search(r"\btax|withh|to cover", text):
+    if re.search(r"\btax|\bwithh|\bto cover\b", text):
         return "tax_withholding", "nature states tax or sell-to-cover"
-    if re.search(r"dividend|scrip|reinvest|transfer|conversion|pension|isa\b|sipp", text):
+    if re.search(
+        r"\b(?:dividend|scrip|reinvest|transfer|conversion|pension)|\b(?:isa|sipp)\b", text
+    ):
         return "other", "nature states a reinvestment, transfer or conversion"
     side = None
-    if re.search(r"purchase|acquisition|acquire|bought|buy", text):
+    if re.search(r"\b(?:purchase|acquisition|acquire|bought|buy)", text):
         side = "open_market_buy"
-    elif re.search(r"sale|sold|disposal|dispose|sell", text):
+    elif re.search(r"\b(?:sale|sold|disposal|dispose|sell)", text):
         side = "open_market_sell"
     if side is None:
         return "other", "nature not recognised"
@@ -288,6 +297,7 @@ async def fetch_pdmr(http: httpx.AsyncClient, url: str) -> PdmrFetchResult:
                 AccessState.ACCESS_UNVERIFIED,
                 "Page retrieved but it does not contain the MAR Article 19 template "
                 "(script-rendered or changed layout); no transactions were read.",
-            )
+            ),
+            no_template=True,
         )
     return PdmrFetchResult(AccessResult(AccessState.AVAILABLE), notification)

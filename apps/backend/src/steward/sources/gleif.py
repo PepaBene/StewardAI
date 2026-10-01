@@ -13,6 +13,10 @@ from typing import Any
 
 import httpx
 
+from steward.sources.base import rate_limit_wait
+
+_sleep = asyncio.sleep
+
 BASE_URL = "https://api.gleif.org/api/v1"
 PAGE_SIZE = 200  # GLEIF's maximum page[size]
 # A safety bound only: large groups have hundreds of direct children (Siemens AG ~460).
@@ -21,6 +25,14 @@ MAX_CHILDREN = 5000
 
 class GleifError(Exception):
     pass
+
+
+class GleifRateLimited(GleifError):
+    """HTTP 429 that outlasted the inline retries; `retry_at` is the provider's Retry-After."""
+
+    def __init__(self, message: str, retry_at: dt.datetime | None = None) -> None:
+        super().__init__(message)
+        self.retry_at = retry_at
 
 
 @dataclass(frozen=True)
@@ -100,10 +112,16 @@ class GleifClient:
                 response = await self._http.get(f"{BASE_URL}{path}", params=params)
             except httpx.TransportError as exc:  # GLEIF drops connections now and then
                 last = exc
-                await asyncio.sleep(1 + attempt)
+                await _sleep(1 + attempt)
                 continue
             if response.status_code == 404:
                 return None
+            if response.status_code == 429:
+                wait, retry_at = rate_limit_wait(response.headers.get("Retry-After"), attempt)
+                if wait is None or attempt == 2:
+                    raise GleifRateLimited(f"GLEIF {path} rate limited (HTTP 429)", retry_at)
+                await _sleep(wait)
+                continue
             if response.status_code != 200:
                 raise GleifError(f"GLEIF {path} returned HTTP {response.status_code}")
             try:

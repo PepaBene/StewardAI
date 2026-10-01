@@ -6,7 +6,13 @@
 -- first. The migration file itself is never edited.
 -- DATA LOSS: drops these tables and every row in them: company_research_observation.
 -- DATA LOSS: drops these columns and their values: news_item.sentiment_relevance, news_item.sentiment_score.
+-- PRECONDITION: no row may use a value the restored CHECK constraint (source_type_check) forbids; the rollback stops with a clear error before changing anything if one does.
 
+do $$ begin
+  if exists (select 1 from public.source where not ((type = ANY (ARRAY['rss'::text, 'page'::text, 'edgar'::text, 'finnhub'::text, 'google_news'::text, 'reference'::text, 'rns'::text, 'eqs'::text, 'edgar_fts'::text, 'macro'::text])))) then
+    raise exception 'rollback precondition failed: public.source holds rows that violate the restored constraint source_type_check; delete or migrate those rows first (select * from public.source where not ((type = ANY (ARRAY[''rss''::text, ''page''::text, ''edgar''::text, ''finnhub''::text, ''google_news''::text, ''reference''::text, ''rns''::text, ''eqs''::text, ''edgar_fts''::text, ''macro''::text]))))';
+  end if;
+end $$;
 alter table public.news_item drop constraint if exists news_item_sentiment_relevance_check;
 alter table public.news_item drop constraint if exists news_item_sentiment_score_check;
 alter table public.source drop constraint if exists source_type_check;

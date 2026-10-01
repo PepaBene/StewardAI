@@ -6,7 +6,9 @@ from dataclasses import dataclass
 from decimal import Decimal, InvalidOperation
 
 from steward.ownership.insider_classify import classify, plan_flag
+from steward.sources.ciks import ten_digit_cik
 from steward.sources.edgar import Filing
+from steward.sources.xml_guard import safe_fromstring
 
 
 def _local(tag: str) -> str:
@@ -130,14 +132,11 @@ def _footnote_ids(item: ET.Element) -> tuple[str, ...]:
 
 def parse_ownership_xml(xml: bytes, filing: Filing) -> InsiderFiling:
     """Parse as-filed ownership XML, keeping transactions and initial holdings."""
-    if b"<!DOCTYPE" in xml.upper() or b"<!ENTITY" in xml.upper():
-        raise ValueError("ownership XML with DTD or entity declarations is not accepted")
-    try:
-        root = ET.fromstring(xml)  # noqa: S314 - DTD/entity declarations are rejected above.
-    except ET.ParseError as exc:
-        raise ValueError(f"ownership XML is not well-formed: {exc}") from exc
+    root = safe_fromstring(xml, ValueError)
     issuer = _child(root, "issuer")
-    issuer_cik = (_text(issuer, "issuerCik") or filing.cik).zfill(10)
+    issuer_cik = ten_digit_cik(_text(issuer, "issuerCik")) or ten_digit_cik(filing.cik)
+    if issuer_cik is None:
+        raise ValueError("ownership XML has no numeric issuer CIK")
     issuer_name = _text(issuer, "issuerName")
     issuer_ticker = _text(issuer, "issuerTradingSymbol")
     rows: list[InsiderRow] = []
@@ -146,7 +145,7 @@ def parse_ownership_xml(xml: bytes, filing: Filing) -> InsiderFiling:
     owner = owners[0] if owners else None
     owner_id = _path(owner, "reportingOwnerId")
     relationship = _path(owner, "reportingOwnerRelationship")
-    owner_cik = (_text(owner_id, "rptOwnerCik") or "").zfill(10)
+    owner_cik = ten_digit_cik(_text(owner_id, "rptOwnerCik")) or "0000000000"
     owner_name = _text(owner_id, "rptOwnerName")
     director = _truth(relationship, "isDirector") if relationship is not None else False
     officer = _truth(relationship, "isOfficer") if relationship is not None else False

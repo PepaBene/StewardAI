@@ -2,8 +2,10 @@
 
 from __future__ import annotations
 
+import ast
 import datetime as dt
 from decimal import Decimal
+from pathlib import Path
 from typing import Any
 
 import asyncpg
@@ -16,6 +18,15 @@ from api.db import get_pool
 from api.gate_routes import router as gate_router
 from steward.sources.base import AccessState, access_from_http
 from steward.sources.governor import Budget, PostgresRequestGovernor, QuotaExceeded
+from steward.verify_sources.budgets import (
+    ANY_ENDPOINT,
+    BUDGET_SITES,
+    SETTINGS_SITES,
+    CollectorBudget,
+    collector_budgets,
+    configured_budgets,
+    literal_budgets,
+)
 from steward.verify_sources.contract import classify_failure
 from steward.verify_sources.zero_cost import (
     DISABLED_OK_STATES,
@@ -24,6 +35,7 @@ from steward.verify_sources.zero_cost import (
     budget_from_access,
     disable_policy,
     evaluate_endpoint,
+    usable_credits,
     verify_hard_stop,
 )
 
@@ -140,17 +152,60 @@ def test_non_free_tier_and_unbounded_quota_are_flagged() -> None:
 # ---------------------------------------------------------------------------------------
 # Hard stop below the paid threshold
 # ---------------------------------------------------------------------------------------
+@pytest.mark.db
 @pytest.mark.parametrize("period", ["minute", "day", "month"])
-async def test_governor_stops_at_the_declared_free_quota(period: str) -> None:
+async def test_governor_stops_at_the_declared_free_quota(
+    backend_pool: asyncpg.Pool, period: str
+) -> None:
+    """Runs against PostgresRequestGovernor / reserve_provider_credits, the production path."""
     budget = budget_from_access(Decimal(7), period)
     assert budget is not None
-    assert await verify_hard_stop(budget) == Decimal(7)
+    assert await verify_hard_stop(backend_pool, budget) == Decimal(7)
+    # the throwaway probe row and its usage windows are gone
+    assert (
+        await backend_pool.fetchval(
+            "select count(*) from public.provider_access where provider='__hard_stop_probe__'"
+        )
+        == 0
+    )
+    assert (
+        await backend_pool.fetchval(
+            "select count(*) from public.provider_quota_usage where provider='__hard_stop_probe__'"
+        )
+        == 0
+    )
 
 
-async def test_reserve_keeps_credits_back_from_non_urgent_work() -> None:
-    budget = budget_from_access(Decimal(10), "day", reserve=Decimal(3))
-    assert budget is not None
-    assert await verify_hard_stop(budget) == Decimal(7)
+@pytest.mark.db
+async def test_reserve_keeps_credits_back_from_day_and_month_windows(
+    backend_pool: asyncpg.Pool,
+) -> None:
+    for period in ("day", "month"):
+        budget = budget_from_access(Decimal(10), period, reserve=Decimal(3))
+        assert budget is not None and budget.reserve == Decimal(3)
+        assert await verify_hard_stop(backend_pool, budget) == Decimal(7), period
+
+
+@pytest.mark.db
+async def test_per_minute_window_has_no_reserve(backend_pool: asyncpg.Pool) -> None:
+    """The governor never subtracts the reserve from a per-minute cap, so the budget helper
+    drops it instead of leaving a number that means nothing."""
+    budget = budget_from_access(Decimal(10), "minute", reserve=Decimal(3))
+    assert budget is not None and budget.reserve == Decimal(0)
+    assert await verify_hard_stop(backend_pool, budget) == Decimal(10)
+    # a hand-built budget with both: the minute cap is not reduced, the day cap is.
+    mixed = Budget(per_minute=Decimal(10), daily=Decimal(6), reserve=Decimal(2))
+    assert usable_credits(mixed) == Decimal(4)
+    assert await verify_hard_stop(backend_pool, mixed) == Decimal(4)
+
+
+def test_reserve_that_leaves_nothing_is_an_error() -> None:
+    with pytest.raises(ValueError, match="no usable credit"):
+        budget_from_access(Decimal(5), "day", reserve=Decimal(5))
+    with pytest.raises(ValueError):
+        budget_from_access(Decimal(0), "day")
+    with pytest.raises(ValueError):
+        budget_from_access(Decimal("NaN"), "day")
 
 
 def test_week_or_unknown_periods_have_no_builtin_budget() -> None:
@@ -176,7 +231,10 @@ async def test_every_seeded_quota_has_a_hard_stop(backend_pool: asyncpg.Pool) ->
             daily=min(budget.daily, Decimal(5)) if budget.daily else None,
             monthly=min(budget.monthly, Decimal(5)) if budget.monthly else None,
         )
-        assert await verify_hard_stop(small) <= Decimal(5), (r["provider"], r["endpoint"])
+        assert await verify_hard_stop(backend_pool, small) <= Decimal(5), (
+            r["provider"],
+            r["endpoint"],
+        )
         checked += 1
     assert checked > 0
 
@@ -328,3 +386,173 @@ async def test_gate_routes_are_read_only_and_report_blocked_by_default(
     assert (await api.get("/verification/coverage")).json() == []
     for path in ("/verification/zero-cost-gate", "/verification/signals"):
         assert (await api.post(path)).status_code == 405
+
+
+# ---------------------------------------------------------------------------------------
+# Collector budgets (B51): the audit inspects what the code asks the governor for
+# ---------------------------------------------------------------------------------------
+SRC = Path(__file__).resolve().parents[1] / "src"
+
+
+def budget_sites() -> dict[str, int]:
+    found: dict[str, int] = {}
+    for path in sorted((SRC / "steward").rglob("*.py")):
+        rel = path.relative_to(SRC).as_posix()
+        if rel.startswith("steward/verify_sources/"):
+            continue
+        count = sum(
+            1
+            for node in ast.walk(ast.parse(path.read_text()))
+            if isinstance(node, ast.Call)
+            and isinstance(node.func, ast.Name)
+            and node.func.id == "Budget"
+        )
+        if count:
+            found[rel] = count
+    return found
+
+
+def test_every_budget_construction_in_the_code_is_registered() -> None:
+    """Adding a `Budget(...)` to a collector without registering it in verify_sources/budgets.py
+    (BUDGET_SITES plus a CollectorBudget entry) fails here, so the zero-cost audit cannot be
+    blind to a new spender."""
+    assert budget_sites() == BUDGET_SITES, (
+        "a Budget(...) was added or removed; update BUDGET_SITES and the registry in "
+        "src/steward/verify_sources/budgets.py"
+    )
+    wheres = " ".join(b.where for b in collector_budgets())
+    assert [f for f in BUDGET_SITES if f not in wheres] == []
+
+
+def test_registered_literal_budgets_equal_the_constants_in_the_collectors() -> None:
+    from steward.valuation.collect import ALPHA_VANTAGE_DAILY_LIMIT
+
+    valuation = [b for b in literal_budgets() if b.where == "steward/valuation/collect.py"]
+    assert [b.budget.daily for b in valuation] == [Decimal(ALPHA_VANTAGE_DAILY_LIMIT)]
+
+
+class _Settings:
+    def __init__(
+        self, daily: int | None = None, monthly: int | None = None, reserve: int = 1
+    ) -> None:
+        self.daily_quota, self.monthly_quota, self.reserve_credits = daily, monthly, reserve
+
+
+def test_shipped_provider_defaults_stay_inside_the_seeded_free_quotas() -> None:
+    by = {b.provider: b for b in configured_budgets() if b.where == SETTINGS_SITES}
+    assert by["alpha_vantage"].budget.daily == Decimal(25)
+    assert by["fmp"].budget.daily == Decimal(250)
+    assert by["un_comtrade"].budget.daily == Decimal(500)
+    assert by["diffbot"].budget.monthly == Decimal(10_000)
+    assert by["people_data_labs"].budget.monthly == Decimal(100)
+    capped = [b for b in configured_budgets({"eodhd": _Settings(daily=999)}) if "prices" in b.where]
+    assert capped[0].budget.daily == Decimal(20)  # prices.py caps the configured value
+
+
+def codes_with(budgets: list[CollectorBudget], **over: Any) -> set[str]:
+    return {f.code for f in evaluate_endpoint(row(**over), budgets) if f.severity == "violation"}
+
+
+def entry(budget: Budget, endpoint: str = "e", provider: str = "p") -> CollectorBudget:
+    return CollectorBudget(provider, endpoint, budget, "steward/x.py", "literal")
+
+
+def test_collector_budget_above_the_free_quota_is_a_violation() -> None:
+    assert codes_with([entry(Budget(daily=Decimal(100)))]) == set()
+    assert codes_with([entry(Budget(daily=Decimal(101)))]) == {"collector_budget_exceeds_quota"}
+    assert codes_with([entry(Budget(daily=Decimal(100)), ANY_ENDPOINT)]) == set()
+    # a monthly cap does not bound a per-day quota
+    assert codes_with([entry(Budget(monthly=Decimal(50)))]) == {"collector_budget_unbounded"}
+
+
+def test_reachable_key_endpoint_needs_a_bounded_collector_budget_or_a_no_overage_provider() -> None:
+    assert codes_with([]) == {"reachable_without_hard_stop"}
+    assert "reachable_without_hard_stop" in codes_with([entry(Budget())])
+    assert codes_with([entry(Budget(daily=Decimal(5)))]) == set()
+    assert codes_with([], provider="finnhub", quota=None, quota_period=None) == set()
+    # keyless endpoints and hard-blocked endpoints are not reachable with a key
+    assert codes_with([], credential_env=None) == set()
+    assert codes_with([], state="paid_only", hard_blocked=True) == set()
+
+
+def test_unverifiable_quota_window_is_a_warning_not_a_pass() -> None:
+    findings = evaluate_endpoint(
+        row(quota=5, quota_period="week"), [entry(Budget(daily=Decimal(1)))]
+    )
+    assert {f.code for f in findings if f.severity == "warning"} >= {"quota_period_unverifiable"}
+
+
+@pytest.mark.db
+async def test_audit_flags_configuration_that_exceeds_a_free_quota(
+    backend_pool: asyncpg.Pool,
+) -> None:
+    from steward.config.jobs import JobsConfig
+
+    providers = JobsConfig().providers
+    providers["alpha_vantage"] = providers["alpha_vantage"].model_copy(update={"daily_quota": 500})
+    report = await audit_zero_cost(backend_pool, providers=providers)
+    assert not report.passed
+    assert {v.code for v in report.violations} == {"collector_budget_exceeds_quota"}
+    assert {v.provider for v in report.violations} == {"alpha_vantage"}
+
+
+@pytest.mark.db
+async def test_audit_flags_a_collector_budget_for_an_endpoint_nobody_registered(
+    backend_pool: asyncpg.Pool,
+) -> None:
+    report = await audit_zero_cost(
+        backend_pool,
+        budgets=[*collector_budgets(), entry(Budget(daily=Decimal(1)), "ghost", "ghost_provider")],
+    )
+    assert {(v.provider, v.endpoint, v.code) for v in report.violations} == {
+        ("ghost_provider", "ghost", "budget_without_access_row")
+    }
+
+
+@pytest.mark.db
+async def test_hard_blocked_endpoint_that_later_records_a_transient_failure_does_not_fail_the_gate(
+    backend_pool: asyncpg.Pool,
+) -> None:
+    """B51: paid-only -> hard-blocked -> a later 503 moved `state`; nothing can be spent, so the
+    daily job must not fail.  Without any denial on record it still fails (policy)."""
+    await backend_pool.execute(
+        "select public.record_provider_attempt('fmp','profile','paid_only','premium',null,402,"
+        "null,null,null,0)"
+    )
+    await backend_pool.execute(
+        "update public.provider_access set state='temporarily_failed' where provider='fmp'"
+        " and endpoint='profile'"
+    )
+    report = await audit_zero_cost(backend_pool)
+    assert report.passed, [f"{v.provider}/{v.endpoint}: {v.code}" for v in report.violations]
+    assert any(f.code == "blocked_state_drift" for f in report.findings)
+    await backend_pool.execute("delete from public.provider_fetch_audit where provider='fmp'")
+    again = await audit_zero_cost(backend_pool)
+    assert {(v.provider, v.endpoint, v.code) for v in again.violations} == {
+        ("fmp", "profile", "disabled_without_reason")
+    }
+
+
+@pytest.mark.db
+async def test_report_counts_warnings_by_code(backend_pool: asyncpg.Pool) -> None:
+    body = (await audit_zero_cost(backend_pool)).to_json()
+    assert body["violation_count"] == 0
+    assert body["warning_count"] == sum(body["warnings_by_code"].values()) > 0
+    assert "unverified_not_blocked" in body["warnings_by_code"]
+
+
+@pytest.mark.parametrize(
+    ("state", "status", "scope"),
+    [
+        ("paid_only", 402, "endpoint"),
+        ("access_unverified", 401, "endpoint"),
+        ("access_unverified", None, "none"),
+        ("quota_exhausted", 429, "endpoint"),
+        ("not_covered", 200, "request"),
+        ("temporarily_failed", 503, "none"),
+    ],
+)
+def test_disable_scope_says_how_far_the_stop_reaches(
+    state: str, status: int | None, scope: str
+) -> None:
+    assert disable_policy(AccessState(state), status).scope == scope

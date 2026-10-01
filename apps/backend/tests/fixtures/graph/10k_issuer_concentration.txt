@@ -1,0 +1,3 @@
+Note 12. Concentrations of credit risk and major customers
+For the year ended December 31, 2025, Customer A accounted for 18% of total revenue and Customer B accounted for 11% of total revenue. One customer, Northwind Traders, accounted for 9% of accounts receivable.
+Supplier concentration: For the fiscal year ended December 31, 2025, one supplier accounted for 31% of our purchases.

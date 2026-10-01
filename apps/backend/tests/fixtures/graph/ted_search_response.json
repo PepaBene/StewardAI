@@ -1,0 +1,32 @@
+{
+  "notices": [
+    {
+      "publication-number": "234567-2026",
+      "notice-type": "can-standard",
+      "notice-title": {"ENG": "Supply of rail signalling equipment", "DEU": "Lieferung von Bahnsignaltechnik"},
+      "buyer-name": {"ENG": ["Deutsche Bahn Infrastructure AG"]},
+      "winner-name": {"ENG": ["Example Industries AG"]},
+      "total-value": 15250000,
+      "total-value-cur": ["EUR"],
+      "publication-date": "2026-03-04+01:00"
+    },
+    {
+      "publication-number": "345678-2026",
+      "notice-type": "can-standard",
+      "notice-title": {"ENG": "Cleaning services"},
+      "buyer-name": {"ENG": ["City of Springfield"]},
+      "winner-name": {"ENG": ["Unrelated Cleaning Ltd"]},
+      "total-value": "480000",
+      "total-value-cur": ["EUR"],
+      "publication-date": "2026-03-05+01:00"
+    },
+    {
+      "publication-number": "456789-2026",
+      "notice-type": "cn-standard",
+      "notice-title": {"ENG": "A contract notice, not an award"},
+      "buyer-name": {"ENG": ["Ministry of Transport"]},
+      "publication-date": "2026-03-06+01:00"
+    }
+  ],
+  "totalNoticeCount": 3
+}

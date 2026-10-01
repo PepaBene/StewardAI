@@ -39,6 +39,9 @@ class EsefFact:
     raw: dict[str, Any] = field(repr=False, compare=False)
     dimensions: dict[str, str] = field(default_factory=dict)
     text: str | None = None
+    # A note text block the report tags but the republished xBRL-JSON carries no text for is
+    # kept as a row classified "unavailable" (so coverage shows the gap) instead of dropped.
+    availability: str = "available"
 
 
 @dataclass(frozen=True)
@@ -141,6 +144,7 @@ def parse_xbrl_json(
     prefixes = {p: canonical_prefix(str(uri), p) for p, uri in namespaces.items()}
     facts: list[EsefFact] = []
     for fact_id, fact in (doc.get("facts") or {}).items():
+        availability = "available"
         dims = fact.get("dimensions") or {}
         written = str(dims.get("concept") or "")
         prefix, _, local = written.partition(":")
@@ -166,13 +170,11 @@ def parse_xbrl_json(
                 start, end = None, _json_moment(first)
         except (InvalidOperation, ValueError):
             text = fact.get("value")
-            if (
-                not include_text_blocks
-                or "textblock" not in local.casefold()
-                or not isinstance(text, str)
-            ):
+            if not include_text_blocks or "textblock" not in local.casefold():
                 continue
             value = None
+            if not isinstance(text, str) or not text.strip():
+                text, availability = None, "unavailable"
         else:
             text = None
         decimals = fact.get("decimals")
@@ -187,6 +189,23 @@ def parse_xbrl_json(
                 raw={"id": fact_id, **fact},
                 dimensions={key: str(member) for key, member in dims.items() if key in extra},
                 text=text,
+                availability=availability,
             )
         )
     return facts
+
+
+def amended_esef(filings: list[EsefFiling], filing: EsefFiling) -> EsefFiling | None:
+    """The earlier filing of the same period this one replaces: filings.xbrl.org lists a
+    corrected package as another filing for the same period end, added later."""
+    earlier = [
+        f
+        for f in filings
+        if f.id != filing.id
+        and f.period_end == filing.period_end
+        and f.added is not None
+        and filing.added is not None
+        and f.added < filing.added
+    ]
+    floor = dt.datetime.min.replace(tzinfo=dt.UTC)
+    return max(earlier, key=lambda f: f.added or floor, default=None)

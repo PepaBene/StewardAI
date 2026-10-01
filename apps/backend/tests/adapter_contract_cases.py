@@ -149,6 +149,8 @@ class ParserCase:
     drift: Callable[[Any], Any] = rename_keys
     partial: Callable[[Any], Any] = drop_last_keys
     rows: Callable[[Any], int] = rows_of
+    # A baseline that yields no rows proves nothing (drift/partial would be vacuous), so every
+    # case must produce at least this many rows from its recorded baseline; never below 1.
     min_rows: int = 1
 
 
@@ -400,9 +402,10 @@ PARSER_CASES: list[ParserCase] = [
         "wikidata_competitors",
         "steward.sources.wikidata",
         wikidata.parse_competitors,
-        lambda: jfix("reference", "wikidata_sap_props.json"),
+        # Recorded SPARQL result in the documented ?c / ?cLabel shape (the third binding is an
+        # unlabelled "Q..." entity the parser must drop), so the baseline really yields rows.
+        lambda: json.loads((CON / "wikidata_competitors.json").read_text()),
         (wikidata.WikidataError,),
-        min_rows=0,
     ),
     # --- SEC / EDGAR / XBRL / ESEF ------------------------------------------------------
     ParserCase(
@@ -427,7 +430,6 @@ PARSER_CASES: list[ParserCase] = [
         empty="",
         drift=lambda t: t.replace(" | ", " ; "),
         partial=half_text,
-        min_rows=0,
     ),
     ParserCase(
         "esef_filings",
@@ -465,7 +467,6 @@ PARSER_CASES: list[ParserCase] = [
         drift=bytes_drift,
         partial=half_bytes,
         rows=lambda i: len(i.facts) if hasattr(i, "facts") else 1,
-        min_rows=0,
     ),
     ParserCase(
         "xbrl_labels",
@@ -476,7 +477,6 @@ PARSER_CASES: list[ParserCase] = [
         empty=b"",
         drift=bytes_drift,
         partial=half_bytes,
-        min_rows=0,
     ),
     ParserCase(
         "form13f_dataset",
@@ -488,7 +488,6 @@ PARSER_CASES: list[ParserCase] = [
         drift=lambda raw: raw[:100],
         partial=half_bytes,
         rows=lambda d: len(d.positions) if hasattr(d, "positions") else 1,
-        min_rows=0,
     ),
     ParserCase(
         "form13f_links",
@@ -936,6 +935,8 @@ NON_ADAPTER_MODULES: dict[str, str] = {
     "steward.sources.documents": "persistence of fetched documents, covered by DB tests",
     "steward.sources.audit": "endpoint probe classifier, covered by CLASSIFIER_CASES",
     "steward.sources.fund_probes": "probe classifier and normalizers, covered by CLASSIFIER_CASES",
+    "steward.sources.xml_guard": "DTD/entity guard, covered by test_funds_stream_hardening",
+    "steward.sources.ciks": "CIK normalisation helper, covered by test_funds_stream_hardening",
 }
 
 # (status, body, allowed states) for the two probe classifiers.

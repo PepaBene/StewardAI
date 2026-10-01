@@ -20,15 +20,22 @@ refused before it reaches the XML parser; no entity can be expanded or fetched.
 """
 
 import datetime as dt
-import itertools
 import re
 import xml.etree.ElementTree as ET
 from collections import defaultdict
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from decimal import Decimal, InvalidOperation
 from io import BytesIO
 from typing import Literal
 from xml.sax.saxutils import escape
+
+from steward.sources.xbrl_concepts import (
+    DOCUMENT_ITEMS,
+    STATEMENT_CONCEPTS,
+    is_wanted_text_block,
+)
+from steward.sources.xml_guard import reject_dtd
 
 XBRLI = "http://www.xbrl.org/2003/instance"
 XBRLDI = "http://xbrl.org/2006/xbrldi"
@@ -37,7 +44,7 @@ XLINK = "http://www.w3.org/1999/xlink"
 XML_LANG = "{http://www.w3.org/XML/1998/namespace}lang"
 
 # Bump when the parse changes, so stored filings are parsed again on the next run.
-PARSER_VERSION = 2
+PARSER_VERSION = 3
 
 # Standard taxonomies by namespace URI prefix -> the prefix used in stored names, whatever
 # prefix a filing declares for them.
@@ -100,7 +107,17 @@ DOCUMENT_CONCEPTS: tuple[str, ...] = (
     "dei:TradingSymbol",
 )
 
-WANTED = {*REVENUE_CONCEPTS, *SHARE_CONCEPTS, *DOCUMENT_CONCEPTS}
+# What a filing parse keeps: revenue, shares and cover-page facts plus the statement set of
+# `steward.sources.xbrl_concepts` (income statement, balance sheet, cash flow, EPS, debt and its
+# maturities, leases, taxes, R&D, repurchases, pensions, segment profit/assets/capex and customer
+# concentration). Text blocks are kept only when asked for (`text_blocks=True`).
+WANTED = {
+    *REVENUE_CONCEPTS,
+    *SHARE_CONCEPTS,
+    *DOCUMENT_CONCEPTS,
+    *STATEMENT_CONCEPTS,
+    *DOCUMENT_ITEMS,
+}
 
 
 class XbrlError(Exception):
@@ -170,8 +187,12 @@ class Instance:
 
 
 def _guard(data: bytes) -> None:
-    if re.search(rb"<!DOCTYPE|<!ENTITY", data, re.IGNORECASE):
-        raise XbrlError("refusing an XML document with a DTD or entity declaration")
+    """Refuse a DTD or entity declaration in any encoding the document could be read as.
+
+    A byte search for `<!DOCTYPE` misses a UTF-16 / UTF-32 document (every character spans
+    several bytes, so the ASCII marker never occurs in the raw bytes) although expat decodes it
+    and honours the DTD; `reject_dtd` searches every reading (F17 / B37)."""
+    reject_dtd(data, XbrlError)
 
 
 def canonical_prefix(uri: str, declared: str) -> str:
@@ -252,9 +273,12 @@ def _leaf_xml(concept: str, el: ET.Element) -> str:
     return f"<{concept}{attrs}>{escape(el.text or '')}</{concept}>"
 
 
-def parse_instance(data: bytes, wanted: set[str] | None = None) -> Instance:
-    """Contexts, units and the facts of the `wanted` concepts (default: revenue, shares and
-    document facts) of an XBRL 2.1 instance. Facts of other concepts are not kept."""
+def parse_instance(
+    data: bytes, wanted: set[str] | None = None, *, text_blocks: bool = False
+) -> Instance:
+    """Contexts, units and the facts of the `wanted` concepts (default `WANTED`: revenue, shares,
+    cover-page facts and the statement set) of an XBRL 2.1 instance. Facts of other concepts are
+    not kept, except note text blocks of the stored topics when `text_blocks` is set."""
     _guard(data)
     wanted = WANTED if wanted is None else wanted
     declared: dict[str, str] = {}
@@ -284,12 +308,15 @@ def parse_instance(data: bytes, wanted: set[str] | None = None) -> Instance:
                 unit_els.append(el)
             else:
                 concept = names.tag(el.tag)
-                if concept in wanted and el.get("contextRef"):
-                    raw_facts.append(
-                        (concept, dict(el.attrib), el.text or "", _leaf_xml(concept, el))
-                    )
-                    el.clear()
-                    continue
+                if concept is not None and el.get("contextRef"):
+                    if concept in wanted:
+                        raw_facts.append(
+                            (concept, dict(el.attrib), el.text or "", _leaf_xml(concept, el))
+                        )
+                    elif text_blocks and is_wanted_text_block(concept):
+                        # Inline markup inside a block is kept as text, not dropped.
+                        body = "".join(el.itertext())
+                        raw_facts.append((concept, dict(el.attrib), body, ""))
                 el.clear()
     except ET.ParseError as exc:
         raise XbrlError(f"not a well-formed XBRL instance: {exc}") from exc
@@ -497,65 +524,133 @@ def _tolerance(rows: list[RevenueRow]) -> Decimal:
     return worst * max(1, len(rows))
 
 
+# Subtotal search is a subset-sum problem. It is a depth-first search over members sorted by
+# value with pruning (a partial sum above the target, or one that cannot reach it with every
+# remaining member, ends the branch) and a hard budget of search nodes per call, so a breakdown
+# with many members cannot take exponential time (F17). When the budget is exhausted the
+# subtotals found so far are kept and the rest stay unflagged (a chart may then count a
+# subtotal twice; the filing's own total is unaffected).
+SUBTOTAL_SEARCH_BUDGET = 200_000
+MAX_PARTITION_MEMBERS = 24
+
+
+class _Exhausted(Exception):
+    pass
+
+
+def _subset_search(
+    indices: list[int],
+    members: list[RevenueRow],
+    target: Decimal,
+    slack: Decimal,
+    accept: Callable[[list[int]], bool],
+    budget: list[int],
+    min_size: int,
+) -> list[int] | None:
+    """The first subset of `indices` (by descending value) of at least `min_size` members
+    whose sum is within `slack` of `target` and which `accept` approves. Members must be
+    non-negative for the pruning to hold. Raises `_Exhausted` when the node budget is spent."""
+    ordered = sorted(indices, key=lambda i: members[i].value, reverse=True)
+    tail = [Decimal(0)] * (len(ordered) + 1)
+    for pos in range(len(ordered) - 1, -1, -1):
+        tail[pos] = tail[pos + 1] + members[ordered[pos]].value
+    chosen: list[int] = []
+
+    def visit(pos: int, partial: Decimal) -> list[int] | None:
+        budget[0] -= 1
+        if budget[0] < 0:
+            raise _Exhausted
+        if len(chosen) >= min_size and abs(partial - target) <= slack and accept(chosen):
+            return list(chosen)
+        if pos >= len(ordered) or partial > target + slack or partial + tail[pos] < target - slack:
+            return None
+        for k in range(pos, len(ordered)):
+            chosen.append(ordered[k])
+            found = visit(k + 1, partial + members[ordered[k]].value)
+            chosen.pop()
+            if found is not None:
+                return found
+        return None
+
+    return visit(0, Decimal(0))
+
+
 def mark_subtotals(members: list[RevenueRow], total: Decimal | None) -> list[RevenueRow]:
     """Flag members that are the sum of other members (Novo's "International Operations" =
     EUCAN + Emerging Markets + APAC + China; ASML's "Product" = its system types), so a
     chart does not count them twice. Only done when the members add up to more than the
-    reported total, largest candidate first, until they no longer do."""
+    reported total, largest candidate first, until they no longer do. Bounded work: see
+    `SUBTOTAL_SEARCH_BUDGET`."""
     if total is None or total <= 0 or len(members) < 3:
         return members
     flagged: set[int] = set()
+    budget = [SUBTOTAL_SEARCH_BUDGET]
+    # A negative member (an elimination line) cannot be one of the parts of a positive subtotal.
+    positive = [i for i, m in enumerate(members) if m.value > 0]
+    slack_each = _tolerance(members) / max(1, len(members))
 
     def excess() -> bool:
         kept = sum((m.value for i, m in enumerate(members) if i not in flagged), Decimal(0))
         return kept > total * Decimal("1.005")
 
-    order = sorted(range(len(members)), key=lambda i: members[i].value, reverse=True)
-    while excess():
-        found = False
-        for i in order:
-            if i in flagged:
-                continue
-            others = [j for j in range(len(members)) if j != i and j not in flagged]
-            if len(others) > 16:
-                break
-            target = members[i].value
-            for size in range(2, len(others) + 1):
-                for combo in itertools.combinations(others, size):
-                    parts = [members[j] for j in combo]
-                    if abs(sum((p.value for p in parts), Decimal(0)) - target) <= _tolerance(
-                        [*parts, members[i]]
-                    ):
-                        flagged.add(i)
-                        found = True
-                        break
-                if found:
+    try:
+        order = sorted(positive, key=lambda i: members[i].value, reverse=True)
+        while excess():
+            found_one = False
+            for i in order:
+                if i in flagged:
+                    continue
+                others = [j for j in positive if j != i and j not in flagged]
+                if len(others) > MAX_PARTITION_MEMBERS:
                     break
-            if found:
+                hit = _subset_search(
+                    others,
+                    members,
+                    members[i].value,
+                    slack_each * (len(others) + 1),
+                    lambda combo, i=i: (  # type: ignore[misc]
+                        abs(sum((members[j].value for j in combo), Decimal(0)) - members[i].value)
+                        <= _tolerance([*(members[j] for j in combo), members[i]])
+                    ),
+                    budget,
+                    2,
+                )
+                if hit is not None:
+                    flagged.add(i)
+                    found_one = True
+                    break
+            if not found_one:
                 break
-        if not found:
-            break
-    if excess():
-        # Two partitions of the same total side by side (Microsoft: "Product" + "Service
-        # and other" = total = its twelve product lines): the coarser one is flagged.
-        rest = [i for i in range(len(members)) if i not in flagged]
-        if len(rest) <= 16:
-            done = False
-            for size in range(1, len(rest) // 2 + 1):
-                for combo in itertools.combinations(rest, size):
+        if excess():
+            # Two partitions of the same total side by side (Microsoft: "Product" + "Service
+            # and other" = total = its twelve product lines): the coarser one is flagged.
+            rest = [i for i in positive if i not in flagged]
+            if len(rest) <= MAX_PARTITION_MEMBERS:
+
+                def both_partitions(combo: list[int]) -> bool:
                     inside = [members[j] for j in combo]
                     outside = [members[j] for j in rest if j not in combo]
-                    tol_in = _tolerance(inside) + total * Decimal("0.0005")
-                    tol_out = _tolerance(outside) + total * Decimal("0.0005")
-                    if (
-                        abs(sum((m.value for m in inside), Decimal(0)) - total) <= tol_in
-                        and abs(sum((m.value for m in outside), Decimal(0)) - total) <= tol_out
-                    ):
-                        flagged.update(combo)
-                        done = True
-                        break
-                if done:
-                    break
+                    return bool(outside) and (
+                        abs(sum((m.value for m in inside), Decimal(0)) - total)
+                        <= _tolerance(inside) + total * Decimal("0.0005")
+                        and abs(sum((m.value for m in outside), Decimal(0)) - total)
+                        <= _tolerance(outside) + total * Decimal("0.0005")
+                    )
+
+                hit = _subset_search(
+                    rest,
+                    members,
+                    total,
+                    slack_each * (len(rest) + 1) + total * Decimal("0.0005"),
+                    both_partitions,
+                    budget,
+                    1,
+                )
+                if hit is not None:
+                    other = [j for j in rest if j not in hit]
+                    flagged.update(hit if len(hit) <= len(other) else other)
+    except _Exhausted:
+        pass
     return [
         RevenueRow(**{**m.__dict__, "subtotal": True}) if i in flagged else m
         for i, m in enumerate(members)
@@ -665,6 +760,10 @@ class ShareClass:
     shares: Decimal
     fact: Fact
 
+    @property
+    def as_of(self) -> dt.date | None:
+        return self.fact.context.instant
+
 
 @dataclass(frozen=True)
 class InstanceShares:
@@ -674,6 +773,10 @@ class InstanceShares:
     as_of: dt.date
     total: Decimal | None
     classes: list[ShareClass]
+
+
+# A class reported this long before the cover date is stale, not "the same cover page".
+CLASS_MAX_AGE_DAYS = 200
 
 
 def instance_shares(instance: Instance, labels: Labels) -> InstanceShares | None:
@@ -691,13 +794,21 @@ def instance_shares(instance: Instance, labels: Labels) -> InstanceShares | None
     as_of = max(f.context.instant for f in facts if f.context.instant is not None)
     latest = [f for f in facts if f.context.instant == as_of]
     total = next((f.number for f in latest if not f.context.dims), None)
+    # Each class takes its own latest figure. Filtering every class to the single latest date
+    # dropped a class whose cover figure is dated a few days before another's (two classes
+    # reported at different dates are both on the cover page).
     classes: dict[str, ShareClass] = {}
-    for f in latest:
-        if not f.context.dims or f.number is None:
+    for f in facts:
+        if not f.context.dims or f.number is None or f.context.instant is None:
+            continue
+        if (as_of - f.context.instant).days > CLASS_MAX_AGE_DAYS:
             continue
         member = f.context.dims[0][1]
         held = classes.get(member)
-        if held is None or f.precision > held.fact.precision:
+        if held is None or (f.context.instant, f.precision) > (
+            held.fact.context.instant or dt.date.min,
+            held.fact.precision,
+        ):
             classes[member] = ShareClass(
                 member, labels.get(member, standard=True) or derived_label(member), f.number, f
             )

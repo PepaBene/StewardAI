@@ -44,15 +44,48 @@ from steward.config.store import load_active
 from steward.jobs.runner import JobContext
 from steward.settings import Settings, get_settings
 from steward.sources.audit import Probe, classify_probe
-from steward.sources.base import AccessResult, AccessState, retry_after_at
+from steward.sources.base import AccessResult, AccessState, quota_denial_text, retry_after_at
 from steward.sources.governor import Budget, PostgresRequestGovernor, QuotaExceeded
 from steward.sources.nport import valid_isin
 from steward.sources.store import record_access
 
 FINNHUB = "https://finnhub.io/api/v1"
 FMP = "https://financialmodelingprep.com/stable"
-PREMIUM_WORDS = ("premium", "upgrade", "subscription", "not available under your", "plan")
-QUOTA_WORDS = ("limit reached", "rate limit", "call frequency", "quota", "too many requests")
+# Plan-boundary phrases. A bare "plan" is not one ("limit reached ... upgrade your plan" is an
+# exhausted allowance), and quota phrases are always checked first (B36).
+PREMIUM_WORDS = (
+    "premium",
+    "upgrade",
+    "subscription",
+    "not available under your",
+    "paid plan",
+    "paid tier",
+    "free plan",
+    "not included in your",
+    "plan does not include",
+)
+QUOTA_WORDS = (
+    "limit reached",
+    "rate limit",
+    "call frequency",
+    "quota",
+    "too many requests",
+    "requests per",
+    "exceeded",
+    "usage limit",
+    "api limit",
+    "daily limit",
+)
+
+
+def _quota_text(text: str) -> bool:
+    lowered = text.casefold()
+    return any(word in lowered for word in QUOTA_WORDS) or quota_denial_text(lowered)
+
+
+def _premium_text(text: str) -> bool:
+    lowered = text.casefold()
+    return not _quota_text(lowered) and any(word in lowered for word in PREMIUM_WORDS)
 
 
 def fund_probe_list(settings: Settings) -> list[Probe]:
@@ -111,21 +144,27 @@ def classify_fund_probe(status: int, body: Any, expected_symbol: str | None = No
     text = json.dumps(body, default=str).casefold() if body is not None else ""
     if status == 401:
         return AccessResult(AccessState.ACCESS_UNVERIFIED, "credential rejected")
-    if status in (402, 403):
-        return AccessResult(AccessState.PAID_ONLY, f"HTTP {status}: endpoint not in the free plan")
     if status == 429:
         return AccessResult(AccessState.QUOTA_EXHAUSTED, "provider rate or quota limit")
+    if status in (402, 403):
+        # An exhausted allowance reported with 402/403 is retryable, not a plan boundary.
+        if _quota_text(text):
+            return AccessResult(AccessState.QUOTA_EXHAUSTED, "provider rate or quota limit")
+        return AccessResult(AccessState.PAID_ONLY, f"HTTP {status}: endpoint not in the free plan")
     if status == 200 and isinstance(body, dict):
         message = " ".join(
             str(body.get(key, "")) for key in ("error", "Error Message", "message", "Information")
         ).casefold()
         if message.strip():
-            if any(word in message for word in PREMIUM_WORDS):
-                return AccessResult(AccessState.PAID_ONLY, "provider reports a paid-tier endpoint")
-            if any(word in message for word in QUOTA_WORDS):
+            if _quota_text(message):
                 return AccessResult(AccessState.QUOTA_EXHAUSTED, "provider rate or quota limit")
-    if status == 200 and isinstance(body, str) and any(w in text for w in PREMIUM_WORDS):
-        return AccessResult(AccessState.PAID_ONLY, "provider reports a paid-tier endpoint")
+            if _premium_text(message):
+                return AccessResult(AccessState.PAID_ONLY, "provider reports a paid-tier endpoint")
+    if status == 200 and isinstance(body, str):
+        if _quota_text(text):
+            return AccessResult(AccessState.QUOTA_EXHAUSTED, "provider rate or quota limit")
+        if _premium_text(text):
+            return AccessResult(AccessState.PAID_ONLY, "provider reports a paid-tier endpoint")
     if status == 200 and _is_empty(body):
         return AccessResult(AccessState.NOT_COVERED, "provider returned no matching data")
     return classify_probe(status, body, expected_symbol)

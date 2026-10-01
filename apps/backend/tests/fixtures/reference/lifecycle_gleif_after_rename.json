@@ -1,0 +1,46 @@
+{
+ "data": {
+  "type": "lei-records",
+  "id": "5299000OLDCO00000001",
+  "attributes": {
+   "lei": "5299000OLDCO00000001",
+   "entity": {
+    "legalName": {
+     "name": "Newco Group SE",
+     "language": "de"
+    },
+    "otherNames": [
+     {
+      "name": "Oldco Holdings AG",
+      "language": "de",
+      "type": "PREVIOUS_LEGAL_NAME"
+     },
+     {
+      "name": "Newco",
+      "language": "en",
+      "type": "TRADING_OR_OPERATING_NAME"
+     }
+    ],
+    "jurisdiction": "DE",
+    "legalForm": {
+     "id": "SGST"
+    },
+    "category": "GENERAL",
+    "headquartersAddress": {
+     "country": "DE",
+     "city": "Walldorf"
+    },
+    "legalAddress": {
+     "country": "DE",
+     "city": "Walldorf"
+    },
+    "status": "ACTIVE"
+   },
+   "registration": {
+    "status": "ISSUED",
+    "initialRegistrationDate": "2014-03-01T00:00:00Z",
+    "nextRenewalDate": "2027-03-01T00:00:00Z"
+   }
+  }
+ }
+}

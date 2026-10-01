@@ -26,6 +26,7 @@ import asyncpg
 from steward.config.budget import BudgetConfig
 from steward.config.store import load_active
 from steward.costs import PriceTable
+from steward.redact import redact_text
 
 logger = logging.getLogger(__name__)
 
@@ -478,7 +479,8 @@ async def _finish(pool: asyncpg.Pool, job_id: int, status: str, error: str | Non
 
 
 def _error_text(exc: BaseException) -> str:
-    text = str(exc) or type(exc).__name__
+    # Stored on the job and its step and shown in the UI: never a credential.
+    text = redact_text(str(exc) or type(exc).__name__)
     return text[:2000]
 
 

@@ -8,9 +8,12 @@ date must be the one that was knowable on that date.  `publish_gate` reads the r
 `signal_audit_result` rows; with none recorded it blocks and says the signal was never audited.
 
 The small pure helpers (`point_in_time_pick`, `deal_state_at`, `consensus_is_stale`,
-`mention_is_relationship`) are reference oracles for the review samples in
-tests/fixtures/audit: they define what a correct answer looks like so a reviewer's label and
-the system's output can be compared; they do not produce published data.
+`mention_is_relationship`, `anonymous_share`, `passage_supports_number`) are reference ORACLES
+for the review samples in tests/fixtures/audit: they define what a correct answer looks like so
+a reviewer's label and the system's output can be compared; they do not produce published data.
+`AUDIT_SCENARIOS` states, per D8.6 scenario, whether the sample is checked against the real
+extractor/reader or only against an oracle because the app has no extractor for it (tests:
+tests/test_audit_scenarios_phase8.py).
 """
 
 from __future__ import annotations
@@ -20,7 +23,7 @@ import json
 import re
 from collections import defaultdict
 from collections.abc import Iterable, Sequence
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from decimal import Decimal
 from typing import Any, Literal
 
@@ -48,6 +51,58 @@ SIGNAL_REQUIREMENTS: dict[str, SignalRequirement] = {
     "supplier_dependency": SignalRequirement(min_precision=Decimal("0.97")),
     "deal_state": SignalRequirement(min_precision=Decimal("0.98")),
     "analyst_consensus_vintage": SignalRequirement(),
+}
+
+
+@dataclass(frozen=True, slots=True)
+class ScenarioBasis:
+    kind: Literal["real", "partial", "oracle"]
+    target: str
+    note: str = ""
+
+
+# What each D8.6 review scenario is checked against.  "oracle" means the app has NO code that
+# produces this signal from text yet, so the sample can only pin the reviewer's standard; it
+# says nothing about the system until such an extractor exists.
+AUDIT_SCENARIOS: dict[str, ScenarioBasis] = {
+    "filing_amendments": ScenarioBasis(
+        "real",
+        "steward.data_context.evidence.filed_notes",
+        "latest revision known by the cutoff, read from financial_statement_fact",
+    ),
+    "xbrl_dimension_collision": ScenarioBasis(
+        "real", "steward.sources.xbrl.parse_instance / plain_facts"
+    ),
+    "sec_notes": ScenarioBasis(
+        "real",
+        "steward.verify.claims.missing_numbers",
+        "the code check that every figure of a note sentence appears in its cited passage",
+    ),
+    "group_13dg": ScenarioBasis("real", "steward.sources.schedule13.stake_of"),
+    "form4_codes": ScenarioBasis("real", "steward.ownership.insider_classify.classify"),
+    "false_mentions": ScenarioBasis(
+        "oracle",
+        "mention_is_relationship",
+        "no text extractor exists: EDGAR full-text hits are stored as unlinked review candidates "
+        "(news.pipeline.record_filing_hits) and never become relationships; the real behaviour "
+        "pinned instead is that nothing is inferred",
+    ),
+    "anonymous_customers": ScenarioBasis(
+        "oracle",
+        "anonymous_share",
+        "no extractor reads customer percentages from filing text yet",
+    ),
+    "deal_reversals": ScenarioBasis(
+        "real",
+        "steward.data_context.evidence.deals",
+        "state of the latest confirmed company_event known by the cutoff",
+    ),
+    "stale_consensus": ScenarioBasis(
+        "partial",
+        "steward.data_context.evidence.consensus + consensus_is_stale",
+        "the reader supplies vintages and published_at; the app has no staleness rule, so the "
+        "staleness verdict itself is the oracle applied to the reader's output",
+    ),
 }
 
 
@@ -110,6 +165,10 @@ async def record_audit_result(
 ) -> AuditSummary:
     if signal_name not in SIGNAL_REQUIREMENTS:
         raise ValueError(f"unknown signal {signal_name!r}")
+    if not (reviewer or "").strip():
+        raise ValueError("an audit result needs the name of the person who reviewed the sample")
+    if audited_at is not None and audited_at > dt.datetime.now(dt.UTC) + dt.timedelta(minutes=5):
+        raise ValueError("an audit cannot be dated in the future")
     summary = summarize(observations)
     await pool.execute(
         """insert into public.signal_audit_result
@@ -147,6 +206,7 @@ class PublishDecision:
     pit_violations: int
     audited_at: dt.datetime | None
     reasons: tuple[str, ...]
+    reviewer: str | None = None
 
 
 class PublishBlocked(RuntimeError):
@@ -167,6 +227,7 @@ def evaluate_requirement(
     pit_violations: int,
     audited_at: dt.datetime | None,
     now: dt.datetime,
+    reviewer: str | None,
 ) -> PublishDecision:
     reasons: list[str] = []
     precision = Decimal(evidence_correct) / sample_size if sample_size else None
@@ -174,6 +235,10 @@ def evaluate_requirement(
         reasons.append("never audited: no reviewed sample is recorded")
     else:
         age = now - audited_at
+        if audited_at > now + dt.timedelta(minutes=5):
+            reasons.append(f"audit is dated in the future ({audited_at.isoformat()})")
+        if not (reviewer or "").strip():
+            reasons.append("the audit names no reviewer")
         if age > dt.timedelta(days=requirement.max_audit_age_days):
             reasons.append(
                 f"audit is {age.days} days old (limit {requirement.max_audit_age_days}); re-sample"
@@ -202,30 +267,63 @@ def evaluate_requirement(
         pit_violations,
         audited_at,
         tuple(reasons),
+        reviewer,
     )
+
+
+_OVERALL = """select sample_size, evidence_correct, pit_checked, pit_violations, audited_at,
+                    reviewer
+               from public.signal_audit_result
+              where signal_name = $1 and jurisdiction is null and metric is null
+                and audited_at <= $2
+              order by audited_at desc, id desc limit 1"""
+_SCOPED_LATEST = """select distinct on (jurisdiction, metric)
+                           jurisdiction, metric, sample_size, evidence_correct, pit_violations,
+                           audited_at
+                      from public.signal_audit_result
+                     where signal_name = $1 and (jurisdiction is not null or metric is not null)
+                       and audited_at <= $2
+                     order by jurisdiction, metric, audited_at desc, id desc"""
+
+
+def scoped_failure(requirement: SignalRequirement, row: asyncpg.Record) -> str | None:
+    """Why a scoped (jurisdiction / metric) audit result fails, or None.  A scoped sample may be
+    small, so only precision and point-in-time violations count, not its size."""
+    scope = ", ".join(f"{k}={row[k]}" for k in ("jurisdiction", "metric") if row[k] is not None)
+    if row["sample_size"] and (
+        Decimal(row["evidence_correct"]) / row["sample_size"] < requirement.min_precision
+    ):
+        precision = Decimal(row["evidence_correct"]) / row["sample_size"]
+        return (
+            f"a newer audit of {scope} ({row['audited_at']:%Y-%m-%d}) found evidence precision "
+            f"{precision:.3f} below required {requirement.min_precision}"
+        )
+    if row["pit_violations"] > requirement.max_pit_violations:
+        return (
+            f"a newer audit of {scope} ({row['audited_at']:%Y-%m-%d}) found "
+            f"{row['pit_violations']} point-in-time violations"
+        )
+    return None
 
 
 async def publish_gate(
     pool: asyncpg.Pool, signal_name: str, *, now: dt.datetime | None = None
 ) -> PublishDecision:
-    """Whether the signal may publish, from the latest recorded audit result."""
+    """Whether the signal may publish, from the latest recorded audit result.
+
+    The overall (jurisdiction-less) audit authorises publication.  It must be dated no later
+    than now and name a reviewer.  A scoped audit (one jurisdiction or metric) that is NEWER
+    than the overall audit and fails blocks the signal: a bad re-sample of one slice must not
+    be hidden behind an older good overall result."""
     now = now or dt.datetime.now(dt.UTC)
     requirement = SIGNAL_REQUIREMENTS.get(signal_name)
     if requirement is None:
         return PublishDecision(
             signal_name, False, 0, None, 0, 0, None, (f"unknown signal {signal_name!r}",)
         )
-    # The overall (jurisdiction-less) audit is what authorizes publication; a jurisdiction-only
-    # row narrows nothing and is reported in the coverage report instead.
-    row = await pool.fetchrow(
-        """select sample_size, evidence_correct, pit_checked, pit_violations, audited_at
-             from public.signal_audit_result
-            where signal_name = $1 and jurisdiction is null and metric is null
-            order by audited_at desc, id desc limit 1""",
-        signal_name,
-    )
+    row = await pool.fetchrow(_OVERALL, signal_name, now + dt.timedelta(minutes=5))
     if row is None:
-        return evaluate_requirement(
+        decision = evaluate_requirement(
             signal_name,
             requirement,
             sample_size=0,
@@ -234,8 +332,21 @@ async def publish_gate(
             pit_violations=0,
             audited_at=None,
             now=now,
+            reviewer=None,
         )
-    return evaluate_requirement(
+        future = await pool.fetchval(
+            "select count(*) from public.signal_audit_result where signal_name=$1"
+            " and audited_at > $2",
+            signal_name,
+            now + dt.timedelta(minutes=5),
+        )
+        if future:
+            decision = replace(
+                decision,
+                reasons=(*decision.reasons, f"{future} audit results dated in the future ignored"),
+            )
+        return decision
+    decision = evaluate_requirement(
         signal_name,
         requirement,
         sample_size=row["sample_size"],
@@ -244,7 +355,17 @@ async def publish_gate(
         pit_violations=row["pit_violations"],
         audited_at=row["audited_at"],
         now=now,
+        reviewer=row["reviewer"],
     )
+    extra: list[str] = []
+    for scoped in await pool.fetch(_SCOPED_LATEST, signal_name, now + dt.timedelta(minutes=5)):
+        if scoped["audited_at"] > row["audited_at"] and (
+            reason := scoped_failure(requirement, scoped)
+        ):
+            extra.append(reason)
+    if extra:
+        decision = replace(decision, allowed=False, reasons=(*decision.reasons, *extra))
+    return decision
 
 
 async def require_publishable(pool: asyncpg.Pool, signal_name: str) -> PublishDecision:
@@ -261,24 +382,35 @@ async def coverage_by_jurisdiction_and_metric(
     """Measured coverage: records, entities and freshness per jurisdiction and metric, from the
     observation tables.  A jurisdiction/metric with no rows does not appear - absence is shown
     by the caller as "no coverage", never as a zero measurement."""
+    # Entities are counted by kind: security 5 and issuer 5 are different things (the old
+    # coalesce(security_id, issuer_id, 0) merged the id spaces and counted "no entity" as one
+    # entity).  Rows tied to no entity do not add to `entities`; macro series have no entity, so
+    # their `entities` is null (not applicable), never a measured zero.
     rows = await pool.fetch(
-        """select coalesce(geography, 'unknown') jurisdiction, domain, metric,
-                  count(*) observations,
-                  count(distinct coalesce(security_id, issuer_id, 0)) entities,
-                  count(*) filter (where value is null and text_value is null) unknown_values,
-                  count(distinct source) sources,
-                  min(period_end) earliest_period, max(period_end) latest_period,
-                  max(known_at) newest_known_at
-             from public.source_observation
-            where ($1::timestamptz is null or known_at >= $1)
-            group by 1, 2, 3
-         union all
-           select geography, 'macro', series_id, count(*), 0, count(*) filter (where value is null),
-                  count(distinct source), min(period), max(period), max(known_at)
-             from public.macro_observation
-            where ($1::timestamptz is null or known_at >= $1)
-            group by geography, series_id
-            order by 1, 2, 3""",
+        """select jurisdiction, domain, metric, observations, entities, unknown_values, sources,
+                  earliest_period, latest_period, newest_known_at
+             from (
+               select coalesce(geography, 'unknown') jurisdiction, domain, metric,
+                      count(*) observations,
+                      count(distinct case when security_id is not null then 's' || security_id
+                                          when issuer_id is not null then 'i' || issuer_id
+                                     end) entities,
+                      count(*) filter (where value is null and text_value is null) unknown_values,
+                      count(distinct source) sources,
+                      min(period_end) earliest_period, max(period_end) latest_period,
+                      max(known_at) newest_known_at
+                 from public.source_observation
+                where ($1::timestamptz is null or known_at >= $1)
+                group by 1, 2, 3
+               union all
+               select geography, 'macro', series_id, count(*), null::bigint,
+                      count(*) filter (where value is null), count(distinct source),
+                      min(period), max(period), max(known_at)
+                 from public.macro_observation
+                where ($1::timestamptz is null or known_at >= $1)
+                group by geography, series_id
+             ) coverage
+            order by jurisdiction, domain, metric""",
         since,
     )
     return [dict(r) for r in rows]

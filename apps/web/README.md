@@ -101,9 +101,10 @@ yet; use the API docs at `/docs` on the backend.
 What the UI shows when a key is removed: the affected figure keeps its last stored value with its
 original date, or an "unavailable" / empty state with the backend's reason; it never shows a
 zero for missing data. The event types `credit_stress`, `trade_exposure` and `patent_status`
-(free-source alerts) arrive as ordinary news items and alerts; their labels in
-`lib/news/labels.ts` and the severity defaults in `lib/config/news-forms.ts` need the three new
-entries added when the API types are regenerated.
+(free-source alerts) arrive as ordinary news items and alerts; their labels are in
+`lib/news/labels.ts` and their severity defaults in `lib/config/news-forms.ts`. They are raised
+by code from stored observations and are never classifier output: the news classifier's schema
+only allows the other event types.
 
 ## Feedback on every item (Phase 4)
 

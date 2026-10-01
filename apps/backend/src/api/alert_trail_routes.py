@@ -30,6 +30,7 @@ async def get_free_source_alert_trail(
         "persisting",
         "review_needed",
         "below_severity",
+        "blocked_by_gate",
     ]
     | None = None,
     ticker: Annotated[str | None, Query(pattern=r"^[A-Za-z0-9._-]{1,32}$")] = None,
@@ -37,7 +38,8 @@ async def get_free_source_alert_trail(
     before_id: Annotated[int | None, Query(ge=1)] = None,
 ) -> TrailOut:
     """Newest first. Silent outcomes (value below threshold, identical re-fetch) are not
-    stored; they appear only in the job step detail."""
+    stored; they appear only in the job step detail. `blocked_by_gate` rows are provisional:
+    a Phase 8 verification gate was closed, and the next run replaces the row once it opens."""
     return await read_trail(
         pool, rule=rule, outcome=outcome, ticker=ticker, limit=limit, before_id=before_id
     )

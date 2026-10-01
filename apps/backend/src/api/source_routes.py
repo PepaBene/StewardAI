@@ -5,7 +5,6 @@ free-text fields (provider detail, denial text, coverage reasons) pass through `
 only typed columns are selected.
 """
 
-import re
 from datetime import date, datetime
 from decimal import Decimal
 from typing import Annotated, Literal
@@ -15,30 +14,13 @@ from pydantic import BaseModel, Field
 
 from api.auth import Owner
 from api.db import Pool
+from steward.geo_codes import has_iso_columns
+from steward.redact import redact
 
 router = APIRouter()
 
 DENIAL_STATES = ("paid_only", "access_unverified", "quota_exhausted")
 USAGE_WINDOWS = ("minute", "day", "month")
-SECRET_PATTERNS = (
-    re.compile(r"(?i)\b(bearer|basic)\s+[^\s,;\"']+"),
-    re.compile(
-        r"(?i)\b(api[_-]?key|apikey|access[_-]?token|token|secret|password|passwd|"
-        r"authorization|bearer|client[_-]?secret|x-api-key)\b(\s*[=:]\s*|\s+)([^\s,;&\"']+)"
-    ),
-    re.compile(r"(?i)([?&](?:api[_-]?key|apikey|key|token|apiKey)=)[^&\s\"']+"),
-    re.compile(r"\b[A-Za-z0-9_\-]{32,}\b"),
-)
-
-
-def redact(text: str | None) -> str | None:
-    """Mask anything that looks like a credential in free text a provider or job wrote."""
-    if text is None:
-        return None
-    out = SECRET_PATTERNS[0].sub(lambda m: f"{m.group(1)} [redacted]", text)
-    out = SECRET_PATTERNS[1].sub(lambda m: f"{m.group(1)}{m.group(2)}[redacted]", out)
-    out = SECRET_PATTERNS[2].sub(lambda m: f"{m.group(1)}[redacted]", out)
-    return SECRET_PATTERNS[3].sub("[redacted]", out)
 
 
 class SourceAccess(BaseModel):
@@ -124,11 +106,20 @@ class CoverageGroup(BaseModel):
     expected_periods: int | None = Field(
         description="Sum of known expected periods; null if no entry states one."
     )
-    available_periods: int | None
+    available_periods: int | None = Field(
+        description="Sum of available periods over the entries that state an expected count, "
+        "so it is comparable with expected_periods; null if there is none."
+    )
     entries_with_expected: int = Field(
         description="Entries that state an expected-period count (the ratio's denominator)."
     )
     available_entries: int
+    coverage_ratio: Decimal | None = Field(
+        default=None,
+        description="available_periods / expected_periods over the entries that state both; "
+        "null unless the expected total is positive. Entries without an expected count are "
+        "in neither term.",
+    )
 
 
 class CoverageSummary(BaseModel):
@@ -141,21 +132,28 @@ class CoverageSummary(BaseModel):
     )
 
 
-ENTITY_KIND_SQL = """
+def entity_kind_sql(has_iso: bool) -> str:
+    # Comtrade reporters are M49 numbers; `reporter_iso` holds the ISO code a geography key uses.
+    reporter = "t.reporter=c.entity_key" + (" or t.reporter_iso=c.entity_key" if has_iso else "")
+    return f"""
 case when exists(select 1 from public.instrument i
                   where i.t212_ticker=c.entity_key or i.price_symbol=c.entity_key)
        or exists(select 1 from public.security_listing l where l.ticker=c.entity_key)
      then 'security'
      when exists(select 1 from public.macro_observation m where m.geography=c.entity_key)
-       or exists(select 1 from public.trade_observation t where t.reporter=c.entity_key)
+       or exists(select 1 from public.trade_observation t where {reporter})
      then 'geography'
      else 'other' end
-"""
-COVERAGE_BASE = f"""
+"""  # noqa: S608 - constant SQL
+
+
+def coverage_base(has_iso: bool) -> str:
+    kind = entity_kind_sql(has_iso).replace("c.entity_key", "s.entity_key")
+    return f"""
 with c as (
   select s.provider,s.dataset,s.entity_key,s.state,s.expected_periods,s.available_periods,
          s.earliest_period,s.latest_period,s.last_good_observation_id,s.checked_at,s.reason,
-         {ENTITY_KIND_SQL.replace("c.entity_key", "s.entity_key")} as entity_kind
+         {kind} as entity_kind
   from public.coverage_status s
   where ($1::text is null or s.provider=$1)
     and ($2::text is null or s.dataset=$2)
@@ -291,7 +289,7 @@ async def get_data_coverage(
     entity_kind: Literal["security", "geography", "other"] | None = None,
 ) -> list[DataCoverage]:
     sql = (
-        COVERAGE_BASE  # noqa: S608 - constant SQL, values bound as parameters
+        coverage_base(await has_iso_columns(pool))  # noqa: S608 - constant SQL, values bound
         + """select * from c where ($6::text is null or entity_kind=$6)
              order by provider,dataset,entity_key"""
     )
@@ -323,7 +321,8 @@ async def get_data_coverage(
 
 
 SUMMARY_SQL = """select __KEY__ as key,state,count(*)::int n,
-  sum(expected_periods)::int expected,sum(available_periods)::int available,
+  sum(expected_periods)::int expected,
+  sum(available_periods) filter(where expected_periods is not null)::int available,
   count(*) filter(where expected_periods is not null)::int with_expected
   from c group by 1,2 order by 1,2"""
 GROUP_KEYS = {
@@ -347,7 +346,9 @@ async def get_data_coverage_summary(
     state: str | None = None,
     period: date | None = None,
 ) -> CoverageSummary:
-    sql = COVERAGE_BASE + SUMMARY_SQL.replace("__KEY__", GROUP_KEYS[group_by])
+    sql = coverage_base(await has_iso_columns(pool)) + SUMMARY_SQL.replace(
+        "__KEY__", GROUP_KEYS[group_by]
+    )
     rows = await pool.fetch(
         sql,
         *_filters(provider, dataset, entity_key, state, period),
@@ -376,6 +377,11 @@ async def get_data_coverage_summary(
             group.expected_periods = (group.expected_periods or 0) + row["expected"]
         if row["available"] is not None:
             group.available_periods = (group.available_periods or 0) + row["available"]
+    for group in groups.values():
+        if group.expected_periods and group.expected_periods > 0:
+            group.coverage_ratio = Decimal(group.available_periods or 0) / Decimal(
+                group.expected_periods
+            )
     ordered = sorted(groups.values(), key=lambda g: (g.key is None, g.key or ""))
     return CoverageSummary(
         group_by=group_by, total_entries=sum(g.entries for g in ordered), groups=ordered

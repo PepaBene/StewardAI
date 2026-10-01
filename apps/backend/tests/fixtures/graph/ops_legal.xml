@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<ops:world-patent-data xmlns="http://www.epo.org/exchange" xmlns:ops="http://ops.epo.org">
+  <ops:patent-family>
+    <ops:publication-reference>
+      <document-id document-id-type="docdb">
+        <country>EP</country>
+        <doc-number>1840100</doc-number>
+        <kind>A1</kind>
+      </document-id>
+    </ops:publication-reference>
+    <ops:family-member family-id="25134712">
+      <ops:publication-reference>
+        <document-id document-id-type="docdb">
+          <country>EP</country>
+          <doc-number>1840100</doc-number>
+          <kind>A1</kind>
+        </document-id>
+      </ops:publication-reference>
+      <ops:legal code="PG25" desc="LAPSED IN A CONTRACTING STATE [ANNOUNCED VIA POSTGRANT INFORMATION FROM NATIONAL OFFICE TO EPO]" date="20140630" infl="-"/>
+      <ops:legal code="REG" desc="REFERENCE TO A NATIONAL CODE" date="20150101" infl="+"/>
+    </ops:family-member>
+    <ops:family-member family-id="25134712">
+      <ops:publication-reference>
+        <document-id document-id-type="docdb">
+          <country>US</country>
+          <doc-number>8123456</doc-number>
+          <kind>B2</kind>
+        </document-id>
+      </ops:publication-reference>
+      <ops:legal code="MAINTENANCE FEE" desc="PAYMENT OF MAINTENANCE FEE, 4TH YR, LARGE ENTITY" date="20160228" infl="+"/>
+    </ops:family-member>
+  </ops:patent-family>
+</ops:world-patent-data>

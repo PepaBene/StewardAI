@@ -1,19 +1,32 @@
 """Job handlers for the Phase 8 verification tooling (registered by the orchestrator).
 
-    shadow_snapshot     daily: record yesterday's per-provider measurements (and optionally
-                        backfill `days_back` earlier days)
-    shadow_report       weekly / on demand: build and store the sign-off report
-    raw_retention       daily: drop expired raw payloads, keep normalized observations
-    zero_cost_gate      daily: audit the endpoint manifest; the job fails on any violation
+    shadow_snapshot     records the PREVIOUS UTC day's per-provider measurements each time it
+                        runs (a run on day D measures D-1; day D is measured on D+1).  Its
+                        default schedule is daily at 23:50 and it ships DISABLED: the 30-day
+                        shadow run does not start until the owner enables it.  `days_back`
+                        backfills earlier days; backfilled rows are marked as such (their
+                        coverage columns are current-state) and never count toward sign-off.
+    shadow_report       builds and stores the sign-off report for the 30 days ending yesterday
+                        (default: Mondays 08:00, DISABLED until the run is started).  A
+                        `window_days` below 30 produces an informational report that can never
+                        be signed off.
+    raw_retention       daily: blanks expired raw observation payloads and macro payloads
+                        (normalized rows stay) and DELETES provider_fetch_audit rows older than
+                        the retention horizon; open conflicts keep their raw evidence.
+    zero_cost_gate      daily: audits the endpoint ledger and the budgets the collectors and the
+                        job configuration pass to the governor; reads only, calls no provider.
+                        The job fails on any violation, never on a warning.
 
 Parameters come from `ctx.params` (optional): `date` (ISO, UTC day), `days_back`, `window_days`,
-`dry_run`.
+`dry_run` (a real boolean or the strings true/false/1/0/yes/no/on/off).
 """
 
 from __future__ import annotations
 
 import datetime as dt
 
+from steward.config.jobs import JobsConfig
+from steward.config.store import load_active
 from steward.jobs.runner import JobContext, JobFailed
 from steward.verify_sources.lifecycle import RetentionPolicy, prune_raw_payloads
 from steward.verify_sources.shadow import (
@@ -23,6 +36,23 @@ from steward.verify_sources.shadow import (
     record_shadow_snapshot,
 )
 from steward.verify_sources.zero_cost import audit_zero_cost
+
+
+def parse_flag(value: object, *, default: bool = False) -> bool:
+    """A job parameter as a boolean.  ``bool("false")`` is True in Python, so a flag that came
+    from JSON text or a command line must be parsed, not truthiness-tested."""
+    if value is None:
+        return default
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, int | float):
+        return bool(value)
+    text = str(value).strip().casefold()
+    if text in {"true", "1", "yes", "y", "on"}:
+        return True
+    if text in {"false", "0", "no", "n", "off", ""}:
+        return False
+    raise JobFailed(f"cannot read {value!r} as a boolean parameter")
 
 
 def _yesterday() -> dt.date:
@@ -52,7 +82,9 @@ async def shadow_report_handler(ctx: JobContext) -> None:
         report = await generate_shadow_report(ctx.pool, end, window_days=window)
         step.detail.update(
             window_end=end.isoformat(),
+            window_days=window,
             days_observed=report["days_observed"],
+            real_daily_snapshots=report["real_daily_snapshots"],
             sign_off_ready=report["sign_off_ready"],
             providers=len(report["providers"]),
             blockers=report["blockers"],
@@ -65,13 +97,17 @@ async def raw_retention_handler(ctx: JobContext) -> None:
     }
     policy = RetentionPolicy(**overrides)
     async with ctx.step("prune") as step:
-        counts = await prune_raw_payloads(ctx.pool, policy, dry_run=bool(ctx.params.get("dry_run")))
+        counts = await prune_raw_payloads(
+            ctx.pool, policy, dry_run=parse_flag(ctx.params.get("dry_run"))
+        )
         step.detail.update(counts)
 
 
 async def zero_cost_gate_handler(ctx: JobContext) -> None:
+    stored = await load_active(ctx.pool, "jobs", JobsConfig)
+    providers = (stored.body if stored else JobsConfig()).providers
     async with ctx.step("audit") as step:
-        report = await audit_zero_cost(ctx.pool)
+        report = await audit_zero_cost(ctx.pool, providers=providers)
         step.detail.update(report.to_json())
     if not report.passed:
         raise JobFailed(

@@ -4,6 +4,7 @@ retention pins and the fund-characteristics parser-drift audit. Wiring: `app.inc
 of `router` in api/main.py."""
 
 import datetime as dt
+import json
 from decimal import Decimal
 from typing import Annotated, Any, Literal
 
@@ -136,7 +137,14 @@ async def get_factsheet(
     out = []
     for r in rows:
         d = dict(r)
-        d.pop("evidence", None)
+        evidence = d.pop("evidence", None)
+        if isinstance(evidence, str):
+            evidence = json.loads(evidence)
+        evidence = evidence or {}
+        # D6.1: the issuer payload field names are unverified candidates; say so per row.
+        d["field_names_verified"] = not evidence.get("names_unverified", d["source"] != "manual")
+        d["field_provenance"] = evidence.get("field_provenance") or {}
+        d["extraction_warnings"] = evidence.get("warnings") or []
         out.append(d)
     return out
 

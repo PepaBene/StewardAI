@@ -1,0 +1,291 @@
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<ops:world-patent-data xmlns="http://www.epo.org/exchange" xmlns:ops="http://ops.epo.org" xmlns:xlink="http://www.w3.org/1999/xlink">
+  <ops:meta name="elapsed-time" value="212"/>
+  <ops:biblio-search total-result-count="4">
+    <ops:query syntax="CQL" offset="1" limit="4">pa="example industries"</ops:query>
+    <ops:search-result>
+      <exchange-documents>
+        <exchange-document system="ops.epo.org" family-id="25134712" country="EP" doc-number="1840100" kind="A1">
+          <bibliographic-data>
+            <publication-reference>
+              <document-id document-id-type="docdb">
+                <country>EP</country>
+                <doc-number>1840100</doc-number>
+                <kind>A1</kind>
+                <date>20071003</date>
+              </document-id>
+              <document-id document-id-type="epodoc">
+                <doc-number>EP1840100</doc-number>
+                <date>20071003</date>
+              </document-id>
+            </publication-reference>
+            <application-reference doc-id="17321003" is-representative="NO">
+              <document-id document-id-type="docdb">
+                <country>EP</country>
+                <doc-number>07100123</doc-number>
+                <kind>A</kind>
+                <date>20070105</date>
+              </document-id>
+            </application-reference>
+            <priority-claims>
+              <priority-claim sequence="1" kind="national">
+                <document-id document-id-type="docdb">
+                  <country>DE</country>
+                  <doc-number>102006001234</doc-number>
+                  <kind>A</kind>
+                  <date>20060109</date>
+                </document-id>
+                <priority-active-indicator>Y</priority-active-indicator>
+              </priority-claim>
+              <priority-claim sequence="2" kind="national">
+                <document-id document-id-type="docdb">
+                  <country>DE</country>
+                  <doc-number>102005099999</doc-number>
+                  <kind>A</kind>
+                  <date>20051115</date>
+                </document-id>
+                <priority-active-indicator>N</priority-active-indicator>
+              </priority-claim>
+            </priority-claims>
+            <patent-classifications>
+              <patent-classification>
+                <classification-scheme office="EP" scheme="CPCI"/>
+                <section>H</section>
+                <class>01</class>
+                <subclass>L</subclass>
+                <main-group>21</main-group>
+                <subgroup>02</subgroup>
+                <symbol-position>F</symbol-position>
+                <classification-value>I</classification-value>
+              </patent-classification>
+              <patent-classification>
+                <classification-scheme office="EP" scheme="CPCI"/>
+                <section>H</section>
+                <class>01</class>
+                <subclass>L</subclass>
+                <main-group>29</main-group>
+                <subgroup>78</subgroup>
+                <symbol-position>L</symbol-position>
+                <classification-value>I</classification-value>
+              </patent-classification>
+            </patent-classifications>
+            <parties>
+              <applicants>
+                <applicant sequence="1" data-format="epodoc">
+                  <applicant-name>
+                    <name>EXAMPLE IND AG [DE]</name>
+                  </applicant-name>
+                </applicant>
+                <applicant sequence="1" data-format="original">
+                  <applicant-name>
+                    <name>Example Industries AG</name>
+                  </applicant-name>
+                  <residence>
+                    <country>DE</country>
+                  </residence>
+                </applicant>
+              </applicants>
+              <inventors>
+                <inventor sequence="1" data-format="original">
+                  <inventor-name>
+                    <name>Mustermann, Hans</name>
+                  </inventor-name>
+                </inventor>
+              </inventors>
+            </parties>
+            <invention-title lang="de">Verfahren zur Herstellung eines Halbleiterbauelements</invention-title>
+            <invention-title lang="en">Method for producing a semiconductor component</invention-title>
+            <references-cited>
+              <citation cited-phase="SEA">
+                <patcit dnum="US2003123456A1" dnum-type="docdb">
+                  <document-id document-id-type="docdb">
+                    <country>US</country>
+                    <doc-number>2003123456</doc-number>
+                    <kind>A1</kind>
+                    <date>20030703</date>
+                  </document-id>
+                </patcit>
+                <category>X</category>
+              </citation>
+              <citation cited-phase="SEA">
+                <patcit dnum="EP1000001A2" dnum-type="docdb">
+                  <document-id document-id-type="docdb">
+                    <country>EP</country>
+                    <doc-number>1000001</doc-number>
+                    <kind>A2</kind>
+                    <date>20000517</date>
+                  </document-id>
+                </patcit>
+                <category>A</category>
+              </citation>
+              <citation cited-phase="SEA">
+                <nplcit>
+                  <text>SMITH J: "Gate oxides", IEEE TRANS ELECTRON DEVICES, 2001</text>
+                </nplcit>
+                <category>A</category>
+              </citation>
+            </references-cited>
+          </bibliographic-data>
+          <abstract lang="en"><p>A method for producing a semiconductor component.</p></abstract>
+        </exchange-document>
+        <exchange-document system="ops.epo.org" family-id="25134712" country="US" doc-number="8123456" kind="B2">
+          <bibliographic-data>
+            <publication-reference>
+              <document-id document-id-type="docdb">
+                <country>US</country>
+                <doc-number>8123456</doc-number>
+                <kind>B2</kind>
+                <date>20120228</date>
+              </document-id>
+            </publication-reference>
+            <application-reference doc-id="17321009" is-representative="NO">
+              <document-id document-id-type="docdb">
+                <country>US</country>
+                <doc-number>65432101</doc-number>
+                <kind>A</kind>
+                <date>20070108</date>
+              </document-id>
+            </application-reference>
+            <priority-claims>
+              <priority-claim sequence="1" kind="national">
+                <document-id document-id-type="docdb">
+                  <country>DE</country>
+                  <doc-number>102006001234</doc-number>
+                  <kind>A</kind>
+                  <date>20060109</date>
+                </document-id>
+              </priority-claim>
+            </priority-claims>
+            <patent-classifications>
+              <patent-classification>
+                <classification-scheme office="" scheme="CPCI"/>
+                <section>H</section>
+                <class>01</class>
+                <subclass>L</subclass>
+                <main-group>21</main-group>
+                <subgroup>02</subgroup>
+              </patent-classification>
+            </patent-classifications>
+            <parties>
+              <applicants>
+                <applicant sequence="1" data-format="original">
+                  <applicant-name>
+                    <name>Example Industries AG</name>
+                  </applicant-name>
+                </applicant>
+              </applicants>
+            </parties>
+            <invention-title lang="en">Method for producing a semiconductor component</invention-title>
+            <references-cited>
+              <citation cited-phase="SEA">
+                <patcit dnum="US2003123456A1" dnum-type="docdb">
+                  <document-id document-id-type="docdb">
+                    <country>US</country>
+                    <doc-number>2003123456</doc-number>
+                    <kind>A1</kind>
+                  </document-id>
+                </patcit>
+              </citation>
+              <citation cited-phase="SEA">
+                <patcit dnum="US6000000A" dnum-type="docdb">
+                  <document-id document-id-type="docdb">
+                    <country>US</country>
+                    <doc-number>6000000</doc-number>
+                    <kind>A</kind>
+                  </document-id>
+                </patcit>
+              </citation>
+            </references-cited>
+          </bibliographic-data>
+        </exchange-document>
+        <exchange-document system="ops.epo.org" family-id="40111222" country="WO" doc-number="2019123456" kind="A1">
+          <bibliographic-data>
+            <publication-reference>
+              <document-id document-id-type="docdb">
+                <country>WO</country>
+                <doc-number>2019123456</doc-number>
+                <kind>A1</kind>
+                <date>20190704</date>
+              </document-id>
+            </publication-reference>
+            <application-reference doc-id="1">
+              <document-id document-id-type="docdb">
+                <country>WO</country>
+                <doc-number>2018EP98765</doc-number>
+                <kind>W</kind>
+                <date>20181220</date>
+              </document-id>
+            </application-reference>
+            <priority-claims>
+              <priority-claim sequence="1" kind="national">
+                <document-id document-id-type="docdb">
+                  <country>EP</country>
+                  <doc-number>17210001</doc-number>
+                  <kind>A</kind>
+                  <date>20171222</date>
+                </document-id>
+              </priority-claim>
+            </priority-claims>
+            <patent-classifications>
+              <patent-classification>
+                <classification-scheme office="EP" scheme="CPCI"/>
+                <section>G</section>
+                <class>06</class>
+                <subclass>N</subclass>
+                <main-group>3</main-group>
+                <subgroup>08</subgroup>
+              </patent-classification>
+            </patent-classifications>
+            <parties>
+              <applicants>
+                <applicant sequence="1" data-format="original">
+                  <applicant-name>
+                    <name>Example Industries AG</name>
+                  </applicant-name>
+                </applicant>
+                <applicant sequence="2" data-format="original">
+                  <applicant-name>
+                    <name>Example Robotics GmbH</name>
+                  </applicant-name>
+                </applicant>
+              </applicants>
+            </parties>
+            <invention-title lang="en">Neural network inference scheduler</invention-title>
+          </bibliographic-data>
+        </exchange-document>
+        <exchange-document system="ops.epo.org" family-id="31999000" country="EP" doc-number="2999999" kind="A1">
+          <bibliographic-data>
+            <publication-reference>
+              <document-id document-id-type="docdb">
+                <country>EP</country>
+                <doc-number>2999999</doc-number>
+                <kind>A1</kind>
+                <date>20160316</date>
+              </document-id>
+            </publication-reference>
+            <priority-claims>
+              <priority-claim sequence="1" kind="national">
+                <document-id document-id-type="docdb">
+                  <country>FR</country>
+                  <doc-number>1458000</doc-number>
+                  <kind>A</kind>
+                  <date>20140827</date>
+                </document-id>
+              </priority-claim>
+            </priority-claims>
+            <parties>
+              <applicants>
+                <applicant sequence="1" data-format="original">
+                  <applicant-name>
+                    <name>Unrelated Holdings SA</name>
+                  </applicant-name>
+                </applicant>
+              </applicants>
+            </parties>
+            <invention-title lang="en">Unrelated invention</invention-title>
+          </bibliographic-data>
+        </exchange-document>
+      </exchange-documents>
+    </ops:search-result>
+  </ops:biblio-search>
+</ops:world-patent-data>

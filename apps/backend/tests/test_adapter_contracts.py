@@ -29,7 +29,7 @@ from steward.sources.base import AccessState, access_from_http, retry_after_at
 from steward.sources.free_market import parse_alpha_statement_facts
 from steward.sources.fund_probes import classify_fund_probe
 from steward.sources.governor import Budget, QuotaExceeded, RequestGovernor
-from steward.verify_sources.contract import DENIAL_STATES, classify_failure
+from steward.verify_sources.contract import DENIAL_STATES, classify_failure, status_of
 from tests.adapter_contract_cases import (
     CLASSIFIER_STATUS_MATRIX,
     CON,
@@ -42,15 +42,50 @@ from tests.adapter_contract_cases import (
 )
 from tests.conftest import NetworkAccessBlocked
 
+# Retry back-off must neither slow the suite nor loop forever.  The fake sleep returns at once
+# but records every requested delay; a runaway retry loop trips the call/total guard instead of
+# hanging, and `attempt` additionally runs under a real wall-clock timeout (B-P8-12).
+MAX_SLEEP_CALLS = 50
+MAX_TOTAL_REQUESTED_SLEEP = 600.0
+CASE_TIMEOUT_SECONDS = 10.0
+REAL_SLEEP = asyncio.sleep
+
+
+class SleepLog:
+    def __init__(self) -> None:
+        self.delays: list[float] = []
+
+    async def __call__(self, delay: float = 0, *_a: Any, **_k: Any) -> None:
+        self.delays.append(float(delay))
+        if len(self.delays) > MAX_SLEEP_CALLS:
+            raise AssertionError(f"retry loop: {len(self.delays)} sleeps requested")
+        if sum(self.delays) > MAX_TOTAL_REQUESTED_SLEEP:
+            raise AssertionError(f"back-off requested {sum(self.delays)}s in total")
+        await REAL_SLEEP(0)  # still yield to the event loop like a real sleep
+
 
 @pytest.fixture(autouse=True)
-def _no_sleep(monkeypatch: pytest.MonkeyPatch) -> None:
-    async def instant(_delay: float = 0, *_a: Any, **_k: Any) -> None:
-        return None
+def sleep_log(monkeypatch: pytest.MonkeyPatch) -> SleepLog:
+    log = SleepLog()
+    monkeypatch.setattr(asyncio, "sleep", log)
+    monkeypatch.setattr(yahoo, "_sleep", log)
+    monkeypatch.setattr(openfigi, "_sleep", log)
+    return log
 
-    monkeypatch.setattr(asyncio, "sleep", instant)
-    monkeypatch.setattr(yahoo, "_sleep", instant)
-    monkeypatch.setattr(openfigi, "_sleep", instant)
+
+async def test_sleep_guard_stops_a_runaway_retry_loop(sleep_log: SleepLog) -> None:
+    async def forever() -> None:
+        while True:
+            await asyncio.sleep(1)
+
+    with pytest.raises(AssertionError, match="retry loop"):
+        await asyncio.wait_for(forever(), CASE_TIMEOUT_SECONDS)
+    assert len(sleep_log.delays) == MAX_SLEEP_CALLS + 1
+
+
+async def test_sleep_guard_flags_excessive_total_backoff() -> None:
+    with pytest.raises(AssertionError, match="back-off"):
+        await asyncio.sleep(MAX_TOTAL_REQUESTED_SLEEP + 1)
 
 
 # ---------------------------------------------------------------------------------------
@@ -90,6 +125,14 @@ def test_parser_baseline_reads_recorded_fixture(case: ParserCase) -> None:
     assert rows >= case.min_rows
 
 
+def test_no_parser_case_may_be_vacuous() -> None:
+    """A baseline that yields zero rows makes the empty/drift/partial checks meaningless."""
+    assert [c.id for c in PARSER_CASES if c.min_rows < 1] == []
+    for case in PARSER_CASES:
+        rows, error = run_parser(case, case.baseline())
+        assert error is None and rows >= 1, f"{case.id}: baseline yields {rows} rows"
+
+
 @pytest.mark.parametrize("case", PARSER_CASES, ids=lambda c: c.id)
 def test_parser_empty_response_is_empty_or_typed(case: ParserCase) -> None:
     rows, _error = run_parser(case, case.empty)
@@ -106,7 +149,7 @@ def test_parser_schema_drift_is_typed_or_empty_never_invented(case: ParserCase) 
 def test_parser_partial_payload_never_crashes_untyped(case: ParserCase) -> None:
     baseline_rows, _ = run_parser(case, case.baseline())
     rows, _error = run_parser(case, case.partial(case.baseline()))
-    assert rows <= max(baseline_rows, 1)
+    assert rows <= baseline_rows
 
 
 # ---------------------------------------------------------------------------------------
@@ -119,7 +162,7 @@ def client(handler: Any) -> httpx.AsyncClient:
 async def attempt(case: FetchCase, handler: Any) -> tuple[Any, BaseException | None]:
     async with client(handler) as http:
         try:
-            return await case.call(http), None
+            return await asyncio.wait_for(case.call(http), CASE_TIMEOUT_SECONDS), None
         except case.typed as exc:
             return None, exc
 
@@ -139,6 +182,13 @@ async def test_fetch_healthy_response_succeeds(case: FetchCase) -> None:
         assert case.access_of(result).state == AccessState.AVAILABLE
 
 
+# Adapters that return an AccessResult instead of raising.  `access_from_http` (steward/sources/
+# base.py, outside the verification stream) does not put the status into `detail` for 5xx, so
+# these three cannot yet show provenance; new adapters must not be added here.
+ACCESS_RESULTS_WITHOUT_STATUS = frozenset(
+    {"public_macro_world_bank", "public_macro_sdmx", "public_macro_comtrade"}
+)
+
 EXPECTED_BY_STATUS = {
     403: {AccessState.ACCESS_UNVERIFIED, AccessState.PAID_ONLY},
     429: {AccessState.QUOTA_EXHAUSTED},
@@ -156,6 +206,17 @@ async def test_fetch_denial_maps_to_typed_access_state(case: FetchCase, status: 
     state = state_of(case, result, error)
     assert state in EXPECTED_BY_STATUS[status], (case.id, status, state)
     assert state in DENIAL_STATES and state != AccessState.AVAILABLE
+    if status == 500:
+        # Provenance: a 5xx must say which HTTP status the provider returned (429/403 may be
+        # named by the provider's envelope text instead), otherwise a server error is
+        # indistinguishable from a parse failure in the audit trail.
+        if error is not None:
+            assert status_of(error) == 500, f"{case.id}: {error!r} does not carry HTTP 500"
+        else:
+            assert case.access_of is not None
+            detail = case.access_of(result).detail
+            if case.id not in ACCESS_RESULTS_WITHOUT_STATUS:
+                assert detail and "500" in detail, f"{case.id}: access result lacks HTTP 500"
 
 
 @pytest.mark.parametrize("case", [c for c in FETCH_CASES if c.garbage_typed], ids=lambda c: c.id)
@@ -306,6 +367,45 @@ def test_network_is_blocked_in_tests() -> None:
         socket.getaddrinfo("api.example.com", 443)
     with pytest.raises(NetworkAccessBlocked):
         socket.create_connection(("93.184.216.34", 443), timeout=1)
+
+
+def test_network_block_cannot_be_swallowed_by_an_except_exception_adapter() -> None:
+    """An adapter that turns every Exception into a typed failure must still fail the test
+    that reached the network (B49: NetworkAccessBlocked is a BaseException)."""
+    assert not issubclass(NetworkAccessBlocked, Exception)
+
+    def adapter() -> str:
+        try:
+            socket.create_connection(("93.184.216.34", 443), timeout=1)
+        except Exception:
+            return "temporarily_failed"
+        return "ok"
+
+    with pytest.raises(NetworkAccessBlocked):
+        adapter()
+
+
+async def test_network_block_survives_an_async_except_exception_adapter() -> None:
+    async def adapter() -> str:
+        try:
+            async with httpx.AsyncClient() as http:
+                await http.get("https://api.example.com/x")
+        except Exception:
+            return "swallowed"
+        return "ok"
+
+    with pytest.raises(NetworkAccessBlocked):
+        await adapter()
+
+
+def test_proxy_environment_and_env_file_are_neutralised_in_tests() -> None:
+    import os
+
+    from steward.settings import Settings
+    from tests.conftest import PROXY_ENV
+
+    assert [n for n in PROXY_ENV if os.environ.get(n)] == []
+    assert Settings.model_config.get("env_file") is None
 
 
 def test_no_provider_key_is_visible_to_tests() -> None:

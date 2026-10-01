@@ -75,18 +75,37 @@ async def pinned_ids(pool: asyncpg.Pool, isin: str) -> set[int]:
 
 
 async def prune_snapshots(pool: asyncpg.Pool, isin: str, policy: RetentionPolicy) -> dict[str, Any]:
-    """Delete the snapshots of a fund the policy does not keep; returns what was kept/dropped."""
-    rows = await pool.fetch(
-        "select id, as_of, fetched_at from public.etf_snapshot where fund_isin = $1", isin
-    )
-    refs = [SnapshotRef(r["id"], r["as_of"], r["fetched_at"]) for r in rows]
-    keep = snapshots_to_keep(refs, await pinned_ids(pool, isin), policy)
-    drop = [s.id for s in refs if s.id not in keep]
-    if drop:
-        await pool.execute("delete from public.etf_snapshot where id = any($1::bigint[])", drop)
+    """Delete the snapshots of a fund the policy does not keep; returns what was kept/dropped.
+
+    A pin can arrive between deciding what to drop and dropping it. The candidate rows are
+    locked (`for update`; `pin_snapshot` takes `for key share` on the row it pins, which
+    conflicts) and the pins are read again inside the lock; a snapshot that still turns out
+    to be pinned (the database refuses to delete it, ON DELETE RESTRICT) is kept, not an
+    error."""
+    async with pool.acquire() as conn, conn.transaction():
+        rows = await conn.fetch(
+            "select id, as_of, fetched_at from public.etf_snapshot where fund_isin = $1"
+            " order by id for update",
+            isin,
+        )
+        refs = [SnapshotRef(r["id"], r["as_of"], r["fetched_at"]) for r in rows]
+        pins = await conn.fetch(
+            "select p.snapshot_id from public.fund_snapshot_pin p"
+            " join public.etf_snapshot s on s.id = p.snapshot_id where s.fund_isin = $1",
+            isin,
+        )
+        keep = snapshots_to_keep(refs, {r["snapshot_id"] for r in pins}, policy)
+        deleted = 0
+        for snapshot_id in (s.id for s in refs if s.id not in keep):
+            try:
+                async with conn.transaction():  # savepoint: a refused delete leaves the rest
+                    await conn.execute("delete from public.etf_snapshot where id = $1", snapshot_id)
+                deleted += 1
+            except asyncpg.ForeignKeyViolationError:
+                keep[snapshot_id] = "pinned"
     return {
         "kept": len(keep),
-        "deleted": len(drop),
+        "deleted": deleted,
         "pinned": sum(v == "pinned" for v in keep.values()),
     }
 
@@ -99,17 +118,25 @@ async def pin_snapshot(
     reason: str | None = None,
 ) -> bool:
     """Protect a snapshot a saved report/decision rests on; False when it does not exist."""
-    exists = await pool.fetchval("select 1 from public.etf_snapshot where id = $1", snapshot_id)
-    if not exists:
-        return False
-    await pool.execute(
-        "insert into public.fund_snapshot_pin (snapshot_id, ref_kind, ref_id, reason)"
-        " values ($1, $2, $3, $4) on conflict (snapshot_id, ref_kind, ref_id) do nothing",
-        snapshot_id,
-        ref_kind,
-        ref_id,
-        reason,
-    )
+    try:
+        async with pool.acquire() as conn, conn.transaction():
+            # `for key share` blocks a concurrent prune's `for update` until this pin commits
+            # (and the other way round), so a snapshot cannot be deleted under a new pin.
+            exists = await conn.fetchval(
+                "select 1 from public.etf_snapshot where id = $1 for key share", snapshot_id
+            )
+            if not exists:
+                return False
+            await conn.execute(
+                "insert into public.fund_snapshot_pin (snapshot_id, ref_kind, ref_id, reason)"
+                " values ($1, $2, $3, $4) on conflict (snapshot_id, ref_kind, ref_id) do nothing",
+                snapshot_id,
+                ref_kind,
+                ref_id,
+                reason,
+            )
+    except asyncpg.ForeignKeyViolationError:
+        return False  # the snapshot was pruned between the check and the insert
     return True
 
 

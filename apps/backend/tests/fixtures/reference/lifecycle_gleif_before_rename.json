@@ -1,0 +1,35 @@
+{
+ "data": {
+  "type": "lei-records",
+  "id": "5299000OLDCO00000001",
+  "attributes": {
+   "lei": "5299000OLDCO00000001",
+   "entity": {
+    "legalName": {
+     "name": "Oldco Holdings AG",
+     "language": "de"
+    },
+    "otherNames": [],
+    "jurisdiction": "DE",
+    "legalForm": {
+     "id": "SGST"
+    },
+    "category": "GENERAL",
+    "headquartersAddress": {
+     "country": "DE",
+     "city": "Walldorf"
+    },
+    "legalAddress": {
+     "country": "DE",
+     "city": "Walldorf"
+    },
+    "status": "ACTIVE"
+   },
+   "registration": {
+    "status": "ISSUED",
+    "initialRegistrationDate": "2014-03-01T00:00:00Z",
+    "nextRenewalDate": "2027-03-01T00:00:00Z"
+   }
+  }
+ }
+}

@@ -37,7 +37,7 @@ from steward.config.jobs import CalendarSettings, JobsConfig, PriceSettings
 from steward.config.store import load_active
 from steward.fx.convert import FxRate, FxSourceName, FxTable, MissingRateError
 from steward.jobs.runner import JobContext
-from steward.reference.calendar import exchange_open
+from steward.reference.calendar import SessionIndex, exchange_open, load_sessions
 from steward.reference.identity import holding_tickers
 from steward.reference.price_series import (
     PriceSymbols,
@@ -116,17 +116,30 @@ def delay_note(mic: str | None) -> str:
 
 
 def market_open(
-    mic: str | None, now: dt.datetime, calendar: CalendarSettings, grace: dt.timedelta = CLOSE_GRACE
+    mic: str | None,
+    now: dt.datetime,
+    calendar: CalendarSettings,
+    grace: dt.timedelta = CLOSE_GRACE,
+    sessions: SessionIndex | None = None,
 ) -> bool:
     """Whether `now` falls in the listing's session (plus `grace` after the close) on an
-    exchange day. An unknown market is treated as open (the job's own hours bound it)."""
+    exchange day. An unknown market is treated as open (the job's own hours bound it).
+
+    `sessions` are the confirmed `exchange_session` rows: a closed row (an ad hoc closure) shuts
+    the day, and an open or half-day row with its own open/close replaces the regular hours
+    (an early close at 13:00, a late open). Without a row the regular session of SESSIONS
+    applies on weekdays that are not configured closures. The session is anchored to the
+    exchange's local clock, so daylight-saving changes move the UTC instants, not the hours."""
     session = SESSIONS.get(mic or "")
     if session is None:
         return True
     zone = ZoneInfo(session.tz)
     local = now.astimezone(zone)
-    if not exchange_open(calendar, mic, local.date()):
+    if not exchange_open(calendar, mic, local.date(), sessions):
         return False
+    row = sessions.get((mic or "", local.date())) if sessions else None
+    if row is not None and row.open_at is not None and row.close_at is not None:
+        return row.open_at <= now <= row.close_at + grace
     start = dt.datetime.combine(local.date(), session.open, zone)
     end = dt.datetime.combine(local.date(), session.close, zone) + grace
     return start <= local <= end
@@ -304,8 +317,17 @@ async def run_intraday(ctx: JobContext, deps: IntradayDeps) -> None:
         symbols = await wanted_symbols(
             pool, settings, profiles.body if profiles else HoldingProfilesConfig()
         )
+        # Confirmed sessions (half-days, ad hoc closures) of the days a session can span.
+        sessions = await load_sessions(
+            pool,
+            [yahoo_mic(s) for s in symbols],
+            now.date() - dt.timedelta(days=1),
+            now.date() + dt.timedelta(days=1),
+        )
         open_now = {
-            s: f for s, f in symbols.items() if market_open(yahoo_mic(s), now, config.calendar)
+            s: f
+            for s, f in symbols.items()
+            if market_open(yahoo_mic(s), now, config.calendar, sessions=sessions)
         }
         step.detail.update(
             symbols=symbols, open=sorted(open_now), closed=sorted(set(symbols) - set(open_now))
@@ -476,6 +498,7 @@ def needs_fetch(
     cache: dt.timedelta,
     mic: str | None,
     calendar: CalendarSettings,
+    sessions: SessionIndex | None = None,
 ) -> bool:
     if quote is None:
         return True
@@ -484,7 +507,7 @@ def needs_fetch(
         return False
     # In the session: refresh past the cache age; outside it, only a quote from before the
     # last session's end (fetched mid-session) is worth refreshing.
-    if market_open(mic, now, calendar):
+    if market_open(mic, now, calendar, sessions=sessions):
         return True
     end = quote["session_end"]
     return end is not None and quote["fetched_at"] < end + CLOSE_GRACE <= now
@@ -557,8 +580,16 @@ async def holding_intraday(
     mic = yahoo_mic(symbol)
     quote = await _quote(pool, symbol)
     fetch_error: str | None = None
+    sessions = await load_sessions(
+        pool, [mic], now.date() - dt.timedelta(days=1), now.date() + dt.timedelta(days=1)
+    )
     if http is not None and needs_fetch(
-        quote, now, dt.timedelta(seconds=settings.intraday_cache_seconds), mic, config.calendar
+        quote,
+        now,
+        dt.timedelta(seconds=settings.intraday_cache_seconds),
+        mic,
+        config.calendar,
+        sessions,
     ):
         _count, fetch_error = await fetch_symbol(pool, http, symbol, now, retry=False)
         quote = await _quote(pool, symbol)

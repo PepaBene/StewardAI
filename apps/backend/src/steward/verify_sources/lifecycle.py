@@ -112,17 +112,22 @@ NOT_FREE_SOURCE_MIGRATIONS = frozenset({"20261001100000_transaction_fees.sql"})
 ROLLBACK_SUFFIX = ".down.sql"
 
 
-# Phase 0-6 free-source migrations end here; later phases ship their own rollback files.
-MIGRATION_ROLLBACK_END = "20261003999999"
+def latest_migration_prefix(migrations_dir: Path) -> str:
+    """Timestamp prefix of the newest migration file (the dynamic end of the rollback range).
+
+    The range used to stop at a hard-coded Phase 6 timestamp, so every later migration silently
+    escaped the rollback requirement.  Now any migration added after MIGRATION_ROLLBACK_START
+    needs a rollback file unless it is listed in NOT_FREE_SOURCE_MIGRATIONS."""
+    prefixes = [p.name.split("_", 1)[0] for p in migrations_dir.glob("*.sql")]
+    return max(prefixes, default=MIGRATION_ROLLBACK_START)
 
 
-def free_source_migrations(
-    migrations_dir: Path, *, through: str = MIGRATION_ROLLBACK_END
-) -> list[Path]:
+def free_source_migrations(migrations_dir: Path, *, through: str | None = None) -> list[Path]:
+    end = through or latest_migration_prefix(migrations_dir)
     return [
         p
         for p in sorted(migrations_dir.glob("*.sql"))
-        if MIGRATION_ROLLBACK_START <= p.name.split("_", 1)[0] <= through
+        if MIGRATION_ROLLBACK_START <= p.name.split("_", 1)[0] <= end
         and p.name not in NOT_FREE_SOURCE_MIGRATIONS
     ]
 

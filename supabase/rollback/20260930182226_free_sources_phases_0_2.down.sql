@@ -5,7 +5,13 @@
 -- rows) must equal the one taken before the migration. Run it in a transaction, newest migration
 -- first. The migration file itself is never edited.
 -- DATA LOSS: drops these tables and every row in them: coverage_status, exposure_mapping, instrument_security_link, issuer, macro_observation, provider_access, provider_identifier, provider_quota_usage, security, security_listing, source_conflict, source_document, source_document_version, source_evidence, source_observation, trade_observation.
+-- PRECONDITION: no row may use a value the restored CHECK constraint (macro_series_source_check) forbids; the rollback stops with a clear error before changing anything if one does.
 
+do $$ begin
+  if exists (select 1 from public.macro_series where not ((source = ANY (ARRAY['fred'::text, 'ecb'::text, 'eurostat'::text])))) then
+    raise exception 'rollback precondition failed: public.macro_series holds rows that violate the restored constraint macro_series_source_check; delete or migrate those rows first (select * from public.macro_series where not ((source = ANY (ARRAY[''fred''::text, ''ecb''::text, ''eurostat''::text]))))';
+  end if;
+end $$;
 alter table public.macro_series drop constraint if exists macro_series_source_check;
 alter table public.macro_series add constraint macro_series_source_check CHECK ((source = ANY (ARRAY['fred'::text, 'ecb'::text, 'eurostat'::text])));
 drop table if exists public.coverage_status cascade;

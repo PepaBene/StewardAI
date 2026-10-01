@@ -8,6 +8,7 @@ from typing import Any
 
 import httpx
 
+from steward.macro.geo import ISO3_TO_ISO2
 from steward.macro.providers import parse_comtrade, parse_sdmx_json, parse_world_bank
 from steward.sources.base import (
     AccessResult,
@@ -132,6 +133,8 @@ class SdmxAdapter(PublicMacroAdapter):
             params={
                 "startPeriod": request.get("start", "2000"),
                 "format": "sdmx-json",
+                # One observation per dimension combination: the area comes from the response.
+                "dimensionAtObservation": "AllDimensions",
             },
             headers={"Accept": "application/vnd.sdmx.data+json;version=2.0.0"},
         )
@@ -161,6 +164,8 @@ class SdmxAdapter(PublicMacroAdapter):
             frequency=request["frequency"],
             source_url=payload["url"],
             vintage=request["vintage"],
+            expect_geography=request.get("area_code"),
+            geography_map=ISO3_TO_ISO2 if self.provider == "oecd" else None,
         )
         now = dt.datetime.now(dt.UTC)
         return [
@@ -200,6 +205,9 @@ class ComtradeAdapter(PublicMacroAdapter):
             "partnerCode": request.get("partner", 0),
             "cmdCode": request["hs_code"],
             "flowCode": request.get("flow_code", "X,M"),
+            "customsCode": "C00",
+            "motCode": "0",
+            "partner2Code": "0",
             "subscription-key": self.api_key,
         }
         response = await self.http.get(url, params=params)
@@ -227,10 +235,13 @@ class ComtradeAdapter(PublicMacroAdapter):
                     "USD",
                     "https://comtradeapi.un.org/",
                     now,
-                    geography=row.reporter,
+                    # ISO alpha-2 where the M49 code is one country (exposure mappings use ISO).
+                    geography=row.reporter_iso or row.reporter,
                     scale=Decimal(1),
                     dimensions={
-                        "partner": row.partner,
+                        "partner": row.partner_iso or row.partner,
+                        "reporter_m49": row.reporter,
+                        "partner_m49": row.partner,
                         "flow": row.flow,
                         "hs_revision": row.hs_revision,
                         "hs_code": row.hs_code,
@@ -238,6 +249,9 @@ class ComtradeAdapter(PublicMacroAdapter):
                     raw={
                         "quantity": str(row.quantity) if row.quantity is not None else None,
                         "quantity_unit": row.quantity_unit,
+                        "net_weight_kg": str(row.net_weight)
+                        if row.net_weight is not None
+                        else None,
                     },
                 )
             )

@@ -27,6 +27,9 @@ import xml.etree.ElementTree as ET
 from dataclasses import dataclass
 from decimal import Decimal, InvalidOperation
 
+from steward.sources.ciks import ten_digit_cik
+from steward.sources.xml_guard import safe_fromstring
+
 SCHEDULE13_FORMS = frozenset(
     {
         "SC 13D",
@@ -82,6 +85,11 @@ def _number(node: ET.Element | None, *names: str) -> Decimal | None:
     except InvalidOperation:
         return None
     return value if value.is_finite() else None
+
+
+def _non_negative(value: Decimal | None) -> Decimal | None:
+    """A negative share count is a filing error: unknown, never stored (the tables reject it)."""
+    return value if value is not None and value >= 0 else None
 
 
 def _percent(value: Decimal | None) -> Decimal | None:
@@ -185,18 +193,20 @@ def _person(node: ET.Element) -> ReportingPerson | None:
         return None
     cik = _text(node, "reportingPersonCIK", "reportingPersonCik")
     return ReportingPerson(
-        cik=cik.zfill(10) if cik and cik.isdigit() else None,
+        cik=ten_digit_cik(cik),
         name=name,
         member_of_group=_group_flag(_text(node, "memberOfGroup", "memberGroup")),
         citizenship=_text(node, "citizenshipOrOrganization"),
-        sole_voting=_number(node, "soleVotingPower"),
-        shared_voting=_number(node, "sharedVotingPower"),
-        sole_dispositive=_number(node, "soleDispositivePower"),
-        shared_dispositive=_number(node, "sharedDispositivePower"),
-        aggregate_shares=_number(
-            node,
-            "aggregateAmountOwned",
-            "reportingPersonBeneficiallyOwnedAggregateNumberOfShares",
+        sole_voting=_non_negative(_number(node, "soleVotingPower")),
+        shared_voting=_non_negative(_number(node, "sharedVotingPower")),
+        sole_dispositive=_non_negative(_number(node, "soleDispositivePower")),
+        shared_dispositive=_non_negative(_number(node, "sharedDispositivePower")),
+        aggregate_shares=_non_negative(
+            _number(
+                node,
+                "aggregateAmountOwned",
+                "reportingPersonBeneficiallyOwnedAggregateNumberOfShares",
+            )
         ),
         percent_of_class=_percent(_number(node, "percentOfClass", "classPercent")),
         person_type=_text(node, "typeOfReportingPerson"),
@@ -220,13 +230,7 @@ def parse_schedule13_xml(xml: bytes, form: str | None = None) -> Schedule13Filin
     `form` is the submissions-API form type; it is used when the XML omits the submission
     type. Raises Schedule13Error for a document that is not a Schedule 13D/G.
     """
-    upper = xml.upper()
-    if b"<!DOCTYPE" in upper or b"<!ENTITY" in upper:
-        raise Schedule13Error("XML with DTD or entity declarations is not accepted")
-    try:
-        root = ET.fromstring(xml)  # noqa: S314 - DTD/entity declarations are rejected above.
-    except ET.ParseError as exc:
-        raise Schedule13Error(f"not well-formed XML: {exc}") from exc
+    root = safe_fromstring(xml, Schedule13Error)
 
     namespace = root.tag.lower()
     submission_type = _text(root, "submissionType") or form
@@ -259,13 +263,13 @@ def parse_schedule13_xml(xml: bytes, form: str | None = None) -> Schedule13Filin
         raise Schedule13Error("no reporting person found")
     issuer_cik = _text(issuer, "issuerCIK", "issuerCik")
     filer = _find(_find(root, ("headerData",)), ("cik",))
-    filer_cik = filer.text.strip().zfill(10) if filer is not None and filer.text else None
+    filer_cik = ten_digit_cik(filer.text if filer is not None else None)
     return Schedule13Filing(
         schedule=schedule,
         is_amendment=is_amendment,
         amendment_no=amendment_no,
         submission_type=submission_type,
-        issuer_cik=issuer_cik.zfill(10) if issuer_cik and issuer_cik.isdigit() else None,
+        issuer_cik=ten_digit_cik(issuer_cik),
         issuer_cusip=normalise_cusip(_text(issuer, "issuerCUSIP", "issuerCusip")),
         issuer_name=_text(issuer, "issuerName", "nameOfIssuer"),
         class_title=_text(header, "securitiesClassTitle", "titleOfClassOfSecurities"),

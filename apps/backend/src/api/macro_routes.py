@@ -2,15 +2,17 @@
 
 import datetime as dt
 from decimal import Decimal
-from typing import Annotated, Literal
+from typing import Annotated, Literal, Self
 
+import asyncpg
 from fastapi import APIRouter, HTTPException, Query, status
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator, model_validator
 
 from api.auth import Owner
 from api.db import DbId, Pool
 from api.routes import _enqueue
-from steward.macro.providers import TradePoint, trade_metrics
+from steward.macro.hs import normalize_hs_revision
+from steward.macro.providers import TradePoint, flow_totals, trade_metrics
 from steward.macro.read import MacroContext, context_for_holding
 from steward.portfolio.read import JobSummary
 
@@ -27,6 +29,19 @@ class ExposureInput(BaseModel):
     weight: Decimal = Field(ge=0, le=1)
     valid_from: dt.date
     valid_to: dt.date | None = None
+
+    @field_validator("hs_revision")
+    @classmethod
+    def _canonical_revision(cls, value: str | None) -> str | None:
+        """'H6', 'hs 2022' and 'HS2022' are one revision; trade rows carry the canonical label."""
+        return normalize_hs_revision(value) if value else None
+
+    @model_validator(mode="after")
+    def _product_needs_revision(self) -> Self:
+        # Stored legacy rows (ExposureResult) may predate the requirement; new input may not.
+        if type(self) is ExposureInput and self.hs_code is not None and self.hs_revision is None:
+            raise ValueError("hs_revision is required with hs_code (e.g. HS2022)")
+        return self
 
 
 class ExposureResult(ExposureInput):
@@ -53,7 +68,8 @@ class TradeContext(BaseModel):
     partner: str | None
     periods: int
     latest_period: dt.date | None
-    latest_value: Decimal | None
+    latest_value: Decimal | None  # exports of the product in its latest period
+    latest_value_by_flow: dict[str, Decimal] = Field(default_factory=dict)
     latest_value_currency: str = "USD"
     metrics: dict[str, Decimal | None]
     source_url: str | None
@@ -97,11 +113,18 @@ async def get_portfolio_macro_coverage(pool: Pool, _owner: Owner) -> PortfolioMa
              left join public.instrument_security_link i on i.ticker=p.ticker
              left join public.security s on s.id=i.security_id
              where p.snapshot_date=$1
+           ), by_dimension as (
+             -- The cap is per dimension: a geography cut and a product cut each describe all
+             -- of the issuer, so the assigned share is the best-covered dimension, not a sum.
+             select p.ticker,p.issuer_id,sum(em.weight) dimension_weight
+             from positions p join public.exposure_mapping em on em.issuer_id=p.issuer_id
+               and em.valid_from <= $1 and (em.valid_to is null or em.valid_to >= $1)
+               and em.created_at < ($1::date + 1)
+             group by p.ticker,p.issuer_id,public.exposure_dimension(em.geography,em.hs_code)
            ), assigned as (
              select p.ticker,p.value_base,p.base_currency,
-                    coalesce(sum(em.weight),0) assigned_weight
-             from positions p left join public.exposure_mapping em on em.issuer_id=p.issuer_id
-               and em.valid_from <= $1 and (em.valid_to is null or em.valid_to >= $1)
+                    coalesce(max(d.dimension_weight),0) assigned_weight
+             from positions p left join by_dimension d on d.ticker=p.ticker
              group by p.ticker,p.value_base,p.base_currency
            )
            select base_currency,sum(value_base) total_value,
@@ -131,12 +154,14 @@ async def get_portfolio_macro_coverage(pool: Pool, _owner: Owner) -> PortfolioMa
                     em.geography exposure_key,null::text hs_revision,em.basis,em.weight
              from positions p join public.exposure_mapping em on em.issuer_id=p.issuer_id
                and em.valid_from <= $1 and (em.valid_to is null or em.valid_to >= $1)
+               and em.created_at < ($1::date + 1)
              where em.geography is not null
              union all
              select p.ticker,p.value_base,'hs_product'::text,em.hs_code,em.hs_revision,
                     em.basis,em.weight
              from positions p join public.exposure_mapping em on em.issuer_id=p.issuer_id
                and em.valid_from <= $1 and (em.valid_to is null or em.valid_to >= $1)
+               and em.created_at < ($1::date + 1)
              where em.hs_code is not null
            )
            select w.exposure_type,w.exposure_key,w.hs_revision,w.basis,
@@ -197,22 +222,25 @@ async def list_exposures(pool: Pool, _owner: Owner) -> list[ExposureResult]:
 async def create_exposure(body: ExposureInput, pool: Pool, owner: Owner) -> ExposureResult:
     if body.geography is None and body.hs_code is None:
         raise HTTPException(422, "geography or hs_code is required")
-    row = await pool.fetchrow(
-        """insert into public.exposure_mapping
-           (issuer_id,segment,geography,hs_revision,hs_code,basis,weight,valid_from,valid_to,created_by)
-           values($1,$2,$3,$4,$5,$6,$7,$8,$9,$10) returning id,issuer_id,segment,geography,
-           hs_revision,hs_code,basis,weight,valid_from,valid_to""",
-        body.issuer_id,
-        body.segment,
-        body.geography,
-        body.hs_revision,
-        body.hs_code,
-        body.basis,
-        body.weight,
-        body.valid_from,
-        body.valid_to,
-        owner.user_id,
-    )
+    try:
+        row = await pool.fetchrow(
+            """insert into public.exposure_mapping
+               (issuer_id,segment,geography,hs_revision,hs_code,basis,weight,valid_from,valid_to,created_by)
+               values($1,$2,$3,$4,$5,$6,$7,$8,$9,$10) returning id,issuer_id,segment,geography,
+               hs_revision,hs_code,basis,weight,valid_from,valid_to""",
+            body.issuer_id,
+            body.segment,
+            body.geography,
+            body.hs_revision,
+            body.hs_code,
+            body.basis,
+            body.weight,
+            body.valid_from,
+            body.valid_to,
+            owner.user_id,
+        )
+    except asyncpg.RaiseError as exc:  # the per-dimension 100% cap
+        raise HTTPException(422, exc.message) from exc
     assert row is not None
     return ExposureResult(**dict(row))
 
@@ -245,13 +273,18 @@ async def get_trade_context(
     _owner: Owner,
     partner: str | None = None,
 ) -> TradeContext:
-    """Product value plus reporter-wide trade metrics; no issuer contract is inferred."""
+    """Product value plus reporter-wide trade metrics; no issuer contract is inferred.
+
+    `reporter` and `partner` may be an ISO alpha-2 code or the UN M49 number Comtrade uses.
+    Only the latest revision of each observation is used."""
     rows = await pool.fetch(
-        """select reporter,partner,flow,hs_revision,hs_code,period,trade_value,quantity,
-                  quantity_unit,known_at,source_url
+        """select distinct on (reporter,partner,flow,hs_revision,hs_code,period)
+                  reporter,partner,reporter_iso,partner_iso,flow,hs_revision,hs_code,period,
+                  trade_value,quantity,quantity_unit,net_weight,known_at,source_url
            from public.trade_observation
-           where reporter=$1 and ($2::text is null or partner=$2)
-           order by period,known_at""",
+           where (reporter=$1 or reporter_iso=$1) and ($2::text is null or partner=$2
+                  or partner_iso=$2)
+           order by reporter,partner,flow,hs_revision,hs_code,period,revision desc,known_at desc""",
         reporter,
         partner,
     )
@@ -268,14 +301,19 @@ async def get_trade_context(
             value=row["trade_value"],
             quantity=row["quantity"],
             quantity_unit=row["quantity_unit"],
+            net_weight=row["net_weight"],
+            reporter_iso=row["reporter_iso"],
+            partner_iso=row["partner_iso"],
         )
         for row in rows
     ]
-    latest_period = max(point.period for point in points)
-    latest = [
-        point for point in points if point.period == latest_period and point.hs_code == hs_code
-    ]
-    latest_value = sum((point.value or Decimal(0) for point in latest), Decimal(0))
+    product = [point for point in points if point.hs_code == hs_code]
+    latest_period = max(point.period for point in product)
+    by_flow: dict[str, Decimal] = {}
+    for flow in sorted({point.flow for point in product}):
+        totals = flow_totals(product, flow)
+        if latest_period in totals:
+            by_flow[flow] = totals[latest_period]
     last_row = max(rows, key=lambda row: row["known_at"])
     revisions = {point.hs_revision for point in points}
     return TradeContext(
@@ -285,7 +323,8 @@ async def get_trade_context(
         partner=partner,
         periods=len({point.period for point in points}),
         latest_period=latest_period,
-        latest_value=latest_value,
+        latest_value=by_flow.get("export"),
+        latest_value_by_flow=by_flow,
         metrics=trade_metrics(points),
         source_url=last_row["source_url"],
         known_at=last_row["known_at"],

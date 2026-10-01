@@ -13,11 +13,78 @@ from typing import Any
 
 import httpx
 
+from steward.sources.base import AccessState
+
 
 class FreeSourceError(Exception):
-    def __init__(self, message: str, status_code: int | None = None) -> None:
+    """A provider failure. `state` is the typed access outcome when the provider's own message
+    makes it unambiguous (an Alpha Vantage HTTP-200 body that says "premium endpoint" is
+    PAID_ONLY; one that says "25 requests per day" is QUOTA_EXHAUSTED), else None and the
+    caller classifies by `status_code`."""
+
+    def __init__(
+        self,
+        message: str,
+        status_code: int | None = None,
+        *,
+        state: AccessState | None = None,
+        provider_charged: bool = True,
+    ) -> None:
         super().__init__(message)
         self.status_code = status_code
+        self.state = state
+        # False when the request provably never reached the provider (network failure), so a
+        # reserved credit can be refunded.
+        self.provider_charged = provider_charged
+
+
+_QUOTA_WORDS = (
+    "rate limit",
+    "requests per day",
+    "calls per day",
+    "calls per minute",
+    "call frequency",
+    "api call volume",
+    "daily limit",
+    "per-minute",
+    "too many requests",
+)
+_PAID_WORDS = (
+    "premium endpoint",
+    "premium feature",
+    "premium plan",
+    "this is a premium",
+    "paid tier",
+    "subscribe to any of the premium",
+    "upgrade your plan",
+)
+_KEY_WORDS = ("apikey", "api key", "unauthorized", "invalid api")
+
+
+def classify_alpha_message(text: str, *, key: str = "Information") -> AccessState:
+    """Typed access state of an Alpha Vantage HTTP-200 envelope message.
+
+    Quota wording is checked before premium wording on purpose: the daily-limit text says "...
+    subscribe to any of the premium plans ... to remove all daily rate limits", which is a
+    quota, not a paid-only endpoint."""
+    lowered = text.casefold()
+    if any(word in lowered for word in _QUOTA_WORDS):
+        return AccessState.QUOTA_EXHAUSTED
+    if any(word in lowered for word in _PAID_WORDS):
+        return AccessState.PAID_ONLY
+    if any(word in lowered for word in _KEY_WORDS):
+        return AccessState.ACCESS_UNVERIFIED
+    if key == "Error Message":
+        return AccessState.NOT_COVERED
+    return AccessState.TEMPORARILY_FAILED
+
+
+def raise_alpha_envelope(payload: dict[str, Any]) -> None:
+    """Raise a typed FreeSourceError for Alpha Vantage's error/denial envelopes (HTTP 200)."""
+    for key in ("Error Message", "Information", "Note"):
+        if payload.get(key):
+            text = str(payload[key])
+            raise FreeSourceError(text[:240], state=classify_alpha_message(text, key=key))
 
 
 def _decimal(value: Any, field: str) -> Decimal:
@@ -56,12 +123,7 @@ class SentimentArticle:
 
 
 def parse_alpha_news(payload: dict[str, Any], symbol: str) -> list[SentimentArticle]:
-    if payload.get("Error Message") or payload.get("Information") or payload.get("Note"):
-        raise FreeSourceError(
-            str(payload.get("Error Message") or payload.get("Information") or payload.get("Note"))[
-                :240
-            ]
-        )
+    raise_alpha_envelope(payload)
     feed = payload.get("feed")
     if not isinstance(feed, list):
         raise FreeSourceError("Alpha Vantage news schema changed")
@@ -113,12 +175,7 @@ def parse_alpha_news(payload: dict[str, Any], symbol: str) -> list[SentimentArti
 
 def parse_alpha_series(payload: dict[str, Any]) -> list[tuple[date, Decimal]]:
     """Normalize Alpha Vantage commodity and FX daily/periodic observations."""
-    if payload.get("Error Message") or payload.get("Information") or payload.get("Note"):
-        raise FreeSourceError(
-            str(payload.get("Error Message") or payload.get("Information") or payload.get("Note"))[
-                :240
-            ]
-        )
+    raise_alpha_envelope(payload)
     raw_rows = payload.get("data")
     if not isinstance(raw_rows, list):
         raw_rows = next((v for k, v in payload.items() if k.startswith("Time Series")), None)
@@ -164,7 +221,9 @@ async def alpha_news_sentiment(
             },
         )
     except httpx.HTTPError as exc:
-        raise FreeSourceError(f"Alpha Vantage network error ({type(exc).__name__})") from exc
+        raise FreeSourceError(
+            f"Alpha Vantage network error ({type(exc).__name__})", provider_charged=False
+        ) from exc
     if response.status_code != 200:
         raise FreeSourceError(f"Alpha Vantage HTTP {response.status_code}", response.status_code)
     try:
@@ -178,12 +237,7 @@ async def alpha_news_sentiment(
 
 def parse_alpha_daily(payload: dict[str, Any]) -> list[DailyBar]:
     """Parse TIME_SERIES_DAILY_ADJUSTED with its provider units preserved."""
-    if payload.get("Error Message") or payload.get("Information") or payload.get("Note"):
-        raise FreeSourceError(
-            str(payload.get("Error Message") or payload.get("Information") or payload.get("Note"))[
-                :240
-            ]
-        )
+    raise_alpha_envelope(payload)
     series = payload.get("Time Series (Daily)")
     if not isinstance(series, dict):
         raise FreeSourceError("Alpha Vantage daily series unavailable")
@@ -222,9 +276,11 @@ async def alpha_daily(
             },
         )
     except httpx.HTTPError as exc:
-        raise FreeSourceError(f"Alpha Vantage network error ({type(exc).__name__})") from exc
+        raise FreeSourceError(
+            f"Alpha Vantage network error ({type(exc).__name__})", provider_charged=False
+        ) from exc
     if response.status_code != 200:
-        raise FreeSourceError(f"Alpha Vantage HTTP {response.status_code}")
+        raise FreeSourceError(f"Alpha Vantage HTTP {response.status_code}", response.status_code)
     try:
         payload = response.json()
     except ValueError as exc:
@@ -241,7 +297,9 @@ async def eodhd_exchange_symbols(
             params={"api_token": api_key, "fmt": "json"},
         )
     except httpx.HTTPError as exc:
-        raise FreeSourceError(f"EODHD network error ({type(exc).__name__})") from exc
+        raise FreeSourceError(
+            f"EODHD network error ({type(exc).__name__})", provider_charged=False
+        ) from exc
     if response.status_code != 200:
         raise FreeSourceError(
             f"EODHD HTTP {response.status_code}: {response.text[:160]}", response.status_code
@@ -262,7 +320,9 @@ async def eodhd_daily(http: httpx.AsyncClient, api_key: str, symbol: str) -> lis
             params={"api_token": api_key, "fmt": "json", "period": "d"},
         )
     except httpx.HTTPError as exc:
-        raise FreeSourceError(f"EODHD network error ({type(exc).__name__})") from exc
+        raise FreeSourceError(
+            f"EODHD network error ({type(exc).__name__})", provider_charged=False
+        ) from exc
     if response.status_code != 200:
         raise FreeSourceError(
             f"EODHD HTTP {response.status_code}: {response.text[:160]}", response.status_code
@@ -278,7 +338,12 @@ async def eodhd_daily(http: httpx.AsyncClient, api_key: str, symbol: str) -> lis
                 _decimal(r["high"], "high"),
                 _decimal(r["low"], "low"),
                 _decimal(r["close"], "close"),
-                None,
+                # EODHD's adjusted_close is adjusted for splits and dividends. Whether its
+                # plain `close` is split-adjusted is unverified without a live payload, so
+                # total return checks the raw series against confirmed splits before use.
+                _decimal(r["adjusted_close"], "adjusted close")
+                if r.get("adjusted_close") is not None
+                else None,
                 _decimal(r["volume"], "volume") if r.get("volume") is not None else None,
             )
             for r in payload
@@ -299,19 +364,16 @@ async def alpha_statement(
             params={"function": function, "symbol": symbol, "apikey": api_key},
         )
     except httpx.HTTPError as exc:
-        raise FreeSourceError(f"Alpha Vantage network error ({type(exc).__name__})") from exc
+        raise FreeSourceError(
+            f"Alpha Vantage network error ({type(exc).__name__})", provider_charged=False
+        ) from exc
     if response.status_code != 200:
-        raise FreeSourceError(f"Alpha Vantage HTTP {response.status_code}")
+        raise FreeSourceError(f"Alpha Vantage HTTP {response.status_code}", response.status_code)
     try:
         payload = response.json()
     except ValueError as exc:
         raise FreeSourceError("Alpha Vantage sent invalid JSON") from exc
-    if payload.get("Error Message") or payload.get("Information") or payload.get("Note"):
-        raise FreeSourceError(
-            str(payload.get("Error Message") or payload.get("Information") or payload.get("Note"))[
-                :240
-            ]
-        )
+    raise_alpha_envelope(payload)
     if not isinstance(payload.get("annualReports"), list):
         raise FreeSourceError("Alpha Vantage statement unavailable or schema changed")
     result: dict[str, Any] = payload
@@ -325,7 +387,9 @@ async def finnhub_peers(http: httpx.AsyncClient, api_key: str, symbol: str) -> l
             params={"symbol": symbol, "token": api_key},
         )
     except httpx.HTTPError as exc:
-        raise FreeSourceError(f"Finnhub network error ({type(exc).__name__})") from exc
+        raise FreeSourceError(
+            f"Finnhub network error ({type(exc).__name__})", provider_charged=False
+        ) from exc
     if response.status_code != 200:
         raise FreeSourceError(f"Finnhub peers HTTP {response.status_code}", response.status_code)
     try:
@@ -346,7 +410,9 @@ async def finnhub_earnings_surprises(
             params={"symbol": symbol, "limit": 4, "token": api_key},
         )
     except httpx.HTTPError as exc:
-        raise FreeSourceError(f"Finnhub network error ({type(exc).__name__})") from exc
+        raise FreeSourceError(
+            f"Finnhub network error ({type(exc).__name__})", provider_charged=False
+        ) from exc
     if response.status_code != 200:
         raise FreeSourceError(f"Finnhub earnings HTTP {response.status_code}", response.status_code)
     try:

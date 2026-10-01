@@ -170,8 +170,42 @@ class PrimarySample:
     primary_source: str
     primary_url: str | None = None
     period_end: dt.date | None = None
+    # Only used by the pure `reconcile_samples` comparison.  `record_reconciliation` ignores it
+    # and re-reads the stored value from the app's own tables (B47).
     stored_value: Decimal | None = None
     reviewer: str | None = None
+    sampled_at: dt.datetime | None = None
+
+
+class SampleRejected(ValueError):
+    """A sample that cannot count as evidence: nothing is recorded."""
+
+
+CLOCK_SKEW = dt.timedelta(minutes=5)
+
+
+def _finite(value: Decimal | None) -> bool:
+    return value is not None and value.is_finite()
+
+
+def validate_sample(sample: PrimarySample, *, now: dt.datetime) -> None:
+    """Refuse samples that lack provenance: a named reviewer, where the primary value was read
+    (source and url), a finite primary value and a sampling time that is not in the future."""
+    problems: list[str] = []
+    if not (sample.reviewer or "").strip():
+        problems.append("reviewer is required")
+    if not (sample.primary_source or "").strip():
+        problems.append("primary_source is required")
+    if not (sample.primary_url or "").strip():
+        problems.append("primary_url is required")
+    if not _finite(sample.primary_value):
+        problems.append("primary_value must be a finite number")
+    if sample.sampled_at is not None and sample.sampled_at > now + CLOCK_SKEW:
+        problems.append(f"sampled_at {sample.sampled_at.isoformat()} is in the future")
+    if problems:
+        raise SampleRejected(
+            f"{sample.domain}/{sample.subject_key}/{sample.metric}: " + "; ".join(problems)
+        )
 
 
 @dataclass(frozen=True, slots=True)
@@ -188,8 +222,13 @@ def compare_sample(sample: PrimarySample, threshold: DomainThreshold) -> SampleR
     primary, stored = sample.primary_value, sample.stored_value
     if primary is None:
         raise ValueError("a reconciliation sample needs the primary-source value")
+    if not primary.is_finite():
+        # NaN and Infinity would make every comparison below raise or silently pass.
+        raise ValueError("the primary-source value must be a finite number")
     if stored is None:
         return SampleResult(sample, False, None, None, "no stored value for the sampled record")
+    if not stored.is_finite():
+        return SampleResult(sample, False, None, None, "stored value is not a finite number")
     abs_error = abs(stored - primary)
     rel_error = abs_error / abs(primary) if primary != 0 else (Decimal(0) if stored == 0 else None)
     return judge(sample, threshold, abs_error, rel_error)
@@ -237,7 +276,10 @@ class ReconciliationReport:
         return max(errors) if errors else None
 
     def decision(self) -> GateDecision:
-        return decide(self.domain, self.threshold, self.sample_count, self.failures)
+        subjects = len({r.sample.subject_key for r in self.results})
+        return decide(
+            self.domain, self.threshold, self.sample_count, self.failures, subject_count=subjects
+        )
 
 
 def reconcile_samples(
@@ -261,16 +303,27 @@ class GateDecision:
     sample_count: int
     failures: int
     reasons: tuple[str, ...] = field(default_factory=tuple)
+    subject_count: int = 0
 
 
 def decide(
-    domain: Domain, threshold: DomainThreshold, sample_count: int, failures: int
+    domain: Domain,
+    threshold: DomainThreshold,
+    sample_count: int,
+    failures: int,
+    *,
+    subject_count: int | None = None,
+    excluded: int = 0,
 ) -> GateDecision:
+    """`min_samples` is checked against DISTINCT subjects (`subject_count`, defaulting to the
+    sample count for callers that have no subjects): thirty metrics of one company are one
+    subject, not thirty samples."""
     reasons: list[str] = []
+    subjects = sample_count if subject_count is None else subject_count
     if sample_count == 0:
         reasons.append("no reconciliation samples recorded; nothing is verified")
-    elif sample_count < threshold.min_samples:
-        reasons.append(f"{sample_count} samples, {threshold.min_samples} required")
+    elif subjects < threshold.min_samples:
+        reasons.append(f"{subjects} distinct subjects sampled, {threshold.min_samples} required")
     if sample_count:
         fraction = Decimal(failures) / sample_count
         if fraction > threshold.max_failing_fraction:
@@ -278,8 +331,13 @@ def decide(
                 f"{failures}/{sample_count} samples outside tolerance "
                 f"(allowed fraction {threshold.max_failing_fraction})"
             )
+    if reasons and excluded:
+        reasons.append(
+            f"{excluded} recorded samples were ignored (future-dated, unreviewed or without "
+            "a named primary source)"
+        )
     return GateDecision(
-        domain, not reasons, threshold.version, sample_count, failures, tuple(reasons)
+        domain, not reasons, threshold.version, sample_count, failures, tuple(reasons), subjects
     )
 
 
@@ -331,16 +389,41 @@ async def activate_threshold(pool: asyncpg.Pool, threshold: DomainThreshold) -> 
         )
 
 
-async def record_reconciliation(pool: asyncpg.Pool, report: ReconciliationReport) -> int:
+_UPSERT_SAMPLE = """insert into public.reconciliation_sample
+   (domain,subject_key,metric,period_end,stored_value,primary_value,primary_source,primary_url,
+    abs_error,rel_error,matched,failure_reason,threshold_version,reviewer,sampled_at)
+   values($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15)
+   on conflict (domain,subject_key,metric,(coalesce(period_end, date '0001-01-01')))
+   do update set stored_value=excluded.stored_value, primary_value=excluded.primary_value,
+     primary_source=excluded.primary_source, primary_url=excluded.primary_url,
+     abs_error=excluded.abs_error, rel_error=excluded.rel_error, matched=excluded.matched,
+     failure_reason=excluded.failure_reason, threshold_version=excluded.threshold_version,
+     reviewer=excluded.reviewer, sampled_at=excluded.sampled_at"""
+
+
+async def record_reconciliation(
+    pool: asyncpg.Pool, report: ReconciliationReport, *, now: dt.datetime | None = None
+) -> int:
+    """Store the primary-source samples of `report` - and only those.
+
+    The caller supplies what a person read from the primary source.  What the app stored is NOT
+    taken from the caller: every `stored_value` is re-read here from the app's own tables and
+    every sample is judged again against the report's threshold, so a hand-written stored value
+    cannot turn a mismatch into a pass.  A sample without a reviewer, source or url, with a
+    non-finite primary value or a future `sampled_at` rejects the whole report (nothing is
+    written).  Re-sampling the same (domain, subject, metric, period) replaces the earlier
+    sample instead of adding a second copy."""
+    now = now or dt.datetime.now(dt.UTC)
+    samples = [r.sample for r in report.results]
+    for sample in samples:
+        validate_sample(sample, now=now)
+    resolved = await resolve_stored_values(pool, samples, recompute=True)
+    judged = [compare_sample(s, report.threshold) for s in resolved]
     async with pool.acquire() as conn, conn.transaction():
-        for r in report.results:
+        for r in judged:
             s = r.sample
             await conn.execute(
-                """insert into public.reconciliation_sample
-                   (domain,subject_key,metric,period_end,stored_value,primary_value,
-                    primary_source,primary_url,abs_error,rel_error,matched,failure_reason,
-                    threshold_version,reviewer)
-                   values($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14)""",
+                _UPSERT_SAMPLE,
                 s.domain,
                 s.subject_key,
                 s.metric,
@@ -355,38 +438,76 @@ async def record_reconciliation(pool: asyncpg.Pool, report: ReconciliationReport
                 r.reason,
                 report.threshold.version,
                 s.reviewer,
+                s.sampled_at or now,
             )
-    return report.sample_count
+    return len(judged)
+
+
+async def record_primary_samples(
+    pool: asyncpg.Pool,
+    domain: Domain,
+    samples: Sequence[PrimarySample],
+    *,
+    now: dt.datetime | None = None,
+) -> ReconciliationReport:
+    """Judge and record primary-source samples of one domain against the active threshold."""
+    threshold = await load_threshold(pool, domain)
+    report = reconcile_samples(samples, threshold)
+    await record_reconciliation(pool, report, now=now)
+    return report
 
 
 async def domain_gate(
     pool: asyncpg.Pool, domain: Domain, *, now: dt.datetime | None = None
 ) -> GateDecision:
     """Decide from recorded samples that are recent enough and were judged against the
-    currently active threshold version (older judgements are re-evaluated from the stored
-    errors, so tightening a limit takes effect without re-sampling)."""
+    currently active threshold version.
+
+    Every sample is re-judged here from its stored and primary values (not from the stored
+    error columns), so tightening a limit takes effect without re-sampling and a hand-edited
+    error column cannot hide a mismatch.  Samples dated in the future, or recorded without a
+    reviewer, primary source or url, are ignored.  `min_samples` counts distinct subjects."""
     threshold = await load_threshold(pool, domain)
     now = now or dt.datetime.now(dt.UTC)
     since = now - dt.timedelta(days=threshold.max_sample_age_days)
     rows = await pool.fetch(
-        """select subject_key, metric, period_end, abs_error, rel_error, stored_value
+        """select subject_key, metric, period_end, stored_value, primary_value, sampled_at,
+                  coalesce(btrim(reviewer), '') <> ''
+                  and coalesce(btrim(primary_source), '') <> ''
+                  and coalesce(btrim(primary_url), '') <> '' as attributed
              from public.reconciliation_sample
             where domain = $1 and sampled_at >= $2""",
         domain,
         since,
     )
     failures = 0
+    counted = 0
+    excluded = 0
+    subjects: set[str] = set()
     for row in rows:
+        if row["sampled_at"] > now + CLOCK_SKEW or not row["attributed"]:
+            excluded += 1
+            continue
+        counted += 1
+        subjects.add(row["subject_key"])
+        primary = row["primary_value"]
         sample = PrimarySample(
-            domain, row["subject_key"], row["metric"], Decimal(0), "recorded", None
+            domain,
+            row["subject_key"],
+            row["metric"],
+            None if primary is None else Decimal(primary),
+            "recorded",
+            None,
+            row["period_end"],
+            row["stored_value"],
         )
-        result = (
-            judge(sample, threshold, row["abs_error"], row["rel_error"])
-            if row["stored_value"] is not None
-            else SampleResult(sample, False, None, None, "no stored value")
-        )
-        failures += 0 if result.matched else 1
-    return decide(domain, threshold, len(rows), failures)
+        if sample.primary_value is None or not sample.primary_value.is_finite():
+            failures += 1
+            continue
+        failures += 0 if compare_sample(sample, threshold).matched else 1
+    return decide(
+        domain, threshold, counted, failures, subject_count=len(subjects), excluded=excluded
+    )
 
 
 async def require_domain_gate(
@@ -420,11 +541,15 @@ def _num(value: object) -> Decimal | None:
 
 
 async def resolve_stored_values(
-    pool: asyncpg.Pool, samples: Sequence[PrimarySample]
+    pool: asyncpg.Pool, samples: Sequence[PrimarySample], *, recompute: bool = False
 ) -> list[PrimarySample]:
-    """Fill `stored_value` from the app's own tables for samples that did not supply one.
+    """Fill `stored_value` from the app's own tables.
 
-    subject_key formats: prices `SYMBOL` (metric `close`), corporate_actions
+    By default only for samples that did not supply one; with `recompute=True` a supplied value
+    is discarded and always re-read (what `record_reconciliation` does).
+
+    subject_key formats: prices `SYMBOL:source:bar_type` or a bare `SYMBOL` that has a single
+    stored bar that day (metric `close`), corporate_actions
     `SYMBOL:action_type` (metric `ratio`|`cash_amount`, period_end = ex-date), statements
     `TICKER` (metric = concept), fund_weights `SNAPSHOT_ID:ISIN` (metric `weight_pct`),
     macro `SOURCE:SERIES:GEO` (metric `value`), patents `FAMILY_KEY` (metric
@@ -432,7 +557,8 @@ async def resolve_stored_values(
     `stored_value=None` and therefore fails - it is never skipped."""
     out: list[PrimarySample] = []
     for s in samples:
-        stored = s.stored_value if s.stored_value is not None else await _resolve_one(pool, s)
+        keep = s.stored_value is not None and not recompute
+        stored = s.stored_value if keep else await _resolve_one(pool, s)
         out.append(
             PrimarySample(
                 s.domain,
@@ -444,6 +570,7 @@ async def resolve_stored_values(
                 s.period_end,
                 stored,
                 s.reviewer,
+                s.sampled_at,
             )
         )
     return out
@@ -451,14 +578,30 @@ async def resolve_stored_values(
 
 async def _resolve_one(pool: asyncpg.Pool, s: PrimarySample) -> Decimal | None:
     if s.domain == "prices" and s.period_end:
-        return _num(
-            await pool.fetchval(
-                "select close from public.price_bar where symbol=$1 and date=$2"
-                " order by fetched_at desc limit 1",
+        # `SYMBOL:source:bar_type` names exactly which stored bar is being checked.  A bare
+        # `SYMBOL` resolves only when one source/basis holds that day: with several (stooq raw
+        # and adjusted, a fallback provider ...) the comparison would silently pick one, so the
+        # sample stays unresolved and fails instead of passing against the wrong series.
+        parts = s.subject_key.split(":")
+        if len(parts) == 3:
+            return _num(
+                await pool.fetchval(
+                    "select close from public.price_bar where symbol=$1 and date=$2"
+                    " and source=$3 and bar_type=$4",
+                    parts[0],
+                    s.period_end,
+                    parts[1],
+                    parts[2],
+                )
+            )
+        if len(parts) == 1:
+            bars = await pool.fetch(
+                "select close from public.price_bar where symbol=$1 and date=$2 limit 2",
                 s.subject_key,
                 s.period_end,
             )
-        )
+            return _num(bars[0]["close"]) if len(bars) == 1 else None
+        return None
     if s.domain == "corporate_actions" and s.period_end and ":" in s.subject_key:
         symbol, action = s.subject_key.split(":", 1)
         column = {"ratio": "ratio", "cash_amount": "cash_amount"}.get(s.metric)

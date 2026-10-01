@@ -656,12 +656,23 @@ def _shares_dict(row: asyncpg.Record | None) -> dict[str, Any] | None:
 # ---------------------------------------------------------------------------
 
 
+def _transient(exc: Exception) -> bool:
+    """A download failure worth retrying (not a plain 404: the file is not there)."""
+    return "HTTP 404" not in str(exc)
+
+
 async def _load_xml(edgar: EdgarClient, filing: Filing) -> tuple[bytes, str] | None:
-    """The filing's structured XML, or None for a legacy text/HTML filing."""
+    """The filing's structured XML, or None for a legacy text/HTML filing.
+
+    A failed download is an error (raised), never "unstructured": that verdict is remembered,
+    so a network blip must not turn a structured filing into a permanent skip."""
+    failures: list[Exception] = []
     try:
         names = await edgar.filing_files(filing)
-    except (EdgarError, httpx.HTTPError):
+    except (EdgarError, httpx.HTTPError) as exc:
         names = []
+        if _transient(exc):
+            failures.append(exc)
     candidates = [filing.primary_document, *names]
     seen: set[str] = set()
     for name in candidates:
@@ -671,11 +682,15 @@ async def _load_xml(edgar: EdgarClient, filing: Filing) -> tuple[bytes, str] | N
         url = filing.url(name)
         try:
             body = await edgar.document(url, max_bytes=8 * 1024 * 1024)
-        except (EdgarError, httpx.HTTPError):
+        except (EdgarError, httpx.HTTPError) as exc:
+            if _transient(exc):
+                failures.append(exc)
             continue
         lowered = body.lower()
         if b"schedule13" in lowered or b"13d" in lowered[:4000] or b"13g" in lowered[:4000]:
             return body, url
+    if failures:
+        raise EdgarError(f"{filing.accession}: download failed ({failures[0]})")
     return None
 
 
@@ -695,7 +710,9 @@ async def collect_control_stakes(
         "stored": 0,
         "unstructured_skipped": 0,
         "not_held_skipped": 0,
+        "already_skipped": 0,
         "parse_failed": 0,
+        "failed": 0,
     }
     start = since or dt.date.today() - dt.timedelta(days=365 * 2)
     seen: dict[str, Filing] = {}
@@ -712,29 +729,106 @@ async def collect_control_stakes(
         counts["candidates"] = len(seen)
         step.detail["candidates"] = len(seen)
     async with ctx.step("store-filings") as step:
+        skipped = await _skipped(ctx.pool, list(seen))
+        failures: list[dict[str, str]] = []
         for accession, filing in sorted(seen.items(), key=lambda kv: (kv[1].filing_date, kv[0])):
             if await ctx.pool.fetchval(
                 "select exists(select 1 from public.control_stake_filing where accession = $1)",
                 accession,
             ):
                 continue
-            loaded = await _load_xml(edgar, filing)
-            if loaded is None:
-                counts["unstructured_skipped"] += 1
+            previous = skipped.get(accession)
+            if previous is not None and not _worth_retrying(previous, held):
+                counts["already_skipped"] += 1
                 continue
-            body, url = loaded
+            # One bad filing is recorded and skipped; it never aborts the run (B35).
             try:
-                parsed = parse_schedule13_xml(body, filing.form)
-            except Schedule13Error:
-                counts["parse_failed"] += 1
-                continue
-            tickers = await store_filing(ctx.pool, filing, parsed, url, body, held)
-            if tickers:
-                counts["stored"] += 1
-            else:
-                counts["not_held_skipped"] += 1
+                loaded = await _load_xml(edgar, filing)
+                if loaded is None:
+                    counts["unstructured_skipped"] += 1
+                    await _record_skip(ctx.pool, filing, "unstructured", None)
+                    continue
+                body, url = loaded
+                try:
+                    parsed = parse_schedule13_xml(body, filing.form)
+                except Schedule13Error as exc:
+                    counts["parse_failed"] += 1
+                    await _record_skip(ctx.pool, filing, "parse_failed", None, detail=str(exc))
+                    continue
+                tickers = await store_filing(ctx.pool, filing, parsed, url, body, held)
+                if tickers:
+                    counts["stored"] += 1
+                    await ctx.pool.execute(
+                        "delete from public.control_stake_skipped_filing where accession = $1",
+                        accession,
+                    )
+                else:
+                    counts["not_held_skipped"] += 1
+                    await _record_skip(ctx.pool, filing, "not_held", parsed)
+            except (EdgarError, httpx.HTTPError, ValueError, asyncpg.PostgresError) as exc:
+                counts["failed"] += 1
+                failures.append(
+                    {"accession": accession, "error": f"{type(exc).__name__}: {exc}"[:300]}
+                )
         step.detail.update(counts)
+        if failures:
+            step.detail["failures"] = failures[:50]
     return counts
+
+
+RETRY_PARSE_AFTER = dt.timedelta(days=7)
+MAX_PARSE_ATTEMPTS = 3
+
+
+async def _skipped(pool: asyncpg.Pool, accessions: list[str]) -> dict[str, asyncpg.Record]:
+    rows = await pool.fetch(
+        "select accession, reason, issuer_cik, issuer_cusip, attempts, last_checked_at"
+        " from public.control_stake_skipped_filing where accession = any($1::text[])",
+        accessions,
+    )
+    return {r["accession"]: r for r in rows}
+
+
+def _worth_retrying(skip: asyncpg.Record, held: HeldIssuers) -> bool:
+    """Whether a filing skipped earlier needs a new download.
+
+    An unstructured (pre-XML) filing never changes. A filing of an issuer that was not held is
+    only re-read once the issuer is held. A parse failure is retried a few times, a week
+    apart (the SEC occasionally corrects a filing)."""
+    reason = skip["reason"]
+    if reason == "unstructured":
+        return False
+    if reason == "not_held":
+        return bool(held.tickers_for(skip["issuer_cik"], skip["issuer_cusip"]))
+    age = dt.datetime.now(dt.UTC) - skip["last_checked_at"]
+    return bool(skip["attempts"] < MAX_PARSE_ATTEMPTS and age >= RETRY_PARSE_AFTER)
+
+
+async def _record_skip(
+    pool: asyncpg.Pool,
+    filing: Filing,
+    reason: str,
+    parsed: Schedule13Filing | None,
+    *,
+    detail: str | None = None,
+) -> None:
+    await pool.execute(
+        """insert into public.control_stake_skipped_filing
+             (accession, form, filed, reason, detail, issuer_cik, issuer_cusip)
+           values ($1,$2,$3,$4,$5,$6,$7)
+           on conflict (accession) do update set reason = excluded.reason,
+             detail = excluded.detail, issuer_cik = excluded.issuer_cik,
+             issuer_cusip = excluded.issuer_cusip,
+             attempts = public.control_stake_skipped_filing.attempts + 1,
+             last_checked_at = now()""",
+        filing.accession,
+        filing.form,
+        filing.filing_date,
+        reason,
+        (detail or "")[:500] or None,
+        parsed.issuer_cik if parsed else None,
+        parsed.issuer_cusip if parsed else None,
+    )
 
 
 async def control_stakes_handler(ctx: JobContext) -> None:

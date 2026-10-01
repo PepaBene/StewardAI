@@ -18,7 +18,8 @@ import asyncpg
 from pydantic import BaseModel, Field
 
 from steward.data_context.common import Gap, as_json, cutoff, to_date
-from steward.free_source_reads import business_network_payload
+from steward.free_source_reads import business_network_payload, has_table, status_as_of_sql
+from steward.geo_codes import has_column
 from steward.ownership.control_stakes_read import (
     ControlStakeOut,
     holding_control_stakes,
@@ -195,6 +196,10 @@ class ConsensusVintage(BaseModel):
 
 
 class ConsensusSeries(BaseModel):
+    provider: str | None = Field(
+        default=None, description="One series per provider: providers are never mixed."
+    )
+    currency: str | None = None
     metric: str
     fiscal_period: str
     vintages: list[ConsensusVintage] = Field(description="Oldest first; none overwritten.")
@@ -430,7 +435,9 @@ async def insider(pool: asyncpg.Pool, ticker: str, as_of: dt.datetime | None = N
 async def dependencies(
     pool: asyncpg.Pool, ticker: str, as_of: dt.datetime | None = None
 ) -> Dependencies:
-    payload = await business_network_payload(pool, ticker, cutoff(as_of))
+    payload = await business_network_payload(
+        pool, ticker, cutoff(as_of), historical=as_of is not None
+    )
     out: list[Dependency] = []
     excluded = 0
     for e in payload["edges"]:
@@ -503,17 +510,26 @@ async def dependencies(
     )
 
 
+def _deal_order(e: DealEvent) -> tuple[dt.date, dt.datetime, int]:
+    """Event time first (effective, else announced, else the day it became known), then the
+    time it became known, then the id: an undated event is placed by when it was learned
+    instead of before every dated one."""
+    return (e.effective_at or e.announced_at or e.known_at.date(), e.known_at, e.event_id)
+
+
 async def deals(pool: asyncpg.Pool, ticker: str, as_of: dt.datetime | None = None) -> Deals:
     when = cutoff(as_of)
+    log = await has_table(pool, "graph_status_log")
+    decided = await has_column(pool, "company_event", "decided_at")
+    status = status_as_of_sql("company_event", "ev", "$2", log=log, decided=decided)
     rows = await pool.fetch(
-        """select ev.id,ev.event_type,ev.event_state,ev.status,ev.announced_at,ev.effective_at,
-                  ev.known_at,ev.counterparty_key,ev.source,ev.source_url,ev.terms,ev.detail,
-                  e.quote
+        f"""select ev.id,ev.event_type,ev.event_state,{status} as status,ev.announced_at,
+                  ev.effective_at,ev.known_at,ev.counterparty_key,ev.source,ev.source_url,
+                  ev.terms,ev.detail,e.quote
            from public.company_event ev
            left join public.source_evidence e on e.id=ev.evidence_id
            where ev.ticker=$1 and ev.event_type in ('deal','financing') and ev.known_at <= $2
-           order by coalesce(ev.counterparty_key,ev.source_url),
-                    coalesce(ev.effective_at,ev.announced_at) nulls first,ev.known_at,ev.id""",
+           order by coalesce(ev.counterparty_key,ev.source_url),ev.known_at,ev.id""",  # noqa: S608 - the status fragment is built from constants
         ticker,
         when,
     )
@@ -546,8 +562,9 @@ async def deals(pool: asyncpg.Pool, ticker: str, as_of: dt.datetime | None = Non
         )
     states: list[DealState] = []
     for key, events in grouped.items():
+        events.sort(key=_deal_order)
         confirmed = [e for e in events if e.status == "confirmed"]
-        current = confirmed[-1] if confirmed else None
+        current = max(confirmed, key=_deal_order) if confirmed else None
         states.append(
             DealState(
                 deal_key=key,
@@ -583,9 +600,13 @@ async def consensus(pool: asyncpg.Pool, ticker: str, as_of: dt.datetime | None =
         ticker,
         when,
     )
-    grouped: dict[tuple[str, str], list[ConsensusVintage]] = {}
+    # A series is one provider's estimates in one currency: a revision is never computed
+    # across providers (or currencies).
+    grouped: dict[tuple[str | None, str | None, str, str], list[ConsensusVintage]] = {}
     for r in rows:
-        grouped.setdefault((r["metric"], r["fiscal_period"]), []).append(
+        grouped.setdefault(
+            (r["provider"], r["currency"], r["metric"], r["fiscal_period"]), []
+        ).append(
             ConsensusVintage(
                 observation_id=r["id"],
                 provider=r["provider"],
@@ -603,7 +624,7 @@ async def consensus(pool: asyncpg.Pool, ticker: str, as_of: dt.datetime | None =
             )
         )
     series: list[ConsensusSeries] = []
-    for (metric, period), vintages in grouped.items():
+    for (provider, currency, metric, period), vintages in grouped.items():
         revision: Decimal | None = None
         inputs: list[int] = []
         if len(vintages) >= 2:
@@ -613,6 +634,8 @@ async def consensus(pool: asyncpg.Pool, ticker: str, as_of: dt.datetime | None =
                 revision = last.value - prev.value
         series.append(
             ConsensusSeries(
+                provider=provider,
+                currency=currency,
                 metric=metric,
                 fiscal_period=period,
                 vintages=vintages,

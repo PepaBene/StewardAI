@@ -1,0 +1,35 @@
+{
+ "data": {
+  "type": "lei-records",
+  "id": "5299000NEWCO00000002",
+  "attributes": {
+   "lei": "5299000NEWCO00000002",
+   "entity": {
+    "legalName": {
+     "name": "Acquirer plc",
+     "language": "de"
+    },
+    "otherNames": [],
+    "jurisdiction": "DE",
+    "legalForm": {
+     "id": "SGST"
+    },
+    "category": "GENERAL",
+    "headquartersAddress": {
+     "country": "DE",
+     "city": "Walldorf"
+    },
+    "legalAddress": {
+     "country": "DE",
+     "city": "Walldorf"
+    },
+    "status": "ACTIVE"
+   },
+   "registration": {
+    "status": "ISSUED",
+    "initialRegistrationDate": "2014-03-01T00:00:00Z",
+    "nextRenewalDate": "2027-03-01T00:00:00Z"
+   }
+  }
+ }
+}

@@ -169,10 +169,14 @@ def test_macro_provider_parsers_and_trade_metrics() -> None:
         }
     )
     metrics = trade_metrics(trade)
-    assert metrics["growth"] == Decimal("1.5")
-    assert metrics["partner_concentration"] == Decimal("0.52")
+    # Flows are never blended (audit C): growth and concentration are per flow, and a missing
+    # import flow is "unknown", not zero - the export share used to come out as 1 here.
+    assert metrics["export_growth"] == Decimal("1.5")
+    assert metrics["import_growth"] is None
+    assert metrics["export_partner_concentration"] == Decimal("0.52")
+    assert metrics["import_partner_concentration"] is None
     assert metrics["revealed_trade_dependence"] is None
-    assert metrics["export_share_of_two_way_trade"] == Decimal(1)
+    assert metrics["export_share_of_two_way_trade"] is None
     assert metrics["product_mix_change"] == Decimal(0)
 
 

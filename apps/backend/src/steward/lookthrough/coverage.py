@@ -30,6 +30,11 @@ Tier = Literal[
 ]
 SubjectKind = Literal["fund", "index"]
 
+# Retained snapshots count as usable constituent history only when there are enough of them
+# over a long enough span; two snapshots a week apart are not a history (audit C-low).
+MIN_HISTORY_SNAPSHOTS = 12
+MIN_HISTORY_DAYS = 180
+
 PROXY_CAVEAT = "constituents are the proxy fund's current holdings, not the official index history"
 
 
@@ -55,9 +60,11 @@ def derive_ledger(
     portfolio: PortfolioIn | None,
     latest_as_of: dict[str, dt.date],
     snapshot_counts: dict[str, int] | None = None,
+    earliest_as_of: dict[str, dt.date] | None = None,
 ) -> list[LedgerEntry]:
     """Ledger rows implied by the configuration and the stored snapshots."""
     counts = snapshot_counts or {}
+    earliest = earliest_as_of or {}
     entries: list[LedgerEntry] = []
     configured = {f.isin for f in settings.funds}
     for fund in settings.funds:
@@ -76,17 +83,26 @@ def derive_ledger(
             )
             continue
         n = counts.get(fund.isin, 1)
+        first = earliest.get(fund.isin)
+        span = (as_of - first).days if first is not None else 0
+        has_history = n >= MIN_HISTORY_SNAPSHOTS and span >= MIN_HISTORY_DAYS
         entries.append(
             LedgerEntry(
                 "fund",
                 fund.isin,
                 fund.label,
                 "issuer_downloadable",
-                f"{provider} publishes holdings for download; {n} dated snapshot(s) retained",
+                f"{provider} publishes holdings for download; {n} dated snapshot(s) retained over "
+                f"{span} days"
+                + (
+                    ""
+                    if has_history
+                    else f" (history needs {MIN_HISTORY_SNAPSHOTS}+ over {MIN_HISTORY_DAYS}+ days)"
+                ),
                 latest_holdings_as_of=as_of,
                 # Only retained snapshots are history we hold; the issuer's own history is
                 # not claimed.
-                historical_constituents=n > 1 or None,
+                historical_constituents=True if has_history else None,
             )
         )
     if portfolio is not None:
@@ -168,8 +184,8 @@ async def refresh_ledger(
     portfolio: PortfolioIn | None,
 ) -> list[LedgerEntry]:
     rows = await pool.fetch(
-        "select fund_isin, max(as_of) as as_of, count(*) as n from public.etf_snapshot"
-        " group by fund_isin"
+        "select fund_isin, max(as_of) as as_of, min(as_of) as first_as_of, count(*) as n"
+        " from public.etf_snapshot group by fund_isin"
     )
     entries = derive_ledger(
         settings,
@@ -177,9 +193,23 @@ async def refresh_ledger(
         portfolio,
         {r["fund_isin"]: r["as_of"] for r in rows},
         {r["fund_isin"]: r["n"] for r in rows},
+        {r["fund_isin"]: r["first_as_of"] for r in rows},
     )
     for entry in entries:
         await save_entry(pool, entry)
+    # Derived rows for subjects that are no longer configured, held or benchmarked are stale:
+    # remove them (owner-entered rows are never touched).
+    keep = {(e.subject_kind, e.subject_key) for e in entries}
+    for row in await pool.fetch(
+        "select subject_kind, subject_key from public.fund_index_coverage where origin = 'derived'"
+    ):
+        if (row["subject_kind"], row["subject_key"]) not in keep:
+            await pool.execute(
+                "delete from public.fund_index_coverage where subject_kind = $1"
+                " and subject_key = $2 and origin = 'derived'",
+                row["subject_kind"],
+                row["subject_key"],
+            )
     return entries
 
 

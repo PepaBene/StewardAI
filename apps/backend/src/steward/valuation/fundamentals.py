@@ -31,6 +31,13 @@ from typing import Any
 from pydantic import BaseModel, Field
 
 from steward.earnings.reconcile import CONCEPTS, REPORT_FORMS
+from steward.sources.xbrl_concepts import (
+    DEBT_EXTRA,
+    DEBT_PARTS,
+    DEBT_TOTAL,
+    STATEMENT_GROUP,
+    STATEMENT_ITEMS,
+)
 
 # The existing reconciliation's diluted EPS concepts: us-gaap first, then ifrs-full.
 EPS_CONCEPTS: list[str] = [f"{t}:{c}" for t, c in CONCEPTS["eps_diluted"]]
@@ -78,25 +85,29 @@ FLOW_CONCEPTS: dict[str, dict[str, list[str]]] = {
         "income_tax": ["ifrs-full:IncomeTaxExpenseContinuingOperations"],
     },
 }
+
+
+def _debt_concepts(taxonomy: str) -> list[str]:
+    """Every element that can be a debt component, from the shared concept catalog."""
+    return [
+        concept
+        for concept, group in STATEMENT_GROUP.items()
+        if group == "debt"
+        and STATEMENT_ITEMS[concept][0] == "balance_sheet"
+        and concept.startswith(f"{taxonomy}:")
+    ]
+
+
 BALANCE_CONCEPTS: dict[str, dict[str, list[str]]] = {
     "us-gaap": {
-        "debt": [
-            "us-gaap:LongTermDebt",
-            "us-gaap:LongTermDebtAndFinanceLeaseObligationsCurrent",
-            "us-gaap:LongTermDebtCurrent",
-            "us-gaap:LongTermDebtNoncurrent",
-        ],
+        "debt": _debt_concepts("us-gaap"),
         "cash": [
             "us-gaap:CashAndCashEquivalentsAtCarryingValue",
             "us-gaap:CashCashEquivalentsRestrictedCashAndRestrictedCashEquivalents",
         ],
     },
     "ifrs-full": {
-        "debt": [
-            "ifrs-full:Borrowings",
-            "ifrs-full:BorrowingsCurrent",
-            "ifrs-full:BorrowingsNoncurrent",
-        ],
+        "debt": _debt_concepts("ifrs-full"),
         "cash": ["ifrs-full:CashAndCashEquivalents"],
     },
 }
@@ -455,13 +466,20 @@ def choose_currency(available: Iterable[str], preferred: Sequence[str]) -> str |
 
 
 def _by_concept(facts: Iterable[Fact], concepts: Sequence[str]) -> list[Fact]:
-    """Facts of the first concept in `concepts` that has any."""
+    """Facts of the concept in `concepts` that reports the latest period (ties: the one listed
+    first). An old filing's `RevenueFromContract...` for FY2018 must not beat the `Revenues`
+    of FY2024 only because it is listed first (B27)."""
     pool = list(facts)
+    best: list[Fact] = []
+    best_end: dt.date | None = None
     for c in concepts:
         found = [f for f in pool if f.concept == c]
-        if found:
-            return found
-    return []
+        if not found:
+            continue
+        end = max(f.end for f in found)
+        if best_end is None or end > best_end:
+            best, best_end = found, end
+    return best
 
 
 def _figure(t: Ttm, currency: str) -> Figure:
@@ -515,6 +533,65 @@ def _balance_figure(
         method=f"reported balance at {chosen.end.isoformat()}",
         inputs=[_ref(chosen)],
     )
+
+
+def _debt_figure(facts: Sequence[Fact], taxonomy: str, preferred: Sequence[str]) -> Figure | None:
+    """Total debt at the latest balance-sheet date for which it can be built from the filing:
+    the total element (US GAAP `LongTermDebt`, IFRS `Borrowings`), else the non-current plus the
+    current portion, plus short-term borrowings and commercial paper where tagged. A date at
+    which only the current portion is tagged is skipped: it would report a fraction of the debt
+    as all of it (B27). Lease liabilities are not included."""
+    total_names = DEBT_TOTAL.get(taxonomy, ())
+    part_groups = DEBT_PARTS.get(taxonomy, ())
+    extra_groups = DEBT_EXTRA.get(taxonomy, ())
+    wanted = {n for n in total_names} | {n for g in (*part_groups, *extra_groups) for n in g}
+    pool = [
+        f
+        for f in facts
+        if f.start is None
+        and f.taxonomy == taxonomy
+        and "/" not in f.unit
+        and f.concept.split(":", 1)[1].lower() in wanted
+    ]
+    if not pool:
+        return None
+    currency = choose_currency({f.unit for f in pool}, preferred)
+    pool = [f for f in pool if f.unit == currency]
+
+    def at(end: dt.date, names: Iterable[str]) -> Fact | None:
+        for name in names:
+            found = [f for f in pool if f.end == end and f.concept.split(":", 1)[1].lower() == name]
+            if found:
+                return max(found, key=lambda f: (f.filed or dt.date.min, f.ref))
+        return None
+
+    for end in sorted({f.end for f in pool}, reverse=True):
+        used: list[Fact] = []
+        total = at(end, total_names)
+        if total is not None:
+            used.append(total)
+            how = f"reported {total.concept.split(':', 1)[1]}"
+        else:
+            parts = [at(end, group) for group in part_groups]
+            if not part_groups or parts[0] is None:
+                continue
+            used.extend(p for p in parts if p is not None)
+            how = " + ".join(p.concept.split(":", 1)[1] for p in used)
+        for group in extra_groups:
+            extra = at(end, group)
+            if extra is not None:
+                used.append(extra)
+                how += f" + {extra.concept.split(':', 1)[1]}"
+        value = sum((f.value for f in used), Decimal(0))
+        return Figure(
+            value=float(value),
+            currency=used[0].unit,
+            period_start=None,
+            period_end=end,
+            method=f"debt at {end.isoformat()}: {how}",
+            inputs=[_ref(f) for f in used],
+        )
+    return None
 
 
 def compute(
@@ -672,7 +749,7 @@ def _compute_basis(
         income_tax_ttm=_flow_figure(facts, flow.get("income_tax", []), financial_currency_order),
         equity_value=equity_value,
         equity_previous_value=equity_previous_value,
-        debt_value=_balance_figure(facts, balances.get("debt", []), financial_currency_order),
+        debt_value=_debt_figure(facts, taxonomy, financial_currency_order),
         cash_value=_balance_figure(facts, balances.get("cash", []), financial_currency_order),
     )
 

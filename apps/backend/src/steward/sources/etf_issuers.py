@@ -26,7 +26,6 @@ import asyncio
 import datetime as dt
 import json
 import re
-import xml.etree.ElementTree as ET
 from collections import Counter
 from collections.abc import Sequence
 from dataclasses import dataclass, field
@@ -36,6 +35,7 @@ from typing import Any, Literal
 import httpx
 
 from steward.lookthrough.classify import country_code, currency_of, normalize_sector
+from steward.sources.xml_guard import safe_fromstring
 
 Provider = Literal["ishares", "vanguard"]
 SourceName = Literal["ishares_json", "ishares_spreadsheet", "vanguard_graphql"]
@@ -127,6 +127,13 @@ def _dec(value: Any) -> Decimal | None:
 def _pct(value: Any) -> Decimal | None:
     number = _dec(value)
     return None if number is None else number / 100
+
+
+def _weight_warning(names: list[str]) -> str:
+    """Rows dropped for a weight that is missing or not a number: they are weight the
+    snapshot does not account for, so the fund's rows may not reconcile to 100 %."""
+    shown = ", ".join(names[:5]) + (", ..." if len(names) > 5 else "")
+    return f"{len(names)} row(s) skipped: weight missing or unparseable ({shown})"
 
 
 def _text(value: Any) -> str | None:
@@ -264,9 +271,11 @@ def parse_ishares_holdings(body: Any, portfolio_id: str) -> FundSnapshot:
 
     rows: list[HoldingRow] = []
     unknown_countries: Counter[str] = Counter()
+    unparseable: list[str] = []
     for i in range(n):
         weight = _pct(weights[i])
         if weight is None:
+            unparseable.append(_text(names[i]) or f"row {i}")
             continue
         country_raw = _text(cell("countryOfRisk", i))
         country = country_code(country_raw)
@@ -296,6 +305,8 @@ def parse_ishares_holdings(body: Any, portfolio_id: str) -> FundSnapshot:
         )
     if unknown_countries:
         warnings.append(f"unmapped countries: {dict(unknown_countries)}")
+    if unparseable:
+        warnings.append(_weight_warning(unparseable))
     return FundSnapshot(
         provider="ishares",
         portfolio_id=portfolio_id,
@@ -441,13 +452,10 @@ _SS = "{urn:schemas-microsoft-com:office:spreadsheet}"
 
 
 def _sheet_rows(text: str, sheet: str) -> list[list[str]]:
-    head = text[:4096].lower()
-    if "<!doctype" in head or "<!entity" in text.lower():
-        raise IssuerSchemaError("iShares fund download: DTD/entity declarations refused")
     try:
-        root = ET.fromstring(text)  # noqa: S314 - no DTD (checked above), no entities
-    except ET.ParseError as exc:
-        raise IssuerSchemaError(f"iShares fund download: not SpreadsheetML ({exc})") from exc
+        root = safe_fromstring(text, IssuerSchemaError)
+    except IssuerSchemaError as exc:
+        raise IssuerSchemaError(f"iShares fund download: {exc}") from exc
     for ws in root.iter(f"{_SS}Worksheet"):
         if ws.get(f"{_SS}Name") != sheet:
             continue
@@ -490,11 +498,17 @@ def parse_ishares_spreadsheet(text: str, portfolio_id: str) -> FundSnapshot:
         return _text(cells[i]) if i is not None and i < len(cells) else None
 
     out: list[HoldingRow] = []
+    unparseable: list[str] = []
     for cells in rows[header_at + 1 :]:
         if not any(cells):
             break
-        weight = _pct(get(cells, "Weight (%)"))
+        raw_weight = get(cells, "Weight (%)")
+        weight = _pct(raw_weight)
         if weight is None:
+            # A footer line has no weight cell at all; a weight cell that is present but not a
+            # number is a lost row.
+            if raw_weight is not None and raw_weight != "-":
+                unparseable.append(get(cells, "Name") or raw_weight)
             continue
         asset = _text(get(cells, "Asset Class"))
         asset_class = _ishares_asset_class(asset)
@@ -522,6 +536,9 @@ def parse_ishares_spreadsheet(text: str, portfolio_id: str) -> FundSnapshot:
         )
     if not out:
         raise IssuerSchemaError("iShares fund download: Holdings sheet has no rows")
+    sheet_warnings = ["fund download has no country or ISIN column (weights rounded to 0.01%)"]
+    if unparseable:
+        sheet_warnings.append(_weight_warning(unparseable))
     return FundSnapshot(
         provider="ishares",
         portfolio_id=portfolio_id,
@@ -533,7 +550,7 @@ def parse_ishares_spreadsheet(text: str, portfolio_id: str) -> FundSnapshot:
         currency_basis="issuer",
         rows=out,
         raw_text=text,
-        warnings=["fund download has no country or ISIN column (weights rounded to 0.01%)"],
+        warnings=sheet_warnings,
     )
 
 
@@ -752,6 +769,7 @@ def parse_vanguard(
 
     rows: list[HoldingRow] = []
     dates: Counter[dt.date] = Counter()
+    unparseable: list[str] = []
     for body in pages:
         holdings = _path(body, ["data", "borHoldings"], "Vanguard borHoldings")
         page = _path(holdings[0], ["holdings"], "Vanguard borHoldings")
@@ -763,6 +781,9 @@ def parse_vanguard(
                 continue
             weight = _pct(item.get("marketValuePercentage"))
             if weight is None:
+                unparseable.append(
+                    _text(item.get("issuerName")) or _text(item.get("isin")) or "unnamed row"
+                )
                 continue
             effective = _ymd(item.get("effectiveDate"))
             if effective:
@@ -803,6 +824,8 @@ def parse_vanguard(
     as_of = dates.most_common(1)[0][0] if dates else vanguard_as_of(fund_body)
     if as_of is None:
         raise IssuerSchemaError(f"{what}: no effectiveDate or allocation date")
+    if unparseable:
+        warnings.append(_weight_warning(unparseable))
     if len(dates) > 1:
         warnings.append(f"holdings carry several effective dates: {sorted(map(str, dates))}")
     table_as_of = vanguard_as_of(fund_body)

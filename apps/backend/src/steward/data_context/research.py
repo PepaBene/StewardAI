@@ -11,6 +11,7 @@ is stored or computed here; explanations and uncertainty wording belong to the w
 from __future__ import annotations
 
 import datetime as dt
+import re
 from decimal import Decimal
 from typing import Any, Literal
 
@@ -24,6 +25,7 @@ from steward.free_source_reads import (
     forward_rows,
     patent_trend_rows,
 )
+from steward.geo_codes import has_iso_columns, reporter_codes, reporter_match_sql
 
 Domain = Literal[
     "macro",
@@ -37,7 +39,11 @@ Domain = Literal[
 
 
 class Claim(BaseModel):
-    claim_id: str = Field(description="Stable id such as macro:123; cite it, never the number.")
+    claim_id: str = Field(
+        description="Stable id built from the record's natural key (series, geography, period; "
+        "never a row id, which changes when the same value is fetched again); cite it, never "
+        "the number."
+    )
     domain: Domain
     subject: str
     metric: str
@@ -69,6 +75,11 @@ class ResearchContext(BaseModel):
         "Stored observations only, latest record known by the cutoff; changes are latest "
         "minus the previous period of the same series. No figure is estimated here."
     )
+
+
+def _slug(*parts: object) -> str:
+    """A claim-id segment list: parts joined by `:`, each reduced to a stable token."""
+    return ":".join(re.sub(r"[^A-Za-z0-9.%+-]+", "_", "" if p is None else str(p)) for p in parts)
 
 
 def _claim(**kw: Any) -> Claim:
@@ -108,7 +119,7 @@ async def country_context(
         )
         claims.append(
             _claim(
-                claim_id=f"macro:{latest['id']}",
+                claim_id="macro:" + _slug(series_id, source, unit, geography, latest["period"]),
                 domain="macro",
                 subject=geography,
                 metric=series_id,
@@ -126,23 +137,34 @@ async def country_context(
                 ),
             )
         )
+    # Comtrade stores reporters as M49 numbers (US = 842); `geography` is ISO alpha-2.
+    codes = reporter_codes(geography)
+    reporter_filter = reporter_match_sql(await has_iso_columns(pool), 1)
     trade = await pool.fetch(
-        """with latest as (
+        f"""with latest as (
              select distinct on (reporter,partner,flow,hs_revision,hs_code,period)
                     id,reporter,partner,flow,hs_revision,hs_code,period,trade_value,known_at,
                     source_url
-             from public.trade_observation where reporter=$1 and known_at <= $2
+             from public.trade_observation where {reporter_filter} and known_at <= $2
              order by reporter,partner,flow,hs_revision,hs_code,period,known_at desc
            )
            select * from latest where period=(select max(period) from latest)
-           order by trade_value desc nulls last,hs_code,partner,flow limit 10""",
-        geography,
+           order by trade_value desc nulls last,hs_code,partner,flow limit 10""",  # noqa: S608 - the filter is built from constants
+        codes,
         when,
     )
     for r in trade:
         claims.append(
             _claim(
-                claim_id=f"trade:{r['id']}",
+                claim_id="trade:"
+                + _slug(
+                    r["reporter"],
+                    r["partner"],
+                    r["flow"],
+                    r["hs_revision"],
+                    r["hs_code"],
+                    r["period"],
+                ),
                 domain="trade",
                 subject=geography,
                 metric=f"trade_{r['flow']}",
@@ -193,7 +215,15 @@ async def industry_context(
     )
     claims = [
         _claim(
-            claim_id=f"trade:{r['id']}",
+            claim_id="trade:"
+            + _slug(
+                r["reporter"],
+                r["partner"],
+                r["flow"],
+                r["hs_revision"],
+                r["hs_code"],
+                r["period"],
+            ),
             domain="trade",
             subject=f"HS {hs_code}",
             metric=f"trade_{r['flow']}",
@@ -243,11 +273,13 @@ async def company_context(
     when = cutoff(as_of)
     claims: list[Claim] = []
     facts = await financial_history_rows(pool, ticker, when)
-    seen: set[tuple[str, dt.date]] = set()
+    seen: set[tuple[str, dt.date | None, dt.date, str, str | None]] = set()
     for f in facts:  # newest period first, latest revision first within a period
         if f["statement"] == "note" or f["value"] is None or as_json(f["dimensions"]):
             continue
-        key = (f["concept"], f["period_end"])
+        # A 3-month and a 6-month fact, or one in USD and one in EUR, ending on the same day
+        # are different facts: the period start, unit and currency are part of the key.
+        key = (f["concept"], f["period_start"], f["period_end"], f["unit"], f["currency"])
         if key in seen:
             continue
         seen.add(key)
@@ -255,7 +287,15 @@ async def company_context(
             continue
         claims.append(
             _claim(
-                claim_id=f"financial:{f['id']}",
+                claim_id="financial:"
+                + _slug(
+                    ticker,
+                    f["concept"],
+                    f["period_start"],
+                    f["period_end"],
+                    f["unit"],
+                    f["currency"],
+                ),
                 domain="financial",
                 subject=ticker,
                 metric=f["concept"],
@@ -271,17 +311,21 @@ async def company_context(
             )
         )
     forward = await forward_rows(pool, ticker, when)
-    latest_forward: dict[tuple[str, str, str], dict[str, Any]] = {}
-    for fr in forward:  # known_at descending within metric, period
-        latest_forward.setdefault((fr["kind"], fr["metric"], fr["fiscal_period"]), fr)
-    for (kind, metric, period), fr in sorted(latest_forward.items())[:10]:
+    latest_forward: dict[tuple[str, str, str, str], dict[str, Any]] = {}
+    for fr in forward:  # known_at descending within provider, metric, period
+        # One latest observation per provider: two providers' estimates are not one series.
+        latest_forward.setdefault(
+            (fr["kind"], fr["provider"] or "", fr["metric"], fr["fiscal_period"]), fr
+        )
+    for (kind, provider, metric, period), fr in sorted(latest_forward.items())[:10]:
         claims.append(
             _claim(
-                claim_id=f"forward:{fr['id']}",
+                claim_id="forward:" + _slug(ticker, kind, provider, metric, period),
                 domain="forward",
                 subject=ticker,
                 metric=metric,
-                label=f"{kind.replace('_', ' ')} {metric} {period}",
+                label=f"{kind.replace('_', ' ')} {metric} {period}"
+                + (f" ({provider})" if provider else ""),
                 value=fr["value"],
                 unit=None,
                 currency=fr["currency"],
@@ -301,7 +345,8 @@ async def company_context(
         seen_metric.add(mk)
         claims.append(
             _claim(
-                claim_id=f"company_research:{r['id']}",
+                claim_id="company_research:"
+                + _slug(ticker, r["provider"], r["dataset"], r["metric"], r["period_end"]),
                 domain="company_research",
                 subject=ticker,
                 metric=r["metric"],
@@ -381,15 +426,27 @@ async def company_context(
     return ResearchContext(scope="company", subject=ticker, as_of=when, claims=claims, gaps=gaps)
 
 
+def _shown(value: Decimal) -> str:
+    """A value for a sentence: two decimals for ordinary magnitudes, enough significant digits
+    for small ones (0.004 stays 0.004, it is never rounded to 0)."""
+    if value == 0:
+        return "0"
+    magnitude = abs(value)
+    if magnitude >= 1:
+        text = f"{value:,.2f}".rstrip("0").rstrip(".") if value % 1 else f"{value:,.0f}"
+        return text
+    if magnitude >= Decimal("0.01"):
+        return f"{value:.4f}".rstrip("0").rstrip(".")
+    # Four significant digits, in plain notation.
+    exponent = magnitude.adjusted()
+    quantum = Decimal(1).scaleb(exponent - 3)
+    return f"{value.quantize(quantum):f}".rstrip("0").rstrip(".")
+
+
 def claim_sentence(claim: Claim) -> str:
     """One deterministic sentence for a report: label, value, period, source and known date."""
     if claim.value is not None:
-        shown = (
-            f"{claim.value:,.2f}".rstrip("0").rstrip(".")
-            if claim.value % 1
-            else f"{claim.value:,.0f}"
-        )
-        value = f"{shown} {claim.unit or claim.currency or ''}".strip()
+        value = f"{_shown(claim.value)} {claim.unit or claim.currency or ''}".strip()
     else:
         value = claim.text_value or "no value"
     when = f" for {claim.period}" if claim.period else ""

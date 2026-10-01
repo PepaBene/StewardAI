@@ -109,7 +109,9 @@ def test_plan_flag_is_only_what_the_form_states() -> None:
     text = "Sold under a Rule 10b5-1 trading plan adopted on March 3, 2026."
     flag = plan_flag(text, None)
     assert (flag.plan, flag.basis, flag.adopted) == (True, "footnote", dt.date(2026, 3, 3))
-    assert plan_flag(None, True).basis == "form_checkbox"
+    # A filing-wide check box cannot say which row was planned: possible, never per-row True.
+    boxed = plan_flag(None, True)
+    assert boxed.basis == "form_checkbox" and boxed.plan is None and boxed.possible
     assert plan_flag(None, False).plan is False
     unknown = plan_flag("Held by the trust.", None)
     assert unknown.plan is None and unknown.basis is None
@@ -117,6 +119,46 @@ def test_plan_flag_is_only_what_the_form_states() -> None:
     assert negative.plan is False and negative.basis == "footnote"
     iso = plan_flag("Rule 10b5-1 plan adopted on 2025-11-20.", None)
     assert iso.adopted == dt.date(2025, 11, 20)
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        "The reporting person has not adopted a Rule 10b5-1 plan.",
+        "Sale was not made pursuant to a Rule 10b5-1 trading plan.",
+        "No Rule 10b5-1 plan covers this sale.",
+        "Effected without a 10b5-1 plan.",
+        "Not effected under any Rule 10b5-1 trading arrangement.",
+    ],
+)
+def test_10b5_1_negations_are_never_true(text: str) -> None:
+    flag = plan_flag(text, True)
+    assert flag.plan is False and flag.basis == "footnote"
+
+
+def test_10b5_1_ambiguous_or_conflicting_mentions_are_unknown() -> None:
+    # A negation word the patterns cannot resolve must not read as an affirmative plan.
+    assert plan_flag("The Rule 10b5-1 plan was not modified.", None).plan is None
+    mixed = plan_flag(
+        "Sold under a 10b5-1 plan adopted May 1, 2025 | Not under a 10b5-1 plan", None
+    )
+    assert mixed.plan is None
+
+
+def test_plan_adoption_dates_and_code_case() -> None:
+    assert plan_flag("10b5-1 plan adopted on Mar. 1, 2026.", None).adopted == dt.date(2026, 3, 1)
+    assert plan_flag("10b5-1 plan adopted Sept. 4, 2025.", None).adopted == dt.date(2025, 9, 4)
+    assert plan_flag("10b5-1 plan adopted on march 3rd, 2026", None).adopted == dt.date(2026, 3, 3)
+    assert classify("s", derivative=False, footnote_text=None).economic_class == "open_market_sell"
+    assert classify(" p ", derivative=False, footnote_text=None).economic_class == "open_market_buy"
+    for phrase in (
+        "Shares sold to cover taxes upon vesting.",
+        "Sale to cover tax withholding on RSU vesting.",
+        "Sold in order to pay taxes due on vesting.",
+        "Sell-to-cover transaction.",
+    ):
+        got = classify("S", derivative=False, footnote_text=phrase)
+        assert got.economic_class == "tax_withholding", phrase
 
 
 # ---------------------------------------------------------------------------
@@ -158,7 +200,8 @@ def test_amendment_fields_and_checkbox() -> None:
     assert parsed.is_amendment and parsed.original_submission_date == dt.date(2026, 8, 12)
     assert parsed.aff10b5_one is True
     buy = next(r for r in parsed.rows if r.shares == Decimal(1000))
-    assert buy.rule_10b5_1_plan is True and buy.rule_10b5_1_basis == "form_checkbox"
+    # B33: the filing-wide box is "possible", never a per-row True.
+    assert buy.rule_10b5_1_plan is None and buy.rule_10b5_1_basis == "form_checkbox"
 
 
 def test_zero_shares_are_kept_not_replaced() -> None:
@@ -281,7 +324,7 @@ def test_planned_trades_direct_indirect_and_missing_prices() -> None:
 async def ingest(pool: asyncpg.Pool, accession: str, form: str, filed: str, name: str) -> None:
     f = filing(accession, form, filed)
     body = fixture(name)
-    await _upsert(pool, "EXM_US_EQ", f, f"https://example.test/{accession}.xml", body,
+    await _upsert(pool, ["EXM_US_EQ"], f, f"https://example.test/{accession}.xml", body,
                   parse_ownership_xml(body, f))  # fmt: skip
 
 
@@ -358,10 +401,13 @@ async def test_activity_read_and_amendment_supersession(
         backend_pool, "EXM_US_EQ", since=dt.date(2026, 1, 1), until=dt.date(2026, 12, 31)
     )
     n = after.net_discretionary
-    # The amendment's check box makes every row a reported 10b5-1 trade: nothing is left in
-    # the discretionary figure, and the original's rows are excluded rather than double counted.
-    assert (n.bought_shares, n.sold_shares) == (0, 0)
-    assert n.pre_planned_bought_shares == 1000 and n.pre_planned_sold_shares == 500
+    # The amendment's filing-wide check box only makes a plan *possible* (audit B33): the
+    # rows stay in the discretionary figure with unknown plan status and are flagged, and the
+    # original's rows are excluded rather than double counted.
+    # The sale carries a footnote naming the plan (True); the purchase only the box (possible).
+    assert (n.bought_shares, n.sold_shares) == (1000, 0)
+    assert n.pre_planned_bought_shares == 0 and n.pre_planned_sold_shares == 500
+    assert n.plan_possible_rows == 1 and n.plan_status_unknown_rows == 1
     gone = next(e for e in n.exclusions if e.reason == "superseded_by_amendment")
     assert gone.rows == 8
     sold = next(t for t in after.transactions if t.shares == 500 and t.form == "4/A")

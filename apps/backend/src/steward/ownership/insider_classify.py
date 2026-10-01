@@ -114,8 +114,11 @@ _PRIVATE = re.compile(
     re.IGNORECASE,
 )
 _SELL_TO_COVER = re.compile(
-    r"sell[- ]to[- ]cover|sold (?:\w+ ){0,6}to cover (?:\w+ ){0,4}"
-    r"(?:tax|withholding)|to satisfy (?:\w+ ){0,4}tax (?:withholding|obligation|liabilit)"
+    r"(?:sell|sale|sold)[- ]+(?:to|and)[- ]+cover|(?:sold|sale|sell|sells) (?:\w+ ){0,6}to cover"
+    r" (?:\w+ ){0,4}(?:tax|withholding)"
+    r"|(?:sold|sale|sell|sells) (?:\w+ ){0,6}(?:to|in order to) (?:pay|satisfy|fund|meet)"
+    r" (?:\w+ ){0,4}(?:tax|withholding)"
+    r"|to satisfy (?:\w+ ){0,4}tax (?:withholding|obligation|liabilit)"
     r"|(?:tax|withholding) (?:obligation|liabilit)\w* (?:in connection|related)",
     re.IGNORECASE,
 )
@@ -127,13 +130,27 @@ _TAX = re.compile(
 _GIFT = re.compile(r"\bgift(?:ed|s)?\b|bona fide gift", re.IGNORECASE)
 
 _PLAN = re.compile(r"10b5-?1", re.IGNORECASE)
+# An explicit statement that the trade was NOT under a plan.
 _NO_PLAN = re.compile(
-    r"not (?:made |effected |executed )?(?:pursuant to|under) (?:a |any |the )?(?:Rule )?10b5-?1",
+    r"\b(?:not|never)\b[^.;|]{0,60}?(?:pursuant to|under|adopt\w*|entered into|enter\w*|"
+    r"part of|subject to|covered by|made under|relied? on)[^.;|]{0,30}?10b5-?1"
+    r"|\b(?:no|without|neither|absence of)\b[^.;|]{0,30}?10b5-?1"
+    r"|\bnot\b[^.;|]{0,20}?10b5-?1",
     re.IGNORECASE,
+)
+# Any negation word near 10b5-1 that the explicit patterns did not resolve: unknown, not True.
+_NEGATION_WORD = re.compile(
+    r"\b(?:not|no|never|neither|nor|without|none|n't|cannot)\b", re.IGNORECASE
+)
+_MONTH = (
+    r"(?:Jan(?:uary)?|Feb(?:ruary)?|Mar(?:ch)?|Apr(?:il)?|May|June?|July?|Aug(?:ust)?"
+    r"|Sept?(?:ember)?|Oct(?:ober)?|Nov(?:ember)?|Dec(?:ember)?)"
 )
 _ADOPTED = re.compile(
     r"adopted (?:by [\w\s,.]{0,40}?)?(?:on |as of )?"
-    r"(?P<date>[A-Z][a-z]+\.? \d{1,2}, \d{4}|\d{1,2}/\d{1,2}/\d{2,4}|\d{4}-\d{2}-\d{2})",
+    rf"(?P<date>{_MONTH}\.? \d{{1,2}}(?:st|nd|rd|th)?,? \d{{4}}"
+    r"|\d{1,2}/\d{1,2}/\d{2,4}|\d{4}-\d{2}-\d{2})",
+    re.IGNORECASE,
 )
 
 
@@ -150,9 +167,10 @@ class Classification:
 def classify(code: str, *, derivative: bool, footnote_text: str | None) -> Classification:
     """Economic class of one reported row, with the rule that produced it."""
     text = footnote_text or ""
+    code = code.strip().upper() if code != "INITIAL_HOLDING" else code
     if code == "INITIAL_HOLDING":
         return Classification("holding_snapshot", "holding reported without a transaction")
-    mapped = CODE_CLASS.get(code.upper())
+    mapped = CODE_CLASS.get(code)
     if mapped is None:
         return Classification("other", f"unrecognised transaction code {code!r}")
     if code in {"P", "S"}:
@@ -178,15 +196,26 @@ def classify(code: str, *, derivative: bool, footnote_text: str | None) -> Class
 
 @dataclass(frozen=True)
 class PlanFlag:
+    """`plan` is True only when a footnote affirmatively says the trade was under a 10b5-1
+    plan. A filing-wide check box is `possible`: it says some transaction in the filing was,
+    not which one, so it never sets a per-row True."""
+
     plan: bool | None
     basis: str | None  # form_checkbox | footnote
     adopted: dt.date | None
+    possible: bool = False
+
+
+_FORMATS = ("%B %d, %Y", "%b %d, %Y", "%B %d %Y", "%b %d %Y", "%m/%d/%Y", "%m/%d/%y", "%Y-%m-%d")
 
 
 def _parse_date(raw: str) -> dt.date | None:
-    for fmt in ("%B %d, %Y", "%b %d, %Y", "%b. %d, %Y", "%m/%d/%Y", "%m/%d/%y", "%Y-%m-%d"):
+    cleaned = re.sub(r"(?<=\d)(?:st|nd|rd|th)\b", "", raw.strip(), flags=re.IGNORECASE)
+    cleaned = re.sub(r"^([A-Za-z]+)\.", r"\1", cleaned).title()
+    cleaned = re.sub(r"^Sept\b", "Sep", cleaned)
+    for fmt in _FORMATS:
         try:
-            return dt.datetime.strptime(raw.strip(), fmt).date()
+            return dt.datetime.strptime(cleaned, fmt).date()
         except ValueError:
             continue
     return None
@@ -195,20 +224,36 @@ def _parse_date(raw: str) -> dt.date | None:
 def plan_flag(footnote_text: str | None, form_checkbox: bool | None) -> PlanFlag:
     """The Rule 10b5-1 status the form itself states, never inferred from the trade.
 
-    A footnote naming a 10b5-1 plan is row-specific; the check box is filing-wide. Where
-    neither speaks, the answer is None (unknown), not False."""
+    A footnote naming a 10b5-1 plan is row-specific; the check box is filing-wide. A negated
+    mention ("not adopted a Rule 10b5-1 plan") is False, an unresolved or conflicting mention
+    is unknown, never True. A ticked filing check box yields plan=None with `possible`: it
+    cannot say which row was planned. Where nothing speaks the answer is None (unknown)."""
     text = footnote_text or ""
     if _PLAN.search(text):
-        if _NO_PLAN.search(text):
-            return PlanFlag(False, "footnote", None)
+        verdicts: list[bool | None] = []
         adopted = None
-        for sentence in re.split(r"(?<=[.;])\s+", text):
-            if _PLAN.search(sentence):
-                match = _ADOPTED.search(sentence)
-                if match:
-                    adopted = _parse_date(match.group("date"))
-                    break
-        return PlanFlag(True, "footnote", adopted)
-    if form_checkbox is not None:
-        return PlanFlag(form_checkbox, "form_checkbox", None)
+        # "Mar. 1, 2026" must not be split into two sentences at the abbreviation period.
+        unabbreviated = re.sub(rf"\b({_MONTH})\.(?=\s+\d)", r"\1", text, flags=re.IGNORECASE)
+        for sentence in re.split(r"(?<=[.;|])\s+", unabbreviated):
+            if not _PLAN.search(sentence):
+                continue
+            if _NO_PLAN.search(sentence):
+                verdicts.append(False)
+            elif _NEGATION_WORD.search(sentence):
+                verdicts.append(None)
+            else:
+                verdicts.append(True)
+                if adopted is None:
+                    match = _ADOPTED.search(sentence)
+                    if match:
+                        adopted = _parse_date(match.group("date"))
+        if verdicts and all(v is True for v in verdicts):
+            return PlanFlag(True, "footnote", adopted)
+        if verdicts and all(v is False for v in verdicts):
+            return PlanFlag(False, "footnote", None)
+        return PlanFlag(None, "footnote", None)
+    if form_checkbox is True:
+        return PlanFlag(None, "form_checkbox", None, possible=True)
+    if form_checkbox is False:
+        return PlanFlag(False, "form_checkbox", None)
     return PlanFlag(None, None, None)

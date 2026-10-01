@@ -209,7 +209,23 @@ class FreeSourceAlertsConfig(ConfigModel):
         ge=1,
         le=30,
         description="Observations first known within this many days are evaluated; older "
-        "ones are never alerted (a replayed backfill raises nothing).",
+        "ones are never alerted (a replayed backfill raises nothing). After an outage the "
+        "window reaches back to the last fully evaluated run (see max_catchup_days).",
+    )
+    max_catchup_days: int = Field(
+        default=30,
+        ge=1,
+        le=90,
+        description="How far back a run reaches to catch up after missed runs: the window "
+        "starts at the last fully evaluated run, never earlier than this many days ago.",
+    )
+    enforce_verification_gates: bool = Field(
+        default=True,
+        description="Consult the Phase 8 gates before raising an alert: the domain "
+        "reconciliation gate (credit stress, trade exposure, patents) or the signal "
+        "publication gate (confirmed graph events and relationships). Without recorded audit "
+        "data a gate denies, and the decision is recorded as blocked_by_gate. Turn off only "
+        "for a deployment that does not run the Phase 8 verification.",
     )
     throttle_hours: int = Field(
         default=24,

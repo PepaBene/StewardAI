@@ -1,0 +1,6 @@
+FORM 8-K
+Example Corp
+
+Item 1.02 Termination of a Material Definitive Agreement.
+
+On January 20, 2027, Example Corp and Target Software Inc. mutually agreed to terminate the Agreement and Plan of Merger dated September 15, 2026 pursuant to which the Company would acquire Target Software Inc., because the regulatory clearances had not been obtained by the outside date.
