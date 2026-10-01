@@ -14,9 +14,22 @@
 
 Both fail loudly (FundDataError) when the expected structure is missing, so a page redesign
 shows up as a failed step rather than as silently empty figures.
+
+Parser-drift audit (plan D6.9). Each result also carries
+- `shape` / `fingerprint`: the structure of the fields the parser reads (key sets and value
+  types of the tracked data points, never their values). A changed fingerprint means the
+  page/GraphQL shape moved - parser drift - whatever the numbers say;
+- `rules`: the issuer's stated exclusion/capping rules parsed from its methodology text
+  (negative earnings excluded, P/E capped at 60, P/B capped at 25, ...), so a rule change is
+  recognised as a methodology change rather than a value change;
+- `basis` ('fund' - the fund's own holdings; the index figures are separate fields with their
+  own `index_as_of`) and the effective dates.
+`compare_definitions` decides whether these figures may be compared with a constituent-
+weighted metric the app computes itself: only when the definitions align.
 """
 
 import datetime as dt
+import hashlib
 import html
 import json
 import re
@@ -86,6 +99,12 @@ class FundFigures:
     methodology: str
     source_url: str
     raw: dict[str, Any] = field(repr=False, compare=False)
+    # Parser-drift audit (D6.9)
+    basis: str = "fund"
+    index_as_of: dt.date | None = None
+    rules: dict[str, Any] = field(default_factory=dict, compare=False)
+    shape: dict[str, Any] = field(default_factory=dict, compare=False)
+    fingerprint: str = field(default="", compare=False)
 
 
 def _dec(value: Any) -> Decimal | None:
@@ -100,6 +119,56 @@ def _dec(value: Any) -> Decimal | None:
 
 def _positive(value: Decimal | None) -> Decimal | None:
     return value if value is not None and value > 0 else None
+
+
+def fingerprint_of(shape: dict[str, Any]) -> str:
+    """Stable hash of a shape description (key sets and type names, no values)."""
+    canonical = json.dumps(shape, sort_keys=True, default=str, separators=(",", ":"))
+    return hashlib.sha256(canonical.encode()).hexdigest()[:16]
+
+
+def _shape_of_point(point: Any) -> Any:
+    """Key set and value types of one data point: its structure, not its numbers. A null and
+    a number are the same shape (a metric may be empty on a given day)."""
+    if not isinstance(point, dict):
+        return type(point).__name__
+    return {
+        k: ("scalar" if v is None or isinstance(v, int | float | str) else type(v).__name__)
+        for k, v in sorted(point.items())
+        if k in ISHARES_SHAPE_KEYS
+    }
+
+
+# The data point keys the iShares parser relies on (others may come and go freely).
+ISHARES_SHAPE_KEYS = ("value", "asOfDate", "infoBubble", "formattedValue", "name")
+ISHARES_TRACKED_POINTS = ("priceEarnings", "priceBook", "numHoldings")
+
+_CAP = re.compile(
+    r"(?P<what>p/e|price to earnings|price to book|p/b)[^.]*?\bover\s+(?P<over>\d+(?:\.\d+)?)"
+    r"\s+are\s+set\s+to\s+(?P<to>\d+(?:\.\d+)?)",
+    re.I,
+)
+
+
+def parse_rules(methodology: str) -> dict[str, Any]:
+    """The issuer's stated exclusion / capping rules from its methodology text. A rule the
+    text does not state is absent (not assumed)."""
+    text = html.unescape(methodology)
+    rules: dict[str, Any] = {}
+    if re.search(r"negative earnings are excluded", text, re.I):
+        rules["negative_earnings_excluded"] = True
+    if re.search(r"negative book values? (are|is) excluded", text, re.I):
+        rules["negative_book_excluded"] = True
+    if re.search(r"extraordinary items are excluded", text, re.I):
+        rules["extraordinary_items_excluded"] = True
+    for sentence in re.split(r"(?<=[.])\s+", text):
+        for match in _CAP.finditer(sentence):
+            key = "pb_cap" if match["what"].lower() in ("price to book", "p/b") else "pe_cap"
+            if match["over"] == match["to"]:
+                rules[key] = float(match["over"])
+    if re.search(r"weighted average", text, re.I):
+        rules["aggregation"] = "weighted_average"
+    return rules
 
 
 # ---------------------------------------------------------------------------
@@ -142,6 +211,11 @@ def parse_ishares(page: str, url: str) -> FundFigures:
     raw_points = {
         k: points[k] for k in ("priceEarnings", "priceBook", "numHoldings") if k in points
     }
+    methodology = " ".join(html.unescape(m) for m in methods)
+    shape = {
+        "container_count": len(props.get("containersByNameMap") or {}),
+        "points": {k: _shape_of_point(points.get(k)) for k in ISHARES_TRACKED_POINTS},
+    }
     return FundFigures(
         provider="ishares",
         as_of=as_of,
@@ -151,9 +225,14 @@ def parse_ishares(page: str, url: str) -> FundFigures:
         index_pb=None,
         dividend_yield=None,
         dividend_yield_kind=None,
-        methodology=" ".join(html.unescape(m) for m in methods),
+        methodology=methodology,
         source_url=url,
         raw={"fundName": props.get("fundName"), "dataPoints": raw_points},
+        basis="fund",
+        index_as_of=None,
+        rules=parse_rules(methodology),
+        shape=shape,
+        fingerprint=fingerprint_of(shape),
     )
 
 
@@ -200,6 +279,28 @@ def parse_vanguard(data: dict[str, Any], url: str) -> FundFigures:
     except ValueError as exc:
         raise FundDataError(f"Vanguard as-of date unreadable: {exc}") from exc
     percent = _dec(dividend.get("statValue"))
+    index_dates = [d for d in (index_pe.get("effectiveDate"), index_pb.get("effectiveDate")) if d]
+    try:
+        index_as_of = (
+            max(dt.date.fromisoformat(str(d)[:10]) for d in index_dates) if index_dates else None
+        )
+    except ValueError:
+        index_as_of = None
+    shape = {
+        "history": type(history[0]).__name__,
+        "monthly": sorted((history[0].get("monthly") or {}).keys()),
+        "analytics": sorted(analytics.keys()),
+        "points": {
+            name: _shape_of_point(point)
+            for name, point in (
+                ("fund.PERATIO", pe),
+                ("fund.PBRATIO", pb),
+                ("benchmark.PERATIOBMK", index_pe),
+                ("benchmark.PBRATIOBMK", index_pb),
+                ("yield.FRCDIVYLD", dividend),
+            )
+        },
+    }
     return FundFigures(
         provider="vanguard",
         as_of=as_of,
@@ -212,6 +313,11 @@ def parse_vanguard(data: dict[str, Any], url: str) -> FundFigures:
         methodology=VANGUARD_METHOD,
         source_url=url,
         raw=data,
+        basis="fund",
+        index_as_of=index_as_of,
+        rules=parse_rules(VANGUARD_METHOD),
+        shape=shape,
+        fingerprint=fingerprint_of(shape),
     )
 
 
@@ -234,3 +340,69 @@ async def vanguard_characteristics(
     except ValueError as exc:
         raise FundDataError(f"Vanguard sent no JSON: {exc}") from exc
     return parse_vanguard(data, url)
+
+
+# ---------------------------------------------------------------------------
+# Comparison with constituent-weighted metrics (D6.9)
+# ---------------------------------------------------------------------------
+
+
+@dataclass(frozen=True)
+class MetricDefinition:
+    """How a P/E or P/B figure was built, for alignment checks."""
+
+    metric: str  # 'pe' | 'pb'
+    aggregation: str  # 'weighted_average' | 'weighted_harmonic' | ...
+    basis: str  # 'fund' | 'index'
+    negatives_excluded: bool
+    cap: float | None
+    as_of: dt.date
+
+
+@dataclass(frozen=True)
+class Alignment:
+    comparable: bool
+    reasons: list[str]
+
+
+def issuer_definition(
+    figures: FundFigures, metric: str, *, index: bool = False
+) -> MetricDefinition:
+    """The issuer's definition of its P/E or P/B, from the rules it states. Aggregation is
+    'weighted_average' only when the methodology says so, otherwise 'unstated'."""
+    rules = figures.rules
+    negatives = bool(
+        rules.get("negative_earnings_excluded" if metric == "pe" else "negative_book_excluded")
+    )
+    cap = rules.get("pe_cap" if metric == "pe" else "pb_cap")
+    return MetricDefinition(
+        metric=metric,
+        aggregation=str(rules.get("aggregation", "unstated")),
+        basis="index" if index else figures.basis,
+        negatives_excluded=negatives,
+        cap=float(cap) if cap is not None else None,
+        as_of=(figures.index_as_of if index and figures.index_as_of else figures.as_of),
+    )
+
+
+def compare_definitions(
+    issuer: MetricDefinition, own: MetricDefinition, *, max_days_apart: int = 7
+) -> Alignment:
+    """May the issuer figure be compared with our constituent-weighted one? Only when metric,
+    basis, aggregation, exclusion and capping rules and the effective date line up."""
+    reasons: list[str] = []
+    if issuer.metric != own.metric:
+        reasons.append(f"different metrics ({issuer.metric} vs {own.metric})")
+    if issuer.basis != own.basis:
+        reasons.append(f"different basis ({issuer.basis} vs {own.basis})")
+    if issuer.aggregation == "unstated":
+        reasons.append("issuer does not state its aggregation")
+    elif issuer.aggregation != own.aggregation:
+        reasons.append(f"different aggregation ({issuer.aggregation} vs {own.aggregation})")
+    if issuer.negatives_excluded != own.negatives_excluded:
+        reasons.append("negative earnings/book treatment differs")
+    if issuer.cap != own.cap:
+        reasons.append(f"different capping rule ({issuer.cap} vs {own.cap})")
+    if abs((issuer.as_of - own.as_of).days) > max_days_apart:
+        reasons.append(f"effective dates differ ({issuer.as_of} vs {own.as_of})")
+    return Alignment(comparable=not reasons, reasons=reasons)

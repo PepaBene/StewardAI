@@ -33,7 +33,7 @@ import datetime as dt
 import json
 import re
 from collections import defaultdict
-from collections.abc import Iterable
+from collections.abc import Iterable, Sequence
 from dataclasses import dataclass, field
 from typing import Literal
 
@@ -1082,6 +1082,13 @@ async def load_snapshots(pool: asyncpg.Pool, isins: list[str]) -> dict[str, Snap
         " where fund_isin = any($1::text[]) order by fund_isin, as_of desc, fetched_at desc",
         isins,
     )
+    return await hydrate_snapshots(pool, metas)
+
+
+async def hydrate_snapshots(
+    pool: asyncpg.Pool, metas: Sequence[asyncpg.Record]
+) -> dict[str, SnapshotIn]:
+    """Snapshot rows and breakdowns for the given `etf_snapshot` metadata records."""
     if not metas:
         return {}
     ids = [m["id"] for m in metas]
