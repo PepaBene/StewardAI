@@ -86,9 +86,22 @@ class EdgarClient:
             raise EdgarError(f"EDGAR {url} returned HTTP {response.status_code}")
         return response
 
+    @staticmethod
+    def _json(response: httpx.Response, url: str) -> Any:
+        try:
+            return response.json()
+        except ValueError as exc:
+            raise EdgarError(f"EDGAR {url} sent no JSON") from exc
+
+    async def _get_json(self, url: str) -> Any:
+        body = self._json(await self._get(url), url)
+        if not isinstance(body, dict):
+            raise EdgarError(f"EDGAR {url} sent an unexpected JSON shape")
+        return body
+
     async def cik_for_ticker(self, ticker: str) -> str | None:
         if self._tickers is None:
-            data: dict[str, Any] = (await self._get(TICKERS_URL)).json()
+            data: dict[str, Any] = await self._get_json(TICKERS_URL)
             self._tickers = {
                 str(row["ticker"]).upper(): pad_cik(row["cik_str"]) for row in data.values()
             }
@@ -97,7 +110,7 @@ class EdgarClient:
     async def filings(self, cik: str, since: dt.date | None = None) -> list[Filing]:
         """The issuer's filings. `recent` covers at least the last year (or 1,000 filings);
         with `since` earlier than that, the older pages covering it are read too."""
-        data = (await self._get(SUBMISSIONS_URL.format(cik=pad_cik(cik)))).json()
+        data = await self._get_json(SUBMISSIONS_URL.format(cik=pad_cik(cik)))
         filings = parse_submissions(pad_cik(cik), data)
         if since is None:
             return filings
@@ -105,7 +118,7 @@ class EdgarClient:
         if oldest is not None and oldest <= since:
             return filings
         for page in older_pages(data, since):
-            body = (await self._get(SUBMISSIONS_PAGE_URL.format(name=page))).json()
+            body = await self._get_json(SUBMISSIONS_PAGE_URL.format(name=page))
             filings += parse_submissions(pad_cik(cik), {"filings": {"recent": body}})
         return filings
 
@@ -123,12 +136,12 @@ class EdgarClient:
             if "HTTP 404" in str(exc):
                 return {}
             raise
-        data: dict[str, Any] = response.json()
+        data: dict[str, Any] = self._json(response, COMPANY_FACTS_URL)
         return data
 
     async def filing_files(self, filing: Filing) -> list[str]:
         """Names of every file in the filing's archive folder (its `index.json`)."""
-        data: dict[str, Any] = (await self._get(filing.url("index.json"))).json()
+        data: dict[str, Any] = await self._get_json(filing.url("index.json"))
         items = (data.get("directory") or {}).get("item") or []
         return [str(i["name"]) for i in items if isinstance(i, dict) and i.get("name")]
 

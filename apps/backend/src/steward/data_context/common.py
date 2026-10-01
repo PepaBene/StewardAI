@@ -3,8 +3,9 @@
 from __future__ import annotations
 
 import datetime as dt
+import json
 from decimal import Decimal
-from typing import Literal
+from typing import Any, Literal
 
 import asyncpg
 from pydantic import BaseModel, Field
@@ -96,6 +97,16 @@ class Share(BaseModel):
             ratio=numerator / denominator if denominator > 0 else None,
             denominator_basis=basis,
         )
+
+
+def as_json(value: object) -> Any:
+    """asyncpg returns jsonb as text here (no codec is registered); decode it, keep objects."""
+    if isinstance(value, (str, bytes)):
+        try:
+            return json.loads(value)
+        except ValueError:
+            return None
+    return value
 
 
 def to_date(value: dt.datetime | dt.date | None) -> dt.date | None:

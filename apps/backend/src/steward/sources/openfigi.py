@@ -89,7 +89,10 @@ async def map_isin(
         raise OpenFigiError("OpenFIGI rate limit reached; retried on the next run")
     if response.status_code != 200:
         raise OpenFigiError(f"OpenFIGI returned HTTP {response.status_code}")
-    body = response.json()
+    try:
+        body = response.json()
+    except ValueError as exc:
+        raise OpenFigiError("OpenFIGI returned a body that is not JSON") from exc
     if not isinstance(body, list) or not body:
         raise OpenFigiError("OpenFIGI returned an unexpected body")
     return parse_mapping(body[0])

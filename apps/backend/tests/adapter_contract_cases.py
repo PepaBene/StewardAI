@@ -425,7 +425,7 @@ PARSER_CASES: list[ParserCase] = [
         ),
         (EdgarError,),
         empty="",
-        drift=lambda t: t.replace("EX-99.1", "EXHIBIT-X").replace("8-K", "FORM"),
+        drift=lambda t: t.replace(" | ", " ; "),
         partial=half_text,
         min_rows=0,
     ),

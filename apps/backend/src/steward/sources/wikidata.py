@@ -112,7 +112,10 @@ class WikidataClient:
         )
         if response.status_code != 200:
             raise WikidataError(f"Wikidata returned HTTP {response.status_code}")
-        body: dict[str, Any] = response.json()
+        try:
+            body: dict[str, Any] = response.json()
+        except ValueError as exc:
+            raise WikidataError("Wikidata sent no JSON") from exc
         return body
 
     async def find(self, lei: str | None, isin: str | None) -> str | None:

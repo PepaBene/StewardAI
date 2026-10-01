@@ -18,6 +18,7 @@ from pydantic import BaseModel, Field
 from steward.data_context.common import (
     Gap,
     Provenance,
+    as_json,
     cutoff,
     provenance_counts,
     provenance_of,
@@ -161,7 +162,7 @@ def _fact(row: dict[str, Any]) -> FinancialFactOut:
         value=row["value"],
         unit=row["unit"],
         currency=row["currency"],
-        dimensions=row["dimensions"],
+        dimensions=as_json(row["dimensions"]),
         source=row["source"],
         provenance=provenance_of(row["source"]),
         source_url=row["source_url"],
@@ -387,6 +388,10 @@ async def holding_data_context(
     rows = await financial_history_rows(pool, ticker, when)
     history = build_financial_history(rows)
     macro = await context_for_holding(pool, ticker, when)
+    if not macro.effects:
+        # Without an active mapping no country is attributable to this issuer; the macro
+        # reader's unfiltered fallback is not shown as the holding's exposure.
+        macro = macro.model_copy(update={"observations": [], "comparisons": []})
     trade = await trade_exposure(pool, macro.effects, when)
     network = await business_network_payload(pool, ticker, when)
     patents = await patent_trend_rows(pool, ticker)

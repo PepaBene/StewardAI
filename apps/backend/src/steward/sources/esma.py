@@ -139,7 +139,12 @@ async def _solr(http: httpx.AsyncClient, url: str, isin: str, rows: int) -> dict
         )
         if response.status_code != 200:
             raise EsmaError(f"ESMA registers returned HTTP {response.status_code}")
-        body = response.json()
+        try:
+            body = response.json()
+        except ValueError as exc:
+            raise EsmaError("ESMA registers sent no JSON") from exc
+        if not isinstance(body, dict):
+            raise EsmaError("ESMA registers schema changed")
         page = body.get("response", {}).get("docs", [])
         docs += page
         found = int(body.get("response", {}).get("numFound", len(docs)))

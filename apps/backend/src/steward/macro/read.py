@@ -91,7 +91,7 @@ async def context_for_holding(pool: asyncpg.Pool, ticker: str, as_of: dt.datetim
              select em.geography from public.exposure_mapping em
              join public.instrument_security_link isl on isl.security_id in (
                select id from public.security where issuer_id=em.issuer_id)
-             where isl.ticker=$1 and em.valid_from <= $2::date
+             where isl.ticker=$1 and em.weight > 0 and em.valid_from <= $2::date
                and (em.valid_to is null or em.valid_to >= $2::date)
            ) or not exists(select 1 from public.exposure_mapping em
              join public.security s on s.issuer_id=em.issuer_id
@@ -104,7 +104,8 @@ async def context_for_holding(pool: asyncpg.Pool, ticker: str, as_of: dt.datetim
         """with active as (
              select em.*,sum(em.weight) over(partition by em.issuer_id) mapped_weight
              from public.exposure_mapping em
-             where em.valid_from <= $2::date and (em.valid_to is null or em.valid_to >= $2::date)
+             where em.weight > 0 and em.valid_from <= $2::date
+               and (em.valid_to is null or em.valid_to >= $2::date)
            )
            select isl.ticker,em.issuer_id,em.segment,em.basis,em.weight,em.geography,em.hs_code,
                   greatest(0,1-em.mapped_weight) unknown_weight

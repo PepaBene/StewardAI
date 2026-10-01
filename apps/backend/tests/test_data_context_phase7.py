@@ -9,7 +9,6 @@ import datetime as dt
 import json
 from collections.abc import AsyncIterator
 from decimal import Decimal
-from typing import Any
 
 import asyncpg
 import httpx
@@ -325,6 +324,8 @@ async def seed_world(p: asyncpg.Pool) -> dict[str, int]:
         " values ($1,'nothing','FR','reported',0,'2026-01-01')",
         issuer,
     )
+    # Mappings count from the day they were entered, not from their valid_from.
+    await p.execute("update public.exposure_mapping set created_at='2026-01-02'")
     macro = [
         ("DE", "2026-07-01", "2.0", "v1", 0, "2026-08-05"),
         ("DE", "2026-08-01", "2.4", "v1", 0, "2026-09-05"),
@@ -674,3 +675,263 @@ async def test_chat_tools_register_cited_observations_and_gather_adds_context(
 
     context = await company_context(backend_pool, "EXM_US_EQ", at("2026-07-01"))
     assert context.claims == []  # nothing was known yet
+
+
+# ---------------------------------------------------------------------------
+# D7.7 evidence summary
+# ---------------------------------------------------------------------------
+
+A_ORIG = "0001234567-26-000001"
+A_AMEND = "0001234567-26-000002"
+
+
+async def seed_evidence(p: asyncpg.Pool) -> None:
+    # Filed note with a stored evidence quote, plus a later revision of the same note.
+    doc = await p.fetchval(
+        "insert into public.source_document (regulator,external_id,stable_url)"
+        " values ('sec','0000111111-26-000010','https://example.test/10q') returning id"
+    )
+    version = await p.fetchval(
+        "insert into public.source_document_version (document_id,content_hash,known_at)"
+        " values ($1,'h1','2026-08-01') returning id",
+        doc,
+    )
+    evidence_id = await p.fetchval(
+        "insert into public.source_evidence (document_version_id,quote)"
+        " values ($1,'Operating lease commitments total USD 40 million.') returning id",
+        version,
+    )
+    for text, known, revision, ev in (
+        ("original text block", "2026-08-01", 0, evidence_id),
+        ("restated text block", "2026-09-28", 1, None),
+    ):
+        await p.execute(
+            "insert into public.financial_statement_fact (ticker,concept,statement,period_end,"
+            " basis,unit,source,source_url,known_at,text_block,revision,evidence_id,form)"
+            " values ('EXM_US_EQ','LeasesNote','note','2026-06-30','reported','text','sec_xbrl',"
+            " 'https://example.test/10q',$1,$2,$3,$4,'10-Q')",
+            at(known),
+            text,
+            revision,
+            ev,
+        )
+
+    # Insider: an original buy later restated by an amendment known on 2026-09-20.
+    await p.execute(
+        "insert into insider_filing (accession,ticker,issuer_cik,form,filed,source_url)"
+        " values ($1,'EXM_US_EQ','0000111111','4/A','2026-09-20','https://example.test/4a')",
+        A_AMEND,
+    )
+    await p.execute(
+        "insert into insider_filing (accession,ticker,issuer_cik,form,filed,source_url,"
+        " superseded_by_accession,amendment_link_status) values ($1,'EXM_US_EQ','0000111111',"
+        " '4','2026-08-12','https://example.test/4',$2,'not_amendment')",
+        A_ORIG,
+        A_AMEND,
+    )
+    await p.execute(
+        "update insider_filing set amends_accession=$1, amendment_link_status='linked'"
+        " where accession=$2",
+        A_ORIG,
+        A_AMEND,
+    )
+    for accession, shares, note in ((A_ORIG, 100, "Open market purchase."), (A_AMEND, 120, None)):
+        await p.execute(
+            "insert into insider_transaction (accession,row_index,reporting_owner_cik,owner_name,"
+            " transaction_code,shares,price_per_share,transaction_date,acquired_disposed,"
+            " direct_indirect,is_officer,economic_class,classification_basis,footnote_text)"
+            " values ($1,0,'0000222222','Jane Roe','P',$2,10,'2026-08-10','A','D',true,"
+            " 'open_market_buy','code P',$3)",
+            accession,
+            Decimal(shares),
+            note,
+        )
+
+    # Dependencies: one confirmed with passage, one suggested, one confirmed disclosure whose
+    # share is unknown, one anonymous.
+    await p.execute(
+        "insert into public.company_graph_edge (subject_key,object_key,object_name,edge_type,"
+        " direction,status,evidence_tier,source,source_url,passage,known_at) values"
+        " ('EXM_US_EQ','acme','Acme Ltd','supplier','incoming','confirmed','primary','sec_xbrl',"
+        " 'https://example.test/e1','Acme supplies wafers under a 2024 agreement.','2026-08-10'),"
+        " ('EXM_US_EQ','zed','Zed Inc','partner','symmetric','suggested','candidate','diffbot',"
+        " 'https://example.test/e2',null,'2026-08-11')"
+    )
+    await p.execute(
+        "insert into public.relationship_disclosure (ticker,relationship,direction,"
+        " counterparty_name,anonymous_counterparty,fiscal_period,valid_from,passage,source_url,"
+        " source,status,known_at) values"
+        " ('EXM_US_EQ','customer','issuer_sells_to','Big Co',false,'FY2025','2025-01-01',"
+        "  'One customer accounted for a significant portion of revenue.','https://example.test/d1',"
+        "  'sec_xbrl','confirmed','2026-08-15'),"
+        " ('EXM_US_EQ','customer','issuer_sells_to',null,true,'FY2025','2025-01-01',"
+        "  'Customer A represented more than ten percent of net sales.','https://example.test/d2',"
+        "  'sec_xbrl','confirmed','2026-08-15')"
+    )
+
+    # Deals: announced (confirmed), closed (only suggested), approved (confirmed, later).
+    for state, status, known, effective in (
+        ("announced", "confirmed", "2026-08-01", None),
+        ("closed", "suggested", "2026-09-01", "2026-09-01"),
+        ("approved", "confirmed", "2026-09-10", "2026-09-10"),
+    ):
+        await p.execute(
+            "insert into public.company_event (ticker,event_type,event_state,announced_at,"
+            " effective_at,known_at,source,source_url,counterparty_key,status,detail) values"
+            " ('EXM_US_EQ','deal',$1,'2026-08-01',$2,$3,'sec_xbrl',$4,'target-1',$5,"
+            '  \'{"passage": "The parties entered into a merger agreement."}\'::jsonb)',
+            state,
+            dt.date.fromisoformat(effective) if effective else None,
+            at(known),
+            f"https://example.test/deal/{state}",
+            status,
+        )
+
+    # Consensus: two vintages of one series, and a provider estimate that is NOT consensus.
+    for vintage, value, known in (
+        ("2026-07", "1.00", "2026-07-20"),
+        ("2026-09", "1.10", "2026-09-12"),
+    ):
+        await p.execute(
+            "insert into public.forward_observation (ticker,kind,provider,metric,fiscal_period,"
+            " value,analyst_count,vintage,known_at,source_url) values ('EXM_US_EQ',"
+            " 'published_analyst_consensus','issuer_ir','eps','FY2026',$1,12,$2,$3,"
+            " 'https://example.test/consensus')",
+            Decimal(value),
+            vintage,
+            at(known),
+        )
+    await p.execute(
+        "insert into public.forward_observation (ticker,kind,provider,metric,fiscal_period,value,"
+        " known_at,source_url) values ('EXM_US_EQ','event_calendar_estimate','finnhub','eps',"
+        " 'FY2026',9,'2026-09-01','u')"
+    )
+
+
+@pytest.mark.db
+async def test_evidence_summary_keeps_channels_separate_and_cites_every_item(
+    backend_pool: asyncpg.Pool, api: httpx.AsyncClient
+) -> None:
+    await seed(backend_pool)
+    assert await run_collector(backend_pool) == "succeeded"
+    await seed_evidence(backend_pool)
+
+    body = (await api.get("/holdings/EXM_US_EQ/evidence-summary")).json()
+    keys = walk_keys(body["positions"])
+    assert not [k for k in keys if "total" in k.lower() or "combined" in k.lower()]
+    assert (
+        "additive" in body["positions"]["not_additive"]
+        or "combined" in body["positions"]["not_additive"]
+    )
+    channels = {
+        body["positions"]["control"]["channel"],
+        body["positions"]["institutional"]["channel"],
+        body["positions"]["funds"]["channel"],
+    }
+    assert channels == {"beneficial_ownership_13dg", "institutional_13f", "fund_positions_nport"}
+    control = body["positions"]["control"]["stakes"]
+    current = next(s for s in control if not s["superseded"])
+    assert current["stake"]["accession"] != ACC_13D
+    assert all(s["known_at"] and s["coverage_reason"] for s in control)
+    g13 = next(s for s in control if s["stake"]["schedule"] == "13G")
+    assert g13["source_passage"] is None and "passive" in g13["passage_reason"]
+    assert body["positions"]["institutional"]["coverage"]["state"] == "not_covered"
+    assert body["positions"]["funds"]["coverage"]["state"] == "not_covered"
+
+    # Latest revision of the note, with its stored passage kept until a quote is missing.
+    note = body["filed_notes"]["notes"][0]
+    assert note["revision"] == 1 and note["passage_basis"] == "filed_text_block"
+    assert note["passage"] == "restated text block" and note["known_at"].startswith("2026-09-28")
+
+    insider = body["insider_activity"]
+    assert Decimal(insider["activity"]["net_discretionary"]["bought_shares"]) == 120
+    assert [d["accession"] for d in insider["net_discretionary_derived_from"]] == [A_AMEND]
+    assert insider["net_discretionary_derived_from"][0]["passage_reason"]
+
+    deps = body["dependencies"]
+    assert {d["counterparty_name"] for d in deps["dependencies"]} == {"Acme Ltd", "Big Co", None}
+    assert deps["excluded_unconfirmed"] == 1
+    anonymous = next(d for d in deps["dependencies"] if d["anonymous_counterparty"])
+    assert anonymous["counterparty_name"] is None and anonymous["reported_share"] is None
+    assert all(d["passage"] for d in deps["dependencies"])
+
+    deal = body["deals"]["deals"][0]
+    assert deal["current_state"] == "approved"  # the suggested 'closed' event never counts
+    assert [e["event_state"] for e in deal["events"]] == ["announced", "closed", "approved"]
+    assert deal["events"][0]["passage"].startswith("The parties")
+
+    series = body["consensus"]["series"]
+    assert len(series) == 1 and [v["vintage"] for v in series[0]["vintages"]] == [
+        "2026-07",
+        "2026-09",
+    ]
+    assert Decimal(series[0]["revision_since_previous"]) == Decimal("0.10")
+    assert len(series[0]["revision_inputs"]) == 2
+    assert {g["domain"] for g in body["gaps"]} >= {"institutional_13f", "fund_positions"}
+
+
+@pytest.mark.db
+async def test_evidence_point_in_time_excludes_later_revisions_and_amendments(
+    backend_pool: asyncpg.Pool, api: httpx.AsyncClient
+) -> None:
+    await seed(backend_pool)
+    assert await run_collector(backend_pool) == "succeeded"
+    await seed_evidence(backend_pool)
+    early = (
+        await api.get(
+            "/holdings/EXM_US_EQ/evidence-summary", params={"as_of": "2026-09-05T00:00:00Z"}
+        )
+    ).json()
+    note = early["filed_notes"]["notes"][0]
+    assert note["revision"] == 0 and note["passage_basis"] == "source_evidence_quote"
+    assert note["passage"].startswith("Operating lease commitments")
+    insider = early["insider_activity"]
+    # The amendment was filed on 2026-09-20: unknown at the cutoff, so the original counts.
+    assert Decimal(insider["activity"]["net_discretionary"]["bought_shares"]) == 100
+    assert [d["accession"] for d in insider["net_discretionary_derived_from"]] == [A_ORIG]
+    assert insider["net_discretionary_derived_from"][0]["passage"] == "Open market purchase."
+
+    deal = early["deals"]["deals"][0]
+    assert deal["current_state"] == "announced" and len(deal["events"]) == 2
+    series = early["consensus"]["series"][0]
+    assert [v["vintage"] for v in series["vintages"]] == ["2026-07"]
+    assert series["revision_since_previous"] is None  # one vintage: no revision invented
+
+    # 13D/A filed 2025-09-15; before it only the initial 13D is public and it is current.
+    mid = (
+        await api.get(
+            "/holdings/EXM_US_EQ/evidence/positions", params={"as_of": "2025-06-01T00:00:00Z"}
+        )
+    ).json()
+    stakes = mid["control"]["stakes"]
+    assert [s["stake"]["accession"] for s in stakes] == [ACC_13D]
+    assert stakes[0]["superseded"] is False
+    after = (
+        await api.get(
+            "/holdings/EXM_US_EQ/evidence/positions", params={"as_of": "2025-10-01T00:00:00Z"}
+        )
+    ).json()
+    flags = {s["stake"]["accession"]: s["superseded"] for s in after["control"]["stakes"]}
+    assert flags == {ACC_13DA: False, ACC_13D: True}
+    nothing = (
+        await api.get(
+            "/holdings/EXM_US_EQ/evidence/dependencies", params={"as_of": "2026-01-01T00:00:00Z"}
+        )
+    ).json()
+    assert nothing["dependencies"] == [] and nothing["coverage"]["state"] == "not_covered"
+
+
+@pytest.mark.db
+async def test_empty_holding_reports_explicit_coverage_reasons(
+    backend_pool: asyncpg.Pool, api: httpx.AsyncClient
+) -> None:
+    await seed(backend_pool)
+    body = (await api.get("/holdings/EXM_US_EQ/evidence-summary")).json()
+    for section in ("filed_notes", "insider_activity", "dependencies", "deals", "consensus"):
+        assert body[section]["coverage"]["state"] == "not_covered"
+        assert body[section]["coverage"]["reason"]
+    assert body["filed_notes"]["notes"] == [] and body["deals"]["deals"] == []
+    assert len(body["gaps"]) >= 7
+    domain = await api.get("/holdings/EXM_US_EQ/evidence/consensus")
+    assert domain.status_code == 200 and domain.json()["series"] == []
+    assert (await api.get("/holdings/EXM_US_EQ/evidence/nonsense")).status_code == 422

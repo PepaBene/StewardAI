@@ -261,7 +261,7 @@ def test_restated_statement_keeps_both_reports_distinguishable() -> None:
 async def test_quota_resets_at_minute_day_and_month_boundaries() -> None:
     governor = RequestGovernor()
     budget = Budget(per_minute=Decimal(1), daily=Decimal(2), monthly=Decimal(3))
-    t0 = dt.datetime(2026, 9, 29, 23, 58, tzinfo=dt.UTC)
+    t0 = dt.datetime(2026, 9, 29, 23, 50, tzinfo=dt.UTC)
     await governor.reserve("p", "e", Decimal(1), budget, now=t0)
     with pytest.raises(QuotaExceeded, match="per-minute"):
         await governor.reserve("p", "e", Decimal(1), budget, now=t0)

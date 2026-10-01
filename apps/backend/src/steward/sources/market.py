@@ -154,7 +154,13 @@ async def frankfurter_series(http: httpx.AsyncClient, start: dt.date, end: dt.da
     )
     if response.status_code != 200:
         raise MarketDataError(f"Frankfurter returned HTTP {response.status_code}")
-    return parse_frankfurter(response.json())
+    try:
+        body = response.json()
+    except ValueError as exc:
+        raise MarketDataError("Frankfurter sent no JSON") from exc
+    if not isinstance(body, dict):
+        raise MarketDataError("Frankfurter schema changed")
+    return parse_frankfurter(body)
 
 
 @dataclass(frozen=True)
@@ -169,6 +175,10 @@ class PublicHoliday:
 
 
 def parse_nager(country: str, body: list[dict[str, Any]]) -> list[PublicHoliday]:
+    if not isinstance(body, list):
+        raise MarketDataError("Nager.Date schema changed: expected a list")
+    if any(not isinstance(h, dict) or "date" not in h for h in body):
+        raise MarketDataError("Nager.Date schema changed: holiday without a date")
     return [
         PublicHoliday(
             country=country,
@@ -189,4 +199,8 @@ async def public_holidays(http: httpx.AsyncClient, country: str, year: int) -> l
         return []
     if response.status_code != 200:
         raise MarketDataError(f"Nager.Date returned HTTP {response.status_code}")
-    return parse_nager(country, response.json())
+    try:
+        body = response.json()
+    except ValueError as exc:
+        raise MarketDataError("Nager.Date sent no JSON") from exc
+    return parse_nager(country, body)

@@ -132,7 +132,10 @@ def parse_ownership_xml(xml: bytes, filing: Filing) -> InsiderFiling:
     """Parse as-filed ownership XML, keeping transactions and initial holdings."""
     if b"<!DOCTYPE" in xml.upper() or b"<!ENTITY" in xml.upper():
         raise ValueError("ownership XML with DTD or entity declarations is not accepted")
-    root = ET.fromstring(xml)  # noqa: S314 - DTD/entity declarations are rejected above.
+    try:
+        root = ET.fromstring(xml)  # noqa: S314 - DTD/entity declarations are rejected above.
+    except ET.ParseError as exc:
+        raise ValueError(f"ownership XML is not well-formed: {exc}") from exc
     issuer = _child(root, "issuer")
     issuer_cik = (_text(issuer, "issuerCik") or filing.cik).zfill(10)
     issuer_name = _text(issuer, "issuerName")

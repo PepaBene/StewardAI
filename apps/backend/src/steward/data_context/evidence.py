@@ -17,7 +17,7 @@ from typing import Any, Literal
 import asyncpg
 from pydantic import BaseModel, Field
 
-from steward.data_context.common import Gap, cutoff, to_date
+from steward.data_context.common import Gap, as_json, cutoff, to_date
 from steward.free_source_reads import business_network_payload
 from steward.ownership.control_stakes_read import (
     ControlStakeOut,
@@ -520,11 +520,13 @@ async def deals(pool: asyncpg.Pool, ticker: str, as_of: dt.datetime | None = Non
     grouped: dict[str, list[DealEvent]] = {}
     keys: dict[str, str | None] = {}
     for r in rows:
-        detail = r["detail"] if isinstance(r["detail"], dict) else {}
-        passage = r["quote"] or (detail.get("passage") if isinstance(detail, dict) else None)
+        detail = as_json(r["detail"])
+        detail = detail if isinstance(detail, dict) else {}
+        passage = r["quote"] or detail.get("passage")
         key = r["counterparty_key"] or r["source_url"]
         keys[key] = r["counterparty_key"]
-        terms = r["terms"] if isinstance(r["terms"], dict) else {}
+        terms = as_json(r["terms"])
+        terms = terms if isinstance(terms, dict) else {}
         grouped.setdefault(key, []).append(
             DealEvent(
                 event_id=r["id"],

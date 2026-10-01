@@ -18,6 +18,18 @@ from steward.sources.base import (
 )
 
 
+def _json_body(response: httpx.Response) -> Any:
+    """The JSON body, or None when the answer is not JSON (an HTML error page) - never an
+    exception, so the caller maps the outcome to a typed access state."""
+    try:
+        return response.json()
+    except ValueError:
+        return None
+
+
+NOT_JSON = AccessResult(AccessState.TEMPORARILY_FAILED, "provider answered with a non-JSON body")
+
+
 class PublicMacroAdapter:
     provider = "public_macro"
 
@@ -66,10 +78,21 @@ class WorldBankAdapter(PublicMacroAdapter):
             url,
             params={"format": "json", "per_page": 20_000, "date": request.get("date", "2000:2030")},
         )
-        state = access_from_http(
-            response.status_code, has_rows=response.status_code == 200 and bool(response.json()[1])
+        body = _json_body(response)
+        if response.status_code == 200 and body is None:
+            return FetchResult(NOT_JSON)
+        # World Bank answers an invalid request with HTTP 200 and `[{"message": [...]}]`.
+        has_rows = (
+            response.status_code == 200
+            and isinstance(body, list)
+            and len(body) > 1
+            and isinstance(body[1], list)
+            and bool(body[1])
         )
-        return FetchResult(state, {"body": response.json(), "url": str(response.url)})
+        state = access_from_http(response.status_code, has_rows=has_rows)
+        if state.state == AccessState.NOT_COVERED and isinstance(body, list) and len(body) == 1:
+            state = AccessResult(AccessState.TEMPORARILY_FAILED, "World Bank error envelope")
+        return FetchResult(state, {"body": body, "url": str(response.url)})
 
     def normalize(self, payload: Any) -> list[SourceObservation]:
         now = dt.datetime.now(dt.UTC)
@@ -112,13 +135,16 @@ class SdmxAdapter(PublicMacroAdapter):
             },
             headers={"Accept": "application/vnd.sdmx.data+json;version=2.0.0"},
         )
+        body = _json_body(response) if response.status_code == 200 else {}
+        if body is None:
+            return FetchResult(NOT_JSON)
         access = access_from_http(
-            response.status_code, has_rows=response.status_code == 200 and bool(response.content)
+            response.status_code, has_rows=response.status_code == 200 and bool(body)
         )
         return FetchResult(
             access,
             {
-                "body": response.json() if response.status_code == 200 else {},
+                "body": body,
                 "url": str(response.url),
                 "request": request,
             },
@@ -177,12 +203,13 @@ class ComtradeAdapter(PublicMacroAdapter):
             "subscription-key": self.api_key,
         }
         response = await self.http.get(url, params=params)
-        access = access_from_http(
-            response.status_code,
-            has_rows=response.status_code == 200 and bool(response.json().get("data")),
-        )
+        body = _json_body(response) if response.status_code == 200 else {}
+        if body is None:
+            return FetchResult(NOT_JSON)
+        rows = body.get("data") if isinstance(body, dict) else None
+        access = access_from_http(response.status_code, has_rows=bool(rows))
         # Do not retain response.url: it may include the subscription key.
-        return FetchResult(access, {"body": response.json() if response.status_code == 200 else {}})
+        return FetchResult(access, {"body": body if isinstance(body, dict) else {}})
 
     def normalize(self, payload: Any) -> list[SourceObservation]:
         now = dt.datetime.now(dt.UTC)

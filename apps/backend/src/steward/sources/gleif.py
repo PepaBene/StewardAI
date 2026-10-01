@@ -106,7 +106,10 @@ class GleifClient:
                 return None
             if response.status_code != 200:
                 raise GleifError(f"GLEIF {path} returned HTTP {response.status_code}")
-            body: dict[str, Any] = response.json()
+            try:
+                body: dict[str, Any] = response.json()
+            except ValueError as exc:
+                raise GleifError(f"GLEIF {path} sent no JSON") from exc
             return body
         raise GleifError(f"GLEIF {path} unreachable ({type(last).__name__})")
 

@@ -17,7 +17,7 @@ from typing import Any, Literal
 import asyncpg
 from pydantic import BaseModel, Field
 
-from steward.data_context.common import Provenance, cutoff, provenance_of, to_date
+from steward.data_context.common import Provenance, as_json, cutoff, provenance_of, to_date
 from steward.free_source_reads import (
     company_research_rows,
     financial_history_rows,
@@ -120,7 +120,7 @@ async def country_context(
                 source=source,
                 source_url=latest["source_url"],
                 note=(
-                    f"Change from {pair[1]['period']}: {change}"
+                    f"Previous {pair[1]['period']}: {pair[1]['value']} {unit}; change {change}"
                     if change is not None
                     else "No earlier period known, so no change is stated."
                 ),
@@ -245,7 +245,7 @@ async def company_context(
     facts = await financial_history_rows(pool, ticker, when)
     seen: set[tuple[str, dt.date]] = set()
     for f in facts:  # newest period first, latest revision first within a period
-        if f["statement"] == "note" or f["value"] is None or f["dimensions"]:
+        if f["statement"] == "note" or f["value"] is None or as_json(f["dimensions"]):
             continue
         key = (f["concept"], f["period_end"])
         if key in seen:

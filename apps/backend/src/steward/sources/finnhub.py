@@ -34,7 +34,13 @@ async def next_earnings_date(
     )
     if response.status_code != 200:
         raise FinnhubError(f"Finnhub returned HTTP {response.status_code}")
-    rows = response.json().get("earningsCalendar") or []
+    try:
+        body = response.json()
+    except ValueError as exc:
+        raise FinnhubError("Finnhub sent no JSON") from exc
+    if not isinstance(body, dict):
+        raise FinnhubError("Finnhub calendar schema changed")
+    rows = body.get("earningsCalendar") or []
     dates = sorted(
         dt.date.fromisoformat(r["date"])
         for r in rows
