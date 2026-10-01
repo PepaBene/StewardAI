@@ -81,7 +81,8 @@ async def context_for_holding(pool: asyncpg.Pool, ticker: str, as_of: dt.datetim
              from public.macro_observation where known_at <= $2 group by 1,2,3
            )
            select e.series_id,e.source,e.geography,e.value,e.unit,e.period,e.release_at,e.known_at,
-                  e.source_url,r.low5,r.high5,r.low10,r.high10,
+                  e.source_url,r.low5 five_year_low,r.high5 five_year_high,
+                  r.low10 ten_year_low,r.high10 ten_year_high,
                   coalesce(pa.state,'available') access_state
            from eligible e join ranges r using(series_id,source,geography)
            left join public.provider_access pa on pa.provider=e.source
@@ -107,10 +108,10 @@ async def context_for_holding(pool: asyncpg.Pool, ticker: str, as_of: dt.datetim
            )
            select isl.ticker,em.issuer_id,em.segment,em.basis,em.weight,em.geography,em.hs_code,
                   greatest(0,1-em.mapped_weight) unknown_weight
-           from public.exposure_mapping em
+           from active em
            join public.security s on s.issuer_id=em.issuer_id
            join public.instrument_security_link isl on isl.security_id=s.id
-           where em.id in (select id from active) and isl.ticker=$1
+           where isl.ticker=$1
            order by em.segment""",
         ticker,
         as_of,
@@ -121,9 +122,9 @@ async def context_for_holding(pool: asyncpg.Pool, ticker: str, as_of: dt.datetim
         item = dict(row)
         geography = item["geography"]
         item["related_series"] = sorted(
-            observation.series_id
+            observation["series_id"]
             for observation in rows
-            if geography and observation.geography == geography
+            if geography and observation["geography"] == geography
         )
         if geography and geography in observed_geographies:
             item["explanation"] = (

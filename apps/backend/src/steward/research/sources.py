@@ -24,6 +24,7 @@ SourceKind = Literal[
     "thesis",
     "report",
     "search",
+    "observation",
 ]
 
 CheckStatus = Literal["supported", "unsupported", "unchecked"]

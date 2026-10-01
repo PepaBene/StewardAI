@@ -1,0 +1,16 @@
+[
+ {
+  "actual": 1.2,
+  "estimate": 1.0,
+  "period": "2026-06-30",
+  "surprise": 0.2,
+  "surprisePercent": 20,
+  "symbol": "AAA"
+ },
+ {
+  "actual": null,
+  "estimate": 0.9,
+  "period": "2026-03-31",
+  "symbol": "AAA"
+ }
+]

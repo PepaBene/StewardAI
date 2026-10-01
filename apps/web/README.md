@@ -80,6 +80,31 @@ Confidence badges (`components/evidence/confidence-badge.tsx`) use the four labe
 spec, Verified / Corroborated / Unconfirmed / Disputed, in the muted grey / blue / amber / red
 palette. Pass and breach use gain and loss; unknown is dashed and neutral.
 
+## Free data sources (Phases 2-7)
+
+The backend's free-source work (macro and trade, prices and corporate actions, fundamentals,
+company graph and patents, funds and ownership, alerts) is exposed as owner-only read endpoints;
+setup, quotas, delays and removal behaviour are in
+[`docs/data/provider-access.md`](../../docs/data/provider-access.md). The web app holds no keys
+and calculates none of these figures: it formats what the backend returns, and every figure keeps
+its source, as-of date and coverage state.
+
+Pages that consume them today: the holding page (insider trades, segments, valuation, intraday,
+prices and risk, ownership), the portfolio views (valuation benchmark, risk, market strip,
+intraday path) and Activity (source trust, coverage, job log). The other endpoints
+(`/data/coverage`, `/sources/{access,usage,status}`, `/macro/*`, `/funds/*`,
+`/holdings/{ticker}/{control-stakes,insider-activity,fund-positions,business-network,patent-trends,
+peer-metrics,returns,...}` and `/alerts/free-source-trail`) are in the backend's `openapi.json` and
+therefore in the generated client types after `npm run gen:api`, but have no dedicated page
+yet; use the API docs at `/docs` on the backend.
+
+What the UI shows when a key is removed: the affected figure keeps its last stored value with its
+original date, or an "unavailable" / empty state with the backend's reason; it never shows a
+zero for missing data. The event types `credit_stress`, `trade_exposure` and `patent_status`
+(free-source alerts) arrive as ordinary news items and alerts; their labels in
+`lib/news/labels.ts` and the severity defaults in `lib/config/news-forms.ts` need the three new
+entries added when the API types are regenerated.
+
 ## Feedback on every item (Phase 4)
 
 `components/feedback/feedback-control.tsx` is one reusable control: **Wrong**, **Irrelevant**

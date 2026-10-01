@@ -307,19 +307,27 @@ async def holding_insider_activity(
     since: dt.date | None = None,
     until: dt.date | None = None,
     limit: int = 200,
+    known_by: dt.date | None = None,
 ) -> InsiderActivityOut:
+    """`known_by` is a point-in-time cutoff on the filing date: filings after it, and the
+    amendments that would have restated rows, are treated as not yet known."""
     until = until or dt.date.today()
     since = since or until - dt.timedelta(days=365)
     records = await pool.fetch(
-        """select f.accession, f.form, f.filed, f.source_url, f.superseded_by_accession,
+        """select f.accession, f.form, f.filed, f.source_url,
+                  case when $4::date is null or sup.filed <= $4::date
+                       then f.superseded_by_accession end as superseded_by_accession,
                   f.amendment_link_status, t.*
            from public.insider_filing f join public.insider_transaction t using (accession)
+           left join public.insider_filing sup on sup.accession = f.superseded_by_accession
            where f.ticker = $1 and coalesce(t.transaction_date, f.filed) between $2 and $3
+             and ($4::date is null or f.filed <= $4::date)
            order by coalesce(t.transaction_date, f.filed) desc, f.filed desc,
                     f.accession desc, t.row_index""",
         ticker,
         since,
         until,
+        known_by,
     )
     rows = [dict(r) for r in records]
     summary, counted = summarise(rows, since, until)

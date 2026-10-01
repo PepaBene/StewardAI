@@ -1,5 +1,7 @@
+import ipaddress
 import os
 import secrets
+import socket
 from collections.abc import AsyncIterator, Iterator
 from dataclasses import dataclass
 from pathlib import Path
@@ -32,6 +34,85 @@ def _no_channel_credentials(monkeypatch: pytest.MonkeyPatch) -> Iterator[None]:
     get_settings.cache_clear()
     yield
     get_settings.cache_clear()
+
+
+# ---------------------------------------------------------------------------------------
+# Offline guard (plan D8.1): CI must never need third-party keys or the internet. Any
+# attempt to open a socket to a non-local address fails the test that made it. Loopback and
+# unix sockets (the test Postgres, in-process ASGI) stay allowed. Set STEWARD_ALLOW_NETWORK=1
+# for an explicit, budgeted live check run by hand.
+# ---------------------------------------------------------------------------------------
+class NetworkAccessBlocked(AssertionError):
+    pass
+
+
+def _is_local_host(host: object) -> bool:
+    if isinstance(host, bytes):
+        host = host.decode(errors="replace")
+    if not isinstance(host, str) or host in {"", "localhost", "localhost.localdomain"}:
+        return True
+    try:
+        return ipaddress.ip_address(host.split("%", 1)[0]).is_loopback
+    except ValueError:
+        return False
+
+
+def _blocked(host: object) -> NetworkAccessBlocked:
+    return NetworkAccessBlocked(
+        f"test attempted real network access to {host!r}; use recorded fixtures "
+        "(httpx.MockTransport) - CI must not need the internet or provider keys"
+    )
+
+
+PROVIDER_KEY_ENV = (
+    "FINNHUB_API_KEY",
+    "ALPHA_VANTAGE_API_KEY",
+    "EODHD_API_KEY",
+    "FMP_API_KEY",
+    "TWELVE_DATA_API_KEY",
+    "UN_COMTRADE_API_KEY",
+    "PEOPLE_DATA_LABS_API_KEY",
+    "DIFFBOT_API_KEY",
+    "EPO_OPS_CLIENT_ID",
+    "EPO_OPS_CLIENT_SECRET",
+    "FRED_API_KEY",
+    "OPENFIGI_API_KEY",
+    "STOOQ_API_KEY",
+)
+
+
+@pytest.fixture(autouse=True)
+def _no_real_network(monkeypatch: pytest.MonkeyPatch) -> Iterator[None]:
+    if os.environ.get("STEWARD_ALLOW_NETWORK") == "1":
+        yield
+        return
+    for name in PROVIDER_KEY_ENV:
+        monkeypatch.delenv(name, raising=False)
+    real_connect = socket.socket.connect
+    real_connect_ex = socket.socket.connect_ex
+    real_getaddrinfo = socket.getaddrinfo
+
+    def guarded_connect(self: socket.socket, address: object) -> None:
+        if self.family in (socket.AF_INET, socket.AF_INET6) and isinstance(address, tuple):
+            if not _is_local_host(address[0]):
+                raise _blocked(address[0])
+        real_connect(self, address)  # type: ignore[arg-type]
+
+    def guarded_connect_ex(self: socket.socket, address: object) -> int:
+        if self.family in (socket.AF_INET, socket.AF_INET6) and isinstance(address, tuple):
+            if not _is_local_host(address[0]):
+                raise _blocked(address[0])
+        return real_connect_ex(self, address)  # type: ignore[arg-type]
+
+    def guarded_getaddrinfo(host: object, *args: object, **kwargs: object) -> object:
+        if not _is_local_host(host):
+            raise _blocked(host)
+        return real_getaddrinfo(host, *args, **kwargs)  # type: ignore[arg-type]
+
+    monkeypatch.setattr(socket.socket, "connect", guarded_connect)
+    monkeypatch.setattr(socket.socket, "connect_ex", guarded_connect_ex)
+    monkeypatch.setattr(socket, "getaddrinfo", guarded_getaddrinfo)
+    yield
 
 
 @dataclass(frozen=True)

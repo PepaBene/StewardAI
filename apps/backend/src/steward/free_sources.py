@@ -426,6 +426,8 @@ async def store_patent_family(
                 citations_forward,citations_backward,legal_status,source,source_url,known_at,raw)
                values($1,$2,null,$3,$4,$5,$6,$7,$8,$9,$10,now(),$11::jsonb)
                on conflict(family_key) do update set
+                 legal_status=case when excluded.legal_status='unknown'
+                   then patent_family.legal_status else excluded.legal_status end,
                  citations_forward=greatest(patent_family.citations_forward,excluded.citations_forward),
                  citations_backward=greatest(patent_family.citations_backward,excluded.citations_backward),
                  cpc_codes=(select array_agg(distinct c) from unnest(

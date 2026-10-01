@@ -17,6 +17,13 @@ import asyncpg
 from steward.config.research import ResearchProfilesConfig
 from steward.config.store import load_active
 from steward.config.thesis import ThesesConfig
+from steward.data_context.research import (
+    Claim,
+    ResearchContext,
+    claim_sentence,
+    company_context,
+    country_context,
+)
 from steward.earnings.read import holding_detail
 from steward.portfolio.read import portfolio_overview
 from steward.research.sources import Registry
@@ -76,6 +83,37 @@ TOOL_DEFINITIONS: list[dict[str, Any]] = [
             "type": "object",
             "properties": {"query": {"type": "string"}},
             "required": ["query"],
+            "additionalProperties": False,
+        },
+    },
+    {
+        "name": "country_context",
+        "description": "Stored country observations (macro series with their latest change, "
+        "latest product trade) for an exposure geography, each with the date it became known. "
+        "Numbers are stored values or latest-minus-previous; they are context, not a "
+        "company-specific effect. Cite the source_id of each claim you use.",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "geography": {"type": "string", "description": "Country code, e.g. DE or US"},
+                "as_of": {"type": "string", "description": "Optional ISO date cutoff."},
+            },
+            "required": ["geography"],
+            "additionalProperties": False,
+        },
+    },
+    {
+        "name": "company_context",
+        "description": "Stored company observations (financial history, forward data, "
+        "company research, confirmed business-network edges, patents) with the date each "
+        "became known and listed gaps. Cite the source_id of each claim you use.",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "ticker": {"type": "string", "description": "e.g. AAPL_US_EQ"},
+                "as_of": {"type": "string", "description": "Optional ISO date cutoff."},
+            },
+            "required": ["ticker"],
             "additionalProperties": False,
         },
     },
@@ -287,6 +325,59 @@ class ChatTools:
                 }
             )
         return {"reports": hits}
+
+    def _register_context(self, context: ResearchContext, app_path: str | None) -> dict[str, Any]:
+        claims: list[dict[str, Any]] = []
+        for claim in context.claims:
+            claims.append(self._register_claim(claim, app_path))
+        return {
+            "scope": context.scope,
+            "subject": context.subject,
+            "as_of": context.as_of.isoformat(),
+            "claims": claims,
+            "gaps": [g.model_dump() for g in context.gaps],
+            "method": context.method,
+        }
+
+    def _register_claim(self, claim: Claim, app_path: str | None) -> dict[str, Any]:
+        sid = self.registry.add(
+            "observation",
+            claim.claim_id,
+            claim.label,
+            url=claim.source_url,
+            app_path=app_path,
+            tier=1 if claim.provenance == "primary" else 2,
+            snippet=claim_sentence(claim),
+            as_of=str(claim.known_as_of),
+        )
+        data = claim.model_dump(mode="json")
+        data["source_id"] = sid
+        return data
+
+    @staticmethod
+    def _cutoff(as_of: str | None) -> dt.datetime | None:
+        if not as_of:
+            return None
+        day = dt.date.fromisoformat(as_of)
+        return dt.datetime.combine(day, dt.time.max, dt.UTC)
+
+    async def _tool_country_context(
+        self, geography: str, as_of: str | None = None
+    ) -> dict[str, Any]:
+        try:
+            cutoff = self._cutoff(as_of)
+        except ValueError:
+            return {"error": "as_of must be an ISO date"}
+        context = await country_context(self.pool, geography.strip().upper(), cutoff)
+        return self._register_context(context, None)
+
+    async def _tool_company_context(self, ticker: str, as_of: str | None = None) -> dict[str, Any]:
+        try:
+            cutoff = self._cutoff(as_of)
+        except ValueError:
+            return {"error": "as_of must be an ISO date"}
+        context = await company_context(self.pool, ticker, cutoff)
+        return self._register_context(context, f"/holdings/{ticker}")
 
     async def _tool_propose_job(
         self,

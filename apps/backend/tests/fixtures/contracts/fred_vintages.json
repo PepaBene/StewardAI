@@ -1,0 +1,24 @@
+{
+ "observation_start": "2025-01-01",
+ "observations": [
+  {
+   "date": "2025-07-01",
+   "realtime_end": "2026-01-28",
+   "realtime_start": "2025-10-30",
+   "value": "22000.0"
+  },
+  {
+   "date": "2025-07-01",
+   "realtime_end": "9999-12-31",
+   "realtime_start": "2026-01-29",
+   "value": "22100.5"
+  },
+  {
+   "date": "2025-10-01",
+   "realtime_end": "9999-12-31",
+   "realtime_start": "2025-10-30",
+   "value": "."
+  }
+ ],
+ "realtime_start": "2026-01-01"
+}

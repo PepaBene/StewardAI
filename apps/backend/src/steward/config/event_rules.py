@@ -29,6 +29,9 @@ EventType = Literal[
     "analyst_rating",
     "delisting",
     "entity_status",
+    "credit_stress",
+    "trade_exposure",
+    "patent_status",
     "other",
 ]
 
@@ -54,6 +57,11 @@ EVENT_DESCRIPTIONS: dict[str, str] = {
     "analyst_rating": "Analyst rating or price target change",
     "delisting": "Delisting: trading on the home market ends (regulator reference data)",
     "entity_status": "Legal entity status change: entity inactive, LEI lapsed or retired",
+    "credit_stress": "Credit stress: a BIS, ECB or FRED credit series crossed its threshold "
+    "on a new observation",
+    "trade_exposure": "Trade exposure change: Comtrade flow for a mapped holding exposure "
+    "moved beyond the threshold",
+    "patent_status": "Material patent legal-status change for a holding's evidenced family",
     "other": "Anything else (market wrap, general commentary, periodic filing)",
 }
 
@@ -75,6 +83,9 @@ DEFAULT_SEVERITIES: dict[str, int] = {
     "analyst_rating": 0,
     "delisting": 2,
     "entity_status": 1,
+    "credit_stress": 2,
+    "trade_exposure": 2,
+    "patent_status": 1,
     "other": 0,
 }
 
@@ -136,6 +147,94 @@ def _default_announcement_rules() -> list[AnnouncementRule]:
         AnnouncementRule.model_validate({"service": s, "pattern": p, "event_type": e})
         for s, p, e in rules
     ]
+
+
+class CreditStressRule(ConfigModel):
+    """A threshold on one stored macro series. Fires once, when a genuinely new observation
+    (a later period than any known before it) is beyond the threshold and the previous
+    period was not; a revision of an old period never fires."""
+
+    key: str = Field(pattern=r"^[a-z0-9_]{1,60}$")
+    label: str = Field(min_length=1, max_length=120)
+    series_id: str = Field(
+        min_length=1,
+        max_length=60,
+        description="`macro_observation.series_id`: a FRED/ECB series key from the jobs config "
+        "or a BIS series key (e.g. debt_service).",
+    )
+    source: Literal["any", "fred", "alfred", "ecb", "eurostat", "bis", "oecd"] = "any"
+    geography: str | None = Field(default=None, max_length=20)
+    direction: Literal["above", "below"] = "above"
+    threshold: float
+    enabled: bool = True
+
+
+def _default_credit_rules() -> list[CreditStressRule]:
+    # Starting points the owner tunes; they are not calibrated against history.
+    return [
+        CreditStressRule(
+            key="ea_bls_tightening",
+            label="Euro-area bank lending survey: enterprise credit standards tightening",
+            series_id="ea_bls_enterprise_credit_standards",
+            source="ecb",
+            threshold=10.0,
+        ),
+        CreditStressRule(
+            key="bis_debt_service_us",
+            label="BIS private-sector debt service ratio, US",
+            series_id="debt_service",
+            source="bis",
+            geography="US",
+            threshold=15.0,
+        ),
+    ]
+
+
+class FreeSourceAlertsConfig(ConfigModel):
+    """Rules for the `free_source_alerts` job (credit stress, trade exposure, patent status,
+    confirmed company-graph events). Every decision, raised or not, is written to
+    `free_source_alert_trail`."""
+
+    enabled: bool = True
+    lookback_days: int = Field(
+        default=3,
+        ge=1,
+        le=30,
+        description="Observations first known within this many days are evaluated; older "
+        "ones are never alerted (a replayed backfill raises nothing).",
+    )
+    throttle_hours: int = Field(
+        default=24,
+        ge=0,
+        le=720,
+        description="After an alert for one rule and scope (series, holding), further alerts "
+        "for the same scope within this many hours are recorded as throttled. 0: off.",
+    )
+    max_alerts_per_run: int = Field(default=10, ge=1, le=100)
+    credit_stress: list[CreditStressRule] = Field(default_factory=_default_credit_rules)
+    trade_min_exposure_weight: float = Field(
+        default=0.05,
+        gt=0,
+        le=1,
+        description="Mapped exposure weight (share of the issuer) below which a trade change "
+        "is not alerted. Unmapped (unknown) weight is never counted.",
+    )
+    trade_min_change_pct: float = Field(
+        default=20.0, gt=0, description="Year-on-year change in the trade value that alerts."
+    )
+    patent_min_ownership_confidence: float = Field(default=0.8, ge=0, le=1)
+    graph_event_types: list[Literal["deal", "financing", "leadership", "relationship"]] = Field(
+        default_factory=lambda: cast(
+            list[Literal["deal", "financing", "leadership", "relationship"]],
+            ["deal", "leadership", "relationship"],
+        ),
+        description="Confirmed company events of these types alert. Suggested or disputed "
+        "ones are listed for review only.",
+    )
+    graph_edge_types: list[str] = Field(
+        default_factory=lambda: ["acquirer", "acquired", "executive", "customer", "supplier"],
+        description="Confirmed company-graph edges of these types alert.",
+    )
 
 
 class EventRulesConfig(ConfigModel):
@@ -205,6 +304,7 @@ class EventRulesConfig(ConfigModel):
         "a policy rate set exactly; fed_funds is the daily effective rate, which drifts, so "
         "it needs a band). Evaluated only on release days.",
     )
+    free_source_alerts: FreeSourceAlertsConfig = Field(default_factory=FreeSourceAlertsConfig)
     announcement_types: list[AnnouncementRule] = Field(
         default_factory=_default_announcement_rules,
         description="How RNS and EQS announcement types map to event types.",
