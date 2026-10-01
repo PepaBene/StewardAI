@@ -1,0 +1,230 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<edgarSubmission xmlns="http://www.sec.gov/edgar/nport" xmlns:com="http://www.sec.gov/edgar/common" xmlns:nportcommon="http://www.sec.gov/edgar/nportcommon">
+ <headerData>
+  <submissionType>NPORT-P</submissionType>
+  <isConfidential>N</isConfidential>
+  <filerInfo>
+   <filer>
+    <issuerCredentials>
+     <cik>0001234567</cik>
+     <ccc>XXXXXXXX</ccc>
+    </issuerCredentials>
+   </filer>
+   <liveTestFlag>LIVE</liveTestFlag>
+   <seriesClassInfo>
+    <seriesId>S000009999</seriesId>
+    <classId>C000012345</classId>
+    <classId>C000012346</classId>
+   </seriesClassInfo>
+  </filerInfo>
+ </headerData>
+ <formData>
+  <genInfo>
+   <regName>Example Index Funds Trust</regName>
+   <regFileNumber>811-99999</regFileNumber>
+   <regCik>0001234567</regCik>
+   <regLei>549300EXAMPLE0000001</regLei>
+   <regStreet1>1 Fund Way</regStreet1>
+   <regCity>Boston</regCity>
+   <regStateConditional regState="US-MA" regCountry="US"/>
+   <regZipOrPostalCode>02110</regZipOrPostalCode>
+   <regPhone>617-555-0100</regPhone>
+   <seriesName>Example US Large Cap ETF</seriesName>
+   <seriesId>S000009999</seriesId>
+   <seriesLei>549300EXAMPLE0000002</seriesLei>
+   <repPdEnd>2026-10-31</repPdEnd>
+   <repPdDate>2026-06-30</repPdDate>
+   <isFinalFiling>N</isFinalFiling>
+  </genInfo>
+  <fundInfo>
+   <totAssets>5012345678.90</totAssets>
+   <totLiabs>12345678.90</totLiabs>
+   <netAssets>5000000000.00</netAssets>
+   <assetsAttrMiscSec>0.00</assetsAttrMiscSec>
+   <assetsInvested>0.00</assetsInvested>
+   <amtPayOneYrBanksBorr>0.00</amtPayOneYrBanksBorr>
+   <curMetrics>
+    <curMetric>
+     <curCd>USD</curCd>
+     <intrstRtRiskdv01>
+      <period3Mon>1200.5</period3Mon>
+      <period1Yr>2300.25</period1Yr>
+      <period5Yr>3100.0</period5Yr>
+      <period10Yr>4000.0</period10Yr>
+      <period30Yr>5200.0</period30Yr>
+     </intrstRtRiskdv01>
+    </curMetric>
+   </curMetrics>
+   <creditSprdRiskInvstGrade>
+    <period3Mon>10.5</period3Mon>
+    <period1Yr>20.5</period1Yr>
+    <period5Yr>30.5</period5Yr>
+    <period10Yr>40.5</period10Yr>
+    <period30Yr>50.5</period30Yr>
+   </creditSprdRiskInvstGrade>
+   <creditSprdRiskNonInvstGrade>
+    <period3Mon>0.0</period3Mon>
+    <period1Yr>0.0</period1Yr>
+    <period5Yr>0.0</period5Yr>
+    <period10Yr>0.0</period10Yr>
+    <period30Yr>0.0</period30Yr>
+   </creditSprdRiskNonInvstGrade>
+   <returnInfo>
+    <monthlyTotReturns>
+     <monthlyTotReturn classId="C000012345" rtn1="1.25" rtn2="-0.50" rtn3="2.10"/>
+     <monthlyTotReturn classId="C000012346" rtn1="1.20" rtn2="-0.55" rtn3="2.05"/>
+    </monthlyTotReturns>
+    <othMon1><netRealizedGain>100.0</netRealizedGain><netUnrealizedAppr>200.0</netUnrealizedAppr></othMon1>
+   </returnInfo>
+   <mon1Flow sales="100000000.00" reinvestment="0.00" redemption="40000000.00"/>
+   <mon2Flow sales="90000000.00" reinvestment="0.00" redemption="50000000.00"/>
+   <mon3Flow sales="80000000.00" reinvestment="0.00" redemption="30000000.00"/>
+  </fundInfo>
+  <invstOrSecs>
+   <invstOrSec>
+    <name>Apple Inc</name>
+    <lei>HWUPKR0MPOU8FGXBT394</lei>
+    <title>Apple Inc</title>
+    <cusip>037833100</cusip>
+    <identifiers>
+     <isin value="US0378331005"/>
+    </identifiers>
+    <balance>1500000.00</balance>
+    <units>NS</units>
+    <curCd>USD</curCd>
+    <valUSD>345000000.00</valUSD>
+    <pctVal>6.9</pctVal>
+    <payoffProfile>Long</payoffProfile>
+    <assetCat>EC</assetCat>
+    <issuerCat>CORP</issuerCat>
+    <invCountry>US</invCountry>
+    <isRestrictedSec>N</isRestrictedSec>
+    <fairValLevel>1</fairValLevel>
+   </invstOrSec>
+   <invstOrSec>
+    <name>Microsoft Corp</name>
+    <lei>INR2EJN1ERAN0W5ZP974</lei>
+    <title>Microsoft Corp</title>
+    <cusip>594918104</cusip>
+    <identifiers>
+     <isin value="US5949181045"/>
+    </identifiers>
+    <balance>800000.00</balance>
+    <units>NS</units>
+    <curCd>USD</curCd>
+    <valUSD>336000000.00</valUSD>
+    <pctVal>6.72</pctVal>
+    <payoffProfile>Long</payoffProfile>
+    <assetCat>EC</assetCat>
+    <issuerCat>CORP</issuerCat>
+    <invCountry>US</invCountry>
+    <isRestrictedSec>N</isRestrictedSec>
+    <fairValLevel>1</fairValLevel>
+   </invstOrSec>
+   <invstOrSec>
+    <name>Alphabet Inc</name>
+    <lei>5493006MHB84DD0ZWV18</lei>
+    <title>Alphabet Inc Class A</title>
+    <cusip>02079K305</cusip>
+    <identifiers>
+     <isin value="US02079K3059"/>
+    </identifiers>
+    <balance>1900000.00</balance>
+    <units>NS</units>
+    <curCd>USD</curCd>
+    <valUSD>320000000.00</valUSD>
+    <pctVal>6.4</pctVal>
+    <payoffProfile>Long</payoffProfile>
+    <assetCat>EC</assetCat>
+    <issuerCat>CORP</issuerCat>
+    <invCountry>US</invCountry>
+    <isRestrictedSec>N</isRestrictedSec>
+    <fairValLevel>1</fairValLevel>
+   </invstOrSec>
+   <invstOrSec>
+    <name>Unmapped Holdings plc</name>
+    <lei>N/A</lei>
+    <title>Unmapped ord</title>
+    <cusip>N/A</cusip>
+    <identifiers>
+     <isin value="GB00B0000001"/>
+    </identifiers>
+    <balance>250000.00</balance>
+    <units>NS</units>
+    <curCd>GBP</curCd>
+    <valUSD>9000000.00</valUSD>
+    <pctVal>0.18</pctVal>
+    <payoffProfile>Long</payoffProfile>
+    <assetCat>EC</assetCat>
+    <issuerCat>CORP</issuerCat>
+    <invCountry>GB</invCountry>
+    <isRestrictedSec>N</isRestrictedSec>
+    <fairValLevel>1</fairValLevel>
+   </invstOrSec>
+   <invstOrSec>
+    <name>US Treasury Note 4.25% 2028</name>
+    <lei>N/A</lei>
+    <title>UST 4.25 15Feb28</title>
+    <cusip>91282CLB5</cusip>
+    <identifiers>
+     <other otherDesc="FIGI" value="BBG000000000"/>
+    </identifiers>
+    <balance>5000000.00</balance>
+    <units>PA</units>
+    <curCd>USD</curCd>
+    <valUSD>4950000.00</valUSD>
+    <pctVal>0.099</pctVal>
+    <payoffProfile>Long</payoffProfile>
+    <assetCat>DBT</assetCat>
+    <issuerCat>UST</issuerCat>
+    <invCountry>US</invCountry>
+    <isRestrictedSec>N</isRestrictedSec>
+    <fairValLevel>1</fairValLevel>
+    <debtSec>
+     <maturityDt>2028-02-15</maturityDt>
+     <couponKind>Fixed</couponKind>
+     <annualizedRt>4.25</annualizedRt>
+     <isDefault>N</isDefault>
+     <areIntrstPmntsInArrears>N</areIntrstPmntsInArrears>
+     <isPaidKind>N</isPaidKind>
+    </debtSec>
+   </invstOrSec>
+   <invstOrSec>
+    <name>S&amp;P 500 E-mini Future Dec26</name>
+    <lei>N/A</lei>
+    <title>ESZ6</title>
+    <cusip>000000000</cusip>
+    <identifiers>
+     <other otherDesc="FIGI" value="BBG000000000"/>
+    </identifiers>
+    <balance>40</balance>
+    <units>NC</units>
+    <curCd>USD</curCd>
+    <valUSD>-125000.00</valUSD>
+    <pctVal>-0.0025</pctVal>
+    <payoffProfile>Short</payoffProfile>
+    <assetCat>DE</assetCat>
+    <issuerCat>CORP</issuerCat>
+    <invCountry>US</invCountry>
+    <isRestrictedSec>N</isRestrictedSec>
+    <fairValLevel>1</fairValLevel>
+    <derivativeInfo>
+     <futrDeriv derivCat="FUT">
+      <counterparties><counterpartyName>Exchange Clearing</counterpartyName></counterparties>
+      <expDate>2026-12-18</expDate>
+      <notionalAmt>250000000.00</notionalAmt>
+      <curCd>USD</curCd>
+      <unrealizedAppr>-125000.00</unrealizedAppr>
+     </futrDeriv>
+    </derivativeInfo>
+   </invstOrSec>
+  </invstOrSecs>
+  <signature>
+   <dateSigned>2026-08-26</dateSigned>
+   <nameOfApplicant>Example Index Funds Trust</nameOfApplicant>
+   <signature>Jane Doe</signature>
+   <signerName>Jane Doe</signerName>
+   <title>Treasurer</title>
+  </signature>
+ </formData>
+</edgarSubmission>

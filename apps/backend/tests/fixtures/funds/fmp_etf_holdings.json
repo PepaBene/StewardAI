@@ -1,0 +1,2 @@
+[{"symbol":"SPY","asset":"AAPL","name":"Apple Inc","isin":"US0378331005","securityCusip":"037833100","sharesNumber":183500000,"weightPercentage":7.01,"marketValue":41200000000,"updatedAt":"2026-09-26T04:00:00.000Z"},
+ {"symbol":"SPY","asset":"AAPL","name":"Apple Inc duplicate","isin":"US0378331005","securityCusip":"037833100","sharesNumber":1,"weightPercentage":0.1,"marketValue":1,"updatedAt":"2026-09-26T04:00:00.000Z"}]
