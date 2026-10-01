@@ -15,6 +15,7 @@ from steward.earnings.calendar import (
 from steward.earnings.check import earnings_check_handler, thesis_verdicts_handler
 from steward.earnings.reconcile import fact_reconcile_handler
 from steward.fundamentals.collect import sec_xbrl_handler
+from steward.funds.drift import fund_characteristics_audit_handler
 from steward.jobs.runner import JobHandler
 from steward.lookthrough.collect import etf_look_through_handler
 from steward.macro.collect import macro_collect_handler
@@ -24,7 +25,9 @@ from steward.news.digest import daily_digest_handler, weekly_digest_handler
 from steward.news.escalation import event_escalation_handler
 from steward.news.pipeline import news_ingest_handler
 from steward.ownership.collect import ownership_13f_handler
+from steward.ownership.control_stakes import control_stakes_handler
 from steward.ownership.insider_collect import insider_trades_handler
+from steward.ownership.nport_collect import nport_holdings_handler
 from steward.portfolio.sync import portfolio_sync_handler
 from steward.reference.identity import reference_data_handler
 from steward.reference.intraday import intraday_prices_handler
@@ -32,6 +35,7 @@ from steward.reference.prices import holiday_refresh_handler, price_history_hand
 from steward.research.run import research_handler
 from steward.review.monthly import monthly_review_handler
 from steward.sources.audit import source_audit_handler
+from steward.sources.fund_probes import fund_probes_handler
 from steward.valuation.collect import valuation_refresh_handler
 
 JobType = Literal[
@@ -62,6 +66,10 @@ JobType = Literal[
     "chat",
     "sec_xbrl",
     "valuation_refresh",
+    "control_stakes",
+    "nport_holdings",
+    "fund_probes",
+    "fund_characteristics_audit",
 ]
 
 JOB_HANDLERS: dict[str, JobHandler] = {
@@ -92,4 +100,8 @@ JOB_HANDLERS: dict[str, JobHandler] = {
     "chat": chat_handler,
     "sec_xbrl": sec_xbrl_handler,
     "valuation_refresh": valuation_refresh_handler,
+    "control_stakes": control_stakes_handler,
+    "nport_holdings": nport_holdings_handler,
+    "fund_probes": fund_probes_handler,
+    "fund_characteristics_audit": fund_characteristics_audit_handler,
 }

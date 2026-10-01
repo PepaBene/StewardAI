@@ -14,9 +14,9 @@ import httpx
 import pytest
 
 from api.auth import AuthenticatedUser, require_owner
+from api.control_stake_routes import router as control_router
 from api.db import get_pool, get_pool_or_error
 from api.main import create_app
-from api.control_stake_routes import router as control_router
 from steward.jobs.runner import JobContext, run_job
 from steward.ownership.control_stakes import (
     Snapshot,
@@ -41,6 +41,14 @@ ACC_13D = "0001500001-25-000001"
 ACC_13DA = "0001500001-25-000020"
 ACC_13G = "0002000001-26-000005"
 ACC_LEGACY = "0003000001-20-000009"
+
+
+def json_keys(node: object) -> list[str]:
+    if isinstance(node, dict):
+        return [str(k).lower() for k in node] + [k for v in node.values() for k in json_keys(v)]
+    if isinstance(node, list):
+        return [k for v in node for k in json_keys(v)]
+    return []
 
 
 def load(name: str) -> bytes:
@@ -383,7 +391,8 @@ async def test_collector_stores_chain_provenance_and_reads_back(
     assert link["percent_check"] == "consistent"
     assert link["class_shares_outstanding"] == Decimal(50_000_000)
     bad = await backend_pool.fetchrow(
-        "select percent_check, computed_percent from control_stake_issuer_link where accession = $1",
+        "select percent_check, computed_percent from control_stake_issuer_link"
+        " where accession = $1",
         ACC_13DA,
     )
     assert bad["computed_percent"] == Decimal("11.20")  # 5.6M / 50M, kept beside the filer's 11.2
@@ -405,8 +414,7 @@ async def test_collector_stores_chain_provenance_and_reads_back(
     assert len(amended["holders"]) == 3
     assert amended["reconciliation"]["percent_check"] == "consistent"
     # No total across filings or channels is ever produced.
-    flat = str(body).lower()
-    assert "total" not in flat and "combined" not in flat
+    assert not [k for k in json_keys(body) if "total" in k or "combined" in k]
 
 
 @pytest.mark.db

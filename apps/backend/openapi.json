@@ -9298,6 +9298,809 @@
           }
         }
       }
+    },
+    "/jobs/control-stakes": {
+      "post": {
+        "tags": [
+          "jobs"
+        ],
+        "summary": "Run Control Stakes",
+        "description": "Load Schedule 13D/G filings for held issuers and tracked managers now.",
+        "operationId": "run_control_stakes",
+        "responses": {
+          "202": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/JobSummary"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/holdings/{ticker}/control-stakes": {
+      "get": {
+        "tags": [
+          "holdings"
+        ],
+        "summary": "Get Control Stakes",
+        "description": "Beneficial-ownership / control stakes (13D/G), never combined with 13F or fund data.",
+        "operationId": "get_control_stakes",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "ticker",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9._-]{1,32}$",
+              "title": "Ticker"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ControlStakesOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/holdings/{ticker}/insider-activity": {
+      "get": {
+        "tags": [
+          "holdings"
+        ],
+        "summary": "Get Insider Activity",
+        "description": "Insider transactions by economic class and net discretionary (open-market) activity.",
+        "operationId": "get_insider_activity",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "ticker",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9._-]{1,32}$",
+              "title": "Ticker"
+            }
+          },
+          {
+            "name": "since",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Default: 365 days before until.",
+              "title": "Since"
+            },
+            "description": "Default: 365 days before until."
+          },
+          {
+            "name": "until",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Default: today.",
+              "title": "Until"
+            },
+            "description": "Default: today."
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 500,
+              "minimum": 1,
+              "default": 200,
+              "title": "Limit"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InsiderActivityOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/jobs/nport-holdings": {
+      "post": {
+        "tags": [
+          "jobs"
+        ],
+        "summary": "Run Nport Holdings",
+        "description": "Load SEC N-PORT holdings for the portfolio's US funds now.",
+        "operationId": "run_nport_holdings",
+        "responses": {
+          "202": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/JobSummary"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/holdings/{ticker}/fund-positions": {
+      "get": {
+        "tags": [
+          "holdings"
+        ],
+        "summary": "Get Fund Positions",
+        "description": "Latest N-PORT positions funds report in this holding, each with its report date,\nfiling lag and public-availability date, plus coverage. Fund positions only: not beneficial\nownership and never additive with Form 13F or 13D/G figures.",
+        "operationId": "get_fund_positions",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "ticker",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9._-]{1,32}$",
+              "title": "Ticker"
+            }
+          },
+          {
+            "name": "as_of",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "As Of"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 200,
+              "minimum": 1,
+              "default": 50,
+              "title": "Limit"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HoldingFundPositions"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/funds/aggregate": {
+      "get": {
+        "tags": [
+          "funds"
+        ],
+        "summary": "Get Fund Aggregate",
+        "description": "Direct shares plus fund holdings by canonical issuer: top issuers and overlap,\nregion/country/sector/currency exposure, fee drag and the explicit unknown fund weight\n(never redistributed), with every as-of date and staleness visible.",
+        "operationId": "get_fund_aggregate",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "as_of",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Answer as of this date (point-in-time).",
+              "title": "As Of"
+            },
+            "description": "Answer as of this date (point-in-time)."
+          },
+          {
+            "name": "top",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 200,
+              "minimum": 1,
+              "default": 25,
+              "title": "Top"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AggregateReport"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/funds/overlap": {
+      "get": {
+        "tags": [
+          "funds"
+        ],
+        "summary": "Get Fund Overlap",
+        "description": "Pairwise overlap between configured funds, per-fund concentration and coverage with\nreporting lag and unknown (unaccounted) weight.",
+        "operationId": "get_fund_overlap",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "as_of",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Answer as of this date (point-in-time).",
+              "title": "As Of"
+            },
+            "description": "Answer as of this date (point-in-time)."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FundOverlapReport"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/funds/look-through": {
+      "get": {
+        "tags": [
+          "funds"
+        ],
+        "summary": "Get Look Through As Of",
+        "description": "The base look-through report as it could have been computed at `as_of`.",
+        "operationId": "get_look_through_as_of",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "as_of",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "date",
+              "description": "Only records known by the end of this day.",
+              "title": "As Of"
+            },
+            "description": "Only records known by the end of this day."
+          },
+          {
+            "name": "top",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 100,
+              "minimum": 1,
+              "default": 25,
+              "title": "Top"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/funds/coverage-ledger": {
+      "get": {
+        "tags": [
+          "funds"
+        ],
+        "summary": "Get Coverage Ledger",
+        "description": "Where each fund's/index's constituents come from, and which benchmarks lack total\nreturn or historical constituents before performance/backtest use.",
+        "operationId": "get_coverage_ledger",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CoverageLedger"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      },
+      "put": {
+        "tags": [
+          "funds"
+        ],
+        "summary": "Put Coverage Entry",
+        "description": "Record an owner-verified ledger row; a refresh never overwrites it.",
+        "operationId": "put_coverage_entry",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LedgerEntryInput"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CoverageLedger"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/funds/coverage-ledger/refresh": {
+      "post": {
+        "tags": [
+          "funds"
+        ],
+        "summary": "Refresh Coverage Ledger",
+        "description": "Rebuild the derived ledger rows from the Jobs config and stored snapshots.",
+        "operationId": "refresh_coverage_ledger",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CoverageLedger"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/funds/{isin}/factsheet": {
+      "get": {
+        "tags": [
+          "funds"
+        ],
+        "summary": "Get Factsheet",
+        "description": "Factsheet history of a fund: charges, benchmark, distribution policy, NAV basis, the\ncash/derivative remainder and whether the rows reconcile.",
+        "operationId": "get_factsheet",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "isin",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[A-Z]{2}[A-Z0-9]{9}[0-9]$",
+              "title": "Isin"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 120,
+              "minimum": 1,
+              "default": 24,
+              "title": "Limit"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "funds"
+        ],
+        "summary": "Put Factsheet",
+        "description": "Owner-entered factsheet figures (KID/issuer factsheet) for gaps the issuer feed leaves.",
+        "operationId": "put_factsheet",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "isin",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[A-Z]{2}[A-Z0-9]{9}[0-9]$",
+              "title": "Isin"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ManualFactsheetInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/funds/snapshots/pin": {
+      "post": {
+        "tags": [
+          "funds"
+        ],
+        "summary": "Pin Snapshots",
+        "description": "Protect the holdings snapshots a saved report/decision rests on from retention pruning.",
+        "operationId": "pin_snapshots",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PinInput"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/funds/characteristics-audit": {
+      "get": {
+        "tags": [
+          "funds"
+        ],
+        "summary": "Get Characteristics Audit",
+        "description": "Parser-drift audit of issuer fund P/E and P/B: verdict per observation (real value or\nmethodology change vs parser drift) with the shape fingerprint and stated rules.",
+        "operationId": "get_characteristics_audit",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "fund_key",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "pattern": "^[A-Za-z0-9._-]{1,32}$"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Fund Key"
+            }
+          },
+          {
+            "name": "alerts_only",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "default": false,
+              "title": "Alerts Only"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 500,
+              "minimum": 1,
+              "default": 50,
+              "title": "Limit"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
@@ -9472,6 +10275,132 @@
           "gaps"
         ],
         "title": "ActivityCoverage"
+      },
+      "AggregateReport": {
+        "properties": {
+          "as_of": {
+            "type": "string",
+            "format": "date",
+            "title": "As Of",
+            "description": "The date this report answers for."
+          },
+          "portfolio_snapshot_date": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Portfolio Snapshot Date"
+          },
+          "base_currency": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Base Currency"
+          },
+          "total_value": {
+            "type": "number",
+            "title": "Total Value"
+          },
+          "available": {
+            "type": "boolean",
+            "title": "Available"
+          },
+          "method": {
+            "type": "string",
+            "title": "Method"
+          },
+          "funds": {
+            "items": {
+              "$ref": "#/components/schemas/FundAsOf"
+            },
+            "type": "array",
+            "title": "Funds"
+          },
+          "stale_funds": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Stale Funds"
+          },
+          "issuers": {
+            "items": {
+              "$ref": "#/components/schemas/IssuerExposure"
+            },
+            "type": "array",
+            "title": "Issuers"
+          },
+          "overlap": {
+            "items": {
+              "$ref": "#/components/schemas/IssuerExposure"
+            },
+            "type": "array",
+            "title": "Overlap",
+            "description": "Issuers reached through 2+ channels."
+          },
+          "exposures": {
+            "items": {
+              "$ref": "#/components/schemas/ExposureView"
+            },
+            "type": "array",
+            "title": "Exposures"
+          },
+          "fees": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/FeeDrag"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "unknown": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Unknown"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "notes": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Notes"
+          }
+        },
+        "type": "object",
+        "required": [
+          "as_of",
+          "portfolio_snapshot_date",
+          "base_currency",
+          "total_value",
+          "available",
+          "method",
+          "funds",
+          "stale_funds",
+          "issuers",
+          "overlap",
+          "exposures",
+          "fees",
+          "unknown",
+          "notes"
+        ],
+        "title": "AggregateReport"
       },
       "AlertOut": {
         "properties": {
@@ -10290,6 +11219,57 @@
         ],
         "title": "BoardRow"
       },
+      "Bucket": {
+        "properties": {
+          "key": {
+            "type": "string",
+            "title": "Key"
+          },
+          "label": {
+            "type": "string",
+            "title": "Label"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "classified",
+              "cash",
+              "fund_cash",
+              "not_looked_through",
+              "unknown_fund",
+              "unclassified"
+            ],
+            "title": "Kind"
+          },
+          "weight": {
+            "type": "number",
+            "title": "Weight"
+          },
+          "value_base": {
+            "type": "number",
+            "title": "Value Base"
+          },
+          "direct_weight": {
+            "type": "number",
+            "title": "Direct Weight"
+          },
+          "fund_weight": {
+            "type": "number",
+            "title": "Fund Weight"
+          }
+        },
+        "type": "object",
+        "required": [
+          "key",
+          "label",
+          "kind",
+          "weight",
+          "value_base",
+          "direct_weight",
+          "fund_weight"
+        ],
+        "title": "Bucket"
+      },
       "BucketDrift": {
         "properties": {
           "bucket": {
@@ -10501,7 +11481,11 @@
                 "monthly_review",
                 "chat",
                 "sec_xbrl",
-                "valuation_refresh"
+                "valuation_refresh",
+                "control_stakes",
+                "nport_holdings",
+                "fund_probes",
+                "fund_characteristics_audit"
               ]
             },
             "type": "array",
@@ -10540,7 +11524,11 @@
                 "monthly_review",
                 "chat",
                 "sec_xbrl",
-                "valuation_refresh"
+                "valuation_refresh",
+                "control_stakes",
+                "nport_holdings",
+                "fund_probes",
+                "fund_characteristics_audit"
               ]
             },
             "type": "object",
@@ -10924,6 +11912,64 @@
         ],
         "title": "CategoryWeightRule",
         "description": "Limit on a category's weight; with no bucket it applies to every bucket of the dimension."
+      },
+      "ChannelWeight": {
+        "properties": {
+          "kind": {
+            "type": "string",
+            "enum": [
+              "direct",
+              "fund"
+            ],
+            "title": "Kind"
+          },
+          "ticker": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ticker"
+          },
+          "isin": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Isin",
+            "description": "The fund's ISIN for a fund channel."
+          },
+          "label": {
+            "type": "string",
+            "title": "Label"
+          },
+          "weight": {
+            "type": "number",
+            "title": "Weight",
+            "description": "Share of total portfolio value."
+          },
+          "value_base": {
+            "type": "number",
+            "title": "Value Base"
+          }
+        },
+        "type": "object",
+        "required": [
+          "kind",
+          "ticker",
+          "isin",
+          "label",
+          "weight",
+          "value_base"
+        ],
+        "title": "ChannelWeight"
       },
       "ChatAnswer": {
         "properties": {
@@ -12331,6 +13377,243 @@
         ],
         "title": "ContributionReport"
       },
+      "ControlStakeOut": {
+        "properties": {
+          "accession": {
+            "type": "string",
+            "title": "Accession"
+          },
+          "form": {
+            "type": "string",
+            "title": "Form"
+          },
+          "schedule": {
+            "type": "string",
+            "enum": [
+              "13D",
+              "13G"
+            ],
+            "title": "Schedule"
+          },
+          "is_amendment": {
+            "type": "boolean",
+            "title": "Is Amendment"
+          },
+          "amendment_no": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Amendment No"
+          },
+          "filed": {
+            "type": "string",
+            "format": "date",
+            "title": "Filed"
+          },
+          "event_date": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Event Date"
+          },
+          "issuer_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Issuer Name"
+          },
+          "issuer_cusip": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Issuer Cusip"
+          },
+          "class_title": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Class Title"
+          },
+          "stake_shares": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Stake Shares"
+          },
+          "stake_percent": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Stake Percent"
+          },
+          "stake_basis": {
+            "type": "string",
+            "title": "Stake Basis"
+          },
+          "intent_text": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Intent Text"
+          },
+          "prior_accession": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Prior Accession"
+          },
+          "holders": {
+            "items": {
+              "$ref": "#/components/schemas/StakeHolderOut"
+            },
+            "type": "array",
+            "title": "Holders"
+          },
+          "reconciliation": {
+            "$ref": "#/components/schemas/StakeReconciliationOut"
+          },
+          "changes": {
+            "items": {
+              "$ref": "#/components/schemas/StakeChangeOut"
+            },
+            "type": "array",
+            "title": "Changes"
+          },
+          "source_url": {
+            "type": "string",
+            "title": "Source Url"
+          }
+        },
+        "type": "object",
+        "required": [
+          "accession",
+          "form",
+          "schedule",
+          "is_amendment",
+          "amendment_no",
+          "filed",
+          "event_date",
+          "issuer_name",
+          "issuer_cusip",
+          "class_title",
+          "stake_shares",
+          "stake_percent",
+          "stake_basis",
+          "intent_text",
+          "prior_accession",
+          "holders",
+          "reconciliation",
+          "changes",
+          "source_url"
+        ],
+        "title": "ControlStakeOut"
+      },
+      "ControlStakesOut": {
+        "properties": {
+          "ticker": {
+            "type": "string",
+            "title": "Ticker"
+          },
+          "channel": {
+            "type": "string",
+            "const": "beneficial_ownership_13dg",
+            "title": "Channel",
+            "default": "beneficial_ownership_13dg"
+          },
+          "not_additive_with": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Not Additive With"
+          },
+          "stakes": {
+            "items": {
+              "$ref": "#/components/schemas/ControlStakeOut"
+            },
+            "type": "array",
+            "title": "Stakes",
+            "description": "Latest filing of each amendment chain (not restated by a later filing)."
+          },
+          "superseded": {
+            "items": {
+              "$ref": "#/components/schemas/ControlStakeOut"
+            },
+            "type": "array",
+            "title": "Superseded",
+            "description": "Earlier filings of those chains, newest first, with their own changes."
+          },
+          "limitations": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Limitations"
+          }
+        },
+        "type": "object",
+        "required": [
+          "ticker",
+          "stakes",
+          "superseded",
+          "limitations"
+        ],
+        "title": "ControlStakesOut"
+      },
       "ConversationDetail": {
         "properties": {
           "conversation": {
@@ -12781,6 +14064,38 @@
           "portfolio_share_looked_through"
         ],
         "title": "Coverage"
+      },
+      "CoverageLedger": {
+        "properties": {
+          "entries": {
+            "items": {
+              "$ref": "#/components/schemas/LedgerRow"
+            },
+            "type": "array",
+            "title": "Entries"
+          },
+          "tiers": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "type": "object",
+            "title": "Tiers"
+          },
+          "flagged_benchmarks": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Flagged Benchmarks"
+          }
+        },
+        "type": "object",
+        "required": [
+          "entries",
+          "tiers",
+          "flagged_benchmarks"
+        ],
+        "title": "CoverageLedger"
       },
       "DailyFallback": {
         "properties": {
@@ -15207,6 +16522,38 @@
         ],
         "title": "ExchangeSessionInput"
       },
+      "ExclusionOut": {
+        "properties": {
+          "reason": {
+            "type": "string",
+            "title": "Reason"
+          },
+          "rows": {
+            "type": "integer",
+            "title": "Rows"
+          },
+          "shares": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              }
+            ],
+            "title": "Shares",
+            "description": "Sum of the reported share counts of the excluded rows."
+          }
+        },
+        "type": "object",
+        "required": [
+          "reason",
+          "rows",
+          "shares"
+        ],
+        "title": "ExclusionOut"
+      },
       "ExportedDomain": {
         "properties": {
           "version_id": {
@@ -15608,6 +16955,39 @@
           "id"
         ],
         "title": "ExposureResult"
+      },
+      "ExposureView": {
+        "properties": {
+          "dimension": {
+            "type": "string",
+            "enum": [
+              "country",
+              "region",
+              "sector",
+              "currency"
+            ],
+            "title": "Dimension"
+          },
+          "buckets": {
+            "items": {
+              "$ref": "#/components/schemas/Bucket"
+            },
+            "type": "array",
+            "title": "Buckets"
+          },
+          "reconciles": {
+            "type": "boolean",
+            "title": "Reconciles",
+            "description": "Buckets add up to the total within tolerance."
+          }
+        },
+        "type": "object",
+        "required": [
+          "dimension",
+          "buckets",
+          "reconciles"
+        ],
+        "title": "ExposureView"
       },
       "FactCheck": {
         "properties": {
@@ -16013,6 +17393,56 @@
           "detail"
         ],
         "title": "FailedCheck"
+      },
+      "FeeDrag": {
+        "properties": {
+          "annual_drag": {
+            "type": "number",
+            "title": "Annual Drag",
+            "description": "Share of total portfolio value per year."
+          },
+          "annual_cost_base": {
+            "type": "number",
+            "title": "Annual Cost Base"
+          },
+          "funds_with_ratio": {
+            "type": "integer",
+            "title": "Funds With Ratio"
+          },
+          "funds_without_ratio": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Funds Without Ratio"
+          },
+          "unpriced_weight": {
+            "type": "number",
+            "title": "Unpriced Weight",
+            "description": "Portfolio share in funds whose expense ratio is unknown (not assumed 0)."
+          },
+          "weighted_expense_ratio": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Weighted Expense Ratio"
+          }
+        },
+        "type": "object",
+        "required": [
+          "annual_drag",
+          "annual_cost_base",
+          "funds_with_ratio",
+          "funds_without_ratio",
+          "unpriced_weight",
+          "weighted_expense_ratio"
+        ],
+        "title": "FeeDrag"
       },
       "FeeNameTotal": {
         "properties": {
@@ -16635,6 +18065,272 @@
         ],
         "title": "Freshness"
       },
+      "FundAsOf": {
+        "properties": {
+          "isin": {
+            "type": "string",
+            "title": "Isin"
+          },
+          "label": {
+            "type": "string",
+            "title": "Label"
+          },
+          "ticker": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ticker"
+          },
+          "weight": {
+            "type": "number",
+            "title": "Weight"
+          },
+          "value_base": {
+            "type": "number",
+            "title": "Value Base"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "ok",
+              "stale",
+              "missing",
+              "not_configured"
+            ],
+            "title": "Status"
+          },
+          "holdings_as_of": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Holdings As Of"
+          },
+          "lag_days": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Lag Days"
+          },
+          "stale": {
+            "type": "boolean",
+            "title": "Stale"
+          },
+          "source": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source"
+          },
+          "rows_total_weight": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Rows Total Weight"
+          },
+          "residual_weight": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Residual Weight",
+            "description": "1 - sum of published rows; unknown."
+          },
+          "unknown_weight": {
+            "type": "number",
+            "title": "Unknown Weight",
+            "description": "Share of total portfolio value left unknown."
+          },
+          "reconciles": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reconciles"
+          },
+          "expense_ratio": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Expense Ratio"
+          },
+          "fee_drag": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fee Drag",
+            "description": "weight x expense ratio, per year."
+          },
+          "warnings": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Warnings"
+          }
+        },
+        "type": "object",
+        "required": [
+          "isin",
+          "label",
+          "ticker",
+          "weight",
+          "value_base",
+          "status",
+          "holdings_as_of",
+          "lag_days",
+          "stale",
+          "source",
+          "rows_total_weight",
+          "residual_weight",
+          "unknown_weight",
+          "reconciles",
+          "expense_ratio",
+          "fee_drag",
+          "warnings"
+        ],
+        "title": "FundAsOf"
+      },
+      "FundCoverage": {
+        "properties": {
+          "isin": {
+            "type": "string",
+            "title": "Isin"
+          },
+          "label": {
+            "type": "string",
+            "title": "Label"
+          },
+          "as_of": {
+            "type": "string",
+            "format": "date",
+            "title": "As Of"
+          },
+          "lag_days": {
+            "type": "integer",
+            "title": "Lag Days"
+          },
+          "stale": {
+            "type": "boolean",
+            "title": "Stale"
+          },
+          "equity_weight": {
+            "type": "number",
+            "title": "Equity Weight"
+          },
+          "cash_derivative_other_weight": {
+            "type": "number",
+            "title": "Cash Derivative Other Weight"
+          },
+          "unknown_weight": {
+            "type": "number",
+            "title": "Unknown Weight",
+            "description": "1 - sum of rows, when positive."
+          },
+          "unidentified_equity_weight": {
+            "type": "number",
+            "title": "Unidentified Equity Weight",
+            "description": "Equity rows without an ISIN (matched by name only)."
+          },
+          "hhi": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Hhi"
+          },
+          "effective_n": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Effective N"
+          },
+          "top10_share": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Top10 Share"
+          },
+          "issuers": {
+            "type": "integer",
+            "title": "Issuers"
+          }
+        },
+        "type": "object",
+        "required": [
+          "isin",
+          "label",
+          "as_of",
+          "lag_days",
+          "stale",
+          "equity_weight",
+          "cash_derivative_other_weight",
+          "unknown_weight",
+          "unidentified_equity_weight",
+          "hhi",
+          "effective_n",
+          "top10_share",
+          "issuers"
+        ],
+        "title": "FundCoverage"
+      },
       "FundHolding": {
         "properties": {
           "name": {
@@ -17000,6 +18696,367 @@
           "top_holdings"
         ],
         "title": "FundLookThrough"
+      },
+      "FundOverlapReport": {
+        "properties": {
+          "as_of": {
+            "type": "string",
+            "format": "date",
+            "title": "As Of"
+          },
+          "pairs": {
+            "items": {
+              "$ref": "#/components/schemas/FundPairOverlap"
+            },
+            "type": "array",
+            "title": "Pairs"
+          },
+          "funds": {
+            "items": {
+              "$ref": "#/components/schemas/FundCoverage"
+            },
+            "type": "array",
+            "title": "Funds"
+          },
+          "notes": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Notes"
+          }
+        },
+        "type": "object",
+        "required": [
+          "as_of",
+          "pairs",
+          "funds",
+          "notes"
+        ],
+        "title": "FundOverlapReport"
+      },
+      "FundPairOverlap": {
+        "properties": {
+          "fund_a": {
+            "type": "string",
+            "title": "Fund A"
+          },
+          "fund_b": {
+            "type": "string",
+            "title": "Fund B"
+          },
+          "overlap": {
+            "type": "number",
+            "title": "Overlap",
+            "description": "Sum over shared issuers of the smaller fund weight."
+          },
+          "shared_issuers": {
+            "type": "integer",
+            "title": "Shared Issuers"
+          },
+          "as_of_a": {
+            "type": "string",
+            "format": "date",
+            "title": "As Of A"
+          },
+          "as_of_b": {
+            "type": "string",
+            "format": "date",
+            "title": "As Of B"
+          },
+          "same_date": {
+            "type": "boolean",
+            "title": "Same Date"
+          }
+        },
+        "type": "object",
+        "required": [
+          "fund_a",
+          "fund_b",
+          "overlap",
+          "shared_issuers",
+          "as_of_a",
+          "as_of_b",
+          "same_date"
+        ],
+        "title": "FundPairOverlap"
+      },
+      "FundPosition": {
+        "properties": {
+          "series_id": {
+            "type": "string",
+            "title": "Series Id"
+          },
+          "fund_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fund Name"
+          },
+          "registrant_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Registrant Name"
+          },
+          "report_period_end": {
+            "type": "string",
+            "format": "date",
+            "title": "Report Period End",
+            "description": "The date the positions are as of."
+          },
+          "filed": {
+            "type": "string",
+            "format": "date",
+            "title": "Filed"
+          },
+          "public_after": {
+            "type": "string",
+            "format": "date",
+            "title": "Public After",
+            "description": "Quarter end + 60 days: earliest the report is expected to be public."
+          },
+          "lag_days": {
+            "type": "integer",
+            "title": "Lag Days",
+            "description": "Filing date minus report date, in days."
+          },
+          "age_days": {
+            "type": "integer",
+            "title": "Age Days",
+            "description": "As-of date minus report date, in days."
+          },
+          "stale": {
+            "type": "boolean",
+            "title": "Stale"
+          },
+          "issuer_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Issuer Name"
+          },
+          "title": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Title"
+          },
+          "cusip": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cusip"
+          },
+          "isin": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Isin"
+          },
+          "balance": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Balance"
+          },
+          "units": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Units",
+            "description": "NS shares, PA principal amount, NC contracts, ..."
+          },
+          "currency": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Currency"
+          },
+          "value_usd": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Value Usd"
+          },
+          "pct_of_fund": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pct Of Fund",
+            "description": "Percent of the fund's net assets as filed."
+          },
+          "payoff_profile": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Payoff Profile"
+          },
+          "asset_cat": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Asset Cat"
+          },
+          "issuer_cat": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Issuer Cat"
+          },
+          "is_derivative": {
+            "type": "boolean",
+            "title": "Is Derivative"
+          },
+          "derivative_cat": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Derivative Cat"
+          },
+          "map_basis": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Map Basis",
+            "description": "Identifier that tied the row to this holding."
+          },
+          "accession": {
+            "type": "string",
+            "title": "Accession"
+          },
+          "form": {
+            "type": "string",
+            "title": "Form"
+          },
+          "source_url": {
+            "type": "string",
+            "title": "Source Url"
+          }
+        },
+        "type": "object",
+        "required": [
+          "series_id",
+          "fund_name",
+          "registrant_name",
+          "report_period_end",
+          "filed",
+          "public_after",
+          "lag_days",
+          "age_days",
+          "stale",
+          "issuer_name",
+          "title",
+          "cusip",
+          "isin",
+          "balance",
+          "units",
+          "currency",
+          "value_usd",
+          "pct_of_fund",
+          "payoff_profile",
+          "asset_cat",
+          "issuer_cat",
+          "is_derivative",
+          "derivative_cat",
+          "map_basis",
+          "accession",
+          "form",
+          "source_url"
+        ],
+        "title": "FundPosition"
       },
       "FundValuation": {
         "properties": {
@@ -18336,6 +20393,48 @@
           "explanation"
         ],
         "title": "HoldingEffect"
+      },
+      "HoldingFundPositions": {
+        "properties": {
+          "ticker": {
+            "type": "string",
+            "title": "Ticker"
+          },
+          "basis": {
+            "type": "string",
+            "const": "fund_position",
+            "title": "Basis",
+            "default": "fund_position"
+          },
+          "notice": {
+            "type": "string",
+            "title": "Notice",
+            "default": "Fund positions from SEC N-PORT: what each fund reports holding at the report date, public about 60 days after quarter end. Not beneficial ownership; do not add to Form 13F holders, 13D/G stakes or issuer-published fund holdings."
+          },
+          "as_of": {
+            "type": "string",
+            "format": "date",
+            "title": "As Of"
+          },
+          "positions": {
+            "items": {
+              "$ref": "#/components/schemas/FundPosition"
+            },
+            "type": "array",
+            "title": "Positions"
+          },
+          "coverage": {
+            "$ref": "#/components/schemas/NportCoverage"
+          }
+        },
+        "type": "object",
+        "required": [
+          "ticker",
+          "as_of",
+          "positions",
+          "coverage"
+        ],
+        "title": "HoldingFundPositions"
       },
       "HoldingIdentity": {
         "properties": {
@@ -20156,6 +22255,126 @@
         ],
         "title": "IndexQuote"
       },
+      "InsiderActivityOut": {
+        "properties": {
+          "ticker": {
+            "type": "string",
+            "title": "Ticker"
+          },
+          "net_discretionary": {
+            "$ref": "#/components/schemas/NetDiscretionary"
+          },
+          "transactions": {
+            "items": {
+              "$ref": "#/components/schemas/InsiderTransactionRow"
+            },
+            "type": "array",
+            "title": "Transactions"
+          },
+          "jurisdiction_coverage": {
+            "items": {
+              "$ref": "#/components/schemas/JurisdictionCoverage"
+            },
+            "type": "array",
+            "title": "Jurisdiction Coverage"
+          },
+          "limitations": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Limitations"
+          }
+        },
+        "type": "object",
+        "required": [
+          "ticker",
+          "net_discretionary",
+          "transactions",
+          "jurisdiction_coverage",
+          "limitations"
+        ],
+        "title": "InsiderActivityOut"
+      },
+      "InsiderNetBreakdown": {
+        "properties": {
+          "owner_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Owner Name"
+          },
+          "reporting_owner_cik": {
+            "type": "string",
+            "title": "Reporting Owner Cik"
+          },
+          "insider_role": {
+            "type": "string",
+            "title": "Insider Role"
+          },
+          "ownership": {
+            "type": "string",
+            "enum": [
+              "direct",
+              "indirect",
+              "unknown"
+            ],
+            "title": "Ownership"
+          },
+          "bought_shares": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              }
+            ],
+            "title": "Bought Shares"
+          },
+          "sold_shares": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              }
+            ],
+            "title": "Sold Shares"
+          },
+          "net_shares": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              }
+            ],
+            "title": "Net Shares"
+          }
+        },
+        "type": "object",
+        "required": [
+          "owner_name",
+          "reporting_owner_cik",
+          "insider_role",
+          "ownership",
+          "bought_shares",
+          "sold_shares",
+          "net_shares"
+        ],
+        "title": "InsiderNetBreakdown"
+      },
       "InsiderTransactionOut": {
         "properties": {
           "accession": {
@@ -20352,6 +22571,373 @@
           "source_url"
         ],
         "title": "InsiderTransactionOut"
+      },
+      "InsiderTransactionRow": {
+        "properties": {
+          "accession": {
+            "type": "string",
+            "title": "Accession"
+          },
+          "form": {
+            "type": "string",
+            "title": "Form"
+          },
+          "filed": {
+            "type": "string",
+            "format": "date",
+            "title": "Filed"
+          },
+          "owner_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Owner Name"
+          },
+          "reporting_owner_cik": {
+            "type": "string",
+            "title": "Reporting Owner Cik"
+          },
+          "insider_role": {
+            "type": "string",
+            "title": "Insider Role"
+          },
+          "officer_title": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Officer Title"
+          },
+          "ownership": {
+            "type": "string",
+            "enum": [
+              "direct",
+              "indirect",
+              "unknown"
+            ],
+            "title": "Ownership"
+          },
+          "security_title": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Security Title"
+          },
+          "transaction_date": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Transaction Date"
+          },
+          "raw_transaction_code": {
+            "type": "string",
+            "title": "Raw Transaction Code",
+            "description": "As reported on the form. Not a signal; read economic_class."
+          },
+          "economic_class": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Economic Class"
+          },
+          "classification_basis": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Classification Basis"
+          },
+          "interpretation": {
+            "type": "string",
+            "title": "Interpretation"
+          },
+          "shares": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Shares"
+          },
+          "price_per_share": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Price Per Share"
+          },
+          "value": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Value"
+          },
+          "acquired_disposed": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Acquired Disposed"
+          },
+          "shares_owned_after": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Shares Owned After"
+          },
+          "derivative": {
+            "type": "boolean",
+            "title": "Derivative"
+          },
+          "exercise_price": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Exercise Price"
+          },
+          "exercisable_date": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Exercisable Date"
+          },
+          "expiration_date": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Expiration Date"
+          },
+          "underlying_security_title": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Underlying Security Title"
+          },
+          "underlying_shares": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Underlying Shares"
+          },
+          "footnote_text": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Footnote Text"
+          },
+          "rule_10b5_1_plan": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Rule 10B5 1 Plan"
+          },
+          "rule_10b5_1_basis": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Rule 10B5 1 Basis"
+          },
+          "rule_10b5_1_adopted": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Rule 10B5 1 Adopted"
+          },
+          "superseded_by": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Superseded By"
+          },
+          "amendment_link_status": {
+            "type": "string",
+            "title": "Amendment Link Status"
+          },
+          "counts_toward_net_discretionary": {
+            "type": "boolean",
+            "title": "Counts Toward Net Discretionary"
+          },
+          "exclusion_reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Exclusion Reason"
+          },
+          "source_url": {
+            "type": "string",
+            "title": "Source Url"
+          }
+        },
+        "type": "object",
+        "required": [
+          "accession",
+          "form",
+          "filed",
+          "owner_name",
+          "reporting_owner_cik",
+          "insider_role",
+          "officer_title",
+          "ownership",
+          "security_title",
+          "transaction_date",
+          "raw_transaction_code",
+          "economic_class",
+          "classification_basis",
+          "interpretation",
+          "shares",
+          "price_per_share",
+          "value",
+          "acquired_disposed",
+          "shares_owned_after",
+          "derivative",
+          "exercise_price",
+          "exercisable_date",
+          "expiration_date",
+          "underlying_security_title",
+          "underlying_shares",
+          "footnote_text",
+          "rule_10b5_1_plan",
+          "rule_10b5_1_basis",
+          "rule_10b5_1_adopted",
+          "superseded_by",
+          "amendment_link_status",
+          "counts_toward_net_discretionary",
+          "exclusion_reason",
+          "source_url"
+        ],
+        "title": "InsiderTransactionRow"
       },
       "InstrumentInfo": {
         "properties": {
@@ -20648,6 +23234,121 @@
         "title": "IntradayQuote",
         "description": "The latest stored Yahoo quote of a holding's listing (Yahoo Finance, unofficial)."
       },
+      "IssuerExposure": {
+        "properties": {
+          "key": {
+            "type": "string",
+            "title": "Key"
+          },
+          "label": {
+            "type": "string",
+            "title": "Label"
+          },
+          "merged_securities": {
+            "type": "integer",
+            "title": "Merged Securities",
+            "description": "Distinct securities merged into this issuer."
+          },
+          "securities": {
+            "items": {
+              "$ref": "#/components/schemas/IssuerSecurity"
+            },
+            "type": "array",
+            "title": "Securities",
+            "description": "Traceable to each security."
+          },
+          "weight": {
+            "type": "number",
+            "title": "Weight"
+          },
+          "value_base": {
+            "type": "number",
+            "title": "Value Base"
+          },
+          "direct_weight": {
+            "type": "number",
+            "title": "Direct Weight"
+          },
+          "fund_weight": {
+            "type": "number",
+            "title": "Fund Weight"
+          },
+          "overlap_weight": {
+            "type": "number",
+            "title": "Overlap Weight",
+            "description": "Exposure supplied by more than one channel: weight minus the largest single channel."
+          },
+          "channels": {
+            "items": {
+              "$ref": "#/components/schemas/ChannelWeight"
+            },
+            "type": "array",
+            "title": "Channels"
+          },
+          "sector": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sector"
+          },
+          "country": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Country"
+          },
+          "region": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Region"
+          },
+          "currency": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Currency"
+          }
+        },
+        "type": "object",
+        "required": [
+          "key",
+          "label",
+          "merged_securities",
+          "securities",
+          "weight",
+          "value_base",
+          "direct_weight",
+          "fund_weight",
+          "overlap_weight",
+          "channels",
+          "sector",
+          "country",
+          "region",
+          "currency"
+        ],
+        "title": "IssuerExposure"
+      },
       "IssuerGroup": {
         "properties": {
           "label": {
@@ -20785,6 +23486,56 @@
           "content_hash"
         ],
         "title": "IssuerIRReleaseInput"
+      },
+      "IssuerSecurity": {
+        "properties": {
+          "isin": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Isin"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "ticker": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ticker"
+          },
+          "weight": {
+            "type": "number",
+            "title": "Weight"
+          },
+          "via": {
+            "items": {
+              "$ref": "#/components/schemas/ChannelWeight"
+            },
+            "type": "array",
+            "title": "Via"
+          }
+        },
+        "type": "object",
+        "required": [
+          "isin",
+          "name",
+          "ticker",
+          "weight",
+          "via"
+        ],
+        "title": "IssuerSecurity"
       },
       "ItemLink": {
         "properties": {
@@ -21400,6 +24151,22 @@
             "$ref": "#/components/schemas/JobSchedule",
             "description": "Load structured SEC Forms 3, 4 and 5 for portfolio issuers. Default: daily 06:30."
           },
+          "control_stakes": {
+            "$ref": "#/components/schemas/JobSchedule",
+            "description": "Load Schedule 13D/G beneficial-ownership filings for portfolio issuers. Default: daily 06:45."
+          },
+          "nport_holdings": {
+            "$ref": "#/components/schemas/JobSchedule",
+            "description": "Load public SEC N-PORT fund holdings for held US funds. Default: Sat 05:15."
+          },
+          "fund_probes": {
+            "$ref": "#/components/schemas/JobSchedule",
+            "description": "Probe optional Finnhub/FMP fund endpoints for free access. Off by default."
+          },
+          "fund_characteristics_audit": {
+            "$ref": "#/components/schemas/JobSchedule",
+            "description": "Check iShares/Vanguard fund valuation figures for parser drift. Default: daily 07:30."
+          },
           "valuation_refresh": {
             "$ref": "#/components/schemas/JobSchedule",
             "description": "Fundamentals (SEC XBRL, ESEF) of holdings that filed since the last read (all of them weekly) and the ETF providers' fund P/E and P/B. Default: daily 07:45."
@@ -21500,6 +24267,41 @@
           "body"
         ],
         "title": "JobsConfigVersion"
+      },
+      "JurisdictionCoverage": {
+        "properties": {
+          "jurisdiction": {
+            "type": "string",
+            "title": "Jurisdiction"
+          },
+          "source": {
+            "type": "string",
+            "title": "Source"
+          },
+          "access": {
+            "type": "string",
+            "title": "Access"
+          },
+          "detail": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Detail"
+          }
+        },
+        "type": "object",
+        "required": [
+          "jurisdiction",
+          "source",
+          "access",
+          "detail"
+        ],
+        "title": "JurisdictionCoverage"
       },
       "KpiRow": {
         "properties": {
@@ -21658,6 +24460,236 @@
           "fallback"
         ],
         "title": "LastAttempt"
+      },
+      "LedgerEntryInput": {
+        "properties": {
+          "subject_kind": {
+            "type": "string",
+            "enum": [
+              "fund",
+              "index"
+            ],
+            "title": "Subject Kind"
+          },
+          "subject_key": {
+            "type": "string",
+            "maxLength": 80,
+            "minLength": 1,
+            "title": "Subject Key"
+          },
+          "label": {
+            "type": "string",
+            "maxLength": 120,
+            "minLength": 1,
+            "title": "Label"
+          },
+          "tier": {
+            "type": "string",
+            "enum": [
+              "official_holdings",
+              "issuer_downloadable",
+              "regulatory_filing",
+              "proxy_fund",
+              "unavailable"
+            ],
+            "title": "Tier"
+          },
+          "reason": {
+            "type": "string",
+            "maxLength": 1000,
+            "minLength": 3,
+            "title": "Reason"
+          },
+          "proxy_fund_isin": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^[A-Z]{2}[A-Z0-9]{9}[0-9]$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Proxy Fund Isin"
+          },
+          "total_return_available": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Total Return Available"
+          },
+          "historical_constituents": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Historical Constituents"
+          },
+          "source_url": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 2000
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Url"
+          }
+        },
+        "type": "object",
+        "required": [
+          "subject_kind",
+          "subject_key",
+          "label",
+          "tier",
+          "reason"
+        ],
+        "title": "LedgerEntryInput"
+      },
+      "LedgerRow": {
+        "properties": {
+          "subject_kind": {
+            "type": "string",
+            "enum": [
+              "fund",
+              "index"
+            ],
+            "title": "Subject Kind"
+          },
+          "subject_key": {
+            "type": "string",
+            "title": "Subject Key"
+          },
+          "label": {
+            "type": "string",
+            "title": "Label"
+          },
+          "tier": {
+            "type": "string",
+            "enum": [
+              "official_holdings",
+              "issuer_downloadable",
+              "regulatory_filing",
+              "proxy_fund",
+              "unavailable"
+            ],
+            "title": "Tier"
+          },
+          "origin": {
+            "type": "string",
+            "enum": [
+              "derived",
+              "manual"
+            ],
+            "title": "Origin"
+          },
+          "proxy_fund_isin": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Proxy Fund Isin"
+          },
+          "total_return_available": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Total Return Available"
+          },
+          "historical_constituents": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Historical Constituents"
+          },
+          "latest_holdings_as_of": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Latest Holdings As Of"
+          },
+          "reason": {
+            "type": "string",
+            "title": "Reason"
+          },
+          "source_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Url"
+          },
+          "checked_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Checked At"
+          },
+          "backtest_flags": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Backtest Flags",
+            "description": "Why this subject should not feed a performance/backtest unreviewed."
+          },
+          "usable_for_backtest": {
+            "type": "boolean",
+            "title": "Usable For Backtest"
+          }
+        },
+        "type": "object",
+        "required": [
+          "subject_kind",
+          "subject_key",
+          "label",
+          "tier",
+          "origin",
+          "proxy_fund_isin",
+          "total_return_available",
+          "historical_constituents",
+          "latest_holdings_as_of",
+          "reason",
+          "source_url",
+          "checked_at",
+          "backtest_flags",
+          "usable_for_backtest"
+        ],
+        "title": "LedgerRow"
       },
       "LegalEntityOut": {
         "properties": {
@@ -23071,6 +26103,134 @@
         ],
         "title": "ManagerSummary"
       },
+      "ManualFactsheetInput": {
+        "properties": {
+          "as_of": {
+            "type": "string",
+            "format": "date",
+            "title": "As Of"
+          },
+          "share_class": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 80
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Share Class"
+          },
+          "total_assets": {
+            "anyOf": [
+              {
+                "type": "number",
+                "minimum": 0.0
+              },
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Total Assets"
+          },
+          "total_assets_currency": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^[A-Z]{3}$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Total Assets Currency"
+          },
+          "expense_ratio": {
+            "anyOf": [
+              {
+                "type": "number",
+                "exclusiveMaximum": 0.2,
+                "minimum": 0.0
+              },
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Expense Ratio",
+            "description": "Fraction per year: 0.0007 = 0.07%."
+          },
+          "benchmark_name": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 200
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Benchmark Name"
+          },
+          "distribution_policy": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "accumulating",
+                  "distributing"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Distribution Policy"
+          },
+          "nav_basis": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 200
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Nav Basis"
+          },
+          "charges": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Charges"
+          },
+          "note": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 1000
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note"
+          }
+        },
+        "type": "object",
+        "required": [
+          "as_of"
+        ],
+        "title": "ManualFactsheetInput"
+      },
       "ManualFundamentals": {
         "properties": {
           "eps_ttm": {
@@ -23469,6 +26629,194 @@
         "type": "object",
         "title": "MonitorSettings",
         "description": "Monitoring: failed jobs, missed scheduled runs and per-holding coverage gaps alert."
+      },
+      "NetDiscretionary": {
+        "properties": {
+          "since": {
+            "type": "string",
+            "format": "date",
+            "title": "Since"
+          },
+          "until": {
+            "type": "string",
+            "format": "date",
+            "title": "Until"
+          },
+          "bought_shares": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              }
+            ],
+            "title": "Bought Shares"
+          },
+          "sold_shares": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              }
+            ],
+            "title": "Sold Shares"
+          },
+          "net_shares": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              }
+            ],
+            "title": "Net Shares"
+          },
+          "buy_rows": {
+            "type": "integer",
+            "title": "Buy Rows"
+          },
+          "sell_rows": {
+            "type": "integer",
+            "title": "Sell Rows"
+          },
+          "bought_value": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Bought Value"
+          },
+          "sold_value": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sold Value"
+          },
+          "net_value": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Net Value",
+            "description": "Bought minus sold at the reported prices; null unless every counted row has a price."
+          },
+          "value_complete": {
+            "type": "boolean",
+            "title": "Value Complete"
+          },
+          "plan_status_unknown_rows": {
+            "type": "integer",
+            "title": "Plan Status Unknown Rows",
+            "description": "Counted rows whose Rule 10b5-1 status the form does not state."
+          },
+          "pre_planned_bought_shares": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              }
+            ],
+            "title": "Pre Planned Bought Shares"
+          },
+          "pre_planned_sold_shares": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              }
+            ],
+            "title": "Pre Planned Sold Shares"
+          },
+          "by_insider": {
+            "items": {
+              "$ref": "#/components/schemas/InsiderNetBreakdown"
+            },
+            "type": "array",
+            "title": "By Insider"
+          },
+          "by_ownership": {
+            "additionalProperties": {
+              "anyOf": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "string",
+                  "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+                }
+              ]
+            },
+            "type": "object",
+            "title": "By Ownership",
+            "description": "Net shares by direct / indirect / unknown ownership."
+          },
+          "exclusions": {
+            "items": {
+              "$ref": "#/components/schemas/ExclusionOut"
+            },
+            "type": "array",
+            "title": "Exclusions"
+          }
+        },
+        "type": "object",
+        "required": [
+          "since",
+          "until",
+          "bought_shares",
+          "sold_shares",
+          "net_shares",
+          "buy_rows",
+          "sell_rows",
+          "bought_value",
+          "sold_value",
+          "net_value",
+          "value_complete",
+          "plan_status_unknown_rows",
+          "pre_planned_bought_shares",
+          "pre_planned_sold_shares",
+          "by_insider",
+          "by_ownership",
+          "exclusions"
+        ],
+        "title": "NetDiscretionary"
       },
       "NewConversation": {
         "properties": {
@@ -24408,6 +27756,67 @@
         ],
         "title": "NotificationsConfigVersion"
       },
+      "NportCoverage": {
+        "properties": {
+          "state": {
+            "type": "string",
+            "enum": [
+              "available",
+              "stale",
+              "no_positions",
+              "no_funds_loaded"
+            ],
+            "title": "State"
+          },
+          "funds_loaded": {
+            "type": "integer",
+            "title": "Funds Loaded",
+            "description": "Tracked funds with a reconciled N-PORT filing."
+          },
+          "funds_holding": {
+            "type": "integer",
+            "title": "Funds Holding"
+          },
+          "latest_report_period_end": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Latest Report Period End"
+          },
+          "oldest_report_period_end": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Oldest Report Period End"
+          },
+          "scope": {
+            "type": "string",
+            "title": "Scope",
+            "default": "Only the portfolio's US-registered funds that lack an issuer holdings snapshot; absence of a fund is not evidence it does not hold the security."
+          }
+        },
+        "type": "object",
+        "required": [
+          "state",
+          "funds_loaded",
+          "funds_holding",
+          "latest_report_period_end",
+          "oldest_report_period_end"
+        ],
+        "title": "NportCoverage"
+      },
       "OwnershipPeriod": {
         "properties": {
           "period": {
@@ -24902,6 +28311,68 @@
           "stale"
         ],
         "title": "PerShareFigure"
+      },
+      "PinInput": {
+        "properties": {
+          "ref_kind": {
+            "type": "string",
+            "enum": [
+              "report",
+              "decision",
+              "manual"
+            ],
+            "title": "Ref Kind"
+          },
+          "ref_id": {
+            "type": "string",
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Ref Id"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 500
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
+          },
+          "snapshot_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Snapshot Id",
+            "description": "Pin this snapshot..."
+          },
+          "as_of": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "As Of",
+            "description": "...or every configured fund's snapshot known at this date."
+          }
+        },
+        "type": "object",
+        "required": [
+          "ref_kind",
+          "ref_id"
+        ],
+        "title": "PinInput"
       },
       "PlausibilityCheck": {
         "properties": {
@@ -30691,6 +34162,319 @@
         ],
         "title": "SourcesHealth"
       },
+      "StakeChangeOut": {
+        "properties": {
+          "change_type": {
+            "type": "string",
+            "title": "Change Type"
+          },
+          "person_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Person Name"
+          },
+          "old_value": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Old Value"
+          },
+          "new_value": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "New Value"
+          },
+          "detail": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Detail"
+          }
+        },
+        "type": "object",
+        "required": [
+          "change_type",
+          "person_name",
+          "old_value",
+          "new_value",
+          "detail"
+        ],
+        "title": "StakeChangeOut"
+      },
+      "StakeHolderOut": {
+        "properties": {
+          "person_name": {
+            "type": "string",
+            "title": "Person Name"
+          },
+          "person_cik": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Person Cik"
+          },
+          "member_of_group": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Member Of Group"
+          },
+          "sole_voting": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sole Voting"
+          },
+          "shared_voting": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Shared Voting"
+          },
+          "sole_dispositive": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sole Dispositive"
+          },
+          "shared_dispositive": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Shared Dispositive"
+          },
+          "aggregate_shares": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Aggregate Shares"
+          },
+          "percent_of_class": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Percent Of Class",
+            "description": "Filer-reported, in percent points."
+          },
+          "person_type": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Person Type"
+          }
+        },
+        "type": "object",
+        "required": [
+          "person_name",
+          "person_cik",
+          "member_of_group",
+          "sole_voting",
+          "shared_voting",
+          "sole_dispositive",
+          "shared_dispositive",
+          "aggregate_shares",
+          "percent_of_class",
+          "person_type"
+        ],
+        "title": "StakeHolderOut"
+      },
+      "StakeReconciliationOut": {
+        "properties": {
+          "match_basis": {
+            "type": "string",
+            "enum": [
+              "cusip",
+              "issuer_cik"
+            ],
+            "title": "Match Basis"
+          },
+          "class_status": {
+            "type": "string",
+            "enum": [
+              "cusip_match",
+              "class_unreconciled"
+            ],
+            "title": "Class Status"
+          },
+          "class_label": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Class Label"
+          },
+          "class_shares_outstanding": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Class Shares Outstanding"
+          },
+          "class_shares_as_of": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Class Shares As Of"
+          },
+          "computed_percent": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Computed Percent",
+            "description": "Cross-check only: stake shares over the class's shares outstanding."
+          },
+          "percent_check": {
+            "type": "string",
+            "enum": [
+              "consistent",
+              "inconsistent",
+              "not_checkable"
+            ],
+            "title": "Percent Check"
+          },
+          "note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note"
+          }
+        },
+        "type": "object",
+        "required": [
+          "match_basis",
+          "class_status",
+          "class_label",
+          "class_shares_outstanding",
+          "class_shares_as_of",
+          "computed_percent",
+          "percent_check",
+          "note"
+        ],
+        "title": "StakeReconciliationOut"
+      },
       "StoryOut": {
         "properties": {
           "id": {
@@ -32262,6 +36046,48 @@
           "benchmark_weight"
         ],
         "title": "UnderlyingHolding"
+      },
+      "Unknown": {
+        "properties": {
+          "unknown_fund_weight": {
+            "type": "number",
+            "title": "Unknown Fund Weight",
+            "description": "Share of total portfolio value in fund weight that is not accounted for by the published rows or whose fund is not looked through. Never redistributed."
+          },
+          "unknown_fund_value": {
+            "type": "number",
+            "title": "Unknown Fund Value"
+          },
+          "not_looked_through_weight": {
+            "type": "number",
+            "title": "Not Looked Through Weight"
+          },
+          "residual_weight": {
+            "type": "number",
+            "title": "Residual Weight"
+          },
+          "over_reported_weight": {
+            "type": "number",
+            "title": "Over Reported Weight"
+          },
+          "by_fund": {
+            "additionalProperties": {
+              "type": "number"
+            },
+            "type": "object",
+            "title": "By Fund"
+          }
+        },
+        "type": "object",
+        "required": [
+          "unknown_fund_weight",
+          "unknown_fund_value",
+          "not_looked_through_weight",
+          "residual_weight",
+          "over_reported_weight",
+          "by_fund"
+        ],
+        "title": "Unknown"
       },
       "ValidationError": {
         "properties": {

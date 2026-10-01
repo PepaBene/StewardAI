@@ -1402,6 +1402,24 @@ class JobsConfig(ConfigModel):
             "Load structured SEC Forms 3, 4 and 5 for portfolio issuers. Default: daily 06:30."
         ),
     )
+    control_stakes: JobSchedule = Field(
+        default_factory=lambda: JobSchedule(cron="45 6 * * *"),
+        description="Load Schedule 13D/G beneficial-ownership filings for portfolio issuers. "
+        "Default: daily 06:45.",
+    )
+    nport_holdings: JobSchedule = Field(
+        default_factory=lambda: JobSchedule(cron="15 5 * * 6"),
+        description="Load public SEC N-PORT fund holdings for held US funds. Default: Sat 05:15.",
+    )
+    fund_probes: JobSchedule = Field(
+        default_factory=lambda: JobSchedule(cron="0 4 * * 0", enabled=False),
+        description="Probe optional Finnhub/FMP fund endpoints for free access. Off by default.",
+    )
+    fund_characteristics_audit: JobSchedule = Field(
+        default_factory=lambda: JobSchedule(cron="30 7 * * *"),
+        description="Check iShares/Vanguard fund valuation figures for parser drift. "
+        "Default: daily 07:30.",
+    )
     valuation_refresh: JobSchedule = Field(
         default_factory=lambda: JobSchedule(cron="45 7 * * *"),
         description="Fundamentals (SEC XBRL, ESEF) of holdings that filed since the last read "
@@ -1458,6 +1476,10 @@ class JobsConfig(ConfigModel):
             "ownership_13f": self.ownership_13f,
             "insider_trades": self.insider_trades,
             "valuation_refresh": self.valuation_refresh,
+            "control_stakes": self.control_stakes,
+            "nport_holdings": self.nport_holdings,
+            "fund_probes": self.fund_probes,
+            "fund_characteristics_audit": self.fund_characteristics_audit,
             "etf_look_through": self.etf_look_through,
             "sec_xbrl": self.sec_xbrl,
         }

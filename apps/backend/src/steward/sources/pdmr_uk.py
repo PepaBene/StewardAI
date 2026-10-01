@@ -233,7 +233,10 @@ def parse_pdmr_notification(text: str) -> PdmrNotification | None:
     blocks = re.split(r"(?=\ba\)\s*Description of the financial instrument)", part4, flags=re.I)
     for block in (b for b in blocks if re.search(r"description of the financial", b, re.I)):
         instrument_text = _after(
-            r"a\)\s*Description of the financial instrument[^:]*", block, r"\bb\)\s*Nature"
+            r"a\)\s*Description of the financial instrument(?:,? type of instrument)?"
+            r"(?:\s*Identification code)?",
+            block,
+            r"\bb\)\s*Nature",
         )
         nature = _after(r"b\)\s*Nature of the transaction", block, r"\bc\)\s*Price")
         pv = _after(r"c\)\s*Price\(s\) and volume\(s\)", block, r"\bd\)\s*Aggregated")

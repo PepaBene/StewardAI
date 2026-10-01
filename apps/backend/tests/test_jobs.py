@@ -214,12 +214,14 @@ async def test_schedule_follows_the_jobs_config() -> None:
         return None
 
     assert apply_jobs_config(scheduler, JobsConfig(), run) == [
+        "control_stakes",
         "daily_digest",
         "earnings_calendar",
         "earnings_calendar_full",
         "earnings_due",
         "etf_look_through",
         "fact_reconcile",
+        "fund_characteristics_audit",
         "holiday_refresh",
         "insider_trades",
         "intraday_prices",
@@ -227,6 +229,7 @@ async def test_schedule_follows_the_jobs_config() -> None:
         "monitor",
         "monthly_review",
         "news_ingest",
+        "nport_holdings",
         "ownership_13f",
         "portfolio_sync",
         "price_history",

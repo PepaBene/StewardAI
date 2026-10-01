@@ -373,7 +373,6 @@ class HeldIssuers:
 
     by_cik: dict[str, list[str]] = field(default_factory=dict)
     by_cusip: dict[str, str] = field(default_factory=dict)
-    ticker_cusips: dict[str, set[str]] = field(default_factory=dict)
 
     def tickers_for(self, issuer_cik: str | None, cusip: str | None) -> list[tuple[str, bool]]:
         """(ticker, cusip_matched) for each held security the filing's issuer matches."""
@@ -401,7 +400,6 @@ async def load_held(pool: asyncpg.Pool) -> HeldIssuers:
     for cusip, ticker in (await portfolio_cusips(pool)).items():
         if ticker in allowed:
             held.by_cusip[cusip] = ticker
-            held.ticker_cusips.setdefault(ticker, set()).add(cusip)
     return held
 
 

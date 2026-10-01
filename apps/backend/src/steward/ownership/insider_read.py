@@ -176,10 +176,10 @@ def verdict(row: dict[str, Any]) -> Verdict:
     cls = row["economic_class"]
     if cls is None:
         return Verdict(False, "not_classified_legacy_row")
-    if row["derivative"]:
-        return Verdict(False, "derivative_security")
     if cls not in {"open_market_buy", "open_market_sell"}:
         return Verdict(False, cls)
+    if row["derivative"]:
+        return Verdict(False, "derivative_security")
     if row["rule_10b5_1_plan"] is True:
         return Verdict(False, "pre_planned_10b5_1")
     if row["shares"] is None or row["shares"] <= 0:
