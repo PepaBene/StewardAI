@@ -1,0 +1,2 @@
+drop table if exists public.insider_filing cascade;
+drop table if exists public.insider_transaction cascade;

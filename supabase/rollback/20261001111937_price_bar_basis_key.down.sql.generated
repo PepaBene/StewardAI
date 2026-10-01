@@ -1,0 +1,2 @@
+alter table public.price_bar drop constraint if exists price_bar_pkey;
+alter table public.price_bar add constraint price_bar_pkey PRIMARY KEY (symbol, date, source);

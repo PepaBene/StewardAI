@@ -1,0 +1,2 @@
+alter table public.source drop constraint if exists source_type_check;
+alter table public.source add constraint source_type_check CHECK ((type = ANY (ARRAY['rss'::text, 'page'::text, 'edgar'::text, 'finnhub'::text, 'google_news'::text, 'alpha_vantage'::text, 'macro'::text, 'edgar_fts'::text, 'rns'::text, 'eqs'::text])));

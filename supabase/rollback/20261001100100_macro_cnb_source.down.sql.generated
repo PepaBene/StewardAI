@@ -1,0 +1,2 @@
+alter table public.macro_series drop constraint if exists macro_series_source_check;
+alter table public.macro_series add constraint macro_series_source_check CHECK ((source = ANY (ARRAY['fred'::text, 'ecb'::text, 'eurostat'::text, 'cnb'::text, 'world_bank'::text, 'oecd'::text, 'bis'::text, 'un_comtrade'::text])));

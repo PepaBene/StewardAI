@@ -1,0 +1,5 @@
+alter table public.price_bar drop constraint if exists price_bar_source_check;
+alter table public.price_bar drop column if exists currency cascade;
+drop table if exists public.intraday_bar cascade;
+drop table if exists public.market_payload cascade;
+drop table if exists public.market_quote cascade;

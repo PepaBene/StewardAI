@@ -35,6 +35,28 @@ class RetentionPolicy:
                 raise ValueError(f"{item.name} must be at least 30 days")
 
 
+# Open conflicts keep their raw evidence until they are resolved.
+COUNT_ELIGIBLE_OBSERVATIONS = """
+select count(*) from public.source_observation o
+ where o.known_at < $1 and o.raw <> '{}'::jsonb
+   and not exists (
+     select 1 from public.source_conflict c
+      where c.status = 'open'
+        and o.id in (c.preferred_observation_id, c.alternative_observation_id))"""
+PRUNE_OBSERVATION_RAW = """
+with pruned as (
+  update public.source_observation o
+     set raw = '{}'::jsonb,
+         validation = o.validation || jsonb_build_object('raw_pruned_at', $2::text)
+   where o.known_at < $1 and o.raw <> '{}'::jsonb
+     and not exists (
+       select 1 from public.source_conflict c
+        where c.status = 'open'
+          and o.id in (c.preferred_observation_id, c.alternative_observation_id))
+  returning 1)
+select count(*) from pruned"""
+
+
 async def prune_raw_payloads(
     pool: asyncpg.Pool,
     policy: RetentionPolicy | None = None,
@@ -51,16 +73,9 @@ async def prune_raw_payloads(
     audit_cutoff = now - dt.timedelta(days=policy.fetch_audit_days)
     counts: dict[str, int] = {}
     async with pool.acquire() as conn, conn.transaction():
-        eligible_obs = """
-            from public.source_observation o
-           where o.known_at < $1 and o.raw <> '{}'::jsonb
-             and not exists (
-               select 1 from public.source_conflict c
-                where c.status = 'open'
-                  and o.id in (c.preferred_observation_id, c.alternative_observation_id))"""
         if dry_run:
             counts["source_observation_raw"] = await conn.fetchval(
-                "select count(*) " + eligible_obs, obs_cutoff
+                COUNT_ELIGIBLE_OBSERVATIONS, obs_cutoff
             )
             counts["macro_payload_archive"] = await conn.fetchval(
                 "select count(*) from public.macro_payload_archive"
@@ -73,18 +88,7 @@ async def prune_raw_payloads(
             )
             return counts
         counts["source_observation_raw"] = await conn.fetchval(
-            """with pruned as (
-                 update public.source_observation o
-                    set raw = '{}'::jsonb,
-                        validation = o.validation
-                          || jsonb_build_object('raw_pruned_at', $2::text)
-                  where o.id in (select o.id """
-            + eligible_obs
-            + """)
-                  returning 1)
-               select count(*) from pruned""",
-            obs_cutoff,
-            now.isoformat(),
+            PRUNE_OBSERVATION_RAW, obs_cutoff, now.isoformat()
         )
         counts["macro_payload_archive"] = await conn.fetchval(
             """with pruned as (
@@ -144,7 +148,8 @@ _CATALOG_QUERIES: dict[str, str] = {
          where n.nspname='public' and p.prokind in ('f','p')""",
     "triggers": """
         select pg_get_triggerdef(t.oid) from pg_trigger t join pg_class c on c.oid=t.tgrelid
-          join pg_namespace n on n.oid=c.relnamespace where n.nspname='public' and not t.tgisinternal""",
+          join pg_namespace n on n.oid=c.relnamespace
+         where n.nspname='public' and not t.tgisinternal""",
     "policies": """
         select schemaname||'.'||tablename||' '||policyname||' '||cmd||' '||roles::text||' '||
                coalesce(qual,'')||' '||coalesce(with_check,'')
@@ -158,7 +163,8 @@ _CATALOG_QUERIES: dict[str, str] = {
           from information_schema.role_table_grants
          where table_schema='public' and grantee in ('anon','authenticated','app_backend')""",
     "views": """
-        select schemaname||'.'||viewname||' '||definition from pg_views where schemaname='public'""",
+        select schemaname||'.'||viewname||' '||definition
+          from pg_views where schemaname='public'""",
 }
 
 # Reference data the free-source migrations seed; rows are fingerprinted too.

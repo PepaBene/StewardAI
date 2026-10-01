@@ -1,0 +1,2 @@
+drop table if exists public.free_source_alert_state cascade;
+drop table if exists public.free_source_alert_trail cascade;

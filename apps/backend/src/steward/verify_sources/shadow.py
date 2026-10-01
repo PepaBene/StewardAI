@@ -324,7 +324,9 @@ async def backfill_shadow_snapshots(pool: asyncpg.Pool, end: dt.date, days: int)
 @dataclass(frozen=True)
 class Recommendation:
     provider: str
-    classification: str  # keep | dormant | low_value | unreliable | disabled_by_access | not_measured
+    classification: (
+        str  # keep | dormant | low_value | unreliable | disabled_by_access | not_measured
+    )
     reasons: tuple[str, ...]
 
 
@@ -374,8 +376,13 @@ def classify_provider(summary: dict[str, Any], days_in_window: int) -> Recommend
                 "keep dormant: use for gap-fill, do not spend its free quota routinely",
             ),
         )
-    if summary["disagreement_rate"] is not None and summary["disagreement_rate"] > HIGH_DISAGREEMENT_RATE:
-        reasons.append(f"{summary['disagreement_rate']:.0%} of observations conflict with another source")
+    if (
+        summary["disagreement_rate"] is not None
+        and summary["disagreement_rate"] > HIGH_DISAGREEMENT_RATE
+    ):
+        reasons.append(
+            f"{summary['disagreement_rate']:.0%} of observations conflict with another source"
+        )
     if summary["quota_pressure"] is not None and summary["quota_pressure"] >= QUOTA_PRESSURE:
         reasons.append(f"busiest day used {summary['quota_pressure']:.0%} of the free daily quota")
     return Recommendation(name, "keep", tuple(reasons))
@@ -391,7 +398,8 @@ async def _scope(pool: asyncpg.Pool) -> dict[str, Any]:
     securities = (
         await pool.fetch(
             """select distinct security_id from public.instrument_security_link
-                where ticker = any($1::text[]) and status = 'confirmed' and security_id is not null""",
+                where ticker = any($1::text[]) and status = 'confirmed'
+                  and security_id is not null""",
             tickers,
         )
         if tickers
@@ -546,7 +554,8 @@ async def generate_shadow_report(
             "dormant": [
                 {"provider": p["provider"], "reasons": p["recommendation_reasons"]}
                 for p in providers
-                if p["recommendation"] in {"dormant", "low_value", "unreliable", "disabled_by_access"}
+                if p["recommendation"]
+                in {"dormant", "low_value", "unreliable", "disabled_by_access"}
             ],
             "not_measured": not_measured,
         },
@@ -594,7 +603,8 @@ def render_markdown(report: dict[str, Any]) -> str:
     scope = report["scope"]
     lines += [
         "## Scope",
-        f"- Held tickers: {scope['held_tickers']}; watchlist tickers: {scope['watchlist_tickers']}; "
+        f"- Held tickers: {scope['held_tickers']}; "
+        f"watchlist tickers: {scope['watchlist_tickers']}; "
         f"securities with a confirmed link: {scope['scope_securities_resolved']}",
         "",
     ]
@@ -609,11 +619,12 @@ def render_markdown(report: dict[str, Any]) -> str:
             "|---|---|---|---|---|---|---|---|---|---|---|",
         ]
         for p in report["providers"]:
+            fresh = p["median_freshness_hours"]
             lines.append(
                 f"| {p['provider']} | {p['days_with_data']} | {p['observations']} | "
                 f"{p['metrics_covered']} | {_pct(p['value_added_ratio'])} | "
                 f"{_pct(p['disagreement_rate'])} | {p['false_matches']} | "
-                f"{_pct(p['failure_rate'])} | {p['median_freshness_hours'] if p['median_freshness_hours'] is not None else 'n/a'} | "
+                f"{_pct(p['failure_rate'])} | {'n/a' if fresh is None else fresh} | "
                 f"{_pct(p['quota_pressure'])} | {p['recommendation']} |"
             )
         lines.append("")
@@ -642,6 +653,13 @@ def render_markdown(report: dict[str, Any]) -> str:
     return "\n".join(lines)
 
 
+def _write_outputs(out: Path, markdown: str, report: dict[str, Any]) -> None:
+    out.mkdir(parents=True, exist_ok=True)
+    (out / "shadow_report.md").write_text(markdown)
+    (out / "shadow_report.json").write_text(json.dumps(report, indent=2, default=str))
+    print(f"wrote {out / 'shadow_report.md'} and shadow_report.json")
+
+
 async def _main(days: int, out: Path | None, record_today: bool) -> int:
     from steward.db import create_pool
     from steward.settings import get_settings
@@ -658,10 +676,7 @@ async def _main(days: int, out: Path | None, record_today: bool) -> int:
     if out is None:
         print(markdown)
     else:
-        out.mkdir(parents=True, exist_ok=True)
-        (out / "shadow_report.md").write_text(markdown)
-        (out / "shadow_report.json").write_text(json.dumps(report, indent=2, default=str))
-        print(f"wrote {out / 'shadow_report.md'} and shadow_report.json")
+        _write_outputs(out, markdown, report)
     return 0 if report["sign_off_ready"] else 1
 
 

@@ -152,7 +152,9 @@ class PublishDecision:
 class PublishBlocked(RuntimeError):
     def __init__(self, decision: PublishDecision) -> None:
         self.decision = decision
-        super().__init__(f"signal {decision.signal!r} is not publishable: " + "; ".join(decision.reasons))
+        super().__init__(
+            f"signal {decision.signal!r} is not publishable: " + "; ".join(decision.reasons)
+        )
 
 
 def evaluate_requirement(
@@ -187,7 +189,10 @@ def evaluate_requirement(
                 f"{pit_checked} point-in-time checks, {requirement.min_pit_checked} required"
             )
         if pit_violations > requirement.max_pit_violations:
-            reasons.append(f"{pit_violations} point-in-time violations (allowed {requirement.max_pit_violations})")
+            reasons.append(
+                f"{pit_violations} point-in-time violations "
+                f"(allowed {requirement.max_pit_violations})"
+            )
     return PublishDecision(
         signal,
         not reasons,
@@ -288,7 +293,9 @@ class VersionedRecord:
     revision: int = 0
 
 
-def point_in_time_pick(records: Sequence[VersionedRecord], as_of: dt.datetime) -> VersionedRecord | None:
+def point_in_time_pick(
+    records: Sequence[VersionedRecord], as_of: dt.datetime
+) -> VersionedRecord | None:
     """The record knowable at `as_of`: latest known_at (then revision) not after it."""
     visible = [r for r in records if r.known_at <= as_of]
     return max(visible, key=lambda r: (r.known_at, r.revision), default=None)

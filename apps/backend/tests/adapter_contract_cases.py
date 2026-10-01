@@ -602,7 +602,8 @@ PARSER_CASES: list[ParserCase] = [
             '<ops:world-patent-data xmlns:ops="urn:ops" xmlns:ex="urn:ex">'
             '<ex:exchange-document doc-number="123" country="EP">'
             '<ex:document-id document-id-type="docdb" doc-number="123"/>'
-            "<ex:applicant><ex:applicant-name>Example Corporation</ex:applicant-name></ex:applicant>"
+            "<ex:applicant><ex:applicant-name>Example Corporation</ex:applicant-name>"
+            "</ex:applicant>"
             "<ex:invention-title>Example invention</ex:invention-title>"
             '<ex:priority-claim date="20240102"/>'
             "<ex:classification-symbol>A01B</ex:classification-symbol>"
@@ -667,7 +668,9 @@ async def _public_macro(http: httpx.AsyncClient, which: str) -> Any:
     from steward.sources.public_macro import ComtradeAdapter, SdmxAdapter, WorldBankAdapter
 
     if which == "world_bank":
-        return await WorldBankAdapter(http).fetch({"country": "CZ", "indicators": ["NY.GDP.MKTP.CD"]})
+        return await WorldBankAdapter(http).fetch(
+            {"country": "CZ", "indicators": ["NY.GDP.MKTP.CD"]}
+        )
     if which == "sdmx":
         return await SdmxAdapter(http, "bis", "https://stats.bis.org/api/v2").fetch(
             {"flow": "WS_CREDIT_GAP", "key": "Q.CZ", "series_id": "x"}
@@ -678,7 +681,9 @@ async def _public_macro(http: httpx.AsyncClient, which: str) -> Any:
 
 
 def _esef_filing_call(http: httpx.AsyncClient) -> Awaitable[Any]:
-    filing = esef.EsefFiling("1", dt.date(2025, 12, 31), None, "DK", "https://x.test/r.json", None, {})
+    filing = esef.EsefFiling(
+        "1", dt.date(2025, 12, 31), None, "DK", "https://x.test/r.json", None, {}
+    )
     return esef.esef_document(http, filing)
 
 
@@ -705,7 +710,9 @@ FETCH_CASES: list[FetchCase] = [
     FetchCase(
         "finnhub_calendar",
         "steward.sources.finnhub",
-        lambda http: next_earnings_date(http, "k", "AAA", dt.date(2026, 10, 1), dt.date(2026, 12, 1)),
+        lambda http: next_earnings_date(
+            http, "k", "AAA", dt.date(2026, 10, 1), dt.date(2026, 12, 1)
+        ),
         _ok_json("finnhub_calendar.json"),
         (FinnhubError,),
     ),

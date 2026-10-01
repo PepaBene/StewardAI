@@ -278,7 +278,9 @@ def decide(
                 f"{failures}/{sample_count} samples outside tolerance "
                 f"(allowed fraction {threshold.max_failing_fraction})"
             )
-    return GateDecision(domain, not reasons, threshold.version, sample_count, failures, tuple(reasons))
+    return GateDecision(
+        domain, not reasons, threshold.version, sample_count, failures, tuple(reasons)
+    )
 
 
 class GateBlocked(RuntimeError):
@@ -314,8 +316,7 @@ async def activate_threshold(pool: asyncpg.Pool, threshold: DomainThreshold) -> 
 
     async with pool.acquire() as conn, conn.transaction():
         await conn.execute(
-            "update public.domain_error_threshold set active = false"
-            " where domain = $1 and active",
+            "update public.domain_error_threshold set active = false where domain = $1 and active",
             threshold.domain,
         )
         await conn.execute(
@@ -493,7 +494,8 @@ async def _resolve_one(pool: asyncpg.Pool, s: PrimarySample) -> Decimal | None:
             int(snapshot),
             isin,
         )
-        return _num(weight) * 100 if weight is not None else None
+        number = _num(weight)
+        return number * 100 if number is not None else None
     if s.domain == "macro" and s.period_end and s.subject_key.count(":") == 2:
         source, series, geography = s.subject_key.split(":")
         return _num(

@@ -58,8 +58,7 @@ def _no_sleep(monkeypatch: pytest.MonkeyPatch) -> None:
 # ---------------------------------------------------------------------------------------
 def test_every_source_module_has_a_contract_or_a_documented_exemption() -> None:
     discovered = {"steward.sources"} | {
-        m.name
-        for m in pkgutil.iter_modules(sources_pkg.__path__, prefix="steward.sources.")
+        m.name for m in pkgutil.iter_modules(sources_pkg.__path__, prefix="steward.sources.")
     }
     covered = {c.module for c in PARSER_CASES} | {c.module for c in FETCH_CASES}
     covered |= set(NON_ADAPTER_MODULES)
@@ -162,9 +161,7 @@ async def test_fetch_denial_maps_to_typed_access_state(case: FetchCase, status: 
 @pytest.mark.parametrize("case", [c for c in FETCH_CASES if c.garbage_typed], ids=lambda c: c.id)
 async def test_fetch_html_instead_of_data_is_typed_not_empty_success(case: FetchCase) -> None:
     def html(request: httpx.Request) -> httpx.Response:
-        return httpx.Response(
-            200, text="<html><body>Service temporarily unavailable</body></html>"
-        )
+        return httpx.Response(200, text="<html><body>Service temporarily unavailable</body></html>")
 
     result, error = await attempt(case, html)
     if error is None:
@@ -173,7 +170,9 @@ async def test_fetch_html_instead_of_data_is_typed_not_empty_success(case: Fetch
         assert not result, f"{case.id}: HTML body produced {result!r}"
 
 
-@pytest.mark.parametrize("case", [c for c in FETCH_CASES if c.not_found_is_empty], ids=lambda c: c.id)
+@pytest.mark.parametrize(
+    "case", [c for c in FETCH_CASES if c.not_found_is_empty], ids=lambda c: c.id
+)
 async def test_fetch_404_is_not_covered_not_failure(case: FetchCase) -> None:
     result, error = await attempt(case, lambda r: httpx.Response(404, json={}))
     assert error is None
@@ -291,7 +290,9 @@ async def test_hard_block_after_denial_survives_quota_reset() -> None:
 def test_retry_after_is_honoured_and_never_in_the_past() -> None:
     now = dt.datetime(2026, 10, 1, 12, 0, tzinfo=dt.UTC)
     at = retry_after_at("120", now=now)
-    assert at is not None and now + dt.timedelta(seconds=120) <= at <= now + dt.timedelta(seconds=124)
+    assert at is not None and now + dt.timedelta(seconds=120) <= at <= now + dt.timedelta(
+        seconds=124
+    )
     assert retry_after_at("not-a-date", now=now) is None
     assert retry_after_at(None, now=now) is None
     assert access_from_http(429, retry_at=at).retry_at == at
