@@ -193,6 +193,12 @@ class HoldingProfile(ConfigModel):
         description="Yahoo Finance symbol (intraday prices, and daily prices when Stooq has "
         "none) when the one derived from the listing is wrong or missing (e.g. 'NOVO-B.CO').",
     )
+    eodhd_symbol: str | None = Field(
+        default=None,
+        pattern=r"^[A-Za-z0-9._-]{1,40}$",
+        description="Exact EODHD exchange:symbol code, including its verified exchange suffix "
+        "(for example AAPL.US). Used only after exchange-list verification.",
+    )
     reporting_currency: CurrencyCode | None = Field(
         default=None, description="Currency the company reports in; figures in another are held."
     )

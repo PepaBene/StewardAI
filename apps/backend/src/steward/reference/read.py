@@ -412,6 +412,7 @@ async def load_series(
     ref = SeriesRef(symbol, "stooq") if isinstance(symbol, str) else symbol
     rows = await pool.fetch(
         "select date, close from public.price_bar where symbol = $1 and source = $3"
+        " and (bar_type = 'adjusted' or (source = 'eodhd' and bar_type = 'raw'))"
         " and ($2::date is null or date >= $2) order by date",
         ref.symbol,
         since,
@@ -437,7 +438,8 @@ async def load_bars(pool: asyncpg.Pool, symbol: str | SeriesRef) -> list[PriceBa
     ref = SeriesRef(symbol, "stooq") if isinstance(symbol, str) else symbol
     rows = await pool.fetch(
         "select date, open, high, low, close, volume from public.price_bar"
-        " where symbol = $1 and source = $2 order by date",
+        " where symbol = $1 and source = $2"
+        " and (bar_type = 'adjusted' or (source = 'eodhd' and bar_type = 'raw')) order by date",
         ref.symbol,
         ref.source,
     )
@@ -491,7 +493,8 @@ async def price_history(pool: asyncpg.Pool, ticker: str, days: int) -> PriceHist
     since = (series[-1][0] if series else dt.date.today()) - dt.timedelta(days=days)
     fetched = (
         await pool.fetchval(
-            "select max(fetched_at) from public.price_bar where symbol = $1 and source = $2",
+            "select max(fetched_at) from public.price_bar where symbol = $1 and source = $2"
+            " and (bar_type = 'adjusted' or (source = 'eodhd' and bar_type = 'raw'))",
             ref.symbol,
             ref.source,
         )

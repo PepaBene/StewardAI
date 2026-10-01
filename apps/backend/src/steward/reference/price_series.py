@@ -27,8 +27,13 @@ import asyncpg
 from steward.config.holding_profiles import HoldingProfilesConfig
 from steward.config.jobs import PriceSettings
 
-PriceSource = Literal["stooq", "yahoo"]
-SOURCE_NAME: dict[PriceSource, str] = {"stooq": "Stooq", "yahoo": "Yahoo"}
+PriceSource = Literal["stooq", "yahoo", "eodhd", "alpha_vantage"]
+SOURCE_NAME: dict[PriceSource, str] = {
+    "stooq": "Stooq",
+    "yahoo": "Yahoo",
+    "eodhd": "EODHD",
+    "alpha_vantage": "Alpha Vantage",
+}
 
 # Stooq market suffix -> Yahoo suffix (US listings are bare on Yahoo).
 YAHOO_SUFFIX_BY_STOOQ: dict[str, str] = {
@@ -154,6 +159,7 @@ async def latest_dates(
     rows = await pool.fetch(
         "select symbol, source, max(date) as latest from public.price_bar"
         " where (symbol, source) in (select * from unnest($1::text[], $2::text[]))"
+        " and (bar_type = 'adjusted' or (source = 'eodhd' and bar_type = 'raw'))"
         " group by symbol, source",
         [r.symbol for r in refs],
         [r.source for r in refs],

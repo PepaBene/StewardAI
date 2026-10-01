@@ -57,6 +57,7 @@ from steward.sources.fund_characteristics import (
     ishares_characteristics,
     vanguard_characteristics,
 )
+from steward.sources.governor import Budget, PostgresRequestGovernor, QuotaExceeded
 from steward.sources.xbrl import XbrlError, parse_instance, plain_facts
 from steward.valuation.common import (
     fund_for_ticker,
@@ -552,13 +553,21 @@ async def refresh_esef(
     latest = picked[0]
     reason = _due(tc.stored.get("esef"), latest.id, settings, deps.today, force)
     if reason is None:
-        detail["esef"] = "unchanged"
-        return
+        has_history = await pool.fetchval(
+            """select exists(select 1 from public.financial_statement_fact
+               where ticker=$1 and accession=$2 and source='esef')""",
+            tc.ticker,
+            latest.id,
+        )
+        if has_history:
+            detail["esef"] = "unchanged"
+            return
+        reason = "populate periodized ESEF statement history"
     facts: list[Fact] = []
     raw: dict[str, Any] = {"filings": [], "facts": []}
     for filing in picked:
         doc = await esef_document(deps.http, filing)
-        parsed = parse_xbrl_json(doc, ALL_CONCEPTS)
+        parsed = parse_xbrl_json(doc, None, include_dimensions=True, include_text_blocks=True)
         filed = filing.added.date() if filing.added else None
         facts += [
             Fact(
@@ -574,7 +583,9 @@ async def refresh_esef(
                 url=filing.report_url,
             )
             for x in parsed
+            if x.value is not None and not x.dimensions and x.concept in ALL_CONCEPTS
         ]
+        await _store_esef_statement_facts(pool, tc.ticker, filing, parsed)
         raw["filings"].append({**filing.raw, "json_url": filing.json_url})
         raw["facts"] += [{**x.raw, "filing": filing.id} for x in parsed]
     if not any(f.concept in SHARES_CONCEPTS for f in facts):
@@ -587,6 +598,80 @@ async def refresh_esef(
         pool, tc.ticker, "esef", figures, raw, latest.id, latest.report_url or latest.json_url
     )
     detail["esef"] = _summary(figures)
+
+
+async def _store_esef_statement_facts(
+    pool: asyncpg.Pool,
+    ticker: str,
+    filing: EsefFiling,
+    facts: list[Any],
+) -> None:
+    """Keep the filing's numeric dimensional facts and cited note blocks point in time."""
+    rows = []
+    for fact in facts:
+        local = fact.concept.split(":", 1)[-1].lower()
+        statement = (
+            "segment"
+            if fact.dimensions
+            else "income"
+            if any(
+                token in local
+                for token in ("revenue", "income", "expense", "profit", "loss", "earnings")
+            )
+            else "cash_flow"
+            if any(
+                token in local
+                for token in ("cashflow", "cashflows", "payments", "proceeds", "repayments")
+            )
+            else "shares"
+            if "sharesoutstanding" in local
+            else "balance_sheet"
+            if any(token in local for token in ("assets", "liabilities", "equity", "debt", "cash"))
+            else "note"
+        )
+        unit = str(fact.unit)
+        currency = unit.upper() if len(unit) == 3 and unit.isalpha() else None
+        rows.append(
+            (
+                ticker,
+                filing.id,
+                "ESEF",
+                filing.report_url or filing.json_url,
+                fact.concept,
+                statement,
+                fact.start,
+                fact.end,
+                str(fact.end.year),
+                "IFRS",
+                fact.value,
+                unit,
+                currency,
+                json.dumps({"members": fact.dimensions}),
+                "esef",
+                filing.report_url or filing.json_url,
+                filing.added,
+                filing.added or dt.datetime.now(dt.UTC),
+                fact.text[:20000] if fact.text else None,
+                json.dumps({"xbrl_json_fact": fact.raw.get("id"), "reviewed": False}),
+            )
+        )
+    async with pool.acquire() as conn, conn.transaction():
+        await conn.execute(
+            "delete from public.financial_statement_fact "
+            "where ticker=$1 and accession=$2 and source='esef'",
+            ticker,
+            filing.id,
+        )
+        if rows:
+            await conn.executemany(
+                """insert into public.financial_statement_fact
+                   (ticker,accession,form,filing_url,concept,statement,period_start,period_end,
+                    fiscal_period,basis,value,unit,currency,dimensions,source,source_url,
+                    published_at,known_at,text_block,validation)
+                   values($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14::jsonb,
+                          $15,$16,$17,$18,$19,$20::jsonb)""",
+                rows,
+            )
 
 
 # ---------------------------------------------------------------------------
@@ -634,20 +719,16 @@ async def _reserve_alpha_vantage_request(pool: asyncpg.Pool, today: dt.date) -> 
     Valuation jobs are serialized by job type using a database advisory lock, so this
     sync-state counter cannot be incremented concurrently by two valuation runs.
     """
-    raw = await pool.fetchval(
-        "select value from public.sync_state where key = $1", ALPHA_VANTAGE_QUOTA_KEY
-    )
-    state = (json.loads(raw) if isinstance(raw, str) else raw) if raw else {}
-    day = today.isoformat()
-    used = int(state.get("used", 0)) if state.get("date") == day else 0
-    if used >= ALPHA_VANTAGE_DAILY_LIMIT:
+    try:
+        await PostgresRequestGovernor(pool).reserve(
+            "alpha_vantage",
+            "account_free",
+            Decimal(1),
+            Budget(daily=Decimal(ALPHA_VANTAGE_DAILY_LIMIT)),
+            now=dt.datetime.combine(today, dt.time.min, tzinfo=dt.UTC),
+        )
+    except QuotaExceeded:
         return False
-    await pool.execute(
-        "insert into public.sync_state (key, value) values ($1, $2::jsonb)"
-        " on conflict (key) do update set value = excluded.value",
-        ALPHA_VANTAGE_QUOTA_KEY,
-        json.dumps({"date": day, "used": used + 1}),
-    )
     return True
 
 
@@ -680,12 +761,22 @@ async def refresh_alpha_vantage(
         if not data or not data.get("Symbol"):
             detail["alphavantage"] = f"no Company Overview for {symbol}"
             await store_fundamentals(
-                pool, tc.ticker, "alphavantage", {}, {"empty": True}, symbol,
+                pool,
+                tc.ticker,
+                "alphavantage",
+                {},
+                {"empty": True},
+                symbol,
                 f"https://www.alphavantage.co/query?function=OVERVIEW&symbol={symbol}",
             )
             return
         await store_fundamentals(
-            pool, tc.ticker, "alphavantage", data, data, symbol,
+            pool,
+            tc.ticker,
+            "alphavantage",
+            data,
+            data,
+            symbol,
             f"https://www.alphavantage.co/query?function=OVERVIEW&symbol={symbol}",
         )
         detail["alphavantage"] = {"symbol": symbol, "as_of": data.get("LatestQuarter")}
@@ -693,7 +784,12 @@ async def refresh_alpha_vantage(
         detail["alphavantage_error"] = str(exc)[:300]
         # Cache errors too, so invalid/missing exchange symbols do not consume a call daily.
         await store_fundamentals(
-            pool, tc.ticker, "alphavantage", {}, {"error": str(exc)[:300]}, symbol,
+            pool,
+            tc.ticker,
+            "alphavantage",
+            {},
+            {"error": str(exc)[:300]},
+            symbol,
             f"https://www.alphavantage.co/query?function=OVERVIEW&symbol={symbol}",
         )
 

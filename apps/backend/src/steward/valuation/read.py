@@ -444,6 +444,7 @@ async def _price(
         return None
     row = await pool.fetchrow(
         "select date, close, currency from public.price_bar where symbol = $1 and source = $2"
+        " and bar_type = 'adjusted'"
         " order by date desc limit 1",
         ref.symbol,
         ref.source,
@@ -476,6 +477,7 @@ async def pe_history(
     since = today - dt.timedelta(days=HISTORY_DAYS)
     bars = await pool.fetch(
         "select date, close from public.price_bar where symbol = $1 and source = $2"
+        " and bar_type = 'adjusted'"
         " and date >= $3 order by date",
         ref.symbol,
         ref.source,

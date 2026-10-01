@@ -78,7 +78,9 @@ async def coverage(pool: asyncpg.Pool, jobs: JobsConfig, now: dt.datetime) -> Ac
     news = await news_last_covered(pool, now - window - dt.timedelta(days=30))
     rows = await pool.fetch(
         "select i.t212_ticker as ticker, i.name, i.price_symbol,"
-        " (select max(date) from public.price_bar b where b.symbol = i.price_symbol) as last_bar,"
+        " (select max(date) from public.price_bar b where b.symbol = i.price_symbol"
+        " and (b.bar_type = 'adjusted'"
+        " or (b.source = 'eodhd' and b.bar_type = 'raw'))) as last_bar,"
         " e.finished_at as earnings_at, e.status as earnings_status"
         " from public.instrument i left join lateral (select finished_at, status"
         " from public.job where job_type = 'earnings_check' and params ->> 'ticker' ="

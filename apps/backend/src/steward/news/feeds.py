@@ -16,6 +16,7 @@ import calendar
 import datetime as dt
 from collections.abc import Sequence
 from dataclasses import dataclass, field
+from decimal import Decimal
 from html.parser import HTMLParser
 from typing import Any
 from urllib.parse import quote_plus, urljoin
@@ -26,7 +27,11 @@ import httpx
 from steward.config.news_sources import GoogleNewsLocale
 from steward.documents.fetch import FetchError, default_headers, fetch_document
 from steward.news.normalize import clean_text, host_of
+from steward.sources.base import AccessResult, AccessState
 from steward.sources.edgar import EdgarClient, EdgarError, Filing
+from steward.sources.free_market import alpha_news_sentiment, parse_alpha_news
+from steward.sources.governor import Budget, PostgresRequestGovernor, QuotaExceeded
+from steward.sources.store import record_access
 
 MAX_FEED_BYTES = 5_000_000
 
@@ -45,6 +50,8 @@ class RawItem:
     tickers: tuple[str, ...] = ()
     # Event type labelled by rule (EDGAR forms); skips the classification call.
     event_type: str | None = None
+    sentiment_score: float | None = None
+    sentiment_relevance: float | None = None
 
 
 @dataclass(frozen=True)
@@ -60,6 +67,88 @@ class HoldingFeedInfo:
     tidm: str | None = None
     regulatory_urls: tuple[str, ...] = ()
     topics: tuple[str, ...] = ()
+    alpha_symbol: str | None = None
+
+
+async def collect_alpha_vantage_news(
+    http: httpx.AsyncClient,
+    api_key: str,
+    source_id: str,
+    holdings: Sequence[HoldingFeedInfo],
+    pool: Any,
+) -> tuple[list[RawItem], list[str]]:
+    items: list[RawItem] = []
+    errors: list[str] = []
+    governor = PostgresRequestGovernor(pool)
+    for holding in holdings:
+        symbol = holding.alpha_symbol
+        if not symbol:
+            continue
+        gates = await pool.fetch(
+            """select endpoint,state,hard_blocked from public.provider_access
+               where provider='alpha_vantage' and endpoint in ('account_free','news_sentiment')"""
+        )
+        gate_map = {row["endpoint"]: row for row in gates}
+        if len(gate_map) != 2 or any(
+            gate_map[endpoint]["state"] != "available" or gate_map[endpoint]["hard_blocked"]
+            for endpoint in ("account_free", "news_sentiment")
+        ):
+            errors.append(f"{holding.ticker}: Alpha Vantage sentiment access gate unavailable")
+            continue
+        try:
+            # Keep five of the shared 25 daily requests available for the Overview fallback.
+            budget = Budget(daily=Decimal(20))
+            await governor.reserve("alpha_vantage", "account_free", Decimal(1), budget)
+            await governor.reserve("alpha_vantage", "news_sentiment", Decimal(1), budget)
+            payload = await alpha_news_sentiment(http, api_key, symbol)
+            parsed = parse_alpha_news(payload, symbol)
+            for article in parsed:
+                publisher_url = article.raw.get("url")
+                published = (
+                    dt.datetime.combine(article.published_at, dt.time.min, tzinfo=dt.UTC)
+                    if article.published_at
+                    else None
+                )
+                items.append(
+                    RawItem(
+                        source_id=source_id,
+                        url=article.url,
+                        headline=article.title,
+                        published_at=published,
+                        summary=article.summary,
+                        language=None,
+                        outlet_host=host_of(str(publisher_url)),
+                        outlet_name=str(article.raw.get("source") or "") or None,
+                        tickers=(holding.ticker,),
+                        sentiment_score=float(article.sentiment),
+                        sentiment_relevance=float(article.relevance),
+                    )
+                )
+            await record_access(
+                pool,
+                "alpha_vantage",
+                "news_sentiment",
+                AccessResult(AccessState.AVAILABLE, "ticker-matched sentiment candidates fetched"),
+                credits=1,
+            )
+        except QuotaExceeded:
+            await record_access(
+                pool,
+                "alpha_vantage",
+                "news_sentiment",
+                AccessResult(AccessState.QUOTA_EXHAUSTED, "shared daily free budget exhausted"),
+            )
+            errors.append(f"{holding.ticker}: Alpha Vantage shared daily budget exhausted")
+            break
+        except Exception as exc:
+            await record_access(
+                pool,
+                "alpha_vantage",
+                "news_sentiment",
+                AccessResult(AccessState.TEMPORARILY_FAILED, "news sentiment request failed"),
+            )
+            errors.append(f"{holding.ticker}: {type(exc).__name__}")
+    return items, errors
 
 
 @dataclass

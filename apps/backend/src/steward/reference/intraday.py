@@ -496,6 +496,7 @@ async def _daily(pool: asyncpg.Pool, symbols: PriceSymbols) -> DailyFallback | N
         return None
     row = await pool.fetchrow(
         "select date, close from public.price_bar where symbol = $1 and source = $2"
+        " and bar_type = 'adjusted'"
         " order by date desc limit 1",
         ref.symbol,
         ref.source,
@@ -890,6 +891,7 @@ async def _previous_close(
     if value is None:
         value = await pool.fetchval(
             "select close from public.price_bar where symbol = $1 and source = 'yahoo'"
+            " and bar_type = 'adjusted'"
             " and date < $2 order by date desc limit 1",
             symbol,
             day,

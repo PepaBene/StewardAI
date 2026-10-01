@@ -11,7 +11,17 @@ from pydantic import AnyHttpUrl, Field, model_validator
 from steward.config.common import ConfigModel, Slug, Ticker, require_unique
 
 Tier = Literal[1, 2, 3]
-SourceType = Literal["rss", "page", "edgar", "finnhub", "google_news", "rns", "eqs", "edgar_fts"]
+SourceType = Literal[
+    "rss",
+    "page",
+    "edgar",
+    "finnhub",
+    "google_news",
+    "rns",
+    "eqs",
+    "edgar_fts",
+    "alpha_vantage",
+]
 Domain = Annotated[
     str,
     Field(
@@ -24,12 +34,12 @@ Domain = Annotated[
 # Types whose URL comes from each holding (EDGAR CIK, Finnhub symbol, aliases, the regulatory
 # news page), not the config.
 PER_HOLDING_TYPES: frozenset[str] = frozenset(
-    {"edgar", "finnhub", "google_news", "rns", "eqs", "edgar_fts"}
+    {"edgar", "finnhub", "google_news", "rns", "eqs", "edgar_fts", "alpha_vantage"}
 )
 # Regulatory news services and the home-market country they cover (from FIRDS/FITRS).
 REGULATORY_COUNTRY: dict[str, str] = {"rns": "GB", "eqs": "DE"}
 # Types that relay other outlets' items: an item's tier is its outlet's, not the source's.
-AGGREGATOR_TYPES: frozenset[str] = frozenset({"finnhub", "google_news"})
+AGGREGATOR_TYPES: frozenset[str] = frozenset({"finnhub", "google_news", "alpha_vantage"})
 
 
 class NewsSource(ConfigModel):
@@ -108,6 +118,13 @@ def _default_sources() -> list[NewsSource]:
             id="edgar-full-text", name="SEC EDGAR full-text search", tier=1, type="edgar_fts"
         ),
         NewsSource(id="finnhub-company-news", name="Finnhub company news", tier=2, type="finnhub"),
+        NewsSource(
+            id="alpha-vantage-sentiment",
+            name="Alpha Vantage ticker sentiment",
+            tier=3,
+            type="alpha_vantage",
+            enabled=False,
+        ),
         NewsSource(id="google-news", name="Google News", tier=2, type="google_news", enabled=False),
         # Off until the owner has checked the services' terms for automated personal use.
         NewsSource(

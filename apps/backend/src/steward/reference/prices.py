@@ -59,6 +59,14 @@ from steward.reference.price_series import (
 )
 from steward.settings import get_settings
 from steward.sources import yahoo
+from steward.sources.base import AccessResult, AccessState
+from steward.sources.free_market import (
+    FreeSourceError,
+    alpha_daily,
+    eodhd_daily,
+    eodhd_exchange_symbols,
+)
+from steward.sources.governor import Budget, PostgresRequestGovernor, QuotaExceeded
 from steward.sources.market import (
     MarketDataError,
     PriceBar,
@@ -67,6 +75,7 @@ from steward.sources.market import (
     stooq_currency,
     stooq_daily,
 )
+from steward.sources.store import record_access
 
 GAPS_KEY = "price_gaps"
 CHECKS_KEY = "price_checks"
@@ -99,15 +108,44 @@ async def store_bars(
     bars: list[PriceBar],
     source: PriceSource = "stooq",
     currency: str | None = None,
+    bar_type: str = "adjusted",
+    listing_id: int | None = None,
+    mic: str | None = None,
 ) -> int:
     await pool.executemany(
         "insert into public.price_bar (symbol, date, open, high, low, close, volume, source,"
-        " currency) values ($1, $2, $3, $4, $5, $6, $7, $8, $9) on conflict (symbol, date, source)"
+        " currency,session_date,listing_id,mic,quote_unit,bar_type,access_state)"
+        " values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$2,coalesce($10,"
+        " (select m.listing_id from public.instrument i join public.instrument_security_link m"
+        "   on m.ticker=i.t212_ticker and m.status='confirmed'"
+        "  where i.price_symbol=$1 and m.listing_id is not null limit 1)),"
+        " coalesce($11,(select l.mic from public.instrument i"
+        " join public.instrument_security_link m"
+        "   on m.ticker=i.t212_ticker and m.status='confirmed'"
+        "   join public.security_listing l on l.id=m.listing_id"
+        "  where i.price_symbol=$1 limit 1)),$9,$12,'available')"
+        " on conflict (symbol,date,source,bar_type)"
         " do update set open = excluded.open, high = excluded.high, low = excluded.low,"
         " close = excluded.close, volume = excluded.volume, currency = excluded.currency,"
-        " fetched_at = now()",
+        " session_date=excluded.session_date,"
+        " listing_id=coalesce(excluded.listing_id,price_bar.listing_id),"
+        " mic=coalesce(excluded.mic,price_bar.mic),quote_unit=excluded.quote_unit,"
+        " bar_type=excluded.bar_type,access_state=excluded.access_state,fetched_at = now()",
         [
-            (b.symbol, b.date, b.open, b.high, b.low, b.close, b.volume, source, currency)
+            (
+                b.symbol,
+                b.date,
+                b.open,
+                b.high,
+                b.low,
+                b.close,
+                b.volume,
+                source,
+                currency,
+                listing_id,
+                mic,
+                bar_type,
+            )
             for b in bars
         ],
     )
@@ -140,7 +178,8 @@ async def _backfill_start(
 ) -> tuple[dt.date | None, dt.date, bool, str]:
     """(latest stored date, full-history start, whether a backfill is due, state key)."""
     last = await pool.fetchval(
-        "select max(date) from public.price_bar where symbol = $1 and source = $2",
+        "select max(date) from public.price_bar where symbol = $1 and source = $2"
+        " and bar_type = 'adjusted'",
         ref.symbol,
         ref.source,
     )
@@ -273,6 +312,290 @@ async def collect_series(
     return {"source": "yahoo", "symbol": symbols.yahoo, "stooq_gap": stooq_gap}, None
 
 
+async def collect_eodhd_fallbacks(
+    pool: asyncpg.Pool,
+    deps: PriceDeps,
+    tickers: list[str],
+    profiles: HoldingProfilesConfig,
+    provider_settings: Any,
+    api_key: str | None,
+    detail: dict[str, Any],
+) -> dict[str, dict[str, Any]]:
+    """Use verified EODHD symbols only for profile-mapped held listings with source gaps.
+
+    One atomic `eod` budget is shared by exchange-list checks and data calls, capped at the
+    documented 20/day even if configuration is accidentally higher.
+    """
+    if not provider_settings.enabled or not api_key:
+        return {}
+    gates = await pool.fetch(
+        """select endpoint,state,hard_blocked from public.provider_access
+           where provider='eodhd' and endpoint in ('eod','symbol_search')"""
+    )
+    if len(gates) != 2 or any(r["state"] != "available" or r["hard_blocked"] for r in gates):
+        detail["eodhd"] = "skipped: both EODHD endpoints must pass the free-key access audit"
+        return {}
+    budget = Budget(
+        daily=Decimal(min(provider_settings.daily_quota or 20, 20)),
+        monthly=Decimal(provider_settings.monthly_quota)
+        if provider_settings.monthly_quota
+        else None,
+        reserve=Decimal(provider_settings.reserve_credits),
+    )
+    governor = PostgresRequestGovernor(pool)
+    listings: dict[str, list[dict[str, Any]]] = {}
+    results: dict[str, dict[str, Any]] = {}
+    for ticker in tickers:
+        profile = profiles.for_ticker(ticker)
+        symbol = profile.eodhd_symbol if profile else None
+        if not symbol:
+            continue
+        code, dot, exchange = symbol.rpartition(".")
+        if not dot or not code or not exchange:
+            detail[ticker] = {"eodhd": "symbol must include its exchange suffix"}
+            continue
+        mapping = await pool.fetchrow(
+            """select m.listing_id,l.mic,l.currency from public.instrument_security_link m
+               join public.security_listing l on l.id=m.listing_id
+               where m.ticker=$1 and m.status='confirmed' and l.status='active'""",
+            ticker,
+        )
+        if mapping is None:
+            detail[ticker] = {"eodhd": "skipped: confirmed canonical listing match is missing"}
+            continue
+        if exchange not in listings:
+            try:
+                await governor.reserve("eodhd", "eod", Decimal(1), budget)
+                listings[exchange] = await eodhd_exchange_symbols(deps.http, api_key, exchange)
+            except QuotaExceeded as exc:
+                detail[ticker] = {"eodhd": f"skipped: {exc}"}
+                break
+            except (FreeSourceError, httpx.HTTPError) as exc:
+                status_code = exc.status_code if isinstance(exc, FreeSourceError) else None
+                result = _provider_error_result(exc)
+                await record_access(
+                    pool,
+                    "eodhd",
+                    "symbol_search",
+                    result,
+                    status_code=status_code,
+                )
+                detail[ticker] = {"eodhd": "exchange-list request failed"}
+                continue
+            else:
+                await record_access(
+                    pool,
+                    "eodhd",
+                    "symbol_search",
+                    AccessResult(AccessState.AVAILABLE, "exchange list retrieved"),
+                    credits=1,
+                )
+        confirmed = any(
+            str(row.get("Code") or row.get("code") or "").casefold() == code.casefold()
+            for row in listings[exchange]
+        )
+        if not confirmed:
+            await pool.execute(
+                """insert into public.coverage_status(provider,dataset,entity_key,state,reason)
+                   values('eodhd','eod', $1,'not_covered',
+                          'exact exchange symbol absent from provider list')
+                   on conflict(provider,dataset,entity_key) do update set state=excluded.state,
+                     checked_at=now(),reason=excluded.reason""",
+                ticker,
+            )
+            detail[ticker] = {"eodhd": "symbol not found on the selected exchange"}
+            continue
+        try:
+            await governor.reserve("eodhd", "eod", Decimal(1), budget)
+            daily = await eodhd_daily(deps.http, api_key, symbol)
+        except QuotaExceeded as exc:
+            detail[ticker] = {"eodhd": f"skipped: {exc}"}
+            break
+        except (FreeSourceError, httpx.HTTPError) as exc:
+            status_code = exc.status_code if isinstance(exc, FreeSourceError) else None
+            await record_access(
+                pool,
+                "eodhd",
+                "eod",
+                _provider_error_result(exc),
+                status_code=status_code,
+            )
+            detail[ticker] = {"eodhd": "daily request failed; previous price history retained"}
+            continue
+        bars = [
+            PriceBar(symbol, bar.day, bar.open, bar.high, bar.low, bar.close, bar.volume)
+            for bar in daily
+        ]
+        if not bars:
+            detail[ticker] = {"eodhd": "verified symbol has no EOD data"}
+            continue
+        await store_bars(
+            pool, bars, "eodhd", mapping["currency"], "raw", mapping["listing_id"], mapping["mic"]
+        )
+        await record_access(
+            pool,
+            "eodhd",
+            "eod",
+            AccessResult(AccessState.AVAILABLE, "verified EOD bars received"),
+            credits=1,
+            response_bytes=None,
+        )
+        results[ticker] = {
+            "source": "eodhd",
+            "symbol": symbol,
+            "bars": len(bars),
+            "basis": "raw",
+            "history_limit": "free plan: up to one year",
+        }
+    return results
+
+
+async def collect_alpha_vantage_fallbacks(
+    pool: asyncpg.Pool,
+    deps: PriceDeps,
+    tickers: list[str],
+    profiles: HoldingProfilesConfig,
+    provider_settings: Any,
+    api_key: str | None,
+    detail: dict[str, Any],
+) -> dict[str, dict[str, Any]]:
+    """Fill held price gaps from explicitly mapped Alpha Vantage symbols.
+
+    The account-wide 25-call governor is shared with Company Overview, source audits and
+    statement probes; the endpoint governor provides a second independent guard. Both
+    access gates must be available so an unverified or paid endpoint is never called.
+    """
+    if not provider_settings.enabled or not api_key:
+        return {}
+    gates = await pool.fetch(
+        """select endpoint,state,hard_blocked from public.provider_access
+           where provider='alpha_vantage' and endpoint in ('daily_adjusted','account_free')"""
+    )
+    by_endpoint = {row["endpoint"]: row for row in gates}
+    if len(by_endpoint) != 2 or any(
+        by_endpoint[name]["state"] != "available" or by_endpoint[name]["hard_blocked"]
+        for name in ("daily_adjusted", "account_free")
+    ):
+        detail["alpha_vantage"] = "skipped: daily and shared-budget gates must be available"
+        return {}
+    governor = PostgresRequestGovernor(pool)
+    endpoint_budget = Budget(
+        daily=Decimal(min(provider_settings.daily_quota or 25, 25)),
+        monthly=Decimal(provider_settings.monthly_quota)
+        if provider_settings.monthly_quota
+        else None,
+        reserve=Decimal(provider_settings.reserve_credits),
+    )
+    account_budget = Budget(daily=Decimal(25))
+    results: dict[str, dict[str, Any]] = {}
+    for ticker in tickers:
+        profile = profiles.for_ticker(ticker)
+        provider_symbol = profile.alpha_vantage_symbol if profile else None
+        if not provider_symbol:
+            continue
+        mapping = await pool.fetchrow(
+            """select m.listing_id,l.mic,l.currency,i.price_symbol
+               from public.instrument_security_link m
+               join public.security_listing l on l.id=m.listing_id
+               join public.instrument i on i.t212_ticker=m.ticker
+               where m.ticker=$1 and m.status='confirmed' and l.status='active'""",
+            ticker,
+        )
+        if mapping is None:
+            detail[ticker] = {"alpha_vantage": "skipped: confirmed canonical listing is missing"}
+            continue
+        try:
+            await governor.reserve("alpha_vantage", "account_free", Decimal(1), account_budget)
+            await governor.reserve("alpha_vantage", "daily_adjusted", Decimal(1), endpoint_budget)
+            payload, daily = await alpha_daily(deps.http, api_key, provider_symbol)
+        except QuotaExceeded as exc:
+            detail[ticker] = {"alpha_vantage": f"skipped: {exc}"}
+            break
+        except (FreeSourceError, httpx.HTTPError) as exc:
+            result = _provider_error_result(exc)
+            await record_access(
+                pool,
+                "alpha_vantage",
+                "daily_adjusted",
+                result,
+                status_code=exc.status_code if isinstance(exc, FreeSourceError) else None,
+            )
+            detail[ticker] = {"alpha_vantage": "request failed; previous price history retained"}
+            continue
+        symbol = mapping["price_symbol"]
+        if not symbol or not daily:
+            detail[ticker] = {"alpha_vantage": "no mapped history returned"}
+            continue
+        raw_bars = [
+            PriceBar(symbol, row.day, row.open, row.high, row.low, row.close, row.volume)
+            for row in daily
+        ]
+        adjusted_bars = [
+            PriceBar(
+                symbol,
+                row.day,
+                row.open * (row.adjusted_close / row.close),
+                row.high * (row.adjusted_close / row.close),
+                row.low * (row.adjusted_close / row.close),
+                row.adjusted_close,
+                row.volume,
+            )
+            for row in daily
+            if row.adjusted_close is not None
+        ]
+        await store_bars(
+            pool,
+            raw_bars,
+            "alpha_vantage",
+            mapping["currency"],
+            "raw",
+            mapping["listing_id"],
+            mapping["mic"],
+        )
+        await store_bars(
+            pool,
+            adjusted_bars,
+            "alpha_vantage",
+            mapping["currency"],
+            "adjusted",
+            mapping["listing_id"],
+            mapping["mic"],
+        )
+        await record_access(
+            pool,
+            "alpha_vantage",
+            "daily_adjusted",
+            AccessResult(AccessState.AVAILABLE, "raw and adjusted daily bars received"),
+            credits=1,
+            response_bytes=len(json.dumps(payload)),
+        )
+        results[ticker] = {
+            "source": "alpha_vantage",
+            "symbol": provider_symbol,
+            "bars": len(daily),
+            "basis": "raw_and_adjusted",
+            "adjustment_source": "Alpha Vantage adjusted close",
+        }
+    return results
+
+
+def _provider_error_result(exc: Exception) -> AccessResult:
+    code = exc.status_code if isinstance(exc, FreeSourceError) else None
+    text = str(exc).casefold()
+    if code in (401, 403):
+        state = (
+            AccessState.PAID_ONLY
+            if any(term in text for term in ("premium", "upgrade", "subscription required"))
+            else AccessState.ACCESS_UNVERIFIED
+        )
+        detail = "provider denied access; endpoint hard-blocked pending configuration review"
+    elif code == 429:
+        state, detail = AccessState.QUOTA_EXHAUSTED, "provider free quota exhausted"
+    else:
+        state, detail = AccessState.TEMPORARILY_FAILED, "provider request failed"
+    return AccessResult(state, detail)
+
+
 async def _restated(
     pool: asyncpg.Pool, bars: list[PriceBar], source: PriceSource = "stooq"
 ) -> bool:
@@ -282,6 +605,7 @@ async def _restated(
         r["date"]: Decimal(r["close"])
         for r in await pool.fetch(
             "select date, close from public.price_bar where symbol = $1 and source = $3"
+            " and bar_type = 'adjusted'"
             " and date = any($2::date[])",
             bars[0].symbol,
             [b.date for b in bars],
@@ -413,6 +737,7 @@ async def latest_move(
     if ref:
         rows = await pool.fetch(
             "select date, close from public.price_bar where symbol = $1 and source = $2"
+            " and bar_type = 'adjusted'"
             " order by date desc limit 2",
             ref.symbol,
             ref.source,
@@ -514,6 +839,47 @@ async def run_price_history(ctx: JobContext, deps: PriceDeps) -> None:
         await _save_state(pool, GAPS_KEY, {"at": now, "gaps": gaps})
         await _save_state(pool, CHECKS_KEY, {"at": now, "checks": checks})
         await _save_state(pool, SOURCES_KEY, {"at": now, "sources": sources})
+
+    provider_credentials = get_settings()
+    alpha_key = provider_credentials.alpha_vantage_api_key
+    if alpha_key and any(ticker in gaps for ticker in holdings):
+        async with ctx.step("alpha_vantage_fallback") as step:
+            alpha = await collect_alpha_vantage_fallbacks(
+                pool,
+                deps,
+                [ticker for ticker in holdings if ticker in gaps],
+                profiles.body if profiles else HoldingProfilesConfig(),
+                (jobs.body if jobs else JobsConfig()).providers["alpha_vantage"],
+                alpha_key.get_secret_value(),
+                step.detail,
+            )
+            for ticker, result in alpha.items():
+                sources[ticker] = result
+                gaps.pop(ticker, None)
+            step.detail["fallbacks"] = alpha
+            now = dt.datetime.now(dt.UTC).isoformat()
+            await _save_state(pool, GAPS_KEY, {"at": now, "gaps": gaps})
+            await _save_state(pool, SOURCES_KEY, {"at": now, "sources": sources})
+
+    eodhd_key = provider_credentials.eodhd_api_key
+    if eodhd_key and any(ticker in gaps for ticker in holdings):
+        async with ctx.step("eodhd_fallback") as step:
+            eodhd = await collect_eodhd_fallbacks(
+                pool,
+                deps,
+                [ticker for ticker in holdings if ticker in gaps],
+                profiles.body if profiles else HoldingProfilesConfig(),
+                (jobs.body if jobs else JobsConfig()).providers["eodhd"],
+                eodhd_key.get_secret_value(),
+                step.detail,
+            )
+            for ticker, result in eodhd.items():
+                sources[ticker] = result
+                gaps.pop(ticker, None)
+            step.detail["fallbacks"] = eodhd
+            now = dt.datetime.now(dt.UTC).isoformat()
+            await _save_state(pool, GAPS_KEY, {"at": now, "gaps": gaps})
+            await _save_state(pool, SOURCES_KEY, {"at": now, "sources": sources})
 
     if PSE_SYMBOL in indices and sources.get(PSE_SYMBOL, {}).get("source") != "stooq":
         # No PX close from Stooq (Yahoo has no PX): the Prague Stock Exchange's own page.

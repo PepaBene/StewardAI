@@ -140,6 +140,82 @@ async def store_segments(
                 for r in result.rows
             ],
         )
+        # Keep a periodized, as-filed fact history beside the purpose-built revenue table.
+        # Unreviewed filing facts stay unpublished; only named concepts can later be promoted
+        # into comparable ratios after source/unit reconciliation.
+        await conn.execute(
+            "delete from public.financial_statement_fact where ticker=$1 and accession=$2",
+            ticker,
+            f.accession,
+        )
+        fact_rows = []
+        for fact in parsed.instance.facts:
+            number = fact.number
+            text_value = fact.text.strip()
+            if number is None and "TextBlock" not in fact.concept:
+                continue
+            if fact.context.typed:
+                dimensions = {"typed": True, "members": list(fact.context.dims)}
+            else:
+                dimensions = {"members": list(fact.context.dims)}
+            name = fact.concept.split(":", 1)[-1].lower()
+            statement = (
+                "segment"
+                if fact.context.dims
+                else "income"
+                if any(
+                    s in name
+                    for s in ("revenue", "income", "expense", "profit", "loss", "eps", "earnings")
+                )
+                else "cash_flow"
+                if any(
+                    s in name
+                    for s in ("cashflow", "cashflows", "payments", "proceeds", "repayments")
+                )
+                else "shares"
+                if "sharesoutstanding" in name
+                else "balance_sheet"
+                if any(
+                    s in name for s in ("assets", "liabilities", "equity", "debt", "cashandcash")
+                )
+                else "note"
+            )
+            # Retain cited note blocks as text, not as fabricated numerical facts.
+            block = text_value[:20000] if "TextBlock" in fact.concept else None
+            fact_rows.append(
+                (
+                    ticker,
+                    f.accession,
+                    f.form,
+                    f.url(f.primary_document),
+                    fact.concept,
+                    statement,
+                    fact.context.start,
+                    fact.context.end or fact.context.instant,
+                    "IFRS"
+                    if fact.concept.startswith("ifrs-full:")
+                    else "US_GAAP"
+                    if fact.concept.startswith("us-gaap:")
+                    else "issuer_extension",
+                    fact.unit or "pure",
+                    number,
+                    json.dumps(dimensions),
+                    block,
+                    f.filing_date,
+                    f.filing_date,
+                    f.url(f.primary_document),
+                    fact.id,
+                )
+            )
+        await conn.executemany(
+            """insert into public.financial_statement_fact
+               (ticker,accession,form,filing_url,concept,statement,period_start,period_end,basis,
+                unit,value,dimensions,text_block,published_at,known_at,source,source_url,validation)
+               values($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12::jsonb,$13,$14::timestamptz,
+                      $15::timestamptz,'sec_xbrl',$16,
+                      jsonb_build_object('source_fact_id',$17,'reviewed',false))""",
+            fact_rows,
+        )
     kinds: dict[str, int] = {}
     for r in result.rows:
         kinds[r.kind] = kinds.get(r.kind, 0) + 1

@@ -69,6 +69,7 @@ from steward.news.escalation import escalation_due, queue_escalation
 from steward.news.feeds import (
     HoldingFeedInfo,
     RawItem,
+    collect_alpha_vantage_news,
     collect_edgar,
     collect_finnhub,
     collect_google_news,
@@ -82,7 +83,6 @@ from steward.news.regulatory import FtsResult, collect_edgar_fts, collect_regula
 from steward.notify.alerts import create_alerts, dispatch_due
 from steward.notify.channels import Channel, channels_from_settings
 from steward.notify.route import AlertRequest
-from steward.reference.identity import object_key, upsert_relationship
 from steward.settings import get_settings
 from steward.sources.documents import link_public_document
 from steward.sources.edgar import EdgarClient
@@ -96,6 +96,7 @@ class NewsDeps:
     http: httpx.AsyncClient
     edgar: EdgarClient | None = None
     finnhub_key: str | None = None
+    alpha_vantage_key: str | None = None
     classifier: Classifier | None = None
     corroborator: Corroborator | None = None
     channels: dict[str, Channel] = field(default_factory=dict)
@@ -224,6 +225,7 @@ async def load_holdings(pool: asyncpg.Pool, config: NewsConfig) -> Holdings:
                 if profile
                 else (),
                 topics=tuple(profile.watch_topics) if profile else (),
+                alpha_symbol=profile.alpha_vantage_symbol if profile else None,
             )
         )
         thesis = next((th for th in config.theses.theses if th.ticker == ticker), None)
@@ -347,6 +349,12 @@ async def collect_source(
             deps.http, deps.finnhub_key, source.id, feeds, since, deps.now().date()
         )
         return result.items, result.errors
+    if source.type == "alpha_vantage":
+        if not deps.alpha_vantage_key:
+            return [], ["ALPHA_VANTAGE_API_KEY is not set"]
+        return await collect_alpha_vantage_news(
+            deps.http, deps.alpha_vantage_key, source.id, feeds, pool
+        )
     if source.type in REGULATORY_COUNTRY:
         result = await collect_regulatory(
             deps.http,
@@ -378,8 +386,12 @@ async def collect_source(
 
 
 async def record_filing_hits(pool: asyncpg.Pool, fts: FtsResult) -> None:
-    """Topic hits (linked to their news item once stored) and other filers naming a holding,
-    stored as suggested relationships linked to the filing."""
+    """Store topic hits and filing-review candidates without inferring counterparties.
+
+    EDGAR full-text results do not include the cited passage. A filer and a holding appearing
+    near "customer" or "supplier" cannot establish direction or even a relationship, so those
+    hits remain unlinked review candidates until a fetched passage is resolved.
+    """
     for ticker, topic, hit in fts.topic_hits:
         await pool.execute(
             "insert into public.filing_hit (ticker, kind, query, matched_term, accession, cik,"
@@ -396,44 +408,22 @@ async def record_filing_hits(pool: asyncpg.Pool, fts: FtsResult) -> None:
             hit.url,
         )
     for ticker, relation, keyword, hit in fts.relations:
-        async with pool.acquire() as conn, conn.transaction():
-            await upsert_relationship(
-                conn,
-                ticker=ticker,
-                subject=ticker,
-                subject_name=None,
-                type=relation,
-                object_name=hit.filer_name,
-                source="edgar",
-                confirmed=False,
-                source_ref=hit.url,
-                as_of=hit.filed_at,
-                detail={"keyword": keyword, "form": hit.form, "accession": hit.accession},
-            )
-            rel_id = await conn.fetchval(
-                "select id from public.entity_relationship where ticker = $1 and type = $2"
-                " and object_key = $3",
-                ticker,
-                relation,
-                object_key(None, None, hit.filer_name),
-            )
-            await conn.execute(
-                "insert into public.filing_hit (ticker, kind, query, matched_term, accession,"
-                " cik, filer_name, form, filed_at, file, url, relationship_id) values ($1, $2,"
-                " $3, $4, $5, $6, $7, $8, $9, $10, $11, $12) on conflict do nothing",
-                ticker,
-                relation,
-                f"name + {keyword}",
-                keyword,
-                hit.accession,
-                hit.cik,
-                hit.filer_name,
-                hit.form,
-                hit.filed_at,
-                hit.file,
-                hit.url,
-                rel_id,
-            )
+        await pool.execute(
+            "insert into public.filing_hit (ticker, kind, query, matched_term, accession,"
+            " cik, filer_name, form, filed_at, file, url) values ($1, $2, $3, $4, $5, $6,"
+            " $7, $8, $9, $10, $11) on conflict do nothing",
+            ticker,
+            relation,
+            f"name + {keyword}",
+            keyword,
+            hit.accession,
+            hit.cik,
+            hit.filer_name,
+            hit.form,
+            hit.filed_at,
+            hit.file,
+            hit.url,
+        )
 
 
 def item_tier(
@@ -557,9 +547,9 @@ async def store_items(
                 "insert into public.news_item (url, source_id, outlet, outlet_name, tier,"
                 " published_at, first_seen_at, headline, summary, language, cluster_id,"
                 " tickers, links, event_type, affected_ticker, rumour, relevant,"
-                " classified_at, classified_by, job_id)"
+                " classified_at, classified_by, job_id, sentiment_score, sentiment_relevance)"
                 " values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13::jsonb, $14,"
-                " $15, $16, $17, $18, $19, $20)"
+                " $15, $16, $17, $18, $19, $20, $21, $22)"
                 " on conflict (url) do nothing returning id",
                 url,
                 source.id,
@@ -581,6 +571,8 @@ async def store_items(
                 now if item.event_type else None,
                 f"rules:{source.type}" if item.event_type else None,
                 job_id,
+                item.sentiment_score,
+                item.sentiment_relevance,
             )
             if item_id is None:
                 stats.duplicate += 1
@@ -1296,6 +1288,11 @@ async def news_ingest_handler(ctx: JobContext) -> None:
             edgar=EdgarClient(http, settings.sec_user_agent) if settings.sec_user_agent else None,
             finnhub_key=(
                 settings.finnhub_api_key.get_secret_value() if settings.finnhub_api_key else None
+            ),
+            alpha_vantage_key=(
+                settings.alpha_vantage_api_key.get_secret_value()
+                if settings.alpha_vantage_api_key
+                else None
             ),
             classifier=classifier,
             corroborator=corroborator,

@@ -30,24 +30,28 @@ class Probe:
     credential: str | None = None
     credential_param: str | None = None
     expected_symbol: str | None = None
+    auth_secret: str | None = None
 
 
 def classify_probe(status: int, body: Any, expected_symbol: str | None = None) -> AccessResult:
     text = str(body).casefold()
     paid = any(word in text for word in ("premium", "upgrade", "subscription required"))
     if status == 200 and isinstance(body, dict):
-        message = " ".join(
-            str(body.get(key, ""))
-            for key in ("Error Message", "Note", "Information", "message", "error")
-        ).strip().casefold()
+        message = (
+            " ".join(
+                str(body.get(key, ""))
+                for key in ("Error Message", "Note", "Information", "message", "error")
+            )
+            .strip()
+            .casefold()
+        )
         if message:
             if any(word in message for word in ("premium", "upgrade", "subscription required")):
                 return AccessResult(AccessState.PAID_ONLY, "provider reports a paid-tier endpoint")
             if any(word in message for word in ("call frequency", "rate limit", "quota exceeded")):
                 return AccessResult(AccessState.QUOTA_EXHAUSTED, "provider rate or quota limit")
             if any(
-                word in message
-                for word in ("invalid api key", "apikey is invalid", "unauthorized")
+                word in message for word in ("invalid api key", "apikey is invalid", "unauthorized")
             ):
                 return AccessResult(AccessState.ACCESS_UNVERIFIED, "credential rejected")
             if any(word in message for word in ("no data", "symbol not found", "not found")):
@@ -61,9 +65,7 @@ def classify_probe(status: int, body: Any, expected_symbol: str | None = None) -
     if result.state == AccessState.AVAILABLE and expected_symbol:
         item = body[0] if isinstance(body, list) and body and isinstance(body[0], dict) else body
         symbol = (
-            str(item.get("symbol") or item.get("Symbol") or "")
-            if isinstance(item, dict)
-            else ""
+            str(item.get("symbol") or item.get("Symbol") or "") if isinstance(item, dict) else ""
         )
         if symbol and symbol.casefold() != expected_symbol.casefold():
             return AccessResult(
@@ -90,6 +92,45 @@ def probes(settings: Settings) -> list[Probe]:
         ),
         Probe(
             "alpha_vantage",
+            "daily_adjusted",
+            "https://www.alphavantage.co/query",
+            {"function": "TIME_SERIES_DAILY_ADJUSTED", "symbol": "IBM", "outputsize": "compact"},
+            secret(settings.alpha_vantage_api_key),
+            "apikey",
+            "IBM",
+        ),
+        Probe(
+            "alpha_vantage",
+            "financial_statements",
+            "https://www.alphavantage.co/query",
+            {"function": "INCOME_STATEMENT", "symbol": "IBM"},
+            secret(settings.alpha_vantage_api_key),
+            "apikey",
+            "IBM",
+        ),
+        Probe(
+            "alpha_vantage",
+            "commodity",
+            "https://www.alphavantage.co/query",
+            {"function": "WTI", "interval": "daily"},
+            secret(settings.alpha_vantage_api_key),
+            "apikey",
+        ),
+        Probe(
+            "alpha_vantage",
+            "fx_daily",
+            "https://www.alphavantage.co/query",
+            {
+                "function": "FX_DAILY",
+                "from_symbol": "EUR",
+                "to_symbol": "USD",
+                "outputsize": "compact",
+            },
+            secret(settings.alpha_vantage_api_key),
+            "apikey",
+        ),
+        Probe(
+            "alpha_vantage",
             "news_sentiment",
             "https://www.alphavantage.co/query",
             {"function": "NEWS_SENTIMENT", "tickers": "IBM"},
@@ -100,6 +141,14 @@ def probes(settings: Settings) -> list[Probe]:
             "eodhd",
             "eod",
             "https://eodhd.com/api/eod/AAPL.US",
+            {"fmt": "json"},
+            secret(settings.eodhd_api_key),
+            "api_token",
+        ),
+        Probe(
+            "eodhd",
+            "symbol_search",
+            "https://eodhd.com/api/exchange-symbol-list/US",
             {"fmt": "json"},
             secret(settings.eodhd_api_key),
             "api_token",
@@ -143,9 +192,9 @@ def probes(settings: Settings) -> list[Probe]:
         ),
         Probe(
             "diffbot",
-            "extract",
-            "https://api.diffbot.com/v3/article",
-            {"url": "https://example.com"},
+            "organization",
+            "https://kg.diffbot.com/kg/v3/dql",
+            {"query": 'type:Organization homepageUri:"example.com"', "size": "1"},
             secret(settings.diffbot_api_key),
             "token",
         ),
@@ -162,6 +211,31 @@ def probes(settings: Settings) -> list[Probe]:
             "earnings_calendar",
             "https://finnhub.io/api/v1/calendar/earnings",
             {},
+            secret(settings.finnhub_api_key),
+            "token",
+        ),
+        Probe(
+            "finnhub",
+            "quote",
+            "https://finnhub.io/api/v1/quote",
+            {"symbol": "AAPL"},
+            secret(settings.finnhub_api_key),
+            "token",
+            "AAPL",
+        ),
+        Probe(
+            "finnhub",
+            "peers",
+            "https://finnhub.io/api/v1/stock/peers",
+            {"symbol": "AAPL"},
+            secret(settings.finnhub_api_key),
+            "token",
+        ),
+        Probe(
+            "finnhub",
+            "earnings_surprises",
+            "https://finnhub.io/api/v1/stock/earnings",
+            {"symbol": "AAPL", "limit": "4"},
             secret(settings.finnhub_api_key),
             "token",
         ),
@@ -207,6 +281,15 @@ def probes(settings: Settings) -> list[Probe]:
         ),
         Probe(
             "twelve_data",
+            "quote",
+            "https://api.twelvedata.com/quote",
+            {"symbol": "AAPL"},
+            secret(settings.twelve_data_api_key),
+            "apikey",
+            "AAPL",
+        ),
+        Probe(
+            "twelve_data",
             "corporate_actions",
             "https://api.twelvedata.com/dividends",
             {"symbol": "AAPL"},
@@ -241,7 +324,14 @@ def probes(settings: Settings) -> list[Probe]:
             secret(settings.un_comtrade_api_key),
             "subscription-key",
         ),
-        Probe("epo_ops", "published_data", "", {}, secret(settings.epo_ops_client_id)),
+        Probe(
+            "epo_ops",
+            "patent_search",
+            "https://ops.epo.org/3.2/auth/accesstoken",
+            {},
+            secret(settings.epo_ops_client_id),
+            auth_secret=secret(settings.epo_ops_client_secret),
+        ),
     ]
 
 
@@ -253,7 +343,9 @@ async def run_source_audit(ctx: JobContext, http: httpx.AsyncClient, settings: S
     governor = PostgresRequestGovernor(ctx.pool)
     for probe in probes(settings):
         async with ctx.step(f"{probe.provider}:{probe.endpoint}") as step:
-            config_hash = hashlib.sha256((probe.credential or "").encode()).hexdigest()
+            config_hash = hashlib.sha256(
+                f"{probe.credential or ''}:{probe.auth_secret or ''}".encode()
+            ).hexdigest()
             gate = await ctx.pool.fetchrow(
                 """select state,hard_blocked,retry_at,configuration_hash
                    from public.provider_access where provider=$1 and endpoint=$2""",
@@ -279,13 +371,24 @@ async def run_source_audit(ctx: JobContext, http: httpx.AsyncClient, settings: S
                 probe.endpoint,
                 config_hash,
             )
-            if not probe.url or (probe.credential_param and not probe.credential):
+            if (
+                not probe.url
+                or (probe.credential_param and not probe.credential)
+                or (probe.provider == "epo_ops" and (not probe.credential or not probe.auth_secret))
+            ):
                 result = AccessResult(AccessState.ACCESS_UNVERIFIED, "credential not configured")
                 await record_access(ctx.pool, probe.provider, probe.endpoint, result)
                 step.detail["state"] = result.state
                 continue
             provider_settings = jobs.providers[probe.provider]
             try:
+                if probe.provider == "alpha_vantage":
+                    await governor.reserve(
+                        "alpha_vantage",
+                        "account_free",
+                        1,
+                        Budget(daily=25),
+                    )
                 await governor.reserve(
                     probe.provider,
                     probe.endpoint,
@@ -306,7 +409,15 @@ async def run_source_audit(ctx: JobContext, http: httpx.AsyncClient, settings: S
                 params[probe.credential_param] = probe.credential
             started = time.monotonic()
             try:
-                response = await http.get(probe.url, params=params)
+                if probe.provider == "epo_ops":
+                    response = await http.post(
+                        probe.url,
+                        data={"grant_type": "client_credentials"},
+                        auth=(probe.credential or "", probe.auth_secret or ""),
+                        headers={"Content-Type": "application/x-www-form-urlencoded"},
+                    )
+                else:
+                    response = await http.get(probe.url, params=params)
                 try:
                     body: Any = response.json()
                 except ValueError:

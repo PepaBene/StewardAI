@@ -27,16 +27,18 @@ ENTITY_FILINGS_URL = FILINGS_XBRL_URL + "/api/entities/{lei}/filings"
 
 @dataclass(frozen=True)
 class EsefFact:
-    """One non-dimensional fact. `start` is None for an instant (balance-sheet) fact."""
+    """One numeric fact or cited note block. `start` is None for an instant fact."""
 
     concept: str  # "ifrs-full:DilutedEarningsLossPerShare"
     start: dt.date | None
     end: dt.date
-    value: Decimal
+    value: Decimal | None
     unit: str  # "DKK/shares"
     decimals: str | None
     # The xBRL-JSON fact object as published, with its id.
     raw: dict[str, Any] = field(repr=False, compare=False)
+    dimensions: dict[str, str] = field(default_factory=dict)
+    text: str | None = None
 
 
 @dataclass(frozen=True)
@@ -124,10 +126,17 @@ def _json_moment(text: str) -> dt.date:
     return moment.date()
 
 
-def parse_xbrl_json(doc: dict[str, Any], concepts: set[str] | None = None) -> list[EsefFact]:
-    """Non-dimensional numeric facts of an xBRL-JSON report. Concept prefixes are the
-    document's own (ČEZ writes `ifrs:`); they are mapped to the canonical ones through
-    `documentInfo.namespaces`."""
+def parse_xbrl_json(
+    doc: dict[str, Any],
+    concepts: set[str] | None = None,
+    *,
+    include_dimensions: bool = False,
+    include_text_blocks: bool = False,
+) -> list[EsefFact]:
+    """Parse numeric facts, optionally retaining axes and cited note blocks.
+
+    Concept prefixes are mapped from the document's own namespaces; ČEZ writes `ifrs:`.
+    """
     namespaces = (doc.get("documentInfo") or {}).get("namespaces") or {}
     prefixes = {p: canonical_prefix(str(uri), p) for p, uri in namespaces.items()}
     facts: list[EsefFact] = []
@@ -139,7 +148,12 @@ def parse_xbrl_json(doc: dict[str, Any], concepts: set[str] | None = None) -> li
         if not concept or (concepts is not None and concept not in concepts):
             continue
         extra = set(dims) - {"concept", "entity", "period", "unit", "language"}
-        if extra or "unit" not in dims or "period" not in dims:
+        is_text_block = include_text_blocks and "textblock" in local.casefold()
+        if (
+            (extra and not include_dimensions)
+            or ("unit" not in dims and not is_text_block)
+            or "period" not in dims
+        ):
             continue
         try:
             value = Decimal(str(fact.get("value")))
@@ -151,7 +165,16 @@ def parse_xbrl_json(doc: dict[str, Any], concepts: set[str] | None = None) -> li
             else:
                 start, end = None, _json_moment(first)
         except (InvalidOperation, ValueError):
-            continue
+            text = fact.get("value")
+            if (
+                not include_text_blocks
+                or "textblock" not in local.casefold()
+                or not isinstance(text, str)
+            ):
+                continue
+            value = None
+        else:
+            text = None
         decimals = fact.get("decimals")
         facts.append(
             EsefFact(
@@ -159,9 +182,11 @@ def parse_xbrl_json(doc: dict[str, Any], concepts: set[str] | None = None) -> li
                 start=start,
                 end=end,
                 value=value,
-                unit=plain_unit(str(dims["unit"])),
+                unit=plain_unit(str(dims.get("unit") or "pure")),
                 decimals=None if decimals is None else str(decimals),
                 raw={"id": fact_id, **fact},
+                dimensions={key: str(member) for key, member in dims.items() if key in extra},
+                text=text,
             )
         )
     return facts

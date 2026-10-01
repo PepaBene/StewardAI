@@ -169,7 +169,8 @@ async def holdings_prices(
         " ranked as (select b.symbol, b.source, b.date, b.close,"
         " row_number() over (partition by b.symbol, b.source order by b.date desc) as rn,"
         " max(b.date) over (partition by b.symbol, b.source) as latest from public.price_bar b"
-        " join wanted w on w.symbol = b.symbol and w.source = b.source)"
+        " join wanted w on w.symbol = b.symbol and w.source = b.source"
+        " where b.bar_type = 'adjusted' or (b.source = 'eodhd' and b.bar_type = 'raw'))"
         " select symbol, source, date, close, rn, date >= latest - $3::int as in_window"
         " from ranked where rn <= 2 or date >= latest - $3::int order by symbol, source, date",
         [r.symbol for r in refs],
@@ -320,6 +321,7 @@ async def _index_quote(
     rows = (
         await pool.fetch(
             "select date, close from public.price_bar where symbol = $1 and source = $2"
+            " and (bar_type = 'adjusted' or (source = 'eodhd' and bar_type = 'raw'))"
             " order by date desc limit 2",
             ref.symbol,
             ref.source,

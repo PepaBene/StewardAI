@@ -246,6 +246,37 @@ def test_xbrl_json_periods_and_units() -> None:
     assert all(f.raw["dimensions"].keys() <= {"concept", "entity", "period", "unit"} for f in facts)
 
 
+def test_esef_optional_dimensional_facts_and_text_blocks_are_retained() -> None:
+    doc = {
+        "documentInfo": {
+            "namespaces": {"ifrs": "http://xbrl.ifrs.org/taxonomy/2024-03-27/ifrs-full"}
+        },
+        "facts": {
+            "segment-revenue": {
+                "value": "42",
+                "dimensions": {
+                    "concept": "ifrs:Revenue",
+                    "period": "2025-01-01T00:00:00/2026-01-01T00:00:00",
+                    "unit": "iso4217:EUR",
+                    "ifrs:OperatingSegmentsAxis": "ifrs:CloudMember",
+                },
+            },
+            "note-block": {
+                "value": "Named customer concentration details",
+                "dimensions": {
+                    "concept": "ifrs:MajorCustomersTextBlock",
+                    "period": "2026-01-01T00:00:00",
+                    "language": "en",
+                },
+            },
+        },
+    }
+    numeric, note = parse_xbrl_json(doc, include_dimensions=True, include_text_blocks=True)
+    assert numeric.value == Decimal(42)
+    assert numeric.dimensions == {"ifrs:OperatingSegmentsAxis": "ifrs:CloudMember"}
+    assert note.value is None and note.text == "Named customer concentration details"
+
+
 def test_xbrl_json_maps_document_prefixes() -> None:
     doc = {
         "documentInfo": {

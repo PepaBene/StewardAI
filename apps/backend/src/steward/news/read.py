@@ -58,6 +58,12 @@ class NewsItemOut(BaseModel):
     affected_ticker: str | None
     rumour: bool | None
     relevant: bool | None
+    sentiment_score: float | None = Field(
+        default=None, description="Provider sentiment signal; candidate ranking only."
+    )
+    sentiment_relevance: float | None = Field(
+        default=None, description="Provider ticker relevance for the sentiment signal."
+    )
     story: StoryOut
 
 
@@ -137,7 +143,8 @@ def _story(row: asyncpg.Record) -> StoryOut:
 FEED_SELECT = (
     "select i.id, i.url, i.headline, i.summary, i.outlet, i.outlet_name, i.tier, i.source_id,"
     " i.published_at, i.tickers, i.links, i.event_type, i.affected_ticker, i.rumour,"
-    " i.relevant, i.cluster_id, c.ticker as c_ticker, c.event_type as c_event_type,"
+    " i.relevant, i.sentiment_score, i.sentiment_relevance, i.cluster_id,"
+    " c.ticker as c_ticker, c.event_type as c_event_type,"
     " c.severity as c_severity, c.status as c_status, c.confidence as c_confidence,"
     " c.status_reason as c_status_reason, c.rumour as c_rumour, c.recycled as c_recycled,"
     " c.best_tier as c_best_tier, c.source_count as c_source_count,"
@@ -175,6 +182,8 @@ async def news_feed(
             affected_ticker=r["affected_ticker"],
             rumour=r["rumour"],
             relevant=r["relevant"],
+            sentiment_score=r["sentiment_score"],
+            sentiment_relevance=r["sentiment_relevance"],
             story=_story(r),
         )
         for r in rows

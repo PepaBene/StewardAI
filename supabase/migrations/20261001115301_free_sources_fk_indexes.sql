@@ -1,0 +1,20 @@
+-- Cover foreign-key lookups added by the phase 3-5 evidence model.
+create index if not exists exchange_session_source_evidence on public.exchange_session(source);
+create index if not exists corporate_action_successor_listing on public.corporate_action(successor_listing_id);
+create index if not exists corporate_action_evidence on public.corporate_action(evidence_id);
+create index if not exists financial_fact_issuer on public.financial_statement_fact(issuer_id);
+create index if not exists financial_fact_amends on public.financial_statement_fact(amends_fact_id);
+create index if not exists financial_fact_evidence on public.financial_statement_fact(evidence_id);
+create index if not exists forward_observation_evidence on public.forward_observation(evidence_id);
+create index if not exists peer_set_issuer on public.peer_set(issuer_id);
+create index if not exists peer_set_evidence on public.peer_set(evidence_id);
+create index if not exists company_graph_subject_issuer on public.company_graph_edge(subject_issuer_id);
+create index if not exists company_graph_object_issuer on public.company_graph_edge(object_issuer_id);
+create index if not exists company_graph_evidence on public.company_graph_edge(evidence_id);
+create index if not exists company_event_issuer on public.company_event(issuer_id);
+create index if not exists company_event_evidence on public.company_event(evidence_id);
+create index if not exists relationship_disclosure_evidence on public.relationship_disclosure(evidence_id);
+create index if not exists patent_family_owner_issuer on public.patent_family_owner(issuer_id);
+create index if not exists patent_family_owner_evidence on public.patent_family_owner(evidence_id);
+create index if not exists issuer_ir_release_document on public.issuer_ir_release(document_version_id);
+create index if not exists security_listing_successor on public.security_listing(successor_listing_id);

@@ -160,7 +160,9 @@ async def _price(
         return position["current_price"], position["instrument_currency"], sid
     if symbol:
         bar = await pool.fetchrow(
-            "select date, close from public.price_bar where symbol = $1 order by date desc limit 1",
+            "select date, close from public.price_bar where symbol = $1"
+            " and (bar_type = 'adjusted' or (source = 'eodhd' and bar_type = 'raw'))"
+            " order by date desc limit 1",
             symbol,
         )
         if bar is not None:
