@@ -119,3 +119,15 @@ Not implemented or only manual: D4.8 SEC notes/datasets and reconciliation, D4.1
 
 ## F. What was not examined
 Frontend; `cnb.py`; GLEIF/Wikidata/OpenFIGI parsing beyond the paths above; lookthrough `read.py` helper lines ~330-560; `etf_issuers.py` Vanguard parsing; production-data migration behavior; every provider endpoint/quota against live documentation.
+
+---
+
+## Resolution status (after the fix pass)
+
+All A and B items were worked in eight streams; each has a regression test and, where schema changed, a migration (`20261005100000`-`20261005170000`) with a rollback. Backend: 1862 passed, 16 skipped (pgmq not installed here), 1 xfailed (the `deals().current_state` ordering for a later-known, earlier-effective reversal, left open by decision; the filed-notes revision tie was fixed). ruff, ruff format and mypy clean.
+
+Still open or only partly fixable offline:
+- Nothing has run against a live provider. Unverified assumptions: EPO OPS biblio/legal shapes, TED and Diffbot field names, EODHD close basis and London pence quoting, Alpha Vantage denial wording, Finnhub per-exchange 403/empty-quote behaviour, Twelve Data plan messages, ALFRED `output_type=1` semantics, OECD/BIS dimension orders, SEC FSDS zip names, iShares/Vanguard factsheet field names (marked `names_unverified`), UK RNS body retrieval.
+- Partial: B14 live Comtrade fields; HS concordance seeded at chapter level only; BIS keys validated for four dataflows; D3.4 per-exchange probes mock-tested; D4.8 FSDS parser unverified against a real download; D6.1 factsheet fields; total return is unavailable for Stooq/Yahoo-only holdings (needs raw closes).
+- Open by decision: `deals().current_state` ordering (xfail); the five web tests that were already failing before this work (palette `/watchlist`, jobs/profiles/fundamentals form round-trips); `NO_OVERAGE_PROVIDERS` from public pricing, not live docs.
+- Behavioural change to know about: alert gates default to enforcing, so a fresh deployment raises no credit/trade/patent/graph alert until reconciliation or signal-audit data exists (`enforce_verification_gates` in the free-source alerts config).
