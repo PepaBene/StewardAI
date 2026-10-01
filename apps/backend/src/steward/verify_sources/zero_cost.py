@@ -18,7 +18,7 @@ access ledger, that:
 from __future__ import annotations
 
 import datetime as dt
-from dataclasses import dataclass, field
+from dataclasses import asdict, dataclass, field
 from decimal import Decimal
 from enum import StrEnum
 from typing import Any
@@ -112,7 +112,7 @@ class ZeroCostReport:
             "free_available": self.free_available,
             "disabled_ok": self.disabled_ok,
             "gated_unverified": self.gated_unverified,
-            "findings": [f.__dict__ for f in self.findings],
+            "findings": [asdict(f) for f in self.findings],
         }
 
 

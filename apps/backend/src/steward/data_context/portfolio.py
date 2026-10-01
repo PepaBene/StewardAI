@@ -73,7 +73,7 @@ class ExposureRow(BaseModel):
     holdings: int
 
 
-class Concentration(BaseModel):
+class PortfolioConcentration(BaseModel):
     dimension: Literal["country", "product"]
     mapped: Share = Field(description="Mapped value over total portfolio value.")
     unmapped_value: Decimal
@@ -131,8 +131,8 @@ class PortfolioDataContext(BaseModel):
     total_value: Decimal
     position_count: int
     identity_coverage: Share | None
-    country_concentration: Concentration | None
-    product_concentration: Concentration | None
+    country_concentration: PortfolioConcentration | None
+    product_concentration: PortfolioConcentration | None
     macro_sensitivities: list[MacroSensitivity]
     adjusted_return_coverage: AdjustedReturnCoverage | None
     fund_overlap: FundOverlapReport | None
@@ -146,7 +146,7 @@ def concentration(
     positions: list[Position],
     mappings: list[Mapping],
     total: Decimal,
-) -> Concentration:
+) -> PortfolioConcentration:
     by_issuer: dict[int, list[Mapping]] = defaultdict(list)
     for m in mappings:
         key = m.geography if dimension == "country" else m.hs_code
@@ -191,7 +191,7 @@ def concentration(
     hhi: Decimal | None = None
     if mapped_value > 0:
         hhi = sum(((r.exposed_value / mapped_value) ** 2 for r in rows_out), Decimal(0))
-    return Concentration(
+    return PortfolioConcentration(
         dimension=dimension,
         mapped=Share.of(mapped_value, total, "total portfolio value"),
         unmapped_value=unmapped,

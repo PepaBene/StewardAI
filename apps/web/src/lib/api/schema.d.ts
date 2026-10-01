@@ -346,6 +346,220 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/macro/context/{ticker}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Macro Context
+         * @description Latest point-in-time country context, ranges, provenance and mapped exposure.
+         */
+        get: operations["get_macro_context"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/macro/coverage/portfolio": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Portfolio Macro Coverage
+         * @description Measure mapped versus unknown portfolio value and country-series coverage.
+         */
+        get: operations["get_portfolio_macro_coverage"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/macro/exposures": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Exposures */
+        get: operations["list_exposures"];
+        put?: never;
+        /** Create Exposure */
+        post: operations["create_exposure"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/macro/exposures/{mapping_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Delete Exposure */
+        delete: operations["delete_exposure"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/jobs/public-data": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Run Public Data */
+        post: operations["run_public_data"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/sources/status": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Source Status */
+        get: operations["source_status"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/macro/trade/{reporter}/{hs_code}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Trade Context
+         * @description Product value plus reporter-wide trade metrics; no issuer contract is inferred.
+         */
+        get: operations["get_trade_context"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/jobs/source-audit": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Run Source Audit */
+        post: operations["run_source_audit"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/sources/access": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Source Access */
+        get: operations["get_source_access"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/sources/usage": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Source Usage */
+        get: operations["get_source_usage"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/data/coverage": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Data Coverage */
+        get: operations["get_data_coverage"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/data/coverage/summary": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Data Coverage Summary */
+        get: operations["get_data_coverage_summary"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/holdings/{ticker}/valuation": {
         parameters: {
             query?: never;
@@ -1780,6 +1994,74 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/reference/listings/{isin}/history": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Listing History */
+        get: operations["listing_history"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/reference/legal-entities/{lei}/history": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Legal Entity History */
+        get: operations["legal_entity_history"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/reference/identity-decisions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Identity Decisions */
+        get: operations["identity_decisions"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/reference/identity/{ticker}/override": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Override Identity */
+        post: operations["override_identity"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/holdings/{ticker}/identity": {
         parameters: {
             query?: never;
@@ -2272,6 +2554,464 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/holdings/{ticker}/company-research-observations": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Company Research Observations */
+        get: operations["company_research_observations"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/holdings/{ticker}/exposure-context/alpha-vantage": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Refresh Alpha Exposure */
+        post: operations["refresh_alpha_exposure"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/holdings/{ticker}/exposure-context": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Exposure Context */
+        get: operations["exposure_context"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/holdings/{ticker}/company-research/diffbot": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Refresh Diffbot Company Research */
+        post: operations["refresh_diffbot_company_research"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/holdings/{ticker}/company-research/pdl": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Refresh Pdl Company Research */
+        post: operations["refresh_pdl_company_research"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/holdings/{ticker}/patent-families/epo-ops/refresh": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Refresh Epo Patents */
+        post: operations["refresh_epo_patents"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/exchange-sessions/{mic}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Exchange Sessions */
+        get: operations["exchange_sessions"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/exchange-sessions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Record Exchange Session */
+        post: operations["record_exchange_session"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/holdings/{ticker}/peer-set": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Peer Set */
+        get: operations["peer_set"];
+        put?: never;
+        /** Record Peer */
+        post: operations["record_peer"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/holdings/{ticker}/peer-metrics": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Peer Metrics */
+        get: operations["peer_metrics"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/holdings/{ticker}/prices/diagnostics": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Price Diagnostics */
+        get: operations["price_diagnostics"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/holdings/{ticker}/returns": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Holding Returns
+         * @description Return price and total return separately; total return requires verified action coverage.
+         */
+        get: operations["holding_returns"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/holdings/{ticker}/corporate-actions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Corporate Actions */
+        get: operations["list_corporate_actions"];
+        put?: never;
+        /**
+         * Record Corporate Action
+         * @description Record action evidence for one exact listing symbol.
+         */
+        post: operations["record_corporate_action"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/holdings/{ticker}/corporate-actions/coverage": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Confirm Action Coverage */
+        post: operations["confirm_action_coverage"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/holdings/{ticker}/financial-history": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Financial History */
+        get: operations["financial_history"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/holdings/{ticker}/financial-history/alpha-vantage/{statement}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Refresh Alpha Vantage Statement */
+        post: operations["refresh_alpha_vantage_statement"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/holdings/{ticker}/financial-history/finnhub-research": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Refresh Finnhub Research
+         * @description Refresh free-gated peer candidates and reported quarterly EPS surprises.
+         */
+        post: operations["refresh_finnhub_research"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/holdings/{ticker}/forward-data": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Forward Data */
+        get: operations["forward_data"];
+        put?: never;
+        /** Record Forward Data */
+        post: operations["record_forward_data"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/holdings/{ticker}/issuer-ir-releases": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Issuer Ir Releases */
+        get: operations["issuer_ir_releases"];
+        put?: never;
+        /** Record Issuer Ir Release */
+        post: operations["record_issuer_ir_release"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/company-graph/edges": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Record Company Edge */
+        post: operations["record_company_edge"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/holdings/{ticker}/company-events": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Record Company Event */
+        post: operations["record_company_event"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/holdings/{ticker}/patent-families": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Record Patent Family */
+        post: operations["record_patent_family"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/holdings/{ticker}/business-network": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Business Network */
+        get: operations["business_network"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/holdings/{ticker}/relationship-disclosures": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Record Relationship Review
+         * @description Record an evidence-passage review. Only confirmed, dated records feed concentration.
+         */
+        post: operations["record_relationship_review"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/holdings/{ticker}/customer-supplier-concentration": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Relationship Concentration */
+        get: operations["relationship_concentration"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/holdings/{ticker}/patent-trends": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Patent Trends */
+        get: operations["patent_trends"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/watchlist": {
         parameters: {
             query?: never;
@@ -2388,6 +3128,570 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/jobs/control-stakes": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Run Control Stakes
+         * @description Load Schedule 13D/G filings for held issuers and tracked managers now.
+         */
+        post: operations["run_control_stakes"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/holdings/{ticker}/control-stakes": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Control Stakes
+         * @description Beneficial-ownership / control stakes (13D/G), never combined with 13F or fund data.
+         */
+        get: operations["get_control_stakes"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/holdings/{ticker}/insider-activity": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Insider Activity
+         * @description Insider transactions by economic class and net discretionary (open-market) activity.
+         */
+        get: operations["get_insider_activity"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/jobs/nport-holdings": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Run Nport Holdings
+         * @description Load SEC N-PORT holdings for the portfolio's US funds now.
+         */
+        post: operations["run_nport_holdings"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/holdings/{ticker}/fund-positions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Fund Positions
+         * @description Latest N-PORT positions funds report in this holding, each with its report date,
+         *     filing lag and public-availability date, plus coverage. Fund positions only: not beneficial
+         *     ownership and never additive with Form 13F or 13D/G figures.
+         */
+        get: operations["get_fund_positions"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/funds/aggregate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Fund Aggregate
+         * @description Direct shares plus fund holdings by canonical issuer: top issuers and overlap,
+         *     region/country/sector/currency exposure, fee drag and the explicit unknown fund weight
+         *     (never redistributed), with every as-of date and staleness visible.
+         */
+        get: operations["get_fund_aggregate"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/funds/overlap": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Fund Overlap
+         * @description Pairwise overlap between configured funds, per-fund concentration and coverage with
+         *     reporting lag and unknown (unaccounted) weight.
+         */
+        get: operations["get_fund_overlap"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/funds/look-through": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Look Through As Of
+         * @description The base look-through report as it could have been computed at `as_of`.
+         */
+        get: operations["get_look_through_as_of"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/funds/coverage-ledger": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Coverage Ledger
+         * @description Where each fund's/index's constituents come from, and which benchmarks lack total
+         *     return or historical constituents before performance/backtest use.
+         */
+        get: operations["get_coverage_ledger"];
+        /**
+         * Put Coverage Entry
+         * @description Record an owner-verified ledger row; a refresh never overwrites it.
+         */
+        put: operations["put_coverage_entry"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/funds/coverage-ledger/refresh": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Refresh Coverage Ledger
+         * @description Rebuild the derived ledger rows from the Jobs config and stored snapshots.
+         */
+        post: operations["refresh_coverage_ledger"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/funds/{isin}/factsheet": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Factsheet
+         * @description Factsheet history of a fund: charges, benchmark, distribution policy, NAV basis, the
+         *     cash/derivative remainder and whether the rows reconcile.
+         */
+        get: operations["get_factsheet"];
+        /**
+         * Put Factsheet
+         * @description Owner-entered factsheet figures (KID/issuer factsheet) for gaps the issuer feed leaves.
+         */
+        put: operations["put_factsheet"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/funds/snapshots/pin": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Pin Snapshots
+         * @description Protect the holdings snapshots a saved report/decision rests on from retention pruning.
+         */
+        post: operations["pin_snapshots"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/funds/characteristics-audit": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Characteristics Audit
+         * @description Parser-drift audit of issuer fund P/E and P/B: verdict per observation (real value or
+         *     methodology change vs parser drift) with the shape fingerprint and stated rules.
+         */
+        get: operations["get_characteristics_audit"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/holdings/{ticker}/data-context": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Holding Data Context
+         * @description Global financial history, country/trade exposure, business network, patents, source
+         *     disagreements, coverage gaps and primary-versus-vendor provenance of one holding.
+         */
+        get: operations["get_holding_data_context"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/portfolio/data-context": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Portfolio Data Context
+         * @description Macro sensitivities (reported versus inferred), country and product concentration,
+         *     adjusted-return coverage and fund overlap. Every ratio carries its denominator; only
+         *     mapped holdings are rolled up.
+         */
+        get: operations["get_portfolio_data_context"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/holdings/{ticker}/evidence-summary": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Evidence Summary
+         * @description Filed-note evidence, separate control / institutional / fund positions, classified
+         *     insider activity, confirmed dependencies, deal states and consensus vintages, each with
+         *     its source passage, known-at date and coverage reason.
+         */
+        get: operations["get_evidence_summary"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/holdings/{ticker}/evidence/{domain}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Evidence Domain
+         * @description One evidence domain of `evidence-summary` on its own.
+         */
+        get: operations["get_evidence_domain"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/research-context/country/{geography}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Country Context */
+        get: operations["get_country_context"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/research-context/industry/{hs_code}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Industry Context */
+        get: operations["get_industry_context"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/research-context/company/{ticker}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Company Context */
+        get: operations["get_company_context"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/alerts/free-source-trail": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Free Source Alert Trail
+         * @description Newest first. Silent outcomes (value below threshold, identical re-fetch) are not
+         *     stored; they appear only in the job step detail.
+         */
+        get: operations["get_free_source_alert_trail"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/jobs/free-source-alerts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Run Free Source Alerts
+         * @description Evaluate the free-source alert rules now.
+         */
+        post: operations["run_free_source_alerts"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/verification/zero-cost-gate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Zero Cost Gate
+         * @description Read-only audit of the endpoint manifest: nothing paid is reachable.
+         */
+        get: operations["get_zero_cost_gate"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/verification/domain-gates": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Domain Gates
+         * @description Per-domain reconciliation gate and which conclusions each domain unlocks.
+         */
+        get: operations["get_domain_gates"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/verification/signals": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Signal Gates */
+        get: operations["get_signal_gates"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/verification/signals/{signal_name}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Signal Gate */
+        get: operations["get_signal_gate"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/verification/coverage": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Measured Coverage
+         * @description Measured coverage by jurisdiction and metric (absent = no coverage, never zero).
+         */
+        get: operations["get_measured_coverage"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/verification/shadow-report": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Latest Shadow Report */
+        get: operations["get_latest_shadow_report"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -2461,6 +3765,49 @@ export interface components {
              */
             gaps: number;
         };
+        /** AdjustedReturnCoverage */
+        AdjustedReturnCoverage: {
+            /** Bases */
+            bases: components["schemas"]["ReturnBasisCoverage"][];
+            /** Note */
+            note: string;
+        };
+        /** AggregateReport */
+        AggregateReport: {
+            /**
+             * As Of
+             * Format: date
+             * @description The date this report answers for.
+             */
+            as_of: string;
+            /** Portfolio Snapshot Date */
+            portfolio_snapshot_date: string | null;
+            /** Base Currency */
+            base_currency: string | null;
+            /** Total Value */
+            total_value: number;
+            /** Available */
+            available: boolean;
+            /** Method */
+            method: string;
+            /** Funds */
+            funds: components["schemas"]["FundAsOf"][];
+            /** Stale Funds */
+            stale_funds: string[];
+            /** Issuers */
+            issuers: components["schemas"]["IssuerExposure"][];
+            /**
+             * Overlap
+             * @description Issuers reached through 2+ channels.
+             */
+            overlap: components["schemas"]["IssuerExposure"][];
+            /** Exposures */
+            exposures: components["schemas"]["ExposureView"][];
+            fees: components["schemas"]["FeeDrag"] | null;
+            unknown: components["schemas"]["Unknown"] | null;
+            /** Notes */
+            notes: string[];
+        };
         /** AlertOut */
         AlertOut: {
             /** Id */
@@ -2532,6 +3879,20 @@ export interface components {
             /** Weight */
             weight: number | null;
         };
+        /** AlphaExposureRequest */
+        AlphaExposureRequest: {
+            /**
+             * Function
+             * @enum {string}
+             */
+            function: "WTI" | "BRENT" | "NATURAL_GAS" | "COPPER" | "ALUMINUM" | "WHEAT" | "CORN" | "COFFEE" | "SUGAR" | "FX_DAILY";
+            /** Series Name */
+            series_name: string;
+            /** From Currency */
+            from_currency?: string | null;
+            /** To Currency */
+            to_currency?: string | null;
+        };
         /**
          * AnnouncementRule
          * @description Maps a regulatory announcement's type (the RNS headline or the EQS category) to an
@@ -2550,7 +3911,7 @@ export interface components {
              */
             pattern: string;
             /** Event Type */
-            event_type: ("guidance_change" | "m_and_a" | "dividend_cut" | "earnings_release" | "management_change" | "regulatory_legal" | "capital_allocation" | "credit_rating" | "central_bank" | "macro_surprise" | "insider_transaction" | "product_business" | "sector_competitor" | "index_change" | "analyst_rating" | "delisting" | "entity_status" | "other") | "classify";
+            event_type: ("guidance_change" | "m_and_a" | "dividend_cut" | "earnings_release" | "management_change" | "regulatory_legal" | "capital_allocation" | "credit_rating" | "central_bank" | "macro_surprise" | "insider_transaction" | "product_business" | "sector_competitor" | "index_change" | "analyst_rating" | "delisting" | "entity_status" | "credit_stress" | "trade_exposure" | "patent_status" | "other") | "classify";
         };
         /** BaseTotals */
         BaseTotals: {
@@ -2737,6 +4098,26 @@ export interface components {
              */
             state: "intact" | "watch" | "at_risk" | "unjudged";
         };
+        /** Bucket */
+        Bucket: {
+            /** Key */
+            key: string;
+            /** Label */
+            label: string;
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "classified" | "cash" | "fund_cash" | "not_looked_through" | "unknown_fund" | "unclassified";
+            /** Weight */
+            weight: number;
+            /** Value Base */
+            value_base: number;
+            /** Direct Weight */
+            direct_weight: number;
+            /** Fund Weight */
+            fund_weight: number;
+        };
         /** BucketDrift */
         BucketDrift: {
             /** Bucket */
@@ -2827,7 +4208,7 @@ export interface components {
              * Critical Job Types
              * @description Job types that run normally at the monthly cap.
              */
-            critical_job_types?: ("portfolio_sync" | "earnings_check" | "thesis_verdicts" | "earnings_calendar" | "earnings_calendar_full" | "earnings_due" | "fact_reconcile" | "reference_data" | "price_history" | "intraday_prices" | "holiday_refresh" | "macro_collect" | "event_escalation" | "monitor" | "news_ingest" | "daily_digest" | "weekly_digest" | "research" | "ownership_13f" | "insider_trades" | "etf_look_through" | "monthly_review" | "chat" | "sec_xbrl" | "valuation_refresh")[];
+            critical_job_types?: ("portfolio_sync" | "earnings_check" | "thesis_verdicts" | "earnings_calendar" | "earnings_calendar_full" | "earnings_due" | "fact_reconcile" | "reference_data" | "price_history" | "intraday_prices" | "holiday_refresh" | "macro_collect" | "public_data_collect" | "source_audit" | "event_escalation" | "monitor" | "news_ingest" | "daily_digest" | "weekly_digest" | "research" | "ownership_13f" | "insider_trades" | "etf_look_through" | "monthly_review" | "chat" | "sec_xbrl" | "valuation_refresh" | "control_stakes" | "nport_holdings" | "fund_probes" | "fund_characteristics_audit" | "free_source_alerts" | "shadow_snapshot" | "shadow_report" | "raw_retention" | "zero_cost_gate")[];
             /**
              * Per Job Cap Usd
              * @description Most AI spend of one run of a job type, in USD. A run over it fails.
@@ -2997,6 +4378,30 @@ export interface components {
             /** Bucket */
             bucket?: string | null;
         };
+        /** ChannelWeight */
+        ChannelWeight: {
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "direct" | "fund";
+            /** Ticker */
+            ticker: string | null;
+            /**
+             * Isin
+             * @description The fund's ISIN for a fund channel.
+             */
+            isin: string | null;
+            /** Label */
+            label: string;
+            /**
+             * Weight
+             * @description Share of total portfolio value.
+             */
+            weight: number;
+            /** Value Base */
+            value_base: number;
+        };
         /** ChatAnswer */
         ChatAnswer: {
             /** Sentences */
@@ -3095,6 +4500,52 @@ export interface components {
             check?: ("supported" | "unsupported" | "unchecked") | null;
             /** Check Reason */
             check_reason?: string | null;
+        };
+        /** Claim */
+        Claim: {
+            /**
+             * Claim Id
+             * @description Stable id such as macro:123; cite it, never the number.
+             */
+            claim_id: string;
+            /**
+             * Domain
+             * @enum {string}
+             */
+            domain: "macro" | "trade" | "financial" | "forward" | "company_research" | "business_network" | "patents";
+            /** Subject */
+            subject: string;
+            /** Metric */
+            metric: string;
+            /** Label */
+            label: string;
+            /** Value */
+            value: number | string | null;
+            /** Text Value */
+            text_value?: string | null;
+            /** Unit */
+            unit: string | null;
+            /** Currency */
+            currency?: string | null;
+            /** Period */
+            period: string | null;
+            /**
+             * Known As Of
+             * Format: date
+             * @description Date the record became known to the app.
+             */
+            known_as_of: string;
+            /** Source */
+            source: string;
+            /**
+             * Provenance
+             * @enum {string}
+             */
+            provenance: "primary" | "vendor" | "owner" | "community" | "unclassified";
+            /** Source Url */
+            source_url: string | null;
+            /** Note */
+            note?: string | null;
         };
         /**
          * ClaimCheckSummary
@@ -3234,6 +4685,93 @@ export interface components {
              */
             policy_rate: boolean;
         };
+        /** CompanyEdgeInput */
+        CompanyEdgeInput: {
+            /** Subject Key */
+            subject_key: string;
+            /** Object Key */
+            object_key: string;
+            /** Object Name */
+            object_name: string;
+            /**
+             * Edge Type
+             * @enum {string}
+             */
+            edge_type: "partner" | "acquirer" | "acquired" | "investor" | "investment" | "product" | "technology" | "executive" | "customer" | "supplier" | "competitor" | "parent" | "subsidiary";
+            /**
+             * Direction
+             * @enum {string}
+             */
+            direction: "outgoing" | "incoming" | "symmetric";
+            /** Source */
+            source: string;
+            /** Source Url */
+            source_url: string;
+            /**
+             * Evidence Tier
+             * @enum {string}
+             */
+            evidence_tier: "primary" | "regulatory" | "owner_review" | "vendor" | "community";
+            /**
+             * Status
+             * @default suggested
+             * @enum {string}
+             */
+            status: "suggested" | "confirmed" | "rejected" | "disputed";
+            /** Valid From */
+            valid_from?: string | null;
+            /** Valid To */
+            valid_to?: string | null;
+            /** Evidence Id */
+            evidence_id?: number | null;
+            /** Passage */
+            passage?: string | null;
+            /** Detail */
+            detail?: {
+                [key: string]: unknown;
+            };
+        };
+        /** CompanyEventInput */
+        CompanyEventInput: {
+            /**
+             * Event Type
+             * @enum {string}
+             */
+            event_type: "deal" | "financing" | "leadership" | "guidance" | "relationship" | "product" | "patent";
+            /**
+             * Event State
+             * @enum {string}
+             */
+            event_state: "announced" | "amended" | "proposed" | "approved" | "closed" | "terminated" | "reversed" | "unknown";
+            /** Announced At */
+            announced_at?: string | null;
+            /** Effective At */
+            effective_at?: string | null;
+            /** Source */
+            source: string;
+            /** Source Url */
+            source_url: string;
+            /** Evidence Id */
+            evidence_id?: number | null;
+            /** Counterparty Key */
+            counterparty_key?: string | null;
+            /** Terms */
+            terms?: {
+                [key: string]: unknown;
+            };
+            /**
+             * Status
+             * @default suggested
+             * @enum {string}
+             */
+            status: "suggested" | "confirmed" | "rejected" | "disputed";
+            /** Thesis Kpi */
+            thesis_kpi?: string | null;
+            /** Detail */
+            detail?: {
+                [key: string]: unknown;
+            };
+        };
         /** ComplianceRow */
         ComplianceRow: {
             /**
@@ -3257,6 +4795,30 @@ export interface components {
             detail: string;
             /** Source Ids */
             source_ids?: string[];
+        };
+        /** ComtradeSlice */
+        ComtradeSlice: {
+            /** Reporter */
+            reporter: number;
+            /**
+             * Partner
+             * @default 0
+             */
+            partner: number;
+            /** Hs Code */
+            hs_code: string;
+            /**
+             * Flow Code
+             * @default X,M
+             */
+            flow_code: string;
+            /**
+             * History Years
+             * @default 1
+             */
+            history_years: number;
+            /** Consumer */
+            consumer: string;
         };
         /** Concentration */
         Concentration: {
@@ -3372,6 +4934,114 @@ export interface components {
              */
             changes: number | null;
         };
+        /** Consensus */
+        Consensus: {
+            coverage: components["schemas"]["SectionCoverage"];
+            /** Series */
+            series: components["schemas"]["ConsensusSeries"][];
+            /** Issuer Published */
+            issuer_published: components["schemas"]["IrConsensusRelease"][];
+            /**
+             * Note
+             * @default Public analyst consensus as published, one row per vintage. Provider earnings-calendar estimates are a different kind and are not shown here.
+             */
+            note: string;
+        };
+        /** ConsensusSeries */
+        ConsensusSeries: {
+            /** Metric */
+            metric: string;
+            /** Fiscal Period */
+            fiscal_period: string;
+            /**
+             * Vintages
+             * @description Oldest first; none overwritten.
+             */
+            vintages: components["schemas"]["ConsensusVintage"][];
+            /**
+             * Revision Since Previous
+             * @description Latest value minus the previous vintage's; null unless both are known.
+             */
+            revision_since_previous: number | string | null;
+            /** Revision Inputs */
+            revision_inputs: number[];
+        };
+        /** ConsensusVintage */
+        ConsensusVintage: {
+            /** Observation Id */
+            observation_id: number;
+            /** Provider */
+            provider: string | null;
+            /** Vintage */
+            vintage: string | null;
+            /** Value */
+            value: number | string | null;
+            /** Low */
+            low: number | string | null;
+            /** High */
+            high: number | string | null;
+            /** Analyst Count */
+            analyst_count: number | null;
+            /** Currency */
+            currency: string | null;
+            /** Published At */
+            published_at: string | null;
+            /**
+             * Known At
+             * Format: date-time
+             */
+            known_at: string;
+            /** Source Url */
+            source_url: string;
+            /** Passage */
+            passage: string | null;
+            /** Passage Reason */
+            passage_reason: string | null;
+        };
+        /** ContextGap */
+        ContextGap: {
+            /** Domain */
+            domain: string;
+            /** Reason */
+            reason: string;
+        };
+        /** ContextPoint */
+        ContextPoint: {
+            /** Series Id */
+            series_id: string;
+            /** Source */
+            source: string;
+            /** Geography */
+            geography: string;
+            /** Value */
+            value: number | string | null;
+            /** Unit */
+            unit: string;
+            /**
+             * Period
+             * Format: date
+             */
+            period: string;
+            /** Release At */
+            release_at: string | null;
+            /**
+             * Known At
+             * Format: date-time
+             */
+            known_at: string;
+            /** Source Url */
+            source_url: string;
+            /** Five Year Low */
+            five_year_low: number | string | null;
+            /** Five Year High */
+            five_year_high: number | string | null;
+            /** Ten Year Low */
+            ten_year_low: number | string | null;
+            /** Ten Year High */
+            ten_year_high: number | string | null;
+            /** Access State */
+            access_state: string;
+        };
         /** ContributionReport */
         ContributionReport: {
             /**
@@ -3393,6 +5063,89 @@ export interface components {
              * @description Why there is no contribution report, when there is none.
              */
             gap: string | null;
+        };
+        /** ControlChannel */
+        ControlChannel: {
+            /**
+             * Channel
+             * @default beneficial_ownership_13dg
+             * @constant
+             */
+            channel: "beneficial_ownership_13dg";
+            coverage: components["schemas"]["SectionCoverage"];
+            /** Stakes */
+            stakes: components["schemas"]["StakeItem"][];
+        };
+        /** ControlStakeOut */
+        ControlStakeOut: {
+            /** Accession */
+            accession: string;
+            /** Form */
+            form: string;
+            /**
+             * Schedule
+             * @enum {string}
+             */
+            schedule: "13D" | "13G";
+            /** Is Amendment */
+            is_amendment: boolean;
+            /** Amendment No */
+            amendment_no: number | null;
+            /**
+             * Filed
+             * Format: date
+             */
+            filed: string;
+            /** Event Date */
+            event_date: string | null;
+            /** Issuer Name */
+            issuer_name: string | null;
+            /** Issuer Cusip */
+            issuer_cusip: string | null;
+            /** Class Title */
+            class_title: string | null;
+            /** Stake Shares */
+            stake_shares: number | string | null;
+            /** Stake Percent */
+            stake_percent: number | string | null;
+            /** Stake Basis */
+            stake_basis: string;
+            /** Intent Text */
+            intent_text: string | null;
+            /** Prior Accession */
+            prior_accession: string | null;
+            /** Holders */
+            holders: components["schemas"]["StakeHolderOut"][];
+            reconciliation: components["schemas"]["StakeReconciliationOut"];
+            /** Changes */
+            changes: components["schemas"]["StakeChangeOut"][];
+            /** Source Url */
+            source_url: string;
+        };
+        /** ControlStakesOut */
+        ControlStakesOut: {
+            /** Ticker */
+            ticker: string;
+            /**
+             * Channel
+             * @default beneficial_ownership_13dg
+             * @constant
+             */
+            channel: "beneficial_ownership_13dg";
+            /** Not Additive With */
+            not_additive_with?: string[];
+            /**
+             * Stakes
+             * @description Latest filing of each amendment chain (not restated by a later filing).
+             */
+            stakes: components["schemas"]["ControlStakeOut"][];
+            /**
+             * Superseded
+             * @description Earlier filings of those chains, newest first, with their own changes.
+             */
+            superseded: components["schemas"]["ControlStakeOut"][];
+            /** Limitations */
+            limitations: string[];
         };
         /** ConversationDetail */
         ConversationDetail: {
@@ -3420,6 +5173,61 @@ export interface components {
             updated_at: string;
             /** Last Message */
             last_message?: string | null;
+        };
+        /** CorporateActionCoverageInput */
+        CorporateActionCoverageInput: {
+            /**
+             * Through
+             * Format: date
+             */
+            through: string;
+            /** Source Url */
+            source_url: string;
+            /** Reason */
+            reason: string;
+        };
+        /** CorporateActionInput */
+        CorporateActionInput: {
+            /**
+             * Action Type
+             * @enum {string}
+             */
+            action_type: "split" | "cash_dividend" | "stock_dividend" | "symbol_change" | "merger" | "spin_off" | "delisting";
+            /** Symbol */
+            symbol: string;
+            /**
+             * Ex Date
+             * Format: date
+             */
+            ex_date: string;
+            /** Record Date */
+            record_date?: string | null;
+            /** Payment Date */
+            payment_date?: string | null;
+            /** Ratio */
+            ratio?: number | string | null;
+            /** Cash Amount */
+            cash_amount?: number | string | null;
+            /** Currency */
+            currency?: string | null;
+            /** Source */
+            source: string;
+            /** Source Url */
+            source_url: string;
+            /** Publisher At */
+            publisher_at?: string | null;
+            /** Evidence Id */
+            evidence_id?: number | null;
+            /**
+             * Status
+             * @default suggested
+             * @enum {string}
+             */
+            status: "suggested" | "confirmed" | "rejected";
+            /** Raw */
+            raw?: {
+                [key: string]: unknown;
+            };
         };
         /** Correlation */
         Correlation: {
@@ -3511,6 +5319,120 @@ export interface components {
              */
             portfolio_share_looked_through: number | null;
         };
+        /** CoverageEntry */
+        CoverageEntry: {
+            /** Provider */
+            provider: string;
+            /** Dataset */
+            dataset: string;
+            /** Entity Key */
+            entity_key: string;
+            /** State */
+            state: string;
+            /** Latest Period */
+            latest_period: string | null;
+            /** Expected Periods */
+            expected_periods: number | null;
+            /** Available Periods */
+            available_periods: number | null;
+            /**
+             * Checked At
+             * Format: date-time
+             */
+            checked_at: string;
+            /** Reason */
+            reason: string | null;
+        };
+        /** CoverageGroup */
+        CoverageGroup: {
+            /** Group By */
+            group_by: string;
+            /** Key */
+            key: string | null;
+            /** Entries */
+            entries: number;
+            /** By State */
+            by_state: {
+                [key: string]: number;
+            };
+            /**
+             * Expected Periods
+             * @description Sum of known expected periods; null if no entry states one.
+             */
+            expected_periods: number | null;
+            /** Available Periods */
+            available_periods: number | null;
+            /**
+             * Entries With Expected
+             * @description Entries that state an expected-period count (the ratio's denominator).
+             */
+            entries_with_expected: number;
+            /** Available Entries */
+            available_entries: number;
+        };
+        /** CoverageLedger */
+        CoverageLedger: {
+            /** Entries */
+            entries: components["schemas"]["LedgerRow"][];
+            /** Tiers */
+            tiers: {
+                [key: string]: number;
+            };
+            /** Flagged Benchmarks */
+            flagged_benchmarks: string[];
+        };
+        /** CoverageSummary */
+        CoverageSummary: {
+            /** Group By */
+            group_by: string;
+            /** Total Entries */
+            total_entries: number;
+            /** Groups */
+            groups: components["schemas"]["CoverageGroup"][];
+            /**
+             * Note
+             * @default Counts are of stored coverage-ledger entries, not of the global universe. An entity with no ledger entry is unknown, not covered or uncovered.
+             */
+            note: string;
+        };
+        /**
+         * CreditStressRule
+         * @description A threshold on one stored macro series. Fires once, when a genuinely new observation
+         *     (a later period than any known before it) is beyond the threshold and the previous
+         *     period was not; a revision of an old period never fires.
+         */
+        CreditStressRule: {
+            /** Key */
+            key: string;
+            /** Label */
+            label: string;
+            /**
+             * Series Id
+             * @description `macro_observation.series_id`: a FRED/ECB series key from the jobs config or a BIS series key (e.g. debt_service).
+             */
+            series_id: string;
+            /**
+             * Source
+             * @default any
+             * @enum {string}
+             */
+            source: "any" | "fred" | "alfred" | "ecb" | "eurostat" | "bis" | "oecd";
+            /** Geography */
+            geography?: string | null;
+            /**
+             * Direction
+             * @default above
+             * @enum {string}
+             */
+            direction: "above" | "below";
+            /** Threshold */
+            threshold: number;
+            /**
+             * Enabled
+             * @default true
+             */
+            enabled: boolean;
+        };
         /** DailyFallback */
         DailyFallback: {
             /**
@@ -3526,6 +5448,54 @@ export interface components {
              */
             source: string;
         };
+        /** DataCoverage */
+        DataCoverage: {
+            /** Provider */
+            provider: string;
+            /** Dataset */
+            dataset: string;
+            /** Entity Key */
+            entity_key: string;
+            /** State */
+            state: string;
+            /** Expected Periods */
+            expected_periods: number | null;
+            /** Available Periods */
+            available_periods: number | null;
+            /** Earliest Period */
+            earliest_period: string | null;
+            /** Latest Period */
+            latest_period: string | null;
+            /** Last Good Observation Id */
+            last_good_observation_id: number | null;
+            /**
+             * Checked At
+             * Format: date-time
+             */
+            checked_at: string;
+            /** Reason */
+            reason: string | null;
+            /**
+             * Entity Kind
+             * @default other
+             * @enum {string}
+             */
+            entity_kind: "security" | "geography" | "other";
+            /** Metric */
+            metric?: string | null;
+            /** Source */
+            source?: string | null;
+            /**
+             * Coverage Ratio
+             * @description available_periods / expected_periods; null unless both are known and the expected count is positive.
+             */
+            coverage_ratio?: number | string | null;
+            /**
+             * Age Days
+             * @description Days from latest_period to today; null without a period.
+             */
+            age_days?: number | null;
+        };
         /** DayCount */
         DayCount: {
             /**
@@ -3535,6 +5505,122 @@ export interface components {
             date: string;
             /** Count */
             count: number;
+        };
+        /** DealEvent */
+        DealEvent: {
+            /** Event Id */
+            event_id: number;
+            /** Event Type */
+            event_type: string;
+            /** Event State */
+            event_state: string;
+            /** Status */
+            status: string;
+            /** Announced At */
+            announced_at: string | null;
+            /** Effective At */
+            effective_at: string | null;
+            /**
+             * Known At
+             * Format: date-time
+             */
+            known_at: string;
+            /** Counterparty Key */
+            counterparty_key: string | null;
+            /** Source */
+            source: string;
+            /** Source Url */
+            source_url: string;
+            /** Passage */
+            passage: string | null;
+            /** Passage Reason */
+            passage_reason: string | null;
+            /** Terms */
+            terms: {
+                [key: string]: unknown;
+            };
+        };
+        /** DealState */
+        DealState: {
+            /** Deal Key */
+            deal_key: string;
+            /** Counterparty Key */
+            counterparty_key: string | null;
+            /**
+             * Current State
+             * @description State of the latest confirmed event by the cutoff; null when none is.
+             */
+            current_state: string | null;
+            /** State Basis */
+            state_basis: string;
+            /** Events */
+            events: components["schemas"]["DealEvent"][];
+        };
+        /** Deals */
+        Deals: {
+            coverage: components["schemas"]["SectionCoverage"];
+            /** Deals */
+            deals: components["schemas"]["DealState"][];
+        };
+        /** Dependencies */
+        Dependencies: {
+            coverage: components["schemas"]["SectionCoverage"];
+            /** Dependencies */
+            dependencies: components["schemas"]["Dependency"][];
+            /** Excluded Unconfirmed */
+            excluded_unconfirmed: number;
+            /**
+             * Note
+             * @default Only confirmed relationships are listed. Suggested and disputed candidates, and legacy edges without a known-at date, are excluded; an anonymous counterparty is never given a name and a missing share stays null.
+             */
+            note: string;
+        };
+        /** Dependency */
+        Dependency: {
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "graph_edge" | "customer_supplier_disclosure";
+            /** Edge Id */
+            edge_id: number;
+            /** Counterparty Key */
+            counterparty_key: string | null;
+            /** Counterparty Name */
+            counterparty_name: string | null;
+            /**
+             * Anonymous Counterparty
+             * @default false
+             */
+            anonymous_counterparty: boolean;
+            /** Relationship */
+            relationship: string;
+            /** Direction */
+            direction: string;
+            /** Reported Share */
+            reported_share: number | string | null;
+            /** Share Basis */
+            share_basis: string | null;
+            /** Fiscal Period */
+            fiscal_period: string | null;
+            /** Valid From */
+            valid_from: string | null;
+            /** Valid To */
+            valid_to: string | null;
+            /** Evidence Tier */
+            evidence_tier: string | null;
+            /** Source */
+            source: string;
+            /** Source Url */
+            source_url: string;
+            /** Passage */
+            passage: string | null;
+            /** Passage Reason */
+            passage_reason: string | null;
+            /** Evidence Id */
+            evidence_id: number | null;
+            /** Known At */
+            known_at: string | null;
         };
         /** DiffChange */
         DiffChange: {
@@ -3804,6 +5890,51 @@ export interface components {
             dimension: string;
             /** Buckets */
             buckets: components["schemas"]["BucketDrift"][];
+        };
+        /** Disagreement */
+        Disagreement: {
+            /** Conflict Id */
+            conflict_id: number;
+            /** Metric */
+            metric: string;
+            /** Status */
+            status: string;
+            /** Tolerance */
+            tolerance: number | string | null;
+            /** Difference */
+            difference: number | string | null;
+            /** Preferred Source */
+            preferred_source: string | null;
+            /**
+             * Preferred Provenance
+             * @enum {string}
+             */
+            preferred_provenance: "primary" | "vendor" | "owner" | "community" | "unclassified";
+            /** Preferred Value */
+            preferred_value: number | string | null;
+            /** Preferred Known At */
+            preferred_known_at: string | null;
+            /** Alternative Source */
+            alternative_source: string;
+            /**
+             * Alternative Provenance
+             * @enum {string}
+             */
+            alternative_provenance: "primary" | "vendor" | "owner" | "community" | "unclassified";
+            /** Alternative Value */
+            alternative_value: number | string | null;
+            /**
+             * Alternative Known At
+             * Format: date-time
+             */
+            alternative_known_at: string;
+            /**
+             * Period End
+             * Format: date
+             */
+            period_end: string;
+            /** Resolution */
+            resolution: string | null;
         };
         /** DisputedStory */
         DisputedStory: {
@@ -4337,7 +6468,7 @@ export interface components {
              * Escalate When Thesis Linked
              * @description Event types raised one level (max 3) when the item touches a thesis KPI or exit condition.
              */
-            escalate_when_thesis_linked?: ("guidance_change" | "m_and_a" | "dividend_cut" | "earnings_release" | "management_change" | "regulatory_legal" | "capital_allocation" | "credit_rating" | "central_bank" | "macro_surprise" | "insider_transaction" | "product_business" | "sector_competitor" | "index_change" | "analyst_rating" | "delisting" | "entity_status" | "other")[];
+            escalate_when_thesis_linked?: ("guidance_change" | "m_and_a" | "dividend_cut" | "earnings_release" | "management_change" | "regulatory_legal" | "capital_allocation" | "credit_rating" | "central_bank" | "macro_surprise" | "insider_transaction" | "product_business" | "sector_competitor" | "index_change" | "analyst_rating" | "delisting" | "entity_status" | "credit_stress" | "trade_exposure" | "patent_status" | "other")[];
             /**
              * Insider Cluster Count
              * @description Insider transactions for one holding within the window that count as cluster buying or selling (raised to severity 2).
@@ -4374,6 +6505,7 @@ export interface components {
             macro_surprise_bands?: {
                 [key: string]: number;
             };
+            free_source_alerts?: components["schemas"]["FreeSourceAlertsConfig"];
             /**
              * Announcement Types
              * @description How RNS and EQS announcement types map to event types.
@@ -4383,7 +6515,7 @@ export interface components {
              * Earnings Check On
              * @description Confirmed stories of these types queue an earnings thesis check for the holding, unless one ran within earnings_check_cooldown_days.
              */
-            earnings_check_on?: ("guidance_change" | "m_and_a" | "dividend_cut" | "earnings_release" | "management_change" | "regulatory_legal" | "capital_allocation" | "credit_rating" | "central_bank" | "macro_surprise" | "insider_transaction" | "product_business" | "sector_competitor" | "index_change" | "analyst_rating" | "delisting" | "entity_status" | "other")[];
+            earnings_check_on?: ("guidance_change" | "m_and_a" | "dividend_cut" | "earnings_release" | "management_change" | "regulatory_legal" | "capital_allocation" | "credit_rating" | "central_bank" | "macro_surprise" | "insider_transaction" | "product_business" | "sector_competitor" | "index_change" | "analyst_rating" | "delisting" | "entity_status" | "credit_stress" | "trade_exposure" | "patent_status" | "other")[];
             /**
              * Earnings Check Cooldown Days
              * @description A story does not queue an earnings check when one was queued or ran for the holding within this many days.
@@ -4417,7 +6549,7 @@ export interface components {
              * Id
              * @enum {string}
              */
-            id: "guidance_change" | "m_and_a" | "dividend_cut" | "earnings_release" | "management_change" | "regulatory_legal" | "capital_allocation" | "credit_rating" | "central_bank" | "macro_surprise" | "insider_transaction" | "product_business" | "sector_competitor" | "index_change" | "analyst_rating" | "delisting" | "entity_status" | "other";
+            id: "guidance_change" | "m_and_a" | "dividend_cut" | "earnings_release" | "management_change" | "regulatory_legal" | "capital_allocation" | "credit_rating" | "central_bank" | "macro_surprise" | "insider_transaction" | "product_business" | "sector_competitor" | "index_change" | "analyst_rating" | "delisting" | "entity_status" | "credit_stress" | "trade_exposure" | "patent_status" | "other";
             /** Description */
             description: string;
         };
@@ -4476,6 +6608,24 @@ export interface components {
              */
             context: string | null;
         };
+        /** EvidenceSummary */
+        EvidenceSummary: {
+            /** Ticker */
+            ticker: string;
+            /**
+             * Known As Of
+             * Format: date-time
+             */
+            known_as_of: string;
+            filed_notes: components["schemas"]["FiledNotes"];
+            positions: components["schemas"]["Positions"];
+            insider_activity: components["schemas"]["Insider"];
+            dependencies: components["schemas"]["Dependencies"];
+            deals: components["schemas"]["Deals"];
+            consensus: components["schemas"]["Consensus"];
+            /** Gaps */
+            gaps: components["schemas"]["Gap"][];
+        };
         /** ExchangeCalendar */
         ExchangeCalendar: {
             /**
@@ -4510,6 +6660,41 @@ export interface components {
             date: string;
             /** Name */
             name: string;
+        };
+        /** ExchangeSessionInput */
+        ExchangeSessionInput: {
+            /** Mic */
+            mic: string;
+            /**
+             * Session Date
+             * Format: date
+             */
+            session_date: string;
+            /**
+             * State
+             * @enum {string}
+             */
+            state: "open" | "half_day" | "closed";
+            /** Open At */
+            open_at?: string | null;
+            /** Close At */
+            close_at?: string | null;
+            /** Source */
+            source: string;
+            /** Evidence Url */
+            evidence_url: string;
+        };
+        /** ExclusionOut */
+        ExclusionOut: {
+            /** Reason */
+            reason: string;
+            /** Rows */
+            rows: number;
+            /**
+             * Shares
+             * @description Sum of the reported share counts of the excluded rows.
+             */
+            shares: number | string;
         };
         /** ExportedDomain */
         ExportedDomain: {
@@ -4598,6 +6783,94 @@ export interface components {
              * @description By weight, special buckets last.
              */
             buckets: components["schemas"]["ExposureBucket"][];
+        };
+        /** ExposureInput */
+        ExposureInput: {
+            /** Issuer Id */
+            issuer_id: number;
+            /** Segment */
+            segment: string;
+            /** Geography */
+            geography?: string | null;
+            /** Hs Revision */
+            hs_revision?: string | null;
+            /** Hs Code */
+            hs_code?: string | null;
+            /**
+             * Basis
+             * @enum {string}
+             */
+            basis: "reported" | "estimated" | "user_assigned";
+            /** Weight */
+            weight: number | string;
+            /**
+             * Valid From
+             * Format: date
+             */
+            valid_from: string;
+            /** Valid To */
+            valid_to?: string | null;
+        };
+        /** ExposureResult */
+        ExposureResult: {
+            /** Issuer Id */
+            issuer_id: number;
+            /** Segment */
+            segment: string;
+            /** Geography */
+            geography?: string | null;
+            /** Hs Revision */
+            hs_revision?: string | null;
+            /** Hs Code */
+            hs_code?: string | null;
+            /**
+             * Basis
+             * @enum {string}
+             */
+            basis: "reported" | "estimated" | "user_assigned";
+            /** Weight */
+            weight: number | string;
+            /**
+             * Valid From
+             * Format: date
+             */
+            valid_from: string;
+            /** Valid To */
+            valid_to?: string | null;
+            /** Id */
+            id: number;
+        };
+        /** ExposureRow */
+        ExposureRow: {
+            /** Key */
+            key: string;
+            /** Hs Revision */
+            hs_revision?: string | null;
+            /** Exposed Value */
+            exposed_value: number | string;
+            share_of_portfolio: components["schemas"]["Share"];
+            share_of_mapped: components["schemas"]["Share"] | null;
+            /** By Basis */
+            by_basis: {
+                [key: string]: number | string;
+            };
+            /** Holdings */
+            holdings: number;
+        };
+        /** ExposureView */
+        ExposureView: {
+            /**
+             * Dimension
+             * @enum {string}
+             */
+            dimension: "country" | "region" | "sector" | "currency";
+            /** Buckets */
+            buckets: components["schemas"]["Bucket"][];
+            /**
+             * Reconciles
+             * @description Buckets add up to the total within tolerance.
+             */
+            reconciles: boolean;
         };
         /** FactCheck */
         FactCheck: {
@@ -4756,6 +7029,27 @@ export interface components {
             check: string;
             /** Detail */
             detail: string;
+        };
+        /** FeeDrag */
+        FeeDrag: {
+            /**
+             * Annual Drag
+             * @description Share of total portfolio value per year.
+             */
+            annual_drag: number;
+            /** Annual Cost Base */
+            annual_cost_base: number;
+            /** Funds With Ratio */
+            funds_with_ratio: number;
+            /** Funds Without Ratio */
+            funds_without_ratio: string[];
+            /**
+             * Unpriced Weight
+             * @description Portfolio share in funds whose expense ratio is unknown (not assumed 0).
+             */
+            unpriced_weight: number;
+            /** Weighted Expense Ratio */
+            weighted_expense_ratio: number | null;
         };
         /** FeeNameTotal */
         FeeNameTotal: {
@@ -4918,6 +7212,162 @@ export interface components {
              */
             created_at: string;
         };
+        /** FiledNote */
+        FiledNote: {
+            /** Fact Id */
+            fact_id: number;
+            /** Concept */
+            concept: string;
+            /** Label */
+            label: string | null;
+            /**
+             * Period End
+             * Format: date
+             */
+            period_end: string;
+            /** Fiscal Period */
+            fiscal_period: string | null;
+            /** Accession */
+            accession: string | null;
+            /** Form */
+            form: string | null;
+            /** Source */
+            source: string;
+            /** Source Url */
+            source_url: string;
+            /** Passage */
+            passage: string | null;
+            /** Passage Basis */
+            passage_basis: ("source_evidence_quote" | "filed_text_block") | null;
+            /** Passage Reason */
+            passage_reason: string | null;
+            /**
+             * Known At
+             * Format: date-time
+             */
+            known_at: string;
+            /** Revision */
+            revision: number;
+            /** Evidence Id */
+            evidence_id: number | null;
+        };
+        /** FiledNotes */
+        FiledNotes: {
+            coverage: components["schemas"]["SectionCoverage"];
+            /** Notes */
+            notes: components["schemas"]["FiledNote"][];
+        };
+        /** FinancialFactOut */
+        FinancialFactOut: {
+            /** Id */
+            id: number;
+            /** Concept */
+            concept: string;
+            /** Label */
+            label: string | null;
+            /** Statement */
+            statement: string;
+            /** Period Start */
+            period_start: string | null;
+            /**
+             * Period End
+             * Format: date
+             */
+            period_end: string;
+            /** Fiscal Period */
+            fiscal_period: string | null;
+            /** Basis */
+            basis: string;
+            /** Value */
+            value: number | string | null;
+            /** Unit */
+            unit: string;
+            /** Currency */
+            currency: string | null;
+            /** Dimensions */
+            dimensions: unknown;
+            /** Source */
+            source: string;
+            /**
+             * Provenance
+             * @enum {string}
+             */
+            provenance: "primary" | "vendor" | "owner" | "community" | "unclassified";
+            /** Source Url */
+            source_url: string;
+            /**
+             * Known At
+             * Format: date-time
+             */
+            known_at: string;
+            /** Revision */
+            revision: number;
+            /** Has Text Block */
+            has_text_block: boolean;
+            /** Evidence Id */
+            evidence_id: number | null;
+        };
+        /** FinancialHistory */
+        FinancialHistory: {
+            /** Total Rows */
+            total_rows: number;
+            /** Returned Rows */
+            returned_rows: number;
+            /** Statements */
+            statements: {
+                [key: string]: number;
+            };
+            /** Earliest Period */
+            earliest_period: string | null;
+            /** Latest Period */
+            latest_period: string | null;
+            /** Provenance */
+            provenance: {
+                [key: string]: number;
+            };
+            /** Facts */
+            facts: components["schemas"]["FinancialFactOut"][];
+        };
+        /** ForwardObservationInput */
+        ForwardObservationInput: {
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "company_guidance" | "owner_scenario" | "published_analyst_consensus" | "event_calendar_estimate";
+            /** Provider */
+            provider?: string | null;
+            /** Metric */
+            metric: string;
+            /** Basis */
+            basis?: string | null;
+            /** Fiscal Period */
+            fiscal_period: string;
+            /** Period End */
+            period_end?: string | null;
+            /** Currency */
+            currency?: string | null;
+            /** Value */
+            value?: number | string | null;
+            /** Low */
+            low?: number | string | null;
+            /** High */
+            high?: number | string | null;
+            /** Analyst Count */
+            analyst_count?: number | null;
+            /** Vintage */
+            vintage?: string | null;
+            /** Published At */
+            published_at?: string | null;
+            /** Source Url */
+            source_url: string;
+            /** Evidence Id */
+            evidence_id?: number | null;
+            /** Raw */
+            raw?: {
+                [key: string]: unknown;
+            };
+        };
         /** FredSeries */
         FredSeries: {
             /** Key */
@@ -4943,6 +7393,65 @@ export interface components {
              */
             policy_rate: boolean;
         };
+        /**
+         * FreeSourceAlertsConfig
+         * @description Rules for the `free_source_alerts` job (credit stress, trade exposure, patent status,
+         *     confirmed company-graph events). Every decision, raised or not, is written to
+         *     `free_source_alert_trail`.
+         */
+        FreeSourceAlertsConfig: {
+            /**
+             * Enabled
+             * @default true
+             */
+            enabled: boolean;
+            /**
+             * Lookback Days
+             * @description Observations first known within this many days are evaluated; older ones are never alerted (a replayed backfill raises nothing).
+             * @default 3
+             */
+            lookback_days: number;
+            /**
+             * Throttle Hours
+             * @description After an alert for one rule and scope (series, holding), further alerts for the same scope within this many hours are recorded as throttled. 0: off.
+             * @default 24
+             */
+            throttle_hours: number;
+            /**
+             * Max Alerts Per Run
+             * @default 10
+             */
+            max_alerts_per_run: number;
+            /** Credit Stress */
+            credit_stress?: components["schemas"]["CreditStressRule"][];
+            /**
+             * Trade Min Exposure Weight
+             * @description Mapped exposure weight (share of the issuer) below which a trade change is not alerted. Unmapped (unknown) weight is never counted.
+             * @default 0.05
+             */
+            trade_min_exposure_weight: number;
+            /**
+             * Trade Min Change Pct
+             * @description Year-on-year change in the trade value that alerts.
+             * @default 20
+             */
+            trade_min_change_pct: number;
+            /**
+             * Patent Min Ownership Confidence
+             * @default 0.8
+             */
+            patent_min_ownership_confidence: number;
+            /**
+             * Graph Event Types
+             * @description Confirmed company events of these types alert. Suggested or disputed ones are listed for review only.
+             */
+            graph_event_types?: ("deal" | "financing" | "leadership" | "relationship")[];
+            /**
+             * Graph Edge Types
+             * @description Confirmed company-graph edges of these types alert.
+             */
+            graph_edge_types?: string[];
+        };
         /** Freshness */
         Freshness: {
             /**
@@ -4958,6 +7467,104 @@ export interface components {
             synced_at: string;
             /** Job Id */
             job_id: number;
+        };
+        /** FundAsOf */
+        FundAsOf: {
+            /** Isin */
+            isin: string;
+            /** Label */
+            label: string;
+            /** Ticker */
+            ticker: string | null;
+            /** Weight */
+            weight: number;
+            /** Value Base */
+            value_base: number;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "ok" | "stale" | "missing" | "not_configured";
+            /** Holdings As Of */
+            holdings_as_of: string | null;
+            /** Lag Days */
+            lag_days: number | null;
+            /** Stale */
+            stale: boolean;
+            /** Source */
+            source: string | null;
+            /** Rows Total Weight */
+            rows_total_weight: number | null;
+            /**
+             * Residual Weight
+             * @description 1 - sum of published rows; unknown.
+             */
+            residual_weight: number | null;
+            /**
+             * Unknown Weight
+             * @description Share of total portfolio value left unknown.
+             */
+            unknown_weight: number;
+            /** Reconciles */
+            reconciles: boolean | null;
+            /** Expense Ratio */
+            expense_ratio: number | null;
+            /**
+             * Fee Drag
+             * @description weight x expense ratio, per year.
+             */
+            fee_drag: number | null;
+            /** Warnings */
+            warnings: string[];
+        };
+        /** FundChannel */
+        FundChannel: {
+            /**
+             * Channel
+             * @default fund_positions_nport
+             * @constant
+             */
+            channel: "fund_positions_nport";
+            coverage: components["schemas"]["SectionCoverage"];
+            positions: components["schemas"]["HoldingFundPositions"];
+        };
+        /** FundCoverage */
+        FundCoverage: {
+            /** Isin */
+            isin: string;
+            /** Label */
+            label: string;
+            /**
+             * As Of
+             * Format: date
+             */
+            as_of: string;
+            /** Lag Days */
+            lag_days: number;
+            /** Stale */
+            stale: boolean;
+            /** Equity Weight */
+            equity_weight: number;
+            /** Cash Derivative Other Weight */
+            cash_derivative_other_weight: number;
+            /**
+             * Unknown Weight
+             * @description 1 - sum of rows, when positive.
+             */
+            unknown_weight: number;
+            /**
+             * Unidentified Equity Weight
+             * @description Equity rows without an ISIN (matched by name only).
+             */
+            unidentified_equity_weight: number;
+            /** Hhi */
+            hhi: number | null;
+            /** Effective N */
+            effective_n: number | null;
+            /** Top10 Share */
+            top10_share: number | null;
+            /** Issuers */
+            issuers: number;
         };
         /** FundHolding */
         FundHolding: {
@@ -5040,6 +7647,129 @@ export interface components {
             warnings: string[];
             /** Top Holdings */
             top_holdings: components["schemas"]["FundHolding"][];
+        };
+        /** FundOverlapReport */
+        FundOverlapReport: {
+            /**
+             * As Of
+             * Format: date
+             */
+            as_of: string;
+            /** Pairs */
+            pairs: components["schemas"]["FundPairOverlap"][];
+            /** Funds */
+            funds: components["schemas"]["FundCoverage"][];
+            /** Notes */
+            notes: string[];
+        };
+        /** FundPairOverlap */
+        FundPairOverlap: {
+            /** Fund A */
+            fund_a: string;
+            /** Fund B */
+            fund_b: string;
+            /**
+             * Overlap
+             * @description Sum over shared issuers of the smaller fund weight.
+             */
+            overlap: number;
+            /** Shared Issuers */
+            shared_issuers: number;
+            /**
+             * As Of A
+             * Format: date
+             */
+            as_of_a: string;
+            /**
+             * As Of B
+             * Format: date
+             */
+            as_of_b: string;
+            /** Same Date */
+            same_date: boolean;
+        };
+        /** FundPosition */
+        FundPosition: {
+            /** Series Id */
+            series_id: string;
+            /** Fund Name */
+            fund_name: string | null;
+            /** Registrant Name */
+            registrant_name: string | null;
+            /**
+             * Report Period End
+             * Format: date
+             * @description The date the positions are as of.
+             */
+            report_period_end: string;
+            /**
+             * Filed
+             * Format: date
+             */
+            filed: string;
+            /**
+             * Public After
+             * Format: date
+             * @description Quarter end + 60 days: earliest the report is expected to be public.
+             */
+            public_after: string;
+            /**
+             * Lag Days
+             * @description Filing date minus report date, in days.
+             */
+            lag_days: number;
+            /**
+             * Age Days
+             * @description As-of date minus report date, in days.
+             */
+            age_days: number;
+            /** Stale */
+            stale: boolean;
+            /** Issuer Name */
+            issuer_name: string | null;
+            /** Title */
+            title: string | null;
+            /** Cusip */
+            cusip: string | null;
+            /** Isin */
+            isin: string | null;
+            /** Balance */
+            balance: number | string | null;
+            /**
+             * Units
+             * @description NS shares, PA principal amount, NC contracts, ...
+             */
+            units: string | null;
+            /** Currency */
+            currency: string | null;
+            /** Value Usd */
+            value_usd: number | string | null;
+            /**
+             * Pct Of Fund
+             * @description Percent of the fund's net assets as filed.
+             */
+            pct_of_fund: number | string | null;
+            /** Payoff Profile */
+            payoff_profile: string | null;
+            /** Asset Cat */
+            asset_cat: string | null;
+            /** Issuer Cat */
+            issuer_cat: string | null;
+            /** Is Derivative */
+            is_derivative: boolean;
+            /** Derivative Cat */
+            derivative_cat: string | null;
+            /**
+             * Map Basis
+             * @description Identifier that tied the row to this holding.
+             */
+            map_basis: string | null;
+            /** Accession */
+            accession: string;
+            /** Form */
+            form: string;
+            /** Source Url */
+            source_url: string;
         };
         /** FundValuation */
         FundValuation: {
@@ -5280,6 +8010,18 @@ export interface components {
             /** Benchmark Weight */
             benchmark_weight: number | null;
         };
+        /** Gap */
+        Gap: {
+            /** Domain */
+            domain: string;
+            /**
+             * State
+             * @enum {string}
+             */
+            state: "missing" | "not_covered" | "unresolved" | "partial" | "stale";
+            /** Reason */
+            reason: string;
+        };
         /** GoldenAccuracy */
         GoldenAccuracy: {
             /**
@@ -5454,6 +8196,54 @@ export interface components {
              */
             prices_gap: boolean;
         };
+        /** HoldingDataContext */
+        HoldingDataContext: {
+            /** Ticker */
+            ticker: string;
+            /**
+             * Known As Of
+             * Format: date-time
+             */
+            known_as_of: string;
+            /** Identity */
+            identity: {
+                [key: string]: unknown;
+            };
+            financial_history: components["schemas"]["FinancialHistory"];
+            country_exposure: components["schemas"]["MacroContext"] | null;
+            /** Trade Exposure */
+            trade_exposure: components["schemas"]["TradeExposure"][];
+            /** Business Network */
+            business_network: {
+                [key: string]: unknown;
+            };
+            /** Patents */
+            patents: {
+                [key: string]: unknown;
+            };
+            /**
+             * Forward Data Provenance
+             * @description Source classes of forward observations (consensus, guidance, scenarios).
+             */
+            forward_data_provenance: {
+                [key: string]: number;
+            };
+            /** Research Observation Provenance */
+            research_observation_provenance: {
+                [key: string]: number;
+            };
+            /** Source Disagreements */
+            source_disagreements: components["schemas"]["Disagreement"][];
+            /** Coverage */
+            coverage: components["schemas"]["CoverageEntry"][];
+            /** Gaps */
+            gaps: components["schemas"]["Gap"][];
+            /**
+             * Provenance Note
+             * @default primary = regulator, central bank, statistics office or issuer; vendor = commercial aggregator. A vendor value never replaces a primary value; disagreements are listed.
+             */
+            provenance_note: string;
+        };
         /** HoldingDetail */
         HoldingDetail: {
             /** Ticker */
@@ -5477,6 +8267,53 @@ export interface components {
             facts: components["schemas"]["FactOut"][];
             last_earnings_check: components["schemas"]["JobSummary"] | null;
             last_verdict_run: components["schemas"]["JobSummary"] | null;
+        };
+        /** HoldingEffect */
+        HoldingEffect: {
+            /** Ticker */
+            ticker: string;
+            /** Issuer Id */
+            issuer_id: number;
+            /** Segment */
+            segment: string;
+            /** Basis */
+            basis: string;
+            /** Weight */
+            weight: number | string;
+            /** Geography */
+            geography: string | null;
+            /** Hs Code */
+            hs_code: string | null;
+            /** Unknown Weight */
+            unknown_weight: number | string;
+            /** Related Series */
+            related_series: string[];
+            /** Explanation */
+            explanation: string;
+        };
+        /** HoldingFundPositions */
+        HoldingFundPositions: {
+            /** Ticker */
+            ticker: string;
+            /**
+             * Basis
+             * @default fund_position
+             * @constant
+             */
+            basis: "fund_position";
+            /**
+             * Notice
+             * @default Fund positions from SEC N-PORT: what each fund reports holding at the report date, public about 60 days after quarter end. Not beneficial ownership; do not add to Form 13F holders, 13D/G stakes or issuer-published fund holdings.
+             */
+            notice: string;
+            /**
+             * As Of
+             * Format: date
+             */
+            as_of: string;
+            /** Positions */
+            positions: components["schemas"]["FundPosition"][];
+            coverage: components["schemas"]["NportCoverage"];
         };
         /** HoldingIdentity */
         HoldingIdentity: {
@@ -5791,6 +8628,11 @@ export interface components {
              */
             yahoo_symbol?: string | null;
             /**
+             * Eodhd Symbol
+             * @description Exact EODHD exchange:symbol code, including its verified exchange suffix (for example AAPL.US). Used only after exchange-list verification.
+             */
+            eodhd_symbol?: string | null;
+            /**
              * Reporting Currency
              * @description Currency the company reports in; figures in another are held.
              */
@@ -6002,6 +8844,19 @@ export interface components {
             /** Problem */
             problem: string;
         };
+        /** IdentityOverride */
+        IdentityOverride: {
+            /** Issuer Id */
+            issuer_id?: number | null;
+            /** Security Id */
+            security_id?: number | null;
+            /** Listing Id */
+            listing_id?: number | null;
+            /** Decision */
+            decision: string;
+            /** Reason */
+            reason: string;
+        };
         /** ImportResult */
         ImportResult: {
             /**
@@ -6065,6 +8920,70 @@ export interface components {
              */
             change_pct: number | null;
         };
+        /** Insider */
+        Insider: {
+            coverage: components["schemas"]["SectionCoverage"];
+            /**
+             * Known By
+             * Format: date
+             */
+            known_by: string;
+            activity: components["schemas"]["InsiderActivityOut"];
+            /** Net Discretionary Derived From */
+            net_discretionary_derived_from: components["schemas"]["InsiderSource"][];
+        };
+        /** InsiderActivityOut */
+        InsiderActivityOut: {
+            /** Ticker */
+            ticker: string;
+            net_discretionary: components["schemas"]["NetDiscretionary"];
+            /** Transactions */
+            transactions: components["schemas"]["InsiderTransactionRow"][];
+            /** Jurisdiction Coverage */
+            jurisdiction_coverage: components["schemas"]["JurisdictionCoverage"][];
+            /** Limitations */
+            limitations: string[];
+        };
+        /** InsiderNetBreakdown */
+        InsiderNetBreakdown: {
+            /** Owner Name */
+            owner_name: string | null;
+            /** Reporting Owner Cik */
+            reporting_owner_cik: string;
+            /** Insider Role */
+            insider_role: string;
+            /**
+             * Ownership
+             * @enum {string}
+             */
+            ownership: "direct" | "indirect" | "unknown";
+            /** Bought Shares */
+            bought_shares: number | string;
+            /** Sold Shares */
+            sold_shares: number | string;
+            /** Net Shares */
+            net_shares: number | string;
+        };
+        /** InsiderSource */
+        InsiderSource: {
+            /** Accession */
+            accession: string;
+            /**
+             * Filed
+             * Format: date
+             */
+            filed: string;
+            /** Source Url */
+            source_url: string;
+            /** Economic Class */
+            economic_class: string | null;
+            /** Shares */
+            shares: number | string | null;
+            /** Passage */
+            passage: string | null;
+            /** Passage Reason */
+            passage_reason: string | null;
+        };
         /** InsiderTransactionOut */
         InsiderTransactionOut: {
             /** Accession */
@@ -6112,6 +9031,99 @@ export interface components {
             derivative: boolean;
             /** Source Url */
             source_url: string;
+        };
+        /** InsiderTransactionRow */
+        InsiderTransactionRow: {
+            /** Accession */
+            accession: string;
+            /** Form */
+            form: string;
+            /**
+             * Filed
+             * Format: date
+             */
+            filed: string;
+            /** Owner Name */
+            owner_name: string | null;
+            /** Reporting Owner Cik */
+            reporting_owner_cik: string;
+            /** Insider Role */
+            insider_role: string;
+            /** Officer Title */
+            officer_title: string | null;
+            /**
+             * Ownership
+             * @enum {string}
+             */
+            ownership: "direct" | "indirect" | "unknown";
+            /** Security Title */
+            security_title: string | null;
+            /** Transaction Date */
+            transaction_date: string | null;
+            /**
+             * Raw Transaction Code
+             * @description As reported on the form. Not a signal; read economic_class.
+             */
+            raw_transaction_code: string;
+            /** Economic Class */
+            economic_class: string | null;
+            /** Classification Basis */
+            classification_basis: string | null;
+            /** Interpretation */
+            interpretation: string;
+            /** Shares */
+            shares: number | string | null;
+            /** Price Per Share */
+            price_per_share: number | string | null;
+            /** Value */
+            value: number | string | null;
+            /** Acquired Disposed */
+            acquired_disposed: string | null;
+            /** Shares Owned After */
+            shares_owned_after: number | string | null;
+            /** Derivative */
+            derivative: boolean;
+            /** Exercise Price */
+            exercise_price: number | string | null;
+            /** Exercisable Date */
+            exercisable_date: string | null;
+            /** Expiration Date */
+            expiration_date: string | null;
+            /** Underlying Security Title */
+            underlying_security_title: string | null;
+            /** Underlying Shares */
+            underlying_shares: number | string | null;
+            /** Footnote Text */
+            footnote_text: string | null;
+            /** Rule 10B5 1 Plan */
+            rule_10b5_1_plan: boolean | null;
+            /** Rule 10B5 1 Basis */
+            rule_10b5_1_basis: string | null;
+            /** Rule 10B5 1 Adopted */
+            rule_10b5_1_adopted: string | null;
+            /** Superseded By */
+            superseded_by: string | null;
+            /** Amendment Link Status */
+            amendment_link_status: string;
+            /** Counts Toward Net Discretionary */
+            counts_toward_net_discretionary: boolean;
+            /** Exclusion Reason */
+            exclusion_reason: string | null;
+            /** Source Url */
+            source_url: string;
+        };
+        /** InstitutionalChannel */
+        InstitutionalChannel: {
+            /**
+             * Channel
+             * @default institutional_13f
+             * @constant
+             */
+            channel: "institutional_13f";
+            coverage: components["schemas"]["SectionCoverage"];
+            ownership: components["schemas"]["HoldingOwnership"] | null;
+            /** Pit Note */
+            pit_note: string | null;
         };
         /** InstrumentInfo */
         InstrumentInfo: {
@@ -6212,6 +9224,68 @@ export interface components {
              */
             fetched_at: string;
         };
+        /** IrConsensusRelease */
+        IrConsensusRelease: {
+            /** Release Id */
+            release_id: number;
+            /** Release Type */
+            release_type: string;
+            /** Published At */
+            published_at: string | null;
+            /**
+             * Known At
+             * Format: date-time
+             */
+            known_at: string;
+            /** Analyst Count */
+            analyst_count: number | null;
+            /** Basis */
+            basis: string | null;
+            /** Status */
+            status: string;
+            /** Source Url */
+            source_url: string;
+        };
+        /** IssuerExposure */
+        IssuerExposure: {
+            /** Key */
+            key: string;
+            /** Label */
+            label: string;
+            /**
+             * Merged Securities
+             * @description Distinct securities merged into this issuer.
+             */
+            merged_securities: number;
+            /**
+             * Securities
+             * @description Traceable to each security.
+             */
+            securities: components["schemas"]["IssuerSecurity"][];
+            /** Weight */
+            weight: number;
+            /** Value Base */
+            value_base: number;
+            /** Direct Weight */
+            direct_weight: number;
+            /** Fund Weight */
+            fund_weight: number;
+            /**
+             * Overlap Weight
+             * @description Exposure supplied by more than one channel: weight minus the largest single channel.
+             */
+            overlap_weight: number;
+            /** Channels */
+            channels: components["schemas"]["ChannelWeight"][];
+            /** Sector */
+            sector: string | null;
+            /** Country */
+            country: string | null;
+            /** Region */
+            region: string | null;
+            /** Currency */
+            currency: string | null;
+        };
         /**
          * IssuerGroup
          * @description Securities of one issuer counted together in the top underlying holdings (an ADR and
@@ -6222,6 +9296,51 @@ export interface components {
             label: string;
             /** Isins */
             isins: string[];
+        };
+        /** IssuerIRReleaseInput */
+        IssuerIRReleaseInput: {
+            /**
+             * Release Type
+             * @enum {string}
+             */
+            release_type: "guidance" | "consensus" | "segment_consensus" | "capital_return";
+            /** Source Url */
+            source_url: string;
+            /** Content Hash */
+            content_hash: string;
+            /** Document Version Id */
+            document_version_id?: number | null;
+            /** Published At */
+            published_at?: string | null;
+            /** Parser Version */
+            parser_version?: string | null;
+            /** Analyst Count */
+            analyst_count?: number | null;
+            /** Basis */
+            basis?: string | null;
+            /**
+             * Status
+             * @default available
+             * @enum {string}
+             */
+            status: "available" | "unavailable" | "access_unverified" | "parse_failed";
+            /** Metadata */
+            metadata?: {
+                [key: string]: unknown;
+            };
+        };
+        /** IssuerSecurity */
+        IssuerSecurity: {
+            /** Isin */
+            isin: string | null;
+            /** Name */
+            name: string;
+            /** Ticker */
+            ticker: string | null;
+            /** Weight */
+            weight: number;
+            /** Via */
+            via: components["schemas"]["ChannelWeight"][];
         };
         /** ItemLink */
         ItemLink: {
@@ -6437,6 +9556,14 @@ export interface components {
              * @default true
              */
             catch_up_on_start: boolean;
+            /**
+             * Providers
+             * @description Per-provider switch, refresh interval and hard free-tier budgets. All new providers default off until their sample audit passes.
+             */
+            providers?: {
+                [key: string]: components["schemas"]["ProviderJobSettings"];
+            };
+            public_data?: components["schemas"]["PublicDataSettings"];
             /** @description Trading212 sync, FX rates and drift. Default: daily at 22:30 Prague time. */
             portfolio_sync?: components["schemas"]["JobSchedule"];
             /** @description Refresh the report date of holdings reporting soon (see earnings_calendar_settings.refresh_within_days). Default: Sundays 06:00. */
@@ -6455,6 +9582,10 @@ export interface components {
             holiday_refresh?: components["schemas"]["JobSchedule"];
             /** @description FRED, ECB and Eurostat macro series; macro surprises on release days. Default: daily 11:30 (after Eurostat's 11:00 releases). */
             macro_collect?: components["schemas"]["JobSchedule"];
+            /** @description Curated World Bank, OECD, BIS and UN Comtrade releases. Disabled until the corresponding provider audit gate passes. */
+            public_data_collect?: components["schemas"]["JobSchedule"];
+            /** @description Repeat the endpoint-level free-access audit. Disabled until test-account credentials are configured. */
+            source_audit?: components["schemas"]["JobSchedule"];
             /** @description Alert on failed jobs, missed runs and coverage gaps. Default: every 15 minutes. */
             monitor?: components["schemas"]["JobSchedule"];
             /** @description Ingest, classify, corroborate and alert. Default: every 2 h, 06:00-22:00. */
@@ -6469,6 +9600,24 @@ export interface components {
             ownership_13f?: components["schemas"]["JobSchedule"];
             /** @description Load structured SEC Forms 3, 4 and 5 for portfolio issuers. Default: daily 06:30. */
             insider_trades?: components["schemas"]["JobSchedule"];
+            /** @description Load Schedule 13D/G beneficial-ownership filings for portfolio issuers. Default: daily 06:45. */
+            control_stakes?: components["schemas"]["JobSchedule"];
+            /** @description Load public SEC N-PORT fund holdings for held US funds. Default: Sat 05:15. */
+            nport_holdings?: components["schemas"]["JobSchedule"];
+            /** @description Probe optional Finnhub/FMP fund endpoints for free access. Off by default. */
+            fund_probes?: components["schemas"]["JobSchedule"];
+            /** @description Check iShares/Vanguard fund valuation figures for parser drift. Default: daily 07:30. */
+            fund_characteristics_audit?: components["schemas"]["JobSchedule"];
+            /** @description Evaluate credit, trade, patent and graph alerts. Default: daily 12:05. */
+            free_source_alerts?: components["schemas"]["JobSchedule"];
+            /** @description Record the daily free-source shadow-run snapshot. Default: daily 23:50. */
+            shadow_snapshot?: components["schemas"]["JobSchedule"];
+            /** @description Generate the free-source shadow-run report. Default: Monday 08:00. */
+            shadow_report?: components["schemas"]["JobSchedule"];
+            /** @description Prune old raw provider payloads (normalized data stays). Default: 03:15. */
+            raw_retention?: components["schemas"]["JobSchedule"];
+            /** @description Verify no paid endpoint or overage is reachable. Default: daily 03:20. */
+            zero_cost_gate?: components["schemas"]["JobSchedule"];
             /** @description Fundamentals (SEC XBRL, ESEF) of holdings that filed since the last read (all of them weekly) and the ETF providers' fund P/E and P/B. Default: daily 07:45. */
             valuation_refresh?: components["schemas"]["JobSchedule"];
             /** @description ETF look-through: the funds' holdings from iShares and Vanguard, skipped when the as-of date has not moved. Default: Saturdays 06:40. */
@@ -6504,6 +9653,17 @@ export interface components {
             /** Note */
             note: string | null;
             body: components["schemas"]["JobsConfig"];
+        };
+        /** JurisdictionCoverage */
+        JurisdictionCoverage: {
+            /** Jurisdiction */
+            jurisdiction: string;
+            /** Source */
+            source: string;
+            /** Access */
+            access: string;
+            /** Detail */
+            detail: string | null;
         };
         /** KpiRow */
         KpiRow: {
@@ -6557,6 +9717,79 @@ export interface components {
             /** Fallback */
             fallback: string | null;
         };
+        /** LedgerEntryInput */
+        LedgerEntryInput: {
+            /**
+             * Subject Kind
+             * @enum {string}
+             */
+            subject_kind: "fund" | "index";
+            /** Subject Key */
+            subject_key: string;
+            /** Label */
+            label: string;
+            /**
+             * Tier
+             * @enum {string}
+             */
+            tier: "official_holdings" | "issuer_downloadable" | "regulatory_filing" | "proxy_fund" | "unavailable";
+            /** Reason */
+            reason: string;
+            /** Proxy Fund Isin */
+            proxy_fund_isin?: string | null;
+            /** Total Return Available */
+            total_return_available?: boolean | null;
+            /** Historical Constituents */
+            historical_constituents?: boolean | null;
+            /** Source Url */
+            source_url?: string | null;
+        };
+        /** LedgerRow */
+        LedgerRow: {
+            /**
+             * Subject Kind
+             * @enum {string}
+             */
+            subject_kind: "fund" | "index";
+            /** Subject Key */
+            subject_key: string;
+            /** Label */
+            label: string;
+            /**
+             * Tier
+             * @enum {string}
+             */
+            tier: "official_holdings" | "issuer_downloadable" | "regulatory_filing" | "proxy_fund" | "unavailable";
+            /**
+             * Origin
+             * @enum {string}
+             */
+            origin: "derived" | "manual";
+            /** Proxy Fund Isin */
+            proxy_fund_isin: string | null;
+            /** Total Return Available */
+            total_return_available: boolean | null;
+            /** Historical Constituents */
+            historical_constituents: boolean | null;
+            /** Latest Holdings As Of */
+            latest_holdings_as_of: string | null;
+            /** Reason */
+            reason: string;
+            /** Source Url */
+            source_url: string | null;
+            /**
+             * Checked At
+             * Format: date-time
+             */
+            checked_at: string;
+            /**
+             * Backtest Flags
+             * @description Why this subject should not feed a performance/backtest unreviewed.
+             */
+            backtest_flags: string[];
+            /** Usable For Backtest */
+            usable_for_backtest: boolean;
+        };
         /** LegalEntityOut */
         LegalEntityOut: {
             /** Lei */
@@ -6585,6 +9818,32 @@ export interface components {
              */
             fetched_at: string;
         };
+        /** LegalEntitySnapshot */
+        LegalEntitySnapshot: {
+            /** Lei */
+            lei: string;
+            /**
+             * Known At
+             * Format: date-time
+             */
+            known_at: string;
+            /** Valid From */
+            valid_from: string | null;
+            /** Valid To */
+            valid_to: string | null;
+            /** Legal Name */
+            legal_name: string | null;
+            /** Other Names */
+            other_names: string[];
+            /** Entity Status */
+            entity_status: string | null;
+            /** Registration Status */
+            registration_status: string | null;
+            /** Successor Lei */
+            successor_lei: string | null;
+            /** Source Url */
+            source_url: string;
+        };
         /** LiquidityOut */
         LiquidityOut: {
             /** Liquid */
@@ -6599,6 +9858,28 @@ export interface components {
             most_relevant_market: string | null;
             /** Period To */
             period_to: string | null;
+        };
+        /** ListingLifecyclePoint */
+        ListingLifecyclePoint: {
+            /** Mic */
+            mic: string;
+            /** Publication Date */
+            publication_date: string | null;
+            /** Status */
+            status: string | null;
+            /** Terminated At */
+            terminated_at: string | null;
+            /** Issuer Lei */
+            issuer_lei: string | null;
+            /** Currency */
+            currency: string | null;
+            /** Source Url */
+            source_url: string;
+            /**
+             * Known At
+             * Format: date-time
+             */
+            known_at: string;
         };
         /** ListingOut */
         ListingOut: {
@@ -6765,6 +10046,67 @@ export interface components {
              */
             keep_snapshots: number;
         };
+        /** MacroComparison */
+        MacroComparison: {
+            /** Series Id */
+            series_id: string;
+            /** Source */
+            source: string;
+            /** Geography */
+            geography: string;
+            /** Value */
+            value: number | string | null;
+            /** Unit */
+            unit: string;
+            /**
+             * Period
+             * Format: date
+             */
+            period: string;
+            /** Release At */
+            release_at: string | null;
+            /**
+             * Known At
+             * Format: date-time
+             */
+            known_at: string;
+            /** Source Url */
+            source_url: string;
+        };
+        /** MacroContext */
+        MacroContext: {
+            /**
+             * As Of
+             * Format: date-time
+             */
+            as_of: string;
+            /** Observations */
+            observations: components["schemas"]["ContextPoint"][];
+            /** Coverage */
+            coverage: components["schemas"]["MacroCoverage"][];
+            /** Effects */
+            effects: components["schemas"]["HoldingEffect"][];
+            /** Comparisons */
+            comparisons: components["schemas"]["MacroComparison"][];
+        };
+        /** MacroCoverage */
+        MacroCoverage: {
+            /** Provider */
+            provider: string;
+            /** Dataset */
+            dataset: string;
+            /** Geography */
+            geography: string;
+            /** State */
+            state: string;
+            /**
+             * Checked At
+             * Format: date-time
+             */
+            checked_at: string;
+            /** Reason */
+            reason: string | null;
+        };
         /** MacroFigure */
         MacroFigure: {
             /** Series Id */
@@ -6789,6 +10131,23 @@ export interface components {
              * @description Released within the digest's window.
              */
             new: boolean;
+        };
+        /** MacroSensitivity */
+        MacroSensitivity: {
+            /** Series Id */
+            series_id: string;
+            /** Source */
+            source: string;
+            /** Unit */
+            unit: string;
+            reported: components["schemas"]["SensitivityBasis"];
+            inferred: components["schemas"]["SensitivityBasis"];
+            /** Latest Period Min */
+            latest_period_min: string | null;
+            /** Latest Period Max */
+            latest_period_max: string | null;
+            /** Portfolio Value */
+            portfolio_value: number | string;
         };
         /**
          * MacroSettings
@@ -6919,6 +10278,37 @@ export interface components {
             previous_value_usd?: number | string | null;
             /** Earlier Period */
             earlier_period?: string | null;
+        };
+        /** ManualFactsheetInput */
+        ManualFactsheetInput: {
+            /**
+             * As Of
+             * Format: date
+             */
+            as_of: string;
+            /** Share Class */
+            share_class?: string | null;
+            /** Total Assets */
+            total_assets?: number | string | null;
+            /** Total Assets Currency */
+            total_assets_currency?: string | null;
+            /**
+             * Expense Ratio
+             * @description Fraction per year: 0.0007 = 0.07%.
+             */
+            expense_ratio?: number | string | null;
+            /** Benchmark Name */
+            benchmark_name?: string | null;
+            /** Distribution Policy */
+            distribution_policy?: ("accumulating" | "distributing") | null;
+            /** Nav Basis */
+            nav_basis?: string | null;
+            /** Charges */
+            charges?: {
+                [key: string]: unknown;
+            };
+            /** Note */
+            note?: string | null;
         };
         /**
          * ManualFundamentals
@@ -7126,6 +10516,60 @@ export interface components {
              */
             news_coverage_hours: number;
         };
+        /** NetDiscretionary */
+        NetDiscretionary: {
+            /**
+             * Since
+             * Format: date
+             */
+            since: string;
+            /**
+             * Until
+             * Format: date
+             */
+            until: string;
+            /** Bought Shares */
+            bought_shares: number | string;
+            /** Sold Shares */
+            sold_shares: number | string;
+            /** Net Shares */
+            net_shares: number | string;
+            /** Buy Rows */
+            buy_rows: number;
+            /** Sell Rows */
+            sell_rows: number;
+            /** Bought Value */
+            bought_value: number | string | null;
+            /** Sold Value */
+            sold_value: number | string | null;
+            /**
+             * Net Value
+             * @description Bought minus sold at the reported prices; null unless every counted row has a price.
+             */
+            net_value: number | string | null;
+            /** Value Complete */
+            value_complete: boolean;
+            /**
+             * Plan Status Unknown Rows
+             * @description Counted rows whose Rule 10b5-1 status the form does not state.
+             */
+            plan_status_unknown_rows: number;
+            /** Pre Planned Bought Shares */
+            pre_planned_bought_shares: number | string;
+            /** Pre Planned Sold Shares */
+            pre_planned_sold_shares: number | string;
+            /** By Insider */
+            by_insider: components["schemas"]["InsiderNetBreakdown"][];
+            /**
+             * By Ownership
+             * @description Net shares by direct / indirect / unknown ownership.
+             */
+            by_ownership: {
+                [key: string]: number | string;
+            };
+            /** Exclusions */
+            exclusions: components["schemas"]["ExclusionOut"][];
+        };
         /** NewConversation */
         NewConversation: {
             /** Title */
@@ -7187,6 +10631,16 @@ export interface components {
             rumour: boolean | null;
             /** Relevant */
             relevant: boolean | null;
+            /**
+             * Sentiment Score
+             * @description Provider sentiment signal; candidate ranking only.
+             */
+            sentiment_score?: number | null;
+            /**
+             * Sentiment Relevance
+             * @description Provider ticker relevance for the sentiment signal.
+             */
+            sentiment_relevance?: number | null;
             story: components["schemas"]["StoryOut"];
         };
         /**
@@ -7198,7 +10652,7 @@ export interface components {
              * Event Type
              * @enum {string}
              */
-            event_type: "guidance_change" | "m_and_a" | "dividend_cut" | "earnings_release" | "management_change" | "regulatory_legal" | "capital_allocation" | "credit_rating" | "central_bank" | "macro_surprise" | "insider_transaction" | "product_business" | "sector_competitor" | "index_change" | "analyst_rating" | "delisting" | "entity_status" | "other";
+            event_type: "guidance_change" | "m_and_a" | "dividend_cut" | "earnings_release" | "management_change" | "regulatory_legal" | "capital_allocation" | "credit_rating" | "central_bank" | "macro_surprise" | "insider_transaction" | "product_business" | "sector_competitor" | "index_change" | "analyst_rating" | "delisting" | "entity_status" | "credit_stress" | "trade_exposure" | "patent_status" | "other";
             /** Affected Ticker */
             affected_ticker: string | null;
             /** Relevant */
@@ -7290,7 +10744,7 @@ export interface components {
              * @description rss: an RSS or Atom feed. page: a news page read daily; new links on it become items. edgar: every holding's SEC filings. finnhub: US company news. google_news: a Google News query per holding (unofficial endpoint). rns: UK regulatory announcements per holding (Investegate company page). eqs: German regulatory announcements (EQS News company page from the holding profile's regulatory_news_urls). edgar_fts: SEC full-text search for each holding's watch topics and for other filers naming it.
              * @enum {string}
              */
-            type: "rss" | "page" | "edgar" | "finnhub" | "google_news" | "rns" | "eqs" | "edgar_fts";
+            type: "rss" | "page" | "edgar" | "finnhub" | "google_news" | "rns" | "eqs" | "edgar_fts" | "alpha_vantage";
             /**
              * Url
              * @description Feed or page URL (rss, page).
@@ -7468,7 +10922,7 @@ export interface components {
             /** Muted Tickers */
             muted_tickers?: string[];
             /** Muted Event Types */
-            muted_event_types?: ("guidance_change" | "m_and_a" | "dividend_cut" | "earnings_release" | "management_change" | "regulatory_legal" | "capital_allocation" | "credit_rating" | "central_bank" | "macro_surprise" | "insider_transaction" | "product_business" | "sector_competitor" | "index_change" | "analyst_rating" | "delisting" | "entity_status" | "other")[];
+            muted_event_types?: ("guidance_change" | "m_and_a" | "dividend_cut" | "earnings_release" | "management_change" | "regulatory_legal" | "capital_allocation" | "credit_rating" | "central_bank" | "macro_surprise" | "insider_transaction" | "product_business" | "sector_competitor" | "index_change" | "analyst_rating" | "delisting" | "entity_status" | "credit_stress" | "trade_exposure" | "patent_status" | "other")[];
             /**
              * Repeat Throttle Hours
              * @description Another story with the same holding and event type within this many hours of an alert is not alerted again.
@@ -7509,6 +10963,30 @@ export interface components {
             /** Note */
             note: string | null;
             body: components["schemas"]["NotificationsConfig"];
+        };
+        /** NportCoverage */
+        NportCoverage: {
+            /**
+             * State
+             * @enum {string}
+             */
+            state: "available" | "stale" | "no_positions" | "no_funds_loaded";
+            /**
+             * Funds Loaded
+             * @description Tracked funds with a reconciled N-PORT filing.
+             */
+            funds_loaded: number;
+            /** Funds Holding */
+            funds_holding: number;
+            /** Latest Report Period End */
+            latest_report_period_end: string | null;
+            /** Oldest Report Period End */
+            oldest_report_period_end: string | null;
+            /**
+             * Scope
+             * @default Only the portfolio's US-registered funds that lack an issuer holdings snapshot; absence of a fund is not evidence it does not hold the security.
+             */
+            scope: string;
         };
         /** OwnershipPeriod */
         OwnershipPeriod: {
@@ -7581,6 +11059,57 @@ export interface components {
              */
             top_holders: number;
         };
+        /** PatentFamilyInput */
+        PatentFamilyInput: {
+            /** Family Key */
+            family_key: string;
+            /** Priority Date */
+            priority_date?: string | null;
+            /** Title */
+            title?: string | null;
+            /** Cpc Codes */
+            cpc_codes?: string[];
+            /** Jurisdictions */
+            jurisdictions?: string[];
+            /**
+             * Forward Citations
+             * @default 0
+             */
+            forward_citations: number;
+            /**
+             * Backward Citations
+             * @default 0
+             */
+            backward_citations: number;
+            /**
+             * Legal Status
+             * @default unknown
+             * @enum {string}
+             */
+            legal_status: "application" | "granted" | "active" | "expired" | "unknown";
+            /** Source */
+            source: string;
+            /** Source Url */
+            source_url: string;
+            /** Applicant */
+            applicant: string;
+            /** Ownership Confidence */
+            ownership_confidence: number | string;
+            /**
+             * Ownership Basis
+             * @default suggested
+             * @enum {string}
+             */
+            ownership_basis: "direct" | "dated_subsidiary_path" | "suggested";
+            /** Ownership Valid From */
+            ownership_valid_from?: string | null;
+            /** Evidence Id */
+            evidence_id?: number | null;
+            /** Raw */
+            raw?: {
+                [key: string]: unknown;
+            };
+        };
         /** PePoint */
         PePoint: {
             /**
@@ -7592,6 +11121,31 @@ export interface components {
             pe: number;
             /** Eps */
             eps: number;
+        };
+        /** PeerInput */
+        PeerInput: {
+            /** Peer Ticker */
+            peer_ticker: string;
+            /** Basis */
+            basis: string;
+            /** Source */
+            source: string;
+            /**
+             * Status
+             * @default suggested
+             * @enum {string}
+             */
+            status: "suggested" | "confirmed" | "rejected";
+            /** Evidence Id */
+            evidence_id?: number | null;
+            /** Valid From */
+            valid_from?: string | null;
+            /** Valid To */
+            valid_to?: string | null;
+            /** Detail */
+            detail?: {
+                [key: string]: unknown;
+            };
         };
         /** PerShareFigure */
         PerShareFigure: {
@@ -7614,6 +11168,28 @@ export interface components {
             stale: boolean;
             /** Inputs */
             inputs?: components["schemas"]["FundamentalFactRef"][];
+        };
+        /** PinInput */
+        PinInput: {
+            /**
+             * Ref Kind
+             * @enum {string}
+             */
+            ref_kind: "report" | "decision" | "manual";
+            /** Ref Id */
+            ref_id: string;
+            /** Reason */
+            reason?: string | null;
+            /**
+             * Snapshot Id
+             * @description Pin this snapshot...
+             */
+            snapshot_id?: number | null;
+            /**
+             * As Of
+             * @description ...or every configured fund's snapshot known at this date.
+             */
+            as_of?: string | null;
         };
         /** PlausibilityCheck */
         PlausibilityCheck: {
@@ -7645,6 +11221,59 @@ export interface components {
              * @description Beyond the configured tolerance.
              */
             flagged: boolean;
+        };
+        /** PortfolioConcentration */
+        PortfolioConcentration: {
+            /**
+             * Dimension
+             * @enum {string}
+             */
+            dimension: "country" | "product";
+            /** @description Mapped value over total portfolio value. */
+            mapped: components["schemas"]["Share"];
+            /** Unmapped Value */
+            unmapped_value: number | string;
+            /** Unmapped Tickers */
+            unmapped_tickers: string[];
+            /** Rows */
+            rows: components["schemas"]["ExposureRow"][];
+            /**
+             * Hhi
+             * @description Herfindahl index of exposed value shares within the mapped value; null without a mapped value.
+             */
+            hhi: number | string | null;
+            /** Hhi Denominator */
+            hhi_denominator: number | string;
+            /** Note */
+            note: string;
+        };
+        /** PortfolioDataContext */
+        PortfolioDataContext: {
+            /** Snapshot Date */
+            snapshot_date: string | null;
+            /**
+             * Known As Of
+             * Format: date-time
+             */
+            known_as_of: string;
+            /** Base Currency */
+            base_currency: string | null;
+            /** Total Value */
+            total_value: number | string;
+            /** Position Count */
+            position_count: number;
+            identity_coverage: components["schemas"]["Share"] | null;
+            country_concentration: components["schemas"]["PortfolioConcentration"] | null;
+            product_concentration: components["schemas"]["PortfolioConcentration"] | null;
+            /** Macro Sensitivities */
+            macro_sensitivities: components["schemas"]["MacroSensitivity"][];
+            adjusted_return_coverage: components["schemas"]["AdjustedReturnCoverage"] | null;
+            fund_overlap: components["schemas"]["FundOverlapReport"] | null;
+            fund_unknown: components["schemas"]["Unknown"] | null;
+            /** Fund Total Value */
+            fund_total_value: number | null;
+            /** Gaps */
+            gaps: components["schemas"]["Gap"][];
         };
         /** PortfolioFlag */
         PortfolioFlag: {
@@ -7787,6 +11416,32 @@ export interface components {
              * @description Covered holdings' value in the base currency.
              */
             value: number;
+        };
+        /** PortfolioMacroCoverage */
+        PortfolioMacroCoverage: {
+            /**
+             * As Of
+             * Format: date
+             */
+            as_of: string;
+            /** Base Currency */
+            base_currency: string;
+            /** Total Value */
+            total_value: number | string;
+            /** Mapped Value */
+            mapped_value: number | string;
+            /** Unknown Value */
+            unknown_value: number | string;
+            /** Mapped Weight */
+            mapped_weight: number | string;
+            /** Unknown Weight */
+            unknown_weight: number | string;
+            /** By Exposure */
+            by_exposure: {
+                [key: string]: unknown;
+            }[];
+            /** Gaps */
+            gaps: string[];
         };
         /** PortfolioOverview */
         PortfolioOverview: {
@@ -7984,6 +11639,17 @@ export interface components {
             /** Ticker */
             ticker?: string | null;
         };
+        /** Positions */
+        Positions: {
+            /**
+             * Not Additive
+             * @default Control stakes (13D/G), institutional 13F positions and N-PORT fund positions measure different things at different dates and overlap; no total or combined percentage is computed anywhere.
+             */
+            not_additive: string;
+            control: components["schemas"]["ControlChannel"];
+            institutional: components["schemas"]["InstitutionalChannel"];
+            funds: components["schemas"]["FundChannel"];
+        };
         /** PostedMessage */
         PostedMessage: {
             message: components["schemas"]["MessageOut"];
@@ -8010,6 +11676,31 @@ export interface components {
             low: number | null;
             /** Volume */
             volume: number | null;
+        };
+        /** PriceDiagnostic */
+        PriceDiagnostic: {
+            /** Symbol */
+            symbol: string;
+            /** Source */
+            source: string;
+            /** Mic */
+            mic: string | null;
+            /** Currency */
+            currency: string | null;
+            /** Quote Unit */
+            quote_unit: string | null;
+            /** Bar Type */
+            bar_type: string;
+            /** Last Session */
+            last_session: string | null;
+            /** Observed Sessions */
+            observed_sessions: number;
+            /** Disagreements */
+            disagreements: number;
+            /** Missing Days */
+            missing_days: number;
+            /** Access State */
+            access_state: string;
         };
         /** PriceGap */
         PriceGap: {
@@ -8219,6 +11910,99 @@ export interface components {
              */
             kpis: string[];
         };
+        /**
+         * ProviderJobSettings
+         * @description A free provider is opt-in until its account-specific endpoint audit passes.
+         */
+        ProviderJobSettings: {
+            /**
+             * Enabled
+             * @default false
+             */
+            enabled: boolean;
+            /**
+             * Refresh Hours
+             * @default 168
+             */
+            refresh_hours: number;
+            /** Daily Quota */
+            daily_quota?: number | null;
+            /** Monthly Quota */
+            monthly_quota?: number | null;
+            /**
+             * Reserve Credits
+             * @default 1
+             */
+            reserve_credits: number;
+        };
+        /** ProviderStatus */
+        ProviderStatus: {
+            /** Provider */
+            provider: string;
+            /** Endpoint */
+            endpoint: string;
+            /** State */
+            state: string;
+            /** Hard Blocked */
+            hard_blocked: boolean;
+            /** Quota */
+            quota: number | string | null;
+            /** Quota Period */
+            quota_period: string | null;
+            /** Last Success At */
+            last_success_at: string | null;
+            /** Retry At */
+            retry_at: string | null;
+            /** Day Credits */
+            day_credits: number | string;
+            /** Month Credits */
+            month_credits: number | string;
+        };
+        /**
+         * PublicDataSettings
+         * @description Curated Phase-2 requests. Every series names a product consumer.
+         */
+        PublicDataSettings: {
+            /** Countries */
+            countries?: string[];
+            /** World Bank */
+            world_bank?: components["schemas"]["WorldBankIndicator"][];
+            /** Sdmx */
+            sdmx?: components["schemas"]["PublicSdmxSeries"][];
+            /** Comtrade */
+            comtrade?: components["schemas"]["ComtradeSlice"][];
+        };
+        /** PublicSdmxSeries */
+        PublicSdmxSeries: {
+            /**
+             * Provider
+             * @enum {string}
+             */
+            provider: "oecd" | "bis";
+            /** Key */
+            key: string;
+            /** Label */
+            label: string;
+            /**
+             * Base Url
+             * Format: uri
+             */
+            base_url: string;
+            /** Flow */
+            flow: string;
+            /** Series Key */
+            series_key: string;
+            /** Geography */
+            geography: string;
+            /** Unit */
+            unit: string;
+            /** Frequency */
+            frequency: string;
+            /** Definition */
+            definition: string;
+            /** Consumer */
+            consumer: string;
+        };
         /** QuietHours */
         QuietHours: {
             /**
@@ -8405,6 +12189,54 @@ export interface components {
             conflict?: {
                 [key: string]: unknown;
             } | null;
+        };
+        /** RelationshipReview */
+        RelationshipReview: {
+            /**
+             * Relationship
+             * @enum {string}
+             */
+            relationship: "customer" | "supplier" | "procurement_award";
+            /**
+             * Direction
+             * @enum {string}
+             */
+            direction: "issuer_sells_to" | "issuer_buys_from" | "award_to_issuer" | "unknown";
+            /** Counterparty Key */
+            counterparty_key?: string | null;
+            /** Counterparty Name */
+            counterparty_name?: string | null;
+            /**
+             * Anonymous Counterparty
+             * @default false
+             */
+            anonymous_counterparty: boolean;
+            /** Reported Share */
+            reported_share?: number | string | null;
+            /** Share Basis */
+            share_basis?: string | null;
+            /** Fiscal Period */
+            fiscal_period?: string | null;
+            /** Valid From */
+            valid_from?: string | null;
+            /** Valid To */
+            valid_to?: string | null;
+            /** Evidence Id */
+            evidence_id?: number | null;
+            /** Passage */
+            passage: string;
+            /** Source Url */
+            source_url: string;
+            /** Source */
+            source: string;
+            /**
+             * Status
+             * @default suggested
+             * @enum {string}
+             */
+            status: "suggested" | "confirmed" | "rejected" | "disputed";
+            /** Decision Reason */
+            decision_reason?: string | null;
         };
         /** ReplayChange */
         ReplayChange: {
@@ -8649,6 +12481,30 @@ export interface components {
             /** Notes */
             notes?: string[];
         };
+        /** ResearchContext */
+        ResearchContext: {
+            /**
+             * Scope
+             * @enum {string}
+             */
+            scope: "country" | "industry" | "company";
+            /** Subject */
+            subject: string;
+            /**
+             * As Of
+             * Format: date-time
+             */
+            as_of: string;
+            /** Claims */
+            claims: components["schemas"]["Claim"][];
+            /** Gaps */
+            gaps: components["schemas"]["ContextGap"][];
+            /**
+             * Method
+             * @default Stored observations only, latest record known by the cutoff; changes are latest minus the previous period of the same series. No figure is estimated here.
+             */
+            method: string;
+        };
         /** ResearchProfile */
         ResearchProfile: {
             /** Id */
@@ -8817,6 +12673,22 @@ export interface components {
             created_at: string;
             /** Job Id */
             job_id: number | null;
+        };
+        /** ReturnBasisCoverage */
+        ReturnBasisCoverage: {
+            /** Adjustment Basis */
+            adjustment_basis: string;
+            complete: components["schemas"]["Share"];
+            /** Partial Value */
+            partial_value: number | string;
+            /** Missing Value */
+            missing_value: number | string;
+            /** Complete Tickers */
+            complete_tickers: string[];
+            /** Partial Tickers */
+            partial_tickers: string[];
+            /** Missing Tickers */
+            missing_tickers: string[];
         };
         /** ReviewBody */
         ReviewBody: {
@@ -9109,7 +12981,7 @@ export interface components {
              * Event Types
              * @description Empty: any type.
              */
-            event_types?: ("guidance_change" | "m_and_a" | "dividend_cut" | "earnings_release" | "management_change" | "regulatory_legal" | "capital_allocation" | "credit_rating" | "central_bank" | "macro_surprise" | "insider_transaction" | "product_business" | "sector_competitor" | "index_change" | "analyst_rating" | "delisting" | "entity_status" | "other")[];
+            event_types?: ("guidance_change" | "m_and_a" | "dividend_cut" | "earnings_release" | "management_change" | "regulatory_legal" | "capital_allocation" | "credit_rating" | "central_bank" | "macro_surprise" | "insider_transaction" | "product_business" | "sector_competitor" | "index_change" | "analyst_rating" | "delisting" | "entity_status" | "credit_stress" | "trade_exposure" | "patent_status" | "other")[];
             /**
              * Tickers
              * @description Empty: any holding.
@@ -9125,6 +12997,16 @@ export interface components {
             date: string;
             /** Score */
             score: number;
+        };
+        /** SectionCoverage */
+        SectionCoverage: {
+            /**
+             * State
+             * @enum {string}
+             */
+            state: "covered" | "partial" | "not_covered";
+            /** Reason */
+            reason: string;
         };
         /** SegmentHistoryPoint */
         SegmentHistoryPoint: {
@@ -9218,6 +13100,21 @@ export interface components {
              */
             note?: string | null;
         };
+        /** SensitivityBasis */
+        SensitivityBasis: {
+            /** Exposed Value Total */
+            exposed_value_total: number | string;
+            /** Exposed Value Covered */
+            exposed_value_covered: number | string;
+            coverage: components["schemas"]["Share"];
+            /**
+             * Weighted Change
+             * @description Exposure-weighted average change over covered geographies only; null when no geography with exposure has two observations.
+             */
+            weighted_change: number | string | null;
+            /** Geographies */
+            geographies: string[];
+        };
         /** Sentence */
         Sentence: {
             /** Text */
@@ -9265,9 +13162,26 @@ export interface components {
              * Event Type
              * @enum {string}
              */
-            event_type: "guidance_change" | "m_and_a" | "dividend_cut" | "earnings_release" | "management_change" | "regulatory_legal" | "capital_allocation" | "credit_rating" | "central_bank" | "macro_surprise" | "insider_transaction" | "product_business" | "sector_competitor" | "index_change" | "analyst_rating" | "delisting" | "entity_status" | "other";
+            event_type: "guidance_change" | "m_and_a" | "dividend_cut" | "earnings_release" | "management_change" | "regulatory_legal" | "capital_allocation" | "credit_rating" | "central_bank" | "macro_surprise" | "insider_transaction" | "product_business" | "sector_competitor" | "index_change" | "analyst_rating" | "delisting" | "entity_status" | "credit_stress" | "trade_exposure" | "patent_status" | "other";
             /** Severity */
             severity: number;
+        };
+        /**
+         * Share
+         * @description A ratio shown with the numerator and the denominator it was divided by.
+         */
+        Share: {
+            /** Numerator */
+            numerator: number | string;
+            /** Denominator */
+            denominator: number | string;
+            /**
+             * Ratio
+             * @description numerator / denominator; null for a zero base.
+             */
+            ratio: number | string | null;
+            /** Denominator Basis */
+            denominator_basis: string;
         };
         /**
          * ShareBasis
@@ -9456,7 +13370,7 @@ export interface components {
              * Kind
              * @enum {string}
              */
-            kind: "fact" | "news_item" | "relationship" | "filing13f" | "price" | "listing" | "verdict" | "position" | "strategy" | "thesis" | "report" | "search";
+            kind: "fact" | "news_item" | "relationship" | "filing13f" | "price" | "listing" | "verdict" | "position" | "strategy" | "thesis" | "report" | "search" | "observation";
             /**
              * Ref
              * @description The stored record: fact id, accession, URL, ...
@@ -9484,6 +13398,80 @@ export interface components {
             /** As Of */
             as_of?: string | null;
         };
+        /** SourceAccess */
+        SourceAccess: {
+            /** Provider */
+            provider: string;
+            /** Endpoint */
+            endpoint: string;
+            /** Account Tier */
+            account_tier: string;
+            /** State */
+            state: string;
+            /** Quota */
+            quota: number | string | null;
+            /** Quota Period */
+            quota_period: string | null;
+            /** Reset Timezone */
+            reset_timezone: string | null;
+            /** Request Weight */
+            request_weight: number | string;
+            /** Tested At */
+            tested_at: string | null;
+            /** Retry At */
+            retry_at: string | null;
+            /** Last Success At */
+            last_success_at: string | null;
+            /** Hard Blocked */
+            hard_blocked: boolean;
+            /** Detail */
+            detail: string | null;
+            /** Last Denial At */
+            last_denial_at: string | null;
+            /** Last Denial State */
+            last_denial_state: string | null;
+            /** Last Denial Status Code */
+            last_denial_status_code?: number | null;
+            /** Last Denial Detail */
+            last_denial_detail?: string | null;
+            /**
+             * Quota Window Start
+             * @description Start of the current usage window; null if none is recorded.
+             */
+            quota_window_start?: string | null;
+            /**
+             * Quota Used
+             * @description Credits spent in the current window (the denominator is `quota`). Null when the period is not tracked per window or no quota is known.
+             */
+            quota_used?: number | string | null;
+            /**
+             * Quota Remaining
+             * @description quota - quota_used, never below zero; null when unknown.
+             */
+            quota_remaining?: number | string | null;
+            /**
+             * Quota Headroom
+             * @description quota_remaining / quota in 0..1; null when unknown.
+             */
+            quota_headroom?: number | string | null;
+            /**
+             * Headroom Reason
+             * @description Why headroom is null (no quota, untracked period, ...).
+             */
+            headroom_reason?: string | null;
+            /**
+             * Freshness
+             * @enum {string}
+             */
+            freshness: "never_succeeded" | "recent" | "stale";
+            /** Last Success Age Seconds */
+            last_success_age_seconds?: number | null;
+            /**
+             * Stale After Hours
+             * @default 72
+             */
+            stale_after_hours: number;
+        };
         /** SourceHealth */
         SourceHealth: {
             /** Id */
@@ -9494,7 +13482,7 @@ export interface components {
              * Type
              * @enum {string}
              */
-            type: "rss" | "page" | "edgar" | "finnhub" | "google_news" | "rns" | "eqs" | "edgar_fts";
+            type: "rss" | "page" | "edgar" | "finnhub" | "google_news" | "rns" | "eqs" | "edgar_fts" | "alpha_vantage";
             /**
              * Host
              * @description The feed's host; null for per-holding sources (EDGAR, Finnhub, ...).
@@ -9549,6 +13537,29 @@ export interface components {
              */
             updated_at: string;
         };
+        /** SourceUsage */
+        SourceUsage: {
+            /** Provider */
+            provider: string;
+            /** Endpoint */
+            endpoint: string;
+            /** Window Kind */
+            window_kind: string;
+            /**
+             * Window Start
+             * Format: date-time
+             */
+            window_start: string;
+            /**
+             * Window End
+             * Format: date-time
+             */
+            window_end: string;
+            /** Credits */
+            credits: number | string;
+            /** Requests */
+            requests: number;
+        };
         /** SourcesHealth */
         SourcesHealth: {
             /**
@@ -9564,6 +13575,97 @@ export interface components {
              * @description Every configured source, in config order.
              */
             sources: components["schemas"]["SourceHealth"][];
+        };
+        /** StakeChangeOut */
+        StakeChangeOut: {
+            /** Change Type */
+            change_type: string;
+            /** Person Name */
+            person_name: string | null;
+            /** Old Value */
+            old_value: string | null;
+            /** New Value */
+            new_value: string | null;
+            /** Detail */
+            detail: string | null;
+        };
+        /** StakeHolderOut */
+        StakeHolderOut: {
+            /** Person Name */
+            person_name: string;
+            /** Person Cik */
+            person_cik: string | null;
+            /** Member Of Group */
+            member_of_group: boolean | null;
+            /** Sole Voting */
+            sole_voting: number | string | null;
+            /** Shared Voting */
+            shared_voting: number | string | null;
+            /** Sole Dispositive */
+            sole_dispositive: number | string | null;
+            /** Shared Dispositive */
+            shared_dispositive: number | string | null;
+            /** Aggregate Shares */
+            aggregate_shares: number | string | null;
+            /**
+             * Percent Of Class
+             * @description Filer-reported, in percent points.
+             */
+            percent_of_class: number | string | null;
+            /** Person Type */
+            person_type: string | null;
+        };
+        /** StakeItem */
+        StakeItem: {
+            /**
+             * Known At
+             * Format: date
+             * @description Filing date: when the stake became public.
+             */
+            known_at: string;
+            /**
+             * Source Passage
+             * @description Item 4 purpose text; 13G has none.
+             */
+            source_passage: string | null;
+            /** Passage Reason */
+            passage_reason: string | null;
+            /** Coverage Reason */
+            coverage_reason: string;
+            /** Superseded */
+            superseded: boolean;
+            stake: components["schemas"]["ControlStakeOut"];
+        };
+        /** StakeReconciliationOut */
+        StakeReconciliationOut: {
+            /**
+             * Match Basis
+             * @enum {string}
+             */
+            match_basis: "cusip" | "issuer_cik";
+            /**
+             * Class Status
+             * @enum {string}
+             */
+            class_status: "cusip_match" | "class_unreconciled";
+            /** Class Label */
+            class_label: string | null;
+            /** Class Shares Outstanding */
+            class_shares_outstanding: number | string | null;
+            /** Class Shares As Of */
+            class_shares_as_of: string | null;
+            /**
+             * Computed Percent
+             * @description Cross-check only: stake shares over the class's shares outstanding.
+             */
+            computed_percent: number | string | null;
+            /**
+             * Percent Check
+             * @enum {string}
+             */
+            percent_check: "consistent" | "inconsistent" | "not_checkable";
+            /** Note */
+            note: string | null;
         };
         /** StoryOut */
         StoryOut: {
@@ -9738,7 +13840,7 @@ export interface components {
              * @default guidance_change
              * @enum {string}
              */
-            event_type: "guidance_change" | "m_and_a" | "dividend_cut" | "earnings_release" | "management_change" | "regulatory_legal" | "capital_allocation" | "credit_rating" | "central_bank" | "macro_surprise" | "insider_transaction" | "product_business" | "sector_competitor" | "index_change" | "analyst_rating" | "delisting" | "entity_status" | "other";
+            event_type: "guidance_change" | "m_and_a" | "dividend_cut" | "earnings_release" | "management_change" | "regulatory_legal" | "capital_allocation" | "credit_rating" | "central_bank" | "macro_surprise" | "insider_transaction" | "product_business" | "sector_competitor" | "index_change" | "analyst_rating" | "delisting" | "entity_status" | "credit_stress" | "trade_exposure" | "patent_status" | "other";
             /** Ticker */
             ticker?: string | null;
         };
@@ -9970,6 +14072,136 @@ export interface components {
             /** Name */
             name: string;
         };
+        /** TradeContext */
+        TradeContext: {
+            /** Reporter */
+            reporter: string;
+            /** Hs Code */
+            hs_code: string;
+            /** Hs Revision */
+            hs_revision: string;
+            /** Partner */
+            partner: string | null;
+            /** Periods */
+            periods: number;
+            /** Latest Period */
+            latest_period: string | null;
+            /** Latest Value */
+            latest_value: number | string | null;
+            /**
+             * Latest Value Currency
+             * @default USD
+             */
+            latest_value_currency: string;
+            /** Metrics */
+            metrics: {
+                [key: string]: number | string | null;
+            };
+            /** Source Url */
+            source_url: string | null;
+            /** Known At */
+            known_at: string | null;
+            /**
+             * Notice
+             * @default National trade statistics do not establish an issuer contract.
+             */
+            notice: string;
+        };
+        /** TradeExposure */
+        TradeExposure: {
+            /** Hs Code */
+            hs_code: string;
+            /** Hs Revision */
+            hs_revision: string | null;
+            /** Geography */
+            geography: string | null;
+            /** Exposure Weight */
+            exposure_weight: number | string;
+            /** Exposure Basis */
+            exposure_basis: string;
+            /** Latest Period */
+            latest_period: string | null;
+            /** Rows */
+            rows: components["schemas"]["TradeRow"][];
+            /**
+             * Notice
+             * @default National product trade statistics. They do not identify the issuer's customers or suppliers, and rows for different partners are listed, never summed.
+             */
+            notice: string;
+            /** Gap */
+            gap?: string | null;
+        };
+        /** TradeRow */
+        TradeRow: {
+            /** Reporter */
+            reporter: string;
+            /** Partner */
+            partner: string;
+            /** Flow */
+            flow: string;
+            /** Hs Revision */
+            hs_revision: string;
+            /** Hs Code */
+            hs_code: string;
+            /**
+             * Period
+             * Format: date
+             */
+            period: string;
+            /** Trade Value */
+            trade_value: number | string | null;
+            /** Quantity */
+            quantity: number | string | null;
+            /** Quantity Unit */
+            quantity_unit: string | null;
+            /**
+             * Known At
+             * Format: date-time
+             */
+            known_at: string;
+            /** Source Url */
+            source_url: string;
+        };
+        /** TrailOut */
+        TrailOut: {
+            /** Rows */
+            rows: components["schemas"]["TrailRow"][];
+            /** Next Before Id */
+            next_before_id: number | null;
+        };
+        /** TrailRow */
+        TrailRow: {
+            /** Id */
+            id: number;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Rule */
+            rule: string;
+            /** Scope */
+            scope: string;
+            /** Ticker */
+            ticker: string | null;
+            /**
+             * Outcome
+             * @description raised, throttled, revision_ignored, baseline, not_material, no_baseline, persisting, review_needed or below_severity.
+             */
+            outcome: string;
+            /** Severity */
+            severity: number | null;
+            /** Reason */
+            reason: string;
+            /** Evidence */
+            evidence: {
+                [key: string]: unknown;
+            };
+            /** News Item Id */
+            news_item_id: number | null;
+            /** Job Id */
+            job_id: number | null;
+        };
         /** TransactionFeeOut */
         TransactionFeeOut: {
             /**
@@ -10118,6 +14350,26 @@ export interface components {
             via: components["schemas"]["Via"][];
             /** Benchmark Weight */
             benchmark_weight: number | null;
+        };
+        /** Unknown */
+        Unknown: {
+            /**
+             * Unknown Fund Weight
+             * @description Share of total portfolio value in fund weight that is not accounted for by the published rows or whose fund is not looked through. Never redistributed.
+             */
+            unknown_fund_weight: number;
+            /** Unknown Fund Value */
+            unknown_fund_value: number;
+            /** Not Looked Through Weight */
+            not_looked_through_weight: number;
+            /** Residual Weight */
+            residual_weight: number;
+            /** Over Reported Weight */
+            over_reported_weight: number;
+            /** By Fund */
+            by_fund: {
+                [key: string]: number;
+            };
         };
         /** ValidationError */
         ValidationError: {
@@ -10573,6 +14825,17 @@ export interface components {
              * Format: date-time
              */
             fetched_at: string;
+        };
+        /** WorldBankIndicator */
+        WorldBankIndicator: {
+            /** Key */
+            key: string;
+            /** Label */
+            label: string;
+            /** Unit */
+            unit: string;
+            /** Consumer */
+            consumer: string;
         };
         /** XbrlRunRequest */
         XbrlRunRequest: {
@@ -11096,6 +15359,378 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["JobSummary"];
+                };
+            };
+        };
+    };
+    get_macro_context: {
+        parameters: {
+            query?: {
+                as_of?: string | null;
+            };
+            header?: never;
+            path: {
+                ticker: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MacroContext"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_portfolio_macro_coverage: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PortfolioMacroCoverage"];
+                };
+            };
+        };
+    };
+    list_exposures: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ExposureResult"][];
+                };
+            };
+        };
+    };
+    create_exposure: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ExposureInput"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ExposureResult"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_exposure: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                mapping_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    run_public_data: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["JobSummary"];
+                };
+            };
+        };
+    };
+    source_status: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProviderStatus"][];
+                };
+            };
+        };
+    };
+    get_trade_context: {
+        parameters: {
+            query?: {
+                partner?: string | null;
+            };
+            header?: never;
+            path: {
+                reporter: string;
+                hs_code: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TradeContext"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    run_source_audit: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["JobSummary"];
+                };
+            };
+        };
+    };
+    get_source_access: {
+        parameters: {
+            query?: {
+                provider?: string | null;
+                endpoint?: string | null;
+                state?: string | null;
+                /** @description Only endpoints with a recorded denial. */
+                denied_only?: boolean;
+                stale_after_hours?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SourceAccess"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_source_usage: {
+        parameters: {
+            query?: {
+                since?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SourceUsage"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_data_coverage: {
+        parameters: {
+            query?: {
+                /** @description Source/provider. */
+                provider?: string | null;
+                /** @description Dataset or metric/series id. */
+                dataset?: string | null;
+                /** @description Security or geography key. */
+                entity_key?: string | null;
+                state?: string | null;
+                /** @description Entries whose span contains it. */
+                period?: string | null;
+                entity_kind?: ("security" | "geography" | "other") | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DataCoverage"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_data_coverage_summary: {
+        parameters: {
+            query: {
+                group_by: "security" | "geography" | "metric" | "period" | "source" | "state";
+                provider?: string | null;
+                dataset?: string | null;
+                entity_key?: string | null;
+                state?: string | null;
+                period?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CoverageSummary"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };
@@ -13494,6 +18129,131 @@ export interface operations {
             };
         };
     };
+    listing_history: {
+        parameters: {
+            query?: {
+                as_of?: string | null;
+            };
+            header?: never;
+            path: {
+                isin: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ListingLifecyclePoint"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    legal_entity_history: {
+        parameters: {
+            query?: {
+                as_of?: string | null;
+            };
+            header?: never;
+            path: {
+                lei: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LegalEntitySnapshot"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    identity_decisions: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    }[];
+                };
+            };
+        };
+    };
+    override_identity: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                ticker: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["IdentityOverride"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: number;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     get_holding_identity: {
         parameters: {
             query?: never;
@@ -14250,6 +19010,1004 @@ export interface operations {
             };
         };
     };
+    company_research_observations: {
+        parameters: {
+            query?: {
+                as_of?: string | null;
+            };
+            header?: never;
+            path: {
+                ticker: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    refresh_alpha_exposure: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                ticker: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AlphaExposureRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    exposure_context: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                ticker: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    refresh_diffbot_company_research: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                ticker: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    refresh_pdl_company_research: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                ticker: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    refresh_epo_patents: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                ticker: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    exchange_sessions: {
+        parameters: {
+            query: {
+                start: string;
+                end: string;
+            };
+            header?: never;
+            path: {
+                mic: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    record_exchange_session: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ExchangeSessionInput"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    peer_set: {
+        parameters: {
+            query?: {
+                as_of?: string | null;
+            };
+            header?: never;
+            path: {
+                ticker: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    record_peer: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                ticker: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PeerInput"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    peer_metrics: {
+        parameters: {
+            query?: {
+                as_of?: string | null;
+            };
+            header?: never;
+            path: {
+                ticker: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    price_diagnostics: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                ticker: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PriceDiagnostic"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    holding_returns: {
+        parameters: {
+            query: {
+                start: string;
+                end: string;
+            };
+            header?: never;
+            path: {
+                ticker: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_corporate_actions: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                ticker: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    record_corporate_action: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                ticker: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CorporateActionInput"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: number;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    confirm_action_coverage: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                ticker: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CorporateActionCoverageInput"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    financial_history: {
+        parameters: {
+            query?: {
+                as_of?: string | null;
+                statement?: ("income" | "cash_flow" | "balance_sheet" | "shares" | "segment" | "note") | null;
+            };
+            header?: never;
+            path: {
+                ticker: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    refresh_alpha_vantage_statement: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                ticker: string;
+                statement: "INCOME_STATEMENT" | "BALANCE_SHEET" | "CASH_FLOW";
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    refresh_finnhub_research: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                ticker: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    forward_data: {
+        parameters: {
+            query?: {
+                as_of?: string | null;
+            };
+            header?: never;
+            path: {
+                ticker: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    record_forward_data: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                ticker: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ForwardObservationInput"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    issuer_ir_releases: {
+        parameters: {
+            query?: {
+                as_of?: string | null;
+            };
+            header?: never;
+            path: {
+                ticker: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    record_issuer_ir_release: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                ticker: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["IssuerIRReleaseInput"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    record_company_edge: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CompanyEdgeInput"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    record_company_event: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                ticker: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CompanyEventInput"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    record_patent_family: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                ticker: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PatentFamilyInput"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    business_network: {
+        parameters: {
+            query?: {
+                as_of?: string | null;
+            };
+            header?: never;
+            path: {
+                ticker: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    record_relationship_review: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                ticker: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RelationshipReview"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: number;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    relationship_concentration: {
+        parameters: {
+            query?: {
+                as_of?: string | null;
+            };
+            header?: never;
+            path: {
+                ticker: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    patent_trends: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                ticker: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     list_watchlist: {
         parameters: {
             query?: never;
@@ -14468,6 +20226,888 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    run_control_stakes: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["JobSummary"];
+                };
+            };
+        };
+    };
+    get_control_stakes: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                ticker: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ControlStakesOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_insider_activity: {
+        parameters: {
+            query?: {
+                /** @description Default: 365 days before until. */
+                since?: string | null;
+                /** @description Default: today. */
+                until?: string | null;
+                limit?: number;
+            };
+            header?: never;
+            path: {
+                ticker: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["InsiderActivityOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    run_nport_holdings: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["JobSummary"];
+                };
+            };
+        };
+    };
+    get_fund_positions: {
+        parameters: {
+            query?: {
+                as_of?: string | null;
+                limit?: number;
+            };
+            header?: never;
+            path: {
+                ticker: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HoldingFundPositions"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_fund_aggregate: {
+        parameters: {
+            query?: {
+                /** @description Answer as of this date (point-in-time). */
+                as_of?: string | null;
+                top?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AggregateReport"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_fund_overlap: {
+        parameters: {
+            query?: {
+                /** @description Answer as of this date (point-in-time). */
+                as_of?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FundOverlapReport"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_look_through_as_of: {
+        parameters: {
+            query: {
+                /** @description Only records known by the end of this day. */
+                as_of: string;
+                top?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_coverage_ledger: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CoverageLedger"];
+                };
+            };
+        };
+    };
+    put_coverage_entry: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["LedgerEntryInput"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CoverageLedger"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    refresh_coverage_ledger: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CoverageLedger"];
+                };
+            };
+        };
+    };
+    get_factsheet: {
+        parameters: {
+            query?: {
+                limit?: number;
+            };
+            header?: never;
+            path: {
+                isin: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    put_factsheet: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                isin: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ManualFactsheetInput"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    pin_snapshots: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PinInput"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_characteristics_audit: {
+        parameters: {
+            query?: {
+                fund_key?: string | null;
+                alerts_only?: boolean;
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_holding_data_context: {
+        parameters: {
+            query?: {
+                /** @description Point-in-time cutoff; records known later are hidden. */
+                as_of?: string | null;
+            };
+            header?: never;
+            path: {
+                ticker: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HoldingDataContext"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_portfolio_data_context: {
+        parameters: {
+            query?: {
+                as_of?: string | null;
+                series_limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PortfolioDataContext"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_evidence_summary: {
+        parameters: {
+            query?: {
+                /** @description Point-in-time cutoff; records known later are hidden. */
+                as_of?: string | null;
+            };
+            header?: never;
+            path: {
+                ticker: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EvidenceSummary"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_evidence_domain: {
+        parameters: {
+            query?: {
+                /** @description Point-in-time cutoff; records known later are hidden. */
+                as_of?: string | null;
+            };
+            header?: never;
+            path: {
+                ticker: string;
+                domain: "filed-notes" | "positions" | "insider-activity" | "dependencies" | "deals" | "consensus";
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_country_context: {
+        parameters: {
+            query?: {
+                /** @description Point-in-time cutoff; records known later are hidden. */
+                as_of?: string | null;
+            };
+            header?: never;
+            path: {
+                geography: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ResearchContext"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_industry_context: {
+        parameters: {
+            query?: {
+                /** @description Point-in-time cutoff; records known later are hidden. */
+                as_of?: string | null;
+            };
+            header?: never;
+            path: {
+                hs_code: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ResearchContext"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_company_context: {
+        parameters: {
+            query?: {
+                /** @description Point-in-time cutoff; records known later are hidden. */
+                as_of?: string | null;
+            };
+            header?: never;
+            path: {
+                ticker: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ResearchContext"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_free_source_alert_trail: {
+        parameters: {
+            query?: {
+                rule?: ("credit_stress" | "trade_exposure" | "patent_status" | "company_graph") | null;
+                outcome?: ("raised" | "throttled" | "revision_ignored" | "baseline" | "not_material" | "no_baseline" | "persisting" | "review_needed" | "below_severity") | null;
+                ticker?: string | null;
+                limit?: number;
+                before_id?: number | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TrailOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    run_free_source_alerts: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["JobSummary"];
+                };
+            };
+        };
+    };
+    get_zero_cost_gate: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+        };
+    };
+    get_domain_gates: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+        };
+    };
+    get_signal_gates: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+        };
+    };
+    get_signal_gate: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                signal_name: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_measured_coverage: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    }[];
+                };
+            };
+        };
+    };
+    get_latest_shadow_report: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
                 };
             };
         };

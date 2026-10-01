@@ -221,6 +221,7 @@ async def test_schedule_follows_the_jobs_config() -> None:
         "earnings_due",
         "etf_look_through",
         "fact_reconcile",
+        "free_source_alerts",
         "fund_characteristics_audit",
         "holiday_refresh",
         "insider_trades",
@@ -233,10 +234,12 @@ async def test_schedule_follows_the_jobs_config() -> None:
         "ownership_13f",
         "portfolio_sync",
         "price_history",
+        "raw_retention",
         "reference_data",
         "sec_xbrl",
         "valuation_refresh",
         "weekly_digest",
+        "zero_cost_gate",
     ]
     job = scheduler.get_job("config:portfolio_sync")
     assert job is not None and "hour='22'" in str(job.trigger) and "minute='30'" in str(job.trigger)

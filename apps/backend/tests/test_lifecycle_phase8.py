@@ -70,6 +70,7 @@ async def stepwise_url() -> AsyncIterator[str]:
         await admin.close()
 
 
+@pytest.mark.db
 async def test_each_rollback_restores_the_schema_its_migration_changed(
     stepwise_url: str, migrated_db: MigratedDatabase
 ) -> None:
@@ -148,6 +149,7 @@ async def _raw_present(pool: asyncpg.Pool, observation_id: int) -> bool:
     )
 
 
+@pytest.mark.db
 async def test_retention_drops_expired_raw_but_keeps_normalized_observation(
     backend_pool: asyncpg.Pool,
 ) -> None:
@@ -225,6 +227,7 @@ def test_retention_policy_refuses_tiny_horizons_and_has_no_indefinite_default() 
 # ---------------------------------------------------------------------------------------
 # Recompute derived metrics from archived observations
 # ---------------------------------------------------------------------------------------
+@pytest.mark.db
 async def test_derived_returns_recompute_identically_after_derived_rows_and_raw_are_gone(
     backend_pool: asyncpg.Pool,
 ) -> None:
@@ -290,6 +293,7 @@ async def _blocked(pool: asyncpg.Pool) -> bool:
     )
 
 
+@pytest.mark.db
 async def test_expired_key_blocks_the_collector_but_keeps_the_last_verified_fact(
     backend_pool: asyncpg.Pool,
 ) -> None:
@@ -338,13 +342,16 @@ async def test_expired_key_blocks_the_collector_but_keeps_the_last_verified_fact
     assert await _blocked(backend_pool) is False
 
 
+@pytest.mark.db
 async def test_removing_a_source_keeps_its_published_observations(
     backend_pool: asyncpg.Pool,
 ) -> None:
     good = await _seed_provider(backend_pool, "world_bank", "indicators")
-    await backend_pool.execute(
-        """insert into public.provider_endpoint_manifest(provider,endpoint,path_template,
-             production_consumer) values('world_bank','indicators','/x','country context')"""
+    assert (
+        await backend_pool.fetchval(
+            "select count(*) from public.provider_endpoint_manifest where provider='world_bank'"
+        )
+        == 1  # seeded by the Phase 0-2 migration
     )
     await backend_pool.execute(
         "delete from public.provider_access where provider='world_bank' and endpoint='indicators'"
@@ -357,11 +364,14 @@ async def test_removing_a_source_keeps_its_published_observations(
         == 0
     )
     assert (
-        await backend_pool.fetchval("select source from public.source_observation where id=$1", good)
+        await backend_pool.fetchval(
+            "select source from public.source_observation where id=$1", good
+        )
         == "world_bank"
     )
 
 
+@pytest.mark.db
 async def test_temporary_failure_does_not_disable_an_endpoint(backend_pool: asyncpg.Pool) -> None:
     await _seed_provider(backend_pool)
     await record_access(

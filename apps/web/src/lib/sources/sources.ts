@@ -22,6 +22,7 @@ export const SOURCE_KIND_LABELS: Record<SourceKind, string> = {
   thesis: "Thesis",
   report: "Report",
   search: "Web search",
+  observation: "Stored observation",
 };
 
 export function sourceKindLabel(kind: string): string {

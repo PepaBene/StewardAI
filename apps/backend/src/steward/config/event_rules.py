@@ -36,6 +36,14 @@ EventType = Literal[
 ]
 
 EVENT_TYPES: tuple[str, ...] = EventType.__args__  # type: ignore[attr-defined]
+# Raised by code from stored observations, never by the news classifier: they stay out of the
+# classification prompt, so adding one does not change the model-facing text.
+SYSTEM_RAISED_EVENT_TYPES: frozenset[str] = frozenset(
+    {"credit_stress", "trade_exposure", "patent_status"}
+)
+CLASSIFIABLE_EVENT_TYPES: tuple[str, ...] = tuple(
+    t for t in EVENT_TYPES if t not in SYSTEM_RAISED_EVENT_TYPES
+)
 
 # Plain-language description of each type, for the classification prompt and the UI.
 EVENT_DESCRIPTIONS: dict[str, str] = {

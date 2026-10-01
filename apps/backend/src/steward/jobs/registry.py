@@ -14,6 +14,7 @@ from steward.earnings.calendar import (
 )
 from steward.earnings.check import earnings_check_handler, thesis_verdicts_handler
 from steward.earnings.reconcile import fact_reconcile_handler
+from steward.free_source_alerts import free_source_alerts_handler
 from steward.fundamentals.collect import sec_xbrl_handler
 from steward.funds.drift import fund_characteristics_audit_handler
 from steward.jobs.runner import JobHandler
@@ -37,6 +38,12 @@ from steward.review.monthly import monthly_review_handler
 from steward.sources.audit import source_audit_handler
 from steward.sources.fund_probes import fund_probes_handler
 from steward.valuation.collect import valuation_refresh_handler
+from steward.verify_sources.jobs import (
+    raw_retention_handler,
+    shadow_report_handler,
+    shadow_snapshot_handler,
+    zero_cost_gate_handler,
+)
 
 JobType = Literal[
     "portfolio_sync",
@@ -70,6 +77,11 @@ JobType = Literal[
     "nport_holdings",
     "fund_probes",
     "fund_characteristics_audit",
+    "free_source_alerts",
+    "shadow_snapshot",
+    "shadow_report",
+    "raw_retention",
+    "zero_cost_gate",
 ]
 
 JOB_HANDLERS: dict[str, JobHandler] = {
@@ -104,4 +116,9 @@ JOB_HANDLERS: dict[str, JobHandler] = {
     "nport_holdings": nport_holdings_handler,
     "fund_probes": fund_probes_handler,
     "fund_characteristics_audit": fund_characteristics_audit_handler,
+    "free_source_alerts": free_source_alerts_handler,
+    "shadow_snapshot": shadow_snapshot_handler,
+    "shadow_report": shadow_report_handler,
+    "raw_retention": raw_retention_handler,
+    "zero_cost_gate": zero_cost_gate_handler,
 }

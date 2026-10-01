@@ -1,0 +1,357 @@
+{
+ "filing_amendments": [
+  {
+   "id": "fa-1",
+   "as_of": "2025-03-01T00:00:00Z",
+   "expect": "1000",
+   "records": [
+    {
+     "value": "1000",
+     "known_at": "2025-02-01T00:00:00Z",
+     "revision": 0
+    },
+    {
+     "value": "1010",
+     "known_at": "2025-06-01T00:00:00Z",
+     "revision": 1
+    }
+   ],
+   "note": "10-K/A filed in June must not leak into a March view"
+  },
+  {
+   "id": "fa-2",
+   "as_of": "2025-07-01T00:00:00Z",
+   "expect": "1010",
+   "records": [
+    {
+     "value": "1000",
+     "known_at": "2025-02-01T00:00:00Z",
+     "revision": 0
+    },
+    {
+     "value": "1010",
+     "known_at": "2025-06-01T00:00:00Z",
+     "revision": 1
+    }
+   ],
+   "note": "after the restatement the amended value is the knowable one"
+  },
+  {
+   "id": "fa-3",
+   "as_of": "2025-01-15T00:00:00Z",
+   "expect": null,
+   "records": [
+    {
+     "value": "1000",
+     "known_at": "2025-02-01T00:00:00Z",
+     "revision": 0
+    }
+   ],
+   "note": "before the first filing nothing was known"
+  },
+  {
+   "id": "fa-4",
+   "as_of": "2025-06-01T00:00:00Z",
+   "expect": "1020",
+   "records": [
+    {
+     "value": "1010",
+     "known_at": "2025-06-01T00:00:00Z",
+     "revision": 1
+    },
+    {
+     "value": "1020",
+     "known_at": "2025-06-01T00:00:00Z",
+     "revision": 2
+    }
+   ],
+   "note": "two amendments accepted the same day: the higher revision wins"
+  }
+ ],
+ "xbrl_dimension_collision": {
+  "instance": "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<xbrli:xbrl xmlns:xbrli=\"http://www.xbrl.org/2003/instance\" xmlns:us-gaap=\"http://fasb.org/us-gaap/2025\" xmlns:xbrldi=\"http://xbrl.org/2006/xbrldi\" xmlns:iso4217=\"http://www.xbrl.org/2003/iso4217\" xmlns:srt=\"http://fasb.org/srt/2025\" xmlns:ex=\"http://example.com/ex\">\n <xbrli:context id=\"FY\"><xbrli:entity><xbrli:identifier scheme=\"http://www.sec.gov/CIK\">0000000001</xbrli:identifier></xbrli:entity><xbrli:period><xbrli:startDate>2025-01-01</xbrli:startDate><xbrli:endDate>2025-12-31</xbrli:endDate></xbrli:period></xbrli:context>\n <xbrli:context id=\"FY_segA\"><xbrli:entity><xbrli:identifier scheme=\"http://www.sec.gov/CIK\">0000000001</xbrli:identifier><xbrli:segment><xbrldi:explicitMember dimension=\"us-gaap:StatementBusinessSegmentsAxis\">ex:SegmentAMember</xbrldi:explicitMember></xbrli:segment></xbrli:entity><xbrli:period><xbrli:startDate>2025-01-01</xbrli:startDate><xbrli:endDate>2025-12-31</xbrli:endDate></xbrli:period></xbrli:context>\n <xbrli:context id=\"FY_prodX\"><xbrli:entity><xbrli:identifier scheme=\"http://www.sec.gov/CIK\">0000000001</xbrli:identifier><xbrli:segment><xbrldi:explicitMember dimension=\"srt:ProductOrServiceAxis\">ex:ProductXMember</xbrldi:explicitMember></xbrli:segment></xbrli:entity><xbrli:period><xbrli:startDate>2025-01-01</xbrli:startDate><xbrli:endDate>2025-12-31</xbrli:endDate></xbrli:period></xbrli:context>\n <xbrli:unit id=\"usd\"><xbrli:measure>iso4217:USD</xbrli:measure></xbrli:unit>\n <us-gaap:Revenues contextRef=\"FY\" unitRef=\"usd\" decimals=\"0\">100</us-gaap:Revenues>\n <us-gaap:Revenues contextRef=\"FY_segA\" unitRef=\"usd\" decimals=\"0\">60</us-gaap:Revenues>\n <us-gaap:Revenues contextRef=\"FY_prodX\" unitRef=\"usd\" decimals=\"0\">55</us-gaap:Revenues>\n</xbrli:xbrl>",
+  "concept": "us-gaap:Revenues",
+  "expect_undimensioned": [
+   "100"
+  ],
+  "expect_dimension_values": [
+   "55",
+   "60"
+  ],
+  "note": "same concept and period under two different axes must never collapse into one figure"
+ },
+ "sec_notes": [
+  {
+   "id": "n-1",
+   "claim": "12.5",
+   "passage": "Note 7 - Customer concentration. One customer represented 12.5% of net revenue in fiscal 2025.",
+   "supported": true
+  },
+  {
+   "id": "n-2",
+   "claim": "12.5",
+   "passage": "Note 7 - Customer concentration. One customer represented 125 of 1,000 units shipped.",
+   "supported": false
+  },
+  {
+   "id": "n-3",
+   "claim": "1250000",
+   "passage": "Goodwill impairment of $1,250,000 was recorded in the fourth quarter (Note 4).",
+   "supported": true
+  },
+  {
+   "id": "n-4",
+   "claim": "40",
+   "passage": "Revenue grew 4.0% year over year.",
+   "supported": false
+  }
+ ],
+ "group_13dg": {
+  "fixture": "control_stakes/sc13da_group.xml",
+  "note": "group members report overlapping beneficial ownership; the filing stake is the largest single figure, never the sum"
+ },
+ "form4_codes": [
+  {
+   "id": "f4-1",
+   "code": "F",
+   "derivative": false,
+   "footnote": null,
+   "expect_class": "tax_withholding",
+   "discretionary": false
+  },
+  {
+   "id": "f4-2",
+   "code": "G",
+   "derivative": false,
+   "footnote": null,
+   "expect_class": "gift",
+   "discretionary": false
+  },
+  {
+   "id": "f4-3",
+   "code": "A",
+   "derivative": false,
+   "footnote": null,
+   "expect_class": "grant_award",
+   "discretionary": false
+  },
+  {
+   "id": "f4-4",
+   "code": "M",
+   "derivative": true,
+   "footnote": null,
+   "expect_class": "option_exercise",
+   "discretionary": false
+  },
+  {
+   "id": "f4-5",
+   "code": "S",
+   "derivative": false,
+   "footnote": "Shares sold to cover tax withholding upon vesting.",
+   "expect_class": "tax_withholding",
+   "discretionary": false
+  },
+  {
+   "id": "f4-6",
+   "code": "S",
+   "derivative": false,
+   "footnote": "Sold under a Rule 10b5-1 trading plan adopted on March 3, 2026.",
+   "expect_class": "open_market_sell",
+   "discretionary": true
+  },
+  {
+   "id": "f4-7",
+   "code": "P",
+   "derivative": false,
+   "footnote": null,
+   "expect_class": "open_market_buy",
+   "discretionary": true
+  },
+  {
+   "id": "f4-8",
+   "code": "P",
+   "derivative": false,
+   "footnote": "Purchased in the issuer's public offering.",
+   "expect_class": "other",
+   "discretionary": false
+  },
+  {
+   "id": "f4-9",
+   "code": "J",
+   "derivative": false,
+   "footnote": null,
+   "expect_class": "other",
+   "discretionary": false
+  }
+ ],
+ "false_mentions": [
+  {
+   "id": "m-1",
+   "counterparty": "Acme Corp",
+   "passage": "Acme Corp accounted for 14% of our revenue and is our largest customer.",
+   "relationship": true
+  },
+  {
+   "id": "m-2",
+   "counterparty": "Acme Corp",
+   "passage": "We compete with Acme Corp in the European market.",
+   "relationship": false
+  },
+  {
+   "id": "m-3",
+   "counterparty": "Acme Corp",
+   "passage": "We have no customers such as Acme Corp that exceed 10% of revenue.",
+   "relationship": false
+  },
+  {
+   "id": "m-4",
+   "counterparty": "Globex",
+   "passage": "Components are purchased from Globex under a multi-year supply agreement.",
+   "relationship": true
+  },
+  {
+   "id": "m-5",
+   "counterparty": "Globex",
+   "passage": "Analysts compared the company with peers including Globex.",
+   "relationship": false
+  },
+  {
+   "id": "m-6",
+   "counterparty": "Initech",
+   "passage": "One large customer accounted for 11% of sales.",
+   "relationship": false
+  }
+ ],
+ "anonymous_customers": [
+  {
+   "id": "a-1",
+   "passage": "One customer accounted for 12% of net sales.",
+   "expect_share": "0.12",
+   "named": false
+  },
+  {
+   "id": "a-2",
+   "passage": "Customer A represented 18.5% of accounts receivable.",
+   "expect_share": "0.185",
+   "named": false
+  },
+  {
+   "id": "a-3",
+   "passage": "Revenue from Acme Corp was 14% of total.",
+   "expect_share": null,
+   "named": true
+  },
+  {
+   "id": "a-4",
+   "passage": "We depend on a major customer for a significant portion of revenue.",
+   "expect_share": null,
+   "named": false
+  }
+ ],
+ "deal_reversals": [
+  {
+   "id": "d-1",
+   "as_of": "2026-03-01T00:00:00Z",
+   "expect": "announced",
+   "events": [
+    {
+     "state": "announced",
+     "known_at": "2026-01-10T00:00:00Z"
+    },
+    {
+     "state": "completed",
+     "known_at": "2026-04-01T00:00:00Z"
+    }
+   ]
+  },
+  {
+   "id": "d-2",
+   "as_of": "2026-05-01T00:00:00Z",
+   "expect": "completed",
+   "events": [
+    {
+     "state": "announced",
+     "known_at": "2026-01-10T00:00:00Z"
+    },
+    {
+     "state": "completed",
+     "known_at": "2026-04-01T00:00:00Z"
+    },
+    {
+     "state": "terminated",
+     "known_at": "2026-08-01T00:00:00Z",
+     "reverses_completed": true
+    }
+   ]
+  },
+  {
+   "id": "d-3",
+   "as_of": "2026-09-01T00:00:00Z",
+   "expect": "reversed",
+   "events": [
+    {
+     "state": "announced",
+     "known_at": "2026-01-10T00:00:00Z"
+    },
+    {
+     "state": "completed",
+     "known_at": "2026-04-01T00:00:00Z"
+    },
+    {
+     "state": "terminated",
+     "known_at": "2026-08-01T00:00:00Z",
+     "reverses_completed": true
+    }
+   ]
+  },
+  {
+   "id": "d-4",
+   "as_of": "2026-09-01T00:00:00Z",
+   "expect": "terminated",
+   "events": [
+    {
+     "state": "announced",
+     "known_at": "2026-01-10T00:00:00Z"
+    },
+    {
+     "state": "terminated",
+     "known_at": "2026-05-01T00:00:00Z"
+    }
+   ]
+  },
+  {
+   "id": "d-5",
+   "as_of": "2025-12-01T00:00:00Z",
+   "expect": "unknown",
+   "events": [
+    {
+     "state": "announced",
+     "known_at": "2026-01-10T00:00:00Z"
+    }
+   ]
+  }
+ ],
+ "stale_consensus": [
+  {
+   "id": "c-1",
+   "as_of": "2026-10-01T00:00:00Z",
+   "published_at": "2026-09-15T00:00:00Z",
+   "max_age_days": 120,
+   "stale": false
+  },
+  {
+   "id": "c-2",
+   "as_of": "2026-10-01T00:00:00Z",
+   "published_at": "2026-04-01T00:00:00Z",
+   "max_age_days": 120,
+   "stale": true
+  },
+  {
+   "id": "c-3",
+   "as_of": "2026-10-01T00:00:00Z",
+   "published_at": null,
+   "max_age_days": 120,
+   "stale": true
+  }
+ ]
+}

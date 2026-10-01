@@ -191,7 +191,8 @@ async def catalog_snapshot(conn: asyncpg.Connection) -> dict[str, str]:
         if not exists:
             continue
         rows = await conn.fetch(
-            f"select row_to_json(t)::text from public.{table} t order by {order}"  # noqa: S608
+            f"select (to_jsonb(t) - 'updated_at' - 'tested_at' - 'last_success_at')::text"  # noqa: S608
+            f" from public.{table} t order by {order}"
         )
         snapshot[f"rows:{table}"] = hashlib.sha256(
             json.dumps([r[0] for r in rows]).encode()

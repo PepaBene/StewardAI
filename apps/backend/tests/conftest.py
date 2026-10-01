@@ -64,7 +64,15 @@ def _blocked(host: object) -> NetworkAccessBlocked:
     )
 
 
+# Credentials and connection strings of the developer's real accounts: tests must neither read
+# nor use them (a stray DATABASE_URL would make "unconfigured" API paths dial a real database).
 PROVIDER_KEY_ENV = (
+    "DATABASE_URL",
+    "SUPABASE_SECRET_KEY",
+    "SUPABASE_JWT_SECRET",
+    "T212_API_KEY",
+    "T212_API_SECRET",
+    "ANTHROPIC_API_KEY",
     "FINNHUB_API_KEY",
     "ALPHA_VANTAGE_API_KEY",
     "EODHD_API_KEY",

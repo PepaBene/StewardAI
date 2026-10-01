@@ -1420,6 +1420,26 @@ class JobsConfig(ConfigModel):
         description="Check iShares/Vanguard fund valuation figures for parser drift. "
         "Default: daily 07:30.",
     )
+    free_source_alerts: JobSchedule = Field(
+        default_factory=lambda: JobSchedule(cron="5 12 * * *"),
+        description="Evaluate credit, trade, patent and graph alerts. Default: daily 12:05.",
+    )
+    shadow_snapshot: JobSchedule = Field(
+        default_factory=lambda: JobSchedule(cron="50 23 * * *", enabled=False),
+        description="Record the daily free-source shadow-run snapshot. Default: daily 23:50.",
+    )
+    shadow_report: JobSchedule = Field(
+        default_factory=lambda: JobSchedule(cron="0 8 * * 1", enabled=False),
+        description="Generate the free-source shadow-run report. Default: Monday 08:00.",
+    )
+    raw_retention: JobSchedule = Field(
+        default_factory=lambda: JobSchedule(cron="15 3 * * *"),
+        description="Prune old raw provider payloads (normalized data stays). Default: 03:15.",
+    )
+    zero_cost_gate: JobSchedule = Field(
+        default_factory=lambda: JobSchedule(cron="20 3 * * *"),
+        description="Verify no paid endpoint or overage is reachable. Default: daily 03:20.",
+    )
     valuation_refresh: JobSchedule = Field(
         default_factory=lambda: JobSchedule(cron="45 7 * * *"),
         description="Fundamentals (SEC XBRL, ESEF) of holdings that filed since the last read "
@@ -1480,6 +1500,11 @@ class JobsConfig(ConfigModel):
             "nport_holdings": self.nport_holdings,
             "fund_probes": self.fund_probes,
             "fund_characteristics_audit": self.fund_characteristics_audit,
+            "free_source_alerts": self.free_source_alerts,
+            "shadow_snapshot": self.shadow_snapshot,
+            "shadow_report": self.shadow_report,
+            "raw_retention": self.raw_retention,
+            "zero_cost_gate": self.zero_cost_gate,
             "etf_look_through": self.etf_look_through,
             "sec_xbrl": self.sec_xbrl,
         }

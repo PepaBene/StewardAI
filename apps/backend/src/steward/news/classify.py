@@ -22,7 +22,11 @@ from anthropic.types import MessageParam
 from pydantic import BaseModel, Field
 
 from steward.ai import Usage
-from steward.config.event_rules import EVENT_DESCRIPTIONS, EVENT_TYPES, EventType
+from steward.config.event_rules import (
+    CLASSIFIABLE_EVENT_TYPES,
+    EVENT_DESCRIPTIONS,
+    EventType,
+)
 from steward.config.jobs import effort_kwargs
 
 
@@ -129,7 +133,7 @@ def has_rumour_language(text: str) -> bool:
 
 
 def _taxonomy() -> str:
-    return "\n".join(f"- {name}: {EVENT_DESCRIPTIONS[name]}" for name in EVENT_TYPES)
+    return "\n".join(f"- {name}: {EVENT_DESCRIPTIONS[name]}" for name in CLASSIFIABLE_EVENT_TYPES)
 
 
 _INTRO = """\

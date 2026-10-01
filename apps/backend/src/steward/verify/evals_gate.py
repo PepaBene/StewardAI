@@ -73,9 +73,9 @@ def _golden_files() -> tuple[Path, ...]:
 
 
 def _event_descriptions() -> str:
-    from steward.config.event_rules import EVENT_DESCRIPTIONS, EVENT_TYPES
+    from steward.config.event_rules import CLASSIFIABLE_EVENT_TYPES, EVENT_DESCRIPTIONS
 
-    return json.dumps({name: EVENT_DESCRIPTIONS[name] for name in EVENT_TYPES})
+    return json.dumps({name: EVENT_DESCRIPTIONS[name] for name in CLASSIFIABLE_EVENT_TYPES})
 
 
 COMPONENTS: tuple[Component, ...] = (

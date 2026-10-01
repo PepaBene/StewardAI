@@ -379,3 +379,19 @@ def anonymous_share(passage: str) -> Decimal | None:
         return None
     match = _PERCENT.search(passage)
     return Decimal(match.group(1)) / 100 if match else None
+
+
+_NUMBER = re.compile(r"\d[\d,]*(?:\.\d+)?")
+
+
+def passage_supports_number(passage: str, claim: Decimal) -> bool:
+    """Whether the quoted passage states the claimed number (thousands separators and a
+    trailing %/currency sign ignored).  A number that merely looks similar ("125" for "12.5")
+    is not support."""
+    for token in _NUMBER.findall(passage):
+        try:
+            if Decimal(token.replace(",", "")) == claim:
+                return True
+        except ArithmeticError:
+            continue
+    return False

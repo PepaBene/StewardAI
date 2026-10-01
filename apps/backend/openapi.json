@@ -1208,27 +1208,111 @@
         ],
         "summary": "Get Source Access",
         "operationId": "get_source_access",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "provider",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Provider"
+            }
+          },
+          {
+            "name": "endpoint",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Endpoint"
+            }
+          },
+          {
+            "name": "state",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "State"
+            }
+          },
+          {
+            "name": "denied_only",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "description": "Only endpoints with a recorded denial.",
+              "default": false,
+              "title": "Denied Only"
+            },
+            "description": "Only endpoints with a recorded denial."
+          },
+          {
+            "name": "stale_after_hours",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 8760,
+              "minimum": 1,
+              "default": 72,
+              "title": "Stale After Hours"
+            }
+          }
+        ],
         "responses": {
           "200": {
             "description": "Successful Response",
             "content": {
               "application/json": {
                 "schema": {
+                  "type": "array",
                   "items": {
                     "$ref": "#/components/schemas/SourceAccess"
                   },
-                  "type": "array",
                   "title": "Response Get Source Access"
                 }
               }
             }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
           }
-        },
-        "security": [
-          {
-            "HTTPBearer": []
-          }
-        ]
+        }
       }
     },
     "/sources/usage": {
@@ -1316,6 +1400,175 @@
                   "type": "null"
                 }
               ],
+              "description": "Source/provider.",
+              "title": "Provider"
+            },
+            "description": "Source/provider."
+          },
+          {
+            "name": "dataset",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Dataset or metric/series id.",
+              "title": "Dataset"
+            },
+            "description": "Dataset or metric/series id."
+          },
+          {
+            "name": "entity_key",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Security or geography key.",
+              "title": "Entity Key"
+            },
+            "description": "Security or geography key."
+          },
+          {
+            "name": "state",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "State"
+            }
+          },
+          {
+            "name": "period",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Entries whose span contains it.",
+              "title": "Period"
+            },
+            "description": "Entries whose span contains it."
+          },
+          {
+            "name": "entity_kind",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "enum": [
+                    "security",
+                    "geography",
+                    "other"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Entity Kind"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/DataCoverage"
+                  },
+                  "title": "Response Get Data Coverage"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/data/coverage/summary": {
+      "get": {
+        "tags": [
+          "data"
+        ],
+        "summary": "Get Data Coverage Summary",
+        "operationId": "get_data_coverage_summary",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "group_by",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "enum": [
+                "security",
+                "geography",
+                "metric",
+                "period",
+                "source",
+                "state"
+              ],
+              "type": "string",
+              "title": "Group By"
+            }
+          },
+          {
+            "name": "provider",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
               "title": "Provider"
             }
           },
@@ -1350,6 +1603,39 @@
               ],
               "title": "Entity Key"
             }
+          },
+          {
+            "name": "state",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "State"
+            }
+          },
+          {
+            "name": "period",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Period"
+            }
           }
         ],
         "responses": {
@@ -1358,11 +1644,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "array",
-                  "items": {
-                    "$ref": "#/components/schemas/DataCoverage"
-                  },
-                  "title": "Response Get Data Coverage"
+                  "$ref": "#/components/schemas/CoverageSummary"
                 }
               }
             }
@@ -10101,6 +10383,851 @@
           }
         }
       }
+    },
+    "/holdings/{ticker}/data-context": {
+      "get": {
+        "tags": [
+          "holdings"
+        ],
+        "summary": "Get Holding Data Context",
+        "description": "Global financial history, country/trade exposure, business network, patents, source\ndisagreements, coverage gaps and primary-versus-vendor provenance of one holding.",
+        "operationId": "get_holding_data_context",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "ticker",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9._-]{1,32}$",
+              "title": "Ticker"
+            }
+          },
+          {
+            "name": "as_of",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date-time"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Point-in-time cutoff; records known later are hidden.",
+              "title": "As Of"
+            },
+            "description": "Point-in-time cutoff; records known later are hidden."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HoldingDataContext"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/portfolio/data-context": {
+      "get": {
+        "tags": [
+          "portfolio"
+        ],
+        "summary": "Get Portfolio Data Context",
+        "description": "Macro sensitivities (reported versus inferred), country and product concentration,\nadjusted-return coverage and fund overlap. Every ratio carries its denominator; only\nmapped holdings are rolled up.",
+        "operationId": "get_portfolio_data_context",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "as_of",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "As Of"
+            }
+          },
+          {
+            "name": "series_limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 100,
+              "minimum": 1,
+              "default": 20,
+              "title": "Series Limit"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PortfolioDataContext"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/holdings/{ticker}/evidence-summary": {
+      "get": {
+        "tags": [
+          "holdings"
+        ],
+        "summary": "Get Evidence Summary",
+        "description": "Filed-note evidence, separate control / institutional / fund positions, classified\ninsider activity, confirmed dependencies, deal states and consensus vintages, each with\nits source passage, known-at date and coverage reason.",
+        "operationId": "get_evidence_summary",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "ticker",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9._-]{1,32}$",
+              "title": "Ticker"
+            }
+          },
+          {
+            "name": "as_of",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date-time"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Point-in-time cutoff; records known later are hidden.",
+              "title": "As Of"
+            },
+            "description": "Point-in-time cutoff; records known later are hidden."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EvidenceSummary"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/holdings/{ticker}/evidence/{domain}": {
+      "get": {
+        "tags": [
+          "holdings"
+        ],
+        "summary": "Get Evidence Domain",
+        "description": "One evidence domain of `evidence-summary` on its own.",
+        "operationId": "get_evidence_domain",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "ticker",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9._-]{1,32}$",
+              "title": "Ticker"
+            }
+          },
+          {
+            "name": "domain",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "enum": [
+                "filed-notes",
+                "positions",
+                "insider-activity",
+                "dependencies",
+                "deals",
+                "consensus"
+              ],
+              "type": "string",
+              "title": "Domain"
+            }
+          },
+          {
+            "name": "as_of",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date-time"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Point-in-time cutoff; records known later are hidden.",
+              "title": "As Of"
+            },
+            "description": "Point-in-time cutoff; records known later are hidden."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/research-context/country/{geography}": {
+      "get": {
+        "tags": [
+          "research"
+        ],
+        "summary": "Get Country Context",
+        "operationId": "get_country_context",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "geography",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9]{2,5}$",
+              "title": "Geography"
+            }
+          },
+          {
+            "name": "as_of",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date-time"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Point-in-time cutoff; records known later are hidden.",
+              "title": "As Of"
+            },
+            "description": "Point-in-time cutoff; records known later are hidden."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResearchContext"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/research-context/industry/{hs_code}": {
+      "get": {
+        "tags": [
+          "research"
+        ],
+        "summary": "Get Industry Context",
+        "operationId": "get_industry_context",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "hs_code",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[0-9]{2,6}$",
+              "title": "Hs Code"
+            }
+          },
+          {
+            "name": "as_of",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date-time"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Point-in-time cutoff; records known later are hidden.",
+              "title": "As Of"
+            },
+            "description": "Point-in-time cutoff; records known later are hidden."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResearchContext"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/research-context/company/{ticker}": {
+      "get": {
+        "tags": [
+          "research"
+        ],
+        "summary": "Get Company Context",
+        "operationId": "get_company_context",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "ticker",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9._-]{1,32}$",
+              "title": "Ticker"
+            }
+          },
+          {
+            "name": "as_of",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date-time"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Point-in-time cutoff; records known later are hidden.",
+              "title": "As Of"
+            },
+            "description": "Point-in-time cutoff; records known later are hidden."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResearchContext"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/alerts/free-source-trail": {
+      "get": {
+        "tags": [
+          "alerts"
+        ],
+        "summary": "Get Free Source Alert Trail",
+        "description": "Newest first. Silent outcomes (value below threshold, identical re-fetch) are not\nstored; they appear only in the job step detail.",
+        "operationId": "get_free_source_alert_trail",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "rule",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "enum": [
+                    "credit_stress",
+                    "trade_exposure",
+                    "patent_status",
+                    "company_graph"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Rule"
+            }
+          },
+          {
+            "name": "outcome",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "enum": [
+                    "raised",
+                    "throttled",
+                    "revision_ignored",
+                    "baseline",
+                    "not_material",
+                    "no_baseline",
+                    "persisting",
+                    "review_needed",
+                    "below_severity"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Outcome"
+            }
+          },
+          {
+            "name": "ticker",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "pattern": "^[A-Za-z0-9._-]{1,32}$"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Ticker"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 500,
+              "minimum": 1,
+              "default": 100,
+              "title": "Limit"
+            }
+          },
+          {
+            "name": "before_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer",
+                  "minimum": 1
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Before Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TrailOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/jobs/free-source-alerts": {
+      "post": {
+        "tags": [
+          "jobs"
+        ],
+        "summary": "Run Free Source Alerts",
+        "description": "Evaluate the free-source alert rules now.",
+        "operationId": "run_free_source_alerts",
+        "responses": {
+          "202": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/JobSummary"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/verification/zero-cost-gate": {
+      "get": {
+        "tags": [
+          "verification"
+        ],
+        "summary": "Get Zero Cost Gate",
+        "description": "Read-only audit of the endpoint manifest: nothing paid is reachable.",
+        "operationId": "get_zero_cost_gate",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "type": "object",
+                  "title": "Response Get Zero Cost Gate"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/verification/domain-gates": {
+      "get": {
+        "tags": [
+          "verification"
+        ],
+        "summary": "Get Domain Gates",
+        "description": "Per-domain reconciliation gate and which conclusions each domain unlocks.",
+        "operationId": "get_domain_gates",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "type": "object",
+                  "title": "Response Get Domain Gates"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/verification/signals": {
+      "get": {
+        "tags": [
+          "verification"
+        ],
+        "summary": "Get Signal Gates",
+        "operationId": "get_signal_gates",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "type": "object",
+                  "title": "Response Get Signal Gates"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/verification/signals/{signal_name}": {
+      "get": {
+        "tags": [
+          "verification"
+        ],
+        "summary": "Get Signal Gate",
+        "operationId": "get_signal_gate",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "signal_name",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[a-z][a-z0-9_]{0,63}$",
+              "title": "Signal Name"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "title": "Response Get Signal Gate"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/verification/coverage": {
+      "get": {
+        "tags": [
+          "verification"
+        ],
+        "summary": "Get Measured Coverage",
+        "description": "Measured coverage by jurisdiction and metric (absent = no coverage, never zero).",
+        "operationId": "get_measured_coverage",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "additionalProperties": true,
+                    "type": "object"
+                  },
+                  "type": "array",
+                  "title": "Response Get Measured Coverage"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/verification/shadow-report": {
+      "get": {
+        "tags": [
+          "verification"
+        ],
+        "summary": "Get Latest Shadow Report",
+        "operationId": "get_latest_shadow_report",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "type": "object",
+                  "title": "Response Get Latest Shadow Report"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
     }
   },
   "components": {
@@ -10275,6 +11402,27 @@
           "gaps"
         ],
         "title": "ActivityCoverage"
+      },
+      "AdjustedReturnCoverage": {
+        "properties": {
+          "bases": {
+            "items": {
+              "$ref": "#/components/schemas/ReturnBasisCoverage"
+            },
+            "type": "array",
+            "title": "Bases"
+          },
+          "note": {
+            "type": "string",
+            "title": "Note"
+          }
+        },
+        "type": "object",
+        "required": [
+          "bases",
+          "note"
+        ],
+        "title": "AdjustedReturnCoverage"
       },
       "AggregateReport": {
         "properties": {
@@ -10710,6 +11858,9 @@
                   "analyst_rating",
                   "delisting",
                   "entity_status",
+                  "credit_stress",
+                  "trade_exposure",
+                  "patent_status",
                   "other"
                 ]
               },
@@ -11485,7 +12636,12 @@
                 "control_stakes",
                 "nport_holdings",
                 "fund_probes",
-                "fund_characteristics_audit"
+                "fund_characteristics_audit",
+                "free_source_alerts",
+                "shadow_snapshot",
+                "shadow_report",
+                "raw_retention",
+                "zero_cost_gate"
               ]
             },
             "type": "array",
@@ -11528,7 +12684,12 @@
                 "control_stakes",
                 "nport_holdings",
                 "fund_probes",
-                "fund_characteristics_audit"
+                "fund_characteristics_audit",
+                "free_source_alerts",
+                "shadow_snapshot",
+                "shadow_report",
+                "raw_retention",
+                "zero_cost_gate"
               ]
             },
             "type": "object",
@@ -12213,6 +13374,159 @@
           "text"
         ],
         "title": "CitedSentence"
+      },
+      "Claim": {
+        "properties": {
+          "claim_id": {
+            "type": "string",
+            "title": "Claim Id",
+            "description": "Stable id such as macro:123; cite it, never the number."
+          },
+          "domain": {
+            "type": "string",
+            "enum": [
+              "macro",
+              "trade",
+              "financial",
+              "forward",
+              "company_research",
+              "business_network",
+              "patents"
+            ],
+            "title": "Domain"
+          },
+          "subject": {
+            "type": "string",
+            "title": "Subject"
+          },
+          "metric": {
+            "type": "string",
+            "title": "Metric"
+          },
+          "label": {
+            "type": "string",
+            "title": "Label"
+          },
+          "value": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Value"
+          },
+          "text_value": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Text Value"
+          },
+          "unit": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Unit"
+          },
+          "currency": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Currency"
+          },
+          "period": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Period"
+          },
+          "known_as_of": {
+            "type": "string",
+            "format": "date",
+            "title": "Known As Of",
+            "description": "Date the record became known to the app."
+          },
+          "source": {
+            "type": "string",
+            "title": "Source"
+          },
+          "provenance": {
+            "type": "string",
+            "enum": [
+              "primary",
+              "vendor",
+              "owner",
+              "community",
+              "unclassified"
+            ],
+            "title": "Provenance"
+          },
+          "source_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Url"
+          },
+          "note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note"
+          }
+        },
+        "type": "object",
+        "required": [
+          "claim_id",
+          "domain",
+          "subject",
+          "metric",
+          "label",
+          "value",
+          "unit",
+          "period",
+          "known_as_of",
+          "source",
+          "provenance",
+          "source_url"
+        ],
+        "title": "Claim"
       },
       "ClaimCheckSummary": {
         "properties": {
@@ -13165,6 +14479,266 @@
         ],
         "title": "ConfigVersionMeta"
       },
+      "Consensus": {
+        "properties": {
+          "coverage": {
+            "$ref": "#/components/schemas/SectionCoverage"
+          },
+          "series": {
+            "items": {
+              "$ref": "#/components/schemas/ConsensusSeries"
+            },
+            "type": "array",
+            "title": "Series"
+          },
+          "issuer_published": {
+            "items": {
+              "$ref": "#/components/schemas/IrConsensusRelease"
+            },
+            "type": "array",
+            "title": "Issuer Published"
+          },
+          "note": {
+            "type": "string",
+            "title": "Note",
+            "default": "Public analyst consensus as published, one row per vintage. Provider earnings-calendar estimates are a different kind and are not shown here."
+          }
+        },
+        "type": "object",
+        "required": [
+          "coverage",
+          "series",
+          "issuer_published"
+        ],
+        "title": "Consensus"
+      },
+      "ConsensusSeries": {
+        "properties": {
+          "metric": {
+            "type": "string",
+            "title": "Metric"
+          },
+          "fiscal_period": {
+            "type": "string",
+            "title": "Fiscal Period"
+          },
+          "vintages": {
+            "items": {
+              "$ref": "#/components/schemas/ConsensusVintage"
+            },
+            "type": "array",
+            "title": "Vintages",
+            "description": "Oldest first; none overwritten."
+          },
+          "revision_since_previous": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Revision Since Previous",
+            "description": "Latest value minus the previous vintage's; null unless both are known."
+          },
+          "revision_inputs": {
+            "items": {
+              "type": "integer"
+            },
+            "type": "array",
+            "title": "Revision Inputs"
+          }
+        },
+        "type": "object",
+        "required": [
+          "metric",
+          "fiscal_period",
+          "vintages",
+          "revision_since_previous",
+          "revision_inputs"
+        ],
+        "title": "ConsensusSeries"
+      },
+      "ConsensusVintage": {
+        "properties": {
+          "observation_id": {
+            "type": "integer",
+            "title": "Observation Id"
+          },
+          "provider": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Provider"
+          },
+          "vintage": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Vintage"
+          },
+          "value": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Value"
+          },
+          "low": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Low"
+          },
+          "high": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "High"
+          },
+          "analyst_count": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Analyst Count"
+          },
+          "currency": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Currency"
+          },
+          "published_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Published At"
+          },
+          "known_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Known At"
+          },
+          "source_url": {
+            "type": "string",
+            "title": "Source Url"
+          },
+          "passage": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Passage"
+          },
+          "passage_reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Passage Reason"
+          }
+        },
+        "type": "object",
+        "required": [
+          "observation_id",
+          "provider",
+          "vintage",
+          "value",
+          "low",
+          "high",
+          "analyst_count",
+          "currency",
+          "published_at",
+          "known_at",
+          "source_url",
+          "passage",
+          "passage_reason"
+        ],
+        "title": "ConsensusVintage"
+      },
+      "ContextGap": {
+        "properties": {
+          "domain": {
+            "type": "string",
+            "title": "Domain"
+          },
+          "reason": {
+            "type": "string",
+            "title": "Reason"
+          }
+        },
+        "type": "object",
+        "required": [
+          "domain",
+          "reason"
+        ],
+        "title": "ContextGap"
+      },
       "ContextPoint": {
         "properties": {
           "series_id": {
@@ -13376,6 +14950,32 @@
           "gap"
         ],
         "title": "ContributionReport"
+      },
+      "ControlChannel": {
+        "properties": {
+          "channel": {
+            "type": "string",
+            "const": "beneficial_ownership_13dg",
+            "title": "Channel",
+            "default": "beneficial_ownership_13dg"
+          },
+          "coverage": {
+            "$ref": "#/components/schemas/SectionCoverage"
+          },
+          "stakes": {
+            "items": {
+              "$ref": "#/components/schemas/StakeItem"
+            },
+            "type": "array",
+            "title": "Stakes"
+          }
+        },
+        "type": "object",
+        "required": [
+          "coverage",
+          "stakes"
+        ],
+        "title": "ControlChannel"
       },
       "ControlStakeOut": {
         "properties": {
@@ -14065,6 +15665,163 @@
         ],
         "title": "Coverage"
       },
+      "CoverageEntry": {
+        "properties": {
+          "provider": {
+            "type": "string",
+            "title": "Provider"
+          },
+          "dataset": {
+            "type": "string",
+            "title": "Dataset"
+          },
+          "entity_key": {
+            "type": "string",
+            "title": "Entity Key"
+          },
+          "state": {
+            "type": "string",
+            "title": "State"
+          },
+          "latest_period": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Latest Period"
+          },
+          "expected_periods": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Expected Periods"
+          },
+          "available_periods": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Available Periods"
+          },
+          "checked_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Checked At"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
+          }
+        },
+        "type": "object",
+        "required": [
+          "provider",
+          "dataset",
+          "entity_key",
+          "state",
+          "latest_period",
+          "expected_periods",
+          "available_periods",
+          "checked_at",
+          "reason"
+        ],
+        "title": "CoverageEntry"
+      },
+      "CoverageGroup": {
+        "properties": {
+          "group_by": {
+            "type": "string",
+            "title": "Group By"
+          },
+          "key": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Key"
+          },
+          "entries": {
+            "type": "integer",
+            "title": "Entries"
+          },
+          "by_state": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "type": "object",
+            "title": "By State"
+          },
+          "expected_periods": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Expected Periods",
+            "description": "Sum of known expected periods; null if no entry states one."
+          },
+          "available_periods": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Available Periods"
+          },
+          "entries_with_expected": {
+            "type": "integer",
+            "title": "Entries With Expected",
+            "description": "Entries that state an expected-period count (the ratio's denominator)."
+          },
+          "available_entries": {
+            "type": "integer",
+            "title": "Available Entries"
+          }
+        },
+        "type": "object",
+        "required": [
+          "group_by",
+          "key",
+          "entries",
+          "by_state",
+          "expected_periods",
+          "available_periods",
+          "entries_with_expected",
+          "available_entries"
+        ],
+        "title": "CoverageGroup"
+      },
       "CoverageLedger": {
         "properties": {
           "entries": {
@@ -14096,6 +15853,113 @@
           "flagged_benchmarks"
         ],
         "title": "CoverageLedger"
+      },
+      "CoverageSummary": {
+        "properties": {
+          "group_by": {
+            "type": "string",
+            "title": "Group By"
+          },
+          "total_entries": {
+            "type": "integer",
+            "title": "Total Entries"
+          },
+          "groups": {
+            "items": {
+              "$ref": "#/components/schemas/CoverageGroup"
+            },
+            "type": "array",
+            "title": "Groups"
+          },
+          "note": {
+            "type": "string",
+            "title": "Note",
+            "default": "Counts are of stored coverage-ledger entries, not of the global universe. An entity with no ledger entry is unknown, not covered or uncovered."
+          }
+        },
+        "type": "object",
+        "required": [
+          "group_by",
+          "total_entries",
+          "groups"
+        ],
+        "title": "CoverageSummary"
+      },
+      "CreditStressRule": {
+        "properties": {
+          "key": {
+            "type": "string",
+            "pattern": "^[a-z0-9_]{1,60}$",
+            "title": "Key"
+          },
+          "label": {
+            "type": "string",
+            "maxLength": 120,
+            "minLength": 1,
+            "title": "Label"
+          },
+          "series_id": {
+            "type": "string",
+            "maxLength": 60,
+            "minLength": 1,
+            "title": "Series Id",
+            "description": "`macro_observation.series_id`: a FRED/ECB series key from the jobs config or a BIS series key (e.g. debt_service)."
+          },
+          "source": {
+            "type": "string",
+            "enum": [
+              "any",
+              "fred",
+              "alfred",
+              "ecb",
+              "eurostat",
+              "bis",
+              "oecd"
+            ],
+            "title": "Source",
+            "default": "any"
+          },
+          "geography": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 20
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Geography"
+          },
+          "direction": {
+            "type": "string",
+            "enum": [
+              "above",
+              "below"
+            ],
+            "title": "Direction",
+            "default": "above"
+          },
+          "threshold": {
+            "type": "number",
+            "title": "Threshold"
+          },
+          "enabled": {
+            "type": "boolean",
+            "title": "Enabled",
+            "default": true
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "key",
+          "label",
+          "series_id",
+          "threshold"
+        ],
+        "title": "CreditStressRule",
+        "description": "A threshold on one stored macro series. Fires once, when a genuinely new observation\n(a later period than any known before it) is beyond the threshold and the previous\nperiod was not; a revision of an old period never fires."
       },
       "DailyFallback": {
         "properties": {
@@ -14212,6 +16076,66 @@
               }
             ],
             "title": "Reason"
+          },
+          "entity_kind": {
+            "type": "string",
+            "enum": [
+              "security",
+              "geography",
+              "other"
+            ],
+            "title": "Entity Kind",
+            "default": "other"
+          },
+          "metric": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Metric"
+          },
+          "source": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source"
+          },
+          "coverage_ratio": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Coverage Ratio",
+            "description": "available_periods / expected_periods; null unless both are known and the expected count is positive."
+          },
+          "age_days": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Age Days",
+            "description": "Days from latest_period to today; null without a period."
           }
         },
         "type": "object",
@@ -14248,6 +16172,417 @@
           "count"
         ],
         "title": "DayCount"
+      },
+      "DealEvent": {
+        "properties": {
+          "event_id": {
+            "type": "integer",
+            "title": "Event Id"
+          },
+          "event_type": {
+            "type": "string",
+            "title": "Event Type"
+          },
+          "event_state": {
+            "type": "string",
+            "title": "Event State"
+          },
+          "status": {
+            "type": "string",
+            "title": "Status"
+          },
+          "announced_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Announced At"
+          },
+          "effective_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Effective At"
+          },
+          "known_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Known At"
+          },
+          "counterparty_key": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Counterparty Key"
+          },
+          "source": {
+            "type": "string",
+            "title": "Source"
+          },
+          "source_url": {
+            "type": "string",
+            "title": "Source Url"
+          },
+          "passage": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Passage"
+          },
+          "passage_reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Passage Reason"
+          },
+          "terms": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Terms"
+          }
+        },
+        "type": "object",
+        "required": [
+          "event_id",
+          "event_type",
+          "event_state",
+          "status",
+          "announced_at",
+          "effective_at",
+          "known_at",
+          "counterparty_key",
+          "source",
+          "source_url",
+          "passage",
+          "passage_reason",
+          "terms"
+        ],
+        "title": "DealEvent"
+      },
+      "DealState": {
+        "properties": {
+          "deal_key": {
+            "type": "string",
+            "title": "Deal Key"
+          },
+          "counterparty_key": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Counterparty Key"
+          },
+          "current_state": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Current State",
+            "description": "State of the latest confirmed event by the cutoff; null when none is."
+          },
+          "state_basis": {
+            "type": "string",
+            "title": "State Basis"
+          },
+          "events": {
+            "items": {
+              "$ref": "#/components/schemas/DealEvent"
+            },
+            "type": "array",
+            "title": "Events"
+          }
+        },
+        "type": "object",
+        "required": [
+          "deal_key",
+          "counterparty_key",
+          "current_state",
+          "state_basis",
+          "events"
+        ],
+        "title": "DealState"
+      },
+      "Deals": {
+        "properties": {
+          "coverage": {
+            "$ref": "#/components/schemas/SectionCoverage"
+          },
+          "deals": {
+            "items": {
+              "$ref": "#/components/schemas/DealState"
+            },
+            "type": "array",
+            "title": "Deals"
+          }
+        },
+        "type": "object",
+        "required": [
+          "coverage",
+          "deals"
+        ],
+        "title": "Deals"
+      },
+      "Dependencies": {
+        "properties": {
+          "coverage": {
+            "$ref": "#/components/schemas/SectionCoverage"
+          },
+          "dependencies": {
+            "items": {
+              "$ref": "#/components/schemas/Dependency"
+            },
+            "type": "array",
+            "title": "Dependencies"
+          },
+          "excluded_unconfirmed": {
+            "type": "integer",
+            "title": "Excluded Unconfirmed"
+          },
+          "note": {
+            "type": "string",
+            "title": "Note",
+            "default": "Only confirmed relationships are listed. Suggested and disputed candidates, and legacy edges without a known-at date, are excluded; an anonymous counterparty is never given a name and a missing share stays null."
+          }
+        },
+        "type": "object",
+        "required": [
+          "coverage",
+          "dependencies",
+          "excluded_unconfirmed"
+        ],
+        "title": "Dependencies"
+      },
+      "Dependency": {
+        "properties": {
+          "kind": {
+            "type": "string",
+            "enum": [
+              "graph_edge",
+              "customer_supplier_disclosure"
+            ],
+            "title": "Kind"
+          },
+          "edge_id": {
+            "type": "integer",
+            "title": "Edge Id"
+          },
+          "counterparty_key": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Counterparty Key"
+          },
+          "counterparty_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Counterparty Name"
+          },
+          "anonymous_counterparty": {
+            "type": "boolean",
+            "title": "Anonymous Counterparty",
+            "default": false
+          },
+          "relationship": {
+            "type": "string",
+            "title": "Relationship"
+          },
+          "direction": {
+            "type": "string",
+            "title": "Direction"
+          },
+          "reported_share": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reported Share"
+          },
+          "share_basis": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Share Basis"
+          },
+          "fiscal_period": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fiscal Period"
+          },
+          "valid_from": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Valid From"
+          },
+          "valid_to": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Valid To"
+          },
+          "evidence_tier": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Evidence Tier"
+          },
+          "source": {
+            "type": "string",
+            "title": "Source"
+          },
+          "source_url": {
+            "type": "string",
+            "title": "Source Url"
+          },
+          "passage": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Passage"
+          },
+          "passage_reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Passage Reason"
+          },
+          "evidence_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Evidence Id"
+          },
+          "known_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Known At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "kind",
+          "edge_id",
+          "counterparty_key",
+          "counterparty_name",
+          "relationship",
+          "direction",
+          "reported_share",
+          "share_basis",
+          "fiscal_period",
+          "valid_from",
+          "valid_to",
+          "evidence_tier",
+          "source",
+          "source_url",
+          "passage",
+          "passage_reason",
+          "evidence_id",
+          "known_at"
+        ],
+        "title": "Dependency"
       },
       "DiffChange": {
         "properties": {
@@ -14830,6 +17165,171 @@
           "buckets"
         ],
         "title": "DimensionAllocation"
+      },
+      "Disagreement": {
+        "properties": {
+          "conflict_id": {
+            "type": "integer",
+            "title": "Conflict Id"
+          },
+          "metric": {
+            "type": "string",
+            "title": "Metric"
+          },
+          "status": {
+            "type": "string",
+            "title": "Status"
+          },
+          "tolerance": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tolerance"
+          },
+          "difference": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Difference"
+          },
+          "preferred_source": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Preferred Source"
+          },
+          "preferred_provenance": {
+            "type": "string",
+            "enum": [
+              "primary",
+              "vendor",
+              "owner",
+              "community",
+              "unclassified"
+            ],
+            "title": "Preferred Provenance"
+          },
+          "preferred_value": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Preferred Value"
+          },
+          "preferred_known_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Preferred Known At"
+          },
+          "alternative_source": {
+            "type": "string",
+            "title": "Alternative Source"
+          },
+          "alternative_provenance": {
+            "type": "string",
+            "enum": [
+              "primary",
+              "vendor",
+              "owner",
+              "community",
+              "unclassified"
+            ],
+            "title": "Alternative Provenance"
+          },
+          "alternative_value": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Alternative Value"
+          },
+          "alternative_known_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Alternative Known At"
+          },
+          "period_end": {
+            "type": "string",
+            "format": "date",
+            "title": "Period End"
+          },
+          "resolution": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Resolution"
+          }
+        },
+        "type": "object",
+        "required": [
+          "conflict_id",
+          "metric",
+          "status",
+          "tolerance",
+          "difference",
+          "preferred_source",
+          "preferred_provenance",
+          "preferred_value",
+          "preferred_known_at",
+          "alternative_source",
+          "alternative_provenance",
+          "alternative_value",
+          "alternative_known_at",
+          "period_end",
+          "resolution"
+        ],
+        "title": "Disagreement"
       },
       "DisputedStory": {
         "properties": {
@@ -16032,6 +18532,9 @@
                 "analyst_rating",
                 "delisting",
                 "entity_status",
+                "credit_stress",
+                "trade_exposure",
+                "patent_status",
                 "other"
               ]
             },
@@ -16068,6 +18571,9 @@
                 "analyst_rating",
                 "delisting",
                 "entity_status",
+                "credit_stress",
+                "trade_exposure",
+                "patent_status",
                 "other"
               ]
             },
@@ -16125,6 +18631,9 @@
             "title": "Macro Surprise Bands",
             "description": "Per macro series key: a new release that moves more than this against the previous one is a macro surprise (in the series' own unit; 0: any change, e.g. a policy rate set exactly; fed_funds is the daily effective rate, which drifts, so it needs a band). Evaluated only on release days."
           },
+          "free_source_alerts": {
+            "$ref": "#/components/schemas/FreeSourceAlertsConfig"
+          },
           "announcement_types": {
             "items": {
               "$ref": "#/components/schemas/AnnouncementRule"
@@ -16154,6 +18663,9 @@
                 "analyst_rating",
                 "delisting",
                 "entity_status",
+                "credit_stress",
+                "trade_exposure",
+                "patent_status",
                 "other"
               ]
             },
@@ -16250,6 +18762,9 @@
               "analyst_rating",
               "delisting",
               "entity_status",
+              "credit_stress",
+              "trade_exposure",
+              "patent_status",
               "other"
             ],
             "title": "Id"
@@ -16387,6 +18902,57 @@
           "context"
         ],
         "title": "EvidenceLink"
+      },
+      "EvidenceSummary": {
+        "properties": {
+          "ticker": {
+            "type": "string",
+            "title": "Ticker"
+          },
+          "known_as_of": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Known As Of"
+          },
+          "filed_notes": {
+            "$ref": "#/components/schemas/FiledNotes"
+          },
+          "positions": {
+            "$ref": "#/components/schemas/Positions"
+          },
+          "insider_activity": {
+            "$ref": "#/components/schemas/Insider"
+          },
+          "dependencies": {
+            "$ref": "#/components/schemas/Dependencies"
+          },
+          "deals": {
+            "$ref": "#/components/schemas/Deals"
+          },
+          "consensus": {
+            "$ref": "#/components/schemas/Consensus"
+          },
+          "gaps": {
+            "items": {
+              "$ref": "#/components/schemas/Gap"
+            },
+            "type": "array",
+            "title": "Gaps"
+          }
+        },
+        "type": "object",
+        "required": [
+          "ticker",
+          "known_as_of",
+          "filed_notes",
+          "positions",
+          "insider_activity",
+          "dependencies",
+          "deals",
+          "consensus",
+          "gaps"
+        ],
+        "title": "EvidenceSummary"
       },
       "ExchangeCalendar": {
         "properties": {
@@ -16955,6 +19521,79 @@
           "id"
         ],
         "title": "ExposureResult"
+      },
+      "ExposureRow": {
+        "properties": {
+          "key": {
+            "type": "string",
+            "title": "Key"
+          },
+          "hs_revision": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Hs Revision"
+          },
+          "exposed_value": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              }
+            ],
+            "title": "Exposed Value"
+          },
+          "share_of_portfolio": {
+            "$ref": "#/components/schemas/Share"
+          },
+          "share_of_mapped": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Share"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "by_basis": {
+            "additionalProperties": {
+              "anyOf": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "string",
+                  "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+                }
+              ]
+            },
+            "type": "object",
+            "title": "By Basis"
+          },
+          "holdings": {
+            "type": "integer",
+            "title": "Holdings"
+          }
+        },
+        "type": "object",
+        "required": [
+          "key",
+          "exposed_value",
+          "share_of_portfolio",
+          "share_of_mapped",
+          "by_basis",
+          "holdings"
+        ],
+        "title": "ExposureRow"
       },
       "ExposureView": {
         "properties": {
@@ -17804,6 +20443,397 @@
         ],
         "title": "FeedbackOut"
       },
+      "FiledNote": {
+        "properties": {
+          "fact_id": {
+            "type": "integer",
+            "title": "Fact Id"
+          },
+          "concept": {
+            "type": "string",
+            "title": "Concept"
+          },
+          "label": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Label"
+          },
+          "period_end": {
+            "type": "string",
+            "format": "date",
+            "title": "Period End"
+          },
+          "fiscal_period": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fiscal Period"
+          },
+          "accession": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Accession"
+          },
+          "form": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Form"
+          },
+          "source": {
+            "type": "string",
+            "title": "Source"
+          },
+          "source_url": {
+            "type": "string",
+            "title": "Source Url"
+          },
+          "passage": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Passage"
+          },
+          "passage_basis": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "source_evidence_quote",
+                  "filed_text_block"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Passage Basis"
+          },
+          "passage_reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Passage Reason"
+          },
+          "known_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Known At"
+          },
+          "revision": {
+            "type": "integer",
+            "title": "Revision"
+          },
+          "evidence_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Evidence Id"
+          }
+        },
+        "type": "object",
+        "required": [
+          "fact_id",
+          "concept",
+          "label",
+          "period_end",
+          "fiscal_period",
+          "accession",
+          "form",
+          "source",
+          "source_url",
+          "passage",
+          "passage_basis",
+          "passage_reason",
+          "known_at",
+          "revision",
+          "evidence_id"
+        ],
+        "title": "FiledNote"
+      },
+      "FiledNotes": {
+        "properties": {
+          "coverage": {
+            "$ref": "#/components/schemas/SectionCoverage"
+          },
+          "notes": {
+            "items": {
+              "$ref": "#/components/schemas/FiledNote"
+            },
+            "type": "array",
+            "title": "Notes"
+          }
+        },
+        "type": "object",
+        "required": [
+          "coverage",
+          "notes"
+        ],
+        "title": "FiledNotes"
+      },
+      "FinancialFactOut": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "concept": {
+            "type": "string",
+            "title": "Concept"
+          },
+          "label": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Label"
+          },
+          "statement": {
+            "type": "string",
+            "title": "Statement"
+          },
+          "period_start": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Period Start"
+          },
+          "period_end": {
+            "type": "string",
+            "format": "date",
+            "title": "Period End"
+          },
+          "fiscal_period": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fiscal Period"
+          },
+          "basis": {
+            "type": "string",
+            "title": "Basis"
+          },
+          "value": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Value"
+          },
+          "unit": {
+            "type": "string",
+            "title": "Unit"
+          },
+          "currency": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Currency"
+          },
+          "dimensions": {
+            "title": "Dimensions"
+          },
+          "source": {
+            "type": "string",
+            "title": "Source"
+          },
+          "provenance": {
+            "type": "string",
+            "enum": [
+              "primary",
+              "vendor",
+              "owner",
+              "community",
+              "unclassified"
+            ],
+            "title": "Provenance"
+          },
+          "source_url": {
+            "type": "string",
+            "title": "Source Url"
+          },
+          "known_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Known At"
+          },
+          "revision": {
+            "type": "integer",
+            "title": "Revision"
+          },
+          "has_text_block": {
+            "type": "boolean",
+            "title": "Has Text Block"
+          },
+          "evidence_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Evidence Id"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "concept",
+          "label",
+          "statement",
+          "period_start",
+          "period_end",
+          "fiscal_period",
+          "basis",
+          "value",
+          "unit",
+          "currency",
+          "dimensions",
+          "source",
+          "provenance",
+          "source_url",
+          "known_at",
+          "revision",
+          "has_text_block",
+          "evidence_id"
+        ],
+        "title": "FinancialFactOut"
+      },
+      "FinancialHistory": {
+        "properties": {
+          "total_rows": {
+            "type": "integer",
+            "title": "Total Rows"
+          },
+          "returned_rows": {
+            "type": "integer",
+            "title": "Returned Rows"
+          },
+          "statements": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "type": "object",
+            "title": "Statements"
+          },
+          "earliest_period": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Earliest Period"
+          },
+          "latest_period": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Latest Period"
+          },
+          "provenance": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "type": "object",
+            "title": "Provenance"
+          },
+          "facts": {
+            "items": {
+              "$ref": "#/components/schemas/FinancialFactOut"
+            },
+            "type": "array",
+            "title": "Facts"
+          }
+        },
+        "type": "object",
+        "required": [
+          "total_rows",
+          "returned_rows",
+          "statements",
+          "earliest_period",
+          "latest_period",
+          "provenance",
+          "facts"
+        ],
+        "title": "FinancialHistory"
+      },
       "ForwardObservationInput": {
         "properties": {
           "kind": {
@@ -18039,6 +21069,93 @@
         ],
         "title": "FredSeries"
       },
+      "FreeSourceAlertsConfig": {
+        "properties": {
+          "enabled": {
+            "type": "boolean",
+            "title": "Enabled",
+            "default": true
+          },
+          "lookback_days": {
+            "type": "integer",
+            "maximum": 30.0,
+            "minimum": 1.0,
+            "title": "Lookback Days",
+            "description": "Observations first known within this many days are evaluated; older ones are never alerted (a replayed backfill raises nothing).",
+            "default": 3
+          },
+          "throttle_hours": {
+            "type": "integer",
+            "maximum": 720.0,
+            "minimum": 0.0,
+            "title": "Throttle Hours",
+            "description": "After an alert for one rule and scope (series, holding), further alerts for the same scope within this many hours are recorded as throttled. 0: off.",
+            "default": 24
+          },
+          "max_alerts_per_run": {
+            "type": "integer",
+            "maximum": 100.0,
+            "minimum": 1.0,
+            "title": "Max Alerts Per Run",
+            "default": 10
+          },
+          "credit_stress": {
+            "items": {
+              "$ref": "#/components/schemas/CreditStressRule"
+            },
+            "type": "array",
+            "title": "Credit Stress"
+          },
+          "trade_min_exposure_weight": {
+            "type": "number",
+            "maximum": 1.0,
+            "exclusiveMinimum": 0.0,
+            "title": "Trade Min Exposure Weight",
+            "description": "Mapped exposure weight (share of the issuer) below which a trade change is not alerted. Unmapped (unknown) weight is never counted.",
+            "default": 0.05
+          },
+          "trade_min_change_pct": {
+            "type": "number",
+            "exclusiveMinimum": 0.0,
+            "title": "Trade Min Change Pct",
+            "description": "Year-on-year change in the trade value that alerts.",
+            "default": 20.0
+          },
+          "patent_min_ownership_confidence": {
+            "type": "number",
+            "maximum": 1.0,
+            "minimum": 0.0,
+            "title": "Patent Min Ownership Confidence",
+            "default": 0.8
+          },
+          "graph_event_types": {
+            "items": {
+              "type": "string",
+              "enum": [
+                "deal",
+                "financing",
+                "leadership",
+                "relationship"
+              ]
+            },
+            "type": "array",
+            "title": "Graph Event Types",
+            "description": "Confirmed company events of these types alert. Suggested or disputed ones are listed for review only."
+          },
+          "graph_edge_types": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Graph Edge Types",
+            "description": "Confirmed company-graph edges of these types alert."
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "FreeSourceAlertsConfig",
+        "description": "Rules for the `free_source_alerts` job (credit stress, trade exposure, patent status,\nconfirmed company-graph events). Every decision, raised or not, is written to\n`free_source_alert_trail`."
+      },
       "Freshness": {
         "properties": {
           "snapshot_date": {
@@ -18233,6 +21350,28 @@
           "warnings"
         ],
         "title": "FundAsOf"
+      },
+      "FundChannel": {
+        "properties": {
+          "channel": {
+            "type": "string",
+            "const": "fund_positions_nport",
+            "title": "Channel",
+            "default": "fund_positions_nport"
+          },
+          "coverage": {
+            "$ref": "#/components/schemas/SectionCoverage"
+          },
+          "positions": {
+            "$ref": "#/components/schemas/HoldingFundPositions"
+          }
+        },
+        "type": "object",
+        "required": [
+          "coverage",
+          "positions"
+        ],
+        "title": "FundChannel"
       },
       "FundCoverage": {
         "properties": {
@@ -19723,6 +22862,36 @@
         ],
         "title": "FxRow"
       },
+      "Gap": {
+        "properties": {
+          "domain": {
+            "type": "string",
+            "title": "Domain"
+          },
+          "state": {
+            "type": "string",
+            "enum": [
+              "missing",
+              "not_covered",
+              "unresolved",
+              "partial",
+              "stale"
+            ],
+            "title": "State"
+          },
+          "reason": {
+            "type": "string",
+            "title": "Reason"
+          }
+        },
+        "type": "object",
+        "required": [
+          "domain",
+          "state",
+          "reason"
+        ],
+        "title": "Gap"
+      },
       "GoldenAccuracy": {
         "properties": {
           "value": {
@@ -20170,6 +23339,112 @@
           "prices_gap"
         ],
         "title": "HoldingCoverage"
+      },
+      "HoldingDataContext": {
+        "properties": {
+          "ticker": {
+            "type": "string",
+            "title": "Ticker"
+          },
+          "known_as_of": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Known As Of"
+          },
+          "identity": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Identity"
+          },
+          "financial_history": {
+            "$ref": "#/components/schemas/FinancialHistory"
+          },
+          "country_exposure": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/MacroContext"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "trade_exposure": {
+            "items": {
+              "$ref": "#/components/schemas/TradeExposure"
+            },
+            "type": "array",
+            "title": "Trade Exposure"
+          },
+          "business_network": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Business Network"
+          },
+          "patents": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Patents"
+          },
+          "forward_data_provenance": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "type": "object",
+            "title": "Forward Data Provenance",
+            "description": "Source classes of forward observations (consensus, guidance, scenarios)."
+          },
+          "research_observation_provenance": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "type": "object",
+            "title": "Research Observation Provenance"
+          },
+          "source_disagreements": {
+            "items": {
+              "$ref": "#/components/schemas/Disagreement"
+            },
+            "type": "array",
+            "title": "Source Disagreements"
+          },
+          "coverage": {
+            "items": {
+              "$ref": "#/components/schemas/CoverageEntry"
+            },
+            "type": "array",
+            "title": "Coverage"
+          },
+          "gaps": {
+            "items": {
+              "$ref": "#/components/schemas/Gap"
+            },
+            "type": "array",
+            "title": "Gaps"
+          },
+          "provenance_note": {
+            "type": "string",
+            "title": "Provenance Note",
+            "default": "primary = regulator, central bank, statistics office or issuer; vendor = commercial aggregator. A vendor value never replaces a primary value; disagreements are listed."
+          }
+        },
+        "type": "object",
+        "required": [
+          "ticker",
+          "known_as_of",
+          "identity",
+          "financial_history",
+          "country_exposure",
+          "trade_exposure",
+          "business_network",
+          "patents",
+          "forward_data_provenance",
+          "research_observation_provenance",
+          "source_disagreements",
+          "coverage",
+          "gaps"
+        ],
+        "title": "HoldingDataContext"
       },
       "HoldingDetail": {
         "properties": {
@@ -22255,6 +25530,36 @@
         ],
         "title": "IndexQuote"
       },
+      "Insider": {
+        "properties": {
+          "coverage": {
+            "$ref": "#/components/schemas/SectionCoverage"
+          },
+          "known_by": {
+            "type": "string",
+            "format": "date",
+            "title": "Known By"
+          },
+          "activity": {
+            "$ref": "#/components/schemas/InsiderActivityOut"
+          },
+          "net_discretionary_derived_from": {
+            "items": {
+              "$ref": "#/components/schemas/InsiderSource"
+            },
+            "type": "array",
+            "title": "Net Discretionary Derived From"
+          }
+        },
+        "type": "object",
+        "required": [
+          "coverage",
+          "known_by",
+          "activity",
+          "net_discretionary_derived_from"
+        ],
+        "title": "Insider"
+      },
       "InsiderActivityOut": {
         "properties": {
           "ticker": {
@@ -22374,6 +25679,82 @@
           "net_shares"
         ],
         "title": "InsiderNetBreakdown"
+      },
+      "InsiderSource": {
+        "properties": {
+          "accession": {
+            "type": "string",
+            "title": "Accession"
+          },
+          "filed": {
+            "type": "string",
+            "format": "date",
+            "title": "Filed"
+          },
+          "source_url": {
+            "type": "string",
+            "title": "Source Url"
+          },
+          "economic_class": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Economic Class"
+          },
+          "shares": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Shares"
+          },
+          "passage": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Passage"
+          },
+          "passage_reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Passage Reason"
+          }
+        },
+        "type": "object",
+        "required": [
+          "accession",
+          "filed",
+          "source_url",
+          "economic_class",
+          "shares",
+          "passage",
+          "passage_reason"
+        ],
+        "title": "InsiderSource"
       },
       "InsiderTransactionOut": {
         "properties": {
@@ -22939,6 +26320,47 @@
         ],
         "title": "InsiderTransactionRow"
       },
+      "InstitutionalChannel": {
+        "properties": {
+          "channel": {
+            "type": "string",
+            "const": "institutional_13f",
+            "title": "Channel",
+            "default": "institutional_13f"
+          },
+          "coverage": {
+            "$ref": "#/components/schemas/SectionCoverage"
+          },
+          "ownership": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/HoldingOwnership"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "pit_note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pit Note"
+          }
+        },
+        "type": "object",
+        "required": [
+          "coverage",
+          "ownership",
+          "pit_note"
+        ],
+        "title": "InstitutionalChannel"
+      },
       "InstrumentInfo": {
         "properties": {
           "name": {
@@ -23233,6 +26655,77 @@
         ],
         "title": "IntradayQuote",
         "description": "The latest stored Yahoo quote of a holding's listing (Yahoo Finance, unofficial)."
+      },
+      "IrConsensusRelease": {
+        "properties": {
+          "release_id": {
+            "type": "integer",
+            "title": "Release Id"
+          },
+          "release_type": {
+            "type": "string",
+            "title": "Release Type"
+          },
+          "published_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Published At"
+          },
+          "known_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Known At"
+          },
+          "analyst_count": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Analyst Count"
+          },
+          "basis": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Basis"
+          },
+          "status": {
+            "type": "string",
+            "title": "Status"
+          },
+          "source_url": {
+            "type": "string",
+            "title": "Source Url"
+          }
+        },
+        "type": "object",
+        "required": [
+          "release_id",
+          "release_type",
+          "published_at",
+          "known_at",
+          "analyst_count",
+          "basis",
+          "status",
+          "source_url"
+        ],
+        "title": "IrConsensusRelease"
       },
       "IssuerExposure": {
         "properties": {
@@ -24166,6 +27659,26 @@
           "fund_characteristics_audit": {
             "$ref": "#/components/schemas/JobSchedule",
             "description": "Check iShares/Vanguard fund valuation figures for parser drift. Default: daily 07:30."
+          },
+          "free_source_alerts": {
+            "$ref": "#/components/schemas/JobSchedule",
+            "description": "Evaluate credit, trade, patent and graph alerts. Default: daily 12:05."
+          },
+          "shadow_snapshot": {
+            "$ref": "#/components/schemas/JobSchedule",
+            "description": "Record the daily free-source shadow-run snapshot. Default: daily 23:50."
+          },
+          "shadow_report": {
+            "$ref": "#/components/schemas/JobSchedule",
+            "description": "Generate the free-source shadow-run report. Default: Monday 08:00."
+          },
+          "raw_retention": {
+            "$ref": "#/components/schemas/JobSchedule",
+            "description": "Prune old raw provider payloads (normalized data stays). Default: 03:15."
+          },
+          "zero_cost_gate": {
+            "$ref": "#/components/schemas/JobSchedule",
+            "description": "Verify no paid endpoint or overage is reachable. Default: daily 03:20."
           },
           "valuation_refresh": {
             "$ref": "#/components/schemas/JobSchedule",
@@ -25723,6 +29236,76 @@
         ],
         "title": "MacroFigure"
       },
+      "MacroSensitivity": {
+        "properties": {
+          "series_id": {
+            "type": "string",
+            "title": "Series Id"
+          },
+          "source": {
+            "type": "string",
+            "title": "Source"
+          },
+          "unit": {
+            "type": "string",
+            "title": "Unit"
+          },
+          "reported": {
+            "$ref": "#/components/schemas/SensitivityBasis"
+          },
+          "inferred": {
+            "$ref": "#/components/schemas/SensitivityBasis"
+          },
+          "latest_period_min": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Latest Period Min"
+          },
+          "latest_period_max": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Latest Period Max"
+          },
+          "portfolio_value": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              }
+            ],
+            "title": "Portfolio Value"
+          }
+        },
+        "type": "object",
+        "required": [
+          "series_id",
+          "source",
+          "unit",
+          "reported",
+          "inferred",
+          "latest_period_min",
+          "latest_period_max",
+          "portfolio_value"
+        ],
+        "title": "MacroSensitivity"
+      },
       "MacroSettings": {
         "properties": {
           "history_years": {
@@ -27093,6 +30676,9 @@
               "analyst_rating",
               "delisting",
               "entity_status",
+              "credit_stress",
+              "trade_exposure",
+              "patent_status",
               "other"
             ],
             "title": "Event Type"
@@ -27663,6 +31249,9 @@
                 "analyst_rating",
                 "delisting",
                 "entity_status",
+                "credit_stress",
+                "trade_exposure",
+                "patent_status",
                 "other"
               ]
             },
@@ -28443,6 +32032,243 @@
           "flagged"
         ],
         "title": "PlausibilityCheck"
+      },
+      "PortfolioConcentration": {
+        "properties": {
+          "dimension": {
+            "type": "string",
+            "enum": [
+              "country",
+              "product"
+            ],
+            "title": "Dimension"
+          },
+          "mapped": {
+            "$ref": "#/components/schemas/Share",
+            "description": "Mapped value over total portfolio value."
+          },
+          "unmapped_value": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              }
+            ],
+            "title": "Unmapped Value"
+          },
+          "unmapped_tickers": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Unmapped Tickers"
+          },
+          "rows": {
+            "items": {
+              "$ref": "#/components/schemas/ExposureRow"
+            },
+            "type": "array",
+            "title": "Rows"
+          },
+          "hhi": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Hhi",
+            "description": "Herfindahl index of exposed value shares within the mapped value; null without a mapped value."
+          },
+          "hhi_denominator": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              }
+            ],
+            "title": "Hhi Denominator"
+          },
+          "note": {
+            "type": "string",
+            "title": "Note"
+          }
+        },
+        "type": "object",
+        "required": [
+          "dimension",
+          "mapped",
+          "unmapped_value",
+          "unmapped_tickers",
+          "rows",
+          "hhi",
+          "hhi_denominator",
+          "note"
+        ],
+        "title": "PortfolioConcentration"
+      },
+      "PortfolioDataContext": {
+        "properties": {
+          "snapshot_date": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Snapshot Date"
+          },
+          "known_as_of": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Known As Of"
+          },
+          "base_currency": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Base Currency"
+          },
+          "total_value": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              }
+            ],
+            "title": "Total Value"
+          },
+          "position_count": {
+            "type": "integer",
+            "title": "Position Count"
+          },
+          "identity_coverage": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Share"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "country_concentration": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/PortfolioConcentration"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "product_concentration": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/PortfolioConcentration"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "macro_sensitivities": {
+            "items": {
+              "$ref": "#/components/schemas/MacroSensitivity"
+            },
+            "type": "array",
+            "title": "Macro Sensitivities"
+          },
+          "adjusted_return_coverage": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AdjustedReturnCoverage"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "fund_overlap": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/FundOverlapReport"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "fund_unknown": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Unknown"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "fund_total_value": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fund Total Value"
+          },
+          "gaps": {
+            "items": {
+              "$ref": "#/components/schemas/Gap"
+            },
+            "type": "array",
+            "title": "Gaps"
+          }
+        },
+        "type": "object",
+        "required": [
+          "snapshot_date",
+          "known_as_of",
+          "base_currency",
+          "total_value",
+          "position_count",
+          "identity_coverage",
+          "country_concentration",
+          "product_concentration",
+          "macro_sensitivities",
+          "adjusted_return_coverage",
+          "fund_overlap",
+          "fund_unknown",
+          "fund_total_value",
+          "gaps"
+        ],
+        "title": "PortfolioDataContext"
       },
       "PortfolioFlag": {
         "properties": {
@@ -29495,6 +33321,31 @@
         ],
         "title": "PositionWeightRule",
         "description": "Limit on a single position's weight; with no ticker it applies to every position."
+      },
+      "Positions": {
+        "properties": {
+          "not_additive": {
+            "type": "string",
+            "title": "Not Additive",
+            "default": "Control stakes (13D/G), institutional 13F positions and N-PORT fund positions measure different things at different dates and overlap; no total or combined percentage is computed anywhere."
+          },
+          "control": {
+            "$ref": "#/components/schemas/ControlChannel"
+          },
+          "institutional": {
+            "$ref": "#/components/schemas/InstitutionalChannel"
+          },
+          "funds": {
+            "$ref": "#/components/schemas/FundChannel"
+          }
+        },
+        "type": "object",
+        "required": [
+          "control",
+          "institutional",
+          "funds"
+        ],
+        "title": "Positions"
       },
       "PostedMessage": {
         "properties": {
@@ -31718,6 +35569,56 @@
         ],
         "title": "ResearchBody"
       },
+      "ResearchContext": {
+        "properties": {
+          "scope": {
+            "type": "string",
+            "enum": [
+              "country",
+              "industry",
+              "company"
+            ],
+            "title": "Scope"
+          },
+          "subject": {
+            "type": "string",
+            "title": "Subject"
+          },
+          "as_of": {
+            "type": "string",
+            "format": "date-time",
+            "title": "As Of"
+          },
+          "claims": {
+            "items": {
+              "$ref": "#/components/schemas/Claim"
+            },
+            "type": "array",
+            "title": "Claims"
+          },
+          "gaps": {
+            "items": {
+              "$ref": "#/components/schemas/ContextGap"
+            },
+            "type": "array",
+            "title": "Gaps"
+          },
+          "method": {
+            "type": "string",
+            "title": "Method",
+            "default": "Stored observations only, latest record known by the cutoff; changes are latest minus the previous period of the same series. No figure is estimated here."
+          }
+        },
+        "type": "object",
+        "required": [
+          "scope",
+          "subject",
+          "as_of",
+          "claims",
+          "gaps"
+        ],
+        "title": "ResearchContext"
+      },
       "ResearchProfile": {
         "properties": {
           "id": {
@@ -32133,6 +36034,73 @@
           "job_id"
         ],
         "title": "ResearchSummary"
+      },
+      "ReturnBasisCoverage": {
+        "properties": {
+          "adjustment_basis": {
+            "type": "string",
+            "title": "Adjustment Basis"
+          },
+          "complete": {
+            "$ref": "#/components/schemas/Share"
+          },
+          "partial_value": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              }
+            ],
+            "title": "Partial Value"
+          },
+          "missing_value": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              }
+            ],
+            "title": "Missing Value"
+          },
+          "complete_tickers": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Complete Tickers"
+          },
+          "partial_tickers": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Partial Tickers"
+          },
+          "missing_tickers": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Missing Tickers"
+          }
+        },
+        "type": "object",
+        "required": [
+          "adjustment_basis",
+          "complete",
+          "partial_value",
+          "missing_value",
+          "complete_tickers",
+          "partial_tickers",
+          "missing_tickers"
+        ],
+        "title": "ReturnBasisCoverage"
       },
       "ReviewBody": {
         "properties": {
@@ -32805,6 +36773,9 @@
                 "analyst_rating",
                 "delisting",
                 "entity_status",
+                "credit_stress",
+                "trade_exposure",
+                "patent_status",
                 "other"
               ]
             },
@@ -32850,6 +36821,29 @@
           "score"
         ],
         "title": "ScorePoint"
+      },
+      "SectionCoverage": {
+        "properties": {
+          "state": {
+            "type": "string",
+            "enum": [
+              "covered",
+              "partial",
+              "not_covered"
+            ],
+            "title": "State"
+          },
+          "reason": {
+            "type": "string",
+            "title": "Reason"
+          }
+        },
+        "type": "object",
+        "required": [
+          "state",
+          "reason"
+        ],
+        "title": "SectionCoverage"
       },
       "SegmentHistoryPoint": {
         "properties": {
@@ -33100,6 +37094,69 @@
         ],
         "title": "SegmentSource"
       },
+      "SensitivityBasis": {
+        "properties": {
+          "exposed_value_total": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              }
+            ],
+            "title": "Exposed Value Total"
+          },
+          "exposed_value_covered": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              }
+            ],
+            "title": "Exposed Value Covered"
+          },
+          "coverage": {
+            "$ref": "#/components/schemas/Share"
+          },
+          "weighted_change": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Weighted Change",
+            "description": "Exposure-weighted average change over covered geographies only; null when no geography with exposure has two observations."
+          },
+          "geographies": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Geographies"
+          }
+        },
+        "type": "object",
+        "required": [
+          "exposed_value_total",
+          "exposed_value_covered",
+          "coverage",
+          "weighted_change",
+          "geographies"
+        ],
+        "title": "SensitivityBasis"
+      },
       "Sentence": {
         "properties": {
           "text": {
@@ -33214,6 +37271,9 @@
               "analyst_rating",
               "delisting",
               "entity_status",
+              "credit_stress",
+              "trade_exposure",
+              "patent_status",
               "other"
             ],
             "title": "Event Type"
@@ -33233,6 +37293,63 @@
           "severity"
         ],
         "title": "SeverityOverride"
+      },
+      "Share": {
+        "properties": {
+          "numerator": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              }
+            ],
+            "title": "Numerator"
+          },
+          "denominator": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              }
+            ],
+            "title": "Denominator"
+          },
+          "ratio": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ratio",
+            "description": "numerator / denominator; null for a zero base."
+          },
+          "denominator_basis": {
+            "type": "string",
+            "title": "Denominator Basis"
+          }
+        },
+        "type": "object",
+        "required": [
+          "numerator",
+          "denominator",
+          "ratio",
+          "denominator_basis"
+        ],
+        "title": "Share",
+        "description": "A ratio shown with the numerator and the denominator it was divided by."
       },
       "ShareBasis": {
         "properties": {
@@ -33690,7 +37807,8 @@
               "strategy",
               "thesis",
               "report",
-              "search"
+              "search",
+              "observation"
             ],
             "title": "Kind"
           },
@@ -33911,6 +38029,126 @@
               }
             ],
             "title": "Last Denial State"
+          },
+          "last_denial_status_code": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Denial Status Code"
+          },
+          "last_denial_detail": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Denial Detail"
+          },
+          "quota_window_start": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Quota Window Start",
+            "description": "Start of the current usage window; null if none is recorded."
+          },
+          "quota_used": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Quota Used",
+            "description": "Credits spent in the current window (the denominator is `quota`). Null when the period is not tracked per window or no quota is known."
+          },
+          "quota_remaining": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Quota Remaining",
+            "description": "quota - quota_used, never below zero; null when unknown."
+          },
+          "quota_headroom": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Quota Headroom",
+            "description": "quota_remaining / quota in 0..1; null when unknown."
+          },
+          "headroom_reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Headroom Reason",
+            "description": "Why headroom is null (no quota, untracked period, ...)."
+          },
+          "freshness": {
+            "type": "string",
+            "enum": [
+              "never_succeeded",
+              "recent",
+              "stale"
+            ],
+            "title": "Freshness"
+          },
+          "last_success_age_seconds": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Success Age Seconds"
+          },
+          "stale_after_hours": {
+            "type": "integer",
+            "title": "Stale After Hours",
+            "default": 72
           }
         },
         "type": "object",
@@ -33929,7 +38167,8 @@
           "hard_blocked",
           "detail",
           "last_denial_at",
-          "last_denial_state"
+          "last_denial_state",
+          "freshness"
         ],
         "title": "SourceAccess"
       },
@@ -34368,6 +38607,60 @@
           "person_type"
         ],
         "title": "StakeHolderOut"
+      },
+      "StakeItem": {
+        "properties": {
+          "known_at": {
+            "type": "string",
+            "format": "date",
+            "title": "Known At",
+            "description": "Filing date: when the stake became public."
+          },
+          "source_passage": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Passage",
+            "description": "Item 4 purpose text; 13G has none."
+          },
+          "passage_reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Passage Reason"
+          },
+          "coverage_reason": {
+            "type": "string",
+            "title": "Coverage Reason"
+          },
+          "superseded": {
+            "type": "boolean",
+            "title": "Superseded"
+          },
+          "stake": {
+            "$ref": "#/components/schemas/ControlStakeOut"
+          }
+        },
+        "type": "object",
+        "required": [
+          "known_at",
+          "source_passage",
+          "passage_reason",
+          "coverage_reason",
+          "superseded",
+          "stake"
+        ],
+        "title": "StakeItem"
       },
       "StakeReconciliationOut": {
         "properties": {
@@ -34921,6 +39214,9 @@
               "analyst_rating",
               "delisting",
               "entity_status",
+              "credit_stress",
+              "trade_exposure",
+              "patent_status",
               "other"
             ],
             "title": "Event Type",
@@ -35653,6 +39949,314 @@
           "known_at"
         ],
         "title": "TradeContext"
+      },
+      "TradeExposure": {
+        "properties": {
+          "hs_code": {
+            "type": "string",
+            "title": "Hs Code"
+          },
+          "hs_revision": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Hs Revision"
+          },
+          "geography": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Geography"
+          },
+          "exposure_weight": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              }
+            ],
+            "title": "Exposure Weight"
+          },
+          "exposure_basis": {
+            "type": "string",
+            "title": "Exposure Basis"
+          },
+          "latest_period": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Latest Period"
+          },
+          "rows": {
+            "items": {
+              "$ref": "#/components/schemas/TradeRow"
+            },
+            "type": "array",
+            "title": "Rows"
+          },
+          "notice": {
+            "type": "string",
+            "title": "Notice",
+            "default": "National product trade statistics. They do not identify the issuer's customers or suppliers, and rows for different partners are listed, never summed."
+          },
+          "gap": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Gap"
+          }
+        },
+        "type": "object",
+        "required": [
+          "hs_code",
+          "hs_revision",
+          "geography",
+          "exposure_weight",
+          "exposure_basis",
+          "latest_period",
+          "rows"
+        ],
+        "title": "TradeExposure"
+      },
+      "TradeRow": {
+        "properties": {
+          "reporter": {
+            "type": "string",
+            "title": "Reporter"
+          },
+          "partner": {
+            "type": "string",
+            "title": "Partner"
+          },
+          "flow": {
+            "type": "string",
+            "title": "Flow"
+          },
+          "hs_revision": {
+            "type": "string",
+            "title": "Hs Revision"
+          },
+          "hs_code": {
+            "type": "string",
+            "title": "Hs Code"
+          },
+          "period": {
+            "type": "string",
+            "format": "date",
+            "title": "Period"
+          },
+          "trade_value": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Trade Value"
+          },
+          "quantity": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Quantity"
+          },
+          "quantity_unit": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Quantity Unit"
+          },
+          "known_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Known At"
+          },
+          "source_url": {
+            "type": "string",
+            "title": "Source Url"
+          }
+        },
+        "type": "object",
+        "required": [
+          "reporter",
+          "partner",
+          "flow",
+          "hs_revision",
+          "hs_code",
+          "period",
+          "trade_value",
+          "quantity",
+          "quantity_unit",
+          "known_at",
+          "source_url"
+        ],
+        "title": "TradeRow"
+      },
+      "TrailOut": {
+        "properties": {
+          "rows": {
+            "items": {
+              "$ref": "#/components/schemas/TrailRow"
+            },
+            "type": "array",
+            "title": "Rows"
+          },
+          "next_before_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Before Id"
+          }
+        },
+        "type": "object",
+        "required": [
+          "rows",
+          "next_before_id"
+        ],
+        "title": "TrailOut"
+      },
+      "TrailRow": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "rule": {
+            "type": "string",
+            "title": "Rule"
+          },
+          "scope": {
+            "type": "string",
+            "title": "Scope"
+          },
+          "ticker": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ticker"
+          },
+          "outcome": {
+            "type": "string",
+            "title": "Outcome",
+            "description": "raised, throttled, revision_ignored, baseline, not_material, no_baseline, persisting, review_needed or below_severity."
+          },
+          "severity": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Severity"
+          },
+          "reason": {
+            "type": "string",
+            "title": "Reason"
+          },
+          "evidence": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Evidence"
+          },
+          "news_item_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "News Item Id"
+          },
+          "job_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Job Id"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "created_at",
+          "rule",
+          "scope",
+          "ticker",
+          "outcome",
+          "severity",
+          "reason",
+          "evidence",
+          "news_item_id",
+          "job_id"
+        ],
+        "title": "TrailRow"
       },
       "TransactionFeeOut": {
         "properties": {
