@@ -21,6 +21,8 @@ const BODY: HoldingProfilesConfig = {
       fiscal_year_end_month: 9,
       price_symbol: "aapl.us",
       yahoo_symbol: null,
+      eodhd_symbol: null,
+      alpha_vantage_symbol: null,
       reporting_currency: "USD",
       competitors: ["Samsung", "Alphabet"],
       suppliers: ["TSMC"],
@@ -51,6 +53,8 @@ const BODY: HoldingProfilesConfig = {
       exposures: [],
       valuation_source: "manual",
       yahoo_symbol: null,
+      eodhd_symbol: null,
+      alpha_vantage_symbol: null,
       manual_fundamentals: {
         eps_ttm: 52.4,
         book_value_per_share: 449.9,

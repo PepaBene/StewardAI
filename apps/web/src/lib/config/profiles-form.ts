@@ -60,6 +60,8 @@ export type ProfileForm = {
   price_symbol: string;
   /** Yahoo Finance symbol override (e.g. "NOVO-B.CO"); empty = derived from the listing. */
   yahoo_symbol: string;
+  /** Exact EODHD exchange:symbol code (e.g. "SAP.XETRA"); empty = not used. */
+  eodhd_symbol: string;
   reporting_currency: string;
   competitors: string;
   suppliers: string;
@@ -96,6 +98,7 @@ export function newProfile(ticker = ""): ProfileForm {
     fiscal_year_end_month: 12,
     price_symbol: "",
     yahoo_symbol: "",
+    eodhd_symbol: "",
     reporting_currency: "",
     competitors: "",
     suppliers: "",
@@ -127,6 +130,7 @@ export function profilesFromBody(body: HoldingProfilesConfig | null): ProfileFor
     fiscal_year_end_month: p.fiscal_year_end_month,
     price_symbol: p.price_symbol ?? "",
     yahoo_symbol: p.yahoo_symbol ?? "",
+    eodhd_symbol: p.eodhd_symbol ?? "",
     reporting_currency: p.reporting_currency ?? "",
     competitors: joined(p.competitors),
     suppliers: joined(p.suppliers),
@@ -198,6 +202,7 @@ export function profilesToBody(forms: ProfileForm[]): HoldingProfilesConfig {
         fiscal_year_end_month: f.fiscal_year_end_month,
         price_symbol: orNull(f.price_symbol)?.toLowerCase() ?? null,
         yahoo_symbol: orNull(f.yahoo_symbol)?.toUpperCase() ?? null,
+        eodhd_symbol: orNull(f.eodhd_symbol) ?? null,
         reporting_currency: orNull(f.reporting_currency)?.toUpperCase() ?? null,
         competitors: lines(f.competitors),
         suppliers: lines(f.suppliers),
