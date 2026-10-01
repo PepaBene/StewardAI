@@ -1,3 +1,14 @@
+-- Rollback for supabase/migrations/20260930182242_free_sources_completion.sql (plan D8.4).
+-- Generated from a before/after diff of the public catalog and proven by
+-- apps/backend/tests/test_lifecycle_phase8.py: the migration is applied, this file is run, and the
+-- catalog fingerprint (tables, columns, constraints, indexes, functions, policies, grants, seed
+-- rows) must equal the one taken before the migration. Run it in a transaction, newest migration
+-- first. The migration file itself is never edited.
+-- DATA LOSS: drops these tables and every row in them: identity_match_decision, issuer_alias, issuer_relationship, macro_payload_archive, macro_series_metadata, provider_endpoint_manifest, provider_fetch_audit.
+-- DATA LOSS: drops these columns and their values: provider_access.configuration_hash, provider_access.hard_blocked, provider_access.last_success_at, provider_quota_usage.window_kind.
+-- Data note: provider_quota_usage minute/month usage windows are discarded so the original (provider, endpoint, window_start) key can be restored; daily windows are kept.
+
+delete from public.provider_quota_usage where window_kind <> 'day';
 alter table public.provider_quota_usage drop constraint if exists provider_quota_usage_pkey;
 alter table public.provider_quota_usage drop constraint if exists provider_quota_usage_window_kind_check;
 alter table public.provider_access drop column if exists configuration_hash cascade;

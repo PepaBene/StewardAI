@@ -1,3 +1,11 @@
+-- Rollback for supabase/migrations/20261003110000_fund_probes_nport.sql (plan D8.4).
+-- Generated from a before/after diff of the public catalog and proven by
+-- apps/backend/tests/test_lifecycle_phase8.py: the migration is applied, this file is run, and the
+-- catalog fingerprint (tables, columns, constraints, indexes, functions, policies, grants, seed
+-- rows) must equal the one taken before the migration. Run it in a transaction, newest migration
+-- first. The migration file itself is never edited.
+-- DATA LOSS: drops these tables and every row in them: fund_probe_record, nport_filing, nport_fund_map, nport_holding.
+
 alter table public.source_record_evidence drop constraint if exists source_record_evidence_domain_table_check;
 alter table public.source_record_evidence add constraint source_record_evidence_domain_table_check CHECK ((domain_table = ANY (ARRAY['news_item'::text, 'fact'::text, 'form13f_filing'::text, 'institutional_holding'::text, 'insider_filing'::text, 'insider_transaction'::text])));
 drop table if exists public.fund_probe_record cascade;

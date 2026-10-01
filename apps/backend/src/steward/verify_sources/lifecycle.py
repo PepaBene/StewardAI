@@ -112,11 +112,17 @@ NOT_FREE_SOURCE_MIGRATIONS = frozenset({"20261001100000_transaction_fees.sql"})
 ROLLBACK_SUFFIX = ".down.sql"
 
 
-def free_source_migrations(migrations_dir: Path) -> list[Path]:
+# Phase 0-6 free-source migrations end here; later phases ship their own rollback files.
+MIGRATION_ROLLBACK_END = "20261003999999"
+
+
+def free_source_migrations(
+    migrations_dir: Path, *, through: str = MIGRATION_ROLLBACK_END
+) -> list[Path]:
     return [
         p
         for p in sorted(migrations_dir.glob("*.sql"))
-        if p.name.split("_", 1)[0] >= MIGRATION_ROLLBACK_START
+        if MIGRATION_ROLLBACK_START <= p.name.split("_", 1)[0] <= through
         and p.name not in NOT_FREE_SOURCE_MIGRATIONS
     ]
 

@@ -1,3 +1,12 @@
+-- Rollback for supabase/migrations/20261003120000_control_stakes_insider_enrichment.sql (plan D8.4).
+-- Generated from a before/after diff of the public catalog and proven by
+-- apps/backend/tests/test_lifecycle_phase8.py: the migration is applied, this file is run, and the
+-- catalog fingerprint (tables, columns, constraints, indexes, functions, policies, grants, seed
+-- rows) must equal the one taken before the migration. Run it in a transaction, newest migration
+-- first. The migration file itself is never edited.
+-- DATA LOSS: drops these tables and every row in them: control_stake_change, control_stake_filing, control_stake_holder, control_stake_issuer_link.
+-- DATA LOSS: drops these columns and their values: insider_filing.aff10b5_one, insider_filing.amendment_link_status, insider_filing.amends_accession, insider_filing.enriched_at, insider_filing.footnotes, insider_filing.is_amendment, insider_filing.joint_owner_count, insider_filing.original_submission_date, insider_filing.remarks, insider_filing.reporting_owner_cik, insider_filing.superseded_by_accession, insider_transaction.classification_basis, insider_transaction.deemed_execution_date, insider_transaction.economic_class, insider_transaction.equity_swap_involved, insider_transaction.exercisable_date, insider_transaction.exercise_price, insider_transaction.expiration_date, insider_transaction.footnote_ids, insider_transaction.footnote_text, insider_transaction.rule_10b5_1_adopted, insider_transaction.rule_10b5_1_basis, insider_transaction.rule_10b5_1_plan, insider_transaction.underlying_security_title, insider_transaction.underlying_shares.
+
 alter table public.insider_filing drop constraint if exists insider_filing_amendment_link_status_check;
 alter table public.insider_filing drop constraint if exists insider_filing_amends_accession_fkey;
 alter table public.insider_filing drop constraint if exists insider_filing_reporting_owner_cik_check;

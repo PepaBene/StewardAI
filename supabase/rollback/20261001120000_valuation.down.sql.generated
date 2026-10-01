@@ -1,2 +1,0 @@
-drop table if exists public.fund_valuation cascade;
-drop table if exists public.fundamentals cascade;

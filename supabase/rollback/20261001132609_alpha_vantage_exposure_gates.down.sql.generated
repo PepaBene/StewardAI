@@ -1,4 +1,0 @@
-delete from public.provider_access where provider='alpha_vantage' and endpoint='commodity';
-delete from public.provider_access where provider='alpha_vantage' and endpoint='fx_daily';
-delete from public.provider_endpoint_manifest where provider='alpha_vantage' and endpoint='commodity';
-delete from public.provider_endpoint_manifest where provider='alpha_vantage' and endpoint='fx_daily';

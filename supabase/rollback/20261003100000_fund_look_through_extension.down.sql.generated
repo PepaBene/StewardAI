@@ -1,4 +1,0 @@
-drop table if exists public.fund_characteristic_audit cascade;
-drop table if exists public.fund_factsheet cascade;
-drop table if exists public.fund_index_coverage cascade;
-drop table if exists public.fund_snapshot_pin cascade;

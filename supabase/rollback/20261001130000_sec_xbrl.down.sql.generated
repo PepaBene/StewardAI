@@ -1,3 +1,0 @@
-drop table if exists public.segment_revenue cascade;
-drop table if exists public.shares_outstanding cascade;
-drop table if exists public.xbrl_filing cascade;

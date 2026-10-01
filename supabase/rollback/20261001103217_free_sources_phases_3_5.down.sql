@@ -1,3 +1,12 @@
+-- Rollback for supabase/migrations/20261001103217_free_sources_phases_3_5.sql (plan D8.4).
+-- Generated from a before/after diff of the public catalog and proven by
+-- apps/backend/tests/test_lifecycle_phase8.py: the migration is applied, this file is run, and the
+-- catalog fingerprint (tables, columns, constraints, indexes, functions, policies, grants, seed
+-- rows) must equal the one taken before the migration. Run it in a transaction, newest migration
+-- first. The migration file itself is never edited.
+-- DATA LOSS: drops these tables and every row in them: company_event, company_graph_edge, corporate_action, exchange_session, financial_statement_fact, forward_observation, issuer_ir_release, patent_family, patent_family_owner, peer_set, price_return_series, relationship_disclosure.
+-- DATA LOSS: drops these columns and their values: price_bar.access_state, price_bar.bar_type, price_bar.listing_id, price_bar.mic, price_bar.quote_unit, price_bar.session_date, price_bar.source_timestamp.
+
 alter table public.price_bar drop constraint if exists price_bar_access_state_check;
 alter table public.price_bar drop constraint if exists price_bar_bar_type_check;
 alter table public.price_bar drop constraint if exists price_bar_listing_id_fkey;
