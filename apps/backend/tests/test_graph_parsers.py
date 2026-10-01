@@ -670,7 +670,7 @@ def test_wording_pointing_both_ways_stays_unknown_for_the_owner() -> None:
 
 def test_a_percentage_without_a_stated_denominator_is_dropped() -> None:
     vague = (
-        "We sell to Example Industries AG, which was 22% of the total for the year ended "
+        "Example Industries AG is our customer and was 22% of the total for the year ended "
         "June 30, 2026."
     )
     (r,) = analyze_counterparty_filing(

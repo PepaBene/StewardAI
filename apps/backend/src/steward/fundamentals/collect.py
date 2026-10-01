@@ -337,9 +337,19 @@ async def collect_ticker(
     force = bool(ctx.params.get("force"))
 
     async def parse_and_store(filing: Filing) -> ParsedFiling:
+        original = amended_filing(filings, filing) if is_amendment(filing.form) else None
+        if (
+            original is not None
+            and original.accession not in parsed_now
+            and await parser_version(original) != PARSER_VERSION
+        ):
+            # The amendment's rows link to the original's: store the original first.
+            try:
+                await parse_and_store(original)
+            except (EdgarError, XbrlError):
+                original = None  # no instance to link to; the amendment stands alone
         parsed = await fetch_filing(edgar, filing, max_bytes)
         parsed_now[filing.accession] = parsed
-        original = amended_filing(filings, filing) if is_amendment(filing.form) else None
         parsed_detail.append(
             await store_segments(
                 pool,

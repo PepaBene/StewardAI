@@ -198,7 +198,7 @@ async def test_report_with_no_data_says_so_and_is_never_signed_off(
     assert stored is not None and stored["sign_off_ready"] is False and stored["days_observed"] == 0
 
 
-async def _full_window(pool: asyncpg.Pool, *, days: int = 30) -> None:
+async def _full_window(pool: asyncpg.Pool, *, days: int = 30, mode: str | None = "daily") -> None:
     await _seed_provider(pool, "useful")
     await _seed_provider(pool, "redundant")
     await _seed_provider(pool, "silent")
@@ -226,6 +226,16 @@ async def _full_window(pool: asyncpg.Pool, *, days: int = 30) -> None:
                         "metrics": ["revenue", "profit"] if obs else [],
                         "geographies": ["CZ"] if obs else [],
                         "endpoints": {"e": {"credits": attempts, "quota": 100, "period": "day"}},
+                        **(
+                            {}
+                            if mode is None
+                            else {
+                                "mode": mode,
+                                "coverage_basis": "recorded_at_day_end"
+                                if mode == "daily"
+                                else "current_state",
+                            }
+                        ),
                     }
                 ),
             )
@@ -297,3 +307,80 @@ async def test_partial_window_blocks_sign_off_with_the_measured_day_count(
     assert report["sign_off_ready"] is False
     assert any("12 of 30" in b for b in report["blockers"])
     assert await backend_pool.fetchval("select count(*) from public.source_shadow_report") == 0
+
+
+# ---------------------------------------------------------------------------------------
+# B48: sign-off needs a 30-day window of real daily snapshots
+# ---------------------------------------------------------------------------------------
+@pytest.mark.db
+async def test_a_short_window_can_never_be_signed_off(
+    backend_pool: asyncpg.Pool, migrated_db: MigratedDatabase
+) -> None:
+    await _full_window(backend_pool, days=7)
+    await _scope(backend_pool, migrated_db.admin_url)
+    report = await generate_shadow_report(backend_pool, DAY, window_days=7, persist=False)
+    assert report["days_observed"] == 7  # every day of the (short) window is present ...
+    assert report["sign_off_ready"] is False  # ... and it still cannot be signed off
+    assert any("window is 7 days" in b for b in report["blockers"])
+    with pytest.raises(ValueError):
+        await generate_shadow_report(backend_pool, DAY, window_days=0, persist=False)
+
+
+@pytest.mark.db
+async def test_backfilled_days_are_flagged_as_current_state_and_block_sign_off(
+    backend_pool: asyncpg.Pool, migrated_db: MigratedDatabase
+) -> None:
+    await _full_window(backend_pool, mode="daily")
+    await _scope(backend_pool, migrated_db.admin_url)
+    await backend_pool.execute(
+        'update public.source_shadow_snapshot set detail = detail || \'{"mode":"backfill",'
+        '"coverage_basis":"current_state"}\'::jsonb where snapshot_date < $1',
+        DAY - dt.timedelta(days=24),
+    )
+    report = await generate_shadow_report(backend_pool, DAY, persist=False)
+    assert report["sign_off_ready"] is False
+    assert report["real_daily_snapshots"] == 25 and len(report["backfilled_days"]) == 5
+    assert any("5 of the window's days were backfilled" in b for b in report["blockers"])
+    assert all(p["coverage_basis"] == "recorded_at_day_end" for p in report["providers"])
+    assert "real daily runs" in render_markdown(report)
+
+
+@pytest.mark.db
+async def test_snapshots_without_a_recording_mode_cannot_be_shown_to_be_real(
+    backend_pool: asyncpg.Pool, migrated_db: MigratedDatabase
+) -> None:
+    await _full_window(backend_pool, mode=None)
+    await _scope(backend_pool, migrated_db.admin_url)
+    report = await generate_shadow_report(backend_pool, DAY, persist=False)
+    assert report["sign_off_ready"] is False and report["real_daily_snapshots"] == 0
+    assert any("no recording mode" in b for b in report["blockers"])
+
+
+@pytest.mark.db
+async def test_recorder_marks_a_daily_run_and_a_backfill(backend_pool: asyncpg.Pool) -> None:
+    await _seed_provider(backend_pool, "useful")
+    await _observe(backend_pool, "useful", "revenue", "5")
+    obs_day = await backend_pool.fetchval("select known_at::date from public.source_observation")
+    end = dt.datetime.combine(obs_day + dt.timedelta(days=1), dt.time(), dt.UTC)
+
+    async def mode() -> tuple[str, str]:
+        detail = await backend_pool.fetchval(
+            "select detail from public.source_shadow_snapshot where provider='useful'"
+            " and snapshot_date=$1",
+            obs_day,
+        )
+        parsed = json.loads(detail) if isinstance(detail, str) else detail
+        return parsed["mode"], parsed["coverage_basis"]
+
+    await record_shadow_snapshot(backend_pool, obs_day, now=end + dt.timedelta(hours=1))
+    assert await mode() == ("daily", "recorded_at_day_end")
+    await record_shadow_snapshot(backend_pool, obs_day, now=end + dt.timedelta(days=3))
+    assert await mode() == ("backfill", "current_state")  # a late re-run is honest about itself
+    await record_shadow_snapshot(
+        backend_pool, obs_day, backfill=True, now=end + dt.timedelta(hours=1)
+    )
+    assert await mode() == ("backfill", "current_state")
+    from steward.verify_sources.shadow import backfill_shadow_snapshots
+
+    await backfill_shadow_snapshots(backend_pool, obs_day, 1)
+    assert await mode() == ("backfill", "current_state")

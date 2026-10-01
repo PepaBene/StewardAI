@@ -54,12 +54,12 @@ _SELLS_TO_HOLDING = [
     r"\bsales? to {h}\b",
     r"{h} (?:is|was|are|were|remains) (?:one of )?(?:our|the company'?s) (?:\w+ ){{0,3}}customers?",
     r"\bour (?:\w+ ){{0,2}}customers?,? (?:including )?{h}",
-    r"\bwe (?:sell|sold|supply|supplied|provide|provided|license|licensed)\b[^.]{{0,100}}\bto {h}",
+    r"\bwe (?:\w+ ){{0,2}}(?:sell|sold|supply|supplied|provide|provided|license|licensed)\b[^.]{{0,100}}\bto {h}",
 ]
 _BUYS_FROM_HOLDING = [
     # the filer buys from the holding: the holding is the filer's supplier
     r"{h} (?:is|was|are|were|remains) (?:one of )?(?:our|the company'?s) (?:\w+ ){{0,3}}(?:suppliers?|vendors?)",
-    r"\bwe (?:purchase|purchased|source|sourced|buy|bought|obtain|obtained|rely on)\b[^.]{{0,100}}\bfrom {h}",
+    r"\bwe (?:\w+ ){{0,2}}(?:purchase|purchased|source|sourced|buy|bought|obtain|obtained|rely on)\b[^.]{{0,100}}\bfrom {h}",
     r"\bwe rely on {h} (?:for|to)\b",
     r"\bpurchases? from {h}\b",
     r"\b(?:supplied|manufactured|provided) by {h}\b",
@@ -201,6 +201,19 @@ def _share_basis(paragraph: str, own_filing: bool) -> str | None:
     return None
 
 
+_NEGATION = re.compile(r"\b(?:not|never|no longer|none)\b|n't", re.I)
+
+
+def _direction_hits(patterns: Sequence[str], holding: str, paragraph: str) -> list[re.Match[str]]:
+    """Matches of the direction patterns, minus negated ones ("we do not purchase from X")."""
+    hits = []
+    for pattern in patterns:
+        match = re.search(pattern.format(h=holding), paragraph, re.I)
+        if match and not _NEGATION.search(paragraph[max(0, match.start() - 12) : match.end()]):
+            hits.append(match)
+    return hits
+
+
 def analyze_counterparty_filing(
     text: str,
     *,
@@ -221,8 +234,8 @@ def analyze_counterparty_filing(
     for paragraph in paragraphs(text):
         if not mentions(paragraph, holding_names) or not _REL_WORDS.search(paragraph):
             continue
-        sells = [m for p in _SELLS_TO_HOLDING if (m := re.search(p.format(h=h), paragraph, re.I))]
-        buys = [m for p in _BUYS_FROM_HOLDING if (m := re.search(p.format(h=h), paragraph, re.I))]
+        sells = _direction_hits(_SELLS_TO_HOLDING, h, paragraph)
+        buys = _direction_hits(_BUYS_FROM_HOLDING, h, paragraph)
         reasons: list[str] = []
         if sells and not buys:
             relationship: Literal["customer", "supplier"] = "supplier"

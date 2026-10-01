@@ -170,12 +170,14 @@ def parse_alpha_time(value: object) -> dt.datetime | None:
     """Alpha Vantage `time_published` ("20260930T140000", UTC) as an aware datetime."""
     if not isinstance(value, str):
         return None
-    for fmt in ("%Y%m%dT%H%M%S", "%Y%m%dT%H%M"):
-        try:
-            return dt.datetime.strptime(value.strip(), fmt).replace(tzinfo=dt.UTC)
-        except ValueError:
-            continue
-    return None
+    text = value.strip()
+    fmt = {15: "%Y%m%dT%H%M%S", 13: "%Y%m%dT%H%M"}.get(len(text))
+    if fmt is None:
+        return None
+    try:
+        return dt.datetime.strptime(text, fmt).replace(tzinfo=dt.UTC)
+    except ValueError:
+        return None
 
 
 def alpha_denial_state(exc: FreeSourceError) -> AccessState:
