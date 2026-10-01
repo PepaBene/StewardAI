@@ -56,6 +56,7 @@ BUDGET_SITES: dict[str, int] = {
     "steward/free_sources.py": 2,
     "steward/macro/public_collect.py": 1,
     "steward/news/feeds.py": 1,
+    "steward/reference/exchange_probes.py": 2,
     "steward/reference/prices.py": 3,
     "steward/sources/audit.py": 2,
     "steward/sources/company_research.py": 4,
@@ -94,6 +95,7 @@ def capped_settings_budget(settings: Any, cap: int) -> Budget:
 
 
 def literal_budgets() -> list[CollectorBudget]:
+    from steward.reference.exchange_probes import FINNHUB_BUDGET, TWELVE_BUDGET
     from steward.valuation.collect import ALPHA_VANTAGE_DAILY_LIMIT
 
     av = "alpha_vantage"
@@ -119,6 +121,9 @@ def literal_budgets() -> list[CollectorBudget]:
         ("finnhub", ANY_ENDPOINT, Budget(), free),
         (av, "account_free", d25, audit),
         (av, "account_free", d25, prices),
+        # the module's own constants, so the registry cannot drift from them
+        ("finnhub", ANY_ENDPOINT, FINNHUB_BUDGET, "steward/reference/exchange_probes.py"),
+        ("twelve_data", ANY_ENDPOINT, TWELVE_BUDGET, "steward/reference/exchange_probes.py"),
     ]
     return [CollectorBudget(p, e, b, w, "literal") for p, e, b, w in rows]
 
