@@ -58,7 +58,7 @@ _PAID_WORDS = (
     "subscribe to any of the premium",
     "upgrade your plan",
 )
-_KEY_WORDS = ("apikey", "api key", "unauthorized", "invalid api")
+_KEY_WORDS = ("apikey", "api key", "unauthorized")
 
 
 def classify_alpha_message(text: str, *, key: str = "Information") -> AccessState:
