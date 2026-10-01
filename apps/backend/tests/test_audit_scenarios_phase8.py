@@ -174,7 +174,8 @@ async def test_deal_state_follows_what_was_known_including_reversals(
     reason="REAL DEFECT (audit C-low, found by this scenario): deals() sorts events by effective "
     "date before known_at, so a reversal known later but effective earlier is shown as older "
     "than the completion and current_state stays 'closed'. Fix: pick the current state by "
-    "known_at (then id) in data_context/evidence.py; an XPASS here means it was fixed: delete the marker.",
+    "known_at (then id) in data_context/evidence.py; an XPASS here means it was fixed: "
+    "delete the marker.",
 )
 async def test_a_reversal_known_later_wins_even_when_its_effective_date_is_earlier(
     backend_pool: asyncpg.Pool,

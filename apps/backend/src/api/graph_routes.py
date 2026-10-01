@@ -27,7 +27,7 @@ from steward.graph.decisions import (
 from steward.graph.kpi import kpi_event_links
 from steward.graph.passages import review_hit
 from steward.graph.patents import competitor_overlap_rows
-from steward.graph.relationships import review_queue
+from steward.graph.relationships import portfolio_knock_on, review_queue
 from steward.graph.successors import open_reconciliations
 from steward.settings import get_settings
 from steward.sources.edgar import EdgarClient
@@ -226,3 +226,18 @@ async def reset_provider_block(
         return await provider_gate.reset_block(pool, provider, endpoint)
     except LookupError as exc:
         raise HTTPException(404, str(exc)) from exc
+
+
+@router.get("/portfolio/relationship-knock-on", tags=["portfolio"], response_model=None)
+async def relationship_knock_on(
+    pool: Pool, _owner: Owner, as_of: Annotated[datetime | None, Query()] = None
+) -> dict[str, Any]:
+    """Confirmed, dated customer / supplier links between two holdings."""
+    return {
+        "known_as_of": as_of,
+        "links": await portfolio_knock_on(pool, as_of),
+        "limitations": [
+            "Only confirmed, dated, directed links between two open positions are listed.",
+            "Shares are as reported by the filer and are not summed or imputed.",
+        ],
+    }

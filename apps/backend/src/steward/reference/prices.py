@@ -333,6 +333,17 @@ async def collect_series(
     return {"source": "yahoo", "symbol": symbols.yahoo, "stooq_gap": stooq_gap}, None
 
 
+def _gate_closed(row: asyncpg.Record) -> bool:
+    """A fallback endpoint is used only while it is audited `available`, not hard-blocked and
+    outside a provider Retry-After window (a quota message sets one until the next day)."""
+    retry_at = row["retry_at"]
+    return bool(
+        row["state"] != "available"
+        or row["hard_blocked"]
+        or (retry_at is not None and retry_at > dt.datetime.now(dt.UTC))
+    )
+
+
 def _scaled_adjusted(rows: list[Any], symbol: str) -> list[PriceBar]:
     """Adjusted-basis bars from a provider's adjusted close: the open/high/low are scaled by the
     same factor as the close, so a bar's shape is kept on the adjusted scale."""
@@ -383,10 +394,10 @@ async def collect_eodhd_fallbacks(
     if not provider_settings.enabled or not api_key:
         return {}
     gates = await pool.fetch(
-        """select endpoint,state,hard_blocked from public.provider_access
+        """select endpoint,state,hard_blocked,retry_at from public.provider_access
            where provider='eodhd' and endpoint in ('eod','symbol_search')"""
     )
-    if len(gates) != 2 or any(r["state"] != "available" or r["hard_blocked"] for r in gates):
+    if len(gates) != 2 or any(_gate_closed(r) for r in gates):
         detail["eodhd"] = "skipped: both EODHD endpoints must pass the free-key access audit"
         return {}
     budget = Budget(
@@ -544,14 +555,11 @@ async def collect_alpha_vantage_fallbacks(
     if not provider_settings.enabled or not api_key:
         return {}
     gates = await pool.fetch(
-        """select endpoint,state,hard_blocked from public.provider_access
+        """select endpoint,state,hard_blocked,retry_at from public.provider_access
            where provider='alpha_vantage' and endpoint in ('daily_adjusted','account_free')"""
     )
     by_endpoint = {row["endpoint"]: row for row in gates}
-    if len(by_endpoint) != 2 or any(
-        by_endpoint[name]["state"] != "available" or by_endpoint[name]["hard_blocked"]
-        for name in ("daily_adjusted", "account_free")
-    ):
+    if len(by_endpoint) != 2 or any(_gate_closed(row) for row in by_endpoint.values()):
         detail["alpha_vantage"] = "skipped: daily and shared-budget gates must be available"
         return {}
     endpoint_budget = Budget(

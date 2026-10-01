@@ -37,6 +37,7 @@ async def get_domain_gates(pool: Pool, _owner: Owner) -> dict[str, Any]:
                 "allowed": x.allowed,
                 "threshold_version": x.version,
                 "samples": x.sample_count,
+                "distinct_subjects": x.subject_count,
                 "failures": x.failures,
                 "reasons": list(x.reasons),
             }
@@ -64,6 +65,7 @@ async def get_signal_gates(pool: Pool, _owner: Owner) -> dict[str, Any]:
             "pit_checked": d.pit_checked,
             "pit_violations": d.pit_violations,
             "audited_at": d.audited_at,
+            "reviewer": d.reviewer,
             "reasons": list(d.reasons),
         }
     return out

@@ -8,8 +8,9 @@ import json
 import asyncpg
 import pytest
 
-from steward.jobs.runner import run_job
+from steward.jobs.runner import JobFailed, run_job
 from steward.verify_sources.jobs import (
+    parse_flag,
     raw_retention_handler,
     shadow_report_handler,
     shadow_snapshot_handler,
@@ -109,3 +110,95 @@ async def test_zero_cost_job_fails_on_a_reachable_paid_endpoint(backend_pool: as
         "select error from public.job where job_type='zero_cost_gate' order by id desc limit 1"
     )
     assert "fmp/profile: paid_reachable" in error
+
+
+@pytest.mark.parametrize(
+    ("value", "expected"),
+    [
+        (True, True),
+        (False, False),
+        ("true", True),
+        ("True", True),
+        ("false", False),
+        ("False", False),
+        ("0", False),
+        ("1", True),
+        ("no", False),
+        ("off", False),
+        ("", False),
+        (None, False),
+        (0, False),
+        (1, True),
+    ],
+)
+def test_job_flags_are_parsed_not_truth_tested(value: object, expected: bool) -> None:
+    """`bool("false")` is True: a dry_run that arrived as text must still mean what it says."""
+    assert parse_flag(value) is expected
+
+
+def test_unreadable_flag_fails_loudly() -> None:
+    with pytest.raises(JobFailed, match="boolean"):
+        parse_flag("maybe")
+
+
+@pytest.mark.db
+async def test_retention_dry_run_string_false_really_prunes(backend_pool: asyncpg.Pool) -> None:
+    await backend_pool.execute(
+        "insert into public.source_observation(domain,metric,period_start,period_end,value,unit,"
+        "source,source_url,known_at,access_state,raw) values('macro','gdp','2020-01-01',"
+        "'2020-12-31',1,'pct','world_bank','https://x','2020-06-01','available','{\"a\":1}')"
+    )
+    await run_job(
+        backend_pool,
+        "raw_retention",
+        raw_retention_handler,
+        trigger="manual",
+        params={"dry_run": "true"},
+    )
+    assert await backend_pool.fetchval("select raw::text from public.source_observation") != "{}"
+    await run_job(
+        backend_pool,
+        "raw_retention",
+        raw_retention_handler,
+        trigger="manual",
+        params={"dry_run": "false"},
+    )
+    assert await backend_pool.fetchval("select raw::text from public.source_observation") == "{}"
+
+
+@pytest.mark.db
+async def test_zero_cost_job_does_not_fail_on_a_safely_blocked_endpoint(
+    backend_pool: asyncpg.Pool,
+) -> None:
+    await backend_pool.execute(
+        "select public.record_provider_attempt('fmp','profile','paid_only','premium',null,402,"
+        "null,null,null,0)"
+    )
+    await backend_pool.execute(
+        "update public.provider_access set state='temporarily_failed'"
+        " where provider='fmp' and endpoint='profile'"
+    )
+    assert (
+        await run_job(backend_pool, "zero_cost_gate", zero_cost_gate_handler, trigger="manual")
+        == "succeeded"
+    )
+    detail = (await _steps(backend_pool, "zero_cost_gate"))[0]["detail"]
+    assert detail["warnings_by_code"]["blocked_state_drift"] == 1  # type: ignore[index]
+
+
+@pytest.mark.db
+async def test_shadow_report_job_with_a_short_window_is_never_signed_off(
+    backend_pool: asyncpg.Pool,
+) -> None:
+    assert (
+        await run_job(
+            backend_pool,
+            "shadow_report",
+            shadow_report_handler,
+            trigger="manual",
+            params={"date": DAY.isoformat(), "window_days": "7"},
+        )
+        == "succeeded"
+    )
+    detail = (await _steps(backend_pool, "shadow_report"))[0]["detail"]
+    assert detail["sign_off_ready"] is False and detail["window_days"] == 7  # type: ignore[index]

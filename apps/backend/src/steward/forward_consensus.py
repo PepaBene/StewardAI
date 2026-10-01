@@ -61,7 +61,7 @@ def observation_key(
         _number(high),
         "" if analyst_count is None else str(analyst_count),
     ]
-    return hashlib.md5("|".join(parts).encode(), usedforsecurity=False).hexdigest()  # noqa: S324
+    return hashlib.md5("|".join(parts).encode(), usedforsecurity=False).hexdigest()
 
 
 SeriesKey = tuple[str, str, str, str, str]

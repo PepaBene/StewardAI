@@ -28,7 +28,7 @@ from steward.macro.providers import (
     parse_world_bank,
 )
 from steward.ownership.insider import parse_ownership_xml
-from steward.sources import cnb, esef, esma, openfigi, pse, wikidata, xbrl
+from steward.sources import cnb, esef, esma, openfigi, pse, twelvedata, wikidata, xbrl
 from steward.sources import market as market_src
 from steward.sources.alphavantage import AlphaVantageError, company_overview
 from steward.sources.company_research import parse_ops_patent_xml, parse_pdl_company
@@ -599,18 +599,23 @@ PARSER_CASES: list[ParserCase] = [
         lambda x: parse_ops_patent_xml(x, ("Example Corporation",)),
         lambda: (
             '<ops:world-patent-data xmlns:ops="urn:ops" xmlns:ex="urn:ex">'
-            '<ex:exchange-document doc-number="123" country="EP">'
-            '<ex:document-id document-id-type="docdb" doc-number="123"/>'
-            "<ex:applicant><ex:applicant-name>Example Corporation</ex:applicant-name>"
-            "</ex:applicant>"
-            "<ex:invention-title>Example invention</ex:invention-title>"
-            '<ex:priority-claim date="20240102"/>'
-            "<ex:classification-symbol>A01B</ex:classification-symbol>"
-            "</ex:exchange-document></ops:world-patent-data>"
+            '<ex:exchange-document family-id="9001" country="EP" doc-number="123" kind="A1">'
+            "<ex:bibliographic-data>"
+            "<ex:publication-reference>"
+            '<ex:document-id document-id-type="docdb"><ex:country>EP</ex:country>'
+            "<ex:doc-number>123</ex:doc-number><ex:kind>A1</ex:kind>"
+            "<ex:date>20240601</ex:date></ex:document-id></ex:publication-reference>"
+            '<ex:priority-claim><ex:document-id document-id-type="docdb">'
+            "<ex:date>20240102</ex:date></ex:document-id></ex:priority-claim>"
+            '<ex:parties><ex:applicants><ex:applicant data-format="original">'
+            "<ex:applicant-name><ex:name>Example Corporation</ex:name></ex:applicant-name>"
+            "</ex:applicant></ex:applicants></ex:parties>"
+            '<ex:invention-title lang="en">Example invention</ex:invention-title>'
+            "</ex:bibliographic-data></ex:exchange-document></ops:world-patent-data>"
         ),
         (FreeSourceError, ValueError),
         empty="",
-        drift=lambda t: t.replace("ex:applicant-name", "ex:person-name"),
+        drift=lambda t: t.replace("ex:name", "ex:person-name"),
         partial=half_text,
     ),
 ]
@@ -923,6 +928,15 @@ FETCH_CASES: list[FetchCase] = [
     _public_macro_case("world_bank", json.loads((CON / "world_bank.json").read_text())),
     _public_macro_case("sdmx", json.loads((CON / "sdmx.json").read_text())),
     _public_macro_case("comtrade", json.loads((CON / "comtrade.json").read_text())),
+    FetchCase(
+        "twelvedata_time_series",
+        "steward.sources.twelvedata",
+        lambda http: twelvedata.probe_time_series(http, "k", "ASML", "Euronext"),
+        _ok_json("twelvedata_time_series.json"),
+        (twelvedata.TwelveDataError,),
+        access_of=lambda probe: probe,  # the probe carries .state and .detail
+        garbage_typed=False,
+    ),
 ]
 
 # Modules with no parser or network contract of their own, and why.
@@ -937,6 +951,10 @@ NON_ADAPTER_MODULES: dict[str, str] = {
     "steward.sources.fund_probes": "probe classifier and normalizers, covered by CLASSIFIER_CASES",
     "steward.sources.xml_guard": "DTD/entity guard, covered by test_funds_stream_hardening",
     "steward.sources.ciks": "CIK normalisation helper, covered by test_funds_stream_hardening",
+    "steward.sources.credit_group": "governor credit-group reservation helper: no parser and no "
+    "network contract of its own",
+    "steward.sources.xbrl_concepts": "static XBRL concept classification table: no parser and no "
+    "network contract of its own (the parsers that use it are covered under steward.sources.xbrl)",
 }
 
 # (status, body, allowed states) for the two probe classifiers.

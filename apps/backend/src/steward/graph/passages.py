@@ -394,8 +394,8 @@ async def review_hit(
     except EdgarError as exc:
         attempts = hit["attempts"] + 1
         await pool.execute(
-            """update public.filing_hit set attempts=$2, review_note=$3,
-                 review_state=case when $2>=$4 then 'failed' else 'pending' end, updated_at=now()
+            """update public.filing_hit set attempts=$2::int, review_note=$3,
+                 review_state=case when $2::int>=$4::int then 'failed' else 'pending' end, updated_at=now()
                where id=$1""",
             hit["id"],
             attempts,
@@ -495,7 +495,15 @@ async def review_pending_hits(
         list(holding_names),
         limit,
     )
-    return [
-        await review_hit(pool, edgar, hit, holding_names=holding_names[hit["ticker"]])
-        for hit in hits
-    ]
+    results: list[dict[str, object]] = []
+    for hit in hits:
+        # An earlier hit on the same document may already have resolved this one.
+        state = await pool.fetchval(
+            "select review_state from public.filing_hit where id=$1", hit["id"]
+        )
+        if state != "pending":
+            continue
+        results.append(
+            await review_hit(pool, edgar, hit, holding_names=holding_names[hit["ticker"]])
+        )
+    return results

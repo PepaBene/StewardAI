@@ -13,7 +13,7 @@ LEI_RE = re.compile(r"^[0-9A-Z]{18}[0-9]{2}$")
 QID_RE = re.compile(r"^wd:q[0-9]+$", re.IGNORECASE)
 _LEGAL_FORM = re.compile(
     r" (inc|incorporated|corp|corporation|co|company|ltd|limited|plc|ag|sa|nv|se|llc|lp|gmbh|bv"
-    r"|spa|oyj|ab|asa|holdings?)$"
+    r"|spa|oyj|ab|asa)$"
 )
 
 

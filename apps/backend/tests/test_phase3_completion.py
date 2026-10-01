@@ -358,7 +358,9 @@ async def test_edgar_fts_topics_become_items_and_filers_become_suggestions(
     assert len(items) == 2
     assert all(json.loads(i["links"])[0]["via"] == "topic" for i in items)
     hits = await backend_pool.fetch("select kind, news_item_id, relationship_id from filing_hit")
-    assert {h["kind"] for h in hits} == {"topic", "supplier"}
+    # The keyword search no longer tags a filer "supplier"/"customer" (D5.8): the hit is a
+    # review candidate with no role until a fetched passage is read (steward.graph.passages).
+    assert {h["kind"] for h in hits} == {"topic", "relationship_candidate"}
     assert all(h["news_item_id"] for h in hits if h["kind"] == "topic")
     # A filer near "customer"/"supplier" proves no relationship (D5.8): the hits stay unlinked
     # review candidates until a fetched passage is resolved.

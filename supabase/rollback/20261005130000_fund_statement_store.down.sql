@@ -30,6 +30,8 @@ alter table public.financial_statement_fact
 alter table public.financial_statement_fact add constraint financial_statement_fact_check
   check (value is not null or text_block is not null);
 
+drop trigger if exists forward_observation_set_key on public.forward_observation;
+drop function if exists public.forward_observation_set_key();
 drop index if exists public.forward_observation_content;
 alter table public.forward_observation drop column if exists observation_key;
 

@@ -24,6 +24,7 @@ from steward.market_analysis import compatible_peer_mean, financial_peer_metrics
 from steward.peer_metrics import latest_period, peer_comparison
 from steward.sources.edgar import Filing, amended_filing, amendments_to_check, latest_periodic
 from steward.sources.esef import parse_xbrl_json
+from steward.sources.xbrl import Labels as _Labels
 from steward.sources.xbrl import (
     RevenueRow,
     XbrlError,
@@ -32,11 +33,11 @@ from steward.sources.xbrl import (
     parse_instance,
     parse_labels,
 )
-from steward.sources.xbrl import Labels as _Labels
 from steward.sources.xbrl_concepts import classify, currency_of
 from steward.valuation.fundamentals import Fact, _by_concept, compute
 from steward.valuation.read import price_to_sales
-from tests.fund_stream_helpers import Ctx, Fact as XFact, instance_xml, pdf_bytes, xlsx_bytes
+from tests.fund_stream_helpers import Ctx, instance_xml, pdf_bytes, xlsx_bytes
+from tests.fund_stream_helpers import Fact as XFact
 
 D = Decimal
 Y25 = dt.date(2025, 1, 1), dt.date(2025, 12, 31)
@@ -708,7 +709,7 @@ def test_mark_subtotals_is_bounded_on_a_pathological_breakdown() -> None:
     """24 members with no subset structure: the search must give up within its budget."""
     import random
 
-    rng = random.Random(7)
+    rng = random.Random(7)  # noqa: S311 - a reproducible fixture, not a secret
     members = [_row(f"m{i}", rng.randint(10_000, 99_999) * 7 + 1) for i in range(24)]
     total = D(1)  # forces `excess()` for ever
     started = time.monotonic()
@@ -810,10 +811,10 @@ def test_xlsx_consensus_table_parses_with_analyst_counts() -> None:
 
 def test_html_table_and_pdf_text_parse_the_same_figures() -> None:
     html = (
-        "<html><body><h1>Consensus</h1><table><tr><th>Metric</th><th>Period</th><th>Mean</th>"
-        "<th>Analysts</th></tr><tr><td>Revenue</td><td>FY2026Q4</td><td>10.7</td><td>14</td></tr>"
-        "</table></body></html>"
-    ).encode()
+        b"<html><body><h1>Consensus</h1><table><tr><th>Metric</th><th>Period</th><th>Mean</th>"
+        b"<th>Analysts</th></tr><tr><td>Revenue</td><td>FY2026Q4</td><td>10.7</td><td>14</td></tr>"
+        b"</table></body></html>"
+    )
     parsed = ir.parse_release(ir.document_lines(html, "text/html"), "consensus")
     assert parsed.forward[0].analyst_count == 14 and parsed.forward[0].value == D("10.7")
     pdf = ir.parse_release(ir.document_lines(pdf_bytes(GUIDANCE)), "guidance")

@@ -652,8 +652,35 @@ DOCUMENT_ITEMS: tuple[str, ...] = (
     "dei:CurrentFiscalYearEndDate",
 )
 
+# A numeric disclosure is never filed under `note`: that statement is for text blocks (what
+# `filed_notes` cites) and for detail facts with no line item. These line items belong to the
+# statement they are a figure of.
+_STATEMENT_OF: dict[str, Statement] = {
+    **{f"debt_maturity_{y}": "balance_sheet" for y in ("y1", "y2", "y3", "y4", "y5")},
+    "debt_maturity_after_y5": "balance_sheet",
+    "debt_maturity_remainder": "balance_sheet",
+    "lease_cost": "income",
+    "lease_payments_due_y1": "balance_sheet",
+    "lease_payments_due_y2": "balance_sheet",
+    "lease_payments_due_after_y5": "balance_sheet",
+    "income_tax_current": "income",
+    "income_tax_deferred": "income",
+    "effective_tax_rate": "income",
+    "income_taxes_paid": "cash_flow",
+    "deferred_tax_assets": "balance_sheet",
+    "deferred_tax_liabilities": "balance_sheet",
+    "unrecognized_tax_benefits": "balance_sheet",
+    "shares_repurchased": "shares",
+    "share_repurchase_value": "cash_flow",
+    "repurchase_authorization": "balance_sheet",
+    "pension_obligation": "balance_sheet",
+    "pension_plan_assets": "balance_sheet",
+    "pension_funded_status": "balance_sheet",
+    "pension_net_cost": "income",
+}
+
 STATEMENT_ITEMS: dict[str, tuple[Statement, str]] = {
-    concept: (statement, line_item)
+    concept: (_STATEMENT_OF.get(line_item, statement), line_item)
     for _group, statement, line_item, concepts in _ENTRIES
     for concept in concepts
 }

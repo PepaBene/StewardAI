@@ -315,3 +315,87 @@ async def review_queue(
         "suggested_disclosures": [dict(r) for r in suggested],
         "contradictions": [dict(r) for r in contradictions],
     }
+
+
+async def portfolio_knock_on(
+    pool: asyncpg.Pool, as_of: dt.datetime | None = None
+) -> list[dict[str, Any]]:
+    """Confirmed, dated customer / supplier links between two *held* companies.
+
+    A counterparty counts as another holding when its normalised name equals the normalised
+    name or an alias of an open position. Only confirmed disclosures with a known direction and
+    a start date, and confirmed customer / supplier edges, are used; shares are the
+    issuer-basis shares as reported and are never imputed or summed across holdings."""
+    held = await pool.fetch(
+        """select i.t212_ticker ticker, i.name,
+                  coalesce(array_agg(a.alias) filter (where a.alias is not null), '{}') aliases
+           from public.instrument i left join public.entity_alias a
+             on a.ticker=i.t212_ticker and a.kind in ('legal_name','other_name','alias')
+           where i.t212_ticker in (select ticker from public.position_snapshot
+             where snapshot_date=coalesce(
+               (select max(snapshot_date) from public.account_snapshot),
+               (select max(snapshot_date) from public.position_snapshot)))
+           group by i.t212_ticker, i.name"""
+    )
+    by_name: dict[str, str] = {}
+    for row in held:
+        for name in [row["name"], *row["aliases"]]:
+            if name:
+                by_name.setdefault(
+                    await pool.fetchval("select public.graph_norm_object_key($1)", name),
+                    row["ticker"],
+                )
+    disclosures = await pool.fetch(
+        """select ticker,relationship,direction,counterparty_name,counterparty_key_norm,
+                  reported_share,share_basis,fiscal_period,valid_from,id
+           from public.relationship_disclosure
+           where status='confirmed' and direction<>'unknown' and valid_from is not null
+             and not anonymous_counterparty and relationship in ('customer','supplier')
+             and valid_from<=coalesce($1::date,current_date)
+             and ($1::timestamptz is null or known_at<=$1)""",
+        as_of,
+    )
+    edges = await pool.fetch(
+        """select subject_key ticker,edge_type relationship,object_name counterparty_name,
+                  object_key_norm counterparty_key_norm,valid_from,id
+           from public.company_graph_edge
+           where status='confirmed' and edge_type in ('customer','supplier')
+             and valid_from is not null and valid_from<=coalesce($1::date,current_date)
+             and (valid_to is null or valid_to>=coalesce($1::date,current_date))
+             and ($1::timestamptz is null or known_at<=$1)""",
+        as_of,
+    )
+    out: list[dict[str, Any]] = []
+    for row in disclosures:
+        other = by_name.get(row["counterparty_key_norm"] or "")
+        if other and other != row["ticker"]:
+            out.append(
+                {
+                    "ticker": row["ticker"],
+                    "counterparty_ticker": other,
+                    "relationship": row["relationship"],
+                    "direction": row["direction"],
+                    "reported_share": row["reported_share"],
+                    "share_basis": row["share_basis"],
+                    "fiscal_period": row["fiscal_period"],
+                    "source": f"disclosure:{row['id']}",
+                }
+            )
+    for edge in edges:
+        other = by_name.get(edge["counterparty_key_norm"])
+        if other and other != edge["ticker"]:
+            out.append(
+                {
+                    "ticker": edge["ticker"],
+                    "counterparty_ticker": other,
+                    "relationship": edge["relationship"],
+                    "direction": "issuer_sells_to"
+                    if edge["relationship"] == "customer"
+                    else "issuer_buys_from",
+                    "reported_share": None,
+                    "share_basis": None,
+                    "fiscal_period": None,
+                    "source": f"edge:{edge['id']}",
+                }
+            )
+    return out

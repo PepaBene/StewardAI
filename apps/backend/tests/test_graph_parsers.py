@@ -312,7 +312,7 @@ def test_normalized_object_key_agrees_for_name_variants() -> None:
     assert normalize_object_key("The Coca-Cola Company") == "name:coca cola"
     assert normalize_object_key("5493001KJTIIGC8Y1R12") == "5493001KJTIIGC8Y1R12"
     assert normalize_object_key("wd:q42") == "wd:Q42"
-    assert normalize_object_key("Alpha & Omega Holdings Inc.") == "name:alpha and omega"
+    assert normalize_object_key("Alpha & Omega Holdings Inc.") == "name:alpha and omega holdings"
 
 
 def test_evidence_class_matches_whole_tokens_only() -> None:

@@ -655,8 +655,7 @@ async def test_expense_ratio_lookup_skips_nulls_and_respects_as_of(
         (dt.date(2026, 9, 1), dt.datetime(2026, 9, 2, 9, tzinfo=dt.UTC)),
     ):
         await backend_pool.execute(
-            "update fund_factsheet set fetched_at = $2"
-            " where fund_isin = $1 and as_of = $3",
+            "update fund_factsheet set fetched_at = $2 where fund_isin = $1 and as_of = $3",
             CSPX_ISIN,
             fetched,
             as_of,

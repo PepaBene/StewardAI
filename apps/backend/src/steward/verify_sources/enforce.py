@@ -103,7 +103,7 @@ async def conclusion_gate(
             f"{d.domain}: {reason}" for d in exc.decisions if not d.allowed for reason in d.reasons
         )
         return Enforcement(False, "conclusion", conclusion, reasons or (str(exc),))
-    except (asyncpg.PostgresError, OSError) as exc:
+    except (asyncpg.PostgresError, asyncpg.InterfaceError, OSError) as exc:
         return Enforcement(False, "conclusion", conclusion, (f"gate unavailable: {exc}",))
     return Enforcement(True, "conclusion", conclusion)
 
@@ -121,7 +121,7 @@ async def signal_gate(
     """May this derived signal publish?  Never raises; fails closed."""
     try:
         decision = await publish_gate(pool, signal_name, now=now)
-    except (asyncpg.PostgresError, OSError) as exc:
+    except (asyncpg.PostgresError, asyncpg.InterfaceError, OSError) as exc:
         return Enforcement(False, "signal", signal_name, (f"gate unavailable: {exc}",))
     return Enforcement(decision.allowed, "signal", signal_name, decision.reasons)
 

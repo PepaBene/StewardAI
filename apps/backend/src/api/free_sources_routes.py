@@ -14,8 +14,9 @@ from pydantic import BaseModel, ConfigDict, Field, model_validator
 from api.auth import Owner
 from api.db import Pool
 from steward.config.holding_profiles import HoldingProfile, HoldingProfilesConfig
+from steward.config.jobs import JobsConfig
 from steward.config.store import StoredConfig, load_active
-from steward.db_json import decode_rows
+from steward.db_json import decode_rows, decode_structured_rows
 from steward.free_source_reads import (
     business_network_payload,
     company_research_rows,
@@ -43,6 +44,7 @@ from steward.graph.patents import store_patent_family as _store_patent
 from steward.graph.relationships import concentration, detect_contradictions, upsert_disclosure
 from steward.market_analysis import financial_peer_metrics
 from steward.peer_metrics import FORMULA_DETAIL, FORMULAS, peer_comparison
+from steward.reference.calendar import expected_sessions
 from steward.reference.listings import (
     ListingDecisionError,
     confirm_listing,
@@ -484,7 +486,7 @@ async def exposure_context(ticker: TickerPath, pool: Pool, _owner: Owner) -> dic
         "exposure_assumptions": [e.model_dump(mode="json") for e in profile.exposures]
         if profile
         else [],
-        "observations": [dict(row) for row in observations],
+        "observations": decode_structured_rows(observations, ("raw",)),
         "limitations": [
             "Price series are contextual inputs, not estimates of issuer margin sensitivity.",
             "Exposure shares are shown only when entered in the holding profile.",
@@ -625,6 +627,34 @@ async def exchange_sessions(
         end,
     )
     return [dict(row) for row in rows]
+
+
+@router.get("/exchange-sessions/{mic}/expected", tags=["reference"], response_model=None)
+async def expected_exchange_sessions(
+    mic: Annotated[str, Path(pattern=r"^[A-Z0-9]{4}$")],
+    pool: Pool,
+    _owner: Owner,
+    start: Annotated[date, Query()],
+    end: Annotated[date, Query()],
+) -> dict[str, Any]:
+    """The sessions the exchange held in a window: confirmed `exchange_session` rows first
+    (half-days, ad hoc closures), else weekdays less the closures confirmed in the Jobs config.
+    This is the denominator of return-window coverage and the yardstick of price freshness."""
+    if end < start:
+        raise HTTPException(422, "end must not precede start")
+    jobs = await load_active(pool, "jobs", JobsConfig)
+    expected = await expected_sessions(
+        pool, (jobs.body if jobs else JobsConfig()).calendar, mic, start, end
+    )
+    return {
+        "mic": mic,
+        "start": start,
+        "end": end,
+        "count": expected.count,
+        "basis": expected.basis,
+        "confirmed_days": expected.confirmed_days,
+        "days": expected.days,
+    }
 
 
 @router.post("/exchange-sessions", tags=["reference"], response_model=None)
@@ -879,7 +909,7 @@ async def list_corporate_actions(
         sorted(names),
         ticker,
     )
-    return [dict(r) for r in rows]
+    return decode_structured_rows(rows, ("raw",))
 
 
 async def _holding_symbol_names(pool: Pool, ticker: str) -> set[str]:
@@ -1459,7 +1489,11 @@ async def record_patent_family(
 async def business_network(
     ticker: TickerPath, pool: Pool, _owner: Owner, as_of: Annotated[datetime | None, Query()] = None
 ) -> dict[str, Any]:
-    return await business_network_payload(pool, ticker, as_of)
+    payload = await business_network_payload(pool, ticker, as_of)
+    # jsonb columns arrive as text (no pool codec); `decode_structured` is idempotent.
+    for key, columns in (("edges", ("detail",)), ("events", ("terms", "detail", "thesis_kpi"))):
+        payload[key] = decode_structured_rows(payload.get(key, []), columns)
+    return payload
 
 
 @router.post("/holdings/{ticker}/relationship-disclosures", tags=["holdings"])

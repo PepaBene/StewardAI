@@ -495,3 +495,46 @@ def test_every_audit_scenario_states_whether_it_runs_against_a_real_extractor() 
     assert oracle_only == {"false_mentions", "anonymous_customers"}
     for name, basis in AUDIT_SCENARIOS.items():
         assert basis.target and (basis.kind == "real" or basis.note), name
+
+
+# ---------------------------------------------------------------------------------------
+# P8-15: coverage query semantics
+# ---------------------------------------------------------------------------------------
+@pytest.mark.db
+async def test_coverage_counts_entities_by_kind_and_leaves_macro_entities_unknown(
+    backend_pool: asyncpg.Pool,
+) -> None:
+    pool = backend_pool
+    issuer = await pool.fetchval("insert into public.issuer(legal_name) values('I') returning id")
+    security = await pool.fetchval(
+        "insert into public.security(kind,name) values('equity','S') returning id"
+    )
+    # one security and one issuer that happen to share an id value, plus rows tied to no entity
+    assert issuer is not None and security is not None
+    for i, entity_sql in enumerate(
+        (f"{security}, null", f"null, {issuer}", "null, null", "null, null")
+    ):
+        await pool.execute(
+            "insert into public.source_observation(domain,metric,geography,period_start,"
+            "period_end,value,unit,source,source_url,known_at,access_state,security_id,issuer_id)"
+            f" values('fundamentals','revenue','CZ','2025-01-01','2025-12-{20 + i}',1,'EUR','s',"
+            f"'https://x.test', now(),'available',{entity_sql})"
+        )
+    await pool.execute(
+        "insert into public.macro_observation(series_id,source,geography,period,value,unit,"
+        "frequency,known_at,vintage,source_url) values('cpi','ecb','CZ','2025-01-01',1,'pct',"
+        "'monthly',now(),'v1','https://x')"
+    )
+    by = {
+        (r["jurisdiction"], r["domain"], r["metric"]): r
+        for r in await coverage_by_jurisdiction_and_metric(pool)
+    }
+    revenue = by[("CZ", "fundamentals", "revenue")]
+    assert revenue["observations"] == 4
+    assert (
+        revenue["entities"] == 2
+    )  # a security and an issuer, never merged; no-entity rows add none
+    assert by[("CZ", "macro", "cpi")]["entities"] is None  # not applicable, not a measured zero
+    # the `since` bound is a lower bound on known_at
+    future = dt.datetime.now(dt.UTC) + dt.timedelta(days=1)
+    assert await coverage_by_jurisdiction_and_metric(pool, since=future) == []

@@ -52,6 +52,7 @@ from steward.reference.identity import holding_tickers
 from steward.reference.prices import symbols_for
 from steward.settings import get_settings
 from steward.sources.alphavantage import AlphaVantageError, company_overview
+from steward.sources.base import AccessState
 from steward.sources.edgar import (
     EdgarClient,
     EdgarError,
@@ -762,9 +763,11 @@ def _transient(exc: Exception) -> bool:
     if isinstance(exc, httpx.HTTPError):
         return True
     if isinstance(exc, AlphaVantageError):
+        # NOT_COVERED ("Error Message": the provider does not know the symbol) is about the
+        # symbol; every other typed state, and any 429 / 5xx, says nothing about it.
         return (
             not exc.provider_charged
-            or exc.state is not None
+            or (exc.state is not None and exc.state is not AccessState.NOT_COVERED)
             or (exc.status_code is not None and exc.status_code >= 429)
         )
     return False

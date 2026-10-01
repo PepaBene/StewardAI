@@ -76,6 +76,24 @@ alter table public.forward_observation alter column observation_key set not null
 create unique index forward_observation_content
   on public.forward_observation (ticker, observation_key);
 
+-- Any writer gets the key: a row inserted without one (the backend's own helper passes it
+-- computed in Python with the same fields and number formatting) is keyed here.
+create function public.forward_observation_set_key() returns trigger
+language plpgsql set search_path = '' as $$
+begin
+  if new.observation_key is null then
+    new.observation_key := md5(concat_ws('|',
+      new.kind, coalesce(new.provider, ''), new.metric, new.fiscal_period,
+      coalesce(new.basis, ''), coalesce(new.currency, ''), coalesce(new.vintage, ''),
+      coalesce(new.period_end::text, ''), coalesce(trim_scale(new.value)::text, ''),
+      coalesce(trim_scale(new.low)::text, ''), coalesce(trim_scale(new.high)::text, ''),
+      coalesce(new.analyst_count::text, '')));
+  end if;
+  return new;
+end $$;
+create trigger forward_observation_set_key before insert on public.forward_observation
+  for each row execute function public.forward_observation_set_key();
+
 -- ---------------------------------------------------------------------------------------------
 -- peer_set: status history
 -- ---------------------------------------------------------------------------------------------

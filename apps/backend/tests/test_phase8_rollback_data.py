@@ -7,6 +7,7 @@ rolled back, so the shared migrated database is left untouched.
 
 from __future__ import annotations
 
+import re
 from collections.abc import AsyncIterator
 
 import asyncpg
@@ -149,11 +150,19 @@ async def test_source_type_rollback_reports_rows_that_use_the_newer_type(
         pass
 
 
-def test_every_rollback_that_restores_a_check_documents_its_precondition() -> None:
+def test_every_rollback_that_restores_a_check_is_loud_or_discloses_its_deletions() -> None:
+    """Re-adding a narrower CHECK fails on rows using a newer value.  The rollback must either
+    stop with a clear PRECONDITION error before changing anything, or delete the offending rows
+    explicitly and say so (DATA LOSS / DELETES), never leave the raw constraint violation."""
     offenders = []
     for path in sorted(ROLLBACK_DIR.glob("*.down.sql")):
         text = path.read_text()
-        if " add constraint " in text and "CHECK" in text and "PRECONDITION" not in text:
+        restores_check = re.search(r"add constraint \w+\s+check", text, re.IGNORECASE)
+        if not restores_check:
+            continue
+        loud = "PRECONDITION" in text
+        discloses = "delete from" in text.lower() and ("DATA LOSS" in text or "DELETES" in text)
+        if not (loud or discloses):
             offenders.append(path.name)
     assert offenders == []
 

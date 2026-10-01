@@ -66,7 +66,7 @@ def test_every_free_source_migration_has_a_documented_rollback() -> None:
         path = rollback_path(ROLLBACK_DIR, migration)
         notes = rollback_notes(path)
         assert f"{migration.stem}.sql" in notes, migration.name
-        assert "proven by" in notes
+        assert "proven by" in notes.casefold(), migration.name
         if "drop table" in path.read_text():
             assert "DATA LOSS" in notes, f"{migration.name}: dropped tables must be disclosed"
 

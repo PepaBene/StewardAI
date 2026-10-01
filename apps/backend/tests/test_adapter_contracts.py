@@ -75,7 +75,7 @@ def sleep_log(monkeypatch: pytest.MonkeyPatch) -> SleepLog:
 
 async def test_sleep_guard_stops_a_runaway_retry_loop(sleep_log: SleepLog) -> None:
     async def forever() -> None:
-        while True:
+        while True:  # noqa: ASYNC110 - the point is to model a runaway retry loop
             await asyncio.sleep(1)
 
     with pytest.raises(AssertionError, match="retry loop"):

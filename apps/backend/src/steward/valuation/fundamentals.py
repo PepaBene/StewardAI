@@ -93,7 +93,7 @@ def _debt_concepts(taxonomy: str) -> list[str]:
         concept
         for concept, group in STATEMENT_GROUP.items()
         if group == "debt"
-        and STATEMENT_ITEMS[concept][0] == "balance_sheet"
+        and not (STATEMENT_ITEMS[concept][1] or "").startswith("debt_maturity")
         and concept.startswith(f"{taxonomy}:")
     ]
 

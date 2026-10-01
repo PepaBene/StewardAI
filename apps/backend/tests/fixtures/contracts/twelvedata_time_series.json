@@ -1,0 +1,8 @@
+{
+  "meta": {"symbol": "ASML", "interval": "1day", "currency": "EUR", "exchange_timezone": "Europe/Amsterdam", "exchange": "Euronext", "type": "Common Stock"},
+  "values": [
+    {"datetime": "2026-09-30", "open": "650.10", "high": "655.00", "low": "648.20", "close": "652.30", "volume": "812345"},
+    {"datetime": "2026-09-29", "open": "648.00", "high": "651.90", "low": "645.50", "close": "650.00", "volume": "790123"}
+  ],
+  "status": "ok"
+}

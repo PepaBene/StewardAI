@@ -2,6 +2,12 @@
 -- tables, status history for as-of reads, deal/event decision columns, passage review queue,
 -- relationship contradictions, patent publications and dated ownership paths, Wikidata
 -- statement provenance, research-observation dedupe and provider auth-failure cooldowns.
+--
+-- G13 note: 20261001131038_free_source_research_consumers.sql rebuilt source_type_check without
+-- 'reference'. 20261002130000_source_type_reference.sql restores it, so a database migrated in
+-- order ends with the full list; this migration neither touches that constraint nor depends on
+-- it. (On a database that already holds a 'reference' source row, 20261001131038 on its own
+-- would fail; fresh databases and the ordered chain do not.)
 
 -- ---------------------------------------------------------------------------------------
 -- Normalised object key. Python mirror: steward.graph.keys.normalize_object_key.
@@ -28,7 +34,7 @@ begin
   loop
     prev := s;
     s := btrim(regexp_replace(s,
-      ' (inc|incorporated|corp|corporation|co|company|ltd|limited|plc|ag|sa|nv|se|llc|lp|gmbh|bv|spa|oyj|ab|asa|holdings?)$',
+      ' (inc|incorporated|corp|corporation|co|company|ltd|limited|plc|ag|sa|nv|se|llc|lp|gmbh|bv|spa|oyj|ab|asa)$',
       ''));
     i := i + 1;
     exit when s = prev or i >= 4;

@@ -1,6 +1,7 @@
 -- Rollback for supabase/migrations/20261005110000_macro_trade_correctness.sql (plan D8.4).
 -- Restores the one-total exposure cap, the two-value flow check and drops the columns,
--- functions and table the migration added. Run it in a transaction, newest migration first.
+-- functions and table the migration added. Proven by apps/backend/tests/test_lifecycle_phase8.py.
+-- Run it in a transaction, newest migration first.
 -- DATA LOSS: deletes re_export / re_import trade rows; drops these columns and their values:
 -- trade_observation.net_weight, reporter_iso, partner_iso, vintage, revision; drops
 -- hs_concordance and every row in it. Revision labels stay in the canonical HS<year> form.

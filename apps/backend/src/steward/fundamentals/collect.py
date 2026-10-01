@@ -182,7 +182,10 @@ async def store_segments(
             filed_at=f.filing_date,
             accepted_at=f.accepted_at,
             known_at=known_at,
-            quote=f"{f.form} {f.accession} filed {f.filing_date}: XBRL financial statements ({ticker})",
+            quote=(
+                f"{f.form} {f.accession} filed {f.filing_date}: "
+                f"XBRL financial statements ({ticker})"
+            ),
             amends_external_id=amends_accession,
         )
         meta = FilingMeta(

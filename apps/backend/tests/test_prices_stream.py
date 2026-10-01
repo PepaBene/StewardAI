@@ -45,11 +45,9 @@ from steward.reference.calendar import (
 )
 from steward.reference.intraday import market_open
 from steward.reference.listings import (
-    confirm_listing,
     derive_listings,
     resolve_series_listing,
 )
-from steward.reference.price_diagnostics import holding_price_diagnostics
 from steward.reference.price_series import (
     PriceSymbols,
     SeriesRef,
@@ -210,9 +208,7 @@ def test_dividend_currency_pence_pound_fx_withholding_adr_and_fx_dates() -> None
     assert result.value == D("0.085")  # 0.85 GBP = 85 pence on a 1000 pence close
     assert result.details["fx_dates"] == {day(2).isoformat(): "0.85"}
     # 15 % withholding is an explicit, reported assumption.
-    net = calculate_return(
-        points, [pence], reinvest_dividends=True, withholding_rate=D("0.15")
-    )
+    net = calculate_return(points, [pence], reinvest_dividends=True, withholding_rate=D("0.15"))
     assert net.value == D("0.0085")
     assert "15.0 %" in str(net.details["withholding_assumption"]).replace("%", " %")
     # ADS ratio: the dividend is per ordinary share and one ADS is five of them.
@@ -298,7 +294,9 @@ def test_an_ad_hoc_closure_without_any_holiday_closes_the_day() -> None:
     closed = _sessions(SessionRow("XNYS", tuesday, "closed", reason="ad hoc closure"))
     assert not exchange_open(settings, "XNYS", tuesday, closed)
     # The configured closure still works without a row; a confirmed open row overrides it.
-    configured = CalendarSettings(exchange_closures=[ExchangeClosure(mic="XPRA", date=tuesday)])
+    configured = CalendarSettings(
+        exchange_closures=[ExchangeClosure(mic="XPRA", date=tuesday, name="Bank holiday")]
+    )
     assert not exchange_open(configured, "XPRA", tuesday)
     reopened = _sessions(SessionRow("XPRA", tuesday, "open"))
     assert exchange_open(configured, "XPRA", tuesday, reopened)
@@ -374,9 +372,9 @@ def test_probe_outcomes_separate_missing_coverage_from_technical_denials() -> No
         {"code": 400, "status": "error", "message": "**symbol** not found: XYZ"}
     )
     assert missing.state is AccessState.NOT_COVERED
-    assert twelvedata.classify_time_series({"code": 429, "message": "run out of API credits"}).state is (
-        AccessState.QUOTA_EXHAUSTED
-    )
+    assert twelvedata.classify_time_series(
+        {"code": 429, "message": "run out of API credits"}
+    ).state is (AccessState.QUOTA_EXHAUSTED)
     ok = twelvedata.classify_time_series(
         {"meta": {"currency": "EUR", "exchange": "XETR"}, "values": [{"close": "1"}]}
     )
@@ -449,6 +447,35 @@ async def confirmed_listing(
     assert results[0].status == "confirmed", results
     assert results[0].listing_id is not None
     return results[0].listing_id
+
+
+async def snapshot(pool: asyncpg.Pool, day: dt.date, tickers: list[tuple[str, str]]) -> None:
+    """A portfolio snapshot holding `tickers` (ticker, instrument currency)."""
+    job_id = await pool.fetchval(
+        "insert into public.job (job_type, trigger, status) values ('portfolio_sync',"
+        " 'schedule', 'succeeded') returning id"
+    )
+    await pool.execute(
+        "insert into public.account_snapshot (snapshot_date, job_id, captured_at,"
+        " t212_account_id, account_currency, total_value, cash_available, cash_in_pies,"
+        " cash_reserved, invested_value, invested_cost, unrealized_ppl, realized_ppl,"
+        " base_currency, fx_source, fx_rate, cash_base, invested_base, total_base,"
+        " weight_basis) values ($1, $2, now(), 1, 'CZK', 0, 0, 0, 0, 0, 0, 0, 0, 'CZK', 'cnb',"
+        " 1, 0, 0, 0, 'total')",
+        day,
+        job_id,
+    )
+    for ticker, currency in tickers:
+        await pool.execute(
+            "insert into public.position_snapshot (snapshot_date, ticker, job_id, captured_at,"
+            " quantity, avg_price, current_price, instrument_currency, value, account_currency,"
+            " value_account, cost_account, ppl, base_currency, fx_source, fx_rate, value_base)"
+            " values ($1, $2, $3, now(), 1, 1, 1, $4, 1, 'CZK', 1, 1, 0, 'CZK', 'cnb', 1, 1)",
+            day,
+            ticker,
+            job_id,
+            currency,
+        )
 
 
 def bar(symbol: str, d: dt.date, close: str, ts: dt.datetime | None = None) -> PriceBar:
@@ -534,7 +561,9 @@ async def test_a1_both_fallback_collectors_store_through_the_source_check(
     await instrument(backend_pool, "CEZ_EQ")
     await firds_and_figi(backend_pool, "CEZ_EQ", "CZ0005112300", "XPRA", "CZK", "CEZ", "CP")
     profiles = HoldingProfilesConfig(
-        profiles=[HoldingProfile(ticker="CEZ_EQ", eodhd_symbol="CEZ.PSE", alpha_vantage_symbol="CEZ.PRG")]
+        profiles=[
+            HoldingProfile(ticker="CEZ_EQ", eodhd_symbol="CEZ.PSE", alpha_vantage_symbol="CEZ.PRG")
+        ]
     )
     await confirmed_listing(backend_pool, "CEZ_EQ", profiles)
     await open_gates(backend_pool)
@@ -546,7 +575,8 @@ async def test_a1_both_fallback_collectors_store_through_the_source_check(
             return httpx.Response(200, json=EODHD_CEZ)
         if request.url.host == "www.alphavantage.co":
             return httpx.Response(
-                200, json=alpha_body({"2026-09-24": ("1300", "1290"), "2026-09-25": ("1349", "1339")})
+                200,
+                json=alpha_body({"2026-09-24": ("1300", "1290"), "2026-09-25": ("1349", "1339")}),
             )
         return httpx.Response(404)
 
@@ -639,8 +669,8 @@ async def test_b23_a_london_listing_from_a_provider_without_units_is_stored_in_p
     def handler(request: httpx.Request) -> httpx.Response:
         if "exchange-symbol-list" in request.url.path:
             return httpx.Response(200, json=[{"Code": "VOD"}])
-        return httpx.Response(200, json=[{"date": "2026-09-25", "open": 70, "high": 71, "low": 69,
-                                          "close": 70.5, "adjusted_close": 70.5, "volume": 5}])  # fmt: skip
+        row = {"date": "2026-09-25", "open": 70, "high": 71, "low": 69, "close": 70.5}
+        return httpx.Response(200, json=[{**row, "adjusted_close": 70.5, "volume": 5}])
 
     async with httpx.AsyncClient(transport=httpx.MockTransport(handler)) as http:
         out = await collect_eodhd_fallbacks(
@@ -767,7 +797,9 @@ async def test_a16_stooq_currency_and_yahoo_listing_are_known_at_write_time(
         backend_pool, "VOD_EQ", currency="GBX", symbol="vod.uk", mic="XLON", isin="GB00BH4HKS39"
     )
     await firds_and_figi(backend_pool, "VOD_EQ", "GB00BH4HKS39", "XLON", "GBP", "VOD", "LN")
-    profiles = HoldingProfilesConfig(profiles=[HoldingProfile(ticker="VOD_EQ", yahoo_symbol="VOD.L")])
+    profiles = HoldingProfilesConfig(
+        profiles=[HoldingProfile(ticker="VOD_EQ", yahoo_symbol="VOD.L")]
+    )
     await confirmed_listing(backend_pool, "VOD_EQ", profiles)
 
     csv = "Date,Open,High,Low,Close,Volume\n2026-09-24,70,71,69,70,100\n2026-09-25,71,72,70,71,90\n"
@@ -814,9 +846,7 @@ async def test_a16_returns_use_the_chosen_series_without_writing_and_the_job_sto
         {d: str(1300 + 10 * i) for i, d in enumerate(dates)},
         currency="CZK",
     )
-    await backend_pool.execute(
-        "insert into public.sync_state (key, value) values ('x', '{}') on conflict do nothing"
-    )
+    await snapshot(backend_pool, dt.date(2026, 9, 25), [("CEZ_EQ", "CZK")])
     response = await api.get(
         "/holdings/CEZ_EQ/returns", params={"start": "2026-09-14", "end": "2026-09-25"}
     )
@@ -898,10 +928,11 @@ async def test_a16_cross_source_disagreement_joins_across_symbols(
     assert by[("cez.cz", "stooq")]["disagreements"] == 2
     assert by[("CEZ.PR", "yahoo")]["disagreements"] == 2
     assert by[("cez.cz", "stooq")]["chosen"] is True  # tie on the last date: Stooq
-    assert by[("cez.cz", "stooq")]["mic"] == "XPRA" and by[("cez.cz", "stooq")]["quote_unit"] == "CZK"
+    assert (
+        by[("cez.cz", "stooq")]["mic"] == "XPRA" and by[("cez.cz", "stooq")]["quote_unit"] == "CZK"
+    )
     assert by[("cez.cz", "stooq")]["missing_days"] == 0
     # A pence line and a pound line of the same series are compared in pounds, not flagged.
-    assert holding_price_diagnostics  # imported API under test
 
 
 # ------------------------------------------------------------------ B21 / B22
@@ -913,9 +944,7 @@ async def test_b21_coverage_is_judged_against_the_real_session_calendar(
     start, end = dt.date(2026, 7, 1), dt.date(2026, 8, 28)
     all_days = weekdays(start, end)
     assert len(all_days) == 43
-    await put_bars(
-        backend_pool, "A", "stooq", {d: "10" for d in all_days[:10]}, currency="USD"
-    )
+    await put_bars(backend_pool, "A", "stooq", {d: "10" for d in all_days[:10]}, currency="USD")
     result = await compute_returns(
         backend_pool, symbol="A", start=start, end=end, source="stooq", currency="USD",
         actions_complete=False, mic="XNYS",
@@ -974,7 +1003,9 @@ async def test_b22_exchange_session_rows_drive_the_expected_calendar(
         " values ('XETR', $1, 'closed', 'owner', true, 'system outage')",
         tuesday,
     )
-    expected = await expected_sessions(backend_pool, settings, "XETR", monday, monday + dt.timedelta(days=4))
+    expected = await expected_sessions(
+        backend_pool, settings, "XETR", monday, monday + dt.timedelta(days=4)
+    )
     assert monday in expected.days and tuesday not in expected.days
     assert expected.count == 4 and expected.basis == "partial_confirmed_calendar"
     index = await load_sessions(backend_pool, ["XETR"], monday, tuesday)
@@ -988,7 +1019,9 @@ async def test_b22_exchange_session_rows_drive_the_expected_calendar(
         " values ('XETR', $1, 'closed', 'vendor', false)",
         monday + dt.timedelta(days=2),
     )
-    again = await expected_sessions(backend_pool, settings, "XETR", monday, monday + dt.timedelta(days=4))
+    again = await expected_sessions(
+        backend_pool, settings, "XETR", monday, monday + dt.timedelta(days=4)
+    )
     assert again.count == 4
 
 
@@ -1012,7 +1045,9 @@ async def test_a17_the_listing_writer_derives_evidence_and_waits_for_the_owner_w
     profiles = HoldingProfilesConfig(
         profiles=[HoldingProfile(ticker="CEZ_EQ", yahoo_symbol="CEZ.PR")]
     )
-    results = {r.ticker: r for r in await derive_listings(backend_pool, ["CEZ_EQ", "MSFT_US_EQ"], profiles)}
+    results = {
+        r.ticker: r for r in await derive_listings(backend_pool, ["CEZ_EQ", "MSFT_US_EQ"], profiles)
+    }
     assert results["CEZ_EQ"].status == "confirmed" and results["MSFT_US_EQ"].status == "suggested"
     listing = await backend_pool.fetchrow(
         "select l.mic, l.ticker, l.currency, l.evidence from public.security_listing l"
@@ -1072,48 +1107,27 @@ async def test_a17_the_listing_writer_derives_evidence_and_waits_for_the_owner_w
     assert (await api.post("/holdings/NOPE/listing/confirm",
                            json={"decision": "confirmed", "reason": "no such link at all"})
             ).status_code == 404  # fmt: skip
-    assert await confirm_listing  # imported API under test
 
 
 @pytest.mark.db
 async def test_a17_the_price_job_derives_listings_before_storing_bars(
     backend_pool: asyncpg.Pool,
 ) -> None:
-    await instrument(backend_pool, "SAPd_EQ", currency="EUR", symbol="sap.de", mic="XETR", isin="DE0007164600")
+    await instrument(
+        backend_pool, "SAPd_EQ", currency="EUR", symbol="sap.de", mic="XETR", isin="DE0007164600"
+    )
     await firds_and_figi(backend_pool, "SAPd_EQ", "DE0007164600", "XETR", "EUR", "SAP", "GR")
-    await backend_pool.execute(
-        "insert into public.account_snapshot (snapshot_date, job_id, captured_at, t212_account_id,"
-        " account_currency, total_value, cash_available, cash_in_pies, cash_reserved,"
-        " invested_value, invested_cost, unrealized_ppl, realized_ppl, base_currency, fx_source,"
-        " fx_rate, cash_base, invested_base, total_base, weight_basis) values"
-        " ('2026-09-25', (select coalesce(max(id),1) from public.job), now(), 1, 'EUR', 0,0,0,0,0,0,0,0,"
-        " 'EUR','ecb',1,0,0,0,'total')"
-    ) if False else None  # holdings come from position_snapshot below
-    job_id = await backend_pool.fetchval(
-        "insert into public.job (job_type, trigger, status) values ('portfolio_sync','schedule',"
-        "'succeeded') returning id"
+    await snapshot(backend_pool, dt.date(2026, 9, 25), [("SAPd_EQ", "EUR")])
+    csv = (
+        "Date,Open,High,Low,Close,Volume\n2026-09-24,180,182,179,181,100\n"
+        "2026-09-25,181,187,180,186,120\n"
     )
-    await backend_pool.execute(
-        "insert into public.account_snapshot (snapshot_date, job_id, captured_at, t212_account_id,"
-        " account_currency, total_value, cash_available, cash_in_pies, cash_reserved,"
-        " invested_value, invested_cost, unrealized_ppl, realized_ppl, base_currency, fx_source,"
-        " fx_rate, cash_base, invested_base, total_base, weight_basis) values ('2026-09-25', $1,"
-        " now(), 1, 'EUR', 0,0,0,0,0,0,0,0,'EUR','ecb',1,0,0,0,'total')",
-        job_id,
-    )
-    await backend_pool.execute(
-        "insert into public.position_snapshot (snapshot_date, ticker, job_id, captured_at,"
-        " quantity, avg_price, current_price, instrument_currency, value, account_currency,"
-        " value_account, cost_account, ppl, base_currency, fx_source, fx_rate, value_base)"
-        " values ('2026-09-25', 'SAPd_EQ', $1, now(), 1, 1, 1, 'EUR', 1, 'EUR', 1, 1, 0,"
-        " 'EUR', 'ecb', 1, 1)",
-        job_id,
-    )
-    csv = "Date,Open,High,Low,Close,Volume\n2026-09-24,180,182,179,181,100\n2026-09-25,181,187,180,186,120\n"
 
     def handler(request: httpx.Request) -> httpx.Response:
         if request.url.host == "stooq.com":
-            return httpx.Response(200, text=csv if request.url.params["s"] == "sap.de" else "No data")
+            return httpx.Response(
+                200, text=csv if request.url.params["s"] == "sap.de" else "No data"
+            )
         if request.url.host == "api.frankfurter.dev":
             return httpx.Response(200, json={"base": "EUR", "rates": {}})
         return httpx.Response(404)
@@ -1141,10 +1155,6 @@ async def test_b26_corporate_actions_are_retracted_only_through_the_decision_rou
     await instrument(backend_pool, "CEZ_EQ")
     await firds_and_figi(backend_pool, "CEZ_EQ", "CZ0005112300", "XPRA", "CZK", "CEZ", "CP")
     await confirmed_listing(backend_pool, "CEZ_EQ")
-    evidence_id = await backend_pool.fetchval(
-        "insert into public.source_evidence (source_type, url) values ('regulator', 'https://x.test')"
-        " returning id"
-    ) if False else None
     body = {
         "action_type": "split", "symbol": "cez.cz", "ex_date": "2026-09-10", "ratio": "2",
         "source": "issuer", "source_url": "https://example.test/split",
@@ -1161,14 +1171,27 @@ async def test_b26_corporate_actions_are_retracted_only_through_the_decision_rou
     await backend_pool.execute(
         "update public.corporate_action set evidence_id = null where id = $1", action_id
     )
-    doc = await backend_pool.fetchval(
-        "select id from public.source_evidence limit 1"
+    document = await backend_pool.fetchval(
+        "insert into public.source_document (regulator, external_id, stable_url)"
+        " values ('PSE', 'split-1', 'https://example.test/split') returning id"
     )
-    if doc is None:
-        pytest.skip("no source_evidence row can be created in this schema")
+    version = await backend_pool.fetchval(
+        "insert into public.source_document_version (document_id, content_hash, known_at)"
+        " values ($1, 'h', now()) returning id",
+        document,
+    )
+    doc = await backend_pool.fetchval(
+        "insert into public.source_evidence (document_version_id, quote)"
+        " values ($1, 'split 2:1') returning id",
+        version,
+    )
     decided = await api.post(
         f"/holdings/CEZ_EQ/corporate-actions/{action_id}/decision",
-        json={"decision": "confirmed", "reason": "split announced by the issuer", "evidence_id": doc},
+        json={
+            "decision": "confirmed",
+            "reason": "split announced by the issuer",
+            "evidence_id": doc,
+        },
     )
     assert decided.status_code == 200 and decided.json()["status"] == "confirmed"
     # A re-post (a vendor re-sync) cannot change the decided status ...
@@ -1216,12 +1239,18 @@ async def test_d34_exchange_probes_record_missing_coverage_apart_from_plan_denia
             if symbol == "MSFT":
                 return httpx.Response(200, json={"c": 421.5, "pc": 420.0, "t": 1790000000})
             if symbol == "SAP.DE":
-                return httpx.Response(403, json={"error": "You don't have access to this resource."})
+                return httpx.Response(
+                    403, json={"error": "You don't have access to this resource."}
+                )
             return httpx.Response(200, json={"c": 0, "d": None, "dp": None, "h": 0, "l": 0,
                                              "o": 0, "pc": 0, "t": 0})  # fmt: skip
         if symbol == "MSFT":
-            return httpx.Response(200, json={"meta": {"currency": "USD"}, "values": [{"close": "1"}]})
-        return httpx.Response(200, json={"code": 400, "status": "error", "message": "**symbol** not found"})
+            return httpx.Response(
+                200, json={"meta": {"currency": "USD"}, "values": [{"close": "1"}]}
+            )
+        return httpx.Response(
+            200, json={"code": 400, "status": "error", "message": "**symbol** not found"}
+        )
 
     detail: dict[str, Any] = {}
     async with httpx.AsyncClient(transport=httpx.MockTransport(handler)) as http:
@@ -1289,7 +1318,96 @@ async def test_migration_objects_are_named_and_widened(backend_pool: asyncpg.Poo
         )
 
 
-def test_json_and_jobs_config_defaults_are_untouched() -> None:
-    # The profile/config models the tests above build must keep their defaults.
-    assert JobsConfig().providers["alpha_vantage"].enabled is False
-    assert save_config is not None
+@pytest.mark.db
+async def test_a2_end_to_end_an_alpha_vantage_fallback_is_what_the_price_reader_serves(
+    backend_pool: asyncpg.Pool, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from steward.config.jobs import PriceSettings
+    from steward.reference.read import price_history
+    from steward.settings import get_settings
+
+    await instrument(backend_pool, "CEZ_EQ")
+    await firds_and_figi(backend_pool, "CEZ_EQ", "CZ0005112300", "XPRA", "CZK", "CEZ", "CP")
+    await snapshot(backend_pool, dt.date(2026, 9, 25), [("CEZ_EQ", "CZK")])
+    await open_gates(backend_pool)
+    profiles = HoldingProfilesConfig(
+        profiles=[HoldingProfile(ticker="CEZ_EQ", alpha_vantage_symbol="CEZ.PRG")]
+    )
+    jobs = JobsConfig(
+        prices=PriceSettings(yahoo_daily_fallback=False),
+        providers={**JobsConfig().providers, "alpha_vantage": ENABLED},
+    )
+    async with backend_pool.acquire() as conn:
+        await save_config(conn, "jobs", jobs, created_by=None)
+        await save_config(conn, "holding_profiles", profiles, created_by=None)
+    monkeypatch.setenv("ALPHA_VANTAGE_API_KEY", "demo-key")
+    get_settings.cache_clear()
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        if request.url.host == "stooq.com":
+            return httpx.Response(200, text="Get your apikey: https://stooq.com/q/d/?get_apikey")
+        if request.url.host == "www.alphavantage.co":
+            return httpx.Response(
+                200,
+                json=alpha_body({"2026-09-24": ("1300", "1290"), "2026-09-25": ("1349", "1339")}),
+            )
+        if request.url.host == "api.frankfurter.dev":
+            return httpx.Response(200, json={"base": "EUR", "rates": {}})
+        return httpx.Response(404)
+
+    async with httpx.AsyncClient(transport=httpx.MockTransport(handler)) as http:
+
+        async def job(ctx: JobContext) -> None:
+            await run_price_history(
+                ctx,
+                PriceDeps(
+                    http=http,
+                    today=dt.date(2026, 9, 28),
+                    now=dt.datetime(2026, 9, 28, 21, 0, tzinfo=dt.UTC),
+                ),
+            )
+
+        assert await run_job(backend_pool, "price_history", job, trigger="manual") == "succeeded"
+    state = {
+        r["key"]: json.loads(r["value"])
+        for r in await backend_pool.fetch(
+            "select key, value from public.sync_state where key in ('price_gaps','price_sources')"
+        )
+    }
+    assert "CEZ_EQ" not in state["price_gaps"]["gaps"]
+    assert state["price_sources"]["sources"]["CEZ_EQ"]["source"] == "alpha_vantage"
+    history = await price_history(backend_pool, "CEZ_EQ", 30)
+    assert history.source == "Alpha Vantage" and history.symbol == "CEZ.PRG"
+    # The adjusted basis is what readers serve.
+    assert history.gap is None and [b.close for b in history.bars] == [1290.0, 1339.0]
+
+
+@pytest.mark.db
+async def test_b22_exchange_session_routes_store_reasons_and_show_the_expected_calendar(
+    api: httpx.AsyncClient,
+) -> None:
+    posted = await api.post(
+        "/exchange-sessions",
+        json={
+            "mic": "XNYS",
+            "session_date": "2026-09-29",
+            "state": "closed",
+            "source": "owner",
+            "evidence_url": "https://example.test/nyse-notice",
+            "reason": "ad hoc closure",
+        },
+    )
+    assert posted.status_code == 200, posted.text
+    listed = (
+        await api.get(
+            "/exchange-sessions/XNYS", params={"start": "2026-09-28", "end": "2026-10-02"}
+        )
+    ).json()
+    assert listed[0]["reason"] == "ad hoc closure" and listed[0]["state"] == "closed"
+    expected = (
+        await api.get(
+            "/exchange-sessions/XNYS/expected", params={"start": "2026-09-28", "end": "2026-10-02"}
+        )
+    ).json()
+    assert expected["count"] == 4 and "2026-09-29" not in expected["days"]
+    assert expected["basis"] == "partial_confirmed_calendar"
