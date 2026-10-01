@@ -55,6 +55,11 @@ BudgetJobType = Literal[
     "shadow_report",
     "raw_retention",
     "zero_cost_gate",
+    "returns_refresh",
+    "exchange_probes",
+    "ir_releases",
+    "sec_fsds_backfill",
+    "pdmr_uk",
 ]
 
 AtCap = Literal["alert_only", "pause_noncritical", "downgrade_noncritical"]

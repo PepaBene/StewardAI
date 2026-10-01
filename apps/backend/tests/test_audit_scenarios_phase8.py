@@ -93,12 +93,6 @@ async def test_restatement_pick_follows_what_was_known(
 
 
 @pytest.mark.db
-@pytest.mark.xfail(
-    strict=False,
-    reason="REAL DEFECT (B48 finding): filed_notes orders `known_at desc, id desc`, not by "
-    "revision, so two amendments accepted at the same instant are ranked by insert order. "
-    "Fix: order by known_at desc, revision desc, id desc in data_context/evidence.py.",
-)
 async def test_restatement_pick_prefers_the_higher_revision_whatever_the_insert_order(
     backend_pool: asyncpg.Pool,
 ) -> None:

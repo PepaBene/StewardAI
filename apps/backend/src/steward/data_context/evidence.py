@@ -261,7 +261,8 @@ async def filed_notes(
              from public.financial_statement_fact f
              left join public.source_evidence e on e.id=f.evidence_id
              where f.ticker=$1 and f.statement='note' and f.known_at <= $2
-             order by f.concept,f.period_end,f.dimensions::text,f.known_at desc,f.id desc
+             order by f.concept,f.period_end,f.dimensions::text,
+                      f.known_at desc,f.revision desc,f.id desc
            ) latest order by period_end desc,concept limit $3""",
         ticker,
         when,

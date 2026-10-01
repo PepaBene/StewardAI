@@ -185,9 +185,7 @@ async def test_fetch_healthy_response_succeeds(case: FetchCase) -> None:
 # Adapters that return an AccessResult instead of raising.  `access_from_http` (steward/sources/
 # base.py, outside the verification stream) does not put the status into `detail` for 5xx, so
 # these three cannot yet show provenance; new adapters must not be added here.
-ACCESS_RESULTS_WITHOUT_STATUS = frozenset(
-    {"public_macro_world_bank", "public_macro_sdmx", "public_macro_comtrade"}
-)
+ACCESS_RESULTS_WITHOUT_STATUS: frozenset[str] = frozenset()  # every 5xx now carries its status
 
 EXPECTED_BY_STATUS = {
     403: {AccessState.ACCESS_UNVERIFIED, AccessState.PAID_ONLY},

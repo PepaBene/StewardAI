@@ -138,7 +138,7 @@ def access_from_http(
     if status == 429:
         return AccessResult(AccessState.QUOTA_EXHAUSTED, retry_at=retry_at)
     if status >= 500:
-        return AccessResult(AccessState.TEMPORARILY_FAILED, retry_at=retry_at)
+        return AccessResult(AccessState.TEMPORARILY_FAILED, f"HTTP {status}", retry_at)
     if 200 <= status < 300:
         return AccessResult(AccessState.AVAILABLE if has_rows else AccessState.NOT_COVERED)
     return AccessResult(AccessState.TEMPORARILY_FAILED, f"HTTP {status}")

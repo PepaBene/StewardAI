@@ -43,6 +43,7 @@ from steward.sources.base import (
 from steward.sources.governor import Budget, PostgresRequestGovernor, QuotaExceeded
 from steward.sources.store import (
     CoverageUpdate,
+    provider_gate,
     publish_observations,
     record_access,
     update_coverage,
@@ -67,6 +68,12 @@ def _budget(settings: ProviderJobSettings) -> Budget:
 
 
 async def _gate(ctx: JobContext, provider: str, endpoint: str) -> AccessState | None:
+    """AVAILABLE when the shared gate rule lets a collector call the endpoint now (a keyless
+    endpoint still `access_unverified` is probed by the call itself; a hard block, a durable
+    paid_only/disputed state or a pending Retry-After keeps it shut), else the stored state."""
+    decision = await provider_gate(ctx.pool, provider, endpoint)
+    if decision.open:
+        return AccessState.AVAILABLE
     value = await ctx.pool.fetchval(
         "select state from public.provider_access where provider=$1 and endpoint=$2",
         provider,

@@ -25,7 +25,7 @@ from steward.config.store import load_active
 from steward.jobs.runner import JobContext
 from steward.notify.alerts import create_alerts
 from steward.notify.route import AlertRequest
-from steward.reference.calendar import exchange_open
+from steward.reference.calendar import exchange_open, load_sessions
 from steward.settings import get_settings
 
 # Job types whose schedule is watched for missed runs (the monitor watches itself only
@@ -109,7 +109,8 @@ async def _market_closed(pool: asyncpg.Pool, jobs: JobsConfig, day: dt.date) -> 
     ]
     if not mics:
         return day.weekday() >= 5
-    return not any(exchange_open(jobs.calendar, mic, day) for mic in mics)
+    sessions = await load_sessions(pool, mics, day, day)
+    return not any(exchange_open(jobs.calendar, mic, day, sessions) for mic in mics)
 
 
 async def run_monitor(ctx: JobContext, now: dt.datetime) -> None:

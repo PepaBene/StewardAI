@@ -14,6 +14,7 @@ from pydantic import BaseModel, Field
 from steward.config.holding_profiles import HoldingProfilesConfig
 from steward.config.jobs import JobsConfig
 from steward.config.store import load_active
+from steward.reference.calendar import last_expected_session
 from steward.reference.price_series import choose_series, holding_symbols, latest_dates
 
 PRICE_GAP_DAYS = 4  # a long weekend plus one missed run
@@ -72,12 +73,30 @@ class ActivityCoverage(BaseModel):
     gaps: int = Field(description="Holdings with at least one gap.")
 
 
+async def _price_is_stale(
+    pool: asyncpg.Pool,
+    jobs: JobsConfig,
+    mic: str | None,
+    last_bar: dt.date,
+    now: dt.datetime,
+) -> bool:
+    """A bar older than the exchange's previous expected session (one missed run of grace),
+    judged on the stored exchange calendar; without a known venue, the day-count fallback."""
+    if not mic:
+        return (now.date() - last_bar).days > PRICE_GAP_DAYS
+    latest = await last_expected_session(pool, jobs.calendar, mic, now.date())
+    if latest is None:
+        return (now.date() - last_bar).days > PRICE_GAP_DAYS
+    previous = await last_expected_session(pool, jobs.calendar, mic, latest - dt.timedelta(days=1))
+    return last_bar < (previous or latest)
+
+
 async def coverage(pool: asyncpg.Pool, jobs: JobsConfig, now: dt.datetime) -> ActivityCoverage:
     window = dt.timedelta(hours=jobs.monitoring.news_coverage_hours)
     held = await held_since(pool)
     news = await news_last_covered(pool, now - window - dt.timedelta(days=30))
     rows = await pool.fetch(
-        "select i.t212_ticker as ticker, i.name, i.price_symbol,"
+        "select i.t212_ticker as ticker, i.name, i.price_symbol, i.home_mic,"
         " (select max(date) from public.price_bar b where b.symbol = i.price_symbol"
         " and (b.bar_type = 'adjusted'"
         " or (b.source = 'eodhd' and b.bar_type = 'raw'))) as last_bar,"
@@ -111,7 +130,8 @@ async def coverage(pool: asyncpg.Pool, jobs: JobsConfig, now: dt.datetime) -> Ac
         if ref is None and ticker in symbols and symbols[ticker].yahoo and not symbol:
             symbol = symbols[ticker].yahoo
         prices_gap = symbol is not None and (
-            last_bar is None or (now.date() - last_bar).days > PRICE_GAP_DAYS
+            last_bar is None
+            or await _price_is_stale(pool, jobs, row["home_mic"] if row else None, last_bar, now)
         )
         holdings.append(
             HoldingCoverage(

@@ -1434,11 +1434,51 @@ class JobsConfig(ConfigModel):
     )
     raw_retention: JobSchedule = Field(
         default_factory=lambda: JobSchedule(cron="15 3 * * *"),
-        description="Prune old raw provider payloads (normalized data stays). Default: 03:15.",
+        description=(
+            "Blanks old raw payloads (normalized data stays) and deletes fetch-audit rows past the "
+            "horizon. Default: daily 03:15."
+        ),
     )
     zero_cost_gate: JobSchedule = Field(
         default_factory=lambda: JobSchedule(cron="20 3 * * *"),
-        description="Verify no paid endpoint or overage is reachable. Default: daily 03:20.",
+        description=(
+            "Audits the access ledger and the budgets collectors pass to the governor against the "
+            "free quotas; reads only. Default: daily 03:20."
+        ),
+    )
+    returns_refresh: JobSchedule = Field(
+        default_factory=lambda: JobSchedule(cron="45 23 * * 1-5"),
+        description=(
+            "Compute and store price and total returns for held securities. "
+            "Default: weekdays 23:45."
+        ),
+    )
+    exchange_probes: JobSchedule = Field(
+        default_factory=lambda: JobSchedule(cron="0 5 2 * *", enabled=False),
+        description=(
+            "Probe free price endpoints per exchange (one held symbol each). Off by default."
+        ),
+    )
+    ir_releases: JobSchedule = Field(
+        default_factory=lambda: JobSchedule(cron="20 7 * * *"),
+        description=(
+            "Fetch and version registered issuer IR pages (guidance, consensus, capital return). "
+            "Default: daily 07:20."
+        ),
+    )
+    sec_fsds_backfill: JobSchedule = Field(
+        default_factory=lambda: JobSchedule(cron="0 4 15 * *", enabled=False),
+        description=(
+            "Backfill statements and notes from the SEC Financial Statement and Notes "
+            "datasets. Off by default."
+        ),
+    )
+    pdmr_uk: JobSchedule = Field(
+        default_factory=lambda: JobSchedule(cron="10 8 * * 1-5", enabled=False),
+        description=(
+            "Parse UK PDMR (MAR Art.19) notifications from the RNS stream. Off by "
+            "default (retrieval unverified)."
+        ),
     )
     valuation_refresh: JobSchedule = Field(
         default_factory=lambda: JobSchedule(cron="45 7 * * *"),
@@ -1505,6 +1545,11 @@ class JobsConfig(ConfigModel):
             "shadow_report": self.shadow_report,
             "raw_retention": self.raw_retention,
             "zero_cost_gate": self.zero_cost_gate,
+            "returns_refresh": self.returns_refresh,
+            "exchange_probes": self.exchange_probes,
+            "ir_releases": self.ir_releases,
+            "sec_fsds_backfill": self.sec_fsds_backfill,
+            "pdmr_uk": self.pdmr_uk,
             "etf_look_through": self.etf_look_through,
             "sec_xbrl": self.sec_xbrl,
         }

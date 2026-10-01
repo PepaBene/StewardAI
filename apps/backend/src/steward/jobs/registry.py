@@ -16,6 +16,8 @@ from steward.earnings.check import earnings_check_handler, thesis_verdicts_handl
 from steward.earnings.reconcile import fact_reconcile_handler
 from steward.free_source_alerts import free_source_alerts_handler
 from steward.fundamentals.collect import sec_xbrl_handler
+from steward.fundamentals.fsds import sec_fsds_backfill_handler
+from steward.fundamentals.ir import ir_releases_handler
 from steward.funds.drift import fund_characteristics_audit_handler
 from steward.jobs.runner import JobHandler
 from steward.lookthrough.collect import etf_look_through_handler
@@ -29,10 +31,13 @@ from steward.ownership.collect import ownership_13f_handler
 from steward.ownership.control_stakes import control_stakes_handler
 from steward.ownership.insider_collect import insider_trades_handler
 from steward.ownership.nport_collect import nport_holdings_handler
+from steward.ownership.pdmr_collect import pdmr_uk_handler
 from steward.portfolio.sync import portfolio_sync_handler
+from steward.reference.exchange_probes import exchange_probes_handler
 from steward.reference.identity import reference_data_handler
 from steward.reference.intraday import intraday_prices_handler
 from steward.reference.prices import holiday_refresh_handler, price_history_handler
+from steward.reference.returns import returns_refresh_handler
 from steward.research.run import research_handler
 from steward.review.monthly import monthly_review_handler
 from steward.sources.audit import source_audit_handler
@@ -82,6 +87,11 @@ JobType = Literal[
     "shadow_report",
     "raw_retention",
     "zero_cost_gate",
+    "returns_refresh",
+    "exchange_probes",
+    "ir_releases",
+    "sec_fsds_backfill",
+    "pdmr_uk",
 ]
 
 JOB_HANDLERS: dict[str, JobHandler] = {
@@ -121,4 +131,9 @@ JOB_HANDLERS: dict[str, JobHandler] = {
     "shadow_report": shadow_report_handler,
     "raw_retention": raw_retention_handler,
     "zero_cost_gate": zero_cost_gate_handler,
+    "returns_refresh": returns_refresh_handler,
+    "exchange_probes": exchange_probes_handler,
+    "ir_releases": ir_releases_handler,
+    "sec_fsds_backfill": sec_fsds_backfill_handler,
+    "pdmr_uk": pdmr_uk_handler,
 }

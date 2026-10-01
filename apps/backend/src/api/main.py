@@ -34,6 +34,7 @@ from api.macro_routes import router as macro_router
 from api.market_routes import router as market_router
 from api.news_routes import router as news_router
 from api.nport_routes import router as nport_router
+from api.pdmr_routes import router as pdmr_router
 from api.prompts_routes import router as prompts_router
 from api.reference_routes import router as reference_router
 from api.research_context_routes import router as research_context_router
@@ -252,6 +253,7 @@ def create_app() -> FastAPI:
     app.include_router(insider_activity_router)
     app.include_router(nport_router)
     app.include_router(fund_router)
+    app.include_router(pdmr_router)
     app.include_router(data_context_router)
     app.include_router(research_context_router)
     app.include_router(alert_trail_router)
