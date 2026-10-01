@@ -199,6 +199,42 @@ export const SCHEDULES: Record<ScheduleKey, { label: string; description: string
       "Verify that no paid endpoint or overage is reachable.",
     cron: "20 3 * * *",
   },
+  returns_refresh: {
+    label: "Returns refresh",
+    description:
+      "Compute and store price and total returns for held securities.",
+    cron: "45 23 * * 1-5",
+  },
+  exchange_probes: {
+    label: "Exchange probes",
+    description:
+      "Probe free price endpoints per exchange, one held symbol each. Off by default.",
+    cron: "0 5 2 * *",
+  },
+  ir_releases: {
+    label: "Issuer IR releases",
+    description:
+      "Fetch and version registered issuer IR pages (guidance, consensus, capital return).",
+    cron: "20 7 * * *",
+  },
+  sec_fsds_backfill: {
+    label: "SEC statements backfill",
+    description:
+      "Backfill statements and notes from the SEC Financial Statement and Notes datasets. Off by default.",
+    cron: "0 4 15 * *",
+  },
+  pdmr_uk: {
+    label: "UK director dealings",
+    description:
+      "Parse UK PDMR notifications from the RNS stream. Off by default (retrieval unverified).",
+    cron: "10 8 * * 1-5",
+  },
+  graph_review: {
+    label: "Relationship and deal review",
+    description:
+      "Review SEC relationship candidates, extract deal events and reconcile parent changes.",
+    cron: "40 7 * * *",
+  },
 };
 export const SCHEDULE_KEYS = Object.keys(SCHEDULES) as ScheduleKey[];
 export const DEFAULT_TIMEZONE = "Europe/Prague";

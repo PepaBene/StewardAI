@@ -1480,6 +1480,13 @@ class JobsConfig(ConfigModel):
             "default (retrieval unverified)."
         ),
     )
+    graph_review: JobSchedule = Field(
+        default_factory=lambda: JobSchedule(cron="40 7 * * *"),
+        description=(
+            "Review SEC relationship candidates, extract deal events and reconcile parent "
+            "changes. Default: daily 07:40."
+        ),
+    )
     valuation_refresh: JobSchedule = Field(
         default_factory=lambda: JobSchedule(cron="45 7 * * *"),
         description="Fundamentals (SEC XBRL, ESEF) of holdings that filed since the last read "
@@ -1550,6 +1557,7 @@ class JobsConfig(ConfigModel):
             "ir_releases": self.ir_releases,
             "sec_fsds_backfill": self.sec_fsds_backfill,
             "pdmr_uk": self.pdmr_uk,
+            "graph_review": self.graph_review,
             "etf_look_through": self.etf_look_through,
             "sec_xbrl": self.sec_xbrl,
         }

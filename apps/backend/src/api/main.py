@@ -26,6 +26,7 @@ from api.free_sources_routes import router as free_sources_router
 from api.fund_routes import router as fund_router
 from api.fundamentals_routes import router as fundamentals_router
 from api.gate_routes import router as gate_router
+from api.graph_routes import router as graph_router
 from api.insider_activity_routes import router as insider_activity_router
 from api.insider_routes import router as insider_router
 from api.investor_routes import router as investor_router
@@ -254,6 +255,7 @@ def create_app() -> FastAPI:
     app.include_router(nport_router)
     app.include_router(fund_router)
     app.include_router(pdmr_router)
+    app.include_router(graph_router)
     app.include_router(data_context_router)
     app.include_router(research_context_router)
     app.include_router(alert_trail_router)

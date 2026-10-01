@@ -19,6 +19,7 @@ from steward.fundamentals.collect import sec_xbrl_handler
 from steward.fundamentals.fsds import sec_fsds_backfill_handler
 from steward.fundamentals.ir import ir_releases_handler
 from steward.funds.drift import fund_characteristics_audit_handler
+from steward.graph.jobs import graph_review_handler
 from steward.jobs.runner import JobHandler
 from steward.lookthrough.collect import etf_look_through_handler
 from steward.macro.collect import macro_collect_handler
@@ -92,6 +93,7 @@ JobType = Literal[
     "ir_releases",
     "sec_fsds_backfill",
     "pdmr_uk",
+    "graph_review",
 ]
 
 JOB_HANDLERS: dict[str, JobHandler] = {
@@ -136,4 +138,5 @@ JOB_HANDLERS: dict[str, JobHandler] = {
     "ir_releases": ir_releases_handler,
     "sec_fsds_backfill": sec_fsds_backfill_handler,
     "pdmr_uk": pdmr_uk_handler,
+    "graph_review": graph_review_handler,
 }

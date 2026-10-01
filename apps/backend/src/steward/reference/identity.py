@@ -39,6 +39,7 @@ from steward import __version__
 from steward.config.holding_profiles import HoldingProfilesConfig
 from steward.config.jobs import JobsConfig, ReferenceSettings
 from steward.config.store import load_active
+from steward.graph.successors import reconcile_parent_change
 from steward.jobs.runner import JobContext
 from steward.news.link import short_name
 from steward.reference.events import LifecycleEvent, entity_events, listing_events, raise_events
@@ -517,6 +518,15 @@ async def _gleif(
         " from public.legal_entity where lei = $1",
         lei,
     )
+    previous_parents = {
+        r["object_lei"]
+        for r in await pool.fetch(
+            "select object_lei from public.entity_relationship where ticker=$1 and subject=$2"
+            " and type='parent' and source='gleif' and object_lei is not null",
+            ticker,
+            lei,
+        )
+    }
     async with pool.acquire() as conn, conn.transaction():
         await store_entity(conn, entity)
         issuer_sync = await sync_gleif_issuer(
@@ -551,7 +561,7 @@ async def _gleif(
                     source="gleif",
                     confirmed=True,
                     source_ref=f"https://search.gleif.org/#/record/{lei}",
-                    as_of=today,
+                    as_of=None,  # GLEIF gives no start date; the fetch date is not one
                 )
             elif isinstance(parent, ReportingException):
                 await conn.execute(
@@ -574,7 +584,7 @@ async def _gleif(
                 source="gleif",
                 confirmed=True,
                 source_ref=f"https://search.gleif.org/#/record/{child.lei}",
-                as_of=today,
+                as_of=None,  # GLEIF gives no start date; the fetch date is not one
             )
         names = [(entity.legal_name, "legal_name"), (short_name(entity.legal_name), "legal_name")]
         names += [(n, "other_name") for n in entity.other_names]
@@ -588,6 +598,24 @@ async def _gleif(
         )
     result.issuer_lei = lei
     result.children = len(children)
+    if isinstance(direct, LegalEntity) and previous_parents and direct.lei not in previous_parents:
+        await reconcile_parent_change(
+            pool,
+            ticker=ticker,
+            change_kind="parent_changed",
+            from_key=sorted(previous_parents)[0],
+            to_key=direct.lei,
+            observed_source="gleif",
+        )
+    if entity.successor_lei and (before is None or before["successor_lei"] != entity.successor_lei):
+        await reconcile_parent_change(
+            pool,
+            ticker=ticker,
+            change_kind="successor_named",
+            from_key=lei,
+            to_key=entity.successor_lei,
+            observed_source="gleif",
+        )
     after = {
         "status": entity.status,
         "successor_lei": entity.successor_lei,
