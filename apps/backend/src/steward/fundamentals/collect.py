@@ -213,7 +213,7 @@ async def store_segments(
                 unit,value,dimensions,text_block,published_at,known_at,source,source_url,validation)
                values($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12::jsonb,$13,$14::timestamptz,
                       $15::timestamptz,'sec_xbrl',$16,
-                      jsonb_build_object('source_fact_id',$17,'reviewed',false))""",
+                      jsonb_build_object('source_fact_id',$17::text,'reviewed',false))""",
             fact_rows,
         )
     kinds: dict[str, int] = {}

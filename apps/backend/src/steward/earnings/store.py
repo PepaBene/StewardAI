@@ -180,7 +180,7 @@ async def store_facts(
                     known_at=dt.datetime.now(dt.UTC),
                     domain_table="fact",
                     record_key=fact_id,
-                    quote=f.figure.source_snippet,
+                    quote=f.source_snippet,
                 )
             summary.inserted[status] += 1
             if v.reason:
