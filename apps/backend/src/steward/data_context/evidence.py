@@ -566,6 +566,17 @@ async def deals(pool: asyncpg.Pool, ticker: str, as_of: dt.datetime | None = Non
         events.sort(key=_deal_order)
         confirmed = [e for e in events if e.status == "confirmed"]
         current = max(confirmed, key=_deal_order) if confirmed else None
+        if current is not None:
+            # An unwind or termination learned after the current state wins even when its
+            # event date is earlier (a retroactive reversal): what was known last decides.
+            later_unwinds = [
+                e
+                for e in confirmed
+                if e.event_state in ("reversed", "terminated")
+                and (e.known_at, e.event_id) > (current.known_at, current.event_id)
+            ]
+            if later_unwinds:
+                current = max(later_unwinds, key=lambda e: (e.known_at, e.event_id))
         states.append(
             DealState(
                 deal_key=key,
