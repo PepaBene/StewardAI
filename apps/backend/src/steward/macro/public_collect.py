@@ -88,8 +88,16 @@ async def _save_macro(ctx: JobContext, points: list[MacroPoint], known_at: dt.da
         ],
         known_at=known_at,
         access=AccessResult(AccessState.AVAILABLE),
-        source_priorities={"alfred": 1, "ecb": 10, "eurostat": 10, "fred": 10,
-                           "cnb": 10, "world_bank": 20, "oecd": 20, "bis": 20},
+        source_priorities={
+            "alfred": 1,
+            "ecb": 10,
+            "eurostat": 10,
+            "fred": 10,
+            "cnb": 10,
+            "world_bank": 20,
+            "oecd": 20,
+            "bis": 20,
+        },
         tolerance_by_metric={point.series_id: 0.0001 for point in valid_points},
     )
     count = 0
@@ -375,8 +383,8 @@ async def run_public_data_collect(ctx: JobContext, deps: PublicDataDeps) -> None
             )
 
     comtrade = jobs.providers["un_comtrade"]
-    for item in jobs.public_data.comtrade:
-        async with ctx.step(f"un_comtrade:{item.reporter}:{item.hs_code}") as step:
+    for trade_item in jobs.public_data.comtrade:
+        async with ctx.step(f"un_comtrade:{trade_item.reporter}:{trade_item.hs_code}") as step:
             if (
                 not comtrade.enabled
                 or not deps.comtrade_key
@@ -389,14 +397,13 @@ async def run_public_data_collect(ctx: JobContext, deps: PublicDataDeps) -> None
             response = await deps.http.get(
                 url,
                 params={
-                    "reporterCode": item.reporter,
-                    "partnerCode": item.partner,
+                    "reporterCode": trade_item.reporter,
+                    "partnerCode": trade_item.partner,
                     "period": ",".join(
-                        str(year)
-                        for year in range(now.year - item.history_years, now.year)
+                        str(year) for year in range(now.year - trade_item.history_years, now.year)
                     ),
-                    "cmdCode": item.hs_code,
-                    "flowCode": item.flow_code,
+                    "cmdCode": trade_item.hs_code,
+                    "flowCode": trade_item.flow_code,
                 },
                 headers={"Ocp-Apim-Subscription-Key": deps.comtrade_key},
             )
@@ -432,10 +439,10 @@ async def run_public_data_collect(ctx: JobContext, deps: PublicDataDeps) -> None
                 ctx.pool,
                 CoverageUpdate(
                     provider="un_comtrade",
-                    dataset=item.hs_code,
-                    entity_key=f"{item.reporter}:{item.partner}",
+                    dataset=trade_item.hs_code,
+                    entity_key=f"{trade_item.reporter}:{trade_item.partner}",
                     access=coverage_access,
-                    expected_periods=item.history_years,
+                    expected_periods=trade_item.history_years,
                     available_periods=len({point.period for point in trade_points}),
                     earliest_period=min((point.period for point in trade_points), default=None),
                     latest_period=max((point.period for point in trade_points), default=None),

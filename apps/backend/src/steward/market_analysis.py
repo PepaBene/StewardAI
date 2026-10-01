@@ -9,7 +9,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import date
 from decimal import Decimal
-from typing import Literal
+from typing import Literal, cast
 
 
 @dataclass(frozen=True, slots=True)
@@ -162,7 +162,7 @@ def financial_peer_metrics(rows: list[dict[str, object]]) -> dict[str, dict[str,
         ]
         if not matches:
             return None
-        return Decimal(matches[-1]["value"])
+        return cast(Decimal, matches[-1]["value"])
 
     by_ticker: dict[str, list[dict[str, object]]] = {}
     for (ticker, period, basis), values in groups.items():
@@ -227,24 +227,26 @@ def financial_peer_metrics(rows: list[dict[str, object]]) -> dict[str, dict[str,
             start = current["period_start"]
             end = current["period_end"]
             current["revenue_growth"] = None
-            revenue = current["revenue"]
-            if not isinstance(start, date) or not isinstance(end, date) or revenue is None:
+            current_revenue = cast("Decimal | None", current["revenue"])
+            if not isinstance(start, date) or not isinstance(end, date) or current_revenue is None:
                 continue
             duration = (end - start).days
             prior = [
                 row
                 for row in periods
                 if row["basis"] == current["basis"]
-                and row["period_end"] < end
                 and isinstance(row["period_start"], date)
                 and isinstance(row["period_end"], date)
+                and row["period_end"] < end
                 and abs((row["period_end"] - row["period_start"]).days - duration) <= 7
                 and 330 <= (end - row["period_end"]).days <= 400
                 and row["revenue"] not in (None, Decimal(0))
             ]
             if prior:
-                prior.sort(key=lambda row: row["period_end"])
-                current["revenue_growth"] = revenue / prior[-1]["revenue"] - Decimal(1)
+                prior.sort(key=lambda row: cast(date, row["period_end"]))
+                current["revenue_growth"] = current_revenue / cast(
+                    Decimal, prior[-1]["revenue"]
+                ) - Decimal(1)
     formulas = {
         "gross_margin": "gross profit / revenue",
         "revenue_growth": "current-period revenue / comparable prior-year revenue - 1",
@@ -279,13 +281,15 @@ def patent_trend(rows: list[dict[str, object]]) -> list[dict[str, object]]:
                 (code, priority.year),
                 {"cpc": code, "year": priority.year, "families": set(), "forward_citations": 0},
             )
-            item["families"].add(str(row["family_key"]))  # type: ignore[union-attr]
-            item["forward_citations"] += int(row.get("citations_forward") or 0)  # type: ignore[operator]
+            cast("set[str]", item["families"]).add(str(row["family_key"]))
+            item["forward_citations"] = cast(int, item["forward_citations"]) + int(
+                row.get("citations_forward") or 0  # type: ignore[call-overload]
+            )
     return [
         {
             "cpc": cpc,
             "year": year,
-            "families": len(item["families"]),
+            "families": len(cast("set[str]", item["families"])),
             "forward_citations": item["forward_citations"],
             "interpretation": "counts and citations are research signals, not patent value",
         }

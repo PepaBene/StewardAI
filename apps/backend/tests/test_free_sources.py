@@ -181,12 +181,8 @@ def test_trade_product_mix_uses_the_reporter_wide_product_set() -> None:
         TradePoint(
             "124", "840", "export", "H6", "27", dt.date(2024, 1, 1), Decimal(100), None, None
         ),
-        TradePoint(
-            "124", "840", "export", "H6", "30", dt.date(2024, 1, 1), Decimal(0), None, None
-        ),
-        TradePoint(
-            "124", "840", "export", "H6", "27", dt.date(2025, 1, 1), Decimal(0), None, None
-        ),
+        TradePoint("124", "840", "export", "H6", "30", dt.date(2024, 1, 1), Decimal(0), None, None),
+        TradePoint("124", "840", "export", "H6", "27", dt.date(2025, 1, 1), Decimal(0), None, None),
         TradePoint(
             "124", "840", "export", "H6", "30", dt.date(2025, 1, 1), Decimal(100), None, None
         ),

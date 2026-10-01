@@ -3,7 +3,7 @@
 import json
 from datetime import date, datetime
 from decimal import Decimal
-from typing import Annotated, Literal
+from typing import Annotated, Any, Literal
 from urllib.parse import urlsplit
 
 import httpx
@@ -12,8 +12,8 @@ from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from api.auth import Owner
 from api.db import Pool
-from steward.config.holding_profiles import HoldingProfilesConfig
-from steward.config.store import load_active
+from steward.config.holding_profiles import HoldingProfile, HoldingProfilesConfig
+from steward.config.store import StoredConfig, load_active
 from steward.free_sources import (
     ForwardValue,
     calculate_and_store_returns,
@@ -310,12 +310,14 @@ class AlphaExposureRequest(BaseModel):
     to_currency: str | None = Field(default=None, pattern=r"^[A-Z]{3}$")
 
 
-def _holding_research_profile(stored, ticker: str):
+def _holding_research_profile(
+    stored: StoredConfig[HoldingProfilesConfig] | None, ticker: str
+) -> HoldingProfile | None:
     config = stored.body if stored else HoldingProfilesConfig()
     return config.for_ticker(ticker)
 
 
-def _profile_domain(profile) -> str | None:
+def _profile_domain(profile: HoldingProfile) -> str | None:
     urls = [profile.ir_url, *profile.results_urls]
     for url in urls:
         host = urlsplit(str(url)).hostname if url else None
@@ -324,13 +326,15 @@ def _profile_domain(profile) -> str | None:
     return profile.extra_domains[0] if profile.extra_domains else None
 
 
-@router.get("/holdings/{ticker}/company-research-observations", tags=["holdings"])
+@router.get(
+    "/holdings/{ticker}/company-research-observations", tags=["holdings"], response_model=None
+)
 async def company_research_observations(
     ticker: TickerPath,
     pool: Pool,
     _owner: Owner,
     as_of: Annotated[datetime | None, Query()] = None,
-):
+) -> dict[str, Any]:
     rows = await pool.fetch(
         """select id,provider,dataset,metric,period_end,value,text_value,unit,currency,source_url,
                   published_at,known_at,match_confidence,raw
@@ -343,10 +347,12 @@ async def company_research_observations(
     return {"ticker": ticker, "known_as_of": as_of, "observations": [dict(r) for r in rows]}
 
 
-@router.post("/holdings/{ticker}/exposure-context/alpha-vantage", tags=["holdings"])
+@router.post(
+    "/holdings/{ticker}/exposure-context/alpha-vantage", tags=["holdings"], response_model=None
+)
 async def refresh_alpha_exposure(
     ticker: TickerPath, body: AlphaExposureRequest, pool: Pool, _owner: Owner
-):
+) -> dict[str, Any]:
     settings = get_settings()
     if not settings.alpha_vantage_api_key:
         raise HTTPException(409, "ALPHA_VANTAGE_API_KEY is not configured")
@@ -401,8 +407,8 @@ async def refresh_alpha_exposure(
     return {"ticker": ticker, "series": body.series_name, "observations_stored": count}
 
 
-@router.get("/holdings/{ticker}/exposure-context", tags=["holdings"])
-async def exposure_context(ticker: TickerPath, pool: Pool, _owner: Owner):
+@router.get("/holdings/{ticker}/exposure-context", tags=["holdings"], response_model=None)
+async def exposure_context(ticker: TickerPath, pool: Pool, _owner: Owner) -> dict[str, Any]:
     stored = await load_active(pool, "holding_profiles", HoldingProfilesConfig)
     profile = _holding_research_profile(stored, ticker)
     observations = await pool.fetch(
@@ -425,8 +431,10 @@ async def exposure_context(ticker: TickerPath, pool: Pool, _owner: Owner):
     }
 
 
-@router.post("/holdings/{ticker}/company-research/diffbot", tags=["holdings"])
-async def refresh_diffbot_company_research(ticker: TickerPath, pool: Pool, _owner: Owner):
+@router.post("/holdings/{ticker}/company-research/diffbot", tags=["holdings"], response_model=None)
+async def refresh_diffbot_company_research(
+    ticker: TickerPath, pool: Pool, _owner: Owner
+) -> dict[str, Any]:
     settings = get_settings()
     if not settings.diffbot_api_key:
         raise HTTPException(409, "DIFFBOT_API_KEY is not configured")
@@ -455,8 +463,10 @@ async def refresh_diffbot_company_research(ticker: TickerPath, pool: Pool, _owne
     return {"ticker": ticker, "suggested_edges": count}
 
 
-@router.post("/holdings/{ticker}/company-research/pdl", tags=["holdings"])
-async def refresh_pdl_company_research(ticker: TickerPath, pool: Pool, _owner: Owner):
+@router.post("/holdings/{ticker}/company-research/pdl", tags=["holdings"], response_model=None)
+async def refresh_pdl_company_research(
+    ticker: TickerPath, pool: Pool, _owner: Owner
+) -> dict[str, Any]:
     settings = get_settings()
     if not settings.people_data_labs_api_key:
         raise HTTPException(409, "PEOPLE_DATA_LABS_API_KEY is not configured")
@@ -487,8 +497,10 @@ async def refresh_pdl_company_research(ticker: TickerPath, pool: Pool, _owner: O
     return {"ticker": ticker, "matched_records": count}
 
 
-@router.post("/holdings/{ticker}/patent-families/epo-ops/refresh", tags=["holdings"])
-async def refresh_epo_patents(ticker: TickerPath, pool: Pool, _owner: Owner):
+@router.post(
+    "/holdings/{ticker}/patent-families/epo-ops/refresh", tags=["holdings"], response_model=None
+)
+async def refresh_epo_patents(ticker: TickerPath, pool: Pool, _owner: Owner) -> dict[str, Any]:
     settings = get_settings()
     if not settings.epo_ops_client_id or not settings.epo_ops_client_secret:
         raise HTTPException(409, "EPO_OPS_CLIENT_ID and EPO_OPS_CLIENT_SECRET are required")
@@ -529,14 +541,14 @@ async def refresh_epo_patents(ticker: TickerPath, pool: Pool, _owner: Owner):
     return {"ticker": ticker, "patent_candidates": count}
 
 
-@router.get("/exchange-sessions/{mic}", tags=["reference"])
+@router.get("/exchange-sessions/{mic}", tags=["reference"], response_model=None)
 async def exchange_sessions(
     mic: Annotated[str, Path(pattern=r"^[A-Z0-9]{4}$")],
     pool: Pool,
     _owner: Owner,
     start: Annotated[date, Query()],
     end: Annotated[date, Query()],
-):
+) -> list[dict[str, Any]]:
     if end < start:
         raise HTTPException(422, "end must not precede start")
     rows = await pool.fetch(
@@ -550,8 +562,10 @@ async def exchange_sessions(
     return [dict(row) for row in rows]
 
 
-@router.post("/exchange-sessions", tags=["reference"])
-async def record_exchange_session(body: ExchangeSessionInput, pool: Pool, _owner: Owner):
+@router.post("/exchange-sessions", tags=["reference"], response_model=None)
+async def record_exchange_session(
+    body: ExchangeSessionInput, pool: Pool, _owner: Owner
+) -> dict[str, Any]:
     row_id = await pool.fetchval(
         """insert into public.exchange_session
            (mic,session_date,open_at,close_at,state,source,confirmed,evidence_url)
@@ -571,10 +585,10 @@ async def record_exchange_session(body: ExchangeSessionInput, pool: Pool, _owner
     return {"session_date": row_id}
 
 
-@router.get("/holdings/{ticker}/peer-set", tags=["holdings"])
+@router.get("/holdings/{ticker}/peer-set", tags=["holdings"], response_model=None)
 async def peer_set(
     ticker: TickerPath, pool: Pool, _owner: Owner, as_of: Annotated[datetime | None, Query()] = None
-):
+) -> dict[str, Any]:
     rows = await pool.fetch(
         """select id,peer_ticker,basis,status,evidence_id,source,valid_from,valid_to,known_at,detail
            from public.peer_set where ticker=$1 and ($2::timestamptz is null or known_at<=$2)
@@ -585,8 +599,10 @@ async def peer_set(
     return {"ticker": ticker, "known_as_of": as_of, "peers": [dict(row) for row in rows]}
 
 
-@router.post("/holdings/{ticker}/peer-set", tags=["holdings"])
-async def record_peer(ticker: TickerPath, body: PeerInput, pool: Pool, _owner: Owner):
+@router.post("/holdings/{ticker}/peer-set", tags=["holdings"], response_model=None)
+async def record_peer(
+    ticker: TickerPath, body: PeerInput, pool: Pool, _owner: Owner
+) -> dict[str, Any]:
     if body.peer_ticker.casefold() == ticker.casefold():
         raise HTTPException(422, "a holding cannot be its own peer")
     row_id = await pool.fetchval(
@@ -614,13 +630,13 @@ async def record_peer(ticker: TickerPath, body: PeerInput, pool: Pool, _owner: O
     return {"id": row_id}
 
 
-@router.get("/holdings/{ticker}/peer-metrics", tags=["holdings"])
+@router.get("/holdings/{ticker}/peer-metrics", tags=["holdings"], response_model=None)
 async def peer_metrics(
     ticker: TickerPath,
     pool: Pool,
     _owner: Owner,
     as_of: Annotated[datetime | None, Query()] = None,
-):
+) -> dict[str, Any]:
     peers = await pool.fetch(
         """select peer_ticker,basis,source,evidence_id from public.peer_set
            where ticker=$1 and status='confirmed'
@@ -641,7 +657,7 @@ async def peer_metrics(
         tickers,
         as_of,
     )
-    metrics = financial_peer_metrics([dict(row) for row in facts])
+    metrics: dict[str, Any] = financial_peer_metrics([dict(row) for row in facts])
     own_periods = metrics.get(ticker, {}).get("periods", [])
     latest = own_periods[0] if own_periods else None
     output = {}
@@ -747,14 +763,14 @@ async def price_diagnostics(ticker: TickerPath, pool: Pool, _owner: Owner) -> li
     return [PriceDiagnostic(**dict(r)) for r in rows]
 
 
-@router.get("/holdings/{ticker}/returns", tags=["holdings"])
+@router.get("/holdings/{ticker}/returns", tags=["holdings"], response_model=None)
 async def holding_returns(
     ticker: TickerPath,
     pool: Pool,
     _owner: Owner,
     start: Annotated[date, Query()],
     end: Annotated[date, Query()],
-):
+) -> dict[str, Any]:
     """Return price and total return separately; total return requires verified action coverage."""
     bars = await pool.fetch(
         """select b.symbol,b.date,b.close,b.currency,b.source from public.price_bar b
@@ -831,8 +847,10 @@ async def holding_returns(
     return {"ticker": ticker, "known_as_of": end, "results": results}
 
 
-@router.get("/holdings/{ticker}/corporate-actions", tags=["holdings"])
-async def list_corporate_actions(ticker: TickerPath, pool: Pool, _owner: Owner):
+@router.get("/holdings/{ticker}/corporate-actions", tags=["holdings"], response_model=None)
+async def list_corporate_actions(
+    ticker: TickerPath, pool: Pool, _owner: Owner
+) -> list[dict[str, Any]]:
     rows = await pool.fetch(
         """select id,symbol,action_type,ex_date,record_date,payment_date,ratio,cash_amount,
                   currency,source,source_url,publisher_at,known_at,evidence_id,status,raw
@@ -899,13 +917,15 @@ async def record_corporate_action(
     return {"id": action_id}
 
 
-@router.post("/holdings/{ticker}/corporate-actions/coverage", tags=["holdings"])
+@router.post(
+    "/holdings/{ticker}/corporate-actions/coverage", tags=["holdings"], response_model=None
+)
 async def confirm_action_coverage(
     ticker: TickerPath,
     body: CorporateActionCoverageInput,
     pool: Pool,
     _owner: Owner,
-):
+) -> dict[str, Any]:
     symbol = await pool.fetchval(
         """select coalesce(price_symbol,t212_ticker) from public.instrument
            where t212_ticker=$1""",
@@ -926,7 +946,7 @@ async def confirm_action_coverage(
     return {"symbol": symbol, "covered_through": body.through, "state": "available"}
 
 
-@router.get("/holdings/{ticker}/financial-history", tags=["holdings"])
+@router.get("/holdings/{ticker}/financial-history", tags=["holdings"], response_model=None)
 async def financial_history(
     ticker: TickerPath,
     pool: Pool,
@@ -934,7 +954,7 @@ async def financial_history(
     as_of: Annotated[datetime | None, Query()] = None,
     statement: Literal["income", "cash_flow", "balance_sheet", "shares", "segment", "note"]
     | None = None,
-):
+) -> list[dict[str, Any]]:
     rows = await pool.fetch(
         """select id,concept,label,statement,period_start,period_end,fiscal_period,basis,value,
                   unit,currency,dimensions,source,source_url,published_at,known_at,revision,
@@ -950,13 +970,17 @@ async def financial_history(
     return [dict(r) for r in rows]
 
 
-@router.post("/holdings/{ticker}/financial-history/alpha-vantage/{statement}", tags=["holdings"])
+@router.post(
+    "/holdings/{ticker}/financial-history/alpha-vantage/{statement}",
+    tags=["holdings"],
+    response_model=None,
+)
 async def refresh_alpha_vantage_statement(
     ticker: TickerPath,
     statement: Literal["INCOME_STATEMENT", "BALANCE_SHEET", "CASH_FLOW"],
     pool: Pool,
     _owner: Owner,
-):
+) -> dict[str, Any]:
     settings = get_settings()
     if not settings.alpha_vantage_api_key:
         raise HTTPException(409, "ALPHA_VANTAGE_API_KEY is not configured")
@@ -995,8 +1019,10 @@ async def refresh_alpha_vantage_statement(
     return {"ticker": ticker, "statement": statement, **result}
 
 
-@router.post("/holdings/{ticker}/financial-history/finnhub-research", tags=["holdings"])
-async def refresh_finnhub_research(ticker: TickerPath, pool: Pool, _owner: Owner):
+@router.post(
+    "/holdings/{ticker}/financial-history/finnhub-research", tags=["holdings"], response_model=None
+)
+async def refresh_finnhub_research(ticker: TickerPath, pool: Pool, _owner: Owner) -> dict[str, Any]:
     """Refresh free-gated peer candidates and reported quarterly EPS surprises."""
     settings = get_settings()
     if not settings.finnhub_api_key:
@@ -1029,10 +1055,10 @@ async def refresh_finnhub_research(ticker: TickerPath, pool: Pool, _owner: Owner
     return {"ticker": ticker, "symbol": symbol, **result}
 
 
-@router.get("/holdings/{ticker}/forward-data", tags=["holdings"])
+@router.get("/holdings/{ticker}/forward-data", tags=["holdings"], response_model=None)
 async def forward_data(
     ticker: TickerPath, pool: Pool, _owner: Owner, as_of: Annotated[datetime | None, Query()] = None
-):
+) -> list[dict[str, Any]]:
     rows = await pool.fetch(
         """select id,kind,provider,metric,basis,fiscal_period,period_end,currency,value,low,high,
                   analyst_count,vintage,published_at,known_at,source_url,evidence_id,raw
@@ -1045,13 +1071,13 @@ async def forward_data(
     return [dict(r) for r in rows]
 
 
-@router.post("/holdings/{ticker}/forward-data", tags=["holdings"])
+@router.post("/holdings/{ticker}/forward-data", tags=["holdings"], response_model=None)
 async def record_forward_data(
     ticker: TickerPath,
     body: ForwardObservationInput,
     pool: Pool,
     _owner: Owner,
-):
+) -> dict[str, Any]:
     observation_id = await store_forward_value(
         pool,
         ForwardValue(
@@ -1077,13 +1103,13 @@ async def record_forward_data(
     return {"id": observation_id}
 
 
-@router.get("/holdings/{ticker}/issuer-ir-releases", tags=["holdings"])
+@router.get("/holdings/{ticker}/issuer-ir-releases", tags=["holdings"], response_model=None)
 async def issuer_ir_releases(
     ticker: TickerPath,
     pool: Pool,
     _owner: Owner,
     as_of: Annotated[datetime | None, Query()] = None,
-):
+) -> dict[str, Any]:
     rows = await pool.fetch(
         """select id,release_type,source_url,content_hash,document_version_id,published_at,
                   known_at,parser_version,analyst_count,basis,status,metadata
@@ -1096,13 +1122,13 @@ async def issuer_ir_releases(
     return {"ticker": ticker, "known_as_of": as_of, "releases": [dict(row) for row in rows]}
 
 
-@router.post("/holdings/{ticker}/issuer-ir-releases", tags=["holdings"])
+@router.post("/holdings/{ticker}/issuer-ir-releases", tags=["holdings"], response_model=None)
 async def record_issuer_ir_release(
     ticker: TickerPath,
     body: IssuerIRReleaseInput,
     pool: Pool,
     _owner: Owner,
-):
+) -> dict[str, Any]:
     release_id = await pool.fetchval(
         """insert into public.issuer_ir_release
            (ticker,release_type,source_url,content_hash,document_version_id,published_at,
@@ -1132,8 +1158,8 @@ async def record_issuer_ir_release(
     return {"id": release_id}
 
 
-@router.post("/company-graph/edges", tags=["research"])
-async def record_company_edge(body: CompanyEdgeInput, pool: Pool, _owner: Owner):
+@router.post("/company-graph/edges", tags=["research"], response_model=None)
+async def record_company_edge(body: CompanyEdgeInput, pool: Pool, _owner: Owner) -> dict[str, Any]:
     edge_id = await store_company_edge(
         pool,
         subject_key=body.subject_key,
@@ -1154,13 +1180,13 @@ async def record_company_edge(body: CompanyEdgeInput, pool: Pool, _owner: Owner)
     return {"id": edge_id}
 
 
-@router.post("/holdings/{ticker}/company-events", tags=["holdings"])
+@router.post("/holdings/{ticker}/company-events", tags=["holdings"], response_model=None)
 async def record_company_event(
     ticker: TickerPath,
     body: CompanyEventInput,
     pool: Pool,
     _owner: Owner,
-):
+) -> dict[str, Any]:
     event_id = await pool.fetchval(
         """insert into public.company_event
            (ticker,event_type,event_state,announced_at,effective_at,known_at,source,source_url,
@@ -1194,13 +1220,13 @@ async def record_company_event(
     return {"id": event_id}
 
 
-@router.post("/holdings/{ticker}/patent-families", tags=["holdings"])
+@router.post("/holdings/{ticker}/patent-families", tags=["holdings"], response_model=None)
 async def record_patent_family(
     ticker: TickerPath,
     body: PatentFamilyInput,
     pool: Pool,
     _owner: Owner,
-):
+) -> dict[str, Any]:
     family_id = await store_patent_family(
         pool,
         family_key=body.family_key,
@@ -1224,10 +1250,10 @@ async def record_patent_family(
     return {"family_id": family_id}
 
 
-@router.get("/holdings/{ticker}/business-network", tags=["holdings"])
+@router.get("/holdings/{ticker}/business-network", tags=["holdings"], response_model=None)
 async def business_network(
     ticker: TickerPath, pool: Pool, _owner: Owner, as_of: Annotated[datetime | None, Query()] = None
-):
+) -> dict[str, Any]:
     edges = await pool.fetch(
         """select id,subject_key,object_key,object_name,edge_type,direction,status,valid_from,
                   valid_to,evidence_tier,source,source_url,evidence_id,passage,known_at,
@@ -1348,13 +1374,15 @@ async def record_relationship_review(
     return {"id": row_id}
 
 
-@router.get("/holdings/{ticker}/customer-supplier-concentration", tags=["holdings"])
+@router.get(
+    "/holdings/{ticker}/customer-supplier-concentration", tags=["holdings"], response_model=None
+)
 async def relationship_concentration(
     ticker: TickerPath,
     pool: Pool,
     _owner: Owner,
     as_of: Annotated[datetime | None, Query()] = None,
-):
+) -> dict[str, Any]:
     rows = await pool.fetch(
         """select fiscal_period,relationship,count(*)::int disclosed_counterparties,
                   count(*) filter(where anonymous_counterparty)::int anonymous_count,
@@ -1380,8 +1408,8 @@ async def relationship_concentration(
     }
 
 
-@router.get("/holdings/{ticker}/patent-trends", tags=["holdings"])
-async def patent_trends(ticker: TickerPath, pool: Pool, _owner: Owner):
+@router.get("/holdings/{ticker}/patent-trends", tags=["holdings"], response_model=None)
+async def patent_trends(ticker: TickerPath, pool: Pool, _owner: Owner) -> list[dict[str, Any]]:
     rows = await pool.fetch(
         """select p.family_key,p.priority_date,p.cpc_codes,p.citations_forward
            from public.patent_family p join public.patent_family_owner o on o.family_id=p.id

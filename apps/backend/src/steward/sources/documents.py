@@ -53,7 +53,7 @@ async def link_public_document(
         stable_url,
         document_type,
     )
-    version_id = await pool.fetchval(
+    version_id: int = await pool.fetchval(
         """insert into public.source_document_version
              (document_id,content_hash,filed_at,accepted_at,published_at,retrieved_at,known_at,
               raw_location,amends_version_id)

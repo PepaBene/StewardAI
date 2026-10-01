@@ -301,7 +301,7 @@ async def store_forward_value(pool: asyncpg.Pool, item: ForwardValue) -> int:
         raise ValueError("published consensus requires its analyst count (zero is valid)")
     if item.low is not None and item.high is not None and item.low > item.high:
         raise ValueError("estimate low exceeds estimate high")
-    return await pool.fetchval(
+    new_id: int = await pool.fetchval(
         """insert into public.forward_observation
            (ticker,kind,provider,metric,basis,fiscal_period,period_end,currency,value,low,high,
             analyst_count,vintage,published_at,known_at,source_url,evidence_id,raw)
@@ -326,6 +326,7 @@ async def store_forward_value(pool: asyncpg.Pool, item: ForwardValue) -> int:
         item.evidence_id,
         json.dumps(item.raw or {}, default=str),
     )
+    return new_id
 
 
 async def store_company_edge(
@@ -354,7 +355,7 @@ async def store_company_edge(
         or (not evidence_id and not passage)
     ):
         raise ValueError("confirmed edges require primary evidence and a cited passage")
-    return await pool.fetchval(
+    new_id: int = await pool.fetchval(
         """insert into public.company_graph_edge
            (subject_key,object_key,object_name,edge_type,direction,status,valid_from,valid_to,
             evidence_tier,source,source_url,evidence_id,passage,detail,decided_at)
@@ -391,6 +392,7 @@ async def store_company_edge(
         passage,
         json.dumps(detail or {}, default=str),
     )
+    return new_id
 
 
 async def store_patent_family(
@@ -418,7 +420,7 @@ async def store_patent_family(
     if ownership_basis == "dated_subsidiary_path" and ownership_valid_from is None:
         raise ValueError("subsidiary patent attribution needs a dated ownership path")
     async with pool.acquire() as conn, conn.transaction():
-        family_id = await conn.fetchval(
+        family_id: int = await conn.fetchval(
             """insert into public.patent_family
                (family_key,priority_date,first_publication_date,family_title,cpc_codes,jurisdictions,
                 citations_forward,citations_backward,legal_status,source,source_url,known_at,raw)

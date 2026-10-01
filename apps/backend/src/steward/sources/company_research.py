@@ -6,7 +6,9 @@ import datetime as dt
 import json
 import re
 import xml.etree.ElementTree as ET
+from collections.abc import Iterable
 from decimal import Decimal
+from typing import cast
 from urllib.parse import urlsplit
 
 import asyncpg
@@ -46,24 +48,27 @@ async def store_research_observation(
     match_confidence: Decimal | None = None,
     raw: dict[str, object] | None = None,
 ) -> int:
-    return await pool.fetchval(
-        """insert into public.company_research_observation
+    return cast(
+        int,
+        await pool.fetchval(
+            """insert into public.company_research_observation
            (ticker,provider,dataset,metric,period_end,value,text_value,unit,currency,source_url,
             published_at,known_at,match_confidence,raw)
            values($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,now(),$12,$13::jsonb) returning id""",
-        ticker,
-        provider,
-        dataset,
-        metric,
-        period_end,
-        value,
-        text_value,
-        unit,
-        currency,
-        source_url,
-        published_at,
-        match_confidence,
-        json.dumps(raw or {}, default=str),
+            ticker,
+            provider,
+            dataset,
+            metric,
+            period_end,
+            value,
+            text_value,
+            unit,
+            currency,
+            source_url,
+            published_at,
+            match_confidence,
+            json.dumps(raw or {}, default=str),
+        ),
     )
 
 
@@ -162,7 +167,9 @@ async def collect_pdl_company(
 ) -> int:
     await _gate(pool, "people_data_labs", "company_enrich")
     governor = PostgresRequestGovernor(pool)
-    await governor.reserve("people_data_labs", "company_enrich", Decimal(1), Budget(monthly=100))
+    await governor.reserve(
+        "people_data_labs", "company_enrich", Decimal(1), Budget(monthly=Decimal(100))
+    )
     response = await http.get(
         "https://api.peopledatalabs.com/v5/company/enrich",
         params={"website": domain, "min_likelihood": 6, "pretty": "false"},
@@ -265,7 +272,7 @@ async def collect_diffbot_candidates(
     await _gate(pool, "diffbot", "organization")
     governor = PostgresRequestGovernor(pool)
     # DQL exports are budgeted by entity; cap this one-holding lookup to two KG entities.
-    await governor.reserve("diffbot", "organization", Decimal(50), Budget(monthly=10_000))
+    await governor.reserve("diffbot", "organization", Decimal(50), Budget(monthly=Decimal(10_000)))
     query = f'type:Organization homepageUri:"{domain}"'
     response = await http.post(
         "https://kg.diffbot.com/kg/v3/dql",
@@ -273,9 +280,7 @@ async def collect_diffbot_candidates(
         json={
             "query": query,
             "size": 2,
-            "filter": (
-                "$.id;$.name;$.homepageUri;$.nbEmployees;$.relationships"
-            ),
+            "filter": ("$.id;$.name;$.homepageUri;$.nbEmployees;$.relationships"),
         },
     )
     if response.status_code != 200:
@@ -460,7 +465,7 @@ async def collect_epo_patents(
     await _gate(pool, "epo_ops", "patent_search")
     governor = PostgresRequestGovernor(pool)
     await governor.reserve(
-        "epo_ops", "patent_search", Decimal(1), Budget(per_minute=1, monthly=100)
+        "epo_ops", "patent_search", Decimal(1), Budget(per_minute=Decimal(1), monthly=Decimal(100))
     )
     token_response = await http.post(
         "https://ops.epo.org/3.2/auth/accesstoken",
@@ -508,9 +513,9 @@ async def collect_epo_patents(
         await store_patent_family(
             pool,
             family_key=str(item["family_key"]),
-            priority_date=item["priority_date"],
-            title=item["title"],
-            cpc_codes=list(item["cpc_codes"]),
+            priority_date=cast("dt.date | None", item["priority_date"]),
+            title=cast("str | None", item["title"]),
+            cpc_codes=list(cast("Iterable[str]", item["cpc_codes"])),
             jurisdictions=[],
             forward_citations=0,
             backward_citations=0,
@@ -521,7 +526,7 @@ async def collect_epo_patents(
             applicant=str(item["applicant"]),
             ownership_confidence=Decimal("0.5"),
             ownership_basis="suggested",
-            raw=item["raw"],
+            raw=cast("dict[str, object] | None", item["raw"]),
         )
     await record_access(
         pool,

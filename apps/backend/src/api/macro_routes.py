@@ -273,9 +273,7 @@ async def get_trade_context(
     ]
     latest_period = max(point.period for point in points)
     latest = [
-        point
-        for point in points
-        if point.period == latest_period and point.hs_code == hs_code
+        point for point in points if point.period == latest_period and point.hs_code == hs_code
     ]
     latest_value = sum((point.value or Decimal(0) for point in latest), Decimal(0))
     last_row = max(rows, key=lambda row: row["known_at"])

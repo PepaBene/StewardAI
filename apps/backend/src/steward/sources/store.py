@@ -138,11 +138,10 @@ async def publish_observations(
                 preferred_value = incoming_scaled
                 preferred_id = observation_id
                 alternatives = [
-                    (p["id"], p["value"] * p["scale"])
-                    for p in prior
-                    if p["value"] is not None
+                    (p["id"], p["value"] * p["scale"]) for p in prior if p["value"] is not None
                 ]
             else:
+                assert preferred_old is not None
                 preferred_value = preferred_old["value"] * preferred_old["scale"]
                 preferred_id = preferred_old["id"]
                 alternatives = [(observation_id, incoming_scaled)]

@@ -172,7 +172,8 @@ async def alpha_news_sentiment(
     except ValueError as exc:
         raise FreeSourceError("Alpha Vantage sent invalid JSON") from exc
     parse_alpha_news(payload, symbol)
-    return payload
+    result: dict[str, Any] = payload
+    return result
 
 
 def parse_alpha_daily(payload: dict[str, Any]) -> list[DailyBar]:
@@ -313,7 +314,8 @@ async def alpha_statement(
         )
     if not isinstance(payload.get("annualReports"), list):
         raise FreeSourceError("Alpha Vantage statement unavailable or schema changed")
-    return payload
+    result: dict[str, Any] = payload
+    return result
 
 
 async def finnhub_peers(http: httpx.AsyncClient, api_key: str, symbol: str) -> list[str]:

@@ -11,9 +11,7 @@ class AlphaVantageError(Exception):
     pass
 
 
-async def company_overview(
-    http: httpx.AsyncClient, api_key: str, symbol: str
-) -> dict[str, Any]:
+async def company_overview(http: httpx.AsyncClient, api_key: str, symbol: str) -> dict[str, Any]:
     """Fetch one overview. Alpha Vantage returns API/rate-limit failures as JSON messages."""
     try:
         response = await http.get(

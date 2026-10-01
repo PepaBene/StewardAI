@@ -7,6 +7,7 @@ import hashlib
 import json
 import time
 from dataclasses import dataclass
+from decimal import Decimal
 from typing import Any
 
 import httpx
@@ -31,6 +32,10 @@ class Probe:
     credential_param: str | None = None
     expected_symbol: str | None = None
     auth_secret: str | None = None
+
+
+def _dec(value: int | None) -> Decimal | None:
+    return None if value is None else Decimal(value)
 
 
 def classify_probe(status: int, body: Any, expected_symbol: str | None = None) -> AccessResult:
@@ -386,17 +391,17 @@ async def run_source_audit(ctx: JobContext, http: httpx.AsyncClient, settings: S
                     await governor.reserve(
                         "alpha_vantage",
                         "account_free",
-                        1,
-                        Budget(daily=25),
+                        Decimal(1),
+                        Budget(daily=Decimal(25)),
                     )
                 await governor.reserve(
                     probe.provider,
                     probe.endpoint,
-                    1,
+                    Decimal(1),
                     Budget(
-                        daily=provider_settings.daily_quota,
-                        monthly=provider_settings.monthly_quota,
-                        reserve=provider_settings.reserve_credits,
+                        daily=_dec(provider_settings.daily_quota),
+                        monthly=_dec(provider_settings.monthly_quota),
+                        reserve=Decimal(provider_settings.reserve_credits),
                     ),
                 )
             except QuotaExceeded as exc:
