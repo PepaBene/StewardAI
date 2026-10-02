@@ -29,6 +29,7 @@ export const CLUSTERS: readonly Cluster[] = [
       { href: "/holdings", label: "Holdings" },
       { href: "/transactions", label: "Transactions" },
       { href: "/watchlist", label: "Watchlist" },
+      { href: "/markets", label: "Price coverage" },
     ],
   },
   {
@@ -40,6 +41,8 @@ export const CLUSTERS: readonly Cluster[] = [
       { href: "/theses", label: "Theses" },
       { href: "/review", label: "Review queue" },
       { href: "/research", label: "Research" },
+      { href: "/financials", label: "Financials" },
+      { href: "/macro", label: "Macro and trade" },
       { href: "/news", label: "News" },
       { href: "/investors", label: "13F investors" },
       { href: "/glossary", label: "Glossary" },

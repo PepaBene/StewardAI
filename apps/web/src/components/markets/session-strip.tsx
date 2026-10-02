@@ -85,7 +85,7 @@ export function SessionStrip({ listing, calendar }: { listing: ListingSeries; ca
         rows: cells.filter((c) => c.status !== "trading").map((c) => [formatDay(c.date), STATUS[c.status].label, c.note ?? "—"]),
       }}
     >
-      <div className="overflow-x-auto">
+      <div className="relative overflow-x-auto">
         <ol className="m-0 flex list-none gap-1.5 p-0" aria-label={`${calendar.venue} weekly session strip`}>
           {weeks.map((w) => (
             <li key={w[0].date} className="flex flex-col gap-0.5">

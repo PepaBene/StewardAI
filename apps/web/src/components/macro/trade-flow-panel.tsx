@@ -4,7 +4,7 @@ import { useState } from "react";
 
 import { LineChart, Meter, Sankey } from "@/components/charts";
 import { ChartFrame, Segmented } from "@/components/data-state";
-import { formatCompact, formatPct } from "@/lib/charts/format";
+import { formatCompact, formatNumber, formatPct } from "@/lib/charts/format";
 import { concentrationTrend, latestGrowth, partnerShares } from "@/lib/macro/logic";
 import type { TradeSlice } from "@/lib/macro/types";
 
@@ -46,7 +46,7 @@ export function TradeFlowPanel({ slice }: { slice: TradeSlice }) {
         hasFlow && top
           ? `${top.partner} takes ${formatPct(top.share, 0)} of ${year} ${slice.flow}. Partner concentration ${
               last.hhi < first.hhi ? "fell" : "rose"
-            } from ${first.hhi.toFixed(2)} (${first.year}) to ${last.hhi.toFixed(2)} (${last.year})${
+            } from ${Math.round(first.hhi * 10000)} (${first.year}) to ${Math.round(last.hhi * 10000)} (${last.year})${
               growth ? `; the total moved ${formatPct(growth.growth, 0, true)} in ${growth.year}` : ""
             }.`
           : "No partner account is available for this year."
@@ -81,14 +81,14 @@ export function TradeFlowPanel({ slice }: { slice: TradeSlice }) {
           <div>
             <h3 className="mb-1 font-heading text-lg font-semibold">Partner concentration (HHI)</h3>
             <LineChart
-              data={trend.map((t) => ({ date: `${t.year}-12-31`, value: t.hhi }))}
+              data={trend.map((t) => ({ date: `${t.year}-12-31`, value: t.hhi * 10000 }))}
               label="HHI"
               width={420}
               height={180}
-              formatValue={(v) => v.toFixed(2)}
+              formatValue={(v) => formatNumber(v, 0)}
               ariaLabel={`Partner concentration (HHI over mapped partners) from ${first.year} to ${last.year}`}
             />
-            <p className="text-xs text-text-muted">1.00 = a single partner; 0.20 = five equal partners.</p>
+            <p className="text-xs text-text-muted">10,000 = a single partner; 2,000 = five equal partners.</p>
           </div>
           <div>
             <h3 className="mb-1 font-heading text-lg font-semibold">Unmapped share</h3>

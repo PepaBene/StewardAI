@@ -36,10 +36,14 @@ export function CountrySlopegraph({ data }: { data: CountryComparison }) {
   const rankedFrom = rows.filter((r) => r.fromRank !== null).length;
   const rankedTo = rows.filter((r) => r.toRank !== null).length;
   const height = TOP + Math.max(rankedFrom, rankedTo) * ROW + 24;
-  const yFor = (rank: number) => TOP + (rank - 1) * ROW + ROW / 2;
+  const yAt = (index: number) => TOP + index * ROW + ROW / 2;
 
   const left = [...rows].filter((r) => r.fromRank !== null).sort((a, b) => a.fromRank! - b.fromRank! || a.country.localeCompare(b.country));
   const right = [...rows].filter((r) => r.toRank !== null).sort((a, b) => a.toRank! - b.toRank! || a.country.localeCompare(b.country));
+  // Vertical position is the order within each column, so tied countries do not overlap;
+  // the printed rank still shows the shared (competition) rank.
+  const yLeft = new Map(left.map((r, i) => [r.country, yAt(i)]));
+  const yRight = new Map(right.map((r, i) => [r.country, yAt(i)]));
   const unranked = rows.filter((r) => r.toRank === null || r.fromRank === null);
   const risers = rows.filter((r) => (r.rankChange ?? 0) > 0).sort((a, b) => b.rankChange! - a.rankChange!);
   const fallers = rows.filter((r) => (r.rankChange ?? 0) < 0).sort((a, b) => a.rankChange! - b.rankChange!);
@@ -96,8 +100,8 @@ export function CountrySlopegraph({ data }: { data: CountryComparison }) {
                 key={r.country}
                 x1={X_LEFT + 8}
                 x2={X_RIGHT - 8}
-                y1={yFor(r.fromRank!)}
-                y2={yFor(r.toRank!)}
+                y1={yLeft.get(r.country)!}
+                y2={yRight.get(r.country)!}
                 className={stroke(r)}
                 strokeWidth={r.rankChange === 0 ? 1 : 2}
                 strokeDasharray={r.rankChange === 0 ? "3 3" : undefined}
@@ -107,8 +111,8 @@ export function CountrySlopegraph({ data }: { data: CountryComparison }) {
             ))}
           {left.map((r) => (
             <g key={`l-${r.country}`}>
-              <circle cx={X_LEFT + 8} cy={yFor(r.fromRank!)} r={3} className="fill-text" />
-              <text x={X_LEFT} y={yFor(r.fromRank!) + 4} textAnchor="end" fontSize={12} className="fill-text">
+              <circle cx={X_LEFT + 8} cy={yLeft.get(r.country)!} r={3} className="fill-text" />
+              <text x={X_LEFT} y={yLeft.get(r.country)! + 4} textAnchor="end" fontSize={12} className="fill-text">
                 <tspan className="fill-text-faint font-mono">{r.fromRank}</tspan> {r.countryName}{" "}
                 <tspan className="num fill-text-muted">{formatNumber(r.from!, 1)}</tspan>
               </text>
@@ -116,8 +120,8 @@ export function CountrySlopegraph({ data }: { data: CountryComparison }) {
           ))}
           {right.map((r) => (
             <g key={`r-${r.country}`}>
-              <circle cx={X_RIGHT - 8} cy={yFor(r.toRank!)} r={3} className="fill-text" />
-              <text x={X_RIGHT} y={yFor(r.toRank!) + 4} fontSize={12} className="fill-text">
+              <circle cx={X_RIGHT - 8} cy={yRight.get(r.country)!} r={3} className="fill-text" />
+              <text x={X_RIGHT} y={yRight.get(r.country)! + 4} fontSize={12} className="fill-text">
                 <tspan className="num fill-text-muted">{formatNumber(r.to!, 1)}</tspan> {r.countryName}{" "}
                 <tspan className="fill-text-faint font-mono">{r.toRank}</tspan>
                 {r.rankChange !== null && r.rankChange !== 0 ? (

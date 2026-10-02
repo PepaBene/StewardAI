@@ -98,13 +98,13 @@ export function ChartFrame({
       {...(id ? { id } : {})}
       className={cn("flex scroll-mt-24 flex-col gap-3 px-5 py-5", className)}
     >
-      <div className="flex flex-wrap items-start justify-between gap-3">
+      <div className="flex min-w-0 flex-wrap items-start justify-between gap-3">
         <div className="min-w-0">
           <PanelHeading kicker={kicker} title={<span id={headingId}>{title}</span>} />
           {takeaway ? <p className="mt-1 max-w-prose text-sm text-text">{takeaway}</p> : null}
           {units ? <p className="num mt-0.5 text-xs text-text-muted">{units}</p> : null}
         </div>
-        {controls ? <div className="flex flex-wrap items-center gap-2">{controls}</div> : null}
+        {controls ? <div className="flex min-w-0 max-w-full flex-wrap items-center gap-2">{controls}</div> : null}
       </div>
       {decision === "placeholder" ? (
         <StatePlaceholder state={provenance.state} reason={provenance.reason} />

@@ -46,7 +46,7 @@ export function ProvenanceFooter({ provenance, className }: { provenance: DataPr
           {knownAt && asOf && knownAt.slice(0, 10) !== asOf.slice(0, 10) ? (
             <>
               {" "}
-              · known since <time dateTime={knownAt}>{formatDate(knownAt)}</time>
+              · known since <time dateTime={knownAt}>{formatDate(knownAt.slice(0, 10))}</time>
             </>
           ) : null}
         </span>
