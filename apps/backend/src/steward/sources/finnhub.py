@@ -4,6 +4,7 @@ the valuation computed from filings. The free plan covers US listings (incl. ADR
 
 import datetime as dt
 from dataclasses import dataclass
+from decimal import Decimal, InvalidOperation
 from typing import Any
 
 import httpx
@@ -12,8 +13,13 @@ CALENDAR_URL = "https://finnhub.io/api/v1/calendar/earnings"
 METRIC_URL = "https://finnhub.io/api/v1/stock/metric"
 
 
+QUOTE_URL = "https://finnhub.io/api/v1/quote"
+
+
 class FinnhubError(Exception):
-    pass
+    def __init__(self, message: str, status_code: int | None = None) -> None:
+        super().__init__(message)
+        self.status_code = status_code
 
 
 @dataclass(frozen=True)
@@ -33,8 +39,14 @@ async def next_earnings_date(
         headers={"X-Finnhub-Token": api_key},
     )
     if response.status_code != 200:
-        raise FinnhubError(f"Finnhub returned HTTP {response.status_code}")
-    rows = response.json().get("earningsCalendar") or []
+        raise FinnhubError(f"Finnhub returned HTTP {response.status_code}", response.status_code)
+    try:
+        body = response.json()
+    except ValueError as exc:
+        raise FinnhubError("Finnhub sent no JSON") from exc
+    if not isinstance(body, dict):
+        raise FinnhubError("Finnhub calendar schema changed")
+    rows = body.get("earningsCalendar") or []
     dates = sorted(
         dt.date.fromisoformat(r["date"])
         for r in rows
@@ -56,9 +68,52 @@ async def basic_financials(http: httpx.AsyncClient, api_key: str, symbol: str) -
         headers={"X-Finnhub-Token": api_key},
     )
     if response.status_code != 200:
-        raise FinnhubError(f"Finnhub returned HTTP {response.status_code}")
+        raise FinnhubError(f"Finnhub returned HTTP {response.status_code}", response.status_code)
     try:
         data: dict[str, Any] = response.json()
     except ValueError as exc:
         raise FinnhubError("Finnhub sent no JSON") from exc
     return data
+
+
+@dataclass(frozen=True)
+class FinnhubQuote:
+    symbol: str
+    price: Decimal
+    previous_close: Decimal | None
+    traded_at: dt.datetime | None
+
+
+async def quote(http: httpx.AsyncClient, api_key: str, symbol: str) -> FinnhubQuote | None:
+    """`/quote` for `symbol`. None when Finnhub answers with its all-zero placeholder, which is
+    how it says "no such symbol on a market this key can see" (missing coverage, not a denial).
+    A technical denial is an HTTP error: 401 (key), 403 (the plan excludes the exchange), 429."""
+    response = await http.get(
+        QUOTE_URL, params={"symbol": symbol}, headers={"X-Finnhub-Token": api_key}
+    )
+    if response.status_code != 200:
+        raise FinnhubError(f"Finnhub returned HTTP {response.status_code}", response.status_code)
+    try:
+        body = response.json()
+    except ValueError as exc:
+        raise FinnhubError("Finnhub sent no JSON") from exc
+    if not isinstance(body, dict):
+        raise FinnhubError("Finnhub quote schema changed")
+    try:
+        price = Decimal(str(body.get("c") or 0))
+        previous = Decimal(str(body.get("pc") or 0))
+    except InvalidOperation as exc:
+        raise FinnhubError("Finnhub quote schema changed") from exc
+    stamp = body.get("t")
+    if price <= 0:
+        return None
+    return FinnhubQuote(
+        symbol=symbol,
+        price=price,
+        previous_close=previous if previous > 0 else None,
+        traded_at=(
+            dt.datetime.fromtimestamp(int(stamp), dt.UTC)
+            if isinstance(stamp, int | float) and stamp > 0
+            else None
+        ),
+    )

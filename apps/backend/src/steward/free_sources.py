@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import datetime as dt
+import hashlib
 import json
 from dataclasses import dataclass
 from decimal import Decimal
@@ -11,7 +12,14 @@ from typing import Literal
 import asyncpg
 import httpx
 
-from steward.market_analysis import Action, PricePoint, calculate_return
+from steward.config.jobs import JobsConfig
+from steward.config.store import load_active
+from steward.forward_consensus import observation_key
+from steward.graph.edges import upsert_edge
+from steward.graph.patents import store_patent_family  # noqa: F401 - re-exported
+from steward.market_analysis import UNHANDLED_KINDS, Action, PricePoint, calculate_return
+from steward.reference.calendar import expected_sessions
+from steward.reference.price_series import series_mic
 from steward.sources.base import AccessResult, AccessState
 from steward.sources.free_market import (
     FreeSourceError,
@@ -59,16 +67,18 @@ async def collect_finnhub_research(
                 peer_symbols = await finnhub_peers(http, api_key, symbol)
                 async with pool.acquire() as conn, conn.transaction():
                     for peer in peer_symbols:
+                        # Insert-once: a vendor re-sync never moves `known_at`, never changes
+                        # a status the owner decided and never re-suggests a rejected peer.
                         await conn.execute(
                             """insert into public.peer_set
-                               (ticker,peer_ticker,basis,status,source,detail)
+                               (ticker,peer_ticker,basis,status,source,detail,status_history)
                                values($1,$2,'Finnhub peer candidate','suggested','finnhub',
                                       '{"identity":"provider symbol; issuer mapping "'
-                                      '"unverified"}'::jsonb)
+                                      '"unverified"}'::jsonb,
+                                      jsonb_build_array(jsonb_build_object(
+                                        'status','suggested','at',now())))
                                on conflict(ticker,peer_ticker,basis,source) do update set
-                                 known_at=now(),detail=peer_set.detail || excluded.detail,
-                                 status=case when peer_set.status in ('confirmed','rejected')
-                                             then peer_set.status else 'suggested' end""",
+                                 detail=peer_set.detail || excluded.detail""",
                             ticker,
                             peer,
                         )
@@ -294,18 +304,37 @@ class ForwardValue:
 
 
 async def store_forward_value(pool: asyncpg.Pool, item: ForwardValue) -> int:
-    """Append a point-in-time forward value; never substitute null consensus with a scenario."""
+    """Append a point-in-time forward value; never substitute null consensus with a scenario.
+
+    The same figures from the same provider, currency, basis and vintage are one observation:
+    storing them again returns the existing row (and leaves its `known_at`); a changed figure
+    is a new row."""
     if item.value is None and item.low is None and item.high is None:
         raise ValueError("a forward observation requires a value or range")
     if item.kind == "published_analyst_consensus" and item.analyst_count is None:
         raise ValueError("published consensus requires its analyst count (zero is valid)")
     if item.low is not None and item.high is not None and item.low > item.high:
         raise ValueError("estimate low exceeds estimate high")
-    return await pool.fetchval(
+    key = observation_key(
+        kind=item.kind,
+        provider=item.provider,
+        metric=item.metric,
+        fiscal_period=item.fiscal_period,
+        basis=item.basis,
+        currency=item.currency,
+        vintage=item.vintage,
+        period_end=item.period_end,
+        value=item.value,
+        low=item.low,
+        high=item.high,
+        analyst_count=item.analyst_count,
+    )
+    new_id: int | None = await pool.fetchval(
         """insert into public.forward_observation
            (ticker,kind,provider,metric,basis,fiscal_period,period_end,currency,value,low,high,
-            analyst_count,vintage,published_at,known_at,source_url,evidence_id,raw)
-           values($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18::jsonb)
+            analyst_count,vintage,published_at,known_at,source_url,evidence_id,raw,observation_key)
+           values($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18::jsonb,$19)
+           on conflict (ticker,observation_key) do nothing
            returning id""",
         item.ticker,
         item.kind,
@@ -325,6 +354,95 @@ async def store_forward_value(pool: asyncpg.Pool, item: ForwardValue) -> int:
         item.source_url,
         item.evidence_id,
         json.dumps(item.raw or {}, default=str),
+        key,
+    )
+    if new_id is None:
+        new_id = await pool.fetchval(
+            "select id from public.forward_observation where ticker=$1 and observation_key=$2",
+            item.ticker,
+            key,
+        )
+    assert new_id is not None
+    return new_id
+
+
+PEER_STATUSES = ("suggested", "confirmed", "rejected")
+
+
+async def upsert_peer(
+    pool: asyncpg.Pool,
+    *,
+    ticker: str,
+    peer_ticker: str,
+    basis: str,
+    status: str,
+    source: str,
+    evidence_id: int | None = None,
+    valid_from: dt.date | None = None,
+    valid_to: dt.date | None = None,
+    detail: dict[str, object] | None = None,
+) -> int:
+    """Record a peer. A new row starts with `status` (its first history entry); an existing
+    row keeps its `known_at` and its status: re-posting a peer never resets either. Changing a
+    decided status is `set_peer_status`."""
+    row_id: int = await pool.fetchval(
+        """insert into public.peer_set
+           (ticker,peer_ticker,basis,status,evidence_id,source,valid_from,valid_to,detail,
+            status_history)
+           values($1,$2,$3,$4,$5,$6,$7,$8,$9::jsonb,
+                  jsonb_build_array(jsonb_build_object('status',$4::text,'at',now())))
+           on conflict(ticker,peer_ticker,basis,source) do update set
+             evidence_id=coalesce(excluded.evidence_id,peer_set.evidence_id),
+             valid_from=coalesce(excluded.valid_from,peer_set.valid_from),
+             valid_to=coalesce(excluded.valid_to,peer_set.valid_to),
+             detail=peer_set.detail || excluded.detail
+           returning id""",
+        ticker,
+        peer_ticker,
+        basis,
+        status,
+        evidence_id,
+        source,
+        valid_from,
+        valid_to,
+        json.dumps(detail or {}, default=str),
+    )
+    return row_id
+
+
+async def set_peer_status(
+    pool: asyncpg.Pool, peer_id: int, status: str, reason: str | None = None
+) -> dict[str, object] | None:
+    """The owner's decision on a peer, in either direction (confirmed -> rejected or back to
+    suggested included). The change is appended to `status_history` with its time, so an
+    as-of read still sees the status that was in force. Returns None for an unknown id."""
+    if status not in PEER_STATUSES:
+        raise ValueError(f"status must be one of {', '.join(PEER_STATUSES)}")
+    row = await pool.fetchrow(
+        """update public.peer_set set status=$2,
+             status_history=status_history || jsonb_build_array(jsonb_build_object(
+               'status',$2::text,'at',now(),'reason',$3::text)),
+             detail=case when $3::text is null then detail
+                         else detail || jsonb_build_object('decision_reason',$3::text) end
+           where id=$1 and status is distinct from $2
+           returning id,ticker,peer_ticker,status""",
+        peer_id,
+        status,
+        reason,
+    )
+    if row is None:
+        row = await pool.fetchrow(
+            "select id,ticker,peer_ticker,status from public.peer_set where id=$1", peer_id
+        )
+    return dict(row) if row is not None else None
+
+
+# The status of a peer_set row `alias` at the cutoff `param` (null: now), from its history.
+def peer_status_as_of(alias: str, param: str) -> str:
+    return (
+        f"coalesce((select h->>'status' from jsonb_array_elements({alias}.status_history) h"  # noqa: S608
+        f" where {param}::timestamptz is null or (h->>'at')::timestamptz <= {param}::timestamptz"
+        f" order by (h->>'at')::timestamptz desc limit 1), {alias}.status)"
     )
 
 
@@ -338,7 +456,7 @@ async def store_company_edge(
     direction: str,
     source: str,
     source_url: str,
-    evidence_tier: str,
+    evidence_tier: str | None = None,
     status: EdgeStatus = "suggested",
     valid_from: dt.date | None = None,
     valid_to: dt.date | None = None,
@@ -346,126 +464,115 @@ async def store_company_edge(
     passage: str | None = None,
     detail: dict[str, object] | None = None,
 ) -> int:
-    """Upsert a candidate while preserving owner rejection and requiring evidence to confirm."""
-    if valid_from and valid_to and valid_to < valid_from:
-        raise ValueError("relationship valid_to precedes valid_from")
-    if status == "confirmed" and (
-        evidence_tier not in {"primary", "regulatory", "owner_review"}
-        or (not evidence_id and not passage)
-    ):
-        raise ValueError("confirmed edges require primary evidence and a cited passage")
-    return await pool.fetchval(
-        """insert into public.company_graph_edge
-           (subject_key,object_key,object_name,edge_type,direction,status,valid_from,valid_to,
-            evidence_tier,source,source_url,evidence_id,passage,detail,decided_at)
-           values($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14::jsonb,
-                  case when $6 in ('confirmed','rejected') then now() else null end)
-           on conflict(subject_key,object_key,edge_type,source,source_url) do update set
-             object_name=excluded.object_name, direction=excluded.direction,
-             valid_from=coalesce(excluded.valid_from,company_graph_edge.valid_from),
-             valid_to=coalesce(excluded.valid_to,company_graph_edge.valid_to),
-             evidence_tier=excluded.evidence_tier,evidence_id=coalesce(excluded.evidence_id,
-               company_graph_edge.evidence_id),passage=coalesce(excluded.passage,company_graph_edge.passage),
-             detail=company_graph_edge.detail || excluded.detail,
-             status=case when company_graph_edge.status='rejected' then 'rejected'
-                         when excluded.status='confirmed' then 'confirmed'
-                         when company_graph_edge.status='confirmed' then 'confirmed'
-                         else excluded.status end,
-             decided_at=case when company_graph_edge.status='rejected'
-                               then company_graph_edge.decided_at
-                             when excluded.status in ('confirmed','rejected') then now()
-                             else company_graph_edge.decided_at end
-           returning id""",
-        subject_key,
-        object_key,
-        object_name,
-        edge_type,
-        direction,
-        status,
-        valid_from,
-        valid_to,
-        evidence_tier,
-        source,
-        source_url,
-        evidence_id,
-        passage,
-        json.dumps(detail or {}, default=str),
+    """Upsert a candidate edge (see `steward.graph.edges.upsert_edge`).
+
+    `evidence_tier` is accepted for compatibility and ignored: the server derives the tier
+    from the linked document's source class (or the writing source), never from the caller.
+    A decided row (confirmed, rejected, disputed) is never changed by a re-sync."""
+    del evidence_tier
+    return await upsert_edge(
+        pool,
+        subject_key=subject_key,
+        object_key=object_key,
+        object_name=object_name,
+        edge_type=edge_type,
+        direction=direction,
+        source=source,
+        source_url=source_url,
+        status=status,
+        valid_from=valid_from,
+        valid_to=valid_to,
+        evidence_id=evidence_id,
+        passage=passage,
+        detail=detail,
     )
 
 
-async def store_patent_family(
+RETURN_CALC_VERSION = 2  # 2: session-calendar coverage, deduplicated and split-adjusted actions
+
+
+@dataclass(frozen=True, slots=True)
+class ReturnRow:
+    basis: str  # price_raw | price_adjusted | total_return
+    value: Decimal | None
+    coverage: Decimal
+    observed: int
+    missing_actions: list[str]
+    details: dict[str, object]
+
+
+@dataclass(frozen=True, slots=True)
+class ReturnComputation:
+    output: dict[str, object]
+    rows: list[ReturnRow]
+    expected: int
+    inputs_digest: str
+
+
+@dataclass(frozen=True, slots=True)
+class LoadedActions:
+    actions: list[Action]
+    flags: list[str]
+
+
+async def load_confirmed_actions(
     pool: asyncpg.Pool,
     *,
-    family_key: str,
-    priority_date: dt.date | None,
-    title: str | None,
-    cpc_codes: list[str],
-    jurisdictions: list[str],
-    forward_citations: int,
-    backward_citations: int,
-    legal_status: str,
-    source: str,
-    source_url: str,
-    ticker: str,
-    applicant: str,
-    ownership_confidence: Decimal,
-    ownership_basis: Literal["direct", "dated_subsidiary_path", "suggested"],
-    ownership_valid_from: dt.date | None = None,
-    evidence_id: int | None = None,
-    raw: dict[str, object] | None = None,
-) -> int:
-    """Deduplicate a family across publications; only evidenced dated ownership is attributable."""
-    if ownership_basis == "dated_subsidiary_path" and ownership_valid_from is None:
-        raise ValueError("subsidiary patent attribution needs a dated ownership path")
-    async with pool.acquire() as conn, conn.transaction():
-        family_id = await conn.fetchval(
-            """insert into public.patent_family
-               (family_key,priority_date,first_publication_date,family_title,cpc_codes,jurisdictions,
-                citations_forward,citations_backward,legal_status,source,source_url,known_at,raw)
-               values($1,$2,null,$3,$4,$5,$6,$7,$8,$9,$10,now(),$11::jsonb)
-               on conflict(family_key) do update set
-                 citations_forward=greatest(patent_family.citations_forward,excluded.citations_forward),
-                 citations_backward=greatest(patent_family.citations_backward,excluded.citations_backward),
-                 cpc_codes=(select array_agg(distinct c) from unnest(
-                   patent_family.cpc_codes || excluded.cpc_codes) c),
-                 jurisdictions=(select array_agg(distinct j) from unnest(
-                   patent_family.jurisdictions || excluded.jurisdictions) j)
-               returning id""",
-            family_key,
-            priority_date,
-            title,
-            cpc_codes,
-            jurisdictions,
-            forward_citations,
-            backward_citations,
-            legal_status,
-            source,
-            source_url,
-            json.dumps(raw or {}, default=str),
+    symbols: list[str],
+    listing_id: int | None,
+    start: dt.date,
+    end: dt.date,
+    ads_ratio: Decimal | None = None,
+) -> LoadedActions:
+    """Confirmed corporate actions of a listing in [start, end]: those recorded under any of its
+    provider symbols or its listing id. Cash dividends carry their currency (incl. GBp), the ADS
+    multiplier when the owner recorded them per ordinary share (`raw.per = "ordinary_share"`),
+    and whether the amount is already split-adjusted (`raw.amount_basis`)."""
+    rows = await pool.fetch(
+        """select action_type,ex_date,ratio,cash_amount,currency,source,raw
+           from public.corporate_action
+           where status='confirmed' and ex_date between $2 and $3
+             and (symbol = any($1::text[]) or ($4::bigint is not null and listing_id=$4))
+           order by ex_date,id""",
+        symbols,
+        start,
+        end,
+        listing_id,
+    )
+    actions: list[Action] = []
+    for r in rows:
+        raw = r["raw"]
+        if isinstance(raw, str):
+            raw = json.loads(raw)
+        raw = raw if isinstance(raw, dict) else {}
+        per_ordinary = raw.get("per") == "ordinary_share" and ads_ratio is not None
+        actions.append(
+            Action(
+                kind=r["action_type"],
+                ex_date=r["ex_date"],
+                ratio=Decimal(r["ratio"]) if r["ratio"] is not None else None,
+                cash=Decimal(r["cash_amount"]) if r["cash_amount"] is not None else None,
+                currency=r["currency"],
+                source=r["source"],
+                per_unit_multiplier=ads_ratio if per_ordinary and ads_ratio else Decimal(1),
+                amount_basis="split_adjusted"
+                if raw.get("amount_basis") == "split_adjusted"
+                else "as_declared",
+            )
         )
-        await conn.execute(
-            """insert into public.patent_family_owner
-               (family_id,ticker,applicant,ownership_confidence,ownership_basis,valid_from,evidence_id)
-               values($1,$2,$3,$4,$5,$6,$7)
-               on conflict(family_id,ticker,applicant) do update set
-                 ownership_confidence=greatest(patent_family_owner.ownership_confidence,
-                                                excluded.ownership_confidence),
-                 ownership_basis=case when excluded.ownership_basis='suggested'
-                   then patent_family_owner.ownership_basis else excluded.ownership_basis end,
-                 valid_from=coalesce(patent_family_owner.valid_from,excluded.valid_from),
-                 evidence_id=coalesce(patent_family_owner.evidence_id,excluded.evidence_id)""",
-            family_id,
-            ticker,
-            applicant,
-            ownership_confidence,
-            ownership_basis,
-            ownership_valid_from,
-            evidence_id,
-        )
-    return family_id
+    flags = [
+        f"{a.kind} on {a.ex_date.isoformat()} is not valued"
+        for a in actions
+        if a.kind in UNHANDLED_KINDS
+    ]
+    return LoadedActions(actions, flags)
 
 
-async def calculate_and_store_returns(
+def _digest(*parts: object) -> str:
+    return hashlib.sha256(json.dumps(parts, default=str, sort_keys=True).encode()).hexdigest()
+
+
+async def compute_returns(
     pool: asyncpg.Pool,
     *,
     symbol: str,
@@ -474,11 +581,23 @@ async def calculate_and_store_returns(
     source: str,
     currency: str,
     actions_complete: bool,
-) -> dict[str, object]:
-    """Persist distinct price and total-return artifacts with exchange-session coverage."""
+    mic: str | None = None,
+    listing_id: int | None = None,
+    action_symbols: list[str] | None = None,
+    ads_ratio: Decimal | None = None,
+    withholding_rate: Decimal = Decimal(0),
+    fx_to_quote: dict[dt.date, Decimal] | None = None,
+) -> ReturnComputation:
+    """The three return artifacts of one stored series, computed without writing anything.
+
+    Coverage is observed sessions over the sessions the exchange actually held in the window
+    (confirmed `exchange_session` rows, else weekdays less configured closures) and is never
+    raised by the bars that happen to exist."""
     bars = await pool.fetch(
-        """select coalesce(session_date,date) session,close,currency,bar_type from public.price_bar
+        """select coalesce(session_date,date) session,close,currency,bar_type,mic,listing_id
+           from public.price_bar
            where symbol=$1 and source=$2 and coalesce(session_date,date) between $3 and $4
+             and access_state='available'
            order by coalesce(session_date,date)""",
         symbol,
         source,
@@ -495,126 +614,217 @@ async def calculate_and_store_returns(
         for r in bars
         if r["bar_type"] == "raw"
     ]
-    action_rows = await pool.fetch(
-        """select action_type,ex_date,ratio,cash_amount,currency from public.corporate_action
-           where symbol=$1 and status='confirmed' and ex_date between $2 and $3""",
-        symbol,
-        start,
-        end,
+    mic = mic or next((r["mic"] for r in bars if r["mic"]), None)
+    mic = mic or series_mic(symbol, source)
+    listing_id = listing_id or next((r["listing_id"] for r in bars if r["listing_id"]), None)
+    jobs = await load_active(pool, "jobs", JobsConfig)
+    calendar = (jobs.body if jobs else JobsConfig()).calendar
+    expected = await expected_sessions(pool, calendar, mic, start, end)
+    expected_days = set(expected.days)
+
+    def coverage_of(points: list[PricePoint]) -> tuple[Decimal, int, int]:
+        inside = sum(1 for p in points if p.day in expected_days)
+        outside = len(points) - inside
+        ratio = Decimal(inside) / Decimal(expected.count) if expected.count else Decimal(0)
+        return min(ratio, Decimal(1)), inside, outside
+
+    loaded = await load_confirmed_actions(
+        pool,
+        symbols=action_symbols or [symbol],
+        listing_id=listing_id,
+        start=start,
+        end=end,
+        ads_ratio=ads_ratio,
     )
-    actions = [
-        Action(
-            kind=r["action_type"],
-            ex_date=r["ex_date"],
-            ratio=Decimal(r["ratio"]) if r["ratio"] is not None else None,
-            cash=Decimal(r["cash_amount"]) if r["cash_amount"] is not None else None,
-            currency=r["currency"],
-        )
-        for r in action_rows
-        if r["action_type"] in {"split", "cash_dividend", "stock_dividend"}
-    ]
-    expected = await pool.fetchval(
-        """select count(distinct x.session_date) from public.exchange_session x
-           join public.price_bar b on b.mic=x.mic
-           where b.symbol=$1 and b.source=$2 and x.confirmed and x.state in ('open','half_day')
-             and x.session_date between $3 and $4""",
-        symbol,
-        source,
-        start,
-        end,
+    window_flags = loaded.flags
+    base: dict[str, object] = {
+        "calendar_basis": expected.basis,
+        "calendar_mic": mic,
+        "expected_session_days": expected.count,
+        "method_version": RETURN_CALC_VERSION,
+    }
+
+    # price_raw: the closes as stored, no action applied. A split in the window shows as a fall.
+    raw_cov, raw_in, raw_out = coverage_of(raw_points)
+    raw_result = calculate_return(raw_points, [])
+    splits_in_window = [a.ex_date.isoformat() for a in loaded.actions if a.kind == "split"]
+    raw_row = ReturnRow(
+        "price_raw",
+        raw_result.value,
+        raw_cov,
+        raw_in,
+        ([raw_result.reason] if raw_result.reason else []) + window_flags,
+        {
+            **base,
+            "reason": raw_result.reason,
+            "bar_type": "raw",
+            "unexpected_session_bars": raw_out,
+            "warnings": (
+                [f"raw closes are not split-adjusted; splits in the window: {splits_in_window}"]
+                if splits_in_window
+                else []
+            ),
+        },
     )
-    expected = max(int(expected or 0), len(adjusted_points), len(raw_points))
-    coverage = Decimal(len(adjusted_points)) / Decimal(expected) if expected else Decimal(0)
+
+    adj_cov, adj_in, adj_out = coverage_of(adjusted_points)
+    price_result = calculate_return(adjusted_points, [])
+    adj_row = ReturnRow(
+        "price_adjusted",
+        price_result.value,
+        adj_cov,
+        adj_in,
+        ([price_result.reason] if price_result.reason else []) + window_flags,
+        {
+            **base,
+            "reason": price_result.reason,
+            "bar_type": "adjusted",
+            "unexpected_session_bars": adj_out,
+        },
+    )
+
+    total_result = calculate_return(
+        raw_points,
+        loaded.actions,
+        reinvest_dividends=True,
+        fx_to_quote=fx_to_quote,
+        withholding_rate=withholding_rate,
+    )
+    total_reason = total_result.reason
+    total_value = total_result.value
+    if not raw_points:
+        total_reason, total_value = "raw close history is unavailable", None
+    elif not actions_complete:
+        total_reason, total_value = "corporate-action coverage is incomplete", None
+    total_row = ReturnRow(
+        "total_return",
+        total_value,
+        raw_cov,
+        raw_in,
+        ([total_reason] if total_reason else []) + list(total_result.incomplete),
+        {
+            **base,
+            **total_result.details,
+            "reason": total_reason,
+            "bar_type": "raw",
+            "actions": len(loaded.actions),
+        },
+    )
+    digest = _digest(
+        [(p.day, p.close, p.currency) for p in raw_points],
+        [(p.day, p.close, p.currency) for p in adjusted_points],
+        [(a.kind, a.ex_date, a.ratio, a.cash, a.currency, a.source) for a in loaded.actions],
+        withholding_rate,
+        sorted((fx_to_quote or {}).items()),
+        RETURN_CALC_VERSION,
+    )
     output: dict[str, object] = {
         "symbol": symbol,
         "source": source,
         "start": start,
         "end": end,
         "currency": currency,
-        "coverage": coverage,
-        "expected_sessions": expected,
-        "observed_sessions": len(adjusted_points),
-        "raw_observations": len(raw_points),
+        "coverage": adj_cov,
+        "expected_sessions": expected.count,
+        "observed_sessions": adj_in,
+        "raw_observations": raw_in,
+        "calendar_basis": expected.basis,
+        "price_raw": raw_row.value,
+        "price_raw_reason": raw_result.reason,
+        "price_adjusted": adj_row.value,
+        "price_adjusted_reason": price_result.reason,
+        "total_return": total_row.value,
+        "total_return_reason": total_reason,
+        "missing_actions": {
+            "price_raw": raw_row.missing_actions,
+            "price_adjusted": adj_row.missing_actions,
+            "total_return": total_row.missing_actions,
+        },
+        "inputs_digest": digest,
     }
-    raw_result = calculate_return(raw_points, actions)
-    output["price_raw"] = raw_result.value
-    await pool.execute(
-        """insert into public.price_return_series
-           (symbol,start_date,end_date,currency,adjustment_basis,source,value,coverage,
-            expected_sessions,observed_sessions,missing_actions,known_at,details)
-           values($1,$2,$3,$4,'price_raw',$5,$6,$7,$8,$9,$10,now(),$11::jsonb)
-           on conflict(symbol,start_date,end_date,adjustment_basis,source) do update set
-             value=excluded.value,coverage=excluded.coverage,
-             expected_sessions=excluded.expected_sessions,observed_sessions=excluded.observed_sessions,
-             missing_actions=excluded.missing_actions,known_at=excluded.known_at,details=excluded.details""",
-        symbol,
-        start,
-        end,
-        currency,
-        source,
-        raw_result.value,
-        Decimal(len(raw_points)) / Decimal(expected) if expected else Decimal(0),
-        expected,
-        len(raw_points),
-        [] if not raw_result.reason else [raw_result.reason],
-        json.dumps({"reason": raw_result.reason, "bar_type": "raw"}, default=str),
+    return ReturnComputation(output, [raw_row, adj_row, total_row], expected.count, digest)
+
+
+async def store_returns(
+    pool: asyncpg.Pool,
+    computation: ReturnComputation,
+    *,
+    symbol: str,
+    start: dt.date,
+    end: dt.date,
+    source: str,
+    currency: str,
+) -> None:
+    """Persist the artifacts of one computation under the current method version. A changed
+    method (new RETURN_CALC_VERSION) adds rows beside the earlier answers; the same version
+    refreshes its own row."""
+    async with pool.acquire() as conn, conn.transaction():
+        for row in computation.rows:
+            await conn.execute(
+                """insert into public.price_return_series
+                   (symbol,start_date,end_date,currency,adjustment_basis,source,value,coverage,
+                    expected_sessions,observed_sessions,missing_actions,known_at,details,
+                    calc_version,inputs_digest)
+                   values($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,now(),$12::jsonb,$13,$14)
+                   on conflict(symbol,start_date,end_date,adjustment_basis,source,calc_version)
+                   do update set value=excluded.value,coverage=excluded.coverage,
+                     currency=excluded.currency,
+                     expected_sessions=excluded.expected_sessions,
+                     observed_sessions=excluded.observed_sessions,
+                     missing_actions=excluded.missing_actions,known_at=excluded.known_at,
+                     details=excluded.details,inputs_digest=excluded.inputs_digest""",
+                symbol,
+                start,
+                end,
+                currency,
+                row.basis,
+                source,
+                row.value,
+                row.coverage,
+                computation.expected,
+                row.observed,
+                row.missing_actions,
+                json.dumps(row.details, default=str),
+                RETURN_CALC_VERSION,
+                computation.inputs_digest,
+            )
+
+
+async def calculate_and_store_returns(
+    pool: asyncpg.Pool,
+    *,
+    symbol: str,
+    start: dt.date,
+    end: dt.date,
+    source: str,
+    currency: str,
+    actions_complete: bool,
+    mic: str | None = None,
+    listing_id: int | None = None,
+    action_symbols: list[str] | None = None,
+    ads_ratio: Decimal | None = None,
+    withholding_rate: Decimal = Decimal(0),
+    fx_to_quote: dict[dt.date, Decimal] | None = None,
+) -> dict[str, object]:
+    """Compute and persist price (raw, adjusted) and total-return artifacts with
+    exchange-session coverage. Only the scheduled `returns_refresh` job and explicit owner
+    actions call this; the read routes use `compute_returns`."""
+    computation = await compute_returns(
+        pool,
+        symbol=symbol,
+        start=start,
+        end=end,
+        source=source,
+        currency=currency,
+        actions_complete=actions_complete,
+        mic=mic,
+        listing_id=listing_id,
+        action_symbols=action_symbols,
+        ads_ratio=ads_ratio,
+        withholding_rate=withholding_rate,
+        fx_to_quote=fx_to_quote,
     )
-    price_result = calculate_return(adjusted_points, [])
-    price_value = price_result.value
-    output["price_adjusted"] = price_value
-    price_reason = price_result.reason
-    await pool.execute(
-        """insert into public.price_return_series
-           (symbol,start_date,end_date,currency,adjustment_basis,source,value,coverage,
-            expected_sessions,observed_sessions,missing_actions,known_at,details)
-           values($1,$2,$3,$4,'price_adjusted',$5,$6,$7,$8,$9,$10,now(),$11::jsonb)
-           on conflict(symbol,start_date,end_date,adjustment_basis,source) do update set
-             value=excluded.value,coverage=excluded.coverage,
-             expected_sessions=excluded.expected_sessions,observed_sessions=excluded.observed_sessions,
-             missing_actions=excluded.missing_actions,known_at=excluded.known_at,details=excluded.details""",
-        symbol,
-        start,
-        end,
-        currency,
-        source,
-        price_value,
-        coverage,
-        expected,
-        len(adjusted_points),
-        [] if not price_reason else [price_reason],
-        json.dumps({"reason": price_reason, "bar_type": "adjusted"}, default=str),
+    await store_returns(
+        pool, computation, symbol=symbol, start=start, end=end, source=source, currency=currency
     )
-    total_result = calculate_return(raw_points, actions, reinvest_dividends=True)
-    total_value = total_result.value if actions_complete and raw_points else None
-    total_reason = total_result.reason
-    if not raw_points:
-        total_reason = "raw close history is unavailable"
-    elif not actions_complete:
-        total_reason = "corporate-action coverage is incomplete"
-    output["total_return"] = total_value
-    output["total_return_reason"] = total_reason
-    await pool.execute(
-        """insert into public.price_return_series
-           (symbol,start_date,end_date,currency,adjustment_basis,source,value,coverage,
-            expected_sessions,observed_sessions,missing_actions,known_at,details)
-           values($1,$2,$3,$4,'total_return',$5,$6,$7,$8,$9,$10,now(),$11::jsonb)
-           on conflict(symbol,start_date,end_date,adjustment_basis,source) do update set
-             value=excluded.value,coverage=excluded.coverage,
-             expected_sessions=excluded.expected_sessions,observed_sessions=excluded.observed_sessions,
-             missing_actions=excluded.missing_actions,known_at=excluded.known_at,details=excluded.details""",
-        symbol,
-        start,
-        end,
-        currency,
-        source,
-        total_value,
-        Decimal(len(raw_points)) / Decimal(expected) if expected else Decimal(0),
-        expected,
-        len(raw_points),
-        [] if not total_reason else [total_reason],
-        json.dumps(
-            {"reason": total_reason, "bar_type": "raw", "actions": len(actions)}, default=str
-        ),
-    )
-    output["price_adjusted_reason"] = price_reason
-    return output
+    return computation.output

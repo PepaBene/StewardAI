@@ -14,6 +14,7 @@ ETFs) get only what their holding profile provides (manual shares outstanding / 
 """
 
 import datetime as dt
+import hashlib
 import html
 import json
 import re
@@ -35,6 +36,19 @@ from steward.fundamentals.shares import (
     manual_figure,
     shares_chain,
 )
+from steward.fundamentals.statements import (
+    FilingMeta,
+    apply_reconciliation,
+    companyfacts_checks,
+    companyfacts_reference,
+    filing_evidence,
+    has_full_statements,
+    internal_checks,
+    resolve_issuer_id,
+    sec_known_at,
+    sec_statement_facts,
+    store_statement_facts,
+)
 from steward.jobs.runner import JobContext, JobFailed
 from steward.reference.identity import holding_tickers
 from steward.settings import get_settings
@@ -43,6 +57,9 @@ from steward.sources.edgar import (
     EdgarClient,
     EdgarError,
     Filing,
+    amended_filing,
+    amendments_to_check,
+    is_amendment,
     latest_periodic,
     pad_cik,
     xbrl_documents,
@@ -69,6 +86,7 @@ class ParsedFiling:
     labels: Labels
     instance_url: str
     label_url: str | None
+    instance_sha256: str = ""
 
 
 async def fetch_filing(edgar: EdgarClient, filing: Filing, max_bytes: int) -> ParsedFiling:
@@ -77,14 +95,23 @@ async def fetch_filing(edgar: EdgarClient, filing: Filing, max_bytes: int) -> Pa
     if instance_name is None:
         raise XbrlError(f"{filing.form} {filing.accession} has no XBRL instance")
     instance_url = filing.url(instance_name)
-    instance = parse_instance(await edgar.document(instance_url, max_bytes))
+    raw = await edgar.document(instance_url, max_bytes)
+    instance = parse_instance(raw, text_blocks=True)
     label_url = filing.url(label_name) if label_name else None
     labels = parse_labels(await edgar.document(label_url, max_bytes)) if label_url else Labels()
-    return ParsedFiling(filing, instance, labels, instance_url, label_url)
+    return ParsedFiling(
+        filing, instance, labels, instance_url, label_url, hashlib.sha256(raw).hexdigest()
+    )
 
 
 async def store_segments(
-    pool: asyncpg.Pool, ticker: str, parsed: ParsedFiling, job_id: int | None
+    pool: asyncpg.Pool,
+    ticker: str,
+    parsed: ParsedFiling,
+    job_id: int | None,
+    *,
+    company_facts: dict[str, Any] | None = None,
+    amends_accession: str | None = None,
 ) -> dict[str, Any]:
     result = segment_revenue(parsed.instance, parsed.labels)
     f = parsed.filing
@@ -140,82 +167,48 @@ async def store_segments(
                 for r in result.rows
             ],
         )
-        # Keep a periodized, as-filed fact history beside the purpose-built revenue table.
-        # Unreviewed filing facts stay unpublished; only named concepts can later be promoted
-        # into comparable ratios after source/unit reconciliation.
-        await conn.execute(
-            "delete from public.financial_statement_fact where ticker=$1 and accession=$2",
-            ticker,
-            f.accession,
+        # Keep a periodized, as-filed fact history beside the purpose-built revenue table:
+        # the statement set, cover-page facts and cited note text blocks, reconciled to the
+        # filing's own identities and to SEC companyfacts before anything is published.
+        cik10 = pad_cik(f.cik)
+        known_at = sec_known_at(f.accepted_at, f.filing_date)
+        evidence_id = await filing_evidence(
+            conn,
+            regulator="SEC",
+            external_id=f.accession,
+            stable_url=f.index_url,
+            document_type=f.form,
+            content_hash=parsed.instance_sha256 or hashlib.sha256(f.accession.encode()).hexdigest(),
+            filed_at=f.filing_date,
+            accepted_at=f.accepted_at,
+            known_at=known_at,
+            quote=(
+                f"{f.form} {f.accession} filed {f.filing_date}: "
+                f"XBRL financial statements ({ticker})"
+            ),
+            amends_external_id=amends_accession,
         )
-        fact_rows = []
-        for fact in parsed.instance.facts:
-            number = fact.number
-            text_value = fact.text.strip()
-            if number is None and "TextBlock" not in fact.concept:
-                continue
-            if fact.context.typed:
-                dimensions = {"typed": True, "members": list(fact.context.dims)}
-            else:
-                dimensions = {"members": list(fact.context.dims)}
-            name = fact.concept.split(":", 1)[-1].lower()
-            statement = (
-                "segment"
-                if fact.context.dims
-                else "income"
-                if any(
-                    s in name
-                    for s in ("revenue", "income", "expense", "profit", "loss", "eps", "earnings")
-                )
-                else "cash_flow"
-                if any(
-                    s in name
-                    for s in ("cashflow", "cashflows", "payments", "proceeds", "repayments")
-                )
-                else "shares"
-                if "sharesoutstanding" in name
-                else "balance_sheet"
-                if any(
-                    s in name for s in ("assets", "liabilities", "equity", "debt", "cashandcash")
-                )
-                else "note"
-            )
-            # Retain cited note blocks as text, not as fabricated numerical facts.
-            block = text_value[:20000] if "TextBlock" in fact.concept else None
-            fact_rows.append(
-                (
-                    ticker,
-                    f.accession,
-                    f.form,
-                    f.url(f.primary_document),
-                    fact.concept,
-                    statement,
-                    fact.context.start,
-                    fact.context.end or fact.context.instant,
-                    "IFRS"
-                    if fact.concept.startswith("ifrs-full:")
-                    else "US_GAAP"
-                    if fact.concept.startswith("us-gaap:")
-                    else "issuer_extension",
-                    fact.unit or "pure",
-                    number,
-                    json.dumps(dimensions),
-                    block,
-                    f.filing_date,
-                    f.filing_date,
-                    f.url(f.primary_document),
-                    fact.id,
-                )
-            )
-        await conn.executemany(
-            """insert into public.financial_statement_fact
-               (ticker,accession,form,filing_url,concept,statement,period_start,period_end,basis,
-                unit,value,dimensions,text_block,published_at,known_at,source,source_url,validation)
-               values($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12::jsonb,$13,$14::timestamptz,
-                      $15::timestamptz,'sec_xbrl',$16,
-                      jsonb_build_object('source_fact_id',$17,'reviewed',false))""",
-            fact_rows,
+        meta = FilingMeta(
+            ticker=ticker,
+            accession=f.accession,
+            form=f.form,
+            filing_date=f.filing_date,
+            filing_url=f.url(f.primary_document),
+            source_url=f.url(f.primary_document),
+            accepted_at=f.accepted_at,
+            cik=cik10,
+            issuer_id=await resolve_issuer_id(conn, ticker, cik10),
+            evidence_id=evidence_id,
+            amends_accession=amends_accession,
         )
+        statement_facts = sec_statement_facts(parsed.instance, meta)
+        checks = internal_checks(statement_facts)
+        if company_facts:
+            checks += companyfacts_checks(
+                statement_facts, companyfacts_reference(company_facts, f.accession)
+            )
+        statement_facts = apply_reconciliation(statement_facts, checks)
+        stored = await store_statement_facts(conn, ticker, "sec_xbrl", f.accession, statement_facts)
     kinds: dict[str, int] = {}
     for r in result.rows:
         kinds[r.kind] = kinds.get(r.kind, 0) + 1
@@ -225,6 +218,10 @@ async def store_segments(
         "rows": kinds,
         "facts_seen": result.facts_seen,
         "skipped_cross_tabs": result.skipped_multi,
+        "statement_facts": stored["rows"],
+        "linked_to_original": stored["linked_to_original"],
+        "reconciled": sum(1 for x in statement_facts if x.published),
+        "failed_checks": sum(1 for c in checks if not c.passed),
     }
 
 
@@ -336,30 +333,88 @@ async def collect_ticker(
         return
     cik = pad_cik(cik)
     filings = await edgar.filings(cik)
-    annual, quarter = latest_periodic(filings)
-    targets = [f for f in (annual, quarter if settings.quarterly else None) if f is not None]
-    detail["filings"] = [f"{f.form} {f.accession} ({f.filing_date})" for f in targets]
-    if not targets:
-        detail["skipped"] = "no 10-K, 10-Q or 20-F on EDGAR"
+    max_bytes = settings.max_document_mb << 20
+    company_facts = await edgar.company_facts(cik)
     parsed_now: dict[str, ParsedFiling] = {}
     parsed_detail: list[dict[str, Any]] = []
-    for filing in targets:
-        done = await pool.fetchval(
+    force = bool(ctx.params.get("force"))
+
+    async def parse_and_store(filing: Filing) -> ParsedFiling:
+        original = amended_filing(filings, filing) if is_amendment(filing.form) else None
+        if (
+            original is not None
+            and original.accession not in parsed_now
+            and await parser_version(original) != PARSER_VERSION
+        ):
+            # The amendment's rows link to the original's: store the original first.
+            try:
+                await parse_and_store(original)
+            except (EdgarError, XbrlError):
+                original = None  # no instance to link to; the amendment stands alone
+        parsed = await fetch_filing(edgar, filing, max_bytes)
+        parsed_now[filing.accession] = parsed
+        parsed_detail.append(
+            await store_segments(
+                pool,
+                ticker,
+                parsed,
+                ctx.job_id,
+                company_facts=company_facts,
+                amends_accession=original.accession if original else None,
+            )
+        )
+        return parsed
+
+    async def parser_version(filing: Filing) -> int | None:
+        value = await pool.fetchval(
             "select parser_version from public.xbrl_filing where ticker = $1 and accession = $2",
             ticker,
             filing.accession,
         )
-        if done == PARSER_VERSION and not ctx.params.get("force"):
+        return int(value) if value is not None else None
+
+    # A 10-K/A is usually Part III only; it replaces the annual report only when its own
+    # instance carries the financial statements (a restatement).
+    full_amendments: set[str] = set()
+    for amendment in amendments_to_check(filings):
+        if await parser_version(amendment) == PARSER_VERSION and not force:
+            has_statements = await pool.fetchval(
+                "select exists(select 1 from public.financial_statement_fact where ticker = $1"
+                " and accession = $2 and line_item in ('revenue', 'net_income', 'total_assets')"
+                " and statement <> 'segment')",
+                ticker,
+                amendment.accession,
+            )
+        else:
+            try:
+                parsed_amendment = await parse_and_store(amendment)
+            except (EdgarError, XbrlError):
+                continue  # an amendment without an instance is not a restatement
+            has_statements = has_full_statements(parsed_amendment.instance)
+        if has_statements:
+            full_amendments.add(amendment.accession)
+    annual, quarter = latest_periodic(filings, full_amendments)
+    targets = [f for f in (annual, quarter if settings.quarterly else None) if f is not None]
+    if annual is not None and is_amendment(annual.form):
+        original = amended_filing(filings, annual)
+        if original is not None:
+            targets.append(original)  # keeps the lineage a restatement points at
+    detail["filings"] = [f"{f.form} {f.accession} ({f.filing_date})" for f in targets]
+    if not targets:
+        detail["skipped"] = "no 10-K, 10-Q or 20-F on EDGAR"
+    for filing in targets:
+        if filing.accession in parsed_now:
             continue
-        parsed = await fetch_filing(edgar, filing, settings.max_document_mb << 20)
-        parsed_now[filing.accession] = parsed
-        parsed_detail.append(await store_segments(pool, ticker, parsed, ctx.job_id))
+        if await parser_version(filing) == PARSER_VERSION and not force:
+            continue
+        await parse_and_store(filing)
     detail["parsed"] = parsed_detail
     detail["unchanged"] = [f.accession for f in targets if f.accession not in parsed_now]
+    if full_amendments:
+        detail["full_amendments"] = sorted(full_amendments)
 
     # Shares outstanding.
     latest = max(targets, key=lambda f: (f.filing_date, f.accession)) if targets else None
-    company_facts = await edgar.company_facts(cik)
     basis = basis_for(profile, cik)
     parsed_latest = parsed_now.get(latest.accession) if latest else None
     figure = shares_chain(
@@ -433,7 +488,13 @@ async def run_sec_xbrl(ctx: JobContext, edgar: EdgarClient | None) -> None:
             profile = config.for_ticker(ticker) or HoldingProfile(ticker=ticker)
             try:
                 await collect_ticker(ctx, edgar, ticker, profile, settings, step.detail)
-            except (EdgarError, XbrlError, httpx.HTTPError, ValueError) as exc:
+            except (
+                EdgarError,
+                XbrlError,
+                httpx.HTTPError,
+                ValueError,
+                asyncpg.PostgresError,
+            ) as exc:
                 # Keep what is stored; the next run tries again.
                 step.detail["error"] = f"{type(exc).__name__}: {exc}"[:500]
                 failed.append(ticker)

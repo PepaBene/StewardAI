@@ -13,22 +13,32 @@ from fastapi.routing import APIRoute
 from pydantic import BaseModel
 from starlette.types import ASGIApp, Message, Receive, Scope, Send
 
+from api.alert_trail_routes import router as alert_trail_router
 from api.auth import Owner
 from api.budget_routes import router as budget_router
 from api.chat_routes import router as chat_router
 from api.config_history_routes import router as config_history_router
+from api.control_stake_routes import router as control_stake_router
+from api.data_context_routes import router as data_context_router
 from api.db import close_pool, get_pool_or_error
 from api.escalation_routes import router as escalation_router
 from api.free_sources_routes import router as free_sources_router
+from api.fund_routes import router as fund_router
 from api.fundamentals_routes import router as fundamentals_router
+from api.gate_routes import router as gate_router
+from api.graph_routes import router as graph_router
+from api.insider_activity_routes import router as insider_activity_router
 from api.insider_routes import router as insider_router
 from api.investor_routes import router as investor_router
 from api.lookthrough_routes import router as lookthrough_router
 from api.macro_routes import router as macro_router
 from api.market_routes import router as market_router
 from api.news_routes import router as news_router
+from api.nport_routes import router as nport_router
+from api.pdmr_routes import router as pdmr_router
 from api.prompts_routes import router as prompts_router
 from api.reference_routes import router as reference_router
+from api.research_context_routes import router as research_context_router
 from api.research_routes import router as research_router
 from api.routes import router
 from api.source_routes import router as source_router
@@ -240,6 +250,16 @@ def create_app() -> FastAPI:
     app.include_router(watchlist_router)
     app.include_router(insider_router)
     app.include_router(investor_router)
+    app.include_router(control_stake_router)
+    app.include_router(insider_activity_router)
+    app.include_router(nport_router)
+    app.include_router(fund_router)
+    app.include_router(pdmr_router)
+    app.include_router(graph_router)
+    app.include_router(data_context_router)
+    app.include_router(research_context_router)
+    app.include_router(alert_trail_router)
+    app.include_router(gate_router)
     return app
 
 

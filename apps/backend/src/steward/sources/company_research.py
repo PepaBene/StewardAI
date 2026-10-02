@@ -5,32 +5,95 @@ from __future__ import annotations
 import datetime as dt
 import json
 import re
-import xml.etree.ElementTree as ET
 from decimal import Decimal
 from urllib.parse import urlsplit
 
 import asyncpg
 import httpx
 
-from steward.free_sources import store_company_edge, store_patent_family
-from steward.sources.base import AccessResult, AccessState
+from steward.free_sources import store_company_edge
+from steward.graph import provider_gate
+from steward.graph.diffbot import parse_diffbot_relations
+from steward.graph.evidence import record_evidence
+from steward.graph.keys import normalize_object_key
+from steward.graph.ops import (
+    EpoAuthError,
+    LegalEvent,
+    OpsFamily,
+    derive_legal_status,
+    fetch_token,
+    parse_ops_legal,
+    parse_ops_page,
+    search_applicants,
+)
+from steward.graph.patents import find_subsidiary_path, store_patent_family
+from steward.sources.base import AccessResult, AccessState, quota_denial_text, retry_after_at
+from steward.sources.credit_group import CreditPart, refund, reserve_group
 from steward.sources.free_market import FreeSourceError, parse_alpha_series
-from steward.sources.governor import Budget, PostgresRequestGovernor
+from steward.sources.governor import Budget, PostgresRequestGovernor, QuotaExceeded
 from steward.sources.store import record_access
+
+__all__ = [
+    "collect_alpha_exposure",
+    "collect_diffbot_candidates",
+    "collect_epo_patents",
+    "collect_pdl_company",
+    "parse_ops_patent_xml",
+    "parse_pdl_company",
+    "pdl_skip_reason",
+    "store_research_observation",
+]
+
+PDL_MATCH_COOLDOWN = dt.timedelta(days=30)
+PDL_NO_MATCH_COOLDOWN = dt.timedelta(days=14)
+PDL_FAILURE_COOLDOWN = dt.timedelta(hours=24)
+_DOMAIN_RE = re.compile(r"^[a-z0-9]([a-z0-9.-]{0,251}[a-z0-9])?$")
 
 
 async def _gate(pool: asyncpg.Pool, provider: str, endpoint: str) -> None:
-    row = await pool.fetchrow(
-        "select state,hard_blocked from public.provider_access where provider=$1 and endpoint=$2",
-        provider,
-        endpoint,
-    )
-    if row is None or row["state"] != AccessState.AVAILABLE.value or row["hard_blocked"]:
+    """Collectors run only on an endpoint verified free and available, not hard-blocked and
+    past any Retry-After / auth-failure cooldown."""
+    if not await provider_gate.gate_open(pool, provider, endpoint):
         raise RuntimeError(f"{provider} {endpoint} endpoint is not verified as free and available")
 
 
-async def store_research_observation(
+async def _record_http_failure(
     pool: asyncpg.Pool,
+    provider: str,
+    endpoint: str,
+    response: httpx.Response,
+    detail: str,
+) -> AccessResult:
+    """Record a non-success HTTP answer with the right typed state (G12).
+
+    401/403 may be a transient denial: the first failures only cool the endpoint down, and only
+    the third consecutive one is recorded as `access_unverified` (which hard-blocks). 402/403
+    bodies that talk about a quota are quota states, 429 honours Retry-After, 5xx is transient."""
+    status = response.status_code
+    retry_at = retry_after_at(response.headers.get("Retry-After"))
+    if status in (401, 403) and not quota_denial_text(response.text[:500]):
+        result = await provider_gate.note_auth_failure(pool, provider, endpoint, status)
+    elif status in (402, 403, 429):
+        quota = status == 429 or quota_denial_text(response.text[:500])
+        result = AccessResult(
+            AccessState.QUOTA_EXHAUSTED if quota else AccessState.PAID_ONLY,
+            f"HTTP {status}",
+            retry_at,
+        )
+    elif status >= 500:
+        result = AccessResult(AccessState.TEMPORARILY_FAILED, f"HTTP {status}", retry_at)
+    else:
+        result = AccessResult(AccessState.TEMPORARILY_FAILED, f"HTTP {status}")
+    if result.detail is None or detail not in result.detail:
+        result = AccessResult(
+            result.state, f"{detail}: {result.detail}" if result.detail else detail, result.retry_at
+        )
+    await record_access(pool, provider, endpoint, result, status_code=status)
+    return result
+
+
+async def store_research_observation(
+    pool: asyncpg.Pool | asyncpg.Connection,
     *,
     ticker: str,
     provider: str,
@@ -46,11 +109,21 @@ async def store_research_observation(
     match_confidence: Decimal | None = None,
     raw: dict[str, object] | None = None,
 ) -> int:
-    return await pool.fetchval(
-        """insert into public.company_research_observation
+    """Append an observation unless an identical one (same ticker, provider, dataset, metric,
+    period, value and unit) is already stored; an unchanged re-fetch only refreshes
+    `last_seen_at` and keeps the earliest `known_at`. A changed value is a new row."""
+    row_id: int = await pool.fetchval(
+        """insert into public.company_research_observation as t
            (ticker,provider,dataset,metric,period_end,value,text_value,unit,currency,source_url,
             published_at,known_at,match_confidence,raw)
-           values($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,now(),$12,$13::jsonb) returning id""",
+           values($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,now(),$12,$13::jsonb)
+           on conflict (ticker,provider,dataset,metric,coalesce(period_end, date '0001-01-01'),
+                        coalesce(trim_scale(value)::text, ''), coalesce(text_value, ''),
+                        coalesce(unit, ''))
+           do update set last_seen_at=now(),
+             match_confidence=greatest(t.match_confidence,excluded.match_confidence),
+             currency=coalesce(t.currency,excluded.currency)
+           returning id""",
         ticker,
         provider,
         dataset,
@@ -65,6 +138,18 @@ async def store_research_observation(
         match_confidence,
         json.dumps(raw or {}, default=str),
     )
+    return row_id
+
+
+def normalize_commodity_unit(unit: str) -> tuple[str, str | None, Decimal]:
+    """(unit label, currency, divisor). Alpha Vantage reports some commodities in cents; the
+    stored value is converted to the major currency so it is never read as dollars."""
+    lowered = unit.casefold()
+    if "cent" in lowered:
+        return re.sub(r"(?i)cents?", "USD", unit, count=1), "USD", Decimal(100)
+    if "dollar" in lowered or "usd" in lowered:
+        return unit, "USD", Decimal(1)
+    return unit, None, Decimal(1)
 
 
 async def collect_alpha_exposure(
@@ -81,23 +166,40 @@ async def collect_alpha_exposure(
     endpoint = "fx_daily" if function == "FX_DAILY" else "commodity"
     await _gate(pool, "alpha_vantage", endpoint)
     await _gate(pool, "alpha_vantage", "account_free")
-    governor = PostgresRequestGovernor(pool)
     budget = Budget(daily=Decimal(20))
-    await governor.reserve("alpha_vantage", "account_free", Decimal(1), budget)
-    await governor.reserve("alpha_vantage", endpoint, Decimal(1), budget)
+    # One transaction for both credits: a refusal of the second never burns the first.
+    reservation = await reserve_group(
+        pool,
+        [
+            CreditPart("alpha_vantage", "account_free", Decimal(1), budget),
+            CreditPart("alpha_vantage", endpoint, Decimal(1), budget),
+        ],
+    )
     params: dict[str, str] = {"function": function, "apikey": api_key}
     if function == "FX_DAILY":
         if not from_currency or not to_currency:
+            await refund(pool, reservation)
             raise ValueError("FX_DAILY requires from_currency and to_currency")
         params.update(from_symbol=from_currency, to_symbol=to_currency, outputsize="compact")
-        currency = to_currency
+        currency: str | None = to_currency
         unit = f"{from_currency}/{to_currency}"
     else:
         params["interval"] = "daily"
         currency = None
         unit = "provider_reported"
+    divisor = Decimal(1)
     try:
         response = await http.get("https://www.alphavantage.co/query", params=params)
+    except httpx.HTTPError:
+        await refund(pool, reservation)  # the request never reached the provider
+        await record_access(
+            pool,
+            "alpha_vantage",
+            endpoint,
+            AccessResult(AccessState.TEMPORARILY_FAILED, "network error"),
+        )
+        raise
+    try:
         if response.status_code != 200:
             raise FreeSourceError(
                 f"Alpha Vantage HTTP {response.status_code}", response.status_code
@@ -105,33 +207,61 @@ async def collect_alpha_exposure(
         payload = response.json()
         series = parse_alpha_series(payload)
         if function != "FX_DAILY" and isinstance(payload.get("unit"), str):
-            unit = str(payload["unit"])
-            currency = "USD"
-    except (httpx.HTTPError, ValueError, FreeSourceError):
+            unit, currency, divisor = normalize_commodity_unit(str(payload["unit"]))
+    except (ValueError, FreeSourceError) as exc:
+        state = (
+            exc.state
+            if isinstance(exc, FreeSourceError) and exc.state is not None
+            else AccessState.TEMPORARILY_FAILED
+        )
         await record_access(
             pool,
             "alpha_vantage",
             endpoint,
-            AccessResult(AccessState.TEMPORARILY_FAILED, "series fetch failed"),
+            AccessResult(state, "series fetch failed"),
+            status_code=exc.status_code if isinstance(exc, FreeSourceError) else None,
         )
         raise
     url = f"https://www.alphavantage.co/query?function={function}"
+    stored = 0
     async with pool.acquire() as conn, conn.transaction():
         for day, value in series:
-            await conn.execute(
-                """insert into public.company_research_observation
-                   (ticker,provider,dataset,metric,period_end,value,unit,currency,source_url,
-                    known_at,match_confidence,raw)
-                   values($1,'alpha_vantage','exposure_context',$2,$3,$4,$5,$6,$7,now(),1,$8::jsonb)""",
+            before = await conn.fetchval(
+                """select count(*) from public.company_research_observation
+                   where ticker=$1 and provider='alpha_vantage' and dataset='exposure_context'
+                     and metric=$2 and period_end=$3""",
                 ticker,
                 series_name,
                 day,
-                value,
-                unit,
-                currency,
-                url,
-                json.dumps({"function": function, "provider_series_name": series_name}),
             )
+            await store_research_observation(
+                conn,
+                ticker=ticker,
+                provider="alpha_vantage",
+                dataset="exposure_context",
+                metric=series_name,
+                period_end=day,
+                value=value / divisor,
+                unit=unit,
+                currency=currency,
+                source_url=url,
+                match_confidence=Decimal(1),
+                raw={
+                    "function": function,
+                    "provider_series_name": series_name,
+                    "provider_value": str(value),
+                    "provider_unit": payload.get("unit") if function != "FX_DAILY" else unit,
+                },
+            )
+            after = await conn.fetchval(
+                """select count(*) from public.company_research_observation
+                   where ticker=$1 and provider='alpha_vantage' and dataset='exposure_context'
+                     and metric=$2 and period_end=$3""",
+                ticker,
+                series_name,
+                day,
+            )
+            stored += int(after) - int(before)
     await record_access(
         pool,
         "alpha_vantage",
@@ -139,7 +269,7 @@ async def collect_alpha_exposure(
         AccessResult(AccessState.AVAILABLE, "exposure-linked series retrieved"),
         credits=1,
     )
-    return len(series)
+    return stored
 
 
 def parse_pdl_company(
@@ -157,18 +287,97 @@ def parse_pdl_company(
     return max(Decimal(0), min(Decimal(1), confidence)), payload
 
 
+async def pdl_skip_reason(
+    pool: asyncpg.Pool, ticker: str, *, now: dt.datetime | None = None
+) -> str | None:
+    """Why a PDL lookup should not be spent on this holding right now, or None to proceed.
+
+    PDL's allowance is tiny (100 per month), so it is used only to fill a gap and at most once
+    per cooldown: a match is reused for 30 days, a 'no match' for 14, a failed call for one."""
+    now = now or dt.datetime.now(dt.UTC)
+    log = await pool.fetchrow(
+        "select outcome, looked_up_at from public.research_lookup_log"
+        " where provider='people_data_labs' and lookup_key=$1",
+        ticker,
+    )
+    if log is not None:
+        cooldown = {
+            "matched": PDL_MATCH_COOLDOWN,
+            "no_match": PDL_NO_MATCH_COOLDOWN,
+            "failed": PDL_FAILURE_COOLDOWN,
+            "refunded": PDL_FAILURE_COOLDOWN,
+        }[log["outcome"]]
+        if now - log["looked_up_at"] < cooldown:
+            return f"last PDL lookup ({log['outcome']}) is inside its cooldown"
+    identity = await pool.fetchrow(
+        "select issuer_lei from public.instrument where t212_ticker=$1", ticker
+    )
+    gaps = await pool.fetch(
+        """select distinct metric from public.company_research_observation
+           where ticker=$1 and metric in ('employee_count','total_funding_raised')
+             and known_at > $2""",
+        ticker,
+        now - dt.timedelta(days=400),
+    )
+    have = {r["metric"] for r in gaps}
+    identity_unresolved = identity is None or not identity["issuer_lei"]
+    if not identity_unresolved and {"employee_count", "total_funding_raised"} <= have:
+        return "identity, headcount and funding are already resolved; PDL would add nothing"
+    return None
+
+
+async def _log_lookup(pool: asyncpg.Pool, ticker: str, outcome: str) -> None:
+    await pool.execute(
+        """insert into public.research_lookup_log(provider,lookup_key,looked_up_at,outcome)
+           values('people_data_labs',$1,now(),$2)
+           on conflict(provider,lookup_key) do update set
+             looked_up_at=excluded.looked_up_at,outcome=excluded.outcome""",
+        ticker,
+        outcome,
+    )
+
+
 async def collect_pdl_company(
-    pool: asyncpg.Pool, http: httpx.AsyncClient, *, ticker: str, domain: str, api_key: str
+    pool: asyncpg.Pool,
+    http: httpx.AsyncClient,
+    *,
+    ticker: str,
+    domain: str,
+    api_key: str,
+    force: bool = False,
 ) -> int:
     await _gate(pool, "people_data_labs", "company_enrich")
-    governor = PostgresRequestGovernor(pool)
-    await governor.reserve("people_data_labs", "company_enrich", Decimal(1), Budget(monthly=100))
-    response = await http.get(
-        "https://api.peopledatalabs.com/v5/company/enrich",
-        params={"website": domain, "min_likelihood": 6, "pretty": "false"},
-        headers={"X-API-Key": api_key},
+    if not force:
+        reason = await pdl_skip_reason(pool, ticker)
+        if reason is not None:
+            return 0
+    clean_domain = (urlsplit(domain).hostname or domain).lower().removeprefix("www.")
+    if not _DOMAIN_RE.match(clean_domain):
+        raise ValueError("PDL lookups need a plain company domain")
+    budget = Budget(monthly=Decimal(100))
+    reservation = await reserve_group(
+        pool, [CreditPart("people_data_labs", "company_enrich", Decimal(1), budget)]
     )
+    try:
+        response = await http.get(
+            "https://api.peopledatalabs.com/v5/company/enrich",
+            params={"website": clean_domain, "min_likelihood": 6, "pretty": "false"},
+            headers={"X-API-Key": api_key},
+        )
+    except httpx.HTTPError:
+        await refund(pool, reservation)  # never reached PDL: do not spend the monthly credit
+        await _log_lookup(pool, ticker, "refunded")
+        await record_access(
+            pool,
+            "people_data_labs",
+            "company_enrich",
+            AccessResult(AccessState.TEMPORARILY_FAILED, "network error"),
+        )
+        raise
     if response.status_code == 404:
+        # PDL bills only matches; a 404 is free, so give the reserved credit back.
+        await refund(pool, reservation)
+        await _log_lookup(pool, ticker, "no_match")
         await record_access(
             pool,
             "people_data_labs",
@@ -178,27 +387,26 @@ async def collect_pdl_company(
         )
         return 0
     if response.status_code != 200:
-        state = (
-            AccessState.ACCESS_UNVERIFIED
-            if response.status_code in {401, 403}
-            else AccessState.TEMPORARILY_FAILED
+        if response.status_code >= 500 or response.status_code == 429:
+            await refund(pool, reservation)  # PDL does not bill failed calls
+        await _log_lookup(pool, ticker, "failed")
+        await _record_http_failure(
+            pool, "people_data_labs", "company_enrich", response, "PDL enrichment request failed"
         )
-        await record_access(
-            pool,
-            "people_data_labs",
-            "company_enrich",
-            AccessResult(state, "PDL enrichment request failed"),
-            status_code=response.status_code,
-        )
-        if state == AccessState.ACCESS_UNVERIFIED:
-            await governor.hard_block("people_data_labs", "company_enrich")
         raise FreeSourceError(f"PDL enrichment HTTP {response.status_code}", response.status_code)
     payload = response.json()
     if not isinstance(payload, dict):
+        await _log_lookup(pool, ticker, "failed")
         raise FreeSourceError("PDL company enrichment schema changed")
-    confidence, _ = parse_pdl_company(payload, domain)
+    try:
+        confidence, _ = parse_pdl_company(payload, clean_domain)
+    except FreeSourceError:
+        await _log_lookup(pool, ticker, "no_match")
+        raise
     if confidence < Decimal("0.6"):
+        await _log_lookup(pool, ticker, "no_match")
         raise FreeSourceError("PDL company match confidence is below the publication threshold")
+    await provider_gate.note_success(pool, "people_data_labs", "company_enrich")
     source = "https://api.peopledatalabs.com/v5/company/enrich"
     # Keep only business-level matching and workforce/funding fields; discard any
     # unrequested person-level or contact fields if the response schema expands.
@@ -249,6 +457,7 @@ async def collect_pdl_company(
                     match_confidence=confidence,
                     raw=safe_raw,
                 )
+    await _log_lookup(pool, ticker, "matched")
     await record_access(
         pool,
         "people_data_labs",
@@ -263,37 +472,55 @@ async def collect_diffbot_candidates(
     pool: asyncpg.Pool, http: httpx.AsyncClient, *, ticker: str, domain: str, api_key: str
 ) -> int:
     await _gate(pool, "diffbot", "organization")
-    governor = PostgresRequestGovernor(pool)
+    clean_domain = (urlsplit(domain).hostname or domain).lower().removeprefix("www.").rstrip("/")
+    if not _DOMAIN_RE.match(clean_domain):
+        raise ValueError("Diffbot lookups need a plain company domain")
     # DQL exports are budgeted by entity; cap this one-holding lookup to two KG entities.
-    await governor.reserve("diffbot", "organization", Decimal(50), Budget(monthly=10_000))
-    query = f'type:Organization homepageUri:"{domain}"'
-    response = await http.post(
-        "https://kg.diffbot.com/kg/v3/dql",
-        params={"token": api_key},
-        json={
-            "query": query,
-            "size": 2,
-            "filter": (
-                "$.id;$.name;$.homepageUri;$.nbEmployees;$.relationships"
-            ),
-        },
+    reservation = await reserve_group(
+        pool,
+        [CreditPart("diffbot", "organization", Decimal(50), Budget(monthly=Decimal(10_000)))],
     )
-    if response.status_code != 200:
-        state = (
-            AccessState.ACCESS_UNVERIFIED
-            if response.status_code in {401, 403}
-            else AccessState.TEMPORARILY_FAILED
+    query = f'type:Organization homepageUri:"{clean_domain}"'
+    fields = "$.id;$.name;$.homepageUri;$.nbEmployees;" + ";".join(
+        f"${'.' + f}"
+        for f in (
+            "parentCompany",
+            "subsidiaries",
+            "acquisitions",
+            "acquiredBy",
+            "investments",
+            "investors",
+            "competitors",
+            "partnerships",
+            "customers",
+            "suppliers",
+            "products",
+            "ceo",
         )
+    )
+    try:
+        response = await http.post(
+            "https://kg.diffbot.com/kg/v3/dql",
+            params={"token": api_key},
+            json={"query": query, "size": 2, "filter": fields},
+        )
+    except httpx.HTTPError:
+        await refund(pool, reservation)
         await record_access(
             pool,
             "diffbot",
             "organization",
-            AccessResult(state, "Diffbot KG query failed"),
-            status_code=response.status_code,
+            AccessResult(AccessState.TEMPORARILY_FAILED, "network error"),
         )
-        if state == AccessState.ACCESS_UNVERIFIED:
-            await governor.hard_block("diffbot", "organization")
+        raise
+    if response.status_code != 200:
+        if response.status_code >= 500:
+            await refund(pool, reservation)
+        await _record_http_failure(
+            pool, "diffbot", "organization", response, "Diffbot KG query failed"
+        )
         raise FreeSourceError(f"Diffbot KG HTTP {response.status_code}", response.status_code)
+    await provider_gate.note_success(pool, "diffbot", "organization")
     payload = response.json()
     rows = payload.get("data") if isinstance(payload, dict) else None
     if not isinstance(rows, list):
@@ -307,9 +534,7 @@ async def collect_diffbot_candidates(
         homepage_uri = str(entity.get("homepageUri") or "")
         homepage = (urlsplit(homepage_uri).hostname or homepage_uri).lower()
         homepage = homepage.removeprefix("www.").rstrip("/")
-        expected_domain = (urlsplit(domain).hostname or domain).lower()
-        expected_domain = expected_domain.removeprefix("www.").rstrip("/")
-        if homepage and homepage != expected_domain:
+        if homepage and homepage != clean_domain:
             continue
         await store_research_observation(
             pool,
@@ -320,48 +545,24 @@ async def collect_diffbot_candidates(
             text_value=str(entity["name"]),
             source_url=dql_url,
             match_confidence=Decimal("0.8"),
-            raw=entity,
+            raw={k: entity[k] for k in ("id", "name", "homepageUri", "nbEmployees") if k in entity},
         )
-        rels = entity.get("relationships")
-        if isinstance(rels, list):
-            for rel in rels[:100]:
-                if not isinstance(rel, dict):
-                    continue
-                target = rel.get("object") or rel.get("target") or rel.get("entity")
-                if not isinstance(target, dict) or not target.get("name"):
-                    continue
-                raw_type = str(rel.get("type") or rel.get("relationship") or "").casefold()
-                edge_type = next(
-                    (
-                        value
-                        for key, value in (
-                            ("compet", "competitor"),
-                            ("acqui", "acquired"),
-                            ("partner", "partner"),
-                            ("product", "product"),
-                            ("executive", "executive"),
-                            ("invest", "investment"),
-                            ("parent", "parent"),
-                        )
-                        if key in raw_type
-                    ),
-                    None,
-                )
-                if edge_type:
-                    await store_company_edge(
-                        pool,
-                        subject_key=ticker,
-                        object_key=str(target.get("id") or target["name"]),
-                        object_name=str(target["name"]),
-                        edge_type=edge_type,
-                        direction="outgoing",
-                        source="diffbot",
-                        source_url=str(entity.get("homepageUri") or dql_url),
-                        evidence_tier="vendor",
-                        status="suggested",
-                        detail={"provider_relation": rel},
-                    )
-                    stored += 1
+        for rel in parse_diffbot_relations(entity)[:200]:
+            await store_company_edge(
+                pool,
+                subject_key=ticker,
+                object_key=rel.object_key,
+                object_name=rel.object_name,
+                edge_type=rel.edge_type,
+                direction=rel.direction,
+                source="diffbot",
+                source_url=f"{dql_url}#{entity['id']}/{rel.provider_field}",
+                status="suggested",
+                valid_from=rel.valid_from,
+                valid_to=rel.valid_to,
+                detail=rel.detail,
+            )
+            stored += 1
     await record_access(
         pool,
         "diffbot",
@@ -372,80 +573,69 @@ async def collect_diffbot_candidates(
     return stored
 
 
-def _xml_children(doc: ET.Element, name: str) -> list[ET.Element]:
-    return [node for node in doc.iter() if node.tag.rsplit("}", 1)[-1] == name]
+# --------------------------------------------------------------------------------------- EPO
 
 
 def parse_ops_patent_xml(
     xml_text: str, applicant_aliases: tuple[str, ...]
 ) -> list[dict[str, object]]:
-    if len(xml_text) > 5_000_000:
-        raise FreeSourceError("EPO OPS response exceeds the 5 MB parse limit")
-    try:
-        root = ET.fromstring(xml_text)  # noqa: S314 - Expat disables external entity expansion.
-    except ET.ParseError as exc:
-        raise FreeSourceError("EPO OPS response was not valid XML") from exc
-    aliases = {re.sub(r"[^a-z0-9]", "", x.casefold()) for x in applicant_aliases}
-    results: dict[str, dict[str, object]] = {}
-    for doc in root.iter():
-        if doc.tag.rsplit("}", 1)[-1] != "exchange-document":
-            continue
+    """Patent families (one per OPS family-id) whose applicants include an alias.
 
-        applicant_names = [
-            " ".join((n.text or "").split()) for n in _xml_children(doc, "applicant-name")
-        ]
-        if not any(
-            re.sub(r"[^a-z0-9]", "", name.casefold()) in aliases for name in applicant_names
-        ):
-            continue
-        publication = next(
-            (
-                n.attrib.get("doc-number")
-                for n in _xml_children(doc, "document-id")
-                if n.attrib.get("document-id-type") == "docdb"
-            ),
-            None,
-        )
-        if not publication:
-            publication = doc.attrib.get("doc-number")
-        if not publication:
-            continue
-        titles = [
-            " ".join((n.text or "").split())
-            for n in _xml_children(doc, "invention-title")
-            if n.text
-        ]
-        priority = next(
-            (
-                n.attrib.get("date")
-                for n in _xml_children(doc, "priority-claim")
-                if n.attrib.get("date")
-            ),
-            None,
-        )
-        cpcs = sorted(
-            {
-                "".join((n.text or "").split())
-                for n in _xml_children(doc, "classification-symbol")
-                if n.text
-            }
-        )
-        try:
-            priority_date = dt.datetime.strptime(priority, "%Y%m%d").date() if priority else None
-        except ValueError:
-            priority_date = None
-        results.setdefault(
-            str(publication),
-            {
-                "family_key": str(publication),
-                "priority_date": priority_date,
-                "title": titles[0] if titles else None,
-                "cpc_codes": cpcs,
-                "applicant": applicant_names[0],
-                "raw": {"publication": publication},
-            },
-        )
-    return list(results.values())
+    Kept as the dict-shaped view of `graph.ops.parse_ops_page` for callers and tests that want
+    plain values; `family_key` is the OPS family id."""
+    page = parse_ops_page(xml_text, applicant_aliases)
+    out: list[dict[str, object]] = []
+    for family in page.families:
+        out.append(_family_dict(family))
+    return out
+
+
+def _family_dict(family: OpsFamily) -> dict[str, object]:
+    return {
+        "family_key": family.family_id,
+        "priority_date": family.priority_date,
+        "title": family.title,
+        "cpc_codes": sorted(family.cpc_codes),
+        "applicant": family.applicants[0] if family.applicants else "",
+        "applicants": list(family.applicants),
+        "jurisdictions": family.jurisdictions,
+        "backward_citations": len(family.cited),
+        "first_publication_date": family.first_publication_date,
+        "grant_date": family.grant_date,
+        "publications": [(p.country, p.doc_number, p.kind, p.date) for p in family.publications],
+        "raw": {
+            "ops_family_id": family.family_id,
+            "forward_citations": "not provided by OPS bibliographic data",
+        },
+    }
+
+
+async def patent_search_aliases(
+    pool: asyncpg.Pool, ticker: str, base_aliases: tuple[str, ...]
+) -> tuple[tuple[str, ...], set[str]]:
+    """(all search aliases, normalised subsidiary names).
+
+    Aliases are the profile's names, the resolved legal/other names and every confirmed or
+    GLEIF-reported subsidiary, so a family filed by a subsidiary is found too."""
+    rows = await pool.fetch(
+        "select alias, kind from public.entity_alias where ticker=$1"
+        " and kind in ('legal_name','other_name','alias','subsidiary')",
+        ticker,
+    )
+    edges = await pool.fetch(
+        "select object_name from public.company_graph_edge where subject_key=$1"
+        " and edge_type='subsidiary' and status='confirmed'",
+        ticker,
+    )
+    subsidiaries = {normalize_object_key(r["alias"]) for r in rows if r["kind"] == "subsidiary"}
+    subsidiaries |= {normalize_object_key(r["object_name"]) for r in edges}
+    names = [
+        *base_aliases,
+        *(r["alias"] for r in rows if r["kind"] != "listing_ticker"),
+        *(r["object_name"] for r in edges),
+    ]
+    unique = tuple(dict.fromkeys(n.strip() for n in names if n and n.strip()))
+    return unique, subsidiaries
 
 
 async def collect_epo_patents(
@@ -456,79 +646,151 @@ async def collect_epo_patents(
     applicant_aliases: tuple[str, ...],
     client_id: str,
     client_secret: str,
+    legal_lookups: int = 10,
+    today: dt.date | None = None,
 ) -> int:
     await _gate(pool, "epo_ops", "patent_search")
-    governor = PostgresRequestGovernor(pool)
-    await governor.reserve(
-        "epo_ops", "patent_search", Decimal(1), Budget(per_minute=1, monthly=100)
-    )
-    token_response = await http.post(
-        "https://ops.epo.org/3.2/auth/accesstoken",
-        data={"grant_type": "client_credentials"},
-        auth=(client_id, client_secret),
-        headers={"Content-Type": "application/x-www-form-urlencoded"},
-    )
-    if token_response.status_code != 200:
-        raise FreeSourceError(
-            f"EPO OPS OAuth HTTP {token_response.status_code}", token_response.status_code
-        )
-    token = token_response.json().get("access_token")
-    if not token:
-        raise FreeSourceError("EPO OPS OAuth response omitted access token")
     if not applicant_aliases:
         raise ValueError("at least one resolved applicant alias is required")
-    cql = f'pa="{applicant_aliases[0].replace(chr(34), "")}"'
-    response = await http.get(
-        "https://ops.epo.org/3.2/rest-services/published-data/search/biblio",
-        params={"q": cql},
-        headers={
-            "Authorization": f"Bearer {token}",
-            "Accept": "application/exchange+xml",
-            "Range": "1-25",
-        },
-    )
-    if response.status_code != 200:
-        state = (
-            AccessState.ACCESS_UNVERIFIED
-            if response.status_code in {401, 403}
-            else AccessState.TEMPORARILY_FAILED
-        )
+    today = today or dt.datetime.now(dt.UTC).date()
+    aliases, subsidiaries = await patent_search_aliases(pool, ticker, applicant_aliases)
+    own_names = {normalize_object_key(a) for a in applicant_aliases} - subsidiaries
+    governor = PostgresRequestGovernor(pool)
+    budget = Budget(per_minute=Decimal(20), monthly=Decimal(500))
+
+    async def reserve() -> None:
+        await governor.reserve("epo_ops", "patent_search", Decimal(1), budget)
+
+    await reserve()  # the OAuth call and the first page share one credit
+    try:
+        token = await fetch_token(http, client_id, client_secret)
+    except EpoAuthError as exc:
+        # Typed: bad credentials, a quota/throttle denial and an outage are different states.
+        if exc.kind == "forbidden" or exc.kind == "invalid_credentials":
+            result = await provider_gate.note_auth_failure(
+                pool, "epo_ops", "patent_search", exc.status_code or 403
+            )
+            if exc.kind == "invalid_credentials" and result.state == AccessState.TEMPORARILY_FAILED:
+                # Rejected credentials are not transient, but one 400 may still be a typo that
+                # was just fixed: keep the cooldown and block on the repeat.
+                pass
+        else:
+            result = AccessResult(exc.state or AccessState.TEMPORARILY_FAILED, str(exc))
+        await record_access(pool, "epo_ops", "patent_search", result, status_code=exc.status_code)
+        raise
+    try:
+        search = await search_applicants(http, token, aliases, reserve_request=reserve)
+    except FreeSourceError as exc:
+        if exc.status_code in (401, 403):
+            result = await provider_gate.note_auth_failure(
+                pool, "epo_ops", "patent_search", exc.status_code
+            )
+        else:
+            result = AccessResult(AccessState.TEMPORARILY_FAILED, "OPS search failed")
+        await record_access(pool, "epo_ops", "patent_search", result, status_code=exc.status_code)
+        raise
+    except httpx.HTTPError:
         await record_access(
             pool,
             "epo_ops",
             "patent_search",
-            AccessResult(state, "OPS search failed"),
-            status_code=response.status_code,
+            AccessResult(AccessState.TEMPORARILY_FAILED, "network error"),
         )
-        if state == AccessState.ACCESS_UNVERIFIED:
-            await governor.hard_block("epo_ops", "patent_search")
-        raise FreeSourceError(f"EPO OPS search HTTP {response.status_code}", response.status_code)
-    patents = parse_ops_patent_xml(response.text, applicant_aliases)
-    for item in patents:
+        raise
+    await provider_gate.note_success(pool, "epo_ops", "patent_search")
+    legal: dict[str, list[LegalEvent]] = {}
+    lookups = 0
+    for family in search.families.values():
+        if lookups >= legal_lookups or family.grant_date is None:
+            continue
+        representative = next((p for p in family.publications if p.kind[:1] in {"B", "C"}), None)
+        if representative is None:
+            continue
+        try:
+            await reserve()
+            lookups += 1
+            response = await http.get(
+                "https://ops.epo.org/3.2/rest-services/legal/publication/docdb/"
+                f"{representative.country}.{representative.doc_number}.{representative.kind}",
+                headers={"Authorization": f"Bearer {token}", "Accept": "application/xml"},
+            )
+            if response.status_code == 200:
+                events = parse_ops_legal(response.text).get(family.family_id, [])
+                legal[family.family_id] = list(events)
+        except (QuotaExceeded, httpx.HTTPError, FreeSourceError):
+            break  # legal status is a refinement: keep what the biblio data proves
+    stored = 0
+    for family in search.families.values():
+        events = legal.get(family.family_id, [])
+        status, expiry = derive_legal_status(family, events, today=today)
+        matched = [
+            a
+            for a in family.applicants
+            if normalize_object_key(a) in {normalize_object_key(x) for x in aliases}
+        ]
+        applicant = matched[0] if matched else (family.applicants[0] if family.applicants else "")
+        applicant_key = normalize_object_key(applicant) if applicant else ""
+        basis, confidence, evidence_id, valid_from = "suggested", Decimal("0.5"), None, None
+        if applicant_key in own_names and applicant_key not in subsidiaries:
+            evidence_id = await record_evidence(
+                pool,
+                regulator="epo_ops",
+                external_id=f"family:{family.family_id}",
+                url=f"https://worldwide.espacenet.com/patent/search/family/{family.family_id}/",
+                document_type="patent_family",
+                content=None,
+                quote=f"applicant: {applicant}",
+            )
+            basis, confidence = "direct", Decimal("0.8")
+        elif applicant_key in subsidiaries and family.priority_date is not None:
+            path = await find_subsidiary_path(
+                pool, ticker=ticker, applicant=applicant, priority_date=family.priority_date
+            )
+            if path is not None:
+                basis, confidence, valid_from = (
+                    "dated_subsidiary_path",
+                    Decimal("0.7"),
+                    path["valid_from"],
+                )
         await store_patent_family(
             pool,
-            family_key=str(item["family_key"]),
-            priority_date=item["priority_date"],
-            title=item["title"],
-            cpc_codes=list(item["cpc_codes"]),
-            jurisdictions=[],
+            family_key=family.family_id,
+            priority_date=family.priority_date,
+            title=family.title,
+            cpc_codes=sorted(family.cpc_codes),
+            jurisdictions=family.jurisdictions,
             forward_citations=0,
-            backward_citations=0,
-            legal_status="unknown",
+            backward_citations=len(family.cited),
+            legal_status=status,
             source="epo_ops",
-            source_url="https://worldwide.espacenet.com/",
+            source_url=f"https://worldwide.espacenet.com/patent/search/family/{family.family_id}/",
             ticker=ticker,
-            applicant=str(item["applicant"]),
-            ownership_confidence=Decimal("0.5"),
-            ownership_basis="suggested",
-            raw=item["raw"],
+            applicant=applicant,
+            ownership_confidence=confidence,
+            ownership_basis=basis,  # type: ignore[arg-type]
+            ownership_valid_from=valid_from,
+            evidence_id=evidence_id,
+            raw={
+                "ops_family_id": family.family_id,
+                "forward_citations": "not provided by OPS bibliographic data",
+                "applicants": family.applicants,
+            },
+            family_id_source="ops_family_id",
+            first_publication_date=family.first_publication_date,
+            grant_date=family.grant_date,
+            expiry_date=expiry,
+            legal_events=events,
+            publications=[(p.country, p.doc_number, p.kind, p.date) for p in family.publications],
         )
+        stored += 1
+    detail = f"{stored} families over {search.pages} pages"
+    if search.truncated:
+        detail += f" (stopped: {search.stopped_reason})"
     await record_access(
         pool,
         "epo_ops",
         "patent_search",
-        AccessResult(AccessState.AVAILABLE, "applicant-filtered family candidates fetched"),
-        credits=1,
-        response_bytes=len(response.content),
+        AccessResult(AccessState.AVAILABLE, detail),
+        credits=max(search.pages, 1),
     )
-    return len(patents)
+    return stored

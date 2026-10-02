@@ -22,6 +22,8 @@ const CEZ: HoldingProfilesConfig = {
       fiscal_year_end_month: 12,
       price_symbol: null,
       yahoo_symbol: null,
+      eodhd_symbol: null,
+      alpha_vantage_symbol: null,
       reporting_currency: "CZK",
       competitors: [],
       suppliers: [],

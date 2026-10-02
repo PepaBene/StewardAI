@@ -6,9 +6,11 @@ import datetime as dt
 import json
 from dataclasses import dataclass
 from decimal import Decimal
+from typing import Any
 
 import asyncpg
 
+from steward.redact import redact
 from steward.sources.base import AccessResult, SourceObservation
 from steward.sources.reconcile import record_conflicts
 
@@ -37,22 +39,94 @@ async def record_access(
     elapsed_ms: int | None = None,
     response_bytes: int | None = None,
     credits: float = 0,
+    job_id: int | None = None,
 ) -> None:
-    """Record every attempt without replacing a prior successful observation."""
+    """Record every attempt without replacing a prior successful observation.
+
+    Only durable verdicts (available, paid_only, access_unverified, disputed) change the
+    endpoint's `state`; a 429, 5xx, timeout or empty 2xx is kept as the last attempt and,
+    when the provider sent one, as the Retry-After window the governor honors (A6)."""
     request_id = request_id or result.request_id
     await pool.execute(
-        "select public.record_provider_attempt($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)",
+        "select public.record_provider_attempt($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)",
         provider,
         endpoint,
         result.state.value,
-        result.detail,
+        redact(result.detail),  # stored as error_redacted and provider_access.detail
         result.retry_at,
         status_code,
         request_id,
         elapsed_ms,
         response_bytes,
         credits,
+        job_id,
     )
+
+
+@dataclass(frozen=True, slots=True)
+class GateDecision:
+    open: bool
+    reason: str | None = None
+    state: str | None = None
+    retry_at: dt.datetime | None = None
+
+
+def gate_decision(row: asyncpg.Record | dict[str, Any] | None, now: dt.datetime) -> GateDecision:
+    """May a collector call this endpoint now? The single rule behind every `_gate` check.
+
+    Closed for: no provider_access row, a hard block (paid-tier or credential denial), a durable
+    state of paid_only or disputed, and a provider Retry-After window still pending.  Open for
+    `available` and for `access_unverified` that is not hard-blocked: the attempt is the probe.
+    A transient failure (429, 5xx, timeout, empty 2xx) never closes the gate by itself (A6)."""
+    if row is None:
+        return GateDecision(False, "no provider_access row")
+    state = row["state"]
+    if row["hard_blocked"]:
+        return GateDecision(False, "hard-blocked until the credential or plan changes", state)
+    retry_at = row["retry_at"]
+    if retry_at is not None and retry_at > now:
+        return GateDecision(False, "provider Retry-After window", state, retry_at)
+    if state not in ("available", "access_unverified"):
+        return GateDecision(False, f"endpoint state is {state}", state)
+    return GateDecision(True, None, state)
+
+
+async def provider_gate(
+    pool: asyncpg.Pool | asyncpg.Connection,
+    provider: str,
+    endpoint: str,
+    *,
+    now: dt.datetime | None = None,
+) -> GateDecision:
+    row = await pool.fetchrow(
+        "select state,hard_blocked,retry_at,last_success_at from public.provider_access"
+        " where provider=$1 and endpoint=$2",
+        provider,
+        endpoint,
+    )
+    return gate_decision(row, now or dt.datetime.now(dt.UTC))
+
+
+# Index expressions of source_observation_identity (migration 20261005100100), minus revision.
+_IDENTITY_WHERE = """domain=$1 and metric=$2 and coalesce(issuer_id,0)=$3
+  and coalesce(security_id,0)=$4 and coalesce(listing_id,0)=$5
+  and coalesce(geography,'')=$6 and period_start=$7 and period_end=$8 and unit=$9
+  and coalesce(currency,'')=$10 and normalized=$11::jsonb and source=$12
+  and coalesce(vintage,'')=$13"""
+
+
+async def _fill_ids(conn: asyncpg.Connection, row: SourceObservation) -> tuple[int, int, int]:
+    """issuer/security/listing ids as 0 for unknown, filling a wider id from a narrower one."""
+    issuer_id, security_id, listing_id = row.issuer_id, row.security_id, row.listing_id
+    if listing_id is not None and security_id is None:
+        security_id = await conn.fetchval(
+            "select security_id from public.security_listing where id=$1", listing_id
+        )
+    if security_id is not None and issuer_id is None:
+        issuer_id = await conn.fetchval(
+            "select issuer_id from public.security where id=$1", security_id
+        )
+    return issuer_id or 0, security_id or 0, listing_id or 0
 
 
 async def publish_observations(
@@ -66,9 +140,14 @@ async def publish_observations(
 ) -> list[int]:
     """Append observations and persist comparable-source conflicts.
 
-    Only records with identical metric, period, unit, currency and geography are compared.
-    Callers choose source priority and an explicit metric tolerance; no conversion or
-    concept-equivalence is guessed here.
+    An observation's identity is (domain, metric, issuer/security/listing, geography,
+    period_start, period_end, unit, currency, dimensions, source, vintage); `revision` counts
+    the changed values stored under one identity: an identical re-fetch stores nothing, a
+    restated value is stored as revision n+1 and supersedes (published=false) the earlier one.
+    Only records with the same metric, period, unit, currency, geography, entity and dimensions
+    are compared across sources. Callers choose source priority and an explicit metric
+    tolerance; no conversion or concept-equivalence is guessed here.  A displaced preferred
+    row is set published=false so readers never see two preferred values.
     """
     if access.state.value != "available":
         return []
@@ -78,20 +157,57 @@ async def publish_observations(
     async with pool.acquire() as conn, conn.transaction():
         for row in rows:
             priority = source_priorities.get(row.source, 10_000)
-            prior = await conn.fetch(
-                """select id,source,value,scale,source_priority from public.source_observation
-                   where domain=$1 and metric=$2 and geography is not distinct from $3
-                     and period_start=$4 and period_end=$5 and unit=$6
-                     and currency is not distinct from $7 and source<>$8 and value is not null
-                   order by coalesce(source_priority,10000),known_at desc""",
+            issuer_id, security_id, listing_id = await _fill_ids(conn, row)
+            dimensions = json.dumps(row.dimensions, sort_keys=True, default=str)
+            key = (
                 row.domain,
                 row.metric,
-                row.geography,
+                issuer_id,
+                security_id,
+                listing_id,
+                row.geography or "",
                 row.period_start.date(),
                 row.period_end.date(),
                 row.unit,
-                row.currency,
+                row.currency or "",
+                dimensions,
+            )
+            own = (*key, row.source, row.vintage or "")
+            # Serialize writers of one identity so two workers cannot both claim revision n+1.
+            await conn.execute(
+                "select pg_advisory_xact_lock(hashtextextended($1, 0))",
+                json.dumps(own, default=str),
+            )
+            latest = await conn.fetchrow(
+                f"""select id,revision,value,scale,text_value from public.source_observation
+                    where {_IDENTITY_WHERE} order by revision desc limit 1""",  # noqa: S608
+                *own,
+            )
+            if latest is not None and (
+                latest["value"] == row.value and latest["scale"] == row.scale
+            ):
+                continue  # identical re-fetch: nothing new to remember
+            revision = 0 if latest is None else latest["revision"] + 1
+            prior = await conn.fetch(
+                """select distinct on (source) id,source,value,scale,source_priority
+                   from public.source_observation
+                   where domain=$1 and metric=$2 and coalesce(issuer_id,0)=$3
+                     and coalesce(security_id,0)=$4 and coalesce(listing_id,0)=$5
+                     and coalesce(geography,'')=$6 and period_start=$7 and period_end=$8
+                     and unit=$9 and coalesce(currency,'')=$10 and normalized=$11::jsonb
+                     and source<>$12 and value is not null
+                   order by source, revision desc, known_at desc""",
+                *key,
                 row.source,
+            )
+            prior = sorted(
+                prior,
+                key=lambda p: (
+                    p["source_priority"]
+                    if p["source_priority"] is not None
+                    else source_priorities.get(p["source"], 10_000),
+                    p["id"],
+                ),
             )
             tolerance = Decimal(str(tolerance_by_metric.get(row.metric, 0)))
             incoming_scaled = row.value * row.scale if row.value is not None else None
@@ -103,14 +219,19 @@ async def publish_observations(
             )
             observation_id = await conn.fetchval(
                 """insert into public.source_observation
-                   (domain, metric, geography, period_start, period_end, value, unit, scale,
-                    currency, source, source_url, publisher_at, retrieved_at, known_at, vintage,
-                    access_state, raw, normalized, source_priority, published)
-                   values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,
-                           $17::jsonb,$18::jsonb,$19,$20)
+                   (domain, metric, issuer_id, security_id, listing_id, geography, period_start,
+                    period_end, value, unit, scale, currency, source, source_url, publisher_at,
+                    retrieved_at, known_at, vintage, revision, access_state, raw, normalized,
+                    source_priority, published)
+                   values ($1,$2,nullif($3::bigint,0),nullif($4::bigint,0),
+                           nullif($5::bigint,0),$6,$7,$8,$9,$10,$11,$12,
+                           $13,$14,$15,$16,$17,$18,$19,$20,$21::jsonb,$22::jsonb,$23,$24)
                    on conflict do nothing returning id""",
                 row.domain,
                 row.metric,
+                issuer_id,
+                security_id,
+                listing_id,
                 row.geography,
                 row.period_start.date(),
                 row.period_end.date(),
@@ -124,37 +245,52 @@ async def publish_observations(
                 row.retrieved_at,
                 known_at,
                 row.vintage,
+                revision,
                 access.state.value,
                 json.dumps(row.raw, default=str),
-                json.dumps(row.dimensions, default=str),
+                dimensions,
                 priority,
                 incoming_preferred,
             )
-            if observation_id is not None:
-                ids.append(observation_id)
-            if observation_id is None or not prior or incoming_scaled is None:
+            if observation_id is None:
+                continue
+            ids.append(observation_id)
+            if latest is not None:
+                # A restatement supersedes the earlier revisions of the same identity.
+                await conn.execute(
+                    f"""update public.source_observation set published=false
+                        where {_IDENTITY_WHERE} and id<>$14 and published""",  # noqa: S608
+                    *own,
+                    observation_id,
+                )
+            if incoming_preferred and prior:
+                # The displaced preferred rows stay as alternatives but are no longer published.
+                await conn.execute(
+                    "update public.source_observation set published=false"
+                    " where id = any($1::bigint[]) and published",
+                    [p["id"] for p in prior],
+                )
+            if not prior or incoming_scaled is None:
                 continue
             if incoming_preferred:
                 preferred_value = incoming_scaled
                 preferred_id = observation_id
                 alternatives = [
-                    (p["id"], p["value"] * p["scale"])
-                    for p in prior
-                    if p["value"] is not None
+                    (p["id"], p["value"] * p["scale"]) for p in prior if p["value"] is not None
                 ]
             else:
+                assert preferred_old is not None
                 preferred_value = preferred_old["value"] * preferred_old["scale"]
                 preferred_id = preferred_old["id"]
                 alternatives = [(observation_id, incoming_scaled)]
-            if preferred_value is not None:
-                await record_conflicts(
-                    conn,
-                    preferred_id,
-                    alternatives,
-                    metric=row.metric,
-                    preferred_value=preferred_value,
-                    tolerance=tolerance,
-                )
+            await record_conflicts(
+                conn,
+                preferred_id,
+                alternatives,
+                metric=row.metric,
+                preferred_value=preferred_value,
+                tolerance=tolerance,
+            )
     return ids
 
 

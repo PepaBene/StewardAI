@@ -63,13 +63,15 @@ async def get_insider_trades(
     if not selected:
         return []
     rows = await pool.fetch(
-        """select f.accession, f.form, f.filed, f.ticker, f.issuer_name, f.source_url,
+        """select f.accession, f.form, f.filed, $1::text as ticker, f.issuer_name, f.source_url,
                   t.owner_name, t.reporting_owner_cik, t.officer_title, t.is_director,
                   t.is_officer, t.is_ten_percent_owner, t.security_title, t.transaction_date,
                   t.transaction_code, t.shares, t.price_per_share, t.acquired_disposed,
                   t.shares_owned_after, t.direct_indirect, t.derivative
            from public.insider_filing f join public.insider_transaction t using (accession)
-           where f.ticker = $1 and f.form = any($2::text[])
+           where (f.ticker = $1 or exists (select 1 from public.insider_filing_ticker l
+                                           where l.accession = f.accession and l.ticker = $1))
+             and f.form = any($2::text[])
            order by coalesce(t.transaction_date, f.filed) desc, f.filed desc, f.accession desc,
                     t.row_index limit $3""",
         ticker.upper(),

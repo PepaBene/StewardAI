@@ -4,11 +4,17 @@ transparency: liquidity, turnover, the most relevant market).
 Both are read per ISIN from the registers' Solr API (no key). Tier 1 (the regulator).
 """
 
+import asyncio
 import datetime as dt
 from dataclasses import dataclass
 from typing import Any
 
 import httpx
+
+from steward.sources.base import rate_limit_wait
+
+_sleep = asyncio.sleep
+RATE_LIMIT_ATTEMPTS = 3
 
 FIRDS_URL = "https://registers.esma.europa.eu/solr/esma_registers_firds/select"
 FITRS_URL = "https://registers.esma.europa.eu/solr/esma_registers_fitrs_equities/select"
@@ -16,6 +22,14 @@ FITRS_URL = "https://registers.esma.europa.eu/solr/esma_registers_fitrs_equities
 
 class EsmaError(Exception):
     pass
+
+
+class EsmaRateLimited(EsmaError):
+    """HTTP 429 that outlasted the inline retries; `retry_at` is the provider's Retry-After."""
+
+    def __init__(self, message: str, retry_at: dt.datetime | None = None) -> None:
+        super().__init__(message)
+        self.retry_at = retry_at
 
 
 @dataclass(frozen=True)
@@ -56,16 +70,24 @@ def _ts(value: Any) -> dt.datetime | None:
         return None
 
 
+def _publication_key(doc: dict[str, Any]) -> tuple[str, int]:
+    # Same-day records: a cancellation is the later statement about the record.
+    return str(doc.get("publication_date", "")), 1 if doc.get("status") == "CANC" else 0
+
+
 def parse_firds(body: dict[str, Any]) -> list[FirdsRecord]:
-    """Current records per venue (cancelled records dropped; the latest per MIC kept)."""
+    """The current state per venue: the latest published record for each MIC.
+
+    A cancellation (status CANC) is a state like any other. The latest record per MIC is chosen
+    *before* anything is dropped, so a venue whose newest record is a cancellation is returned
+    as cancelled (status "CANC") rather than falling back to the older ACTIVE record it
+    replaced (B2). Callers that want live listings filter on `status != "CANC"`."""
     latest: dict[str, dict[str, Any]] = {}
     for doc in body.get("response", {}).get("docs", []):
-        if doc.get("status") == "CANC" or not doc.get("mic") or not doc.get("isin"):
+        if not doc.get("mic") or not doc.get("isin"):
             continue
         current = latest.get(doc["mic"])
-        if current is None or str(doc.get("publication_date", "")) > str(
-            current.get("publication_date", "")
-        ):
+        if current is None or _publication_key(doc) >= _publication_key(current):
             latest[doc["mic"]] = doc
     return [_firds_record(d) for d in sorted(latest.values(), key=lambda d: d["mic"])]
 
@@ -133,13 +155,25 @@ async def _solr(http: httpx.AsyncClient, url: str, isin: str, rows: int) -> dict
     docs: list[dict[str, Any]] = []
     body: dict[str, Any] = {}
     while True:
-        response = await http.get(
-            url,
-            params={"q": f"isin:{isin}", "wt": "json", "rows": rows, "start": len(docs)},
-        )
+        for attempt in range(RATE_LIMIT_ATTEMPTS):
+            response = await http.get(
+                url,
+                params={"q": f"isin:{isin}", "wt": "json", "rows": rows, "start": len(docs)},
+            )
+            if response.status_code != 429:
+                break
+            wait, retry_at = rate_limit_wait(response.headers.get("Retry-After"), attempt)
+            if wait is None or attempt == RATE_LIMIT_ATTEMPTS - 1:
+                raise EsmaRateLimited("ESMA registers rate limited (HTTP 429)", retry_at)
+            await _sleep(wait)
         if response.status_code != 200:
             raise EsmaError(f"ESMA registers returned HTTP {response.status_code}")
-        body = response.json()
+        try:
+            body = response.json()
+        except ValueError as exc:
+            raise EsmaError("ESMA registers sent no JSON") from exc
+        if not isinstance(body, dict):
+            raise EsmaError("ESMA registers schema changed")
         page = body.get("response", {}).get("docs", [])
         docs += page
         found = int(body.get("response", {}).get("numFound", len(docs)))

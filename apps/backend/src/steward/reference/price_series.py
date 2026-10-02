@@ -1,16 +1,19 @@
 """Which stored daily price series a holding or an index uses, and its Yahoo symbol.
 
-Daily closes come from two sources, each under its own symbol in `price_bar`:
+Daily closes come from up to four sources, each under its own provider symbol in `price_bar`:
 
 - Stooq (`cez.cz`), the source of record;
 - Yahoo Finance (`CEZ.PR`, unofficial), collected only when Stooq refuses, cannot be reached
-  or has no symbol for the holding.
+  or has no symbol for the holding;
+- EODHD (`CEZ.PSE`) and Alpha Vantage (`CEZ.PRG`), gap fallbacks under free-tier budgets,
+  used only for holdings whose profile names their exact provider symbol.
 
-A series is never stitched from both (their adjustments differ, so a stitch could show a
-false jump). Every reader picks one whole series per holding with `choose_series`: Stooq's
-when it is at least as recent as Yahoo's, else Yahoo's. While Stooq works, Yahoo is not
-collected, so Stooq wins; once Stooq stops delivering, the Yahoo series (backfilled over
-the configured history on its first run) takes over, and Stooq wins again when it catches up.
+A series is never stitched from several (their adjustments differ, so a stitch could show a
+false jump). Every reader picks one whole series per holding with `choose_series`: the one
+whose latest bar is newest, the source order above breaking ties (so Stooq wins while it is as
+recent as any other). While Stooq works the fallbacks are not collected, so Stooq wins; once
+it stops delivering, the freshest fallback takes over, and Stooq wins again when it catches up.
+Every series a fallback stores is served here: a gap is not cleared for data no reader uses.
 
 Yahoo symbols are derived from the listing: the Stooq symbol's ticker and market suffix
 (`novo-b.dk` -> `NOVO-B.CO`), else the OpenFIGI listing ticker on the home market (MIC).
@@ -100,10 +103,37 @@ def yahoo_mic(symbol: str) -> str | None:
     return MIC_BY_YAHOO_SUFFIX.get(f".{suffix}" if dot else "")
 
 
+# Source preference when two series are equally recent.
+SOURCE_ORDER: tuple[PriceSource, ...] = ("stooq", "yahoo", "eodhd", "alpha_vantage")
+
+
+def series_mic(symbol: str, source: str) -> str | None:
+    """The exchange a series' symbol implies when no confirmed listing says: a Yahoo suffix,
+    or the Yahoo counterpart of a Stooq market suffix. EODHD/Alpha Vantage symbols are not
+    interpreted. (US symbols map to XNYS: NYSE and Nasdaq share hours.)"""
+    if source == "yahoo":
+        return yahoo_mic(symbol)
+    if source == "stooq":
+        counterpart = yahoo_from_stooq(symbol)
+        return yahoo_mic(counterpart) if counterpart else None
+    return None
+
+
 @dataclass(frozen=True)
 class PriceSymbols:
     stooq: str | None
     yahoo: str | None
+    eodhd: str | None = None
+    alpha_vantage: str | None = None
+
+    def refs(self) -> list["SeriesRef"]:
+        """Every series that could exist for this holding, in source order."""
+        out = []
+        for source in SOURCE_ORDER:
+            symbol = getattr(self, source)
+            if symbol:
+                out.append(SeriesRef(symbol, source))
+        return out
 
 
 @dataclass(frozen=True)
@@ -143,7 +173,12 @@ async def holding_symbols(
             or yahoo_from_stooq(stooq)
             or (yahoo_from_listing(row["listing_ticker"], row["home_mic"]) if row else None)
         )
-        out[ticker] = PriceSymbols(stooq=stooq, yahoo=yahoo)
+        out[ticker] = PriceSymbols(
+            stooq=stooq,
+            yahoo=yahoo,
+            eodhd=(profile.eodhd_symbol if profile else None) or None,
+            alpha_vantage=(profile.alpha_vantage_symbol if profile else None) or None,
+        )
     return out
 
 
@@ -159,7 +194,7 @@ async def latest_dates(
     rows = await pool.fetch(
         "select symbol, source, max(date) as latest from public.price_bar"
         " where (symbol, source) in (select * from unnest($1::text[], $2::text[]))"
-        " and (bar_type = 'adjusted' or (source = 'eodhd' and bar_type = 'raw'))"
+        " and bar_type = 'adjusted' and access_state = 'available'"
         " group by symbol, source",
         [r.symbol for r in refs],
         [r.source for r in refs],
@@ -168,16 +203,15 @@ async def latest_dates(
 
 
 def pick(symbols: PriceSymbols, latest: dict[SeriesRef, dt.date]) -> SeriesRef | None:
-    """Stooq's series when it is at least as recent as Yahoo's, else Yahoo's."""
-    stooq = SeriesRef(symbols.stooq, "stooq") if symbols.stooq else None
-    yahoo = SeriesRef(symbols.yahoo, "yahoo") if symbols.yahoo else None
-    stooq_at = latest.get(stooq) if stooq else None
-    yahoo_at = latest.get(yahoo) if yahoo else None
-    if stooq and stooq_at and (yahoo_at is None or stooq_at >= yahoo_at):
-        return stooq
-    if yahoo and yahoo_at:
-        return yahoo
-    return None
+    """The stored series with the newest bar; the source order breaks ties, so Stooq (the
+    source of record) wins whenever it is at least as recent as any fallback."""
+    best: SeriesRef | None = None
+    best_at: dt.date | None = None
+    for ref in symbols.refs():
+        at = latest.get(ref)
+        if at is not None and (best_at is None or at > best_at):
+            best, best_at = ref, at
+    return best
 
 
 async def choose_series[K](
@@ -186,10 +220,7 @@ async def choose_series[K](
     """For each key, the one stored series its readers use (None: nothing stored)."""
     refs: set[SeriesRef] = set()
     for p in wanted.values():
-        if p.stooq:
-            refs.add(SeriesRef(p.stooq, "stooq"))
-        if p.yahoo:
-            refs.add(SeriesRef(p.yahoo, "yahoo"))
+        refs.update(p.refs())
     latest = await latest_dates(pool, sorted(refs, key=lambda r: (r.symbol, r.source)))
     return {key: pick(p, latest) for key, p in wanted.items()}
 

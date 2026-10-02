@@ -249,8 +249,9 @@ async def test_13f_loads_within_history_and_reports_remaining(
 
     async def fake_download(_: Any, url: str, target: Any) -> None:
         loaded_now.append(url)
+        target.write_bytes(b"zip")
 
-    async def fake_store(*_: Any) -> tuple[int, int]:
+    async def fake_store(*_: Any, **__: Any) -> tuple[int, int]:
         return 0, 0
 
     monkeypatch.setattr(ownership_collect, "portfolio_cusips", no_cusips)

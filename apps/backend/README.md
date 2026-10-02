@@ -155,6 +155,68 @@ extension; CI runs against a Postgres image that has it.
 
 All but the two health routes need the owner's MFA-verified Supabase JWT.
 
+## Free data sources (Phases 2-7)
+
+Full per-provider setup, quotas, expected delays and what degrades when a key is removed are in
+[`docs/data/provider-access.md`](../../docs/data/provider-access.md). Behaviour not yet confirmed
+against a live account is marked unverified there; fixtures under `tests/fixtures` are built from
+the providers' documented formats, not recorded from live calls.
+
+Environment variables (backend only, listed in `.env.example`, read in
+`src/steward/settings.py`): `SEC_USER_AGENT`, `STOOQ_API_KEY`, `FINNHUB_API_KEY`,
+`ALPHA_VANTAGE_API_KEY`, `EODHD_API_KEY`, `FMP_API_KEY`, `TWELVE_DATA_API_KEY`, `FRED_API_KEY`,
+`UN_COMTRADE_API_KEY`, `EPO_OPS_CLIENT_ID`, `EPO_OPS_CLIENT_SECRET`, `DIFFBOT_API_KEY`,
+`PEOPLE_DATA_LABS_API_KEY`, `OPENFIGI_API_KEY`. A missing key makes that source `unavailable`
+(`access_unverified`, "credential not configured"); it is never stored as zero or as an empty
+success, and stored observations stay readable. Free providers are additionally switched by
+`JobsConfig.providers[<name>].enabled` (default off) and the `provider_access` audit gate.
+
+Jobs (cron defaults in `config/jobs.py`; run now with `POST /jobs/...`):
+
+| Job | Default | Notes |
+| --- | --- | --- |
+| `macro_collect` | daily 11:30 | Eurostat, ECB, FRED (key), ČNB; macro surprises |
+| `public_data_collect` | disabled | World Bank, OECD, BIS, UN Comtrade; needs provider enabled + `available` audit gate (+ Comtrade key) |
+| `source_audit` | disabled | endpoint-level free-access probes into `provider_access` |
+| `sec_xbrl` / `valuation_refresh` | Tue 05:40 / daily 07:45 | shares, segments; P/E, P/B, yield inputs |
+| `insider_trades` | daily 06:30 | Forms 3/4/5 for held issuers (economic classification, 10b5-1 flags, amendments) |
+| `control_stakes` | daily 06:45 | Schedule 13D/G for held issuers and tracked managers, kept apart from 13F and fund data; unstructured pre-Dec-2024 filings are counted and skipped |
+| `nport_holdings` | Sat 05:15 | SEC N-PORT positions of held US funds that have no issuer snapshot; stored as readable only when series, class and report date reconcile with EDGAR; about 60 days after quarter end |
+| `fund_probes` | disabled | probes optional Finnhub/FMP fund, index and ownership endpoints; 402/403 becomes `paid_only` and is not retried with the same credential |
+| `fund_characteristics_audit` | daily 07:30 | fingerprints the iShares/Vanguard fund P/E and P/B payloads and rules: `parser_drift` and `methodology_change` are reviewed, not read as market moves |
+| `etf_look_through` | Sat 06:40 | issuer fund holdings; aggregated by canonical issuer in `/funds/*`; unknown fund weight stays its own bucket |
+| `free_source_alerts` | daily, after `macro_collect` | D7.5 alert evaluator described below |
+
+Read endpoints and run-now routes added in these phases are listed by tag in `openapi.json`
+(`GET /data/coverage`, `/sources/{access,usage,status}`, `/macro/*`, `/funds/*`,
+`/holdings/{ticker}/{control-stakes,insider-activity,fund-positions,valuation,segments,
+business-network,patent-trends,...}`, `/alerts/free-source-trail`, `POST /jobs/{public-data,
+source-audit,sec-xbrl,valuation-refresh,control-stakes,nport-holdings,free-source-alerts}`).
+
+### Free-source alerts (D7.5)
+
+`steward/free_source_alerts.py` (`free_source_alerts_handler`) turns new free-source
+observations into alerts and records why. Four rules, configured in the Event rules config
+under `free_source_alerts` (lookback 3 days, one alert per rule and scope per 24 h, 10 per run):
+
+- **Credit stress**: a configured `macro_observation` series (BIS, ECB, FRED) crosses its
+  threshold on a new period. Revisions of old periods, the first load of a series and values
+  that stay beyond the threshold never alert.
+- **Trade exposure**: a new Comtrade period for an HS code in a held issuer's
+  `exposure_mapping` (weight at least 0.05) moves at least 20% year on year. Unmapped weight is
+  never counted; national trade is not company revenue.
+- **Patent status**: an evidenced owned family lapses (granted/active to expired) or is granted;
+  `unknown` never counts as a change.
+- **Company graph**: only `confirmed` events and edges with primary evidence and a cited passage
+  alert. Suggested or disputed ones are written to the trail as `review_needed` and raise no
+  news item, no alert and never a thesis breach.
+
+Alerts are tier-1 synthetic news items (new event types `credit_stress`, `trade_exposure`,
+`patent_status`; graph events reuse `m_and_a`, `management_change`, `sector_competitor`), so the
+event-rule severity, notification rules, repeat throttle, daily cap and digests apply. Each
+decision is one row in `free_source_alert_trail` (unique per rule and dedupe key, so replays add
+nothing); read it with `GET /alerts/free-source-trail`. Tests: `tests/test_free_source_alerts.py`.
+
 ## Design notes
 
 - **Portfolio sync** (`portfolio_sync`, default daily 22:30 Prague, set in the Jobs config):

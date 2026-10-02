@@ -11,7 +11,7 @@ from anthropic.types import ToolUseBlock
 
 from steward.chat.assistant import SYSTEM as CHAT_SYSTEM
 from steward.chat.assistant import AnswerSentence, ChatAnswerDraft, ClaudeChatAssistant
-from steward.config.event_rules import EVENT_TYPES
+from steward.config.event_rules import CLASSIFIABLE_EVENT_TYPES
 from steward.config.jobs import ChatSettings, DigestSettings, EscalationSettings
 from steward.config.prompts import PromptsConfig, default_text
 from steward.news.classify import (
@@ -76,13 +76,13 @@ def test_the_default_classification_prompt_is_unchanged() -> None:
     # The editable default is the instruction text; the event types are appended by code.
     assert default_text("news_classification") == SYSTEM_PROMPT
     assert "Event types:" not in SYSTEM_PROMPT
-    assert all(f"- {name}:" in system_prompt() for name in EVENT_TYPES)
+    assert all(f"- {name}:" in system_prompt() for name in CLASSIFIABLE_EVENT_TYPES)
 
 
 def test_an_override_gets_the_event_types_appended() -> None:
     built = system_prompt(OVERRIDE)
     assert built.startswith(OVERRIDE)
-    assert all(f"- {name}:" in built for name in EVENT_TYPES)
+    assert all(f"- {name}:" in built for name in CLASSIFIABLE_EVENT_TYPES)
     assert "Rules:" not in built
 
 

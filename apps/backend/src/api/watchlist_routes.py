@@ -47,19 +47,23 @@ class WatchlistUpdate(BaseModel):
 
 def _item(row: asyncpg.Record) -> WatchlistItem:
     return WatchlistItem(
-        id=row["id"], ticker=row["ticker"], list_name=row["list_name"],
+        id=row["id"],
+        ticker=row["ticker"],
+        list_name=row["list_name"],
         buy_target=float(row["buy_target"]) if row["buy_target"] is not None else None,
         sell_target=float(row["sell_target"]) if row["sell_target"] is not None else None,
-        reason=row["reason"], note=row["note"],
-        created_at=row["created_at"].isoformat(), updated_at=row["updated_at"].isoformat(),
+        reason=row["reason"],
+        note=row["note"],
+        created_at=row["created_at"].isoformat(),
+        updated_at=row["updated_at"].isoformat(),
     )
 
 
 @router.get("", response_model=list[WatchlistItem])
 async def list_watchlist(pool: Pool, owner: Owner) -> list[WatchlistItem]:
     rows = await pool.fetch(
-        """select id, ticker, list_name, buy_target, sell_target, reason, note, created_at, updated_at
-           from public.watchlist_item where owner_id = $1 order by list_name, ticker""",
+        "select id, ticker, list_name, buy_target, sell_target, reason, note, created_at,"
+        " updated_at from public.watchlist_item where owner_id = $1 order by list_name, ticker",
         owner.user_id,
     )
     return [_item(row) for row in rows]
@@ -69,15 +73,22 @@ async def list_watchlist(pool: Pool, owner: Owner) -> list[WatchlistItem]:
 async def add_watchlist_item(body: WatchlistCreate, pool: Pool, owner: Owner) -> WatchlistItem:
     try:
         row = await pool.fetchrow(
-            """insert into public.watchlist_item
-               (owner_id, ticker, list_name, buy_target, sell_target, reason, note)
-               values ($1, upper($2), $3, $4, $5, $6, $7)
-               returning id, ticker, list_name, buy_target, sell_target, reason, note, created_at, updated_at""",
-            owner.user_id, body.ticker, body.list_name, body.buy_target, body.sell_target,
-            body.reason, body.note,
+            "insert into public.watchlist_item"
+            " (owner_id, ticker, list_name, buy_target, sell_target, reason, note)"
+            " values ($1, upper($2), $3, $4, $5, $6, $7) returning id, ticker, list_name,"
+            " buy_target, sell_target, reason, note, created_at, updated_at",
+            owner.user_id,
+            body.ticker,
+            body.list_name,
+            body.buy_target,
+            body.sell_target,
+            body.reason,
+            body.note,
         )
     except asyncpg.UniqueViolationError as exc:
-        raise HTTPException(status.HTTP_409_CONFLICT, "Ticker is already in this watchlist") from exc
+        raise HTTPException(
+            status.HTTP_409_CONFLICT, "Ticker is already in this watchlist"
+        ) from exc
     return _item(row)
 
 
@@ -99,20 +110,27 @@ async def update_watchlist_item(
         values.append(value)
         assignments.append(f"{field} = ${len(values)}")
     assignments.append("updated_at = now()")
-    sql = f"""update public.watchlist_item set {', '.join(assignments)}
-        where id = $1 and owner_id = $2
-        returning id, ticker, list_name, buy_target, sell_target, reason, note, created_at, updated_at"""
+    # `fields` is a fixed whitelist, so only column names are interpolated.
+    sql = (
+        f"update public.watchlist_item set {', '.join(assignments)}"  # noqa: S608
+        " where id = $1 and owner_id = $2 returning id, ticker, list_name, buy_target,"
+        " sell_target, reason, note, created_at, updated_at"
+    )
     try:
         row = await pool.fetchrow(sql, *values)
     except asyncpg.UniqueViolationError as exc:
-        raise HTTPException(status.HTTP_409_CONFLICT, "Ticker is already in this watchlist") from exc
+        raise HTTPException(
+            status.HTTP_409_CONFLICT, "Ticker is already in this watchlist"
+        ) from exc
     if row is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Watchlist item not found")
     return _item(row)
 
 
 @router.delete("/{item_id}", status_code=status.HTTP_204_NO_CONTENT)
-async def delete_watchlist_item(item_id: Annotated[int, Path(ge=1)], pool: Pool, owner: Owner) -> None:
+async def delete_watchlist_item(
+    item_id: Annotated[int, Path(ge=1)], pool: Pool, owner: Owner
+) -> None:
     result = await pool.execute(
         "delete from public.watchlist_item where id = $1 and owner_id = $2", item_id, owner.user_id
     )

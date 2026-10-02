@@ -90,9 +90,7 @@ def test_alpha_vantage_news_requires_ticker_relevance_and_bounded_sentiment() ->
     ]
 
 
-def test_pdl_requires_domain_consistent_high_confidence_and_epo_parses_applicant_candidates() -> (
-    None
-):
+def test_pdl_requires_domain_consistent_high_confidence() -> None:
     confidence, _ = parse_pdl_company(
         {"likelihood": 9, "website": "example.com", "employee_count": 120},
         "www.example.com",
@@ -100,19 +98,20 @@ def test_pdl_requires_domain_consistent_high_confidence_and_epo_parses_applicant
     assert confidence == Decimal("0.9")
     with pytest.raises(FreeSourceError):
         parse_pdl_company({"likelihood": 9, "website": "other.example"}, "example.com")
-    xml = """<ops:world-patent-data xmlns:ops="urn:ops" xmlns:ex="urn:ex">
-      <ex:exchange-document doc-number="123" country="EP">
-        <ex:document-id document-id-type="docdb" doc-number="123"/>
-        <ex:applicant><ex:applicant-name>Example Corporation</ex:applicant-name></ex:applicant>
-        <ex:invention-title>Example invention</ex:invention-title>
-        <ex:priority-claim date="20240102"/>
-        <ex:classification-symbol>A01B</ex:classification-symbol>
-      </ex:exchange-document>
-    </ops:world-patent-data>"""
-    patents = parse_ops_patent_xml(xml, ("Example Corporation",))
-    assert patents[0]["family_key"] == "123"
-    assert patents[0]["priority_date"] == dt.date(2024, 1, 2)
-    assert patents[0]["cpc_codes"] == ["A01B"]
+
+
+def test_epo_parser_reads_the_documented_ops_structure_not_an_invented_fixture() -> None:
+    """The earlier fixture invented `doc-number` attributes and flat children, which the real OPS
+    exchange-document does not have (audit A20); the parser was written to pass it and returned
+    [] on a real-structure payload. The recorded-format fixture follows the OPS documentation:
+    child elements, the family-id attribute, original/epodoc applicant formats."""
+    from pathlib import Path
+
+    xml = (Path(__file__).parent / "fixtures" / "graph" / "ops_biblio_search.xml").read_text()
+    patents = parse_ops_patent_xml(xml, ("Example Industries AG",))
+    assert patents and patents[0]["family_key"] == "25134712"  # the OPS family-id
+    assert patents[0]["priority_date"] == dt.date(2005, 11, 15)
+    assert patents[0]["cpc_codes"] == ["H01L21/02", "H01L29/78"]
     assert parse_ops_patent_xml(xml, ("Unrelated Company",)) == []
 
 
@@ -180,15 +179,16 @@ def test_peer_metrics_explain_coverage_and_patents_deduplicate_families() -> Non
         [("A", Decimal(4), "ROIC"), ("B", None, "ROIC"), ("C", Decimal(9), "other")], metric="ROIC"
     )
     assert result["mean"] == Decimal(4) and result["covered_peers"] == 1
-    rows = [
-        {
-            "family_key": "F1",
-            "priority_date": dt.date(2025, 2, 1),
-            "cpc_codes": ["A01", "A01"],
-            "citations_forward": 3,
-        }
-    ]
-    assert patent_trend(rows)[0]["families"] == 1
+    row = {
+        "family_key": "F1",
+        "priority_date": dt.date(2025, 2, 1),
+        "cpc_codes": ["A01", "A01"],
+        "citations_forward": 3,
+    }
+    # One family filed in two offices / joined through two owner rows must count once (a single
+    # row could not have shown any deduplication).
+    trend = patent_trend([row, dict(row), {**row, "family_key": "F2", "citations_forward": 1}])
+    assert trend[0]["families"] == 2 and trend[0]["forward_citations"] == 4
 
 
 def test_filed_peer_metrics_require_complete_inputs_and_exclude_dimensions() -> None:

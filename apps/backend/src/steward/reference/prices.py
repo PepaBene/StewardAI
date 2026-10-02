@@ -48,6 +48,7 @@ from steward.news.escalation import queue_escalation
 from steward.portfolio.sync import store_rates
 from steward.reference.identity import holding_tickers
 from steward.reference.intraday import PSE_SYMBOL, refresh_pse_px, store_payload
+from steward.reference.listings import derive_listings, resolve_series_listing
 from steward.reference.price_series import (
     PriceSource,
     PriceSymbols,
@@ -56,10 +57,12 @@ from steward.reference.price_series import (
     describe,
     holding_symbols,
     index_symbols,
+    series_mic,
 )
 from steward.settings import get_settings
 from steward.sources import yahoo
 from steward.sources.base import AccessResult, AccessState
+from steward.sources.credit_group import CreditPart, refund, reserve_group
 from steward.sources.free_market import (
     FreeSourceError,
     alpha_daily,
@@ -71,11 +74,13 @@ from steward.sources.market import (
     MarketDataError,
     PriceBar,
     frankfurter_series,
+    infer_quote_currency,
     public_holidays,
+    quote_unit_of,
     stooq_currency,
     stooq_daily,
 )
-from steward.sources.store import record_access
+from steward.sources.store import CoverageUpdate, record_access, update_coverage
 
 GAPS_KEY = "price_gaps"
 CHECKS_KEY = "price_checks"
@@ -90,6 +95,10 @@ RESTATEMENT_PCT = Decimal(5)
 SPLIT_RATIOS = (2, 3, 4, 5, 10, 20)
 SPLIT_TOLERANCE = 0.02
 NO_STOOQ_SYMBOL = "no Stooq symbol (set price_symbol in the holding profile)"
+# Alpha Vantage's free tier is 25 requests a day for the whole account. The price fallback may
+# never spend the last ALPHA_VANTAGE_ACCOUNT_RESERVE of them: Company Overview (the valuation
+# fallback) draws on the same account and must not be starved by a Stooq outage (B24).
+ALPHA_VANTAGE_ACCOUNT_RESERVE = 5
 
 
 @dataclass
@@ -111,27 +120,24 @@ async def store_bars(
     bar_type: str = "adjusted",
     listing_id: int | None = None,
     mic: str | None = None,
+    quote_unit: str | None = None,
 ) -> int:
-    await pool.executemany(
-        "insert into public.price_bar (symbol, date, open, high, low, close, volume, source,"
-        " currency,session_date,listing_id,mic,quote_unit,bar_type,access_state)"
-        " values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$2,coalesce($10,"
-        " (select m.listing_id from public.instrument i join public.instrument_security_link m"
-        "   on m.ticker=i.t212_ticker and m.status='confirmed'"
-        "  where i.price_symbol=$1 and m.listing_id is not null limit 1)),"
-        " coalesce($11,(select l.mic from public.instrument i"
-        " join public.instrument_security_link m"
-        "   on m.ticker=i.t212_ticker and m.status='confirmed'"
-        "   join public.security_listing l on l.id=m.listing_id"
-        "  where i.price_symbol=$1 limit 1)),$9,$12,'available')"
-        " on conflict (symbol,date,source,bar_type)"
-        " do update set open = excluded.open, high = excluded.high, low = excluded.low,"
-        " close = excluded.close, volume = excluded.volume, currency = excluded.currency,"
-        " session_date=excluded.session_date,"
-        " listing_id=coalesce(excluded.listing_id,price_bar.listing_id),"
-        " mic=coalesce(excluded.mic,price_bar.mic),quote_unit=excluded.quote_unit,"
-        " bar_type=excluded.bar_type,access_state=excluded.access_state,fetched_at = now()",
-        [
+    """Store daily bars. `currency` is the quote currency code as the source reports it (GBX or
+    GBp for pence); `quote_unit` its canonical unit (derived from the currency when omitted).
+    The listing and exchange come from the confirmed provider-symbol mapping (any source, under
+    the provider's own symbol), else from the symbol's suffix. A bar carries the source's own
+    timestamp when it has one."""
+    if not bars:
+        return 0
+    unit = quote_unit or quote_unit_of(currency)
+    resolved: dict[str, tuple[int | None, str | None]] = {}
+    rows = []
+    for b in bars:
+        if b.symbol not in resolved:
+            found_listing, found_mic = await resolve_series_listing(pool, b.symbol, source)
+            resolved[b.symbol] = (found_listing, found_mic)
+        found_listing, found_mic = resolved[b.symbol]
+        rows.append(
             (
                 b.symbol,
                 b.date,
@@ -142,12 +148,27 @@ async def store_bars(
                 b.volume,
                 source,
                 currency,
-                listing_id,
-                mic,
+                listing_id if listing_id is not None else found_listing,
+                mic or found_mic or series_mic(b.symbol, source),
+                unit,
                 bar_type,
+                b.source_timestamp,
             )
-            for b in bars
-        ],
+        )
+    await pool.executemany(
+        "insert into public.price_bar (symbol, date, open, high, low, close, volume, source,"
+        " currency, session_date, listing_id, mic, quote_unit, bar_type, access_state,"
+        " source_timestamp) values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$2,$10,$11,$12,$13,'available',$14)"
+        " on conflict (symbol,date,source,bar_type)"
+        " do update set open = excluded.open, high = excluded.high, low = excluded.low,"
+        " close = excluded.close, volume = excluded.volume, currency = excluded.currency,"
+        " session_date=excluded.session_date,"
+        " listing_id=coalesce(excluded.listing_id,price_bar.listing_id),"
+        " mic=coalesce(excluded.mic,price_bar.mic),quote_unit=excluded.quote_unit,"
+        " bar_type=excluded.bar_type,access_state=excluded.access_state,"
+        " source_timestamp=coalesce(excluded.source_timestamp,price_bar.source_timestamp),"
+        " fetched_at = now()",
+        rows,
     )
     return len(bars)
 
@@ -234,7 +255,7 @@ async def collect_symbol(
             return 0, f"Stooq restated history; refetch failed: {describe(exc)}"[:300]
         if notes is not None:
             notes[symbol] = f"history restated by Stooq; refetched {len(bars)} bars"
-    return await store_bars(pool, bars), None
+    return await store_bars(pool, bars, "stooq", stooq_currency(symbol)), None
 
 
 async def _yahoo_daily(
@@ -312,6 +333,48 @@ async def collect_series(
     return {"source": "yahoo", "symbol": symbols.yahoo, "stooq_gap": stooq_gap}, None
 
 
+def _gate_closed(row: asyncpg.Record) -> bool:
+    """A fallback endpoint is used only while it is audited `available`, not hard-blocked and
+    outside a provider Retry-After window (a quota message sets one until the next day)."""
+    retry_at = row["retry_at"]
+    return bool(
+        row["state"] != "available"
+        or row["hard_blocked"]
+        or (retry_at is not None and retry_at > dt.datetime.now(dt.UTC))
+    )
+
+
+def _scaled_adjusted(rows: list[Any], symbol: str) -> list[PriceBar]:
+    """Adjusted-basis bars from a provider's adjusted close: the open/high/low are scaled by the
+    same factor as the close, so a bar's shape is kept on the adjusted scale."""
+    out = []
+    for row in rows:
+        if row.adjusted_close is None or row.close <= 0 or row.adjusted_close <= 0:
+            continue
+        factor = row.adjusted_close / row.close
+        out.append(
+            PriceBar(
+                symbol,
+                row.day,
+                row.open * factor,
+                row.high * factor,
+                row.low * factor,
+                row.adjusted_close,
+                row.volume,
+            )
+        )
+    return out
+
+
+async def _not_covered(
+    pool: asyncpg.Pool, provider: str, dataset: str, key: str, reason: str
+) -> None:
+    await update_coverage(
+        pool,
+        CoverageUpdate(provider, dataset, key, AccessResult(AccessState.NOT_COVERED, reason)),
+    )
+
+
 async def collect_eodhd_fallbacks(
     pool: asyncpg.Pool,
     deps: PriceDeps,
@@ -324,15 +387,17 @@ async def collect_eodhd_fallbacks(
     """Use verified EODHD symbols only for profile-mapped held listings with source gaps.
 
     One atomic `eod` budget is shared by exchange-list checks and data calls, capped at the
-    documented 20/day even if configuration is accidentally higher.
+    documented 20/day even if configuration is accidentally higher. The series is stored under
+    the EODHD symbol: `close` as the raw basis and `adjusted_close` (split and dividend
+    adjusted) as the adjusted basis readers use.
     """
     if not provider_settings.enabled or not api_key:
         return {}
     gates = await pool.fetch(
-        """select endpoint,state,hard_blocked from public.provider_access
+        """select endpoint,state,hard_blocked,retry_at from public.provider_access
            where provider='eodhd' and endpoint in ('eod','symbol_search')"""
     )
-    if len(gates) != 2 or any(r["state"] != "available" or r["hard_blocked"] for r in gates):
+    if len(gates) != 2 or any(_gate_closed(r) for r in gates):
         detail["eodhd"] = "skipped: both EODHD endpoints must pass the free-key access audit"
         return {}
     budget = Budget(
@@ -355,8 +420,10 @@ async def collect_eodhd_fallbacks(
             detail[ticker] = {"eodhd": "symbol must include its exchange suffix"}
             continue
         mapping = await pool.fetchrow(
-            """select m.listing_id,l.mic,l.currency from public.instrument_security_link m
+            """select m.listing_id,l.mic,l.currency,i.currency as instrument_currency
+               from public.instrument_security_link m
                join public.security_listing l on l.id=m.listing_id
+               join public.instrument i on i.t212_ticker=m.ticker
                where m.ticker=$1 and m.status='confirmed' and l.status='active'""",
             ticker,
         )
@@ -395,13 +462,8 @@ async def collect_eodhd_fallbacks(
             for row in listings[exchange]
         )
         if not confirmed:
-            await pool.execute(
-                """insert into public.coverage_status(provider,dataset,entity_key,state,reason)
-                   values('eodhd','eod', $1,'not_covered',
-                          'exact exchange symbol absent from provider list')
-                   on conflict(provider,dataset,entity_key) do update set state=excluded.state,
-                     checked_at=now(),reason=excluded.reason""",
-                ticker,
+            await _not_covered(
+                pool, "eodhd", "eod", ticker, "exact exchange symbol absent from provider list"
             )
             detail[ticker] = {"eodhd": "symbol not found on the selected exchange"}
             continue
@@ -422,15 +484,34 @@ async def collect_eodhd_fallbacks(
             )
             detail[ticker] = {"eodhd": "daily request failed; previous price history retained"}
             continue
-        bars = [
+        if not daily:
+            detail[ticker] = {"eodhd": "verified symbol has no EOD data"}
+            continue
+        quote_currency, unit_basis = infer_quote_currency(
+            mapping["mic"], mapping["currency"], mapping["instrument_currency"]
+        )
+        raw_bars = [
             PriceBar(symbol, bar.day, bar.open, bar.high, bar.low, bar.close, bar.volume)
             for bar in daily
         ]
-        if not bars:
-            detail[ticker] = {"eodhd": "verified symbol has no EOD data"}
-            continue
+        adjusted_bars = _scaled_adjusted(daily, symbol)
         await store_bars(
-            pool, bars, "eodhd", mapping["currency"], "raw", mapping["listing_id"], mapping["mic"]
+            pool,
+            raw_bars,
+            "eodhd",
+            quote_currency,
+            "raw",
+            mapping["listing_id"],
+            mapping["mic"],
+        )
+        await store_bars(
+            pool,
+            adjusted_bars,
+            "eodhd",
+            quote_currency,
+            "adjusted",
+            mapping["listing_id"],
+            mapping["mic"],
         )
         await record_access(
             pool,
@@ -443,8 +524,11 @@ async def collect_eodhd_fallbacks(
         results[ticker] = {
             "source": "eodhd",
             "symbol": symbol,
-            "bars": len(bars),
-            "basis": "raw",
+            "bars": len(daily),
+            "adjusted_bars": len(adjusted_bars),
+            "basis": "raw_and_adjusted" if adjusted_bars else "raw",
+            "quote_unit": quote_unit_of(quote_currency),
+            "quote_unit_basis": unit_basis,
             "history_limit": "free plan: up to one year",
         }
     return results
@@ -461,24 +545,23 @@ async def collect_alpha_vantage_fallbacks(
 ) -> dict[str, dict[str, Any]]:
     """Fill held price gaps from explicitly mapped Alpha Vantage symbols.
 
-    The account-wide 25-call governor is shared with Company Overview, source audits and
-    statement probes; the endpoint governor provides a second independent guard. Both
-    access gates must be available so an unverified or paid endpoint is never called.
+    The account-wide 25-call budget is shared with Company Overview, source audits and
+    statement probes. The account credit and the endpoint credit are reserved together in one
+    transaction (a refused endpoint credit never burns the account credit), the price fallback
+    leaves ALPHA_VANTAGE_ACCOUNT_RESERVE calls to Company Overview, and a reservation is
+    refunded when the request never reached the provider. Both access gates must be available
+    so an unverified or paid endpoint is never called.
     """
     if not provider_settings.enabled or not api_key:
         return {}
     gates = await pool.fetch(
-        """select endpoint,state,hard_blocked from public.provider_access
+        """select endpoint,state,hard_blocked,retry_at from public.provider_access
            where provider='alpha_vantage' and endpoint in ('daily_adjusted','account_free')"""
     )
     by_endpoint = {row["endpoint"]: row for row in gates}
-    if len(by_endpoint) != 2 or any(
-        by_endpoint[name]["state"] != "available" or by_endpoint[name]["hard_blocked"]
-        for name in ("daily_adjusted", "account_free")
-    ):
+    if len(by_endpoint) != 2 or any(_gate_closed(row) for row in by_endpoint.values()):
         detail["alpha_vantage"] = "skipped: daily and shared-budget gates must be available"
         return {}
-    governor = PostgresRequestGovernor(pool)
     endpoint_budget = Budget(
         daily=Decimal(min(provider_settings.daily_quota or 25, 25)),
         monthly=Decimal(provider_settings.monthly_quota)
@@ -486,7 +569,10 @@ async def collect_alpha_vantage_fallbacks(
         else None,
         reserve=Decimal(provider_settings.reserve_credits),
     )
-    account_budget = Budget(daily=Decimal(25))
+    account_budget = Budget(
+        daily=Decimal(25),
+        reserve=Decimal(max(ALPHA_VANTAGE_ACCOUNT_RESERVE, provider_settings.reserve_credits)),
+    )
     results: dict[str, dict[str, Any]] = {}
     for ticker in tickers:
         profile = profiles.for_ticker(ticker)
@@ -494,7 +580,7 @@ async def collect_alpha_vantage_fallbacks(
         if not provider_symbol:
             continue
         mapping = await pool.fetchrow(
-            """select m.listing_id,l.mic,l.currency,i.price_symbol
+            """select m.listing_id,l.mic,l.currency,i.currency as instrument_currency
                from public.instrument_security_link m
                join public.security_listing l on l.id=m.listing_id
                join public.instrument i on i.t212_ticker=m.ticker
@@ -504,50 +590,54 @@ async def collect_alpha_vantage_fallbacks(
         if mapping is None:
             detail[ticker] = {"alpha_vantage": "skipped: confirmed canonical listing is missing"}
             continue
+        reservation = None
         try:
-            await governor.reserve("alpha_vantage", "account_free", Decimal(1), account_budget)
-            await governor.reserve("alpha_vantage", "daily_adjusted", Decimal(1), endpoint_budget)
+            reservation = await reserve_group(
+                pool,
+                [
+                    CreditPart("alpha_vantage", "account_free", Decimal(1), account_budget),
+                    CreditPart("alpha_vantage", "daily_adjusted", Decimal(1), endpoint_budget),
+                ],
+            )
             payload, daily = await alpha_daily(deps.http, api_key, provider_symbol)
         except QuotaExceeded as exc:
             detail[ticker] = {"alpha_vantage": f"skipped: {exc}"}
             break
         except (FreeSourceError, httpx.HTTPError) as exc:
-            result = _provider_error_result(exc)
-            await record_access(
-                pool,
-                "alpha_vantage",
-                "daily_adjusted",
-                result,
-                status_code=exc.status_code if isinstance(exc, FreeSourceError) else None,
-            )
-            detail[ticker] = {"alpha_vantage": "request failed; previous price history retained"}
+            if reservation is not None and not getattr(exc, "provider_charged", False):
+                await refund(pool, reservation)
+            state = getattr(exc, "state", None)
+            if state is AccessState.NOT_COVERED:
+                await _not_covered(pool, "alpha_vantage", "daily_adjusted", ticker, str(exc)[:200])
+            else:
+                await record_access(
+                    pool,
+                    "alpha_vantage",
+                    "daily_adjusted",
+                    _provider_error_result(exc),
+                    status_code=exc.status_code if isinstance(exc, FreeSourceError) else None,
+                )
+            detail[ticker] = {
+                "alpha_vantage": f"request failed ({state.value if state else 'error'});"
+                " previous price history retained"
+            }
             continue
-        symbol = mapping["price_symbol"]
-        if not symbol or not daily:
+        if not daily:
             detail[ticker] = {"alpha_vantage": "no mapped history returned"}
             continue
+        quote_currency, unit_basis = infer_quote_currency(
+            mapping["mic"], mapping["currency"], mapping["instrument_currency"]
+        )
         raw_bars = [
-            PriceBar(symbol, row.day, row.open, row.high, row.low, row.close, row.volume)
+            PriceBar(provider_symbol, row.day, row.open, row.high, row.low, row.close, row.volume)
             for row in daily
         ]
-        adjusted_bars = [
-            PriceBar(
-                symbol,
-                row.day,
-                row.open * (row.adjusted_close / row.close),
-                row.high * (row.adjusted_close / row.close),
-                row.low * (row.adjusted_close / row.close),
-                row.adjusted_close,
-                row.volume,
-            )
-            for row in daily
-            if row.adjusted_close is not None
-        ]
+        adjusted_bars = _scaled_adjusted(daily, provider_symbol)
         await store_bars(
             pool,
             raw_bars,
             "alpha_vantage",
-            mapping["currency"],
+            quote_currency,
             "raw",
             mapping["listing_id"],
             mapping["mic"],
@@ -556,7 +646,7 @@ async def collect_alpha_vantage_fallbacks(
             pool,
             adjusted_bars,
             "alpha_vantage",
-            mapping["currency"],
+            quote_currency,
             "adjusted",
             mapping["listing_id"],
             mapping["mic"],
@@ -575,13 +665,36 @@ async def collect_alpha_vantage_fallbacks(
             "bars": len(daily),
             "basis": "raw_and_adjusted",
             "adjustment_source": "Alpha Vantage adjusted close",
+            "quote_unit": quote_unit_of(quote_currency),
+            "quote_unit_basis": unit_basis,
         }
     return results
 
 
-def _provider_error_result(exc: Exception) -> AccessResult:
+def _next_utc_midnight(now: dt.datetime) -> dt.datetime:
+    return dt.datetime.combine(now.date() + dt.timedelta(days=1), dt.time.min, dt.UTC)
+
+
+def _provider_error_result(exc: Exception, now: dt.datetime | None = None) -> AccessResult:
+    """The typed access outcome of a provider failure. A provider's own HTTP-200 message wins
+    (`exc.state`: an Alpha Vantage "premium endpoint" is PAID_ONLY, "25 requests per day" is
+    QUOTA_EXHAUSTED); otherwise the HTTP status decides."""
+    now = now or dt.datetime.now(dt.UTC)
     code = exc.status_code if isinstance(exc, FreeSourceError) else None
     text = str(exc).casefold()
+    typed: AccessState | None = getattr(exc, "state", None)
+    if typed is AccessState.PAID_ONLY:
+        return AccessResult(
+            typed, "provider reports a premium-only endpoint; hard-blocked pending a plan review"
+        )
+    if typed is AccessState.QUOTA_EXHAUSTED:
+        return AccessResult(
+            typed,
+            "provider free quota message",
+            retry_at=_next_utc_midnight(now) if "day" in text else now + dt.timedelta(minutes=2),
+        )
+    if typed is AccessState.ACCESS_UNVERIFIED:
+        return AccessResult(typed, "provider rejected the key; hard-blocked pending a key check")
     if code in (401, 403):
         state = (
             AccessState.PAID_ONLY
@@ -643,7 +756,7 @@ async def plausibility(
     )
     if row is None or not row["current_price"]:
         return None
-    quoted = row["currency"] if ref.source == "yahoo" else stooq_currency(ref.symbol)
+    quoted = row["currency"] or (stooq_currency(ref.symbol) if ref.source == "stooq" else None)
     if not _same_currency(quoted, row["instrument_currency"]):
         if notes is not None:
             notes[ticker] = (
@@ -762,6 +875,36 @@ async def latest_move(
     return day, float((ratio - 1) * 100), source
 
 
+async def _accept_fallbacks(
+    pool: asyncpg.Pool,
+    results: dict[str, dict[str, Any]],
+    holdings: dict[str, PriceSymbols],
+    gaps: dict[str, dict[str, Any]],
+    sources: dict[str, dict[str, Any]],
+    detail: dict[str, Any],
+) -> None:
+    """Record a fallback's source and clear the holding's gap only when the readers will
+    actually serve the stored series (A2): `choose_series` must pick it. A series that was
+    stored but is not served (an older Stooq/Yahoo series is fresher, or the symbol the
+    reader looks up differs) leaves the gap visible with the reason."""
+    for ticker, result in results.items():
+        ref = await choose_one(pool, holdings[ticker])
+        if ref is not None and ref.source == result.get("source"):
+            result["stooq_gap"] = (gaps.pop(ticker, None) or {}).get("reason")
+            sources[ticker] = result
+            result["served"] = True
+            continue
+        result["served"] = False
+        note = (
+            f"{result.get('source')} bars stored under {result.get('symbol')} but readers serve"
+            f" {ref.name + ' ' + ref.symbol if ref else 'no series'}; gap kept"
+        )
+        result["note"] = note
+        if ticker in gaps:
+            gaps[ticker]["reason"] = f"{gaps[ticker].get('reason', '')}; {note}"[:400]
+        detail.setdefault("unserved", {})[ticker] = note
+
+
 async def run_price_history(ctx: JobContext, deps: PriceDeps) -> None:
     pool = ctx.pool
     async with ctx.step("load_config") as step:
@@ -785,6 +928,25 @@ async def run_price_history(ctx: JobContext, deps: PriceDeps) -> None:
             dict.fromkeys(settings.benchmark_symbols + [i.symbol for i in settings.market_strip])
         )
         step.detail["market_strip"] = [i.symbol for i in settings.market_strip]
+
+    async with ctx.step("listings") as step:
+        # The canonical listing of each holding (and its provider symbols) before bars are
+        # stored, so every bar can carry listing_id and mic (A17). A failure here is a note,
+        # never a failed price job.
+        try:
+            derived = await derive_listings(
+                pool,
+                list(holdings),
+                profiles.body if profiles else HoldingProfilesConfig(),
+                today=deps.today,
+            )
+        except asyncpg.PostgresError as exc:
+            step.detail["error"] = f"{type(exc).__name__}: {str(exc)[:200]}"
+        else:
+            step.detail["listings"] = {r.ticker: r.status for r in derived}
+            step.detail["needs_owner_confirmation"] = [
+                r.ticker for r in derived if r.status == "suggested"
+            ]
 
     gaps: dict[str, dict[str, Any]] = {}
     checks: dict[str, Any] = {}
@@ -853,9 +1015,7 @@ async def run_price_history(ctx: JobContext, deps: PriceDeps) -> None:
                 alpha_key.get_secret_value(),
                 step.detail,
             )
-            for ticker, result in alpha.items():
-                sources[ticker] = result
-                gaps.pop(ticker, None)
+            await _accept_fallbacks(pool, alpha, holdings, gaps, sources, step.detail)
             step.detail["fallbacks"] = alpha
             now = dt.datetime.now(dt.UTC).isoformat()
             await _save_state(pool, GAPS_KEY, {"at": now, "gaps": gaps})
@@ -873,9 +1033,7 @@ async def run_price_history(ctx: JobContext, deps: PriceDeps) -> None:
                 eodhd_key.get_secret_value(),
                 step.detail,
             )
-            for ticker, result in eodhd.items():
-                sources[ticker] = result
-                gaps.pop(ticker, None)
+            await _accept_fallbacks(pool, eodhd, holdings, gaps, sources, step.detail)
             step.detail["fallbacks"] = eodhd
             now = dt.datetime.now(dt.UTC).isoformat()
             await _save_state(pool, GAPS_KEY, {"at": now, "gaps": gaps})

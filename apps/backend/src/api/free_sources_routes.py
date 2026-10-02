@@ -3,33 +3,65 @@
 import json
 from datetime import date, datetime
 from decimal import Decimal
-from typing import Annotated, Literal
+from typing import Annotated, Any, Literal
 from urllib.parse import urlsplit
 
+import asyncpg
 import httpx
 from fastapi import APIRouter, HTTPException, Path, Query
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from api.auth import Owner
 from api.db import Pool
-from steward.config.holding_profiles import HoldingProfilesConfig
-from steward.config.store import load_active
+from steward.config.holding_profiles import HoldingProfile, HoldingProfilesConfig
+from steward.config.jobs import JobsConfig
+from steward.config.store import StoredConfig, load_active
+from steward.db_json import decode_rows, decode_structured_rows
+from steward.free_source_reads import (
+    business_network_payload,
+    company_research_rows,
+    financial_history_rows,
+    forward_payload,
+    forward_rows,
+    patent_trend_rows,
+)
 from steward.free_sources import (
     ForwardValue,
-    calculate_and_store_returns,
     collect_alpha_vantage_statement,
     collect_finnhub_research,
+    peer_status_as_of,
+    set_peer_status,
     store_company_edge,
     store_forward_value,
-    store_patent_family,
+    upsert_peer,
 )
-from steward.market_analysis import PricePoint, compatible_peer_mean, financial_peer_metrics
+from steward.fundamentals.ir import IrError, actual_vs_consensus, assert_fetchable
+from steward.graph.deals import DealTransitionError, deal_key, record_deal_event
+from steward.graph.decisions import GraphDecisionError, decide_disclosure
+from steward.graph.edges import upsert_event
+from steward.graph.kpi import validate_thesis_kpi
+from steward.graph.patents import store_patent_family as _store_patent
+from steward.graph.relationships import concentration, detect_contradictions, upsert_disclosure
+from steward.market_analysis import financial_peer_metrics
+from steward.peer_metrics import FORMULA_DETAIL, FORMULAS, peer_comparison
+from steward.reference.calendar import expected_sessions
+from steward.reference.listings import (
+    ListingDecisionError,
+    confirm_listing,
+    derive_listings,
+    holding_symbol_names,
+    listing_overview,
+)
+from steward.reference.price_diagnostics import holding_price_diagnostics
+from steward.reference.price_series import holding_symbols
+from steward.reference.returns import actions_complete, compute_for, return_inputs
 from steward.settings import get_settings
 from steward.sources.company_research import (
     collect_alpha_exposure,
     collect_diffbot_candidates,
     collect_epo_patents,
     collect_pdl_company,
+    pdl_skip_reason,
 )
 from steward.sources.free_market import FreeSourceError
 from steward.sources.governor import QuotaExceeded
@@ -87,7 +119,13 @@ class CorporateActionInput(BaseModel):
     payment_date: date | None = None
     ratio: Decimal | None = Field(default=None, gt=0)
     cash_amount: Decimal | None = Field(default=None, ge=0)
-    currency: str | None = Field(default=None, pattern=r"^[A-Z]{3}$")
+    # ISO 4217, or a minor unit a dividend is declared in (pence GBp, cents ZAc, agorot ILa).
+    currency: str | None = Field(default=None, pattern=r"^([A-Z]{3}|GBp|ZAc|ILa)$")
+    # "ordinary_share": the dividend is per ordinary share and the holding is an ADS (the
+    # profile's ADS ratio converts it); "split_adjusted": a provider already restated the
+    # amount for later splits.
+    per: Literal["listed_line", "ordinary_share"] = "listed_line"
+    amount_basis: Literal["as_declared", "split_adjusted"] = "as_declared"
     source: str = Field(min_length=2, max_length=80)
     source_url: str = Field(min_length=8, max_length=2000)
     publisher_at: datetime | None = None
@@ -99,15 +137,35 @@ class CorporateActionInput(BaseModel):
     def valid_action(self) -> "CorporateActionInput":
         if self.action_type == "split" and self.ratio is None:
             raise ValueError("split ratio is required")
-        if (
-            self.action_type in {"cash_dividend", "stock_dividend"}
-            and self.cash_amount is None
-            and self.ratio is None
-        ):
-            raise ValueError("dividend amount or ratio is required")
+        if self.action_type == "stock_dividend" and self.ratio is None:
+            # A stock dividend is shares for shares: a cash amount cannot stand in for the
+            # ratio (the return would silently skip it).
+            raise ValueError("stock dividend ratio is required (a cash amount alone is not enough)")
+        if self.action_type == "cash_dividend":
+            if self.cash_amount is None:
+                raise ValueError("cash dividend amount is required")
+            if self.currency is None:
+                raise ValueError("cash dividend currency is required")
         if self.status == "confirmed" and self.evidence_id is None:
             raise ValueError("confirmed actions require linked source evidence")
         return self
+
+
+class CorporateActionDecision(BaseModel):
+    """The owner's explicit decision on one recorded action: confirm it, reject it, or retract
+    it back to review (`suggested`). Only this path changes a decided action."""
+
+    decision: Literal["confirmed", "rejected", "suggested"]
+    reason: str = Field(min_length=10, max_length=2000)
+    evidence_id: int | None = None
+
+
+class ListingDecision(BaseModel):
+    decision: Literal["confirmed", "rejected"]
+    reason: str = Field(min_length=10, max_length=2000)
+    listing_id: int | None = Field(
+        default=None, description="Another listing of the same security, instead of the derived."
+    )
 
 
 class ExchangeSessionInput(BaseModel):
@@ -118,6 +176,9 @@ class ExchangeSessionInput(BaseModel):
     close_at: datetime | None = None
     source: str = Field(min_length=2, max_length=80)
     evidence_url: str = Field(min_length=8, max_length=2000)
+    reason: str | None = Field(
+        default=None, max_length=300, description="e.g. ad hoc closure, early close, holiday."
+    )
 
     @model_validator(mode="after")
     def validate_times(self) -> "ExchangeSessionInput":
@@ -211,8 +272,15 @@ class CompanyEdgeInput(BaseModel):
     direction: Literal["outgoing", "incoming", "symmetric"]
     source: str = Field(min_length=2, max_length=80)
     source_url: str = Field(min_length=8, max_length=2000)
-    evidence_tier: Literal["primary", "regulatory", "owner_review", "vendor", "community"]
-    status: Literal["suggested", "confirmed", "rejected", "disputed"] = "suggested"
+    evidence_tier: (
+        Literal["primary", "regulatory", "owner_review", "vendor", "community"] | None
+    ) = Field(
+        default=None,
+        description="Ignored. The server derives the tier from the linked document's source "
+        "class (or the writing source); rejecting or disputing an edge uses the decision "
+        "endpoint.",
+    )
+    status: Literal["suggested", "confirmed"] = "suggested"
     valid_from: date | None = None
     valid_to: date | None = None
     evidence_id: int | None = None
@@ -241,7 +309,7 @@ class CompanyEventInput(BaseModel):
     evidence_id: int | None = None
     counterparty_key: str | None = Field(default=None, max_length=160)
     terms: dict[str, object] = Field(default_factory=dict)
-    status: Literal["suggested", "confirmed", "rejected", "disputed"] = "suggested"
+    status: Literal["suggested", "confirmed"] = "suggested"
     thesis_kpi: str | None = Field(default=None, max_length=120)
     detail: dict[str, object] = Field(default_factory=dict)
 
@@ -274,8 +342,11 @@ class PatentFamilyInput(BaseModel):
     def validate_ownership(self) -> "PatentFamilyInput":
         if self.ownership_basis == "direct" and self.evidence_id is None:
             raise ValueError("direct patent attribution requires primary ownership evidence")
-        if self.ownership_basis == "dated_subsidiary_path" and self.ownership_valid_from is None:
-            raise ValueError("subsidiary attribution requires a dated ownership path")
+        if self.ownership_basis == "dated_subsidiary_path" and self.priority_date is None:
+            raise ValueError(
+                "subsidiary attribution needs the family priority date, which a confirmed "
+                "subsidiary edge must cover"
+            )
         return self
 
 
@@ -310,12 +381,14 @@ class AlphaExposureRequest(BaseModel):
     to_currency: str | None = Field(default=None, pattern=r"^[A-Z]{3}$")
 
 
-def _holding_research_profile(stored, ticker: str):
+def _holding_research_profile(
+    stored: StoredConfig[HoldingProfilesConfig] | None, ticker: str
+) -> HoldingProfile | None:
     config = stored.body if stored else HoldingProfilesConfig()
     return config.for_ticker(ticker)
 
 
-def _profile_domain(profile) -> str | None:
+def _profile_domain(profile: HoldingProfile) -> str | None:
     urls = [profile.ir_url, *profile.results_urls]
     for url in urls:
         host = urlsplit(str(url)).hostname if url else None
@@ -324,29 +397,25 @@ def _profile_domain(profile) -> str | None:
     return profile.extra_domains[0] if profile.extra_domains else None
 
 
-@router.get("/holdings/{ticker}/company-research-observations", tags=["holdings"])
+@router.get(
+    "/holdings/{ticker}/company-research-observations", tags=["holdings"], response_model=None
+)
 async def company_research_observations(
     ticker: TickerPath,
     pool: Pool,
     _owner: Owner,
     as_of: Annotated[datetime | None, Query()] = None,
-):
-    rows = await pool.fetch(
-        """select id,provider,dataset,metric,period_end,value,text_value,unit,currency,source_url,
-                  published_at,known_at,match_confidence,raw
-           from public.company_research_observation where ticker=$1
-             and ($2::timestamptz is null or known_at<=$2)
-           order by dataset,metric,period_end desc nulls last,known_at desc""",
-        ticker,
-        as_of,
-    )
-    return {"ticker": ticker, "known_as_of": as_of, "observations": [dict(r) for r in rows]}
+) -> dict[str, Any]:
+    rows = await company_research_rows(pool, ticker, as_of)
+    return {"ticker": ticker, "known_as_of": as_of, "observations": rows}
 
 
-@router.post("/holdings/{ticker}/exposure-context/alpha-vantage", tags=["holdings"])
+@router.post(
+    "/holdings/{ticker}/exposure-context/alpha-vantage", tags=["holdings"], response_model=None
+)
 async def refresh_alpha_exposure(
     ticker: TickerPath, body: AlphaExposureRequest, pool: Pool, _owner: Owner
-):
+) -> dict[str, Any]:
     settings = get_settings()
     if not settings.alpha_vantage_api_key:
         raise HTTPException(409, "ALPHA_VANTAGE_API_KEY is not configured")
@@ -401,8 +470,8 @@ async def refresh_alpha_exposure(
     return {"ticker": ticker, "series": body.series_name, "observations_stored": count}
 
 
-@router.get("/holdings/{ticker}/exposure-context", tags=["holdings"])
-async def exposure_context(ticker: TickerPath, pool: Pool, _owner: Owner):
+@router.get("/holdings/{ticker}/exposure-context", tags=["holdings"], response_model=None)
+async def exposure_context(ticker: TickerPath, pool: Pool, _owner: Owner) -> dict[str, Any]:
     stored = await load_active(pool, "holding_profiles", HoldingProfilesConfig)
     profile = _holding_research_profile(stored, ticker)
     observations = await pool.fetch(
@@ -417,7 +486,7 @@ async def exposure_context(ticker: TickerPath, pool: Pool, _owner: Owner):
         "exposure_assumptions": [e.model_dump(mode="json") for e in profile.exposures]
         if profile
         else [],
-        "observations": [dict(row) for row in observations],
+        "observations": decode_structured_rows(observations, ("raw",)),
         "limitations": [
             "Price series are contextual inputs, not estimates of issuer margin sensitivity.",
             "Exposure shares are shown only when entered in the holding profile.",
@@ -425,8 +494,10 @@ async def exposure_context(ticker: TickerPath, pool: Pool, _owner: Owner):
     }
 
 
-@router.post("/holdings/{ticker}/company-research/diffbot", tags=["holdings"])
-async def refresh_diffbot_company_research(ticker: TickerPath, pool: Pool, _owner: Owner):
+@router.post("/holdings/{ticker}/company-research/diffbot", tags=["holdings"], response_model=None)
+async def refresh_diffbot_company_research(
+    ticker: TickerPath, pool: Pool, _owner: Owner
+) -> dict[str, Any]:
     settings = get_settings()
     if not settings.diffbot_api_key:
         raise HTTPException(409, "DIFFBOT_API_KEY is not configured")
@@ -455,8 +526,10 @@ async def refresh_diffbot_company_research(ticker: TickerPath, pool: Pool, _owne
     return {"ticker": ticker, "suggested_edges": count}
 
 
-@router.post("/holdings/{ticker}/company-research/pdl", tags=["holdings"])
-async def refresh_pdl_company_research(ticker: TickerPath, pool: Pool, _owner: Owner):
+@router.post("/holdings/{ticker}/company-research/pdl", tags=["holdings"], response_model=None)
+async def refresh_pdl_company_research(
+    ticker: TickerPath, pool: Pool, _owner: Owner
+) -> dict[str, Any]:
     settings = get_settings()
     if not settings.people_data_labs_api_key:
         raise HTTPException(409, "PEOPLE_DATA_LABS_API_KEY is not configured")
@@ -465,6 +538,9 @@ async def refresh_pdl_company_research(ticker: TickerPath, pool: Pool, _owner: O
     domain = _profile_domain(profile) if profile else None
     if not domain:
         raise HTTPException(422, "a resolved company website domain is required")
+    skipped = await pdl_skip_reason(pool, ticker)
+    if skipped is not None:
+        return {"ticker": ticker, "matched_records": 0, "skipped": skipped}
     try:
         async with httpx.AsyncClient(timeout=30) as http:
             count = await collect_pdl_company(
@@ -487,8 +563,10 @@ async def refresh_pdl_company_research(ticker: TickerPath, pool: Pool, _owner: O
     return {"ticker": ticker, "matched_records": count}
 
 
-@router.post("/holdings/{ticker}/patent-families/epo-ops/refresh", tags=["holdings"])
-async def refresh_epo_patents(ticker: TickerPath, pool: Pool, _owner: Owner):
+@router.post(
+    "/holdings/{ticker}/patent-families/epo-ops/refresh", tags=["holdings"], response_model=None
+)
+async def refresh_epo_patents(ticker: TickerPath, pool: Pool, _owner: Owner) -> dict[str, Any]:
     settings = get_settings()
     if not settings.epo_ops_client_id or not settings.epo_ops_client_secret:
         raise HTTPException(409, "EPO_OPS_CLIENT_ID and EPO_OPS_CLIENT_SECRET are required")
@@ -529,18 +607,19 @@ async def refresh_epo_patents(ticker: TickerPath, pool: Pool, _owner: Owner):
     return {"ticker": ticker, "patent_candidates": count}
 
 
-@router.get("/exchange-sessions/{mic}", tags=["reference"])
+@router.get("/exchange-sessions/{mic}", tags=["reference"], response_model=None)
 async def exchange_sessions(
     mic: Annotated[str, Path(pattern=r"^[A-Z0-9]{4}$")],
     pool: Pool,
     _owner: Owner,
     start: Annotated[date, Query()],
     end: Annotated[date, Query()],
-):
+) -> list[dict[str, Any]]:
     if end < start:
         raise HTTPException(422, "end must not precede start")
     rows = await pool.fetch(
-        """select mic,session_date,open_at,close_at,state,source,confirmed,evidence_url,known_at
+        """select mic,session_date,open_at,close_at,state,source,confirmed,evidence_url,reason,
+                  known_at
            from public.exchange_session where mic=$1 and session_date between $2 and $3
            order by session_date,confirmed desc,known_at desc""",
         mic,
@@ -550,15 +629,45 @@ async def exchange_sessions(
     return [dict(row) for row in rows]
 
 
-@router.post("/exchange-sessions", tags=["reference"])
-async def record_exchange_session(body: ExchangeSessionInput, pool: Pool, _owner: Owner):
+@router.get("/exchange-sessions/{mic}/expected", tags=["reference"], response_model=None)
+async def expected_exchange_sessions(
+    mic: Annotated[str, Path(pattern=r"^[A-Z0-9]{4}$")],
+    pool: Pool,
+    _owner: Owner,
+    start: Annotated[date, Query()],
+    end: Annotated[date, Query()],
+) -> dict[str, Any]:
+    """The sessions the exchange held in a window: confirmed `exchange_session` rows first
+    (half-days, ad hoc closures), else weekdays less the closures confirmed in the Jobs config.
+    This is the denominator of return-window coverage and the yardstick of price freshness."""
+    if end < start:
+        raise HTTPException(422, "end must not precede start")
+    jobs = await load_active(pool, "jobs", JobsConfig)
+    expected = await expected_sessions(
+        pool, (jobs.body if jobs else JobsConfig()).calendar, mic, start, end
+    )
+    return {
+        "mic": mic,
+        "start": start,
+        "end": end,
+        "count": expected.count,
+        "basis": expected.basis,
+        "confirmed_days": expected.confirmed_days,
+        "days": expected.days,
+    }
+
+
+@router.post("/exchange-sessions", tags=["reference"], response_model=None)
+async def record_exchange_session(
+    body: ExchangeSessionInput, pool: Pool, _owner: Owner
+) -> dict[str, Any]:
     row_id = await pool.fetchval(
         """insert into public.exchange_session
-           (mic,session_date,open_at,close_at,state,source,confirmed,evidence_url)
-           values($1,$2,$3,$4,$5,$6,true,$7)
+           (mic,session_date,open_at,close_at,state,source,confirmed,evidence_url,reason)
+           values($1,$2,$3,$4,$5,$6,true,$7,$8)
            on conflict(mic,session_date,source) do update set open_at=excluded.open_at,
              close_at=excluded.close_at,state=excluded.state,confirmed=true,
-             evidence_url=excluded.evidence_url,known_at=now()
+             evidence_url=excluded.evidence_url,reason=excluded.reason,known_at=now()
            returning session_date""",
         body.mic,
         body.session_date,
@@ -567,124 +676,136 @@ async def record_exchange_session(body: ExchangeSessionInput, pool: Pool, _owner
         body.state,
         body.source,
         body.evidence_url,
+        body.reason,
     )
     return {"session_date": row_id}
 
 
-@router.get("/holdings/{ticker}/peer-set", tags=["holdings"])
+@router.get("/holdings/{ticker}/peer-set", tags=["holdings"], response_model=None)
 async def peer_set(
     ticker: TickerPath, pool: Pool, _owner: Owner, as_of: Annotated[datetime | None, Query()] = None
-):
+) -> dict[str, Any]:
+    """Peers as known at `as_of`, each with the status that was in force at that moment."""
     rows = await pool.fetch(
-        """select id,peer_ticker,basis,status,evidence_id,source,valid_from,valid_to,known_at,detail
-           from public.peer_set where ticker=$1 and ($2::timestamptz is null or known_at<=$2)
-           order by status,peer_ticker,known_at desc""",
+        f"""select p.id,p.peer_ticker,p.basis,{peer_status_as_of("p", "$2")} as status,
+                  p.evidence_id,p.source,p.valid_from,p.valid_to,p.known_at,p.detail,
+                  p.status_history
+           from public.peer_set p where p.ticker=$1 and ($2::timestamptz is null or p.known_at<=$2)
+           order by 4,p.peer_ticker,p.known_at desc""",  # noqa: S608 - status fragment is constant
         ticker,
         as_of,
     )
-    return {"ticker": ticker, "known_as_of": as_of, "peers": [dict(row) for row in rows]}
+    return {
+        "ticker": ticker,
+        "known_as_of": as_of,
+        "peers": decode_rows(rows, ("detail", "status_history")),
+    }
 
 
-@router.post("/holdings/{ticker}/peer-set", tags=["holdings"])
-async def record_peer(ticker: TickerPath, body: PeerInput, pool: Pool, _owner: Owner):
+@router.post("/holdings/{ticker}/peer-set", tags=["holdings"], response_model=None)
+async def record_peer(
+    ticker: TickerPath, body: PeerInput, pool: Pool, _owner: Owner
+) -> dict[str, Any]:
+    """Record a peer. Posting an existing peer again changes neither its status nor when it
+    became known (`known_at` is set once); a status change is the `.../status` route."""
     if body.peer_ticker.casefold() == ticker.casefold():
         raise HTTPException(422, "a holding cannot be its own peer")
-    row_id = await pool.fetchval(
-        """insert into public.peer_set
-           (ticker,peer_ticker,basis,status,evidence_id,source,valid_from,valid_to,detail)
-           values($1,$2,$3,$4,$5,$6,$7,$8,$9::jsonb)
-           on conflict(ticker,peer_ticker,basis,source) do update set
-             status=case when peer_set.status in ('rejected','confirmed')
-                         then peer_set.status else excluded.status end,
-             evidence_id=coalesce(excluded.evidence_id,peer_set.evidence_id),
-             valid_from=coalesce(excluded.valid_from,peer_set.valid_from),
-             valid_to=coalesce(excluded.valid_to,peer_set.valid_to),
-             detail=peer_set.detail || excluded.detail,known_at=now()
-           returning id""",
-        ticker,
-        body.peer_ticker,
-        body.basis,
-        body.status,
-        body.evidence_id,
-        body.source,
-        body.valid_from,
-        body.valid_to,
-        json.dumps(body.detail),
+    row_id = await upsert_peer(
+        pool,
+        ticker=ticker,
+        peer_ticker=body.peer_ticker,
+        basis=body.basis,
+        status=body.status,
+        source=body.source,
+        evidence_id=body.evidence_id,
+        valid_from=body.valid_from,
+        valid_to=body.valid_to,
+        detail=body.detail,
     )
     return {"id": row_id}
 
 
-@router.get("/holdings/{ticker}/peer-metrics", tags=["holdings"])
+class PeerStatusInput(BaseModel):
+    status: Literal["suggested", "confirmed", "rejected"]
+    reason: str | None = Field(default=None, min_length=3, max_length=2000)
+    evidence_id: int | None = None
+
+
+@router.put("/holdings/{ticker}/peer-set/{peer_id}/status", tags=["holdings"], response_model=None)
+async def change_peer_status(
+    ticker: TickerPath, peer_id: int, body: PeerStatusInput, pool: Pool, _owner: Owner
+) -> dict[str, Any]:
+    """The owner's decision on a peer in either direction: a confirmed peer can be rejected or
+    returned to suggested. The change is dated in the peer's status history, so an `as_of` read
+    still shows the earlier status. Confirming needs supporting evidence."""
+    existing = await pool.fetchrow(
+        "select id,evidence_id from public.peer_set where id=$1 and ticker=$2", peer_id, ticker
+    )
+    if existing is None:
+        raise HTTPException(404, "peer not found for this holding")
+    if body.status == "confirmed" and body.evidence_id is None and existing["evidence_id"] is None:
+        raise HTTPException(422, "confirming a peer requires supporting evidence")
+    if body.evidence_id is not None:
+        try:
+            await pool.execute(
+                "update public.peer_set set evidence_id=$2 where id=$1", peer_id, body.evidence_id
+            )
+        except asyncpg.ForeignKeyViolationError as exc:
+            raise HTTPException(422, "evidence_id does not exist") from exc
+    changed = await set_peer_status(pool, peer_id, body.status, body.reason)
+    return {"peer": changed}
+
+
+@router.get("/holdings/{ticker}/peer-metrics", tags=["holdings"], response_model=None)
 async def peer_metrics(
     ticker: TickerPath,
     pool: Pool,
     _owner: Owner,
     as_of: Annotated[datetime | None, Query()] = None,
-):
+    reconciled_only: Annotated[
+        bool,
+        Query(
+            description="Use only facts a reconciliation check passed. Facts a check failed are "
+            "never used; unchecked facts are used and flagged unless this is set."
+        ),
+    ] = False,
+) -> dict[str, Any]:
     peers = await pool.fetch(
-        """select peer_ticker,basis,source,evidence_id from public.peer_set
-           where ticker=$1 and status='confirmed'
-             and ($2::timestamptz is null or known_at<=$2)
-             and (valid_from is null or valid_from<=coalesce($2::date,current_date))
-             and (valid_to is null or valid_to>=coalesce($2::date,current_date))
-           order by peer_ticker""",
+        f"""select p.peer_ticker,p.basis,p.source,p.evidence_id
+           from public.peer_set p
+           where p.ticker=$1 and {peer_status_as_of("p", "$2")}='confirmed'
+             and ($2::timestamptz is null or p.known_at<=$2)
+             and (p.valid_from is null or p.valid_from<=coalesce($2::date,current_date))
+             and (p.valid_to is null or p.valid_to>=coalesce($2::date,current_date))
+           order by p.peer_ticker""",  # noqa: S608 - status fragment is constant
         ticker,
         as_of,
     )
     peer_tickers = sorted({row["peer_ticker"] for row in peers})
     tickers = sorted(set(peer_tickers) | {ticker})
+    # jsonb arrives as text (no pool codec): `dimensions` and `validation` are decoded by
+    # `financial_peer_metrics`, which skips segment facts and failed reconciliations.
     facts = await pool.fetch(
-        """select ticker,concept,period_start,period_end,basis,value,unit,dimensions,known_at
+        """select ticker,concept,period_start,period_end,basis,value,unit,dimensions,known_at,
+                  validation,published
            from public.financial_statement_fact where ticker=any($1::text[])
              and value is not null and ($2::timestamptz is null or known_at<=$2)
            order by ticker,period_end,known_at,concept""",
         tickers,
         as_of,
     )
-    metrics = financial_peer_metrics([dict(row) for row in facts])
-    own_periods = metrics.get(ticker, {}).get("periods", [])
-    latest = own_periods[0] if own_periods else None
-    output = {}
-    metric_names = (
-        "revenue_growth",
-        "gross_margin",
-        "operating_margin",
-        "roic",
-        "net_debt_to_equity",
-        "free_cash_flow_conversion",
-    )
-    for name in metric_names:
-        comparable: list[tuple[str, Decimal | None, str]] = []
-        if latest:
-            comparable.append((ticker, latest.get(name), name))
-        for peer in peer_tickers:
-            peer_periods = metrics.get(peer, {}).get("periods", [])
-            peer_fact = (
-                next(
-                    (
-                        p
-                        for p in peer_periods
-                        if p["period_end"] == latest["period_end"] and p["basis"] == latest["basis"]
-                    ),
-                    None,
-                )
-                if latest
-                else None
-            )
-            comparable.append((peer, peer_fact.get(name) if peer_fact else None, name))
-        peer_mean = compatible_peer_mean(comparable[1:], metric=name)
-        output[name] = {
-            **peer_mean,
-            "holding_value": comparable[0][1] if comparable else None,
-            "period_end": latest["period_end"] if latest else None,
-            "basis": latest["basis"] if latest else None,
-        }
+    metrics = financial_peer_metrics([dict(row) for row in facts], reconciled_only=reconciled_only)
+    comparison = peer_comparison(ticker, peer_tickers, metrics)
     return {
         "ticker": ticker,
         "known_as_of": as_of,
         "confirmed_peers": [dict(row) for row in peers],
-        "covered_peer_metrics": output,
-        "formula_definitions": metrics.get(ticker, {}).get("formulas", {}),
+        "covered_peer_metrics": comparison["metrics"],
+        "excluded_peers": comparison["excluded_peers"],
+        "holding_period": comparison["holding_period"],
+        "reconciled_only": reconciled_only,
+        "formula_definitions": FORMULAS,
+        "formula_detail": FORMULA_DETAIL,
         "universe": (
             "owner-confirmed peers with compatible filed facts; not a global sector average"
         ),
@@ -704,182 +825,140 @@ class PriceDiagnostic(BaseModel):
     disagreements: int
     missing_days: int
     access_state: str
+    chosen: bool = False
+    expected_sessions: int = 0
+    calendar_basis: str | None = None
+    stale_sessions: int | None = None
 
 
 @router.get("/holdings/{ticker}/prices/diagnostics", tags=["holdings"])
 async def price_diagnostics(ticker: TickerPath, pool: Pool, _owner: Owner) -> list[PriceDiagnostic]:
-    rows = await pool.fetch(
-        """with bars as (
-             select b.* from public.price_bar b where b.symbol in
-               (select coalesce(price_symbol,t212_ticker) from public.instrument
-                 where t212_ticker=$1)
-           ), spans as (
-             select symbol,mic,bar_type,min(coalesce(session_date,date)) first_day,
-                    max(coalesce(session_date,date)) last_day from bars group by symbol,mic,bar_type
-           ), missing as (
-             select s.symbol,s.mic,s.bar_type,count(*)::int missing_days
-               from spans s join public.exchange_session x on x.mic=s.mic and x.confirmed
-                 and x.state in ('open','half_day')
-                 and x.session_date between s.first_day and s.last_day
-              where not exists(select 1 from bars b where b.symbol=s.symbol and b.mic=s.mic
-                and b.bar_type=s.bar_type and coalesce(b.session_date,b.date)=x.session_date)
-              group by s.symbol,s.mic,s.bar_type
-           ), disagreements as (
-             select a.symbol,a.mic,a.bar_type,a.date,count(distinct a.source)::int source_count
-               from bars a join bars b on b.symbol=a.symbol and b.date=a.date and b.source>a.source
-                and b.bar_type=a.bar_type and b.currency is not distinct from a.currency
-              where abs(a.close-b.close)/greatest(a.close,b.close) > 0.02
-              group by a.symbol,a.mic,a.bar_type,a.date
-           )
-           select b.symbol,b.source,b.mic,b.currency,b.quote_unit,b.bar_type,
-                  max(coalesce(b.session_date,b.date)) last_session,
-                  count(distinct coalesce(b.session_date,b.date))::int observed_sessions,
-                  (select count(*)::int from disagreements d where d.symbol=b.symbol
-                    and d.mic is not distinct from b.mic and d.bar_type=b.bar_type) disagreements,
-                  coalesce((select m.missing_days from missing m where m.symbol=b.symbol
-                    and m.mic is not distinct from b.mic and m.bar_type=b.bar_type),0) missing_days,
-                  b.access_state
-           from bars b group by b.symbol,b.source,b.mic,b.currency,b.quote_unit,b.bar_type,
-             b.access_state
-           order by last_session desc,b.source""",
-        ticker,
-    )
-    return [PriceDiagnostic(**dict(r)) for r in rows]
+    """One row per stored series of the holding (every source and bar type), joined through the
+    holding's provider symbols; the series readers serve is marked `chosen`. Missing days are
+    judged against the exchange's real session calendar."""
+    return [PriceDiagnostic(**row) for row in await holding_price_diagnostics(pool, ticker)]
 
 
-@router.get("/holdings/{ticker}/returns", tags=["holdings"])
+@router.get("/holdings/{ticker}/returns", tags=["holdings"], response_model=None)
 async def holding_returns(
     ticker: TickerPath,
     pool: Pool,
     _owner: Owner,
     start: Annotated[date, Query()],
     end: Annotated[date, Query()],
-):
-    """Return price and total return separately; total return requires verified action coverage."""
-    bars = await pool.fetch(
-        """select b.symbol,b.date,b.close,b.currency,b.source from public.price_bar b
-           where b.symbol in (select coalesce(price_symbol,t212_ticker) from public.instrument
-                              where t212_ticker=$1)
-             and b.date between $2 and $3 order by b.symbol,b.source,b.date""",
-        ticker,
-        start,
-        end,
+    withholding_rate: Annotated[Decimal, Query(ge=0, lt=1)] = Decimal(0),
+) -> dict[str, Any]:
+    """Raw price, adjusted price and total return of the holding's chosen series (the one every
+    reader serves). Computed on request and never written: the scheduled `returns_refresh` job
+    stores them. Total return needs raw closes, confirmed actions and owner-verified action
+    coverage; otherwise it is unavailable with the reason while the price returns stay."""
+    if end < start:
+        raise HTTPException(422, "end must not precede start")
+    profiles = await load_active(pool, "holding_profiles", HoldingProfilesConfig)
+    body = profiles.body if profiles else HoldingProfilesConfig()
+    symbols = (await holding_symbols(pool, [ticker], body))[ticker]
+    inputs = await return_inputs(pool, ticker, symbols, body)
+    if inputs is None:
+        return {
+            "ticker": ticker,
+            "known_as_of": end,
+            "results": [],
+            "reason": "no stored price series with a known quote currency",
+        }
+    out = await compute_for(
+        pool, inputs, start, end, store=False, withholding_rate=withholding_rate
     )
-    results = []
-    for symbol, source in sorted({(r["symbol"], r["source"]) for r in bars}):
-        source_rows = [r for r in bars if r["symbol"] == symbol and r["source"] == source]
-        currencies = {r["currency"] for r in source_rows}
-        if len(currencies) != 1 or None in currencies:
-            results.append(
-                {
-                    "symbol": symbol,
-                    "source": source,
-                    "currency": None,
-                    "price_return": None,
-                    "total_return": None,
-                    "reason": "missing or mixed quote currency",
-                }
-            )
-            continue
-        points = [
-            PricePoint(r["date"], Decimal(r["close"]), str(r["currency"])) for r in source_rows
-        ]
-        action_coverage = await pool.fetchrow(
-            """select state,latest_period from public.coverage_status
-               where provider='owner_review' and dataset='corporate_actions' and entity_key=$1
-               order by checked_at desc limit 1""",
-            symbol,
-        )
-        stored = await calculate_and_store_returns(
-            pool,
-            symbol=symbol,
-            start=start,
-            end=end,
-            source=source,
-            currency=str(next(iter(currencies))),
-            actions_complete=(
-                action_coverage is not None
-                and action_coverage["state"] == "available"
-                and action_coverage["latest_period"] is not None
-                and action_coverage["latest_period"] >= end
-            ),
-        )
-        total_return = stored["total_return"]
-        price_return = stored["price_adjusted"]
-        raw_price_return = stored["price_raw"]
-        results.append(
-            {
-                "symbol": symbol,
-                "source": source,
-                "currency": next(iter(currencies)),
-                "price_return": price_return,
-                "raw_price_return": raw_price_return,
-                "total_return": total_return,
-                "total_return_reason": stored["total_return_reason"],
-                "action_coverage": (
-                    action_coverage["state"]
-                    if action_coverage is not None
-                    and action_coverage["latest_period"] is not None
-                    and action_coverage["latest_period"] >= end
-                    else "incomplete"
-                ),
-                "observations": len(points),
-                "start": start,
-                "end": end,
-            }
-        )
-    return {"ticker": ticker, "known_as_of": end, "results": results}
+    coverage_ok = await actions_complete(pool, inputs.action_symbols, end)
+    result = {
+        "symbol": inputs.ref.symbol,
+        "source": inputs.ref.name,
+        "chosen": True,
+        "currency": inputs.currency,
+        "mic": inputs.mic,
+        "price_return": out["price_adjusted"],
+        "price_return_reason": out["price_adjusted_reason"],
+        "raw_price_return": out["price_raw"],
+        "total_return": out["total_return"],
+        "total_return_reason": out["total_return_reason"],
+        "action_coverage": "available" if coverage_ok else "incomplete",
+        "coverage": out["coverage"],
+        "expected_sessions": out["expected_sessions"],
+        "observed_sessions": out["observed_sessions"],
+        "calendar_basis": out["calendar_basis"],
+        "missing_actions": out["missing_actions"],
+        "observations": out["observed_sessions"],
+        "start": start,
+        "end": end,
+    }
+    return {"ticker": ticker, "known_as_of": end, "results": [result]}
 
 
-@router.get("/holdings/{ticker}/corporate-actions", tags=["holdings"])
-async def list_corporate_actions(ticker: TickerPath, pool: Pool, _owner: Owner):
+@router.get("/holdings/{ticker}/corporate-actions", tags=["holdings"], response_model=None)
+async def list_corporate_actions(
+    ticker: TickerPath, pool: Pool, _owner: Owner
+) -> list[dict[str, Any]]:
+    names = await _holding_symbol_names(pool, ticker)
     rows = await pool.fetch(
         """select id,symbol,action_type,ex_date,record_date,payment_date,ratio,cash_amount,
-                  currency,source,source_url,publisher_at,known_at,evidence_id,status,raw
-           from public.corporate_action where symbol in
-             (select coalesce(price_symbol,t212_ticker) from public.instrument where t212_ticker=$1)
+                  currency,source,source_url,publisher_at,known_at,evidence_id,status,raw,
+                  decided_at,decision_reason
+           from public.corporate_action where symbol = any($1::text[])
+              or listing_id in (select listing_id from public.instrument_security_link
+                                where ticker=$2 and listing_id is not null)
            order by ex_date desc,known_at desc""",
+        sorted(names),
         ticker,
     )
-    return [dict(r) for r in rows]
+    return decode_structured_rows(rows, ("raw",))
+
+
+async def _holding_symbol_names(pool: Pool, ticker: str) -> set[str]:
+    profiles = await load_active(pool, "holding_profiles", HoldingProfilesConfig)
+    body = profiles.body if profiles else HoldingProfilesConfig()
+    return await holding_symbol_names(pool, ticker, body)
 
 
 @router.post("/holdings/{ticker}/corporate-actions", tags=["holdings"])
 async def record_corporate_action(
     ticker: TickerPath, body: CorporateActionInput, pool: Pool, _owner: Owner
-) -> dict[str, int]:
-    """Record action evidence for one exact listing symbol."""
-    known = await pool.fetchval(
-        """select 1 from public.instrument where t212_ticker=$1
-           and coalesce(price_symbol,t212_ticker)=$2""",
-        ticker,
-        body.symbol,
-    )
-    if not known:
-        raise HTTPException(422, "symbol does not match this holding's configured price symbol")
+) -> dict[str, Any]:
+    """Record action evidence for one of the holding's listing symbols (the exchange ticker or
+    any provider symbol that prices it). An already decided action keeps its status: change it
+    through the decision route."""
+    if body.symbol not in await _holding_symbol_names(pool, ticker):
+        raise HTTPException(
+            422, "symbol does not match this holding's listing ticker or provider symbols"
+        )
     listing_id = await pool.fetchval(
-        """select l.id from public.instrument_security_link m
-           join public.security_listing l on l.id=m.listing_id
-           where m.ticker=$1 and m.status='confirmed' and l.ticker=$2""",
+        """select m.listing_id from public.instrument_security_link m
+           where m.ticker=$1 and m.status='confirmed' and m.listing_id is not null""",
         ticker,
-        body.symbol,
     )
     if listing_id is None:
-        raise HTTPException(422, "a confirmed canonical listing match is required")
-    action_id = await pool.fetchval(
+        raise HTTPException(
+            422,
+            "a confirmed canonical listing match is required "
+            "(derive it and confirm it on the holding's listing route)",
+        )
+    raw = {**body.raw, "per": body.per, "amount_basis": body.amount_basis}
+    row = await pool.fetchrow(
         """insert into public.corporate_action
            (listing_id,symbol,action_type,ex_date,record_date,payment_date,ratio,cash_amount,currency,
-            source,source_url,publisher_at,evidence_id,status,raw)
-           values($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15::jsonb)
+            source,source_url,publisher_at,evidence_id,status,raw,decided_at)
+           values($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15::jsonb,
+                  case when $14 in ('confirmed','rejected') then now() else null end)
            on conflict(listing_id,action_type,ex_date,source,source_url) do update set
              ratio=coalesce(excluded.ratio,corporate_action.ratio),
              cash_amount=coalesce(excluded.cash_amount,corporate_action.cash_amount),
              currency=coalesce(excluded.currency,corporate_action.currency),
              evidence_id=coalesce(excluded.evidence_id,corporate_action.evidence_id),
-             status=case when corporate_action.status='rejected' then 'rejected'
-                         when excluded.status='confirmed' then 'confirmed'
-                         else corporate_action.status end
-           returning id""",
+             raw=corporate_action.raw || excluded.raw,
+             status=case when corporate_action.status = 'suggested'
+                         then excluded.status else corporate_action.status end,
+             decided_at=case when corporate_action.status = 'suggested'
+                                  and excluded.status in ('confirmed','rejected')
+                             then now() else corporate_action.decided_at end
+           returning id,status,(status = $14) as applied""",
         listing_id,
         body.symbol,
         body.action_type,
@@ -894,18 +973,63 @@ async def record_corporate_action(
         body.publisher_at,
         body.evidence_id,
         body.status,
-        json.dumps(body.raw),
+        json.dumps(raw),
     )
-    return {"id": action_id}
+    assert row is not None
+    return {"id": row["id"], "status": row["status"], "status_applied": row["applied"]}
 
 
-@router.post("/holdings/{ticker}/corporate-actions/coverage", tags=["holdings"])
+@router.post(
+    "/holdings/{ticker}/corporate-actions/{action_id}/decision",
+    tags=["holdings"],
+    response_model=None,
+)
+async def decide_corporate_action(
+    ticker: TickerPath,
+    action_id: Annotated[int, Path(ge=1)],
+    body: CorporateActionDecision,
+    pool: Pool,
+    owner: Owner,
+) -> dict[str, Any]:
+    """Confirm, reject or retract (back to `suggested`) one recorded action. This is the only
+    way to change an action that already has a status; every decision keeps its reason and
+    time, and a confirmed action needs linked evidence."""
+    names = await _holding_symbol_names(pool, ticker)
+    current = await pool.fetchrow(
+        """select id,status,evidence_id,symbol,listing_id from public.corporate_action
+           where id=$1 and (symbol = any($2::text[]) or listing_id in
+             (select listing_id from public.instrument_security_link
+              where ticker=$3 and listing_id is not null))""",
+        action_id,
+        sorted(names),
+        ticker,
+    )
+    if current is None:
+        raise HTTPException(404, "corporate action not found for this holding")
+    evidence_id = body.evidence_id or current["evidence_id"]
+    if body.decision == "confirmed" and evidence_id is None:
+        raise HTTPException(422, "confirming an action requires linked source evidence")
+    await pool.execute(
+        """update public.corporate_action set status=$2, evidence_id=coalesce($3,evidence_id),
+             decided_at=now(), decided_by=$4::uuid, decision_reason=$5 where id=$1""",
+        action_id,
+        body.decision,
+        body.evidence_id,
+        owner.user_id,
+        body.reason,
+    )
+    return {"id": action_id, "previous_status": current["status"], "status": body.decision}
+
+
+@router.post(
+    "/holdings/{ticker}/corporate-actions/coverage", tags=["holdings"], response_model=None
+)
 async def confirm_action_coverage(
     ticker: TickerPath,
     body: CorporateActionCoverageInput,
     pool: Pool,
     _owner: Owner,
-):
+) -> dict[str, Any]:
     symbol = await pool.fetchval(
         """select coalesce(price_symbol,t212_ticker) from public.instrument
            where t212_ticker=$1""",
@@ -926,7 +1050,50 @@ async def confirm_action_coverage(
     return {"symbol": symbol, "covered_through": body.through, "state": "available"}
 
 
-@router.get("/holdings/{ticker}/financial-history", tags=["holdings"])
+@router.get("/holdings/{ticker}/listing", tags=["holdings"], response_model=None)
+async def holding_listing(ticker: TickerPath, pool: Pool, _owner: Owner) -> dict[str, Any]:
+    """The holding's derived canonical listing, the evidence it was matched on and the provider
+    symbols mapped to it."""
+    overview = await listing_overview(pool, ticker)
+    if overview is None:
+        raise HTTPException(404, "no listing derived for this holding yet")
+    return overview
+
+
+@router.post("/holdings/{ticker}/listing/derive", tags=["holdings"], response_model=None)
+async def derive_holding_listing(ticker: TickerPath, pool: Pool, _owner: Owner) -> dict[str, Any]:
+    """(Re)derive the holding's listing from the instrument, ESMA FIRDS and OpenFIGI. A link is
+    `confirmed` automatically only when all three agree; otherwise it is `suggested` and waits
+    for the owner. An owner decision is never overwritten."""
+    profiles = await load_active(pool, "holding_profiles", HoldingProfilesConfig)
+    results = await derive_listings(
+        pool, [ticker], profiles.body if profiles else HoldingProfilesConfig()
+    )
+    result = results[0]
+    return {
+        "ticker": ticker,
+        "status": result.status,
+        "listing_id": result.listing_id,
+        "reason": result.reason,
+        "score": result.score,
+    }
+
+
+@router.post("/holdings/{ticker}/listing/confirm", tags=["holdings"], response_model=None)
+async def confirm_holding_listing(
+    ticker: TickerPath, body: ListingDecision, pool: Pool, owner: Owner
+) -> dict[str, Any]:
+    """The owner confirms or rejects the holding's listing match. Confirmation is what lets
+    corporate actions be recorded and the EODHD/Alpha Vantage fallbacks run for the holding."""
+    try:
+        return await confirm_listing(
+            pool, ticker, body.decision, owner.user_id, body.reason, listing_id=body.listing_id
+        )
+    except ListingDecisionError as exc:
+        raise HTTPException(404 if exc.not_found else 422, str(exc)) from exc
+
+
+@router.get("/holdings/{ticker}/financial-history", tags=["holdings"], response_model=None)
 async def financial_history(
     ticker: TickerPath,
     pool: Pool,
@@ -934,29 +1101,28 @@ async def financial_history(
     as_of: Annotated[datetime | None, Query()] = None,
     statement: Literal["income", "cash_flow", "balance_sheet", "shares", "segment", "note"]
     | None = None,
-):
-    rows = await pool.fetch(
-        """select id,concept,label,statement,period_start,period_end,fiscal_period,basis,value,
-                  unit,currency,dimensions,source,source_url,published_at,known_at,revision,
-                  amends_fact_id,text_block,evidence_id,validation
-           from public.financial_statement_fact where ticker=$1
-             and ($2::timestamptz is null or known_at <= $2)
-             and ($3::text is null or statement=$3)
-           order by period_end desc,concept,known_at desc""",
-        ticker,
-        as_of,
-        statement,
+    line_item: Annotated[str | None, Query(max_length=80)] = None,
+    reconciled_only: Annotated[
+        bool, Query(description="Only facts a reconciliation check passed.")
+    ] = False,
+) -> list[dict[str, Any]]:
+    """Stored statement facts as known at `as_of`; every row says whether it was reconciled."""
+    return await financial_history_rows(
+        pool, ticker, as_of, statement, reconciled_only=reconciled_only, line_item=line_item
     )
-    return [dict(r) for r in rows]
 
 
-@router.post("/holdings/{ticker}/financial-history/alpha-vantage/{statement}", tags=["holdings"])
+@router.post(
+    "/holdings/{ticker}/financial-history/alpha-vantage/{statement}",
+    tags=["holdings"],
+    response_model=None,
+)
 async def refresh_alpha_vantage_statement(
     ticker: TickerPath,
     statement: Literal["INCOME_STATEMENT", "BALANCE_SHEET", "CASH_FLOW"],
     pool: Pool,
     _owner: Owner,
-):
+) -> dict[str, Any]:
     settings = get_settings()
     if not settings.alpha_vantage_api_key:
         raise HTTPException(409, "ALPHA_VANTAGE_API_KEY is not configured")
@@ -995,8 +1161,10 @@ async def refresh_alpha_vantage_statement(
     return {"ticker": ticker, "statement": statement, **result}
 
 
-@router.post("/holdings/{ticker}/financial-history/finnhub-research", tags=["holdings"])
-async def refresh_finnhub_research(ticker: TickerPath, pool: Pool, _owner: Owner):
+@router.post(
+    "/holdings/{ticker}/financial-history/finnhub-research", tags=["holdings"], response_model=None
+)
+async def refresh_finnhub_research(ticker: TickerPath, pool: Pool, _owner: Owner) -> dict[str, Any]:
     """Refresh free-gated peer candidates and reported quarterly EPS surprises."""
     settings = get_settings()
     if not settings.finnhub_api_key:
@@ -1029,29 +1197,28 @@ async def refresh_finnhub_research(ticker: TickerPath, pool: Pool, _owner: Owner
     return {"ticker": ticker, "symbol": symbol, **result}
 
 
-@router.get("/holdings/{ticker}/forward-data", tags=["holdings"])
+@router.get("/holdings/{ticker}/forward-data", tags=["holdings"], response_model=None)
 async def forward_data(
     ticker: TickerPath, pool: Pool, _owner: Owner, as_of: Annotated[datetime | None, Query()] = None
-):
-    rows = await pool.fetch(
-        """select id,kind,provider,metric,basis,fiscal_period,period_end,currency,value,low,high,
-                  analyst_count,vintage,published_at,known_at,source_url,evidence_id,raw
-           from public.forward_observation where ticker=$1
-             and ($2::timestamptz is null or known_at <= $2)
-           order by fiscal_period,metric,known_at desc""",
-        ticker,
-        as_of,
-    )
-    return [dict(r) for r in rows]
+) -> list[dict[str, Any]]:
+    return await forward_rows(pool, ticker, as_of)
 
 
-@router.post("/holdings/{ticker}/forward-data", tags=["holdings"])
+@router.get("/holdings/{ticker}/forward-data/consensus", tags=["holdings"], response_model=None)
+async def forward_consensus(
+    ticker: TickerPath, pool: Pool, _owner: Owner, as_of: Annotated[datetime | None, Query()] = None
+) -> dict[str, Any]:
+    """Forward observations with consensus series per provider, currency and basis."""
+    return await forward_payload(pool, ticker, as_of)
+
+
+@router.post("/holdings/{ticker}/forward-data", tags=["holdings"], response_model=None)
 async def record_forward_data(
     ticker: TickerPath,
     body: ForwardObservationInput,
     pool: Pool,
     _owner: Owner,
-):
+) -> dict[str, Any]:
     observation_id = await store_forward_value(
         pool,
         ForwardValue(
@@ -1077,32 +1244,94 @@ async def record_forward_data(
     return {"id": observation_id}
 
 
-@router.get("/holdings/{ticker}/issuer-ir-releases", tags=["holdings"])
+@router.get("/holdings/{ticker}/issuer-ir-releases", tags=["holdings"], response_model=None)
 async def issuer_ir_releases(
     ticker: TickerPath,
     pool: Pool,
     _owner: Owner,
     as_of: Annotated[datetime | None, Query()] = None,
-):
+) -> dict[str, Any]:
     rows = await pool.fetch(
         """select id,release_type,source_url,content_hash,document_version_id,published_at,
-                  known_at,parser_version,analyst_count,basis,status,metadata
+                  known_at,parser_version,analyst_count,basis,status,metadata,source_id,
+                  previous_release_id,content_type,byte_size,fetched_at
            from public.issuer_ir_release where ticker=$1
              and ($2::timestamptz is null or known_at<=$2)
            order by published_at desc nulls last,known_at desc""",
         ticker,
         as_of,
     )
-    return {"ticker": ticker, "known_as_of": as_of, "releases": [dict(row) for row in rows]}
+    return {
+        "ticker": ticker,
+        "known_as_of": as_of,
+        "releases": decode_rows(rows, ("metadata",)),
+    }
 
 
-@router.post("/holdings/{ticker}/issuer-ir-releases", tags=["holdings"])
+class IssuerIRSourceInput(BaseModel):
+    url: str = Field(pattern=r"^https://[^\s]{4,2000}$")
+    release_type: Literal["guidance", "consensus", "segment_consensus", "capital_return"]
+    basis: str | None = Field(default=None, max_length=120)
+    label: str | None = Field(default=None, max_length=200)
+    active: bool = True
+
+
+@router.get("/holdings/{ticker}/issuer-ir-sources", tags=["holdings"], response_model=None)
+async def issuer_ir_sources(ticker: TickerPath, pool: Pool, _owner: Owner) -> dict[str, Any]:
+    """The IR pages the `ir_releases` job polls for this holding, with their last outcome."""
+    rows = await pool.fetch(
+        """select id,url,release_type,basis,label,active,last_checked_at,last_changed_at,
+                  last_hash,last_status,last_error,created_at
+           from public.issuer_ir_source where ticker=$1 order by id""",
+        ticker,
+    )
+    return {"ticker": ticker, "sources": [dict(row) for row in rows]}
+
+
+@router.post("/holdings/{ticker}/issuer-ir-sources", tags=["holdings"], response_model=None)
+async def register_issuer_ir_source(
+    ticker: TickerPath, body: IssuerIRSourceInput, pool: Pool, _owner: Owner
+) -> dict[str, Any]:
+    """Register (or update) an IR page for the `ir_releases` job to fetch, version and parse."""
+    try:
+        assert_fetchable(body.url)
+    except IrError as exc:
+        raise HTTPException(422, str(exc)) from exc
+    source_id = await pool.fetchval(
+        """insert into public.issuer_ir_source (ticker,url,release_type,basis,label,active)
+           values($1,$2,$3,$4,$5,$6)
+           on conflict(ticker,url) do update set release_type=excluded.release_type,
+             basis=excluded.basis,label=excluded.label,active=excluded.active
+           returning id""",
+        ticker,
+        body.url,
+        body.release_type,
+        body.basis,
+        body.label,
+        body.active,
+    )
+    return {"id": source_id}
+
+
+@router.get("/holdings/{ticker}/actual-vs-consensus", tags=["holdings"], response_model=None)
+async def actual_vs_consensus_route(
+    ticker: TickerPath,
+    pool: Pool,
+    _owner: Owner,
+    metric: Annotated[str, Query(min_length=1, max_length=80)],
+    fiscal_period: Annotated[str, Query(pattern=r"^FY\d{4}(Q[1-4]|H[12]|M9)?$")],
+) -> dict[str, Any]:
+    """The reported figure of a fiscal period against the last consensus known before it."""
+    return await actual_vs_consensus(pool, ticker, metric, fiscal_period)
+
+
+@router.post("/holdings/{ticker}/issuer-ir-releases", tags=["holdings"], response_model=None)
 async def record_issuer_ir_release(
     ticker: TickerPath,
     body: IssuerIRReleaseInput,
     pool: Pool,
     _owner: Owner,
-):
+) -> dict[str, Any]:
     release_id = await pool.fetchval(
         """insert into public.issuer_ir_release
            (ticker,release_type,source_url,content_hash,document_version_id,published_at,
@@ -1115,7 +1344,7 @@ async def record_issuer_ir_release(
              parser_version=coalesce(excluded.parser_version,issuer_ir_release.parser_version),
              analyst_count=coalesce(excluded.analyst_count,issuer_ir_release.analyst_count),
              basis=coalesce(excluded.basis,issuer_ir_release.basis),status=excluded.status,
-             metadata=issuer_ir_release.metadata || excluded.metadata,known_at=now()
+             metadata=issuer_ir_release.metadata || excluded.metadata
            returning id""",
         ticker,
         body.release_type,
@@ -1132,263 +1361,215 @@ async def record_issuer_ir_release(
     return {"id": release_id}
 
 
-@router.post("/company-graph/edges", tags=["research"])
-async def record_company_edge(body: CompanyEdgeInput, pool: Pool, _owner: Owner):
-    edge_id = await store_company_edge(
-        pool,
-        subject_key=body.subject_key,
-        object_key=body.object_key,
-        object_name=body.object_name,
-        edge_type=body.edge_type,
-        direction=body.direction,
-        source=body.source,
-        source_url=body.source_url,
-        evidence_tier=body.evidence_tier,
-        status=body.status,
-        valid_from=body.valid_from,
-        valid_to=body.valid_to,
-        evidence_id=body.evidence_id,
-        passage=body.passage,
-        detail=body.detail,
+@router.post("/company-graph/edges", tags=["research"], response_model=None)
+async def record_company_edge(body: CompanyEdgeInput, pool: Pool, _owner: Owner) -> dict[str, Any]:
+    """Suggest (or, with primary evidence and a passage, confirm) an edge. A re-sync never
+    changes a decided edge; move one with POST /company-graph/edges/{id}/decision."""
+    try:
+        edge_id = await store_company_edge(
+            pool,
+            subject_key=body.subject_key,
+            object_key=body.object_key,
+            object_name=body.object_name,
+            edge_type=body.edge_type,
+            direction=body.direction,
+            source=body.source,
+            source_url=body.source_url,
+            status=body.status,
+            valid_from=body.valid_from,
+            valid_to=body.valid_to,
+            evidence_id=body.evidence_id,
+            passage=body.passage,
+            detail=body.detail,
+        )
+    except (ValueError, GraphDecisionError) as exc:
+        raise HTTPException(422, str(exc)) from exc
+    status = await pool.fetchval(
+        "select status from public.company_graph_edge where id=$1", edge_id
     )
-    return {"id": edge_id}
+    return {"id": edge_id, "status": status}
 
 
-@router.post("/holdings/{ticker}/company-events", tags=["holdings"])
+@router.post("/holdings/{ticker}/company-events", tags=["holdings"], response_model=None)
 async def record_company_event(
     ticker: TickerPath,
     body: CompanyEventInput,
     pool: Pool,
     _owner: Owner,
-):
-    event_id = await pool.fetchval(
-        """insert into public.company_event
-           (ticker,event_type,event_state,announced_at,effective_at,known_at,source,source_url,
-            evidence_id,counterparty_key,terms,status,thesis_kpi,detail)
-           values($1,$2,$3,$4,$5,now(),$6,$7,$8,$9,$10::jsonb,$11,$12,$13::jsonb)
-           on conflict(ticker,event_type,source_url,event_state) do update set
-             announced_at=coalesce(excluded.announced_at,company_event.announced_at),
-             effective_at=coalesce(excluded.effective_at,company_event.effective_at),
-             evidence_id=coalesce(excluded.evidence_id,company_event.evidence_id),
-             counterparty_key=coalesce(excluded.counterparty_key,company_event.counterparty_key),
-             terms=company_event.terms || excluded.terms,
-             status=case when company_event.status in ('rejected','confirmed')
-                         then company_event.status else excluded.status end,
-             thesis_kpi=coalesce(excluded.thesis_kpi,company_event.thesis_kpi),
-             detail=company_event.detail || excluded.detail,known_at=now()
-           returning id""",
-        ticker,
-        body.event_type,
-        body.event_state,
-        body.announced_at,
-        body.effective_at,
-        body.source,
-        body.source_url,
-        body.evidence_id,
-        body.counterparty_key,
-        json.dumps(body.terms),
-        body.status,
-        body.thesis_kpi,
-        json.dumps(body.detail),
-    )
+) -> dict[str, Any]:
+    """Record one event state. Deals and financings go through the deal state machine (invalid
+    transitions are refused); a confirmed event needs linked primary evidence; a decided event
+    is only changed by POST /holdings/{ticker}/company-events/{id}/decision."""
+    try:
+        await validate_thesis_kpi(pool, ticker, body.thesis_kpi)
+        if body.event_type in {"deal", "financing"}:
+            if body.event_state == "unknown":
+                raise ValueError("a deal or financing needs a known state")
+            key = (
+                body.detail.get("deal_key")
+                if isinstance(body.detail.get("deal_key"), str)
+                else None
+            )
+            counterparty = body.counterparty_key or body.source_url
+            event_id = await record_deal_event(
+                pool,
+                ticker=ticker,
+                event_type=body.event_type,
+                key=str(key or deal_key(ticker, body.event_type, counterparty)),
+                state=body.event_state,
+                source=body.source,
+                source_url=body.source_url,
+                announced_at=body.announced_at,
+                effective_at=body.effective_at,
+                counterparty=body.counterparty_key,
+                terms=body.terms,
+                evidence_id=body.evidence_id,
+                status=body.status,
+                thesis_kpi=body.thesis_kpi,
+                detail=body.detail,
+            )
+        else:
+            event_id = await upsert_event(
+                pool,
+                ticker=ticker,
+                event_type=body.event_type,
+                event_state=body.event_state,
+                source=body.source,
+                source_url=body.source_url,
+                status=body.status,
+                announced_at=body.announced_at,
+                effective_at=body.effective_at,
+                evidence_id=body.evidence_id,
+                counterparty_key=body.counterparty_key,
+                terms=body.terms,
+                thesis_kpi=body.thesis_kpi,
+                detail=body.detail,
+            )
+    except DealTransitionError as exc:
+        raise HTTPException(409, str(exc)) from exc
+    except (ValueError, GraphDecisionError) as exc:
+        raise HTTPException(422, str(exc)) from exc
     return {"id": event_id}
 
 
-@router.post("/holdings/{ticker}/patent-families", tags=["holdings"])
+@router.post("/holdings/{ticker}/patent-families", tags=["holdings"], response_model=None)
 async def record_patent_family(
     ticker: TickerPath,
     body: PatentFamilyInput,
     pool: Pool,
     _owner: Owner,
-):
-    family_id = await store_patent_family(
-        pool,
-        family_key=body.family_key,
-        priority_date=body.priority_date,
-        title=body.title,
-        cpc_codes=body.cpc_codes,
-        jurisdictions=body.jurisdictions,
-        forward_citations=body.forward_citations,
-        backward_citations=body.backward_citations,
-        legal_status=body.legal_status,
-        source=body.source,
-        source_url=body.source_url,
-        ticker=ticker,
-        applicant=body.applicant,
-        ownership_confidence=body.ownership_confidence,
-        ownership_basis=body.ownership_basis,
-        ownership_valid_from=body.ownership_valid_from,
-        evidence_id=body.evidence_id,
-        raw=body.raw,
-    )
+) -> dict[str, Any]:
+    try:
+        family_id = await _store_patent(
+            pool,
+            family_key=body.family_key,
+            priority_date=body.priority_date,
+            title=body.title,
+            cpc_codes=body.cpc_codes,
+            jurisdictions=body.jurisdictions,
+            forward_citations=body.forward_citations,
+            backward_citations=body.backward_citations,
+            legal_status=body.legal_status,
+            source=body.source,
+            source_url=body.source_url,
+            ticker=ticker,
+            applicant=body.applicant,
+            ownership_confidence=body.ownership_confidence,
+            ownership_basis=body.ownership_basis,
+            ownership_valid_from=body.ownership_valid_from,
+            evidence_id=body.evidence_id,
+            raw=body.raw,
+        )
+    except ValueError as exc:
+        raise HTTPException(422, str(exc)) from exc
     return {"family_id": family_id}
 
 
-@router.get("/holdings/{ticker}/business-network", tags=["holdings"])
+@router.get("/holdings/{ticker}/business-network", tags=["holdings"], response_model=None)
 async def business_network(
     ticker: TickerPath, pool: Pool, _owner: Owner, as_of: Annotated[datetime | None, Query()] = None
-):
-    edges = await pool.fetch(
-        """select id,subject_key,object_key,object_name,edge_type,direction,status,valid_from,
-                  valid_to,evidence_tier,source,source_url,evidence_id,passage,known_at,
-                  decision_reason,detail from public.company_graph_edge
-           where subject_key=$1 and ($2::timestamptz is null or known_at <= $2)
-             and (valid_from is null or valid_from<=coalesce($2::date,current_date))
-             and (valid_to is null or valid_to>=coalesce($2::date,current_date))
-           order by known_at desc,id""",
-        ticker,
-        as_of,
-    )
-    legacy_edges = await pool.fetch(
-        """select id,object_key,object_name,type,source,source_ref,as_of,status,detail
-           from public.entity_relationship where ticker=$1
-             and ($2::date is null or as_of is null or as_of <= $2::date)
-           order by as_of desc nulls last,id""",
-        ticker,
-        as_of,
-    )
-    events = await pool.fetch(
-        """select id,event_type,event_state,announced_at,effective_at,known_at,source,source_url,
-                  evidence_id,counterparty_key,terms,status,thesis_kpi,detail
-           from public.company_event where ticker=$1 and ($2::timestamptz is null or known_at <= $2)
-           order by coalesce(effective_at,announced_at) desc nulls last,id""",
-        ticker,
-        as_of,
-    )
-    patents = await pool.fetch(
-        """select p.family_key,p.priority_date,p.first_publication_date,p.family_title,p.cpc_codes,
-                  p.jurisdictions,p.citations_forward,p.citations_backward,p.legal_status,p.source,
-                  p.source_url,p.known_at,o.applicant,o.ownership_confidence,o.ownership_basis,
-                  o.valid_from ownership_valid_from,o.valid_to ownership_valid_to,o.evidence_id
-           from public.patent_family p join public.patent_family_owner o on o.family_id=p.id
-           where o.ticker=$1
-             and ($2::timestamptz is null or p.known_at <= $2)
-           order by p.priority_date desc nulls last,p.family_key""",
-        ticker,
-        as_of,
-    )
-    disclosures = await pool.fetch(
-        """select id,relationship,direction,counterparty_key,counterparty_name,
-                  anonymous_counterparty,reported_share,share_basis,fiscal_period,valid_from,
-                  valid_to,evidence_id,passage,source_url,source,status,decision_reason,known_at
-           from public.relationship_disclosure where ticker=$1
-             and ($2::timestamptz is null or known_at <= $2)
-           order by fiscal_period desc nulls last,known_at desc""",
-        ticker,
-        as_of,
-    )
-    normalized_edges = [dict(r) for r in edges]
-    normalized_edges.extend(
-        {
-            "id": f"legacy:{r['id']}",
-            "subject_key": ticker,
-            "object_key": r["object_key"],
-            "object_name": r["object_name"],
-            "edge_type": r["type"],
-            "direction": "outgoing",
-            "status": r["status"],
-            "valid_from": r["as_of"],
-            "valid_to": None,
-            "evidence_tier": "primary" if r["source"] == "gleif" else "candidate",
-            "source": r["source"],
-            "source_url": r["source_ref"],
-            "evidence_id": None,
-            "passage": None,
-            "known_at": None,
-            "decision_reason": None,
-            "detail": r["detail"],
-        }
-        for r in legacy_edges
-    )
-    return {
-        "ticker": ticker,
-        "known_as_of": as_of,
-        "edges": normalized_edges,
-        "events": [dict(r) for r in events],
-        "disclosures": [dict(r) for r in disclosures],
-        "patents": [dict(r) for r in patents],
-        "limitations": [
-            "Suggested and disputed edges are candidates, not verified facts.",
-            "Patent counts and citations are signals, not patent valuation or FTO advice.",
-        ],
-    }
+) -> dict[str, Any]:
+    payload = await business_network_payload(pool, ticker, as_of)
+    # jsonb columns arrive as text (no pool codec); `decode_structured` is idempotent.
+    for key, columns in (("edges", ("detail",)), ("events", ("terms", "detail", "thesis_kpi"))):
+        payload[key] = decode_structured_rows(payload.get(key, []), columns)
+    return payload
 
 
 @router.post("/holdings/{ticker}/relationship-disclosures", tags=["holdings"])
 async def record_relationship_review(
     ticker: TickerPath, body: RelationshipReview, pool: Pool, _owner: Owner
 ) -> dict[str, int]:
-    """Record an evidence-passage review. Only confirmed, dated records feed concentration."""
-    row_id = await pool.fetchval(
-        """insert into public.relationship_disclosure
-           (ticker,relationship,direction,counterparty_key,counterparty_name,anonymous_counterparty,
-            reported_share,share_basis,fiscal_period,valid_from,valid_to,evidence_id,passage,
-            source_url,source,status,decision_reason,decided_at)
-           values($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,
-                  case when $16 in ('confirmed','rejected') then now() else null end)
-           returning id""",
-        ticker,
-        body.relationship,
-        body.direction,
-        body.counterparty_key,
-        body.counterparty_name,
-        body.anonymous_counterparty,
-        body.reported_share,
-        body.share_basis,
-        body.fiscal_period,
-        body.valid_from,
-        body.valid_to,
-        body.evidence_id,
-        body.passage,
-        body.source_url,
-        body.source,
-        body.status,
-        body.decision_reason,
-    )
+    """Record an evidence-passage review. Re-posting the same passage updates it instead of
+    duplicating it. A non-suggested `status` is an owner decision and goes through the
+    transition rules (a confirmed disclosure can be rejected or disputed here)."""
+    try:
+        row_id = await upsert_disclosure(
+            pool,
+            ticker=ticker,
+            relationship=body.relationship,
+            direction=body.direction,
+            passage=body.passage,
+            source_url=body.source_url,
+            source=body.source,
+            counterparty_key=body.counterparty_key,
+            counterparty_name=body.counterparty_name,
+            anonymous_counterparty=body.anonymous_counterparty,
+            reported_share=body.reported_share,
+            share_basis=body.share_basis,
+            fiscal_period=body.fiscal_period,
+            valid_from=body.valid_from,
+            valid_to=body.valid_to,
+            evidence_id=body.evidence_id,
+            status="suggested",
+            origin="owner_review",
+        )
+        current = await pool.fetchval(
+            "select status from public.relationship_disclosure where id=$1", row_id
+        )
+        wanted = {"confirmed": "confirm", "rejected": "reject", "disputed": "dispute"}.get(
+            body.status
+        )
+        if wanted and current != body.status:
+            await decide_disclosure(
+                pool,
+                row_id,
+                wanted,  # type: ignore[arg-type]
+                reason=body.decision_reason or "owner review",
+            )
+        await detect_contradictions(pool, row_id)
+    except GraphDecisionError as exc:
+        raise HTTPException(409, str(exc)) from exc
+    except ValueError as exc:
+        raise HTTPException(422, str(exc)) from exc
     return {"id": row_id}
 
 
-@router.get("/holdings/{ticker}/customer-supplier-concentration", tags=["holdings"])
+@router.get(
+    "/holdings/{ticker}/customer-supplier-concentration", tags=["holdings"], response_model=None
+)
 async def relationship_concentration(
     ticker: TickerPath,
     pool: Pool,
     _owner: Owner,
     as_of: Annotated[datetime | None, Query()] = None,
-):
-    rows = await pool.fetch(
-        """select fiscal_period,relationship,count(*)::int disclosed_counterparties,
-                  count(*) filter(where anonymous_counterparty)::int anonymous_count,
-                  sum(reported_share) filter(where reported_share is not null) reported_share_sum,
-                  count(*) filter(where reported_share is null)::int missing_share_count
-           from public.relationship_disclosure where ticker=$1 and status='confirmed'
-             and valid_from is not null and fiscal_period is not null
-             and (valid_to is null or valid_to>=coalesce($2::date,current_date))
-             and valid_from<=coalesce($2::date,current_date)
-             and ($2::timestamptz is null or known_at<=$2)
-           group by fiscal_period,relationship
-           order by fiscal_period desc nulls last,relationship""",
-        ticker,
-        as_of,
-    )
+) -> dict[str, Any]:
+    periods = await concentration(pool, ticker, as_of)
+    for row in periods:
+        row["disclosed_counterparties"] = row["named_count"] + row["anonymous_count"]
     return {
         "ticker": ticker,
-        "periods": [dict(r) for r in rows],
+        "periods": periods,
         "limitations": [
-            "Only owner-confirmed, dated disclosures are included.",
-            "Reported shares are not imputed for anonymous or unnamed counterparties.",
+            "Only owner-confirmed, dated disclosures with a known direction are included.",
+            "Only shares reported against the issuer's own revenue or purchases count; a share of"
+            " another filer's revenue is that filer's concentration, not this holding's.",
+            "Anonymous counterparties keep their reported share but are never merged with named"
+            " ones; shares are not imputed where none was reported.",
         ],
     }
 
 
-@router.get("/holdings/{ticker}/patent-trends", tags=["holdings"])
-async def patent_trends(ticker: TickerPath, pool: Pool, _owner: Owner):
-    rows = await pool.fetch(
-        """select p.family_key,p.priority_date,p.cpc_codes,p.citations_forward
-           from public.patent_family p join public.patent_family_owner o on o.family_id=p.id
-           where o.ticker=$1 and (o.ownership_basis='direct' or
-             (o.ownership_basis='dated_subsidiary_path' and o.valid_from is not null))""",
-        ticker,
-    )
-    from steward.market_analysis import patent_trend
-
-    return patent_trend([dict(r) for r in rows])
+@router.get("/holdings/{ticker}/patent-trends", tags=["holdings"], response_model=None)
+async def patent_trends(ticker: TickerPath, pool: Pool, _owner: Owner) -> list[dict[str, Any]]:
+    return await patent_trend_rows(pool, ticker)

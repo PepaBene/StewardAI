@@ -277,6 +277,7 @@ def daily_bars(chart: YahooChart, now: dt.datetime) -> list[PriceBar]:
                 low=bar.low,
                 close=bar.close,
                 volume=bar.volume,
+                source_timestamp=bar.ts,
             )
         )
     # One bar per day (Yahoo can repeat the last day as a live point).

@@ -1,5 +1,7 @@
+import ipaddress
 import os
 import secrets
+import socket
 from collections.abc import AsyncIterator, Iterator
 from dataclasses import dataclass
 from pathlib import Path
@@ -25,13 +27,125 @@ CHANNEL_ENV = (
 
 @pytest.fixture(autouse=True)
 def _no_channel_credentials(monkeypatch: pytest.MonkeyPatch) -> Iterator[None]:
-    from steward.settings import get_settings
+    from steward.settings import Settings, get_settings
 
     for name in CHANNEL_ENV:
         monkeypatch.delenv(name, raising=False)
+    # The developer's repo-level .env must not feed Settings during tests (B49).  Tests that
+    # want a value pass it explicitly or set the environment variable.
+    monkeypatch.setitem(Settings.model_config, "env_file", None)
     get_settings.cache_clear()
     yield
     get_settings.cache_clear()
+
+
+# ---------------------------------------------------------------------------------------
+# Offline guard (plan D8.1): CI must never need third-party keys or the internet. Any
+# attempt to open a socket to a non-local address fails the test that made it. Loopback and
+# unix sockets (the test Postgres, in-process ASGI) stay allowed. Set STEWARD_ALLOW_NETWORK=1
+# for an explicit, budgeted live check run by hand.
+# ---------------------------------------------------------------------------------------
+class NetworkAccessBlocked(BaseException):
+    """Raised by the offline guard.
+
+    A BaseException on purpose: adapters and collectors commonly wrap provider calls in
+    `except Exception` and turn the failure into a typed "temporarily failed" result, which
+    would silently hide a test that reached the real network.  `except Exception` cannot catch
+    this; only `pytest.raises(NetworkAccessBlocked)` or `except BaseException` can."""
+
+
+def _is_local_host(host: object) -> bool:
+    if isinstance(host, bytes):
+        host = host.decode(errors="replace")
+    if not isinstance(host, str) or host in {"", "localhost", "localhost.localdomain"}:
+        return True
+    try:
+        return ipaddress.ip_address(host.split("%", 1)[0]).is_loopback
+    except ValueError:
+        return False
+
+
+def _blocked(host: object) -> NetworkAccessBlocked:
+    return NetworkAccessBlocked(
+        f"test attempted real network access to {host!r}; use recorded fixtures "
+        "(httpx.MockTransport) - CI must not need the internet or provider keys"
+    )
+
+
+# Credentials and connection strings of the developer's real accounts: tests must neither read
+# nor use them (a stray DATABASE_URL would make "unconfigured" API paths dial a real database).
+PROVIDER_KEY_ENV = (
+    "DATABASE_URL",
+    "SUPABASE_SECRET_KEY",
+    "SUPABASE_JWT_SECRET",
+    "T212_API_KEY",
+    "T212_API_SECRET",
+    "ANTHROPIC_API_KEY",
+    "FINNHUB_API_KEY",
+    "ALPHA_VANTAGE_API_KEY",
+    "EODHD_API_KEY",
+    "FMP_API_KEY",
+    "TWELVE_DATA_API_KEY",
+    "UN_COMTRADE_API_KEY",
+    "PEOPLE_DATA_LABS_API_KEY",
+    "DIFFBOT_API_KEY",
+    "EPO_OPS_CLIENT_ID",
+    "EPO_OPS_CLIENT_SECRET",
+    "FRED_API_KEY",
+    "OPENFIGI_API_KEY",
+    "STOOQ_API_KEY",
+)
+
+
+# A configured proxy (even a loopback one) can carry a request to the real internet, and the
+# guard only sees the loopback connect.  Clear every spelling.
+PROXY_ENV = (
+    "HTTP_PROXY",
+    "HTTPS_PROXY",
+    "ALL_PROXY",
+    "NO_PROXY",
+    "http_proxy",
+    "https_proxy",
+    "all_proxy",
+    "no_proxy",
+    "REQUESTS_CA_BUNDLE",
+    "SSL_CERT_FILE",
+    "CURL_CA_BUNDLE",
+)
+
+
+@pytest.fixture(autouse=True)
+def _no_real_network(monkeypatch: pytest.MonkeyPatch) -> Iterator[None]:
+    if os.environ.get("STEWARD_ALLOW_NETWORK") == "1":
+        yield
+        return
+    for name in PROVIDER_KEY_ENV + PROXY_ENV:
+        monkeypatch.delenv(name, raising=False)
+    real_connect = socket.socket.connect
+    real_connect_ex = socket.socket.connect_ex
+    real_getaddrinfo = socket.getaddrinfo
+
+    def guarded_connect(self: socket.socket, address: object) -> None:
+        if self.family in (socket.AF_INET, socket.AF_INET6) and isinstance(address, tuple):
+            if not _is_local_host(address[0]):
+                raise _blocked(address[0])
+        real_connect(self, address)  # type: ignore[arg-type]
+
+    def guarded_connect_ex(self: socket.socket, address: object) -> int:
+        if self.family in (socket.AF_INET, socket.AF_INET6) and isinstance(address, tuple):
+            if not _is_local_host(address[0]):
+                raise _blocked(address[0])
+        return real_connect_ex(self, address)  # type: ignore[arg-type]
+
+    def guarded_getaddrinfo(host: object, *args: object, **kwargs: object) -> object:
+        if not _is_local_host(host):
+            raise _blocked(host)
+        return real_getaddrinfo(host, *args, **kwargs)  # type: ignore[arg-type]
+
+    monkeypatch.setattr(socket.socket, "connect", guarded_connect)
+    monkeypatch.setattr(socket.socket, "connect_ex", guarded_connect_ex)
+    monkeypatch.setattr(socket, "getaddrinfo", guarded_getaddrinfo)
+    yield
 
 
 @dataclass(frozen=True)

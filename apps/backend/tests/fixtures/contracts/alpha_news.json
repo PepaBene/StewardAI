@@ -1,0 +1,19 @@
+{
+ "feed": [
+  {
+   "summary": "s",
+   "ticker_sentiment": [
+    {
+     "relevance_score": "0.91",
+     "ticker": "AAA",
+     "ticker_sentiment_label": "Bullish",
+     "ticker_sentiment_score": "0.4"
+    }
+   ],
+   "time_published": "20260930T140000",
+   "title": "AAA update",
+   "url": "https://pub.example/a"
+  }
+ ],
+ "items": "1"
+}

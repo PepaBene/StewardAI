@@ -1,0 +1,10 @@
+FORM 8-K
+Example Corp
+
+Item 1.01 Entry into a Material Definitive Agreement.
+
+On November 2, 2026, Example Corp entered into a Credit Agreement with a syndicate of banks providing for a $2.5 billion revolving credit facility maturing in 2031.
+
+Item 2.03 Creation of a Direct Financial Obligation or an Obligation under an Off-Balance Sheet Arrangement of a Registrant.
+
+The information set forth under Item 1.01 is incorporated herein by reference. The Company drew $1.0 billion term loan under the Credit Agreement on November 2, 2026.

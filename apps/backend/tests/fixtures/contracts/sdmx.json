@@ -1,0 +1,35 @@
+{
+ "data": {
+  "dataSets": [
+   {
+    "observations": {
+     "0": [
+      2.5
+     ],
+     "1": [
+      2.7
+     ]
+    }
+   }
+  ],
+  "structures": [
+   {
+    "dimensions": {
+     "observation": [
+      {
+       "id": "TIME_PERIOD",
+       "values": [
+        {
+         "id": "2025-Q1"
+        },
+        {
+         "id": "2025-Q2"
+        }
+       ]
+      }
+     ]
+    }
+   }
+  ]
+ }
+}

@@ -7,6 +7,7 @@ import hashlib
 import json
 import time
 from dataclasses import dataclass
+from decimal import Decimal
 from typing import Any
 
 import httpx
@@ -16,8 +17,20 @@ from steward.config.jobs import JobsConfig
 from steward.config.store import load_active
 from steward.jobs.runner import JobContext
 from steward.settings import Settings, get_settings
-from steward.sources.base import AccessResult, AccessState, access_from_http, retry_after_at
-from steward.sources.governor import Budget, PostgresRequestGovernor, QuotaExceeded
+from steward.sources.base import (
+    AccessResult,
+    AccessState,
+    access_from_http,
+    quota_denial_text,
+    retry_after_at,
+)
+from steward.sources.governor import (
+    Budget,
+    HardBlocked,
+    PostgresRequestGovernor,
+    QuotaExceeded,
+    RetryPending,
+)
 from steward.sources.store import record_access
 
 
@@ -33,9 +46,18 @@ class Probe:
     auth_secret: str | None = None
 
 
+def _dec(value: int | None) -> Decimal | None:
+    return None if value is None else Decimal(value)
+
+
 def classify_probe(status: int, body: Any, expected_symbol: str | None = None) -> AccessResult:
     text = str(body).casefold()
-    paid = any(word in text for word in ("premium", "upgrade", "subscription required"))
+    # An exhausted allowance is not a plan boundary, even when the message also says "upgrade"
+    # or "premium" (Alpha Vantage's daily-limit notice does): quota is checked first (B8/B36).
+    quota = quota_denial_text(text)
+    paid = not quota and any(
+        word in text for word in ("premium", "upgrade", "subscription required")
+    )
     if status == 200 and isinstance(body, dict):
         message = (
             " ".join(
@@ -46,10 +68,10 @@ def classify_probe(status: int, body: Any, expected_symbol: str | None = None) -
             .casefold()
         )
         if message:
+            if quota_denial_text(message):
+                return AccessResult(AccessState.QUOTA_EXHAUSTED, "provider rate or quota limit")
             if any(word in message for word in ("premium", "upgrade", "subscription required")):
                 return AccessResult(AccessState.PAID_ONLY, "provider reports a paid-tier endpoint")
-            if any(word in message for word in ("call frequency", "rate limit", "quota exceeded")):
-                return AccessResult(AccessState.QUOTA_EXHAUSTED, "provider rate or quota limit")
             if any(
                 word in message for word in ("invalid api key", "apikey is invalid", "unauthorized")
             ):
@@ -60,7 +82,10 @@ def classify_probe(status: int, body: Any, expected_symbol: str | None = None) -
                 AccessState.TEMPORARILY_FAILED, "provider returned an error response"
             )
     result = access_from_http(
-        status, has_rows=body not in ({}, [], None, ""), paid_tier_denial=paid
+        status,
+        has_rows=body not in ({}, [], None, ""),
+        paid_tier_denial=paid,
+        quota_denial=quota,
     )
     if result.state == AccessState.AVAILABLE and expected_symbol:
         item = body[0] if isinstance(body, list) and body and isinstance(body[0], dict) else body
@@ -364,8 +389,12 @@ async def run_source_audit(ctx: JobContext, http: httpx.AsyncClient, settings: S
             ):
                 step.detail.update(state=gate["state"], skipped="same credential is hard-blocked")
                 continue
+            # A changed credential lifts a hard block so the endpoint is re-probed (B1); an
+            # unchanged one keeps it (the skip above).
             await ctx.pool.execute(
-                """update public.provider_access set configuration_hash=$3
+                """update public.provider_access set configuration_hash=$3,
+                     hard_blocked=case when configuration_hash is distinct from $3
+                                       then false else hard_blocked end
                    where provider=$1 and endpoint=$2""",
                 probe.provider,
                 probe.endpoint,
@@ -377,7 +406,9 @@ async def run_source_audit(ctx: JobContext, http: httpx.AsyncClient, settings: S
                 or (probe.provider == "epo_ops" and (not probe.credential or not probe.auth_secret))
             ):
                 result = AccessResult(AccessState.ACCESS_UNVERIFIED, "credential not configured")
-                await record_access(ctx.pool, probe.provider, probe.endpoint, result)
+                await record_access(
+                    ctx.pool, probe.provider, probe.endpoint, result, job_id=ctx.job_id
+                )
                 step.detail["state"] = result.state
                 continue
             provider_settings = jobs.providers[probe.provider]
@@ -386,22 +417,33 @@ async def run_source_audit(ctx: JobContext, http: httpx.AsyncClient, settings: S
                     await governor.reserve(
                         "alpha_vantage",
                         "account_free",
-                        1,
-                        Budget(daily=25),
+                        Decimal(1),
+                        Budget(daily=Decimal(25)),
+                        job_id=ctx.job_id,
                     )
                 await governor.reserve(
                     probe.provider,
                     probe.endpoint,
-                    1,
+                    Decimal(1),
                     Budget(
-                        daily=provider_settings.daily_quota,
-                        monthly=provider_settings.monthly_quota,
-                        reserve=provider_settings.reserve_credits,
+                        daily=_dec(provider_settings.daily_quota),
+                        monthly=_dec(provider_settings.monthly_quota),
+                        reserve=Decimal(provider_settings.reserve_credits),
                     ),
+                    job_id=ctx.job_id,
                 )
+            except HardBlocked as exc:
+                # Not a quota state: report it as the block it is and leave the verdict alone.
+                step.detail.update(skipped=str(exc), hard_blocked=True)
+                continue
+            except RetryPending as exc:
+                step.detail.update(skipped=str(exc), retry_at=exc.retry_at)
+                continue
             except QuotaExceeded as exc:
                 result = AccessResult(AccessState.QUOTA_EXHAUSTED, str(exc))
-                await record_access(ctx.pool, probe.provider, probe.endpoint, result)
+                await record_access(
+                    ctx.pool, probe.provider, probe.endpoint, result, job_id=ctx.job_id
+                )
                 step.detail.update(state=result.state, skipped="free request budget exhausted")
                 continue
             params = dict(probe.params)
@@ -423,7 +465,7 @@ async def run_source_audit(ctx: JobContext, http: httpx.AsyncClient, settings: S
                 except ValueError:
                     body = response.text[:2000]
                 result = classify_probe(response.status_code, body, probe.expected_symbol)
-                if response.status_code == 429:
+                if result.state in (AccessState.QUOTA_EXHAUSTED, AccessState.TEMPORARILY_FAILED):
                     result = AccessResult(
                         result.state,
                         result.detail,
@@ -440,6 +482,7 @@ async def run_source_audit(ctx: JobContext, http: httpx.AsyncClient, settings: S
                     elapsed_ms=elapsed,
                     response_bytes=len(response.content),
                     credits=1,
+                    job_id=ctx.job_id,
                 )
                 response_item = (
                     body[0]
@@ -484,7 +527,9 @@ async def run_source_audit(ctx: JobContext, http: httpx.AsyncClient, settings: S
                 )
             except httpx.HTTPError as exc:
                 result = AccessResult(AccessState.TEMPORARILY_FAILED, type(exc).__name__)
-                await record_access(ctx.pool, probe.provider, probe.endpoint, result)
+                await record_access(
+                    ctx.pool, probe.provider, probe.endpoint, result, job_id=ctx.job_id
+                )
                 step.detail.update(state=result.state, error=type(exc).__name__)
 
 

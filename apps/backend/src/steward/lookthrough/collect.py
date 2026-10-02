@@ -11,7 +11,10 @@ Per fund, one step:
   failed job. Fallbacks, in order: the last stored snapshot when it is at most
   `cached_fallback_days` old; for iShares the full-fund SpreadsheetML download (no country,
   no ISIN); otherwise nothing, and the API labels the fund as not looked through.
-- Snapshots keep the original payloads; only the newest `keep_snapshots` per fund are kept.
+- Snapshots keep the original payloads. Retention is policy-driven (lookthrough.retention):
+  the newest `keep_snapshots` per fund, the last snapshot of each recent month (historical
+  look-through) and every snapshot a saved report/decision pins are kept; each stored
+  snapshot also gets a factsheet row (lookthrough.factsheet).
 
 The outcome per fund (checked_at, ok, error, fallback) is kept in `sync_state`
 ('etf_look_through_status') for the API's labels.
@@ -30,6 +33,8 @@ from steward.config.jobs import JobsConfig, LookThroughFund, LookThroughSettings
 from steward.config.store import load_active
 from steward.jobs.runner import JobContext
 from steward.lookthrough.classify import region_of
+from steward.lookthrough.factsheet import store_factsheet
+from steward.lookthrough.retention import RetentionPolicy, prune_snapshots
 from steward.sources.etf_issuers import (
     FundSnapshot,
     IssuerError,
@@ -158,14 +163,9 @@ async def store_snapshot(
 
 
 async def prune(pool: asyncpg.Pool, isin: str, keep: int) -> int:
-    deleted: str = await pool.execute(
-        "delete from public.etf_snapshot where fund_isin = $1 and id not in (select id from"
-        " public.etf_snapshot where fund_isin = $1 order by as_of desc, fetched_at desc"
-        " limit $2)",
-        isin,
-        keep,
-    )
-    return int(deleted.split()[-1])
+    """Prune by the retention policy (newest `keep`, month ends, pinned); the number deleted."""
+    result = await prune_snapshots(pool, isin, RetentionPolicy(keep_latest=keep))
+    return int(result["deleted"])
 
 
 async def funds_to_fetch(
@@ -328,7 +328,10 @@ async def collect_fund(
     )
     if snapshot_id:
         detail["snapshot_id"] = snapshot_id
-        detail["pruned"] = await prune(pool, fund.isin, settings.keep_snapshots)
+        detail["factsheet_id"] = await store_factsheet(pool, fund, snap, snapshot_id)
+        retention = await prune_snapshots(pool, fund.isin, RetentionPolicy.from_settings(settings))
+        detail["pruned"] = retention["deleted"]
+        detail["retention"] = retention
     return detail
 
 

@@ -1,0 +1,27 @@
+{
+ "count": 2,
+ "data": [
+  {
+   "classificationCode": "H6",
+   "cmdCode": "85",
+   "flowDesc": "Export",
+   "netWgt": 300,
+   "partnerCode": 276,
+   "period": "2024",
+   "primaryValue": 1200.5,
+   "qtyUnitAbbr": "kg",
+   "reporterCode": 203
+  },
+  {
+   "classificationCode": "H6",
+   "cmdCode": "85",
+   "flowDesc": "Import",
+   "netWgt": null,
+   "partnerCode": 276,
+   "period": "2024",
+   "primaryValue": 900,
+   "qtyUnitAbbr": null,
+   "reporterCode": 203
+  }
+ ]
+}

@@ -74,7 +74,10 @@ def test_firds_and_fitrs() -> None:
     records = esma.parse_firds(load("firds_sap.json"))
     assert records and all(r.isin == SAP_ISIN for r in records)
     assert len({r.mic for r in records}) == len(records)  # one current record per venue
-    assert {r.issuer_lei for r in records} == {SAP_LEI}
+    assert {r.issuer_lei for r in records if r.status != "CANC"} == {SAP_LEI}
+    # B2: venues whose newest record is a cancellation are reported as cancelled (they carry
+    # no issuer LEI), not silently dropped or resurrected from an older record.
+    assert {r.mic for r in records if r.status == "CANC"} == {"VFSI", "BAAD"}
     xetra = next(r for r in records if r.mic == "XETA")
     assert xetra.cfi == "ESVUFB" and xetra.currency == "EUR" and xetra.terminated_at is None
     assert any(r.terminated_at is not None for r in records)
@@ -108,7 +111,24 @@ def test_firds_history_keeps_cancelled_listing_versions() -> None:
     history = esma.parse_firds_history(raw)
     assert [record.status for record in history] == ["ACTIVE", "CANC"]
     assert history[-1].terminated_at is not None
-    assert esma.parse_firds(raw) == history[:1]
+    # B2: the newest record for the venue is the cancellation. The audit found this test
+    # asserting the opposite (the older ACTIVE record), i.e. a delisted line staying ACTIVE.
+    current = esma.parse_firds(raw)
+    assert [r.status for r in current] == ["CANC"] and current == history[-1:]
+    reactivated = {
+        "response": {
+            "docs": [
+                *raw["response"]["docs"],
+                {
+                    "isin": SAP_ISIN,
+                    "mic": "XETR",
+                    "status": "ACTIVE",
+                    "publication_date": "2025-06-01T00:00:00Z",
+                },
+            ]
+        }
+    }
+    assert [r.status for r in esma.parse_firds(reactivated)] == ["ACTIVE"]
 
 
 def test_gleif_level1_record() -> None:

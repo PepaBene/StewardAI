@@ -1,0 +1,3 @@
+{"symbol":"AAPL","cusip":"037833100","data":[{"reportDate":"2026-06-30","ownership":[
+ {"cik":"0000102909","name":"VANGUARD GROUP INC","share":1300000000,"change":2000000,"filingDate":"2026-08-12","percentage":8.5,"portfolioPercent":4.2,"value":300000000000},
+ {"cik":null,"name":null,"share":1,"filingDate":"2026-08-12"}]}]}

@@ -1,0 +1,19 @@
+{
+  "head": {"vars": ["c", "cLabel"]},
+  "results": {
+    "bindings": [
+      {
+        "c": {"type": "uri", "value": "http://www.wikidata.org/entity/Q37156"},
+        "cLabel": {"xml:lang": "en", "type": "literal", "value": "IBM"}
+      },
+      {
+        "c": {"type": "uri", "value": "http://www.wikidata.org/entity/Q95"},
+        "cLabel": {"xml:lang": "en", "type": "literal", "value": "Google"}
+      },
+      {
+        "c": {"type": "uri", "value": "http://www.wikidata.org/entity/Q1234567"},
+        "cLabel": {"type": "literal", "value": "Q1234567"}
+      }
+    ]
+  }
+}

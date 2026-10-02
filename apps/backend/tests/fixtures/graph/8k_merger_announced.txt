@@ -1,0 +1,17 @@
+UNITED STATES SECURITIES AND EXCHANGE COMMISSION
+FORM 8-K
+CURRENT REPORT
+Pursuant to Section 13 or 15(d) of the Securities Exchange Act of 1934
+Date of Report (Date of earliest event reported): September 15, 2026
+Example Corp
+(Exact name of registrant as specified in its charter)
+
+Item 1.01 Entry into a Material Definitive Agreement.
+
+On September 15, 2026, Example Corp (the "Company") entered into an Agreement and Plan of Merger (the "Merger Agreement") pursuant to which the Company will acquire Target Software Inc. ("Target") in a transaction valued at approximately $4.2 billion. Under the terms of the Merger Agreement, each outstanding share of Target common stock will be converted into the right to receive $38.50 per share, consisting of 60% in cash and 40% in shares of the Company's common stock. The Company expects to issue approximately 21 million shares of its common stock in the transaction and to fund the cash portion with a new $1.8 billion senior notes offering and a $1.0 billion term loan. The transaction is expected to close in the first half of 2027, subject to Target stockholder approval and regulatory clearances.
+
+Item 9.01 Financial Statements and Exhibits.
+
+(d) Exhibits.
+2.1 Agreement and Plan of Merger, dated as of September 15, 2026.
+99.1 Press release dated September 15, 2026.

@@ -1,0 +1,40 @@
+{
+  "entities": {
+    "Q12345": {
+      "id": "Q12345",
+      "claims": {
+        "P749": [
+          {
+            "id": "Q12345$AAAA-1111",
+            "rank": "preferred",
+            "mainsnak": {"snaktype": "value", "property": "P749", "datavalue": {"type": "wikibase-entityid", "value": {"entity-type": "item", "id": "Q777"}}},
+            "qualifiers": {"P580": [{"snaktype": "value", "property": "P580", "datavalue": {"type": "time", "value": {"time": "+2019-04-01T00:00:00Z", "precision": 11}}}]},
+            "references": [{"snaks": {"P854": [{"snaktype": "value", "property": "P854", "datavalue": {"type": "string", "value": "https://example.test/annual-report"}}]}}]
+          },
+          {
+            "id": "Q12345$BBBB-2222",
+            "rank": "deprecated",
+            "mainsnak": {"snaktype": "value", "property": "P749", "datavalue": {"type": "wikibase-entityid", "value": {"entity-type": "item", "id": "Q888"}}}
+          }
+        ],
+        "P856": [
+          {
+            "id": "Q12345$CCCC-3333",
+            "rank": "normal",
+            "mainsnak": {"snaktype": "value", "property": "P856", "datavalue": {"type": "string", "value": "https://www.example.test"}}
+          }
+        ],
+        "P169": [
+          {
+            "id": "Q12345$DDDD-4444",
+            "rank": "normal",
+            "mainsnak": {"snaktype": "somevalue", "property": "P169"}
+          }
+        ],
+        "P31": [
+          {"id": "Q12345$EEEE-5555", "rank": "normal", "mainsnak": {"snaktype": "value", "property": "P31", "datavalue": {"type": "wikibase-entityid", "value": {"id": "Q4830453"}}}}
+        ]
+      }
+    }
+  }
+}

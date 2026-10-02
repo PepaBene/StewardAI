@@ -1,0 +1,15 @@
+{
+ "data": [
+  {
+   "date": "2026-09-30",
+   "value": "72.5"
+  },
+  {
+   "date": "2026-09-29",
+   "value": "."
+  }
+ ],
+ "interval": "daily",
+ "name": "WTI",
+ "unit": "dollars per barrel"
+}

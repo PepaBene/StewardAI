@@ -1,0 +1,4 @@
+{"symbol":"SPY","atDate":"2026-09-26","numberOfHoldings":3,"holdings":[
+ {"symbol":"AAPL","name":"Apple Inc","isin":"US0378331005","cusip":"037833100","share":183500000,"percent":7.01,"value":41200000000},
+ {"symbol":"MSFT","name":"Microsoft Corp","isin":"US5949181045","cusip":"594918104","share":96000000,"percent":6.5,"value":39000000000},
+ {"symbol":"BADROW","name":"Unit error row","isin":"US0000000000","cusip":"0","share":10,"percent":700,"value":null}]}

@@ -407,13 +407,13 @@ async def record_filing_hits(pool: asyncpg.Pool, fts: FtsResult) -> None:
             hit.file,
             hit.url,
         )
-    for ticker, relation, keyword, hit in fts.relations:
+    for ticker, kind, keyword, hit in fts.relations:
         await pool.execute(
             "insert into public.filing_hit (ticker, kind, query, matched_term, accession,"
             " cik, filer_name, form, filed_at, file, url) values ($1, $2, $3, $4, $5, $6,"
             " $7, $8, $9, $10, $11) on conflict do nothing",
             ticker,
-            relation,
+            kind,  # always 'relationship_candidate': no role is inferred from the keyword
             f"name + {keyword}",
             keyword,
             hit.accession,

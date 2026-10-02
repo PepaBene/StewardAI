@@ -409,6 +409,24 @@ def _convert(
         return None, f"no {exc.source.upper()} reference rate for {exc.currency}"
 
 
+def market_cap(price_per_listing: float, shares: float, per_listing: float) -> float:
+    """Market capitalization from the listed line's price. `shares` are home-market (ordinary)
+    shares; `per_listing` is the ordinary shares one listed unit represents (the ADS ratio,
+    5 for TSMC's ADS), so the price of ONE ordinary share is `price_per_listing / per_listing`.
+    Multiplying by the ratio instead overstated market cap, and P/S, by ratio squared (A14)."""
+    return price_per_listing / per_listing * shares
+
+
+def price_to_sales(
+    price_per_listing: float, shares: float, per_listing: float, revenue: float
+) -> ValuationRatio:
+    if per_listing <= 0:
+        return ValuationRatio(value=None, reason="the listing ratio is not positive")
+    return ValuationRatio(
+        value=market_cap(price_per_listing, shares, per_listing) / revenue, reason=None
+    )
+
+
 def ratio(
     price: ValuationPrice | None,
     figure: PerShareFigure | None,
@@ -670,8 +688,9 @@ async def holding_valuation(
             if market_price is None:
                 ps.reason = why or "cannot convert price to revenue currency"
             else:
-                market_cap = market_price * source_figures.shares_outstanding * per_listing
-                ps = ValuationRatio(value=market_cap / revenue.value, reason=None)
+                ps = price_to_sales(
+                    market_price, source_figures.shares_outstanding, per_listing, revenue.value
+                )
 
     def margin(numerator: Figure | None, label: str) -> ValuationRatio:
         if numerator is None or revenue is None:

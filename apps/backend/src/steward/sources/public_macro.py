@@ -8,6 +8,7 @@ from typing import Any
 
 import httpx
 
+from steward.macro.geo import ISO3_TO_ISO2
 from steward.macro.providers import parse_comtrade, parse_sdmx_json, parse_world_bank
 from steward.sources.base import (
     AccessResult,
@@ -16,6 +17,18 @@ from steward.sources.base import (
     SourceObservation,
     access_from_http,
 )
+
+
+def _json_body(response: httpx.Response) -> Any:
+    """The JSON body, or None when the answer is not JSON (an HTML error page) - never an
+    exception, so the caller maps the outcome to a typed access state."""
+    try:
+        return response.json()
+    except ValueError:
+        return None
+
+
+NOT_JSON = AccessResult(AccessState.TEMPORARILY_FAILED, "provider answered with a non-JSON body")
 
 
 class PublicMacroAdapter:
@@ -66,10 +79,21 @@ class WorldBankAdapter(PublicMacroAdapter):
             url,
             params={"format": "json", "per_page": 20_000, "date": request.get("date", "2000:2030")},
         )
-        state = access_from_http(
-            response.status_code, has_rows=response.status_code == 200 and bool(response.json()[1])
+        body = _json_body(response)
+        if response.status_code == 200 and body is None:
+            return FetchResult(NOT_JSON)
+        # World Bank answers an invalid request with HTTP 200 and `[{"message": [...]}]`.
+        has_rows = (
+            response.status_code == 200
+            and isinstance(body, list)
+            and len(body) > 1
+            and isinstance(body[1], list)
+            and bool(body[1])
         )
-        return FetchResult(state, {"body": response.json(), "url": str(response.url)})
+        state = access_from_http(response.status_code, has_rows=has_rows)
+        if state.state == AccessState.NOT_COVERED and isinstance(body, list) and len(body) == 1:
+            state = AccessResult(AccessState.TEMPORARILY_FAILED, "World Bank error envelope")
+        return FetchResult(state, {"body": body, "url": str(response.url)})
 
     def normalize(self, payload: Any) -> list[SourceObservation]:
         now = dt.datetime.now(dt.UTC)
@@ -109,16 +133,21 @@ class SdmxAdapter(PublicMacroAdapter):
             params={
                 "startPeriod": request.get("start", "2000"),
                 "format": "sdmx-json",
+                # One observation per dimension combination: the area comes from the response.
+                "dimensionAtObservation": "AllDimensions",
             },
             headers={"Accept": "application/vnd.sdmx.data+json;version=2.0.0"},
         )
+        body = _json_body(response) if response.status_code == 200 else {}
+        if body is None:
+            return FetchResult(NOT_JSON)
         access = access_from_http(
-            response.status_code, has_rows=response.status_code == 200 and bool(response.content)
+            response.status_code, has_rows=response.status_code == 200 and bool(body)
         )
         return FetchResult(
             access,
             {
-                "body": response.json() if response.status_code == 200 else {},
+                "body": body,
                 "url": str(response.url),
                 "request": request,
             },
@@ -135,6 +164,8 @@ class SdmxAdapter(PublicMacroAdapter):
             frequency=request["frequency"],
             source_url=payload["url"],
             vintage=request["vintage"],
+            expect_geography=request.get("area_code"),
+            geography_map=ISO3_TO_ISO2 if self.provider == "oecd" else None,
         )
         now = dt.datetime.now(dt.UTC)
         return [
@@ -174,15 +205,19 @@ class ComtradeAdapter(PublicMacroAdapter):
             "partnerCode": request.get("partner", 0),
             "cmdCode": request["hs_code"],
             "flowCode": request.get("flow_code", "X,M"),
+            "customsCode": "C00",
+            "motCode": "0",
+            "partner2Code": "0",
             "subscription-key": self.api_key,
         }
         response = await self.http.get(url, params=params)
-        access = access_from_http(
-            response.status_code,
-            has_rows=response.status_code == 200 and bool(response.json().get("data")),
-        )
+        body = _json_body(response) if response.status_code == 200 else {}
+        if body is None:
+            return FetchResult(NOT_JSON)
+        rows = body.get("data") if isinstance(body, dict) else None
+        access = access_from_http(response.status_code, has_rows=bool(rows))
         # Do not retain response.url: it may include the subscription key.
-        return FetchResult(access, {"body": response.json() if response.status_code == 200 else {}})
+        return FetchResult(access, {"body": body if isinstance(body, dict) else {}})
 
     def normalize(self, payload: Any) -> list[SourceObservation]:
         now = dt.datetime.now(dt.UTC)
@@ -200,10 +235,13 @@ class ComtradeAdapter(PublicMacroAdapter):
                     "USD",
                     "https://comtradeapi.un.org/",
                     now,
-                    geography=row.reporter,
+                    # ISO alpha-2 where the M49 code is one country (exposure mappings use ISO).
+                    geography=row.reporter_iso or row.reporter,
                     scale=Decimal(1),
                     dimensions={
-                        "partner": row.partner,
+                        "partner": row.partner_iso or row.partner,
+                        "reporter_m49": row.reporter,
+                        "partner_m49": row.partner,
                         "flow": row.flow,
                         "hs_revision": row.hs_revision,
                         "hs_code": row.hs_code,
@@ -211,6 +249,9 @@ class ComtradeAdapter(PublicMacroAdapter):
                     raw={
                         "quantity": str(row.quantity) if row.quantity is not None else None,
                         "quantity_unit": row.quantity_unit,
+                        "net_weight_kg": str(row.net_weight)
+                        if row.net_weight is not None
+                        else None,
                     },
                 )
             )

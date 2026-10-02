@@ -20,6 +20,9 @@ export const EVENT_TYPES = [
   "analyst_rating",
   "delisting",
   "entity_status",
+  "credit_stress",
+  "trade_exposure",
+  "patent_status",
   "other",
 ] as const satisfies readonly EventType[];
 
@@ -41,6 +44,9 @@ export const EVENT_LABELS: Record<EventType, string> = {
   analyst_rating: "Analyst rating",
   delisting: "Delisting",
   entity_status: "Legal entity status",
+  credit_stress: "Credit stress",
+  trade_exposure: "Trade exposure",
+  patent_status: "Patent status",
   other: "Other",
 };
 

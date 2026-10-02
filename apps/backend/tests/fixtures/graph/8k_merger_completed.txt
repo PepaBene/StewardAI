@@ -1,0 +1,9 @@
+FORM 8-K
+Example Corp
+(Exact name of registrant as specified in its charter)
+
+Item 2.01 Completion of Acquisition or Disposition of Assets.
+
+On March 3, 2027, Example Corp completed its previously announced acquisition of Target Software Inc. pursuant to the Agreement and Plan of Merger dated September 15, 2026. At the effective time, each share of Target common stock was converted into the right to receive $38.50 per share in an all-cash and stock transaction. The aggregate consideration was approximately $4.2 billion, including the assumption of $0.6 billion of Target debt.
+
+Item 9.01 Financial Statements and Exhibits.

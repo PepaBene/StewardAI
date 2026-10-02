@@ -39,9 +39,11 @@ from steward import __version__
 from steward.config.holding_profiles import HoldingProfilesConfig
 from steward.config.jobs import JobsConfig, ReferenceSettings
 from steward.config.store import load_active
+from steward.graph.successors import reconcile_parent_change
 from steward.jobs.runner import JobContext
 from steward.news.link import short_name
 from steward.reference.events import LifecycleEvent, entity_events, listing_events, raise_events
+from steward.reference.lifecycle import sync_firds_names, sync_gleif_issuer
 from steward.settings import get_settings
 from steward.sources import esma, openfigi
 from steward.sources.edgar import EXCHANGE_MIC, EdgarClient, EdgarError
@@ -76,12 +78,14 @@ class HoldingResult:
     share_class_figi: str | None = None
     home_mic: str | None = None
     issuer_lei: str | None = None
+    issuer_id: int | None = None
     price_symbol: str | None = None
     listings: int = 0
     children: int = 0
     events: list[LifecycleEvent] = field(default_factory=list)
     problems: list[str] = field(default_factory=list)
     notes: list[str] = field(default_factory=list)
+    firds_history: list[esma.FirdsRecord] = field(default_factory=list, repr=False)
 
     def detail(self) -> dict[str, Any]:
         return {
@@ -332,6 +336,7 @@ async def _esma(
     try:
         records, history = await esma.firds_with_history(deps.http, isin)
         liquidity = await esma.fitrs(deps.http, isin)
+        result.firds_history = history
     except (esma.EsmaError, httpx.HTTPError, ValueError) as exc:
         result.notes.append(f"ESMA registers: {exc}")
         return [], None, previous
@@ -405,7 +410,7 @@ async def _esma(
                 liquidity.period_to,
                 json.dumps(liquidity.raw),
             )
-    result.listings = len(records)
+    result.listings = sum(1 for r in records if r.status != "CANC")
     return records, liquidity, previous
 
 
@@ -447,7 +452,9 @@ async def _gleif(
     settings: ReferenceSettings,
     result: HoldingResult,
     today: dt.date,
+    cik: str | None = None,
 ) -> LegalEntity | None:
+    successor_entity: LegalEntity | None = None
     try:
         by_isin = await deps.gleif.for_isin(isin)
         lei = firds_lei or (by_isin.lei if by_isin else None)
@@ -497,16 +504,48 @@ async def _gleif(
             result.notes.append(
                 f"GLEIF: {len(children)} of {deps.gleif.children_total} direct children read"
             )
+        if entity.successor_lei:
+            try:
+                successor_entity = await deps.gleif.record(entity.successor_lei)
+            except GleifError as exc:  # the link is still recorded by LEI in the snapshot
+                result.notes.append(f"GLEIF successor {entity.successor_lei}: {exc}")
     except GleifError as exc:
         result.problems.append(f"GLEIF: {exc}")
         return None
 
     before = await pool.fetchrow(
-        "select status, successor_lei, registration_status from public.legal_entity where lei = $1",
+        "select status, successor_lei, registration_status, legal_name"
+        " from public.legal_entity where lei = $1",
         lei,
     )
+    previous_parents = {
+        r["object_lei"]
+        for r in await pool.fetch(
+            "select object_lei from public.entity_relationship where ticker=$1 and subject=$2"
+            " and type='parent' and source='gleif' and object_lei is not null",
+            ticker,
+            lei,
+        )
+    }
     async with pool.acquire() as conn, conn.transaction():
         await store_entity(conn, entity)
+        issuer_sync = await sync_gleif_issuer(
+            conn,
+            entity,
+            before_name=before["legal_name"] if before else None,
+            today=today,
+            known_at=deps.now(),
+            successor=successor_entity,
+            cik=cik,
+        )
+        result.issuer_id = issuer_sync.issuer_id
+        if issuer_sync.renamed_from:
+            result.notes.append(
+                f"legal name changed: {issuer_sync.renamed_from!r} -> {entity.legal_name!r}"
+            )
+        await sync_firds_names(
+            conn, issuer_sync.issuer_id, result.firds_history, known_at=deps.now()
+        )
         await conn.execute("delete from public.entity_reporting_exception where lei = $1", lei)
         for kind, parent in (("parent", direct), ("ultimate_parent", ultimate)):
             if isinstance(parent, LegalEntity):
@@ -522,7 +561,7 @@ async def _gleif(
                     source="gleif",
                     confirmed=True,
                     source_ref=f"https://search.gleif.org/#/record/{lei}",
-                    as_of=today,
+                    as_of=None,  # GLEIF gives no start date; the fetch date is not one
                 )
             elif isinstance(parent, ReportingException):
                 await conn.execute(
@@ -545,7 +584,7 @@ async def _gleif(
                 source="gleif",
                 confirmed=True,
                 source_ref=f"https://search.gleif.org/#/record/{child.lei}",
-                as_of=today,
+                as_of=None,  # GLEIF gives no start date; the fetch date is not one
             )
         names = [(entity.legal_name, "legal_name"), (short_name(entity.legal_name), "legal_name")]
         names += [(n, "other_name") for n in entity.other_names]
@@ -559,6 +598,24 @@ async def _gleif(
         )
     result.issuer_lei = lei
     result.children = len(children)
+    if isinstance(direct, LegalEntity) and previous_parents and direct.lei not in previous_parents:
+        await reconcile_parent_change(
+            pool,
+            ticker=ticker,
+            change_kind="parent_changed",
+            from_key=sorted(previous_parents)[0],
+            to_key=direct.lei,
+            observed_source="gleif",
+        )
+    if entity.successor_lei and (before is None or before["successor_lei"] != entity.successor_lei):
+        await reconcile_parent_change(
+            pool,
+            ticker=ticker,
+            change_kind="successor_named",
+            from_key=lei,
+            to_key=entity.successor_lei,
+            observed_source="gleif",
+        )
     after = {
         "status": entity.status,
         "successor_lei": entity.successor_lei,
@@ -707,7 +764,7 @@ async def resolve_holding(
             today,
         )
 
-    entity = await _gleif(pool, deps, ticker, name, isin, firds_lei, settings, result, today)
+    entity = await _gleif(pool, deps, ticker, name, isin, firds_lei, settings, result, today, cik)
 
     wikidata = json.loads(inst["wikidata"]) if inst["wikidata"] else None
     wikidata_due = (

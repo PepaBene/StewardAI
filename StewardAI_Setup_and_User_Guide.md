@@ -117,10 +117,16 @@ The variables, grouped by what they're for:
 | `T212_ENV`, `T212_API_KEY`, `T212_API_SECRET` | yes | Trading212 demo or live account, **read-only** key. Verify with `cd apps/backend && uv run python -m steward.trading212`. |
 | `ANTHROPIC_API_KEY` | yes | Claude API key — powers extraction, news classification, digests, impact notes, research, the monthly review, chat, and the claim verifier. |
 | `ANTHROPIC_WORKSPACE_ID` | no | Only for org-level keys scoped to a workspace. |
-| `SEC_USER_AGENT` | for EDGAR/13F | Required by SEC's EDGAR API for filings and Form 13F ownership. |
+| `SEC_USER_AGENT` | for EDGAR | Required by SEC's EDGAR API: filings, Form 13F, Forms 3/4/5 insider trades, Schedule 13D/G control stakes, N-PORT fund positions, XBRL fundamentals. Without it those jobs fail with a clear message. |
 | `FINNHUB_API_KEY` | no | Adds a US earnings-calendar and company-news source. |
 | `FRED_API_KEY` | no | Adds Fed macro series (Eurostat/ECB series need no key). |
 | `OPENFIGI_API_KEY` | no | Raises the identifier-mapping rate limit (works unauthenticated too). |
+| `ALPHA_VANTAGE_API_KEY` | no | Free key (25 requests/day, one shared budget). Fills a missing price series or valuation input and feeds owner-triggered exposure and statement lookups. |
+| `EODHD_API_KEY` | no | Free plan (20 requests/day): last-resort fallback for a price series Stooq, Yahoo and Alpha Vantage could not supply. |
+| `FMP_API_KEY`, `TWELVE_DATA_API_KEY` | no | Access probes only (the Source audit and fund probes record whether your free plan covers an endpoint); nothing else reads them yet. |
+| `UN_COMTRADE_API_KEY` | no | Free registered UN Comtrade key (500 calls/day). Needed for trade data and trade-exposure alerts; also requires the provider to be enabled in `/config/jobs` and an audit pass. |
+| `EPO_OPS_CLIENT_ID`, `EPO_OPS_CLIENT_SECRET` | no | EPO Open Patent Services OAuth client: owner-triggered patent family refresh and legal-status alerts. |
+| `DIFFBOT_API_KEY`, `PEOPLE_DATA_LABS_API_KEY` | no | Owner-triggered company research enrichment (company data only). Off by default. |
 | `STOOQ_API_KEY` | yes (as of spring 2026) | Required for daily price history, risk metrics and benchmark series. |
 | `HEARTBEAT_PING_URL` | no | A dead-man's-switch URL (e.g. healthchecks.io) the worker pings every minute, so a stopped worker is caught from *outside* the host. |
 | `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID` | for Telegram alerts | Alert/digest delivery channel. |
@@ -130,7 +136,13 @@ The variables, grouped by what they're for:
 | `STEWARD_TEST_DATABASE_URL` | dev/test only | A local Postgres superuser URL for running DB-backed tests. Never point this at your Supabase project. |
 
 Every optional key degrades gracefully — the app runs without it, just with that one data
-source or channel disabled.
+source or channel disabled. Removing a key never deletes stored data and never shows a zero:
+the affected figure keeps its last verified value with its date, or shows as unavailable, and
+the gap is listed in the coverage views. The per-provider detail (free quotas, expected data
+delays, what exactly degrades) is in `docs/data/provider-access.md`; behaviour not yet
+confirmed against a live account is marked unverified there. New free providers are also off
+until you enable them under `providers` in `/config/jobs` and the Source audit
+(`POST /jobs/source-audit`) has confirmed your plan covers the endpoint.
 
 ### 2.4 Run it locally
 
@@ -368,6 +380,14 @@ Typical schedule (all configurable):
 | Monthly review | first weekday of the month | Compliance table, KPI statuses, cited proposed actions. |
 | Reference data / prices / FX / macro / holidays | weekly / weekdays / daily / monthly | Keeps identity, price history, risk metrics and the calendar current. |
 | Reconciliation | daily | Compares press-release figures against the later official filing. |
+| Macro data / public data | daily 11:30 / off by default | Eurostat, ECB, FRED, ČNB daily; World Bank, OECD, BIS and UN Comtrade only after you enable the provider and the audit passes. |
+| Fundamentals and valuation | Tue 05:40 / daily 07:45 | Shares, revenue by region and segment, P/E, P/B and yield from SEC and ESEF filings. |
+| Insider trades | daily 06:30 | SEC Forms 3, 4 and 5 for held issuers, classified economically. |
+| Control stakes (`control_stakes`) | daily 06:45 | SEC Schedule 13D/G holders above 5% for held issuers. Reported separately from 13F and fund holdings; never added to them. |
+| N-PORT holdings (`nport_holdings`) | Saturdays 05:15 | What US-registered funds you hold report owning, about 60 days after quarter end. UCITS funds do not file N-PORT. |
+| Fund probes (`fund_probes`) | off by default | Checks whether your free Finnhub/FMP plan covers fund, index and ownership endpoints; a paid-only answer is recorded and not retried. |
+| Fund characteristics audit (`fund_characteristics_audit`) | daily 07:30 | Watches the iShares/Vanguard fund P/E and P/B pages for layout or methodology changes so a parser problem is not mistaken for a market move. |
+| Free-source alerts (`free_source_alerts`) | daily, after macro data | Credit stress, trade-exposure, patent-status and confirmed company-graph alerts, with a readable decision trail (below). |
 | Monitor | every 15 min | Raises one alert each for a failed job, a missed scheduled run, or a holding with no news coverage. |
 
 A "catch up on start" option in `/config/jobs` makes the worker run anything that never
@@ -375,6 +395,34 @@ succeeded or missed its last scheduled run, in order, when it starts up — so a
 install or one that's been off for a while fills itself in without waiting on each cron. A
 `HEARTBEAT_PING_URL` dead-man's-switch, pinged every minute, catches the case where the
 worker itself has stopped.
+
+### 9.1 Free-source alerts and the decision trail
+
+Four rules watch the free data and can raise an alert (they appear as news items of type
+`credit_stress`, `trade_exposure`, `patent_status`, or as deal / management / relationship
+events, and go through your normal notification rules, quiet hours and daily cap):
+
+- **Credit stress**: a BIS, ECB or FRED series you configure crosses its threshold on a *new*
+  period. The shipped thresholds (ECB bank-lending-survey credit standards above 10, BIS US debt
+  service ratio above 15) are starting points, not calibrated values; tune them in the Event
+  rules config under `free_source_alerts`. Revised or back-filled old periods never alert.
+- **Trade exposure**: a UN Comtrade period for a product code you have mapped to a holding
+  (weight at least 5%) moves 20% or more year on year. This is national trade data, not the
+  company's revenue; exposure you have not mapped is treated as unknown, never as zero.
+- **Patent status**: a patent family evidenced as the company's lapses or is granted. A
+  status the source could not read ("unknown") keeps the last known status.
+- **Company graph**: only relationships and events you or a primary source have *confirmed*
+  alert. Suggested or disputed ones are listed for your review and never raise an alert or a
+  thesis breach.
+
+Each rule alerts at most once per series or holding and product per day, and a replayed
+observation never alerts twice. To see why something did or did not alert, read the decision
+trail (`GET /alerts/free-source-trail`, filters `rule`, `outcome`, `ticker`): outcomes are
+`raised`, `throttled`, `revision_ignored`, `baseline` (first load of a series), `not_material`,
+`no_baseline`, `persisting`, `review_needed` and `below_severity`, each with its reason and the
+observation behind it. There is no web page for the trail yet. Run the evaluator now with
+`POST /jobs/free-source-alerts`; turn all four rules off with `free_source_alerts.enabled =
+false` in the Event rules config.
 
 ---
 
@@ -446,3 +494,13 @@ You'll see this system everywhere:
   having been scheduled at all.
 - **DB-backed backend tests are skipped** — they need `STEWARD_TEST_DATABASE_URL` pointed at
   a throwaway local Postgres instance; without it they skip rather than fail.
+- **A source shows `access_unverified`, `paid_only` or `quota_exhausted`** — see
+  `GET /sources/access` and `docs/data/provider-access.md`. A missing key is `access_unverified`
+  ("credential not configured"); a plan denial is `paid_only` and is not retried until you change
+  the key; free quotas reset on the provider's schedule. Gaps stay visible, they are never filled
+  with zeros.
+- **`ownership_13f`, `control_stakes`, `nport_holdings` or `insider_trades` fail at once** —
+  `SEC_USER_AGENT` is unset or has no contact email.
+- **A free-source alert did not fire** — read the decision trail; a revised old period, a first
+  load, a throttled repeat or a suggested (unconfirmed) relationship is recorded there with the
+  reason.

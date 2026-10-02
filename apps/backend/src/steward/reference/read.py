@@ -379,10 +379,10 @@ class PriceHistory(BaseModel):
     symbol: str | None = Field(
         description="Symbol of the series shown (the Stooq symbol when nothing is stored)."
     )
-    source: Literal["Stooq", "Yahoo"] = Field(
+    source: Literal["Stooq", "Yahoo", "EODHD", "Alpha Vantage"] = Field(
         default="Stooq",
-        description="Whose daily closes: Stooq (the source of record) or Yahoo Finance "
-        "(unofficial; the fallback when Stooq has none).",
+        description="Whose daily closes: Stooq (the source of record), Yahoo Finance "
+        "(unofficial), or EODHD / Alpha Vantage (free-tier gap fallbacks).",
     )
     stooq_symbol: str | None = None
     yahoo_symbol: str | None = None
@@ -393,7 +393,7 @@ class PriceHistory(BaseModel):
     fetched_at: dt.datetime | None
     bars: list[PriceBarOut]
     benchmark_symbol: str | None
-    benchmark_source: Literal["Stooq", "Yahoo"] | None = None
+    benchmark_source: Literal["Stooq", "Yahoo", "EODHD", "Alpha Vantage"] | None = None
     benchmark: list[PricePoint]
     risk: RiskCard | None
     correlations: list[Correlation] = Field(description="With each other holding, last 252 days.")
@@ -412,7 +412,7 @@ async def load_series(
     ref = SeriesRef(symbol, "stooq") if isinstance(symbol, str) else symbol
     rows = await pool.fetch(
         "select date, close from public.price_bar where symbol = $1 and source = $3"
-        " and (bar_type = 'adjusted' or (source = 'eodhd' and bar_type = 'raw'))"
+        " and bar_type = 'adjusted'"
         " and ($2::date is null or date >= $2) order by date",
         ref.symbol,
         since,
@@ -439,7 +439,7 @@ async def load_bars(pool: asyncpg.Pool, symbol: str | SeriesRef) -> list[PriceBa
     rows = await pool.fetch(
         "select date, open, high, low, close, volume from public.price_bar"
         " where symbol = $1 and source = $2"
-        " and (bar_type = 'adjusted' or (source = 'eodhd' and bar_type = 'raw')) order by date",
+        " and bar_type = 'adjusted' order by date",
         ref.symbol,
         ref.source,
     )
@@ -494,7 +494,7 @@ async def price_history(pool: asyncpg.Pool, ticker: str, days: int) -> PriceHist
     fetched = (
         await pool.fetchval(
             "select max(fetched_at) from public.price_bar where symbol = $1 and source = $2"
-            " and (bar_type = 'adjusted' or (source = 'eodhd' and bar_type = 'raw'))",
+            " and bar_type = 'adjusted'",
             ref.symbol,
             ref.source,
         )
@@ -505,7 +505,7 @@ async def price_history(pool: asyncpg.Pool, ticker: str, days: int) -> PriceHist
     if series:
         for other in others:
             other_symbols = all_symbols[other]
-            if not other_symbols.stooq and not other_symbols.yahoo:
+            if not other_symbols.refs():
                 continue
             other_ref = chosen.get(other)
             other_series = await load_series(pool, other_ref) if other_ref else []
@@ -516,7 +516,7 @@ async def price_history(pool: asyncpg.Pool, ticker: str, days: int) -> PriceHist
     gap = None
     if not series:
         gap = (gaps.get(ticker) or {}).get("reason") or (
-            NO_STOOQ_SYMBOL if not symbols.stooq and not symbols.yahoo else "no prices stored yet"
+            NO_STOOQ_SYMBOL if not symbols.refs() else "no prices stored yet"
         )
     fallback_reason = None
     if ref is not None and ref.source != "stooq":

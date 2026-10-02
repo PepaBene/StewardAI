@@ -133,6 +133,108 @@ export const SCHEDULES: Record<ScheduleKey, { label: string; description: string
       "Shares outstanding (the 13F % denominator) and revenue by region / segment from the holdings' latest 10-K, 10-Q and 20-F XBRL. Only filings not parsed yet are downloaded.",
     cron: "40 5 * * 2",
   },
+  public_data_collect: {
+    label: "Public macro and trade data",
+    description:
+      "World Bank, OECD, BIS and UN Comtrade observations. Off until the provider audit gate passes.",
+    cron: "0 4 * * 0",
+  },
+  source_audit: {
+    label: "Source access audit",
+    description:
+      "Repeat the endpoint-level free-access audit. Off until test-account keys are set.",
+    cron: "0 3 1 * *",
+  },
+  control_stakes: {
+    label: "Control stakes (13D/G)",
+    description:
+      "Load Schedule 13D/G beneficial-ownership filings for portfolio issuers.",
+    cron: "45 6 * * *",
+  },
+  nport_holdings: {
+    label: "Fund holdings (N-PORT)",
+    description:
+      "Load public SEC N-PORT fund holdings for held US funds.",
+    cron: "15 5 * * 6",
+  },
+  fund_probes: {
+    label: "Fund endpoint probes",
+    description:
+      "Probe optional Finnhub and FMP fund endpoints for free access. Off by default.",
+    cron: "0 4 * * 0",
+  },
+  fund_characteristics_audit: {
+    label: "Fund figures drift check",
+    description:
+      "Check the iShares and Vanguard fund valuation figures for parser drift.",
+    cron: "30 7 * * *",
+  },
+  free_source_alerts: {
+    label: "Free-source alerts",
+    description:
+      "Credit stress, trade exposure, patent status and confirmed company-graph alerts.",
+    cron: "5 12 * * *",
+  },
+  shadow_snapshot: {
+    label: "Shadow-run snapshot",
+    description:
+      "Record the daily free-source shadow-run snapshot. Off by default.",
+    cron: "50 23 * * *",
+  },
+  shadow_report: {
+    label: "Shadow-run report",
+    description:
+      "Generate the free-source shadow-run report. Off by default.",
+    cron: "0 8 * * 1",
+  },
+  raw_retention: {
+    label: "Raw payload retention",
+    description:
+      "Prune old raw provider payloads; normalized data stays.",
+    cron: "15 3 * * *",
+  },
+  zero_cost_gate: {
+    label: "Zero-cost gate",
+    description:
+      "Verify that no paid endpoint or overage is reachable.",
+    cron: "20 3 * * *",
+  },
+  returns_refresh: {
+    label: "Returns refresh",
+    description:
+      "Compute and store price and total returns for held securities.",
+    cron: "45 23 * * 1-5",
+  },
+  exchange_probes: {
+    label: "Exchange probes",
+    description:
+      "Probe free price endpoints per exchange, one held symbol each. Off by default.",
+    cron: "0 5 2 * *",
+  },
+  ir_releases: {
+    label: "Issuer IR releases",
+    description:
+      "Fetch and version registered issuer IR pages (guidance, consensus, capital return).",
+    cron: "20 7 * * *",
+  },
+  sec_fsds_backfill: {
+    label: "SEC statements backfill",
+    description:
+      "Backfill statements and notes from the SEC Financial Statement and Notes datasets. Off by default.",
+    cron: "0 4 15 * *",
+  },
+  pdmr_uk: {
+    label: "UK director dealings",
+    description:
+      "Parse UK PDMR notifications from the RNS stream. Off by default (retrieval unverified).",
+    cron: "10 8 * * 1-5",
+  },
+  graph_review: {
+    label: "Relationship and deal review",
+    description:
+      "Review SEC relationship candidates, extract deal events and reconcile parent changes.",
+    cron: "40 7 * * *",
+  },
 };
 export const SCHEDULE_KEYS = Object.keys(SCHEDULES) as ScheduleKey[];
 export const DEFAULT_TIMEZONE = "Europe/Prague";

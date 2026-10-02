@@ -34,8 +34,73 @@ STOOQ_CURRENCY: dict[str, str] = {
 
 
 def stooq_currency(symbol: str) -> str | None:
-    _, _, suffix = symbol.rpartition(".")
-    return STOOQ_CURRENCY.get(suffix.lower())
+    _, dot, suffix = symbol.rpartition(".")
+    return STOOQ_CURRENCY.get(suffix.lower()) if dot else None
+
+
+# Minor-unit quote codes a provider or Trading212 uses -> (ISO currency, major units per minor
+# unit, canonical unit code). Pence are quoted as GBX by Stooq/Trading212 and GBp by Yahoo.
+MINOR_QUOTE_UNITS: dict[str, tuple[str, Decimal, str]] = {
+    "GBX": ("GBP", Decimal("0.01"), "GBX"),
+    "GBp": ("GBP", Decimal("0.01"), "GBX"),
+    "ZAc": ("ZAR", Decimal("0.01"), "ZAC"),
+    "ZAC": ("ZAR", Decimal("0.01"), "ZAC"),
+    "ILa": ("ILS", Decimal("0.01"), "ILA"),
+    "ILA": ("ILS", Decimal("0.01"), "ILA"),
+}
+# Exchanges whose providers conventionally quote in a minor unit (London pence, Johannesburg
+# cents, Tel Aviv agorot). Used only when a source reports no unit of its own.
+MINOR_UNIT_BY_MIC: dict[str, str] = {"XLON": "GBX", "XJSE": "ZAC", "XTAE": "ILA"}
+
+
+def quote_unit_of(currency: str | None) -> str | None:
+    """The canonical quote unit of a quote currency code: `GBp`/`GBX` -> `GBX` (pence),
+    `GBP` -> `GBP` (pounds), `eur` -> `EUR`. None when no currency is known."""
+    if not currency:
+        return None
+    code = currency.strip()
+    if code in MINOR_QUOTE_UNITS:
+        return MINOR_QUOTE_UNITS[code][2]
+    return code.upper() or None
+
+
+def major_currency(currency: str | None) -> str | None:
+    """The ISO currency behind a quote code (pence -> GBP)."""
+    if not currency:
+        return None
+    code = currency.strip()
+    return MINOR_QUOTE_UNITS[code][0] if code in MINOR_QUOTE_UNITS else code.upper()
+
+
+def unit_factor(currency: str | None) -> Decimal:
+    """Major units per quoted unit (0.01 for pence, 1 otherwise)."""
+    code = (currency or "").strip()
+    return MINOR_QUOTE_UNITS[code][1] if code in MINOR_QUOTE_UNITS else Decimal(1)
+
+
+def infer_quote_currency(
+    mic: str | None, listing_currency: str | None, instrument_currency: str | None
+) -> tuple[str | None, str]:
+    """(quote currency code, basis) for a provider that reports no unit of its own (EODHD,
+    Alpha Vantage), so a London line is not stored as pounds when the provider quotes pence.
+
+    1. The instrument's own code when it is the minor unit of the listing currency
+       (Trading212 reports London lines as GBX): `instrument`.
+    2. The exchange's conventional minor unit (XLON -> GBX) when the listing currency is that
+       unit's major currency: `exchange_convention` (unverified against a live payload).
+    3. The listing currency as is: `listing_currency`."""
+    major = major_currency(listing_currency)
+    if major is None:
+        return None, "unknown"
+    if (
+        instrument_currency in MINOR_QUOTE_UNITS
+        and MINOR_QUOTE_UNITS[instrument_currency][0] == major
+    ):
+        return instrument_currency, "instrument"
+    minor = MINOR_UNIT_BY_MIC.get(mic or "")
+    if minor is not None and MINOR_QUOTE_UNITS[minor][0] == major:
+        return minor, "exchange_convention"
+    return major, "listing_currency"
 
 
 class MarketDataError(Exception):
@@ -51,6 +116,8 @@ class PriceBar:
     low: Decimal | None
     close: Decimal
     volume: Decimal | None
+    # When the source stamped the bar (Yahoo: the bar's timestamp); None when it gives none.
+    source_timestamp: dt.datetime | None = None
 
 
 def _dec(value: str | None) -> Decimal | None:
@@ -154,7 +221,13 @@ async def frankfurter_series(http: httpx.AsyncClient, start: dt.date, end: dt.da
     )
     if response.status_code != 200:
         raise MarketDataError(f"Frankfurter returned HTTP {response.status_code}")
-    return parse_frankfurter(response.json())
+    try:
+        body = response.json()
+    except ValueError as exc:
+        raise MarketDataError("Frankfurter sent no JSON") from exc
+    if not isinstance(body, dict):
+        raise MarketDataError("Frankfurter schema changed")
+    return parse_frankfurter(body)
 
 
 @dataclass(frozen=True)
@@ -169,6 +242,10 @@ class PublicHoliday:
 
 
 def parse_nager(country: str, body: list[dict[str, Any]]) -> list[PublicHoliday]:
+    if not isinstance(body, list):
+        raise MarketDataError("Nager.Date schema changed: expected a list")
+    if any(not isinstance(h, dict) or "date" not in h for h in body):
+        raise MarketDataError("Nager.Date schema changed: holiday without a date")
     return [
         PublicHoliday(
             country=country,
@@ -189,4 +266,8 @@ async def public_holidays(http: httpx.AsyncClient, country: str, year: int) -> l
         return []
     if response.status_code != 200:
         raise MarketDataError(f"Nager.Date returned HTTP {response.status_code}")
-    return parse_nager(country, response.json())
+    try:
+        body = response.json()
+    except ValueError as exc:
+        raise MarketDataError("Nager.Date sent no JSON") from exc
+    return parse_nager(country, body)

@@ -19,6 +19,7 @@ from pydantic import BaseModel, Field
 from steward.config.research import ResearchProfile
 from steward.config.strategy import StrategyConfig
 from steward.config.thesis import ThesisConfig
+from steward.data_context.research import claim_sentence, company_context
 from steward.earnings.metrics import BASE_METRICS
 from steward.ownership.read import holding_ownership
 from steward.reference.read import holding_identity, price_history
@@ -549,6 +550,34 @@ async def liquidity(
     return section
 
 
+async def data_context_section(
+    pool: asyncpg.Pool, reg: Registry, ticker: str, max_sentences: int = 12
+) -> CodeSection:
+    """Stored free-source observations (financial history, forward data, confirmed network,
+    patents) as cited sentences; every sentence states the date the record became known.
+
+    Not a configured report section: it is offered to the writer as already-written material,
+    so a model section can cite the claims without a new profile section.
+    """
+    section = CodeSection(id="data_context")
+    context = await company_context(pool, ticker)
+    for claim in context.claims[:max_sentences]:
+        sid = reg.add(
+            "observation",
+            claim.claim_id,
+            claim.label,
+            url=claim.source_url,
+            app_path=f"/holdings/{ticker}",
+            tier=1 if claim.provenance == "primary" else 2,
+            snippet=claim_sentence(claim),
+            as_of=str(claim.known_as_of),
+        )
+        section.sentences.append(CitedSentence(text=claim_sentence(claim), source_ids=[sid]))
+    if not section.sentences:
+        section.note = "No free-source observation is stored for this ticker."
+    return section
+
+
 async def gather(
     pool: asyncpg.Pool,
     ticker: str,
@@ -601,6 +630,9 @@ async def gather(
         sections["liquidity"] = await liquidity(
             pool, reg, inst["isin"] if inst else None, position, ticker
         )
+    extra = await data_context_section(pool, reg, ticker)
+    if extra.sentences:
+        sections["data_context"] = extra
 
     thesis_sid = None
     if thesis is not None:

@@ -3,15 +3,20 @@
 - ČNB fixes rates on Czech business days: no fixing on weekends and Czech public holidays.
 - The ECB publishes reference rates on TARGET business days: no rates on weekends, New Year,
   Good Friday, Easter Monday, 1 May and 25-26 December (a published rule set, so it is code).
-- An exchange is closed on weekends and on the closures in the Jobs config's calendar
-  (public holidays are not exchange calendars; Nager.Date only seeds suggestions).
+- An exchange session is, in order of authority: a confirmed `exchange_session` row (open,
+  half-day with its own open/close, or closed: an ad hoc closure needs no public holiday and a
+  national holiday on which the exchange trades needs no closure), else a closure in the Jobs
+  config's calendar, else any weekday. Public holidays are not exchange calendars: Nager.Date
+  only seeds suggestions.
 
 So an FX rate missing on a holiday is not stale, a sync with nothing to collect on an
-exchange holiday is not a missed run, and the digest can mark market holidays.
+exchange holiday is not a missed run, a return window is judged against the sessions that
+existed, and the digest can mark market holidays.
 """
 
 import datetime as dt
 from collections.abc import Iterable
+from dataclasses import dataclass
 
 import asyncpg
 
@@ -92,11 +97,141 @@ async def fx_stale(
     return await fx_publication_days(pool, source, latest_rate_date + dt.timedelta(days=1), as_of)
 
 
-def exchange_open(settings: CalendarSettings, mic: str | None, day: dt.date) -> bool:
-    """False on weekends and on the configured closures of the exchange."""
+@dataclass(frozen=True)
+class SessionRow:
+    """A confirmed `exchange_session` row."""
+
+    mic: str
+    session_date: dt.date
+    state: str  # open | half_day | closed
+    open_at: dt.datetime | None = None
+    close_at: dt.datetime | None = None
+    source: str = ""
+    reason: str | None = None
+
+    @property
+    def trades(self) -> bool:
+        return self.state in ("open", "half_day")
+
+
+SessionIndex = dict[tuple[str, dt.date], SessionRow]
+
+
+async def load_sessions(
+    pool: asyncpg.Pool | asyncpg.Connection,
+    mics: Iterable[str | None],
+    start: dt.date,
+    end: dt.date,
+) -> SessionIndex:
+    """Confirmed exchange sessions of `mics` in [start, end]. When several sources confirm the
+    same day, the most recently known row wins (a later closure overrides an earlier open)."""
+    wanted = sorted({m for m in mics if m})
+    if not wanted:
+        return {}
+    rows = await pool.fetch(
+        "select mic, session_date, state, open_at, close_at, source, reason"
+        " from public.exchange_session where confirmed and mic = any($1::text[])"
+        " and session_date between $2 and $3 order by known_at",
+        wanted,
+        start,
+        end,
+    )
+    return {
+        (r["mic"], r["session_date"]): SessionRow(
+            r["mic"],
+            r["session_date"],
+            r["state"],
+            r["open_at"],
+            r["close_at"],
+            r["source"],
+            r["reason"],
+        )
+        for r in rows
+    }
+
+
+def exchange_open(
+    settings: CalendarSettings,
+    mic: str | None,
+    day: dt.date,
+    sessions: SessionIndex | None = None,
+) -> bool:
+    """Whether the exchange holds a session on `day`.
+
+    A confirmed `exchange_session` row (in `sessions`) decides; without one, False on
+    weekends and on the closures confirmed in the Jobs config. Callers that can reach the
+    database pass `await load_sessions(...)`; the argument is optional so config-only callers
+    keep working."""
+    if mic is not None and sessions is not None:
+        row = sessions.get((mic, day))
+        if row is not None:
+            return row.trades
     if day.weekday() >= 5:
         return False
     return mic is None or day not in settings.closures(mic)
+
+
+async def exchange_open_on(
+    pool: asyncpg.Pool | asyncpg.Connection,
+    settings: CalendarSettings,
+    mic: str | None,
+    day: dt.date,
+) -> bool:
+    """`exchange_open` with the stored sessions of that day."""
+    return exchange_open(settings, mic, day, await load_sessions(pool, [mic], day, day))
+
+
+@dataclass(frozen=True)
+class ExpectedSessions:
+    days: list[dt.date]
+    # confirmed_calendar: every weekday of the window has a confirmed row;
+    # partial_confirmed_calendar: some do; weekdays_minus_configured_closures: none does.
+    basis: str
+    confirmed_days: int
+
+    @property
+    def count(self) -> int:
+        return len(self.days)
+
+
+async def expected_sessions(
+    pool: asyncpg.Pool | asyncpg.Connection,
+    settings: CalendarSettings,
+    mic: str | None,
+    start: dt.date,
+    end: dt.date,
+) -> ExpectedSessions:
+    """The sessions an exchange held in [start, end] (the denominator of return-window
+    coverage). Never derived from the bars that exist: a window with 10 bars and 43 expected
+    sessions has coverage 10/43."""
+    if end < start:
+        return ExpectedSessions([], "weekdays_minus_configured_closures", 0)
+    index = await load_sessions(pool, [mic], start, end)
+    days = [d for d in _days(start, end) if exchange_open(settings, mic, d, index)]
+    confirmed = sum(1 for (m, d) in index if m == mic and start <= d <= end)
+    weekdays = sum(1 for d in _days(start, end) if d.weekday() < 5)
+    if confirmed == 0:
+        basis = "weekdays_minus_configured_closures"
+    elif confirmed >= weekdays:
+        basis = "confirmed_calendar"
+    else:
+        basis = "partial_confirmed_calendar"
+    return ExpectedSessions(days, basis, confirmed)
+
+
+async def last_expected_session(
+    pool: asyncpg.Pool | asyncpg.Connection,
+    settings: CalendarSettings,
+    mic: str | None,
+    on_or_before: dt.date,
+    *,
+    lookback_days: int = 14,
+) -> dt.date | None:
+    """The latest session of the exchange on or before a day (price freshness is judged
+    against it: a bar is stale when it is older than this)."""
+    start = on_or_before - dt.timedelta(days=lookback_days)
+    expected = await expected_sessions(pool, settings, mic, start, on_or_before)
+    return expected.days[-1] if expected.days else None
 
 
 async def closure_suggestions(

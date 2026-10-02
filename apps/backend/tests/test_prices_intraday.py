@@ -411,8 +411,10 @@ async def test_stooq_refusal_falls_back_to_yahoo_daily_and_px_to_the_pse_page(
             " from public.price_bar group by symbol, source"
         )
     }
-    # Stooq's closes where it has them; Yahoo's (with its quote currency) where it refused.
-    assert stored[("sap.de", "stooq")] == (2, None)
+    # Stooq's closes where it has them (its quote currency is derived from the market suffix at
+    # write time, audit A16: it used to be NULL and made every return "missing currency");
+    # Yahoo's (with its quote currency) where it refused.
+    assert stored[("sap.de", "stooq")] == (2, "EUR")
     assert stored[("CEZ.PR", "yahoo")] == (5, "CZK")
     assert ("SAP.DE", "yahoo") not in stored  # Yahoo is only asked when Stooq fails
     payload = await backend_pool.fetchrow(

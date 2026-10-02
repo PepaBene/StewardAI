@@ -46,6 +46,21 @@ BudgetJobType = Literal[
     "chat",
     "sec_xbrl",
     "valuation_refresh",
+    "control_stakes",
+    "nport_holdings",
+    "fund_probes",
+    "fund_characteristics_audit",
+    "free_source_alerts",
+    "shadow_snapshot",
+    "shadow_report",
+    "raw_retention",
+    "zero_cost_gate",
+    "returns_refresh",
+    "exchange_probes",
+    "ir_releases",
+    "sec_fsds_backfill",
+    "pdmr_uk",
+    "graph_review",
 ]
 
 AtCap = Literal["alert_only", "pause_noncritical", "downgrade_noncritical"]

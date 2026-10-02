@@ -32,7 +32,10 @@ def _settings(**overrides: Any) -> Settings:
     return Settings(anthropic_api_key="sk-test", **overrides)  # type: ignore[arg-type]
 
 
-def test_create_client_sends_the_workspace_header_only_when_set() -> None:
+def test_create_client_sends_the_workspace_header_only_when_set(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.delenv("ANTHROPIC_WORKSPACE_ID", raising=False)
     with_id = create_client(_settings(anthropic_workspace_id="wrk_123"))
     assert with_id.default_headers["anthropic-workspace-id"] == "wrk_123"
 

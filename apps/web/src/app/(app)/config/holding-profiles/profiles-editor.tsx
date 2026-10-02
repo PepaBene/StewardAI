@@ -236,6 +236,13 @@ function ProfileCard({
           hint="Intraday prices, and daily closes when Stooq has none (Yahoo Finance, unofficial). Only when the derived one is wrong, e.g. NOVO-B.CO, CEZ.PR, VWCE.DE."
           {...text("yahoo_symbol")}
         />
+        <TextField
+          label="EODHD symbol"
+          placeholder="not used unless set"
+          spellCheck={false}
+          hint="Exact exchange code with its verified suffix, e.g. SAP.XETRA. Free plan: one year of daily closes, 20 calls a day."
+          {...text("eodhd_symbol")}
+        />
       </fieldset>
 
       <fieldset className="grid gap-3 lg:grid-cols-2">

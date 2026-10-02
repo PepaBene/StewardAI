@@ -4,8 +4,9 @@ weights, from the latest stored issuer snapshots (never fetched on a request).
 Definitions (shown to the owner as the method note):
 - Weights are fractions of the portfolio's total value in the base currency (positions plus
   cash). Portfolio cash is its own bucket; a fund's own cash, derivatives and anything else
-  that is not an equity line is "fund cash & derivatives"; a fund with no stored snapshot
-  (or no look-through config) is "not looked through". Nothing is spread over buckets it
+  that is not an equity line is "fund cash & derivatives"; weight the published rows do not
+  account for is "unknown fund weight", never relabelled as known cash; a fund with no stored
+  snapshot (or no look-through config) is "not looked through". Nothing is spread over buckets it
   was not published for.
 - Country: a direct stock's home market (or the configured override); a fund's per-holding
   country as its issuer publishes it (iShares: country of risk), except where the issuer
@@ -33,7 +34,7 @@ import datetime as dt
 import json
 import re
 from collections import defaultdict
-from collections.abc import Iterable
+from collections.abc import Iterable, Sequence
 from dataclasses import dataclass, field
 from typing import Literal
 
@@ -53,22 +54,27 @@ from steward.lookthrough.classify import (
 from steward.lookthrough.collect import STATUS_KEY
 
 Dimension = Literal["country", "region", "sector", "currency"]
-BucketKind = Literal["classified", "unclassified", "cash", "fund_cash", "not_looked_through"]
+BucketKind = Literal[
+    "classified", "unclassified", "cash", "fund_cash", "not_looked_through", "unknown_fund"
+]
 DIMENSIONS: tuple[Dimension, ...] = ("country", "region", "sector", "currency")
 
 CASH = "__cash__"
 FUND_CASH = "__fund_cash__"
+UNKNOWN_FUND = "__unknown_fund_weight__"
 NOT_LOOKED = "__not_looked_through__"
 UNCLASSIFIED = "__unclassified__"
 SPECIAL_LABELS = {
     CASH: "Cash",
     FUND_CASH: "Fund cash & derivatives",
+    UNKNOWN_FUND: "Unknown fund weight (rows do not account for it)",
     NOT_LOOKED: "Not looked through",
     UNCLASSIFIED: "Unclassified",
 }
 SPECIAL_KINDS: dict[str, BucketKind] = {
     CASH: "cash",
     FUND_CASH: "fund_cash",
+    UNKNOWN_FUND: "unknown_fund",
     NOT_LOOKED: "not_looked_through",
     UNCLASSIFIED: "unclassified",
 }
@@ -90,7 +96,8 @@ COUNTRY_BASIS_LABELS = {
 METHOD = (
     "Direct stocks plus each fund's weight x its holdings' weights, from the latest stored "
     "issuer snapshots. Weights are shares of total portfolio value; cash, the funds' own "
-    "cash & derivatives and funds without a snapshot are shown separately, never spread. "
+    "cash & derivatives, the fund weight no published row accounts for and funds without a "
+    "snapshot are shown separately, never spread. "
     "Region is derived from country; Vanguard currencies are derived from the listing "
     "country. Concentration: HHI, 1/HHI and top-10 share over the looked-through "
     "securities (merged by ISIN and issuer groups)."
@@ -105,7 +112,8 @@ METHOD = (
 class ExposureBucket(BaseModel):
     key: str = Field(
         description="ISO country code, region, GICS sector or currency code; or one of "
-        "__cash__, __fund_cash__, __not_looked_through__, __unclassified__."
+        "__cash__, __fund_cash__, __unknown_fund_weight__, __not_looked_through__, "
+        "__unclassified__."
     )
     label: str
     kind: BucketKind
@@ -828,6 +836,8 @@ def compute_look_through(
     acc = {d: _Acc() for d in DIMENSIONS}
     securities = _Securities(groups)
     direct_value = fund_value = looked_value = not_looked_value = 0.0
+    unknown_value = 0.0
+    over_reported: list[tuple[str, float]] = []
 
     for p in portfolio.positions:
         w = p.value_base / total if total > 0 else 0.0
@@ -845,7 +855,13 @@ def compute_look_through(
             looked_value += p.value_base
             equity_rows = [r for r in snap.rows if r.asset_class == "equity"]
             equity_share = sum(r.weight for r in equity_rows)
-            other_share = max(0.0, 1.0 - equity_share)
+            # Cash, derivatives and other rows the issuer publishes are known; the part of the
+            # fund no published row accounts for is unknown and stays its own bucket (B38).
+            known_other_share = sum(r.weight for r in snap.rows if r.asset_class != "equity")
+            rows_share = equity_share + known_other_share
+            unknown_share = max(0.0, 1.0 - rows_share)
+            if rows_share > 1.0 + 1e-6:
+                over_reported.append((fund_cfg.label if fund_cfg else p.ticker, rows_share))
             table = _fund_country_table(snap)
             for r in equity_rows:
                 contribution = w * r.weight
@@ -870,7 +886,9 @@ def compute_look_through(
                     acc["country"].add(code, contribution, direct=False)
                     acc["region"].add(region_of(code), contribution, direct=False)
             for d in DIMENSIONS:
-                acc[d].add(FUND_CASH, w * other_share, direct=False)
+                acc[d].add(FUND_CASH, w * known_other_share, direct=False)
+                acc[d].add(UNKNOWN_FUND, w * unknown_share, direct=False)
+            unknown_value += p.value_base * unknown_share
             continue
 
         direct_value += p.value_base
@@ -1043,6 +1061,17 @@ def compute_look_through(
             f"({', '.join(missing)}): shown as its own bucket."
         )
 
+    if unknown_value > 0 and total > 0:
+        notes.append(
+            f"{unknown_value / total:.1%} of the portfolio is fund weight no published row "
+            "accounts for: shown as its own bucket, not spread over known holdings."
+        )
+    for label, rows_share in over_reported:
+        notes.append(
+            f"{label}: published rows add up to {rows_share:.1%} of net assets (over 100%); "
+            "weights are shown as published, not rescaled."
+        )
+
     return LookThroughReport(
         snapshot_date=portfolio.snapshot_date,
         base_currency=portfolio.base_currency,
@@ -1082,6 +1111,13 @@ async def load_snapshots(pool: asyncpg.Pool, isins: list[str]) -> dict[str, Snap
         " where fund_isin = any($1::text[]) order by fund_isin, as_of desc, fetched_at desc",
         isins,
     )
+    return await hydrate_snapshots(pool, metas)
+
+
+async def hydrate_snapshots(
+    pool: asyncpg.Pool, metas: Sequence[asyncpg.Record]
+) -> dict[str, SnapshotIn]:
+    """Snapshot rows and breakdowns for the given `etf_snapshot` metadata records."""
     if not metas:
         return {}
     ids = [m["id"] for m in metas]

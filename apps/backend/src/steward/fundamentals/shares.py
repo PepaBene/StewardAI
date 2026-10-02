@@ -219,6 +219,7 @@ def from_instance(
                 "label": c.label,
                 "shares": str(c.shares),
                 "counted": not wanted or c.member in wanted,
+                **({"as_of": c.as_of.isoformat()} if c.as_of and c.as_of != shares.as_of else {}),
             }
             for c in shares.classes
         ],

@@ -668,7 +668,11 @@ async def test_refresh_falls_back_to_the_instance_and_serves_ratios(
     assert tsm["eps_ttm"]["stale"] is True  # period ended over 200 days ago
     assert tsm["fundamentals"]["source_label"] == "SEC filing's XBRL instance"
     # Dividends are tagged in TWD only, and there is no TWD reference rate.
-    assert tsm["dividend_yield"] == {"value": None, "reason": "no CNB reference rate for TWD"}
+    assert tsm["dividend_yield"] == {
+        "value": None,
+        "reason": "no CNB reference rate for TWD",
+        "source_label": None,
+    }
     assert tsm["pe_history"] and tsm["pe_history"][0]["date"] == "2026-05-01"
     assert tsm["pe_history"][0]["eps"] == pytest.approx(2.09)  # effective from 2026-04-16
 
@@ -741,7 +745,7 @@ async def test_valuation_before_anything_is_stored(api: httpx.AsyncClient) -> No
     assert body["portfolio"]["pe"] is None
     assert body["holdings"] == []
     one = (await api.get("/holdings/MSFT_US_EQ/valuation")).json()
-    assert one["pe"] == {"value": None, "reason": "no stored price"}
+    assert one["pe"] == {"value": None, "reason": "no stored price", "source_label": None}
 
 
 def _chosen(source: str, steps: list[tuple[str, float]]) -> _Chosen:

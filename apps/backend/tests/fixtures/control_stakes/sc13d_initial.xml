@@ -1,0 +1,50 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<edgarSubmission xmlns="http://www.sec.gov/edgar/schedule13D">
+  <headerData>
+    <submissionType>SCHEDULE 13D</submissionType>
+    <filerInfo><filer><filerCredentials><cik>0001500001</cik></filerCredentials></filer></filerInfo>
+  </headerData>
+  <formData>
+    <coverPageHeader>
+      <securitiesClassTitle>Class A Common Stock, $0.001 par value</securitiesClassTitle>
+      <dateOfEvent>03/05/2025</dateOfEvent>
+      <issuerInfo>
+        <issuerCIK>0000111111</issuerCIK>
+        <issuerCUSIP>30000A104</issuerCUSIP>
+        <issuerName>Example Corp</issuerName>
+      </issuerInfo>
+    </coverPageHeader>
+    <reportingPersons>
+      <reportingPersonInfo>
+        <reportingPersonCIK>0001500001</reportingPersonCIK>
+        <reportingPersonName>Alpha Capital Partners LP</reportingPersonName>
+        <memberOfGroup>a</memberOfGroup>
+        <citizenshipOrOrganization>DE</citizenshipOrOrganization>
+        <soleVotingPower>0</soleVotingPower>
+        <sharedVotingPower>4000000</sharedVotingPower>
+        <soleDispositivePower>0</soleDispositivePower>
+        <sharedDispositivePower>4000000</sharedDispositivePower>
+        <aggregateAmountOwned>4000000</aggregateAmountOwned>
+        <percentOfClass>8.0</percentOfClass>
+        <typeOfReportingPerson>PN</typeOfReportingPerson>
+      </reportingPersonInfo>
+      <reportingPersonInfo>
+        <reportingPersonCIK>0001500002</reportingPersonCIK>
+        <reportingPersonName>Alpha Capital GP LLC</reportingPersonName>
+        <memberOfGroup>a</memberOfGroup>
+        <citizenshipOrOrganization>DE</citizenshipOrOrganization>
+        <soleVotingPower>0</soleVotingPower>
+        <sharedVotingPower>4000000</sharedVotingPower>
+        <soleDispositivePower>0</soleDispositivePower>
+        <sharedDispositivePower>4000000</sharedDispositivePower>
+        <aggregateAmountOwned>4000000</aggregateAmountOwned>
+        <percentOfClass>8.0</percentOfClass>
+        <typeOfReportingPerson>OO</typeOfReportingPerson>
+      </reportingPersonInfo>
+    </reportingPersons>
+    <items>
+      <item1><securityTitle>Class A Common Stock</securityTitle></item1>
+      <item4><purposeOfTransaction>The Reporting Persons acquired the shares for investment purposes and intend to review their investment on a continuing basis.</purposeOfTransaction></item4>
+    </items>
+  </formData>
+</edgarSubmission>

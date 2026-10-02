@@ -147,14 +147,31 @@ async def _sec_rows(pool: asyncpg.Pool, ticker: str) -> list[dict[str, Any]]:
         " order by f.filed desc, f.accession desc",
         ticker,
     )
+    return latest_filing_rows([dict(r) for r in rows])
+
+
+def latest_filing_rows(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """For each (kind, period, unit) breakdown keep the rows of ONE filing: the latest that
+    reports it. Companies recast segments, so an older filing's members (a segment that no
+    longer exists after the recast) must not be unioned with the recast members of the newer
+    one; choosing per member, as before, mixed the two (B30)."""
+    winner: dict[tuple[Any, ...], tuple[Any, Any]] = {}
+    for r in rows:
+        key = (r["kind"], r["period_start"], r["period_end"], r["unit"])
+        rank = (r["filed"], r["accession"])
+        if key not in winner or rank > winner[key]:
+            winner[key] = rank
     seen: set[tuple[Any, ...]] = set()
     out: list[dict[str, Any]] = []
     for r in rows:
-        key = (r["kind"], r["member"], r["period_start"], r["period_end"], r["unit"])
-        if key in seen:
+        key = (r["kind"], r["period_start"], r["period_end"], r["unit"])
+        if (r["filed"], r["accession"]) != winner[key]:
             continue
-        seen.add(key)
-        out.append(dict(r))
+        row_key = (*key, r["member"])
+        if row_key in seen:
+            continue
+        seen.add(row_key)
+        out.append(r)
     return out
 
 
@@ -320,6 +337,9 @@ class ShareClassOut(BaseModel):
     label: str
     shares: Decimal
     counted: bool
+    as_of: dt.date | None = Field(
+        default=None, description="Set when this class's cover figure is dated differently."
+    )
 
 
 class SharesOutstandingOut(BaseModel):

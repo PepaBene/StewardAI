@@ -18,7 +18,9 @@ ingest) and both sources are off until the owner has checked the services' terms
 - edgar_fts: EDGAR full-text search (efts.sec.gov). Each holding's watch topics run as
   saved searches over new 8-K, 6-K, 10-Q, 10-K and 20-F filings; every hit becomes a tier-1
   item. Other filers' 10-K and 20-F filings that name the holding next to "customer" or
-  "supplier" become suggested relationships linked to the filing.
+  "supplier" become *review candidates* only: the search says the words occur in the filing,
+  not who sells to whom, so no role is assigned here. `steward.graph.passages` fetches the
+  filing, reads the passage and resolves the counterparties and direction (D5.8).
 """
 
 import datetime as dt
@@ -349,7 +351,9 @@ async def efts_search(
 
 @dataclass
 class FtsResult(CollectResult):
-    # (ticker, kind customer|supplier, keyword, hit): other filers naming the holding.
+    # (ticker, "relationship_candidate", keyword, hit): other filers whose document contains the
+    # holding's name and the keyword. The keyword proves no role or direction; it is only the
+    # reason the filing is queued for passage review.
     relations: list[tuple[str, str, str, FilingHit]] = field(default_factory=list)
     # (ticker, topic, hit) for every topic hit, to record in filing_hit.
     topic_hits: list[tuple[str, str, FilingHit]] = field(default_factory=list)
@@ -402,9 +406,10 @@ async def collect_edgar_fts(
         name = holding.names[0] if holding.names else None
         if not name or len(name) < 4:
             continue
-        # "customer" next to the holding: the filer sells to it (the filer is a supplier);
-        # "supplier": the filer buys from it (the filer is a customer).
-        for keyword, relation in (("customer", "supplier"), ("supplier", "customer")):
+        # Full-text proximity says nothing about who sells to whom ("customer" may describe the
+        # holding's own customers, a third party, or boilerplate), so both keywords queue the
+        # filing for passage review without assigning a role.
+        for keyword in ("customer", "supplier"):
             try:
                 hits = await efts_search(
                     http,
@@ -422,5 +427,5 @@ async def collect_edgar_fts(
             for hit in hits:
                 if holding.cik and hit.cik and int(hit.cik) == int(holding.cik):
                     continue  # its own filing
-                result.relations.append((holding.ticker, relation, keyword, hit))
+                result.relations.append((holding.ticker, "relationship_candidate", keyword, hit))
     return result

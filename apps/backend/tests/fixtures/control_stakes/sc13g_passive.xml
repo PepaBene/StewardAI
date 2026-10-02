@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<edgarSubmission xmlns="http://www.sec.gov/edgar/schedule13g">
+  <headerData>
+    <submissionType>SCHEDULE 13G</submissionType>
+    <filerInfo><filer><filerCredentials><cik>0002000001</cik></filerCredentials></filer></filerInfo>
+  </headerData>
+  <formData>
+    <coverPageHeader>
+      <securitiesClassTitle>Class A Common Stock</securitiesClassTitle>
+      <eventDateRequiresFilingThisStatement>12/31/2025</eventDateRequiresFilingThisStatement>
+      <issuerInfo>
+        <issuerCik>0000111111</issuerCik>
+        <issuerCusip>30000A104</issuerCusip>
+        <issuerName>Example Corp</issuerName>
+      </issuerInfo>
+    </coverPageHeader>
+    <coverPageHeaderReportingPersonDetails>
+      <reportingPersonName>Index Giant Asset Management Inc</reportingPersonName>
+      <citizenshipOrOrganization>DE</citizenshipOrOrganization>
+      <reportingPersonBeneficiallyOwnedNumberOfShares>
+        <soleVotingPower>2900000</soleVotingPower>
+        <sharedVotingPower>0</sharedVotingPower>
+        <soleDispositivePower>3050000</soleDispositivePower>
+        <sharedDispositivePower>0</sharedDispositivePower>
+      </reportingPersonBeneficiallyOwnedNumberOfShares>
+      <reportingPersonBeneficiallyOwnedAggregateNumberOfShares>3050000</reportingPersonBeneficiallyOwnedAggregateNumberOfShares>
+      <classPercent>6.1</classPercent>
+      <typeOfReportingPerson>IA</typeOfReportingPerson>
+    </coverPageHeaderReportingPersonDetails>
+  </formData>
+</edgarSubmission>
