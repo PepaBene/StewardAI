@@ -7,6 +7,7 @@ import { PageHeader } from "@/components/page-header";
 
 import { AlertsPanel } from "./alerts-panel";
 import { CoveragePanel } from "./coverage-panel";
+import { SourceCoveragePanel } from "./source-coverage-panel";
 import { EvalCandidatesPanel } from "./eval-candidates-panel";
 import { JobLog } from "./job-log";
 import { CoverageRings, JobGridPanel, SpendPanel } from "./overview-panels";
@@ -14,6 +15,7 @@ import { TrustPanel } from "./trust-panel";
 
 const SECTIONS = [
   { id: "coverage", label: "Coverage per holding" },
+  { id: "source-coverage", label: "Source coverage" },
   { id: "alerts", label: "Alerts" },
   { id: "job-log", label: "Job log" },
   { id: "source-trust", label: "Source trust" },
@@ -60,6 +62,7 @@ export function ActivityView() {
         </ul>
       </nav>
       <CoveragePanel />
+      <SourceCoveragePanel />
       <AlertsPanel />
       <JobLog />
       <TrustPanel />
