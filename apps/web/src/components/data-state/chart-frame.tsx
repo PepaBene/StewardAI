@@ -14,6 +14,48 @@ export type TableEquivalent = {
   rows: readonly (readonly ReactNode[])[];
 };
 
+/** The visible table equivalent of a chart: exact values behind a disclosure, with real headers. */
+export function TableView({ table, summary = "Table view: exact values" }: { table: TableEquivalent; summary?: string }) {
+  return (
+    <details className="group border border-border-soft text-sm">
+      <summary className="cursor-pointer px-3 py-1.5 text-xs font-medium text-accent-ink select-none hover:underline">
+        {summary}
+      </summary>
+      <div className="overflow-x-auto border-t border-border-soft">
+        <table className="w-full min-w-[28rem] text-xs">
+          <caption className="sr-only">{table.caption}</caption>
+          <thead className="bg-surface-muted">
+            <tr className="border-b border-border text-[11px] tracking-[0.08em] text-text-muted uppercase">
+              {table.columns.map((c, i) => (
+                <th key={i} scope="col" className={cn("px-3 py-1.5 font-medium", i === 0 ? "text-left" : "text-right")}>
+                  {c}
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {table.rows.map((row, r) => (
+              <tr key={r} className="border-b border-border-soft last:border-0">
+                {row.map((cell, c) =>
+                  c === 0 ? (
+                    <th key={c} scope="row" className="px-3 py-1.5 text-left font-normal">
+                      {cell}
+                    </th>
+                  ) : (
+                    <td key={c} className="num px-3 py-1.5 text-right">
+                      {cell}
+                    </td>
+                  ),
+                )}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </details>
+  );
+}
+
 /**
  * The frame every chart of the free-data views sits in (Phase 7 contract, applied from the
  * start): a plain-language takeaway, units, the chart, a visible table equivalent with the
@@ -69,44 +111,7 @@ export function ChartFrame({
       ) : (
         children
       )}
-      {table && decision !== "placeholder" ? (
-        <details className="group border border-border-soft text-sm">
-          <summary className="cursor-pointer px-3 py-1.5 text-xs font-medium text-accent-ink select-none hover:underline">
-            Table view: exact values
-          </summary>
-          <div className="overflow-x-auto border-t border-border-soft">
-            <table className="w-full min-w-[28rem] text-xs">
-              <caption className="sr-only">{table.caption}</caption>
-              <thead className="bg-surface-muted">
-                <tr className="border-b border-border text-[11px] tracking-[0.08em] text-text-muted uppercase">
-                  {table.columns.map((c, i) => (
-                    <th key={i} scope="col" className={cn("px-3 py-1.5 font-medium", i === 0 ? "text-left" : "text-right")}>
-                      {c}
-                    </th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {table.rows.map((row, r) => (
-                  <tr key={r} className="border-b border-border-soft last:border-0">
-                    {row.map((cell, c) =>
-                      c === 0 ? (
-                        <th key={c} scope="row" className="px-3 py-1.5 text-left font-normal">
-                          {cell}
-                        </th>
-                      ) : (
-                        <td key={c} className="num px-3 py-1.5 text-right">
-                          {cell}
-                        </td>
-                      ),
-                    )}
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </details>
-      ) : null}
+      {table && decision !== "placeholder" ? <TableView table={table} /> : null}
       <ProvenanceFooter provenance={provenance} />
     </Blueprint>
   );
