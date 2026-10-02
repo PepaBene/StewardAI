@@ -2,7 +2,15 @@
  * OHLC helpers for the candle chart.
  */
 
-import { isFiniteNumber } from "./scale";
+import { bandScale, isFiniteNumber } from "./scale";
+
+/** Right-hand gutter of the candle chart (y labels), shared with charts aligned to it. */
+export const CANDLE_RIGHT = 52;
+
+/** The horizontal band layout of the candle chart for `count` bars in a `width` viewBox. */
+export function candleBand(count: number, width: number) {
+  return bandScale(count, [0, width - CANDLE_RIGHT], { paddingInner: 0.36 });
+}
 
 /** One trading day. open/high/low may be missing when the source only has closes. */
 export type OhlcBar = {

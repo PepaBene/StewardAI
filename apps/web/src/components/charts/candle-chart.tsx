@@ -1,7 +1,7 @@
-import { hasCompleteOhlc, hasVolume, type OhlcBar } from "@/lib/charts/candles";
+import { candleBand, CANDLE_RIGHT, hasCompleteOhlc, hasVolume, type OhlcBar } from "@/lib/charts/candles";
 import { formatCompact, formatNumber } from "@/lib/charts/format";
 import { areaPath, linePath, n, type Point } from "@/lib/charts/path";
-import { bandScale, extent, isFiniteNumber, linearScale, niceTicks } from "@/lib/charts/scale";
+import { extent, isFiniteNumber, linearScale, niceTicks } from "@/lib/charts/scale";
 import { movingAverage } from "@/lib/charts/series";
 import { formatDay, timeTicks, type TimeTick } from "@/lib/charts/time";
 import { cn } from "@/lib/utils";
@@ -61,7 +61,7 @@ export function CandleChart({
   const ma = maWindow && maWindow > 1 ? movingAverage(closes, maWindow) : null;
   const hasMa = !!ma && ma.some(isFiniteNumber);
 
-  const right = 52;
+  const right = CANDLE_RIGHT;
   const x0 = 0;
   const x1 = width - right;
   const priceTop = 8;
@@ -78,7 +78,7 @@ export function CandleChart({
   const domain: [number, number] = [ext[0] - pad, ext[1] + pad];
   const ticks = niceTicks(domain[0], domain[1], 5).filter((t) => t >= domain[0] && t <= domain[1]);
   const y = linearScale(domain, [priceBottom, priceTop]);
-  const band = bandScale(bars.length, [x0, x1], { paddingInner: 0.36 });
+  const band = candleBand(bars.length, width);
   const cx = (i: number) => band.x(i) + band.bandwidth / 2;
   const maxVol = Math.max(0, ...bars.map((b) => (isFiniteNumber(b.volume) ? b.volume : 0)));
   const vy = linearScale([0, maxVol || 1], [volBottom, volTop]);
