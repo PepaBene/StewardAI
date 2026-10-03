@@ -590,7 +590,7 @@ class MacroSettings(ConfigModel):
             EcbSeries(
                 key="euro_area_private_credit",
                 label="Euro-area MFI loans to euro-area residents",
-                flow_key="BSI/M.U2.N.A.A20.A.1.U2.2300.Z01.E",
+                flow_key="BSI/M.U2.N.A.A20.A.1.U2.0000.Z01.E",
                 unit="EUR millions",
             ),
             EcbSeries(
@@ -602,13 +602,13 @@ class MacroSettings(ConfigModel):
             EcbSeries(
                 key="euro_area_m3_growth",
                 label="Euro-area M3 annual growth rate",
-                flow_key="BSI/BSI.M.U2.Y.V.M30.A.I.U2.0000.Z01.A",
+                flow_key="BSI/M.U2.Y.V.M30.X.I.U2.2300.Z01.A",
                 unit="%",
             ),
             EcbSeries(
                 key="euro_area_household_loan_rate",
                 label="Euro-area cost of borrowing for household house purchase",
-                flow_key="MIR/MIR.M.U2.B.A2C.AM.R.A.2250.EUR.N",
+                flow_key="MIR/M.U2.B.A2C.AM.R.A.2250.EUR.N",
                 unit="% p.a.",
             ),
             EcbSeries(
@@ -632,7 +632,7 @@ class MacroSettings(ConfigModel):
             EcbSeries(
                 key="ea_bls_enterprise_credit_standards",
                 label="Euro-area bank lending survey: enterprise credit standards",
-                flow_key="BLS/BLS.Q.U2.ALL.O.E.Z.B3.ST.S.WFNET",
+                flow_key="BLS/Q.U2.ALL.O.E.Z.B3.ST.S.WFNET",
                 unit="net % balance",
             ),
         ]

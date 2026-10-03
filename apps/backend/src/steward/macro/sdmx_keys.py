@@ -351,3 +351,23 @@ def data_request(provider: str, base_url: str, flow: str, key: str) -> tuple[str
             raise SdmxKeyError(f"BIS flow {flow!r} must be 'agency,id,version'")
         return f"{base}/data/dataflow/{parts[0]}/{parts[1]}/{parts[2]}/{key}", BIS_ACCEPT
     return f"{base}/data/{flow}/{key}", OECD_ACCEPT
+
+
+# ECB Data Portal flow/key strings that earlier defaults shipped and that the live API does not
+# serve (verified 2026-10-03: HTTP 400 when the key repeats the dataset prefix, "BSI.M..." instead
+# of "M..."; HTTP 404 for a counterpart-sector code the dataset has no series for) -> the verified
+# replacement. A stored configuration keeps the old text, so the collector applies this map.
+ECB_KEY_CORRECTIONS: dict[str, str] = {
+    # loans of MFIs (excl. Eurosystem) to euro area residents: counterpart sector 0000 (all);
+    # the shipped 2300 has no series in BSI
+    "BSI/M.U2.N.A.A20.A.1.U2.2300.Z01.E": "BSI/M.U2.N.A.A20.A.1.U2.0000.Z01.E",
+    # M3 annual growth rate: M30, X (index of notional stocks, growth), sector 2300 (money-holding)
+    "BSI/BSI.M.U2.Y.V.M30.A.I.U2.0000.Z01.A": "BSI/M.U2.Y.V.M30.X.I.U2.2300.Z01.A",
+    "MIR/MIR.M.U2.B.A2C.AM.R.A.2250.EUR.N": "MIR/M.U2.B.A2C.AM.R.A.2250.EUR.N",
+    "BLS/BLS.Q.U2.ALL.O.E.Z.B3.ST.S.WFNET": "BLS/Q.U2.ALL.O.E.Z.B3.ST.S.WFNET",
+}
+
+
+def ecb_flow_key(flow_key: str) -> str:
+    """The ECB flow/key to request: the configured one unless it is a known-broken default."""
+    return ECB_KEY_CORRECTIONS.get(flow_key, flow_key)

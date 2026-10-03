@@ -934,3 +934,120 @@ def test_the_shipped_defaults_cover_the_documented_dimension_orders() -> None:
     for (provider, key), series in SHIPPED.items():
         pinned = pin_key(provider, series.flow, series.series_key, series.geography)
         assert pinned.validated, key
+
+
+# ---------------------------------------------------------------- ALFRED output_type=1 (live)
+ALFRED = FIXTURES / "alfred_live"
+
+
+def _alfred_rows() -> list[dict[str, Any]]:
+    return json.loads((ALFRED / "cpiaucsl_lin_output_type_1.json").read_text())["observations"]
+
+
+def test_alfred_windows_start_at_the_real_first_release_not_at_the_request_start() -> None:
+    # recorded with realtime_start = 1776-07-04: June 2024 CPI was first published on 11 July 2024
+    first = min(r["realtime_start"] for r in _alfred_rows() if r["date"] == "2024-06-01")
+    assert first == "2024-07-11"
+    # and a revision (the February seasonal-factor update) is a second window of the same period
+    windows = [r for r in _alfred_rows() if r["date"] == "2024-06-01"]
+    assert len(windows) == 3 and windows[0]["value"] != windows[-1]["value"]
+
+
+def test_pc1_vintages_derived_from_levels_equal_fred_pc1_for_the_current_vintage() -> None:
+    from steward.macro.collect import derive_pc1_vintages
+
+    derived = derive_pc1_vintages(_alfred_rows())
+    latest = {}
+    for row in derived:  # the last emitted vintage of each period is the current one
+        latest[row["date"]] = row["value"]
+    truth = json.loads((ALFRED / "cpiaucsl_pc1_current.json").read_text())["observations"]
+    assert len(truth) >= 14
+    checked = 0
+    for row in truth:
+        if row["value"] == ".":  # FRED has no value (October 2025: no CPI was published)
+            assert row["date"] not in latest  # nothing is guessed for a missing level
+            continue
+        assert latest[row["date"]] == row["value"], row["date"]
+        checked += 1
+    assert checked >= 12
+    # an observation revised by the seasonal factors has several vintages, each with its own value
+    june = [r for r in derived if r["date"] == "2025-06-01"]
+    assert len(june) >= 2 and june[0]["realtime_start"] < june[-1]["realtime_start"]
+    assert june[-1]["realtime_end"] == "9999-12-31" and len({r["value"] for r in june}) == len(june)
+
+
+def test_pc1_needs_both_levels_known_on_the_vintage_date() -> None:
+    from steward.macro.collect import derive_pc1_vintages
+
+    rows = [
+        {"date": "2025-06-01", "value": "100", "realtime_start": "2025-07-01",
+         "realtime_end": "9999-12-31"},
+        {"date": "2026-06-01", "value": "103", "realtime_start": "2026-07-01",
+         "realtime_end": "2026-12-31"},
+        {"date": "2026-06-01", "value": "104", "realtime_start": "2027-01-01",
+         "realtime_end": "9999-12-31"},
+        {"date": "2026-07-01", "value": "104", "realtime_start": "2026-08-01",
+         "realtime_end": "9999-12-31"},  # no level a year earlier: no row, nothing is guessed
+    ]  # fmt: skip
+    out = derive_pc1_vintages(rows)
+    assert [(r["date"], r["value"], r["realtime_start"], r["realtime_end"]) for r in out] == [
+        ("2026-06-01", "3.00000", "2026-07-01", "2026-12-31"),
+        ("2026-06-01", "4.00000", "2027-01-01", "9999-12-31"),
+    ]
+
+
+@pytest.mark.db
+async def test_alfred_is_requested_as_levels_from_the_earliest_realtime_date(
+    backend_pool: asyncpg.Pool,
+) -> None:
+    from steward.config.jobs import FredSeries
+    from steward.macro.collect import MacroError, store_fred_vintages
+
+    seen: list[httpx.Request] = []
+    body = (ALFRED / "cpiaucsl_lin_output_type_1.json").read_text()
+
+    def serve(request: httpx.Request) -> httpx.Response:
+        seen.append(request)
+        if request.url.params["units"] != "lin":  # what the live API answers
+            return httpx.Response(400, json={"error_code": 400})
+        return httpx.Response(200, text=body)
+
+    cpi = FredSeries(key="us_cpi", label="CPI", series_id="CPIAUCSL", units="pc1")
+    async with httpx.AsyncClient(transport=httpx.MockTransport(serve)) as http:
+        stored = await store_fred_vintages(
+            backend_pool, http, cpi, "secret", dt.date(2026, 10, 3), history_years=1
+        )
+        assert stored > 0
+        params = seen[0].url.params
+        assert (params["units"], params["realtime_start"], params["output_type"]) == (
+            "lin",
+            "1776-07-04",
+            "1",
+        )
+        rows = await backend_pool.fetch(
+            "select period, value, vintage, transformation from macro_observation"
+            " where series_id='us_cpi' order by period, vintage"
+        )
+        assert rows and {r["transformation"] for r in rows} == {"percent change from year ago"}
+        # percent change from a year ago, never index levels under a % unit
+        assert all(Decimal(0) < r["value"] < Decimal(10) for r in rows)
+        # a series with another transformation has no vintage history: reported, not faked
+        pch = FredSeries(key="x", label="x", series_id="CPIAUCSL", units="pch")
+        with pytest.raises(MacroError, match="no real-time history"):
+            await store_fred_vintages(backend_pool, http, pch, "k", dt.date(2026, 10, 3), 1)
+
+
+# ------------------------------------------------------------------------------ ECB keys
+def test_known_broken_ecb_defaults_are_corrected_to_the_keys_the_live_api_serves() -> None:
+    from steward.config.jobs import MacroSettings
+    from steward.macro.sdmx_keys import ECB_KEY_CORRECTIONS, ecb_flow_key
+
+    shipped = {s.key: s.flow_key for s in MacroSettings().ecb}
+    # no shipped default repeats the dataset prefix in the key (HTTP 400 live) or needs a fix
+    assert all(ecb_flow_key(k) == k for k in shipped.values())
+    assert not [k for k in shipped.values() if k.split("/", 1)[1].startswith(k.split("/", 1)[0])]
+    assert ecb_flow_key("BSI/BSI.M.U2.Y.V.M30.A.I.U2.0000.Z01.A") == (
+        "BSI/M.U2.Y.V.M30.X.I.U2.2300.Z01.A"
+    )
+    assert ecb_flow_key("MIR/M.U2.B.A2I.AM.R.A.2240.EUR.N") == "MIR/M.U2.B.A2I.AM.R.A.2240.EUR.N"
+    assert len(ECB_KEY_CORRECTIONS) == 4

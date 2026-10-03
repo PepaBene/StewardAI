@@ -31,7 +31,7 @@ import json
 import logging
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, replace
-from decimal import Decimal
+from decimal import ROUND_HALF_UP, Decimal
 from functools import partial
 from typing import Any
 
@@ -57,6 +57,7 @@ from steward.macro.providers import (
     parse_period,
     sdmx_unit_multiplier,
 )
+from steward.macro.sdmx_keys import ecb_flow_key
 from steward.macro.store import MacroRow, store_macro_rows, upsert_series_metadata
 from steward.news.synthetic import SyntheticEvent, SyntheticSource, raise_events
 from steward.settings import get_settings
@@ -303,6 +304,78 @@ async def fetch_fred(
         params["offset"] = str(offset)
 
 
+FRED_EARLIEST_REALTIME = "1776-07-04"  # the earliest real-time date FRED/ALFRED accepts
+FRED_OPEN_WINDOW = "9999-12-31"
+
+
+def _year_earlier(day: dt.date) -> dt.date | None:
+    try:
+        return day.replace(year=day.year - 1)
+    except ValueError:  # 29 February
+        return None
+
+
+def derive_pc1_vintages(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """`units=pc1` (percent change from a year ago) real-time rows from index-level real-time rows.
+
+    FRED refuses `output_type=1` over a real-time range for any `units` other than `lin` (HTTP 400,
+    verified live 2026-10-03), so the level windows are fetched and the transformation is applied
+    to each vintage: FRED's own formula, (x[t] / x[t-1 year] - 1) * 100, rounded half up to five
+    decimals (checked against FRED's pc1 for CPIAUCSL: 2026-08 -> 3.35302). An observation gets a
+    row for every vintage date on which its percent change differs from the previous vintage; both
+    levels must be known on that date, otherwise there is no row (nothing is guessed)."""
+    windows: dict[dt.date, list[tuple[dt.date, dt.date, Decimal]]] = {}
+    starts: set[dt.date] = set()
+    for row in rows:
+        value = finite_decimal(row.get("value"))
+        try:
+            day = dt.date.fromisoformat(str(row["date"]))
+            first = dt.date.fromisoformat(str(row["realtime_start"]))
+            last = dt.date.fromisoformat(str(row["realtime_end"]))
+        except (KeyError, ValueError):
+            continue
+        if value is None:
+            continue
+        windows.setdefault(day, []).append((first, last, value))
+        starts.add(first)
+
+    def level(day: dt.date, vintage: dt.date) -> Decimal | None:
+        for first, last, value in windows.get(day, []):
+            if first <= vintage <= last:
+                return value
+        return None
+
+    vintages = sorted(starts)
+    out: list[dict[str, Any]] = []
+    for day in sorted(windows):
+        prior = _year_earlier(day)
+        if prior is None or prior not in windows:
+            continue
+        emitted: list[tuple[dt.date, Decimal]] = []
+        for vintage in vintages:
+            now, then = level(day, vintage), level(prior, vintage)
+            if now is None or then is None or then == 0:
+                continue
+            change = ((now / then - 1) * 100).quantize(Decimal("0.00001"), ROUND_HALF_UP)
+            if not emitted or emitted[-1][1] != change:
+                emitted.append((vintage, change))
+        for position, (vintage, change) in enumerate(emitted):
+            following = (
+                emitted[position + 1][0] - dt.timedelta(days=1)
+                if position + 1 < len(emitted)
+                else None
+            )
+            out.append(
+                {
+                    "date": day.isoformat(),
+                    "value": format(change, "f"),
+                    "realtime_start": vintage.isoformat(),
+                    "realtime_end": following.isoformat() if following else FRED_OPEN_WINDOW,
+                }
+            )
+    return out
+
+
 async def store_fred_vintages(
     pool: asyncpg.Pool,
     http: httpx.AsyncClient,
@@ -315,9 +388,20 @@ async def store_fred_vintages(
 
     `output_type=1` returns one row per observation and real-time window (value, start, end),
     which is what holds revisions; `output_type=4` is *initial release only* and would never
-    show one. The same `units` as the current-vintage request is sent, so a transformed series
-    (`us_cpi`, `pc1`) is not stored as index levels under a `%` unit."""
+    show one. Two live-verified (2026-10-03) points of the API: the request starts at
+    FRED's earliest real-time date, because a window is clipped to the requested `realtime_start`
+    (an observation first published before it would otherwise carry the clip date as its release
+    date); and FRED answers HTTP 400 for `output_type=1` over a real-time range with `units`
+    other than `lin`, so a `pc1` series (`us_cpi`) is fetched as levels and transformed per
+    vintage (`derive_pc1_vintages`). Other transformations have no vintage history (reported)."""
+    if series.units not in ("lin", "pc1"):
+        raise MacroError(
+            f"ALFRED {series.series_id}: units={series.units} has no real-time history "
+            "(FRED refuses it with output_type=1); only lin and pc1 are derived"
+        )
     start = dt.date(today.year - history_years, 1, 1)
+    # pc1 needs the level a year before the first observation kept
+    first_observation = dt.date(start.year - 1, 1, 1) if series.units == "pc1" else start
     response = await http.get(
         FRED_URL,
         params={
@@ -325,9 +409,9 @@ async def store_fred_vintages(
             "api_key": api_key,
             "file_type": "json",
             "output_type": "1",
-            "units": series.units,
-            "observation_start": start.isoformat(),
-            "realtime_start": start.isoformat(),
+            "units": "lin",
+            "observation_start": first_observation.isoformat(),
+            "realtime_start": FRED_EARLIEST_REALTIME,
             "realtime_end": today.isoformat(),
             "limit": str(FRED_MAX_LIMIT),
         },
@@ -335,8 +419,18 @@ async def store_fred_vintages(
     if response.status_code != 200:
         raise MacroError(f"ALFRED {series.series_id} returned HTTP {response.status_code}")
     skipped: list[str] = []
+    body = response.json()
+    if series.units == "pc1":
+        body = {
+            **body,
+            "observations": [
+                row
+                for row in derive_pc1_vintages(body.get("observations") or [])
+                if dt.date.fromisoformat(row["date"]) >= start
+            ],
+        }
     points = parse_fred_vintages(
-        response.json(),
+        body,
         series_id=series.key,
         unit=series.unit,
         source_url=FRED_PAGE.format(series_id=series.series_id),
@@ -371,7 +465,7 @@ def parse_ecb_series(
     monthly (`2026-07`), quarterly (`2026-Q2`), half-yearly, weekly or annual. A row whose
     period or value cannot be read is appended to `skipped` instead of vanishing.
     `seen_on` is the release date to record (None: unknown, as for a backfill)."""
-    flow, key = series.flow_key.split("/", 1)
+    flow, key = ecb_flow_key(series.flow_key).split("/", 1)
     out = []
     for row in csv.DictReader(io.StringIO(text)):
         label = (row.get("TIME_PERIOD") or "").strip()
@@ -418,7 +512,8 @@ async def fetch_ecb_series(
     unknown (None), not the day the job happened to run."""
     window = {"startPeriod": since.isoformat()} if since else {"lastNObservations": "5"}
     response = await http.get(
-        ECB_URL.format(flow_key=series.flow_key), params={**window, "format": "csvdata"}
+        ECB_URL.format(flow_key=ecb_flow_key(series.flow_key)),
+        params={**window, "format": "csvdata"},
     )
     if response.status_code != 200:
         raise MacroError(f"ECB {series.flow_key} returned HTTP {response.status_code}")

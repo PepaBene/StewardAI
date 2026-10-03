@@ -684,7 +684,11 @@ async def test_events_survive_an_alfred_failure_and_alfred_asks_for_revisions(
     alfred = [r for r in transport.seen if r.url.params.get("output_type")]  # type: ignore[attr-defined]
     assert {r.url.params["output_type"] for r in alfred} == {"1"}  # not 4 (initial release only)
     cpi_call = next(r for r in alfred if r.url.params["series_id"] == "CPIAUCSL")
-    assert cpi_call.url.params["units"] == "pc1"
+    # FRED answers HTTP 400 for output_type=1 over a real-time range with units != lin (verified
+    # live 2026-10-03): the levels are requested from FRED's earliest real-time date and the
+    # percent change from a year ago is applied to each vintage locally.
+    assert cpi_call.url.params["units"] == "lin"
+    assert cpi_call.url.params["realtime_start"] == "1776-07-04"
     # The current-vintage run twice stored each period once.
     assert (
         await backend_pool.fetchval(
