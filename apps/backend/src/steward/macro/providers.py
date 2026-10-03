@@ -304,14 +304,23 @@ def parse_sdmx_json(
     attrs = structure.get("attributes") or {}
     series_attrs: list[dict[str, Any]] = attrs.get("series") or []
     obs_attrs: list[dict[str, Any]] = attrs.get("observation") or []
-    dataset_attrs: list[dict[str, Any]] = attrs.get("dataSet") or []
+    # SDMX-JSON 2.0 names the level `dataSet`, 1.0 (BIS) `dataset`
+    dataset_attrs: list[dict[str, Any]] = attrs.get("dataSet") or attrs.get("dataset") or []
     time_in_obs = next((i for i, d in enumerate(obs_dims) if d.get("id") in TIME_DIMENSIONS), None)
     if time_in_obs is None:
         return []
     dataset = datasets[0]
-    dataset_level = {
-        str(a.get("id")): _code(a.get("values") or [], 0) for a in dataset_attrs if a.get("values")
-    }
+    chosen = dataset.get("attributes")  # per attribute, the index of its value for this dataset
+    dataset_level: dict[str, str | None] = {}
+    for position, a in enumerate(dataset_attrs):
+        if not a.get("values"):
+            continue
+        if isinstance(chosen, list) and position < len(chosen):
+            if chosen[position] is None:
+                continue  # the attribute carries no value for this dataset
+            dataset_level[str(a.get("id"))] = _code(a["values"], chosen[position])
+        else:
+            dataset_level[str(a.get("id"))] = _code(a["values"], 0)
 
     # (dimension values, attribute values, period label, raw observation)
     records: list[tuple[dict[str, str], dict[str, str], str, Any]] = []

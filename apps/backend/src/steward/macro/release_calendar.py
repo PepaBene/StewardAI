@@ -26,6 +26,7 @@ from steward import __version__
 from steward.config.jobs import JobsConfig
 from steward.config.store import load_active
 from steward.jobs.runner import JobContext
+from steward.macro.sdmx_keys import SdmxKeyError, pin_key
 from steward.settings import get_settings
 from steward.sources.base import AccessResult, AccessState
 from steward.sources.governor import Budget, PostgresRequestGovernor
@@ -33,6 +34,7 @@ from steward.sources.release_calendar import (
     CalendarEntry,
     CalendarFetch,
     fetch_bis,
+    fetch_bls,
     fetch_cnb,
     fetch_ecb,
     fetch_ecfin,
@@ -45,16 +47,20 @@ log = logging.getLogger(__name__)
 
 ENDPOINT = "release_calendar"
 COVERAGE_PROVIDER = "macro_release_calendar"
-# `ecfin` is the DG ECFIN survey calendar: it is called and gated as its own endpoint, but its rows
-# date the `eurostat` sentiment series (the observation source), see CalendarFetch.rows_provider.
-CALENDAR_PROVIDERS = ("fred", "eurostat", "ecb", "bis", "ecfin", "cnb")
+# `ecfin` is the DG ECFIN survey calendar and `bls` the BLS release schedule: each is called and
+# gated as its own endpoint, but its rows date the `eurostat` sentiment series / the `fred` series
+# (the observation source), see CalendarFetch.rows_provider. `bls` runs after `fred` so that the
+# two can be compared.
+CALENDAR_PROVIDERS = ("fred", "bls", "eurostat", "ecb", "bis", "ecfin", "cnb")
 
 # The collector's own hard stop per provider (the ledger rows in provider_access declare FRED's
 # published 120 requests per minute; the others publish no limit). A daily run needs 1 request
-# (Eurostat, BIS, ČNB), 2 (ECFIN: this and next year's PDF), 4 (ECB) or 2 per series (FRED), so
-# these leave room for a few manual runs.
+# (Eurostat, BIS, BLS), 2 (ECFIN: this and next year's PDF), 3 (ČNB: meetings, holidays, CZEONIA
+# rule), 6 (ECB: three statistical calendars, the meeting calendar, the yield-curve rule's two
+# pages) or 2 per series (FRED), so these leave room for a few manual runs.
 CALENDAR_BUDGETS: dict[str, Budget] = {
     "fred": Budget(per_minute=Decimal(30), daily=Decimal(60)),
+    "bls": Budget(daily=Decimal(6)),
     "eurostat": Budget(daily=Decimal(6)),
     "ecb": Budget(daily=Decimal(15)),
     "bis": Budget(daily=Decimal(6)),
@@ -67,6 +73,8 @@ CALENDAR_BUDGETS: dict[str, Budget] = {
 class CalendarDeps:
     http: httpx.AsyncClient
     fred_key: str | None = None
+    # A User-Agent with a contact address: BLS refuses requests without one.
+    bls_user_agent: str | None = None
     now: dt.datetime | None = None
 
 
@@ -116,8 +124,9 @@ async def store_calendar(pool: asyncpg.Pool, fetch: CalendarFetch, now: dt.datet
                 await conn.execute(
                     """insert into public.macro_release_calendar
                        (provider,series_id,calendar_key,release_date,release_time,title,
-                        reference_period,source_url,retrieved_at,known_at)
-                       values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$9)""",
+                        reference_period,source_url,retrieved_at,known_at,source,
+                        release_timezone,release_timezone_source)
+                       values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$9,$10,$11,$12)""",
                     entry.provider,
                     entry.series_id,
                     entry.calendar_key,
@@ -127,6 +136,9 @@ async def store_calendar(pool: asyncpg.Pool, fetch: CalendarFetch, now: dt.datet
                     entry.reference_period,
                     entry.source_url,
                     now,
+                    entry.basis,
+                    entry.release_timezone,
+                    entry.release_timezone_source,
                 )
                 inserted += 1
     return StoreResult(inserted, superseded, unchanged)
@@ -157,6 +169,7 @@ async def _provider_step(
     fred_series: dict[str, str],
     bis_flows: dict[str, str],
     step: Any,
+    bls_user_agent: str | None = None,
 ) -> None:
     decision = await provider_gate(ctx.pool, provider, ENDPOINT)
     if not decision.open:
@@ -174,6 +187,8 @@ async def _provider_step(
     today = now.astimezone(dt.UTC).date()
     if provider == "fred":
         fetch = await fetch_fred(deps.http, deps.fred_key or "", fred_series, today, before_call)
+    elif provider == "bls":
+        fetch = await fetch_bls(deps.http, today, before_call, fred_series, bls_user_agent)
     elif provider == "eurostat":
         fetch = await fetch_eurostat(deps.http, today, before_call)
     elif provider == "ecb":
@@ -205,6 +220,13 @@ async def _provider_step(
     step.detail.update(
         inserted=result.inserted, superseded=result.superseded, unchanged=result.unchanged
     )
+    if provider == "bls" and fetch.entries:
+        mismatches = await bls_fred_mismatches(ctx.pool, fetch)
+        if mismatches:
+            # The BLS is the agency that publishes these releases: its date is the one the read
+            # path returns. A disagreement with FRED is reported, never silently resolved.
+            step.detail["bls_fred_date_mismatch"] = mismatches
+            log.warning("BLS and FRED release dates disagree: %s", mismatches)
     access = fetch.access
     if access.state == AccessState.AVAILABLE and not fetch.entries:
         access = AccessResult(AccessState.NOT_COVERED, "calendar lists no upcoming release")
@@ -229,6 +251,46 @@ async def _coverage(
     )
 
 
+def _effective_bis_flow(series: Any) -> str:
+    """The dataflow id ("WS_TC") a BIS series is really collected from, after key corrections."""
+    flow: str = series.flow
+    try:
+        flow = pin_key("bis", series.flow, series.series_key, series.geography).flow
+    except SdmxKeyError:
+        pass  # the collector reports an unusable key; the calendar maps the configured flow
+    parts = flow.split(",")
+    return parts[1] if len(parts) >= 2 else flow
+
+
+async def bls_fred_mismatches(
+    pool: asyncpg.Pool, bls: CalendarFetch
+) -> dict[str, dict[str, list[str]]]:
+    """Per series, the upcoming dates that only one of BLS and FRED lists, compared inside the
+    window both calendars cover (BLS lists a year ahead, FRED fewer dates)."""
+    out: dict[str, dict[str, list[str]]] = {}
+    for series_id, _calendar_key in sorted(bls.covered):
+        theirs = {e.release_date for e in bls.entries if e.series_id == series_id}
+        rows = await pool.fetch(
+            """select release_date from public.macro_release_calendar
+               where provider='fred' and series_id=$1 and calendar_key like 'release:%'
+                 and superseded_at is null""",
+            series_id,
+        )
+        fred = {r["release_date"] for r in rows}
+        if not fred or not theirs:
+            continue
+        low = min(min(fred), min(theirs))
+        high = min(max(fred), max(theirs))
+        only_bls = sorted(d for d in theirs if low <= d <= high and d not in fred)
+        only_fred = sorted(d for d in fred if low <= d <= high and d not in theirs)
+        if only_bls or only_fred:
+            out[series_id] = {
+                "only_bls": [d.isoformat() for d in only_bls],
+                "only_fred": [d.isoformat() for d in only_fred],
+            }
+    return out
+
+
 async def run_release_calendar(ctx: JobContext, deps: CalendarDeps) -> None:
     stored = await load_active(ctx.pool, "jobs", JobsConfig)
     await ctx.record_config_version(stored.id if stored else None)
@@ -237,14 +299,24 @@ async def run_release_calendar(ctx: JobContext, deps: CalendarDeps) -> None:
     governor = PostgresRequestGovernor(ctx.pool)
     fred_series = {s.key: s.series_id for s in jobs.macro.fred}
     # "BIS,WS_TC,2.0" -> "WS_TC": the dataflow a BIS series is really collected from.
+    # The flow is the one actually requested: a stored config may still hold a key that
+    # `pin_key` corrects to another dataflow (property_prices: WS_LONG_CPI -> WS_SPP).
     bis_flows = {
-        s.key: s.flow.split(",")[1] if s.flow.count(",") >= 1 else s.flow
-        for s in jobs.public_data.sdmx
-        if s.provider == "bis"
+        s.key: _effective_bis_flow(s) for s in jobs.public_data.sdmx if s.provider == "bis"
     }
     for provider in CALENDAR_PROVIDERS:
         async with ctx.step(f"{provider}:{ENDPOINT}") as step:
-            await _provider_step(ctx, deps, governor, now, provider, fred_series, bis_flows, step)
+            await _provider_step(
+                ctx,
+                deps,
+                governor,
+                now,
+                provider,
+                fred_series,
+                bis_flows,
+                step,
+                bls_user_agent=deps.bls_user_agent,
+            )
 
 
 async def macro_release_calendar_handler(ctx: JobContext) -> None:
@@ -259,6 +331,7 @@ async def macro_release_calendar_handler(ctx: JobContext) -> None:
                 fred_key=settings.fred_api_key.get_secret_value()
                 if settings.fred_api_key
                 else None,
+                bls_user_agent=settings.bls_user_agent or settings.sec_user_agent,
             ),
         )
 

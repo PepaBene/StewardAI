@@ -6355,14 +6355,24 @@ export interface components {
             release_calendar?: string | null;
             /**
              * Next Release
-             * @description Date of the next release of this series as announced in the provider's own published release calendar: the earliest stored calendar date on or after the UTC date of `as_of`, from calendar rows known by `as_of` and not superseded (rescheduled) by then. A date, not a promise: the provider may still reschedule it. Null when no calendar entry is stored for the series (then see `next_release_estimate`). `next_release_basis` is `provider_calendar` whenever this is set.
+             * @description Date of the next release of this series as announced in the provider's own published release calendar: the earliest stored calendar date on or after the UTC date of `as_of`, from calendar rows known by `as_of` and not superseded (rescheduled) by then. A date, not a promise: the provider may still reschedule it. Null when no calendar entry or published rule is stored for the series (then see `next_release_estimate`). `next_release_basis` is `provider_calendar` or `published_rule` whenever this is set.
              */
             next_release?: string | null;
             /**
              * Next Release Time
-             * @description Time of day of `next_release` exactly as the provider publishes it (the publisher's local time; the ECB calendar does not state a zone). Null when the calendar gives only a date (FRED, Eurostat, BIS) or `next_release` is null.
+             * @description Wall-clock time of day of `next_release` exactly as the provider publishes it, never converted. The zone it is a time in is `next_release_timezone`. Null when the calendar gives only a date (FRED, Eurostat, BIS, ECB meeting days) or `next_release` is null.
              */
             next_release_time?: string | null;
+            /**
+             * Next Release Timezone
+             * @description IANA time zone of `next_release_time` (for example Europe/Prague). Set only when `next_release_time` is set; null for a date-only release. `next_release_timezone_source` says whether the provider stated it or it was assumed from where the publishing agency is located: show an assumed zone as assumed.
+             */
+            next_release_timezone?: string | null;
+            /**
+             * Next Release Timezone Source
+             * @description `stated_by_provider`: the provider's calendar names the zone (BLS iCal TZID US-Eastern; ECB yield curves 'CET'). `agency_location`: the provider states a time but no zone, so the zone is that of the publishing agency's seat (ECB Frankfurt, ČNB Prague, DG ECFIN Brussels, ...), an assumption. Null with `next_release_timezone`.
+             */
+            next_release_timezone_source?: ("stated_by_provider" | "agency_location") | null;
             /** @description Provider and calendar URL of `next_release`; null when it is null. */
             next_release_source?: components["schemas"]["NextReleaseSource"] | null;
             /**
@@ -6372,9 +6382,9 @@ export interface components {
             next_release_estimate?: string | null;
             /**
              * Next Release Basis
-             * @description Where the returned next-release date comes from: `provider_calendar` (`next_release`, the provider's published schedule) or `observed_cadence` (`next_release_estimate`, the median gap of stored first releases; a fallback only when no calendar entry exists). Null when both are null.
+             * @description Where the returned next-release date comes from: `provider_calendar` (`next_release`, a date in the provider's published schedule), `published_rule` (`next_release`, derived from a release rule and a holiday list the provider itself publishes, for example 'every TARGET business day' with the ECB's closing days; the date can still move when the provider postpones) or `observed_cadence` (`next_release_estimate`, the median gap of stored first releases; a fallback only when no calendar entry or rule exists). Null when both are null.
              */
-            next_release_basis?: ("provider_calendar" | "observed_cadence") | null;
+            next_release_basis?: ("provider_calendar" | "published_rule" | "observed_cadence") | null;
         };
         /** ContradictionResolution */
         ContradictionResolution: {
@@ -13698,12 +13708,12 @@ export interface components {
         NextReleaseSource: {
             /**
              * Provider
-             * @description Provider whose calendar names the date (fred, eurostat, ecb, bis).
+             * @description Provider whose calendar names the date (fred, eurostat, ecb, bis, cnb).
              */
             provider: string;
             /**
              * Url
-             * @description The provider's calendar page the date was read from.
+             * @description The provider's calendar page the date was read from (for a `published_rule`, the page that states the rule).
              */
             url: string;
             /**

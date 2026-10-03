@@ -63,6 +63,9 @@ class Settings(BaseSettings):
     supabase_secret_key: SecretStr | None = None
     # SEC EDGAR asks for a descriptive User-Agent with a contact address.
     sec_user_agent: str | None = None
+    # BLS refuses requests without a User-Agent that carries a contact address (release schedule
+    # iCal). Falls back to SEC_USER_AGENT, the owner's contact address for the same purpose.
+    bls_user_agent: str | None = None
     # Finnhub free tier: US earnings calendar.
     finnhub_api_key: SecretStr | None = None
     # Alpha Vantage free tier: fallback valuation overview (25 requests per day).

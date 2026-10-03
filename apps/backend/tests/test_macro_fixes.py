@@ -312,14 +312,19 @@ def test_sdmx_1_0_layout_and_legacy_fixture() -> None:
 
 
 def test_bis_and_oecd_keys_are_pinned_and_validated() -> None:
+    # The shipped OECD inflation key had 4 of the 8 dimensions of DF_PRICES_ALL (verified live
+    # 2026-10-03): it is corrected to the full key and validated against the data structure.
     oecd = pin_key("oecd", "OECD.SDD.TPS,DSD_PRICES@DF_PRICES_ALL,1.0", ".M.CPI.PC_CHGPP", "US")
-    assert oecd.key == "USA.M.CPI.PC_CHGPP" and not oecd.validated
+    assert oecd.key == "USA.M.N.CPI.PA._T.N.GY" and oecd.validated and oecd.corrected
+    # a flow outside the documented table is still pinned when the area slot comes first
+    other = pin_key("oecd", "OECD.X,DSD_X@DF_X,1.0", ".A.B", "US")
+    assert other.key == "USA.A.B" and not other.validated
     # The shipped default ".Q.P.A.M.770.A" started with the area slot; BIS WS_TC starts with FREQ.
     tc = pin_key("bis", "BIS,WS_TC,2.0", ".Q.P.A.M.770.A", "US")
     assert tc.key == "Q.US.P.A.M.770.A" and tc.validated and tc.corrected
     assert pin_key("bis", "BIS,WS_DSR,1.0", ".Q.P.N", "US").key == "Q.US.P"
     spp = pin_key("bis", "BIS,WS_LONG_CPI,1.0", ".Q.R", "US")
-    assert (spp.flow, spp.key) == ("BIS,WS_SPP,1.0", "Q.US.R.628")
+    assert (spp.flow, spp.key) == ("BIS,WS_SPP,1.0", "Q.US.R.628") and spp.unit
     with pytest.raises(SdmxKeyError, match="has 3 dimensions"):
         pin_key("bis", "BIS,WS_TC,2.0", "Q.US.P", "US")
     with pytest.raises(SdmxKeyError, match="area slot"):
@@ -825,7 +830,8 @@ async def test_oecd_request_is_pinned_and_rows_carry_the_response_geography(
     config = _public_config(sdmx=[_oecd_series()])
     assert await _run_public(backend_pool, config, transport) == "succeeded"
     request = next(r for r in transport.seen if "/data/" in str(r.url))  # type: ignore[attr-defined]
-    assert request.url.path.endswith("/USA.M.CPI.PC_CHGPP")
+    # the stored key (4 of 8 dimensions) is corrected to the verified full key
+    assert request.url.path.endswith("/USA.M.N.CPI.PA._T.N.GY")
     assert request.url.params["dimensionAtObservation"] == "AllDimensions"
     rows = await backend_pool.fetch("select geography, period, value from macro_observation")
     # The response also held CAN: it is not stored under the configured US.

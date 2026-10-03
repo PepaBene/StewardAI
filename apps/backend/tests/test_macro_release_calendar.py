@@ -297,13 +297,23 @@ def _provider_transport() -> httpx.MockTransport:
         if url.host == "ec.europa.eu":
             return httpx.Response(200, text=_text("eurostat_euro_indicators.ics"))
         if url.host == "www.ecb.europa.eu":
+            if "euro_area_yield_curves" in url.path:
+                return httpx.Response(200, text=_text("ecb_yield_curve.html"))
+            if "/paym/target/" in url.path:
+                return httpx.Response(200, text=_text("ecb_t2_opening_hours.html"))
             page = url.path.rsplit("/", 1)[1].split(".")[0]
             if "/mgcgc/" in url.path:
                 page = "mgcgc"
             return httpx.Response(200, text=_text(f"ecb_{page}.html"))
         if url.host == "data.bis.org":
             return httpx.Response(200, text=_text("bis_releasecalendar.json"))
+        if url.host == "www.bls.gov":
+            return httpx.Response(200, text=_text("bls_schedule.ics"))
         if url.host == "www.cnb.cz":
+            if "bank-holidays" in url.path:
+                return httpx.Response(200, text=_text("cnb_bank_holidays.html"))
+            if "calculation-methodology" in url.path:
+                return httpx.Response(200, text=_text("cnb_czeonia_methodology.html"))
             return httpx.Response(200, text=_text("cnb_bank_board.html"))
         return httpx.Response(404)
 
@@ -344,6 +354,7 @@ async def test_every_provider_maps_to_its_series_and_keeps_only_upcoming_dates()
     # The preliminary flash (t+30) already updates namq_10_gdp: it is the next GDP release.
     assert gdp[0] == dt.date(2026, 10, 30)
     assert {e.series_id for e in ecb.entries} == {
+        "euro_area_10y_yield",
         "euro_area_m3_growth",
         "euro_area_private_credit",
         "euro_area_household_loan_rate",
@@ -364,7 +375,7 @@ async def test_every_provider_maps_to_its_series_and_keeps_only_upcoming_dates()
         "banking_claims",
         "debt_securities",
         "global_liquidity",
-        "property_prices",  # collected from WS_LONG_CPI: BIS category CPI, not residential
+        "property_prices",  # collected from WS_SPP: BIS category RPP (selected residential)
     }
     decisions = sorted(e.release_date for e in ecb.entries if e.series_id == "ecb_deposit_rate")
     assert decisions[0] == dt.date(2026, 10, 29)  # Day 2 of the meeting, not Day 1
@@ -592,11 +603,22 @@ async def test_next_releases_is_empty_without_calendar_rows(backend_pool: asyncp
 # ---------------------------------------------------------------------------------------
 # The job: free and gated, quota ledger, coverage, quarantine
 # ---------------------------------------------------------------------------------------
-async def _run(pool: asyncpg.Pool, transport: httpx.MockTransport, key: str | None = SECRET) -> str:
+BLS_AGENT = "StewardAI test ops@example.test"
+
+
+async def _run(
+    pool: asyncpg.Pool,
+    transport: httpx.MockTransport,
+    key: str | None = SECRET,
+    bls_agent: str | None = BLS_AGENT,
+) -> str:
     async with httpx.AsyncClient(transport=transport) as http:
 
         async def handler(ctx: JobContext) -> None:
-            await run_release_calendar(ctx, CalendarDeps(http, fred_key=key, now=NOW))
+            await run_release_calendar(
+                ctx,
+                CalendarDeps(http, fred_key=key, now=NOW, bls_user_agent=bls_agent),
+            )
 
         return await run_job(pool, "macro_release_calendar", handler, trigger="manual")
 
@@ -617,14 +639,20 @@ async def test_job_stores_every_provider_calendar_and_writes_coverage_and_usage(
     row = await backend_pool.fetchrow(
         "select known_at, retrieved_at, source from macro_release_calendar limit 1"
     )
-    assert row is not None and row["known_at"] == NOW and row["source"] == "provider_calendar"
+    assert row is not None and row["known_at"] == NOW
+    assert {
+        r["source"] for r in await backend_pool.fetch("select source from macro_release_calendar")
+    } == {
+        "provider_calendar",
+        "published_rule",
+    }
     coverage = {
         r["dataset"]: r
         for r in await backend_pool.fetch(
             "select * from coverage_status where provider='macro_release_calendar'"
         )
     }
-    assert set(coverage) == {"fred", "eurostat", "ecb", "bis", "ecfin", "cnb"}
+    assert set(coverage) == {"fred", "bls", "eurostat", "ecb", "bis", "ecfin", "cnb"}
     assert all(c["state"] == "available" and c["available_periods"] for c in coverage.values())
     usage = {
         r["provider"]: r["credits"]
@@ -635,8 +663,11 @@ async def test_job_stores_every_provider_calendar_and_writes_coverage_and_usage(
             " group by provider"
         )
     }
-    assert usage["fred"] == 6 and usage["eurostat"] == 1 and usage["ecb"] == 4 and usage["bis"] == 1
-    assert usage["ecfin"] == 2 and usage["cnb"] == 1  # this year's PDF and the unpublished next
+    assert usage["fred"] == 6 and usage["eurostat"] == 1 and usage["bis"] == 1
+    # ECB: 3 statistical calendars + the meeting calendar + the yield-curve rule's two pages
+    assert usage["ecb"] == 6 and usage["bls"] == 1
+    assert usage["ecfin"] == 2  # this year's PDF and the unpublished next
+    assert usage["cnb"] == 3  # Bank Board meetings, bank holidays, CZEONIA methodology
     # The key is nowhere in the audit trail.
     audit = await backend_pool.fetchval(
         "select string_agg(coalesce(error_redacted,''),' ') from provider_fetch_audit"
@@ -652,7 +683,8 @@ async def test_job_stores_every_provider_calendar_and_writes_coverage_and_usage(
 @pytest.mark.db
 async def test_job_reschedule_flows_through_to_the_context(backend_pool: asyncpg.Pool) -> None:
     await _seed_context(backend_pool)
-    assert await _run(backend_pool, _provider_transport()) == "succeeded"
+    # no BLS calendar here: FRED's date is the only one (the BLS's own wins when present)
+    assert await _run(backend_pool, _provider_transport(), bls_agent=None) == "succeeded"
     ctx = await context_for_holding(backend_pool, "MAPPED", NOW)
     cpi = next(o for o in ctx.observations if o.series_id == "us_cpi")
     assert (cpi.next_release, cpi.next_release_basis) == (
@@ -790,7 +822,14 @@ async def test_job_without_a_fred_key_skips_fred_and_still_reads_the_keyless_cal
         r["provider"]
         for r in await backend_pool.fetch("select distinct provider from macro_release_calendar")
     }
-    assert providers == {"eurostat", "ecb", "bis", "cnb"}
+    # the BLS iCal needs no FRED key: its rows are stored under the observation source `fred`
+    assert providers == {"fred", "eurostat", "ecb", "bis", "cnb"}
+    assert {
+        r["calendar_key"]
+        for r in await backend_pool.fetch(
+            "select distinct calendar_key from macro_release_calendar where provider='fred'"
+        )
+    } == {"bls:cpi", "bls:empsit"}
 
 
 # ---------------------------------------------------------------------------------------
@@ -825,6 +864,7 @@ async def test_zero_cost_gate_passes_with_the_calendar_endpoints_and_fails_if_on
     }
     assert registered == {
         ("fred", "available", False, "free"),
+        ("bls", "available", False, "free"),
         ("eurostat", "available", False, "free"),
         ("ecb", "available", False, "free"),
         ("bis", "available", False, "free"),
@@ -834,7 +874,7 @@ async def test_zero_cost_gate_passes_with_the_calendar_endpoints_and_fails_if_on
     manifest = await backend_pool.fetchval(
         "select count(*) from provider_endpoint_manifest where endpoint='release_calendar'"
     )
-    assert manifest == 6
+    assert manifest == 7
     gate = (await client.get("/verification/zero-cost-gate")).json()
     assert gate["passed"] is True
     assert not [

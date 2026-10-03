@@ -40,22 +40,62 @@ class CollectorBudget:
         return self.provider == provider and self.endpoint in (ANY_ENDPOINT, endpoint)
 
 
-# Credentialed providers without pay-as-you-go overage (stated from the providers' public
-# pricing pages; re-verify when a plan changes).  Reachable endpoints of these need no ledger
-# quota to be provably zero-cost.
+# Credentialed providers without pay-as-you-go overage: beyond the free limit they refuse (HTTP
+# 429) or require an explicit plan change; none bills per call.  Reachable endpoints of these need
+# no ledger quota to be provably zero-cost.  Re-verified from the providers' own pages on
+# 2026-10-03 (see NO_OVERAGE_EVIDENCE and docs/data/provider-access.md); re-verify when a plan
+# changes.
 NO_OVERAGE_PROVIDERS: dict[str, str] = {
-    "fred": "free API key, no paid tier; requests over the rate limit are refused",
-    "finnhub": "free key limited to 60 calls/minute; over the limit answers 429, never bills",
-    "twelve_data": "Basic plan has fixed daily/minute credits; over them answers 429, never bills",
-    "epo_ops": "non-paying OPS use has a weekly volume allowance; over it requests are "
-    "throttled or refused, and billing needs a signed contract",
+    "fred": "free API key; the terms list no fee or paid tier and reserve the right to limit or "
+    "disable access",
+    "finnhub": "free key; docs: 'If your limit is exceeded, you will receive a response with "
+    "status code 429', plus a 30 calls/second cap on every plan; fixed subscription plans only",
+    "twelve_data": "Basic plan is free with 8 credits/minute and 800/day; over the limit the API "
+    "answers 429 'Wait briefly or upgrade your plan'; no hidden charges, upgrading is an explicit "
+    "plan switch",
+    "epo_ops": "non-paying use is free up to 4 GB/week; more than that is the EUR 2,800/year "
+    "'paying user' subscription, which must be taken out explicitly",
+}
+
+# Where each claim above was read (official pages, fetched 2026-10-03) and what to watch.
+NO_OVERAGE_EVIDENCE: dict[str, dict[str, str]] = {
+    "fred": {
+        "checked": "2026-10-03",
+        "urls": "https://fred.stlouisfed.org/docs/api/terms_of_use.html; "
+        "https://fred.stlouisfed.org/docs/api/api_key.html",
+        "note": "The pages state no fee, quota or paid tier; the terms allow the Federal Reserve "
+        "Bank of St. Louis to impose or adjust bandwidth/transaction limits. The numeric rate "
+        "limit is not published there.",
+    },
+    "finnhub": {
+        "checked": "2026-10-03",
+        "urls": "https://finnhub.io/docs/api/rate-limit; https://finnhub.io/terms-of-service",
+        "note": "429 on exceeding the limit; 30 calls/second on top of every plan. The pricing "
+        "page is script-rendered and could not be read, so the free plan's per-minute figure "
+        "is not re-confirmed here; the terms mention no usage-based charge.",
+    },
+    "twelve_data": {
+        "checked": "2026-10-03",
+        "urls": "https://twelvedata.com/pricing; https://twelvedata.com/docs (Errors)",
+        "note": "Basic: free, 8 API credits/minute, 800/day, 'No contracts, no hidden charges'. "
+        "LICENCE CAVEAT: the Basic plan states 'Internal non-display usage: data may be used "
+        "internally for testing, evaluation, or development purposes only; it cannot be "
+        "displayed to users, shared externally, or used in production systems'. Zero-cost "
+        "holds; whether Twelve Data figures may be shown in this app is the owner's call.",
+    },
+    "epo_ops": {
+        "checked": "2026-10-03",
+        "urls": "https://www.epo.org/en/searching-for-patents/data/web-services/ops",
+        "note": "'Non-paying users: up to 4 GB of data per week, free; paying users: more than "
+        "4 GB per week, annual subscription EUR 2,800 (Subscribe as paying user)'.",
+    },
 }
 
 # `Budget(` constructions per source file under src/steward (excluding verify_sources).
 BUDGET_SITES: dict[str, int] = {
     "steward/free_sources.py": 2,
     "steward/macro/public_collect.py": 1,
-    "steward/macro/release_calendar.py": 6,
+    "steward/macro/release_calendar.py": 7,
     "steward/news/feeds.py": 1,
     "steward/reference/exchange_probes.py": 2,
     "steward/reference/prices.py": 3,

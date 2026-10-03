@@ -274,8 +274,11 @@ async def test_international_debt_securities_series_maps_to_ids_not_dss() -> Non
     # WS_DEBT_SEC2_PUB is "International debt securities (BIS-compiled)": calendar category IDS.
     assert BIS_FLOW_CATEGORY["WS_DEBT_SEC2_PUB"] == "IDS"
     assert {e.calendar_key for e in fetch.entries if e.series_id == "debt_securities"} == {"IDS"}
-    # Mapped through the dataflow, the labelled "property_prices" series (WS_LONG_CPI) is CPI.
-    assert {e.calendar_key for e in fetch.entries if e.series_id == "property_prices"} == {"CPI"}
+    # property_prices is collected from WS_SPP (selected residential property prices): the BIS
+    # category RPP, and only its "Selected residential" release types (not the detailed WS_DPP).
+    rows = [e for e in fetch.entries if e.series_id == "property_prices"]
+    assert {e.calendar_key for e in rows} == {"RPP"}
+    assert all(e.title == "BIS RPP release" for e in rows)
     assert _dates(fetch, "property_prices")[0] == dt.date(2026, 10, 29)
 
 
@@ -295,10 +298,15 @@ def test_default_bis_flows_match_the_shipped_configuration() -> None:
 
 
 def test_series_with_calendar_lists_the_new_mappings() -> None:
+    # the yield curve and CZEONIA are dated by a published rule (third pass)
     assert series_with_calendar("ecb", ["ecb_deposit_rate", "euro_area_10y_yield"]) == [
-        "ecb_deposit_rate"
+        "ecb_deposit_rate",
+        "euro_area_10y_yield",
     ]
-    assert series_with_calendar("cnb", ["czeonia", "cnb_repo_2w"]) == ["cnb_repo_2w"]
+    assert series_with_calendar("cnb", ["czeonia", "cnb_repo_2w", "x"]) == [
+        "czeonia",
+        "cnb_repo_2w",
+    ]
     assert series_with_calendar("eurostat", ["sentiment", "hicp:EA21", "x"]) == [
         "sentiment",
         "hicp:EA21",
