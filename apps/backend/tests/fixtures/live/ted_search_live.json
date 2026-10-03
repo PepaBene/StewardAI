@@ -1,0 +1,78 @@
+{
+ "notices": [
+  {
+   "notice-type": "can-standard",
+   "publication-number": "599729-2026",
+   "buyer-name": {
+    "deu": [
+     "Fraunhofer-Gesellschaft zur Förderung der angewandten Forschung e.V. - Einkauf B12 - Vergabestelle Bau"
+    ]
+   },
+   "total-value-cur": [
+    "EUR"
+   ],
+   "publication-date": "2026-09-01+02:00",
+   "winner-name": {
+    "deu": [
+     "Siemens AG"
+    ]
+   },
+   "notice-title": {
+    "spa": "Alemania – Instalación de puestos de seccionamiento – Gebäudeautomation 70-00211-3900-22 - PR1228189-3900-B",
+    "deu": "Deutschland – Installation von Schaltanlagen – Gebäudeautomation 70-00211-3900-22 - PR1228189-3900-B",
+    "eng": "Germany – Switching station installation work – Gebäudeautomation 70-00211-3900-22 - PR1228189-3900-B"
+   }
+  },
+  {
+   "notice-type": "can-standard",
+   "publication-number": "600452-2026",
+   "buyer-name": {
+    "spa": [
+     "Red Eléctrica de España, S.A.U. (Red Eléctrica)"
+    ]
+   },
+   "total-value-cur": [
+    "EUR"
+   ],
+   "publication-date": "2026-09-01+02:00",
+   "winner-name": {
+    "spa": [
+     "SIEMENS S.A."
+    ]
+   },
+   "notice-title": {
+    "spa": "España – Servicios de instalación (excepto software) – Implementación de proyectos de desarrollo en los sistemas de control de la energía (EMS)",
+    "deu": "Spanien – Installation (außer Software) – Implementación de proyectos de desarrollo en los sistemas de control de la energía (EMS)",
+    "eng": "Spain – Installation services (except software) – Implementación de proyectos de desarrollo en los sistemas de control de la energía (EMS)"
+   }
+  },
+  {
+   "notice-type": "can-standard",
+   "publication-number": "600850-2026",
+   "buyer-name": {
+    "deu": [
+     "Burgenländische Krankenanstalten-Gesellschaft m.b.H."
+    ]
+   },
+   "total-value-cur": [
+    "EUR"
+   ],
+   "publication-date": "2026-09-01+02:00",
+   "winner-name": {
+    "deu": [
+     "Siemens Healthcare Diagnostics GmbH"
+    ]
+   },
+   "notice-title": {
+    "spa": "Austria – Equipo de imaginería por resonancia magnética – Lieferung, Montage, Inbetriebnahme und Wartung eines 3T-MRT-Systems",
+    "deu": "Österreich – Magnetresonanz-Bildgebungsgeräte – Lieferung, Montage, Inbetriebnahme und Wartung eines 3T-MRT-Systems",
+    "eng": "Austria – Magnetic resonance imaging equipment – Lieferung, Montage, Inbetriebnahme und Wartung eines 3T-MRT-Systems"
+   },
+   "total-value": 1760000
+  }
+ ],
+ "totalNoticeCount": 115,
+ "iterationNextToken": null,
+ "timedOut": false,
+ "_recorded": "2026-10-03 live POST https://api.ted.europa.eu/v3/notices/search; links and non-ENG/DEU/SPA titles trimmed"
+}

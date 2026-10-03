@@ -1,0 +1,41 @@
+[
+ {
+  "date": "2026-01-01",
+  "localName": "Den obnovy samostatného českého státu; Nový rok",
+  "name": "New Year's Day",
+  "countryCode": "CZ",
+  "fixed": false,
+  "global": true,
+  "counties": null,
+  "launchYear": null,
+  "types": [
+   "Public"
+  ]
+ },
+ {
+  "date": "2026-04-03",
+  "localName": "Velký pátek",
+  "name": "Good Friday",
+  "countryCode": "CZ",
+  "fixed": false,
+  "global": true,
+  "counties": null,
+  "launchYear": null,
+  "types": [
+   "Public"
+  ]
+ },
+ {
+  "date": "2026-04-06",
+  "localName": "Velikonoční pondělí",
+  "name": "Easter Monday",
+  "countryCode": "CZ",
+  "fixed": false,
+  "global": true,
+  "counties": null,
+  "launchYear": null,
+  "types": [
+   "Public"
+  ]
+ }
+]

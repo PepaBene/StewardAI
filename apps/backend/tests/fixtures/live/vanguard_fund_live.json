@@ -1,0 +1,63 @@
+{
+ "data": {
+  "funds": [
+   {
+    "profile": {
+     "fundFullName": "Vanguard FTSE All-World UCITS ETF (USD) Accumulating",
+     "fundCurrency": "USD",
+     "primarySectorEquityClassification": "ICB Sectors",
+     "distributionStrategy": "Accumulating Income",
+     "shareClassName": "ETF",
+     "fundInceptionDate": "2019-07-23"
+    },
+    "marketAllocation": [
+     {
+      "date": "2026-08-31",
+      "countryName": "United Arab Emirates",
+      "countryCode": "AE",
+      "holdingStatCode": "FTCTYATPCS",
+      "regionCode": "EM",
+      "regionName": "Emerging Markets",
+      "fundMktPercent": 0.15976,
+      "benchmarkMktPercent": 0.16066
+     },
+     {
+      "date": "2026-08-31",
+      "countryName": "Austria",
+      "countryCode": "AT",
+      "holdingStatCode": "FTCTYATPCS",
+      "regionCode": "EU",
+      "regionName": "Europe",
+      "fundMktPercent": 0.08387,
+      "benchmarkMktPercent": 0.08718
+     },
+     {
+      "date": "2026-08-31",
+      "countryName": "Australia",
+      "countryCode": "AU",
+      "holdingStatCode": "FTCTYATPCS",
+      "regionCode": "FE",
+      "regionName": "Pacific",
+      "fundMktPercent": 1.59408,
+      "benchmarkMktPercent": 1.61308
+     }
+    ],
+    "sectorDiversification": [
+     {
+      "date": "2026-08-31",
+      "sectorName": "Basic Materials",
+      "fundPercent": 3.4405,
+      "benchmarkPercent": 3.4249
+     },
+     {
+      "date": "2026-08-31",
+      "sectorName": "Utilities",
+      "fundPercent": 2.5439,
+      "benchmarkPercent": 2.55129
+     }
+    ]
+   }
+  ]
+ },
+ "_recorded": "2026-10-03 live POST https://www.ie.vanguard/gpx/graphql (X-Consumer-ID ie0) portIds 9679; tables trimmed"
+}

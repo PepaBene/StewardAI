@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="UTF-8"?><edgarSubmission xmlns="http://www.sec.gov/edgar/nport" xmlns:com="http://www.sec.gov/edgar/common" xmlns:ncom="http://www.sec.gov/edgar/nportcommon" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+  <headerData>
+    <submissionType>NPORT-P/A</submissionType>
+    <isConfidential>false</isConfidential>
+    <accessionNumber>0001193125-26-376507</accessionNumber>
+    <filerInfo>
+
+      <filer>
+        <issuerCredentials>
+          <cik>0002021979</cik>
+          <ccc>XXXXXXXX</ccc>
+        </issuerCredentials>
+      </filer>
+
+
+
+
+    </filerInfo>
+  </headerData>
+  <formData>
+    <genInfo>
+      <regName>First Trust Enhanced Private Credit Fund</regName>
+      <regFileNumber>811-23963</regFileNumber>
+      <regCik>0002021979</regCik>
+      <regLei>254900G48BG2P8MIDJ45</regLei>
+      <seriesName>First Trust Enhanced Private Credit Fund</seriesName>
+      <seriesLei>254900G48BG2P8MIDJ45</seriesLei>
+      <repPdEnd>2027-03-31</repPdEnd>
+      <repPdDate>2026-06-30</repPdDate>
+      <isFinalFiling>N</isFinalFiling>
+    </genInfo>
+  </formData>
+</edgarSubmission>

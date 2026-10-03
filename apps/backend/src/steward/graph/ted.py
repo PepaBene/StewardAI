@@ -7,10 +7,16 @@ business terms, multilingual ones as a language map (`{"ENG": ["..."]}` or `{"EN
 `publication-number`, `notice-type`, `notice-title`, `buyer-name`, `winner-name`,
 `total-value` / `total-value-cur`, `publication-date`, `links`.
 
+Checked live (2026-10-03, keyless): the query syntax (`winner-name=("Siemens") AND
+publication-date>=20260901`), the field names above, `totalNoticeCount`, `scope: "ALL"`, English
+and non-English titles keyed by lower-case ISO 639-3 codes (`eng`, `deu`), `buyer-name` and
+`winner-name` as `{"deu": ["..."]}` lists, `total-value-cur` as a plain list (`["EUR"]`), a
+numeric `total-value` that is absent on many awards, `publication-date` as
+"2026-09-01+02:00", and the extra `links` object the API adds. Fixture:
+tests/fixtures/live/ted_search_live.json.
+
 The adapter only *suggests*: an award names a winner by legal name, so a match against the
-holding's names becomes a `procurement_award` disclosure for the owner to confirm. The query
-syntax and field availability follow the public API documentation and the recorded-format
-fixture in tests/fixtures/graph; they have not been verified against the live service.
+holding's names becomes a `procurement_award` disclosure for the owner to confirm.
 """
 
 from __future__ import annotations

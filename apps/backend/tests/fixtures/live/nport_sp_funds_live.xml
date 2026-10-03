@@ -1,0 +1,228 @@
+<?xml version="1.0" encoding="UTF-8"?><edgarSubmission xmlns="http://www.sec.gov/edgar/nport" xmlns:com="http://www.sec.gov/edgar/common" xmlns:ncom="http://www.sec.gov/edgar/nportcommon" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+  <headerData>
+    <submissionType>NPORT-P/A</submissionType>
+    <isConfidential>false</isConfidential>
+    <accessionNumber>0000894189-26-025310</accessionNumber>
+    <filerInfo>
+
+      <filer>
+        <issuerCredentials>
+          <cik>0001989916</cik>
+          <ccc>XXXXXXXX</ccc>
+        </issuerCredentials>
+      </filer>
+
+
+      <seriesClassInfo>
+        <seriesId>S000085286</seriesId>
+        <classId>C000250263</classId>
+        <classId>C000250264</classId>
+      </seriesClassInfo>
+
+
+    </filerInfo>
+  </headerData>
+  <formData>
+    <genInfo>
+      <regName>SP Funds Trust</regName>
+      <regFileNumber>811-23893</regFileNumber>
+      <regCik>0001989916</regCik>
+      <regLei>529900BJ968TFBK2QJ70</regLei>
+      <seriesName>SP Funds 2050 Target Date Fund</seriesName>
+      <seriesId>S000085286</seriesId>
+      <seriesLei>254900R0XUHOPCVI8147</seriesLei>
+      <repPdEnd>2026-10-31</repPdEnd>
+      <repPdDate>2026-07-31</repPdDate>
+      <isFinalFiling>N</isFinalFiling>
+    </genInfo>
+    <fundInfo>
+      <totAssets>5456704.260000000000</totAssets>
+      <totLiabs>3813.150000000000</totLiabs>
+      <netAssets>5452891.110000000000</netAssets>
+      <assetsAttrMiscSec>0.000000000000</assetsAttrMiscSec>
+      <assetsInvested>0.000000000000</assetsInvested>
+      <amtPayOneYrBanksBorr>0.000000000000</amtPayOneYrBanksBorr>
+      <amtPayOneYrCtrldComp>0.000000000000</amtPayOneYrCtrldComp>
+      <amtPayOneYrOthAffil>0.000000000000</amtPayOneYrOthAffil>
+      <amtPayOneYrOther>0.000000000000</amtPayOneYrOther>
+      <amtPayAftOneYrBanksBorr>0.000000000000</amtPayAftOneYrBanksBorr>
+      <amtPayAftOneYrCtrldComp>0.000000000000</amtPayAftOneYrCtrldComp>
+      <amtPayAftOneYrOthAffil>0.000000000000</amtPayAftOneYrOthAffil>
+      <amtPayAftOneYrOther>0.000000000000</amtPayAftOneYrOther>
+      <delayDeliv>0.000000000000</delayDeliv>
+      <standByCommit>0.000000000000</standByCommit>
+      <liquidPref>0.000000000000</liquidPref>
+      <cshNotRptdInCorD>100245.400000000000</cshNotRptdInCorD>
+      <isNonCashCollateral>N</isNonCashCollateral>
+      <returnInfo>
+        <monthlyTotReturns>
+          <monthlyTotReturn classId="C000250263" rtn1="9.770000000000" rtn2="-.220000000000" rtn3="-4.610000000000"/>
+          <monthlyTotReturn classId="C000250264" rtn1="9.760000000000" rtn2="-.250000000000" rtn3="-4.660000000000"/>
+        </monthlyTotReturns>
+        <othMon1 netRealizedGain="9074.330000000000" netUnrealizedAppr="490969.410000000000"/>
+        <othMon2 netRealizedGain="43283.560000000000" netUnrealizedAppr="-54902.590000000000"/>
+        <othMon3 netRealizedGain="10430.090000000000" netUnrealizedAppr="-279001.310000000000"/>
+      </returnInfo>
+      <mon1Flow redemption="237.530000000000" reinvestment=".000000000000" sales="36664.880000000000"/>
+      <mon2Flow redemption="16161.930000000000" reinvestment=".000000000000" sales="128501.630000000000"/>
+      <mon3Flow redemption="81245.460000000000" reinvestment=".000000000000" sales="53319.800000000000"/>
+
+
+
+      <varInfo>
+
+        <fundsDesignatedInfo>
+          <nameDesignatedIndex>N/A</nameDesignatedIndex>
+          <indexIdentifier>N/A</indexIdentifier>
+
+        </fundsDesignatedInfo>
+
+      </varInfo>
+    </fundInfo>
+    <invstOrSecs>
+      <invstOrSec>
+        <name>SP Funds Dow Jones Global Suku</name>
+        <lei>549300T032UNSH1TQQ47</lei>
+        <title>SP Funds Dow Jones Global Sukuk ETF</title>
+        <cusip>886364702</cusip>
+        <identifiers>
+          <isin value="US8863647025"/>
+          <ticker value="SPSK"/>
+        </identifiers>
+        <balance>15389.000000000000</balance>
+        <units>NS</units>
+        <curCd>USD</curCd>
+        <valUSD>274308.930000000000</valUSD>
+        <pctVal>5.0305227900</pctVal>
+        <payoffProfile>Long</payoffProfile>
+        <assetCat>EC</assetCat>
+        <issuerCat>RF</issuerCat>
+        <invCountry>US</invCountry>
+        <isRestrictedSec>N</isRestrictedSec>
+
+        <fairValLevel>1</fairValLevel>
+        <securityLending>
+          <isCashCollateral>N</isCashCollateral>
+          <isNonCashCollateral>N</isNonCashCollateral>
+          <isLoanByFund>N</isLoanByFund>
+        </securityLending>
+      </invstOrSec>
+      <invstOrSec>
+        <name>SP Funds S&amp;P World ex-US ETF</name>
+        <lei>529900TOV2AMETZGRK34</lei>
+        <title>SP Funds S&amp;P World ex-US ETF</title>
+        <cusip>84612A200</cusip>
+        <identifiers>
+          <isin value="US84612A2006"/>
+          <ticker value="SPWO"/>
+        </identifiers>
+        <balance>34393.000000000000</balance>
+        <units>NS</units>
+        <curCd>USD</curCd>
+        <valUSD>1101951.720000000000</valUSD>
+        <pctVal>20.2085773908</pctVal>
+        <payoffProfile>Long</payoffProfile>
+        <assetCat>EC</assetCat>
+        <issuerCat>RF</issuerCat>
+        <invCountry>US</invCountry>
+        <isRestrictedSec>N</isRestrictedSec>
+
+        <fairValLevel>1</fairValLevel>
+        <securityLending>
+          <isCashCollateral>N</isCashCollateral>
+          <isNonCashCollateral>N</isNonCashCollateral>
+          <isLoanByFund>N</isLoanByFund>
+        </securityLending>
+      </invstOrSec>
+      <invstOrSec>
+        <name>SP Funds S&amp;P Global Technology</name>
+        <lei>529900C0JEA4YB413541</lei>
+        <title>SP Funds S&amp;P Global Technology ETF</title>
+        <cusip>84612A101</cusip>
+        <identifiers>
+          <isin value="US84612A1016"/>
+          <ticker value="SPTE"/>
+        </identifiers>
+        <balance>39879.000000000000</balance>
+        <units>NS</units>
+        <curCd>USD</curCd>
+        <valUSD>1796548.950000000000</valUSD>
+        <pctVal>32.9467233759</pctVal>
+        <payoffProfile>Long</payoffProfile>
+        <assetCat>EC</assetCat>
+        <issuerCat>RF</issuerCat>
+        <invCountry>US</invCountry>
+        <isRestrictedSec>N</isRestrictedSec>
+
+        <fairValLevel>1</fairValLevel>
+        <securityLending>
+          <isCashCollateral>N</isCashCollateral>
+          <isNonCashCollateral>N</isNonCashCollateral>
+          <isLoanByFund>N</isLoanByFund>
+        </securityLending>
+      </invstOrSec>
+      <invstOrSec>
+        <name>SP Funds S&amp;P 500 Sharia Indust</name>
+        <lei>549300JL4D4SLC04BO54</lei>
+        <title>SP Funds S&amp;P 500 Sharia Industry Exclusions ETF</title>
+        <cusip>886364801</cusip>
+        <identifiers>
+          <isin value="US8863648015"/>
+          <ticker value="SPUS"/>
+        </identifiers>
+        <balance>33929.000000000000</balance>
+        <units>NS</units>
+        <curCd>USD</curCd>
+        <valUSD>1911220.570000000000</valUSD>
+        <pctVal>35.0496742269</pctVal>
+        <payoffProfile>Long</payoffProfile>
+        <assetCat>EC</assetCat>
+        <issuerCat>RF</issuerCat>
+        <invCountry>US</invCountry>
+        <isRestrictedSec>N</isRestrictedSec>
+
+        <fairValLevel>1</fairValLevel>
+        <securityLending>
+          <isCashCollateral>N</isCashCollateral>
+          <isNonCashCollateral>N</isNonCashCollateral>
+          <isLoanByFund>N</isLoanByFund>
+        </securityLending>
+      </invstOrSec>
+      <invstOrSec>
+        <name>SP Funds S&amp;P Global Reit Shari</name>
+        <lei>549300LFRV9YWDB14776</lei>
+        <title>SP Funds S&amp;P Global Reit Sharia Etf</title>
+        <cusip>886364769</cusip>
+        <identifiers>
+          <isin value="US8863647694"/>
+          <ticker value="SPRE"/>
+        </identifiers>
+        <balance>12568.000000000000</balance>
+        <units>NS</units>
+        <curCd>USD</curCd>
+        <valUSD>269834.960000000000</valUSD>
+        <pctVal>4.9484751219</pctVal>
+        <payoffProfile>Long</payoffProfile>
+        <assetCat>EC</assetCat>
+        <issuerCat>RF</issuerCat>
+        <invCountry>US</invCountry>
+        <isRestrictedSec>N</isRestrictedSec>
+
+        <fairValLevel>1</fairValLevel>
+        <securityLending>
+          <isCashCollateral>N</isCashCollateral>
+          <isNonCashCollateral>N</isNonCashCollateral>
+          <isLoanByFund>N</isLoanByFund>
+        </securityLending>
+      </invstOrSec>
+    </invstOrSecs>
+    <signature>
+      <ncom:dateSigned>2026-10-01</ncom:dateSigned>
+      <ncom:nameOfApplicant>SP Funds Trust</ncom:nameOfApplicant>
+      <ncom:signature>/s/ Melissa Breitzman</ncom:signature>
+      <ncom:signerName>Melissa Breitzman</ncom:signerName>
+      <ncom:title>Assistant Treasurer</ncom:title>
+    </signature>
+  </formData>
+  <documents>XXXX</documents>
+</edgarSubmission>

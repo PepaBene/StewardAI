@@ -1,6 +1,11 @@
 """Finnhub free tier: the earnings calendar (US issuers, some others) and basic financials
 (`/stock/metric`: P/E, P/B, EPS TTM, dividend yield), used only as a tier-2 cross-check of
-the valuation computed from filings. The free plan covers US listings (incl. ADRs)."""
+the valuation computed from filings. Observed live with a free key (2026-10-03): `/quote`,
+`/stock/metric` and `/calendar/earnings` answer for US listings and for Prague (`CEZ.PR`), and
+HTTP 403 `{"error":"You don't have access to this resource."}` for Frankfurt, London,
+Amsterdam, Swiss, Paris, Tokyo, Copenhagen, Milan and Toronto symbols; an unknown symbol on a
+covered market is HTTP 200 with an all-zero quote (`"c":0,...,"d":null,"t":0`); an invalid key is
+HTTP 401 `{"error":"Invalid API key."}`; successful answers carry `x-ratelimit-limit: 60`."""
 
 import datetime as dt
 from dataclasses import dataclass

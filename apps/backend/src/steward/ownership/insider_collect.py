@@ -255,8 +255,12 @@ async def relink_amendments(
 
 async def _load_filing(edgar: EdgarClient, filing: Filing) -> tuple[bytes, str]:
     names = await edgar.filing_files(filing)
+    # EDGAR lists a Form 3/4/5's primary document as its rendered view, "xslF345X06/doc4.xml"
+    # (an HTML transform, checked live 2026-10-03); the structured XML is the same file name at
+    # the folder root.
+    primary = filing.primary_document.rsplit("/", 1)[-1]
     candidates = [
-        filing.primary_document,
+        primary,
         *[name for name in names if name.lower().endswith(".xml")],
     ]
     seen: set[str] = set()

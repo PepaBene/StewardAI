@@ -6,17 +6,22 @@ what the published rows add up to (equity / cash / derivatives / other, rows wit
 sector or country, and the residual 1 - sum of rows). Everything the payload does not state
 stays NULL: a missing expense ratio is not 0 %, a residual is not spread over the holdings.
 
-The issuer payloads the look-through job already downloads carry the holdings and the share
-class; total assets, charges and the like are read from data points whose names are listed in
-`ISHARES_FACTSHEET_POINTS` / `VANGUARD_PROFILE_FIELDS`. Those names are candidates drawn from
-the issuers' documented/public field vocabulary and NOT confirmed against a live response
-(the recorded fixtures do not contain them). Extraction is therefore tolerant (names are
-compared case- and punctuation-insensitively, a value may be wrapped in `{"value": ...}`, the
-whole payload is searched) and every extracted field records where it came from in
-`evidence.field_provenance` with `verified: false`; `evidence.names_unverified` is true on
-every issuer-sourced row. A fund whose payload lacks a field lists it in `missing_fields` and
-the owner can enter the figures from the KID/factsheet with `store_manual_factsheet`
-(source 'manual').
+The issuer payloads the look-through job downloads carry the holdings and the share class;
+the factsheet figures are read from data points whose names are listed in
+`ISHARES_FACTSHEET_POINTS` / `VANGUARD_PROFILE_FIELDS`. Names checked against a live response
+(2026-10-03) are in `ISHARES_VERIFIED_NAMES` / `VANGUARD_VERIFIED_NAMES` and their provenance
+says `verified: true`: iShares `keyFundFacts` carries `emeaMgt` (the Total Expense Ratio, in
+percent), `totalNetAssetsFundLevel`, `indexSeriesName` and `useOfProfitsCode`; Vanguard's
+`FundProfile` carries `distributionStrategy` and `shareClassName`. The other names are
+candidates from the issuers' public vocabulary that no live payload contained (Vanguard's
+GraphQL has no introspection and none of the guessed expense/assets/benchmark fields exist on
+`FundProfile` or `Fund`); extraction stays tolerant for them (names are compared case- and
+punctuation-insensitively, a value may be wrapped in `{"value": ...}`, the whole payload is
+searched) and they record `verified: false`. A fund whose payload lacks a field lists it in
+`missing_fields`, and the owner can enter the figures from the KID/factsheet with
+`store_manual_factsheet` (source 'manual'). `evidence.names_unverified` is true only when an
+extracted field came from an unverified name; `evidence.unverified_fields` lists the fields this
+issuer has no verified name for.
 
 Rows are insert-only versions per (fund, holdings as-of, source): a re-fetch whose figures
 differ adds a row, identical figures add nothing. Point-in-time reads use `fetched_at`.
@@ -39,6 +44,11 @@ DEFAULT_TOLERANCE = Decimal("0.01")
 # iShares: data point name -> factsheet field, searched in every component/container of the
 # holdings payload. Percent values (0.07 = 0.07 %).
 ISHARES_FACTSHEET_POINTS: dict[str, str] = {
+    # Live names first (component keyFundFacts; see ISHARES_VERIFIED_NAMES).
+    "emeaMgt": "expense_ratio",
+    "totalNetAssetsFundLevel": "total_assets",
+    "indexSeriesName": "benchmark_name",
+    "useOfProfitsCode": "distribution_policy",
     "totalExpenseRatio": "expense_ratio",
     "expenseRatio": "expense_ratio",
     "netExpenseRatio": "expense_ratio",
@@ -56,6 +66,10 @@ ISHARES_FACTSHEET_POINTS: dict[str, str] = {
     "navType": "nav_basis",
     "shareClass": "share_class",
 }
+ISHARES_VERIFIED_NAMES = frozenset(
+    {"emeaMgt", "totalNetAssetsFundLevel", "indexSeriesName", "useOfProfitsCode", "shareClass"}
+)
+VANGUARD_VERIFIED_NAMES = frozenset({"distributionStrategy", "shareClassName"})
 # Vanguard: GraphQL `funds[0].profile` keys.
 VANGUARD_PROFILE_FIELDS: dict[str, str] = {
     "ongoingCharges": "expense_ratio",
@@ -74,8 +88,8 @@ VANGUARD_PROFILE_FIELDS: dict[str, str] = {
     "shareClassName": "share_class",
     "shareClass": "share_class",
 }
-# Expense ratios are quoted in percent (0.07 = 0.07 %) by both issuers' pages. The scale is
-# still detected per value (see `normalise_expense_ratio`) because the field names are unverified.
+# Expense ratios are quoted in percent (0.07 = 0.07 %) by both issuers' pages (iShares `emeaMgt`
+# is 0.07 for CSPX, live). The scale is still detected per value (see `normalise_expense_ratio`).
 MAX_PLAUSIBLE_EXPENSE_RATIO = Decimal("0.05")  # 5 % a year; above it a value is misread
 
 FACTSHEET_FIELDS = (
@@ -277,7 +291,14 @@ def _policy(value: Any) -> str | None:
 
 
 def _apply(
-    facts: IssuerFacts, target: str, value: Any, *, percent: bool, name: str, path: str
+    facts: IssuerFacts,
+    target: str,
+    value: Any,
+    *,
+    percent: bool,
+    name: str,
+    path: str,
+    verified: frozenset[str] = frozenset(),
 ) -> None:
     if value in (None, "", "-"):
         return
@@ -308,12 +329,11 @@ def _apply(
             setattr(facts, target, text)
             applied = True
     if applied:
-        # Names are candidates from the issuers' public vocabulary, not confirmed live.
         facts.provenance[target] = {
             "name": name,
             "path": path,
             "raw": str(value)[:80],
-            "verified": False,
+            "verified": name in verified,  # confirmed in a live payload, 2026-10-03
         }
         if target == "expense_ratio":
             facts.charges.setdefault(name, value)
@@ -337,8 +357,23 @@ def extract_issuer_facts(snap: FundSnapshot) -> IssuerFacts:
                     "raw": facts.share_class[:80],
                     "verified": True,  # present in the recorded holdings fixtures
                 }
-            for target, name, path, value in find_named(body, ISHARES_FACTSHEET_POINTS):
-                _apply(facts, target, value, percent=True, name=name, path=path)
+            for component in ("holdings", "keyFundFacts"):
+                part = raw.get(component)
+                if not isinstance(part, dict):
+                    continue
+                # Names seen in a live payload win over candidates, whatever their order.
+                found = find_named(part, ISHARES_FACTSHEET_POINTS)
+                found.sort(key=lambda hit: hit[1] not in ISHARES_VERIFIED_NAMES)
+                for target, name, path, value in found:
+                    _apply(
+                        facts,
+                        target,
+                        value,
+                        percent=True,
+                        name=name,
+                        path=f"/{component}{path}",
+                        verified=ISHARES_VERIFIED_NAMES,
+                    )
     else:
         fund_body = raw.get("fund")
         try:
@@ -346,8 +381,18 @@ def extract_issuer_facts(snap: FundSnapshot) -> IssuerFacts:
         except (KeyError, IndexError, TypeError):
             fund = None
         if isinstance(fund, dict):
-            for target, name, path, value in find_named(fund, VANGUARD_PROFILE_FIELDS):
-                _apply(facts, target, value, percent=True, name=name, path=path)
+            found = find_named(fund, VANGUARD_PROFILE_FIELDS)
+            found.sort(key=lambda hit: hit[1] not in VANGUARD_VERIFIED_NAMES)
+            for target, name, path, value in found:
+                _apply(
+                    facts,
+                    target,
+                    value,
+                    percent=True,
+                    name=name,
+                    path=path,
+                    verified=VANGUARD_VERIFIED_NAMES,
+                )
             profile = fund.get("profile")
             if isinstance(profile, dict) and profile.get("shareClassName"):
                 facts.provenance["share_class"] = {
@@ -357,6 +402,24 @@ def extract_issuer_facts(snap: FundSnapshot) -> IssuerFacts:
                     "verified": True,  # present in the recorded GraphQL fixtures
                 }
     return facts
+
+
+def unverified_fields(provider: str) -> list[str]:
+    """Factsheet fields the issuer has no live-verified data point name for."""
+    known = (
+        {
+            ISHARES_FACTSHEET_POINTS[n]
+            for n in ISHARES_VERIFIED_NAMES
+            if n in ISHARES_FACTSHEET_POINTS
+        }
+        if provider == "ishares"
+        else {
+            VANGUARD_PROFILE_FIELDS[n]
+            for n in VANGUARD_VERIFIED_NAMES
+            if n in VANGUARD_PROFILE_FIELDS
+        }
+    )
+    return [f for f in FACTSHEET_FIELDS if f not in known]
 
 
 def lookthrough_basis(snap: FundSnapshot) -> LookthroughBasis:
@@ -505,9 +568,10 @@ async def store_factsheet(
         "evidence": {
             "fund_ticker": facts.fund_ticker,
             "portfolio_id": snap.portfolio_id,
-            # D6.1: the payload field names are candidates, not confirmed against a live
-            # response; each extracted field says which name and path it came from.
-            "names_unverified": True,
+            # D6.1: each extracted field says which name and path it came from and whether
+            # that name was seen in a live payload; the flag is true only if one was not.
+            "names_unverified": any(not p.get("verified") for p in facts.provenance.values()),
+            "unverified_fields": unverified_fields(snap.provider),
             "field_provenance": facts.provenance,
             "warnings": facts.warnings,
         },

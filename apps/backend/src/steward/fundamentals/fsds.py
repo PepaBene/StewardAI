@@ -5,8 +5,9 @@ tab-separated files (https://www.sec.gov/dera/data/financial-statement-and-notes
 This module reads the documented layout and writes `financial_statement_fact` rows with
 `source='sec_fsds'`, so filings older than the live XBRL job's reach (or its gaps) have the
 same statement history. It is an optional job (`sec_fsds_backfill`, params
-`{"quarter": "2025q3"}` or `{"url": ...}`, optionally `{"ticker": ...}`). Without a quarter or url
-(the scheduled run) it takes the latest completed quarter whose data set is published.
+`{"quarter": "2025q2"}` (up to 2025q2), `{"quarter": "2026_07"}` (monthly sets, from 2025_07, the
+same parameter) or `{"url": ...}`, optionally `{"ticker": ...}`). Without a quarter or url (the
+scheduled run) it takes the newest of the last completed months whose data set is published.
 
 Layout read (names are the SEC's; a column that is absent is treated as empty):
 
@@ -16,8 +17,9 @@ Layout read (names are the SEC's; a column that is absent is treated as empty):
   `fye` (MMDD).
 - `num`: one row per numeric fact. `adsh`, `tag`, `version` (taxonomy and year, "us-gaap/2025";
   the accession for a company extension), `ddate` (period end, YYYYMMDD), `qtrs` (duration in
-  quarters, 0 for an instant), `uom`, `value`; dimensions as `segments` (older sets) or
-  `dimn`/`dimh` (the Notes sets); `coreg` names a co-registrant (not the filer: skipped).
+  quarters, 0 for an instant), `uom`, `value`; dimensions as `dimn` (count) and `dimh` (hash,
+  "0x00000000" for none) resolved through `dim.tsv` (`dimhash`, `segments`); `coreg` names a
+  co-registrant (not the filer: skipped).
 - `txt`: one row per note text block, same keys plus `value` (the text).
 - `tag`: `tag`, `version`, `custom` (1: extension), `abstract`, `datatype`, `tlabel` (label).
 
@@ -27,10 +29,16 @@ What is kept: standard-taxonomy concepts of the shared statement catalog
 the same classification, fiscal period, reconciliation and lineage as the live path; the one
 check this source cannot run is the companyfacts comparison.
 
-Not verified against a live download (the file was not fetched in development): the file
-extension (`.tsv` in the Notes sets, `.txt` in the older Financial Statement sets, both are
-accepted), the zip file name (`{year}q{n}_notes.zip`), and rare columns. The fixture follows
-the documentation exactly.
+Verified against a live download (2026-10-03, `2025_07_notes.zip`, 100 MB, 10 members:
+`sub tag dim ren cal pre num txt` as `.tsv`, `readme.htm`, `notes-metadata.json`): the column
+names above, the date formats and the `.tsv` extension are exactly as read here; `num` carries
+no `segments` column, a fact's dimensions are the hash `dimh` (with the count `dimn`) whose text
+(`Axis=Member;Axis2=Member2;`) is in `dim.tsv`, which is joined in. What the documentation page
+and the first version of this module got wrong, and is fixed: the Notes sets live in
+`/files/dera/data/financial-statement-notes-data-sets/` (not `...-and-notes-...`), and since July
+2025 they are MONTHLY (`2025_07_notes.zip`, `2026_08_notes.zip`) where up to 2025q2 they are
+quarterly (`2025q2_notes.zip`); a `2025q3_notes.zip` does not exist. A few old files carry a
+suffix (`2010q3_notes_0.zip`): pass those as an explicit `url`.
 """
 
 from __future__ import annotations
@@ -42,6 +50,7 @@ import datetime as dt
 import hashlib
 import io
 import os
+import re
 import tempfile
 import zipfile
 from collections.abc import Iterator
@@ -77,7 +86,9 @@ from steward.sources.xbrl_concepts import (
 
 FORMS = {"10-K", "10-K/A", "10-Q", "10-Q/A", "20-F", "20-F/A", "40-F", "40-F/A"}
 SOURCE = "sec_fsds"
-URL = "https://www.sec.gov/files/dera/data/financial-statement-and-notes-data-sets/{quarter}_notes.zip"
+URL = "https://www.sec.gov/files/dera/data/financial-statement-notes-data-sets/{quarter}_notes.zip"
+MONTHLY_FROM = (2025, 7)  # first monthly data set; the quarterly ones end with 2025q2
+DATASET_NAME = re.compile(r"^(?P<y>\d{4})(?:q(?P<q>[1-4])|_(?P<m>0[1-9]|1[0-2]))$")
 MAX_ZIP_BYTES = 1500 * 1024 * 1024
 TEXT_BLOCK_CAP = 20_000
 EASTERN = ZoneInfo("America/New_York")
@@ -181,6 +192,17 @@ def _is_dimensional(row: dict[str, str]) -> bool:
     return dimh not in ("", "0x00000000", "0")
 
 
+def _members(segments: str) -> list[list[str]]:
+    """`dim.tsv` text "AxisA=MemberA;AxisB=MemberB;" as [[axis, member], ...] (the SEC strips
+    the namespace prefixes)."""
+    pairs = []
+    for part in segments.split(";"):
+        axis, _, member = part.partition("=")
+        if axis.strip() and member.strip():
+            pairs.append([axis.strip(), member.strip()])
+    return pairs
+
+
 def read_filings(
     source: BinaryIO | Path | str,
     *,
@@ -230,6 +252,7 @@ def read_filings(
             if r.get("tag")
         }
         seen: set[tuple[Any, ...]] = set()
+        pending_dims: dict[str, list[dict[str, Any]]] = {}
         for row in _rows(archive, "num"):
             filing = filings.get(row.get("adsh", "").strip())
             if filing is None or row.get("coreg", "").strip():
@@ -252,7 +275,10 @@ def read_filings(
             start = period_start(end, quarters)
             unit = row.get("uom", "").strip() or "pure"
             dims: dict[str, Any] = (
-                {"members": [["dimension", row.get("dimh") or row.get("segments") or ""]]}
+                {
+                    "members": _members(row.get("segments", ""))
+                    or [["dimension", row.get("dimh") or ""]]
+                }
                 if dimensional
                 else {"members": []}
             )
@@ -260,6 +286,8 @@ def read_filings(
             if key in seen:
                 continue
             seen.add(key)
+            if dimensional and row.get("dimh", "").strip():
+                pending_dims.setdefault(row["dimh"].strip(), []).append(dims)
             statement, line_item = classify(concept, dimensional=dimensional)
             filing.facts.append(
                 _fact(
@@ -276,6 +304,15 @@ def read_filings(
                     None,
                 )
             )
+        if pending_dims:
+            # The fact's dimensions are a hash: its text is in dim.tsv. A hash the file does not
+            # explain keeps the hash as its only member, so the fact stays distinct.
+            for row in _rows(archive, "dim"):
+                targets = pending_dims.get(row.get("dimhash", "").strip())
+                members = _members(row.get("segments", "")) if targets else []
+                for target in targets or []:
+                    if members:
+                        target["members"] = members
         for row in _rows(archive, "txt"):
             filing = filings.get(row.get("adsh", "").strip())
             if filing is None or row.get("coreg", "").strip():
@@ -465,6 +502,40 @@ def recent_quarters(today: dt.date, count: int = 3) -> list[str]:
     return out
 
 
+def recent_datasets(today: dt.date, count: int = 3) -> list[str]:
+    """The last `count` COMPLETED calendar months as `2026_07`, newest first, never before the
+    first monthly set (2025_07). The SEC posts a month's set in the first days of the next
+    one (2025_07 is dated 4 August), so the newest may not exist yet."""
+    year, month = today.year, today.month
+    out: list[str] = []
+    for _ in range(count):
+        month -= 1
+        if month == 0:
+            year, month = year - 1, 12
+        if (year, month) < MONTHLY_FROM:
+            break
+        out.append(f"{year}_{month:02d}")
+    return out
+
+
+def dataset_url(name: str) -> str:
+    """URL of a data set named `2025q2` (quarterly, up to 2025q2) or `2025_07` (monthly, from
+    2025_07). A name the SEC never published (`2025q3`, `2025_06`) is refused here."""
+    match = DATASET_NAME.match(name.strip().lower().replace("-", "_"))
+    if match is None:
+        raise FsdsError(f"{name!r} is not a data set name like 2025q2 or 2025_07")
+    year = int(match["y"])
+    if match["q"]:
+        if (year, int(match["q"])) > (2025, 2):
+            raise FsdsError(
+                f"{name}: the SEC publishes monthly data sets from 2025_07, not 2025q3 onwards"
+            )
+        return URL.format(quarter=f"{year}q{match['q']}")
+    if (year, int(match["m"])) < MONTHLY_FROM:
+        raise FsdsError(f"{name}: monthly data sets start with 2025_07; earlier ones are quarterly")
+    return URL.format(quarter=f"{year}_{match['m']}")
+
+
 async def download(http: httpx.AsyncClient, url: str, headers: dict[str, str]) -> Path:
     handle, name = tempfile.mkstemp(suffix=".zip", prefix="fsds-")
     size = 0
@@ -492,7 +563,10 @@ async def run_fsds_backfill(
     """Backfill from one data set. `archive` (tests) replaces the download."""
     quarter = str(ctx.params.get("quarter") or "")
     explicit = bool(quarter or ctx.params.get("url"))
-    url = str(ctx.params.get("url") or (URL.format(quarter=quarter) if quarter else ""))
+    try:
+        url = str(ctx.params.get("url") or (dataset_url(quarter) if quarter else ""))
+    except FsdsError as exc:
+        raise JobFailed(str(exc)) from exc
     only = ctx.params.get("ticker")
     async with ctx.step("select_holdings") as step:
         rows = await ctx.pool.fetch(
@@ -503,7 +577,7 @@ async def run_fsds_backfill(
         by_cik = {pad_cik(r["cik"]): r["t212_ticker"] for r in rows}
         step.detail.update(
             holdings=len(by_cik),
-            source=url or ("latest published quarter" if archive is None else "supplied archive"),
+            source=url or ("latest published data set" if archive is None else "supplied archive"),
         )
     if not by_cik:
         return
@@ -520,18 +594,18 @@ async def run_fsds_backfill(
                 if explicit:
                     temp = await download(http, url, headers)
                 else:
-                    # No quarter given (the scheduled run): the latest quarter whose data set is
+                    # No data set named (the scheduled run): the latest month whose data set is
                     # already published.
-                    for candidate in recent_quarters(dt.datetime.now(dt.UTC).date()):
-                        url = URL.format(quarter=candidate)
+                    for candidate in recent_datasets(dt.datetime.now(dt.UTC).date()):
+                        url = dataset_url(candidate)
                         try:
                             temp = await download(http, url, headers)
                         except FsdsNotPublished:
                             continue
-                        step.detail["quarter"] = candidate
+                        step.detail["dataset"] = candidate
                         break
                     else:
-                        raise JobFailed("no recent quarter's data set is published")
+                        raise JobFailed("no recent month's data set is published")
                 step.detail["bytes"] = temp.stat().st_size
             archive = temp
         async with ctx.step("parse") as step:
@@ -575,7 +649,9 @@ __all__ = [
     "FsdsFiling",
     "FsdsNotPublished",
     "amends_map",
+    "dataset_url",
     "read_filings",
+    "recent_datasets",
     "recent_quarters",
     "run_fsds_backfill",
     "sec_fsds_backfill_handler",

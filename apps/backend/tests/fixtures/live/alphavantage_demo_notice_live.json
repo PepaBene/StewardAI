@@ -1,0 +1,6 @@
+{
+ "_recorded": "2026-10-03 live GET alphavantage.co/query function=OVERVIEW symbol=AAPL the documented demo key",
+ "body": {
+  "Information": "The **demo** API key is for demo purposes only. Please claim your free API key at (https://www.alphavantage.co/support/#api-key) to explore our full API offerings. It takes fewer than 20 seconds."
+ }
+}

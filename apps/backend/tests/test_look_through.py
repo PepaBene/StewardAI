@@ -155,8 +155,9 @@ async def test_ishares_fetch_keeps_the_holdings_when_the_sector_table_fails() ->
 
     async with mock(handler) as http:
         snap = await fetch_ishares(http, "253743", retry_delay=0)
-    assert seen == ["holdings", "exposureBreakdowns"]
+    assert seen == ["holdings", "exposureBreakdowns", "keyFundFacts"]
     assert snap.breakdowns == [] and "sector table unavailable" in snap.warnings[0]
+    assert "key fund facts unavailable" in snap.warnings[1]
     assert snap.raw is not None and set(snap.raw) == {"holdings"}
 
 
@@ -173,8 +174,9 @@ async def test_ishares_http_400_and_retries() -> None:
 
     async with mock(flaky) as http:
         snap = await fetch_ishares(http, "253743", retry_delay=0)
-    assert calls["n"] == 3 and len(snap.breakdowns) == 12
-    assert snap.raw is not None and set(snap.raw) == {"holdings", "exposureBreakdowns"}
+    assert calls["n"] == 4 and len(snap.breakdowns) == 12  # 503 retry + the three components
+    assert snap.raw is not None
+    assert set(snap.raw) == {"holdings", "exposureBreakdowns", "keyFundFacts"}
 
     async with mock(lambda r: httpx.Response(400, text="BAD_REQUEST")) as http:
         with pytest.raises(IssuerHttpError, match="HTTP 400"):
@@ -623,7 +625,7 @@ async def test_job_stores_snapshots_skips_when_current_and_serves_the_endpoint(
     calls: list[str] = []
     await _run(backend_pool, issuer_handler(calls), dt.date(2026, 9, 26))
     # VWCE is configured but not held (and proxies no benchmark): never requested.
-    assert calls == ["holdings", "exposureBreakdowns"]
+    assert calls == ["holdings", "exposureBreakdowns", "keyFundFacts"]
     steps = await _steps(backend_pool)
     assert steps["fund:CSPX"]["outcome"] == "stored" and "fund:VWCE" not in steps
     snap = await backend_pool.fetchrow("select * from public.etf_snapshot")
@@ -665,7 +667,7 @@ async def test_a_failed_fetch_is_a_gap_with_fallbacks(
     # The JSON works again: the spreadsheet snapshot is replaced by a full one.
     calls.clear()
     await _run(backend_pool, issuer_handler(calls), dt.date(2026, 9, 29))
-    assert calls == ["holdings", "exposureBreakdowns"]
+    assert calls == ["holdings", "exposureBreakdowns", "keyFundFacts"]
 
     # It fails again later: the recent stored snapshot stays in use (cached), no spreadsheet.
     calls.clear()

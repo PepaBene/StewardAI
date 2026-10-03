@@ -11,8 +11,8 @@ parentCompany    parent      outgoing  holding's (accounting) parent is the obje
 subsidiaries     subsidiary  outgoing  object is a subsidiary of the holding
 acquisitions     acquirer    outgoing  holding acquired the object
 acquiredBy       acquired    incoming  holding was acquired by the object
-investments      investor    outgoing  holding invested in the object
-investors        investment  incoming  object invested in the holding
+investments      investment  incoming  object invested in the holding (see below)
+investors        investment  incoming  object invested in the holding (undocumented field)
 competitors      competitor  symmetric
 partnerships     partner     symmetric
 customers        customer    outgoing  holding sells to the object
@@ -20,6 +20,15 @@ suppliers        supplier    incoming  holding buys from the object
 products         product     outgoing
 ceo              executive   outgoing
 ===============  ==========  ========  ==========================================
+
+Checked against Diffbot's public Organization ontology (docs.diffbot.com/docs/ont-organization,
+2026-10-03; no key needed to read it): `investments` is "investments RECEIVED by this
+organization": a list of `{date, amount, series, isCurrent, investors: [entity, ...]}`, so the
+investors are nested one level down and the holding is the investee (the first version read
+`investments` as the holding investing in others and found no entity in it). There is no
+top-level `investors` and no `acquisitions` field in the ontology; those two map entries are
+kept only for exports that carry them. `acquiredBy` is a flat entity list with a `date`, as
+mapped. Not verifiable without a key: a real response (a free Diffbot trial needs a sign-up).
 
 Dates belong to each relationship (a Diffbot date object `{"str": "d2019-03-01", "precision":
 3}` or an ISO string); a relationship with no date has no `valid_from`: the fetch date is never
@@ -37,7 +46,7 @@ FIELD_MAP: dict[str, tuple[str, str]] = {
     "subsidiaries": ("subsidiary", "outgoing"),
     "acquisitions": ("acquirer", "outgoing"),
     "acquiredBy": ("acquired", "incoming"),
-    "investments": ("investor", "outgoing"),
+    "investments": ("investment", "incoming"),
     "investors": ("investment", "incoming"),
     "competitors": ("competitor", "symmetric"),
     "partnerships": ("partner", "symmetric"),
@@ -131,8 +140,15 @@ def parse_diffbot_relations(entity: dict[str, object]) -> list[DiffbotRelation]:
         raw = entity.get(provider_field)
         if raw is None:
             continue
+        pairs: list[tuple[object, dict[str, object] | None]] = []
         for item in raw if isinstance(raw, list) else [raw]:
-            ref = _entity_ref(item)
+            nested = item.get("investors") if isinstance(item, dict) else None
+            if provider_field == "investments" and isinstance(nested, list):
+                # InvestmentField: the dated round holds the investor entities.
+                pairs.extend((item, _entity_ref(investor)) for investor in nested)
+            else:
+                pairs.append((item, _entity_ref(item)))
+        for item, ref in pairs:
             if ref is None:
                 continue
             start, start_precision = (
@@ -145,7 +161,7 @@ def parse_diffbot_relations(entity: dict[str, object]) -> list[DiffbotRelation]:
             detail: dict[str, object] = {"provider_field": provider_field}
             if start_precision is not None:
                 detail["date_precision"] = start_precision
-            for extra in ("price", "currency", "status"):
+            for extra in ("price", "currency", "status", "series", "amount"):
                 if isinstance(item, dict) and extra in item:
                     detail[extra] = item[extra]
             out.append(

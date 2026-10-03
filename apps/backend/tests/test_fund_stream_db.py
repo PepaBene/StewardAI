@@ -1065,14 +1065,15 @@ async def test_scheduled_fsds_backfill_without_params_uses_the_latest_published_
     backend_pool: asyncpg.Pool, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     """N8: with no quarter or url (the scheduled run) the job used to fail with "params need a
-    quarter"; it now takes the newest completed quarter whose data set exists."""
+    quarter"; it now takes the newest completed month whose data set exists (the SEC's Notes
+    sets are monthly since 2025_07; the quarterly names it first asked for were 404)."""
     await seed_instrument(backend_pool)
     monkeypatch.setenv("SEC_USER_AGENT", "Steward Test owner@example.test")
     from steward.settings import get_settings
 
     get_settings.cache_clear()
     asked: list[str] = []
-    newest = fsds.recent_quarters(dt.datetime.now(dt.UTC).date())[0]
+    newest = fsds.recent_datasets(dt.datetime.now(dt.UTC).date())[0]
 
     def handler(request: httpx.Request) -> httpx.Response:
         asked.append(request.url.path)

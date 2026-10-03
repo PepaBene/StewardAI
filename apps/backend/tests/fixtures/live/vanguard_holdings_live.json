@@ -1,0 +1,99 @@
+{
+ "data": {
+  "borHoldings": [
+   {
+    "holdings": {
+     "items": [
+      {
+       "issuerName": "NVIDIA Corp",
+       "securityLongDescription": "NVIDIA Corp",
+       "isin": "US67066G1040",
+       "sedol1": "2379504",
+       "ticker": "NVDA",
+       "gicsSectorDescription": "Information Technology",
+       "icbIndustryDescription": "Technology",
+       "marketValuePercentage": 4.76598,
+       "securityType": "EQ.STOCK",
+       "effectiveDate": "2026-08-31",
+       "bloombergIsoCountry": "US",
+       "marketValueBaseCurrency": 4079260657.08
+      },
+      {
+       "issuerName": "Apple Inc",
+       "securityLongDescription": "Apple Inc",
+       "isin": "US0378331005",
+       "sedol1": "2046251",
+       "ticker": "AAPL",
+       "gicsSectorDescription": "Information Technology",
+       "icbIndustryDescription": "Technology",
+       "marketValuePercentage": 4.23529,
+       "securityType": "EQ.STOCK",
+       "effectiveDate": "2026-08-31",
+       "bloombergIsoCountry": "US",
+       "marketValueBaseCurrency": 3625035857.3
+      },
+      {
+       "issuerName": "Microsoft Corp",
+       "securityLongDescription": "Microsoft Corp",
+       "isin": "US5949181045",
+       "sedol1": "2588173",
+       "ticker": "MSFT",
+       "gicsSectorDescription": "Information Technology",
+       "icbIndustryDescription": "Technology",
+       "marketValuePercentage": 3.4866,
+       "securityType": "EQ.STOCK",
+       "effectiveDate": "2026-08-31",
+       "bloombergIsoCountry": "US",
+       "marketValueBaseCurrency": 2984221186.17
+      },
+      {
+       "issuerName": "Amazon.com Inc",
+       "securityLongDescription": "Amazon.com Inc",
+       "isin": "US0231351067",
+       "sedol1": "2000019",
+       "ticker": "AMZN",
+       "gicsSectorDescription": "Consumer Discretionary",
+       "icbIndustryDescription": "Consumer Discretionary",
+       "marketValuePercentage": 2.33245,
+       "securityType": "EQ.STOCK",
+       "effectiveDate": "2026-08-31",
+       "bloombergIsoCountry": "US",
+       "marketValueBaseCurrency": 1996371415.5
+      },
+      {
+       "issuerName": "Alphabet Inc",
+       "securityLongDescription": "Alphabet Inc",
+       "isin": "US02079K3059",
+       "sedol1": "BYVY8G0",
+       "ticker": "GOOGL",
+       "gicsSectorDescription": "Communication Services",
+       "icbIndustryDescription": "Technology",
+       "marketValuePercentage": 1.86766,
+       "securityType": "EQ.STOCK",
+       "effectiveDate": "2026-08-31",
+       "bloombergIsoCountry": "US",
+       "marketValueBaseCurrency": 1598556362.7
+      },
+      {
+       "issuerName": "Taiwan Semiconductor Manufacturing Co Ltd",
+       "securityLongDescription": "Taiwan Semiconductor Manufacturing Co Ltd",
+       "isin": "TW0002330008",
+       "sedol1": "6889106",
+       "ticker": "2330",
+       "gicsSectorDescription": "Information Technology",
+       "icbIndustryDescription": "Technology",
+       "marketValuePercentage": 1.70366,
+       "securityType": "EQ.STOCK",
+       "effectiveDate": "2026-08-31",
+       "bloombergIsoCountry": "TW",
+       "marketValueBaseCurrency": 1458183069.32
+      }
+     ],
+     "totalHoldings": 4093,
+     "lastItemKey": "{\"portIdKey\":\"fundBorHoldings-9679-2026-08-31\",\"pkey\":\"fundBorHoldings-9679-a9a44c78dd5a6554861fef3e92c6f1606239b3c9\",\"skey\":1.70366}"
+    }
+   }
+  ]
+ },
+ "_recorded": "2026-10-03 live POST /gpx/graphql borHoldings limit 6 portIds 9679"
+}

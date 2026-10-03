@@ -1,0 +1,23 @@
+1 | Details of the person discharging managerial responsibilities/person closely associated
+a) | Name | Example Person
+2 | Reason for the notification
+a) | Position/status | Chief External and Corporate Affairs Officer
+b) | Initial notification/ Amendment | Initial notification
+3 | Details of the issuer, emission allowance market participant, auction platform, auctioneer or auction monitor
+a) | Name | Vodafone Group Plc
+b) | LEI | 213800TB53ELEUKM7Q61
+4 | Details of the transaction(s): section to be repeated for (i) each type of instrument; (ii) each type of transaction; (iii) each date; and (iv) each place where transactions have been conducted
+a) | Description of the financial instrument, type of instrument and identification code | Ordinary shares of US$0.20 20/21 each in Vodafone Group Plc (ISIN: GB00BH4HKS39)
+b) | Nature of the transaction | Sale of Ordinary shares
+c) | Price(s) and volume(s) | Price(s) | Volume(s)
+£ 1.26725 | 500,000
+d) | Aggregated information | Price(s): £ 633,625 Volume(s): 500,000
+e) | Date of the transaction | 2026-09-18
+f) | Place of the transaction | London Stock Exchange (XLON)
+- ends -
+For more information, please contact:
+Investor Relations: | vodafone.com | ir@vodafone.co.uk | Media Relations: | Vodafone.com/media/contact | GroupMedia@vodafone.com
+Registered Office: Vodafone House, The Connection, Newbury, Berkshire RG14 2FN, England. Registered in England No. 1833679
+About Vodafone Group
+everyone.connected
+Vodafone is a leading European and African telecoms company.

@@ -1,0 +1,224 @@
+{
+ "productId": 253743,
+ "portfolioType": "ISHARES_FUND_DATA",
+ "currencyCode": "USD",
+ "fundName": "iShares Core S&P 500 UCITS ETF",
+ "componentsByNameMap": {
+  "keyFundFacts": {
+   "componentId": "keyFundFacts",
+   "containersByNameMap": {
+    "default": {
+     "name": "default",
+     "dataPointsByNameMap": {
+      "assetClass": {
+       "name": "assetClass",
+       "value": "Equity",
+       "formattedValue": "Equity",
+       "asOfDate": null,
+       "label": "Asset Class"
+      },
+      "baseCurrencyCode": {
+       "name": "baseCurrencyCode",
+       "value": "USD",
+       "formattedValue": "USD",
+       "asOfDate": null,
+       "label": "Fund Base Currency"
+      },
+      "bbeqtick": {
+       "name": "bbeqtick",
+       "value": "CSPX LN",
+       "formattedValue": "CSPX LN",
+       "asOfDate": null,
+       "label": "Bloomberg Ticker"
+      },
+      "domicile": {
+       "name": "domicile",
+       "value": "Ireland",
+       "formattedValue": "Ireland",
+       "asOfDate": null,
+       "label": "Domicile"
+      },
+      "emeaMgt": {
+       "name": "emeaMgt",
+       "value": 0.07,
+       "formattedValue": "0",
+       "asOfDate": null,
+       "label": "Total Expense Ratio"
+      },
+      "esmaBenchmarksByDataPointName": {
+       "name": "esmaBenchmarksByDataPointName",
+       "value": null,
+       "formattedValue": "-",
+       "asOfDate": null,
+       "label": ""
+      },
+      "fiscalYearEndDate": {
+       "name": "fiscalYearEndDate",
+       "value": 20260731,
+       "formattedValue": "2026-07-31",
+       "asOfDate": null,
+       "label": "Fiscal Year End"
+      },
+      "fundAdministrator": {
+       "name": "fundAdministrator",
+       "value": "BNY Mellon Fund Services (Ireland) Designated Activity Company",
+       "formattedValue": "BNY Mellon Fund Services (Ireland) Designated Activity Company",
+       "asOfDate": null,
+       "label": "Administrator"
+      },
+      "fundCustodian": {
+       "name": "fundCustodian",
+       "value": "The Bank of New York Mellon SA/NV, Dublin Branch",
+       "formattedValue": "The Bank of New York Mellon SA/NV, Dublin Branch",
+       "asOfDate": null,
+       "label": "Custodian"
+      },
+      "fundMethodologyTypeCode": {
+       "name": "fundMethodologyTypeCode",
+       "value": "Physical Replication",
+       "formattedValue": "Physical Replication",
+       "asOfDate": null,
+       "label": "Methodology"
+      },
+      "fundmanager": {
+       "name": "fundmanager",
+       "value": "BlackRock Asset Management Ireland Limited",
+       "formattedValue": "BlackRock Asset Management Ireland Limited",
+       "asOfDate": null,
+       "label": "Fund Manager"
+      },
+      "inceptionDate": {
+       "name": "inceptionDate",
+       "value": 20100519,
+       "formattedValue": "2010-05-19",
+       "asOfDate": null,
+       "label": "Share Class launch date"
+      },
+      "indexSeriesName": {
+       "name": "indexSeriesName",
+       "value": "S&P 500 Index",
+       "formattedValue": "S&P 500 Index",
+       "asOfDate": null,
+       "label": "Benchmark Index"
+      },
+      "isaEligibilityFlag": {
+       "name": "isaEligibilityFlag",
+       "value": "Yes",
+       "formattedValue": "Yes",
+       "asOfDate": null,
+       "label": "ISA Eligibility"
+      },
+      "isin": {
+       "name": "isin",
+       "value": "IE00B5BMR087",
+       "formattedValue": "IE00B5BMR087",
+       "asOfDate": null,
+       "label": "ISIN"
+      },
+      "issuingCompany": {
+       "name": "issuingCompany",
+       "value": "iShares VII plc",
+       "formattedValue": "iShares VII plc",
+       "asOfDate": null,
+       "label": "Issuing Company"
+      },
+      "launchDate": {
+       "name": "launchDate",
+       "value": 20100518,
+       "formattedValue": "2010-05-18",
+       "asOfDate": null,
+       "label": "Fund Launch Date"
+      },
+      "oneYearSecLendingReturn": {
+       "name": "oneYearSecLendingReturn",
+       "value": 0.0,
+       "formattedValue": "0",
+       "asOfDate": 20260630,
+       "label": "Securities Lending Return"
+      },
+      "productStructure": {
+       "name": "productStructure",
+       "value": "Physical",
+       "formattedValue": "Physical",
+       "asOfDate": null,
+       "label": "Product Structure"
+      },
+      "rebalanceFrequency": {
+       "name": "rebalanceFrequency",
+       "value": "Quarterly",
+       "formattedValue": "Quarterly",
+       "asOfDate": null,
+       "label": "Rebalance Frequency"
+      },
+      "seriesBaseCurrencyCode": {
+       "name": "seriesBaseCurrencyCode",
+       "value": "USD",
+       "formattedValue": "USD",
+       "asOfDate": null,
+       "label": "Share Class Currency"
+      },
+      "sfdr": {
+       "name": "sfdr",
+       "value": "Other",
+       "formattedValue": "Other",
+       "asOfDate": null,
+       "label": "SFDR Classification"
+      },
+      "sharesOutstanding": {
+       "name": "sharesOutstanding",
+       "value": 187208070.0,
+       "formattedValue": "187208070",
+       "asOfDate": 20261002,
+       "label": "Shares Outstanding"
+      },
+      "sippEligibilityFlag": {
+       "name": "sippEligibilityFlag",
+       "value": "Yes",
+       "formattedValue": "Yes",
+       "asOfDate": null,
+       "label": "SIPP Available"
+      },
+      "totalNetAssets": {
+       "name": "totalNetAssets",
+       "value": 155965547294.18,
+       "formattedValue": "155965547294",
+       "asOfDate": 20261002,
+       "label": "Net Assets"
+      },
+      "totalNetAssetsFundLevel": {
+       "name": "totalNetAssetsFundLevel",
+       "value": 159086514607.14,
+       "formattedValue": "159086514607",
+       "asOfDate": 20261002,
+       "label": "Net Assets of Fund"
+      },
+      "ucitsCompliantFlag": {
+       "name": "ucitsCompliantFlag",
+       "value": "Yes",
+       "formattedValue": "Yes",
+       "asOfDate": null,
+       "label": "UCITS Compliant"
+      },
+      "ukDistributorStatusTypeId": {
+       "name": "ukDistributorStatusTypeId",
+       "value": "Yes",
+       "formattedValue": "Yes",
+       "asOfDate": null,
+       "label": "UK Reporting Status"
+      },
+      "useOfProfitsCode": {
+       "name": "useOfProfitsCode",
+       "value": "Accumulating",
+       "formattedValue": "Accumulating",
+       "asOfDate": null,
+       "label": "Use of Income"
+      }
+     }
+    }
+   }
+  }
+ },
+ "shareClass": " ",
+ "aladdinFundTicker": "ID-CSPX",
+ "_recorded": "2026-10-03 live GET blackrock.com varnish-api uk-retail01-product-data get-product-data component=keyFundFacts portfolioId=253743 (iShares Core S&P 500 UCITS ETF); content labels and data point metadata trimmed"
+}

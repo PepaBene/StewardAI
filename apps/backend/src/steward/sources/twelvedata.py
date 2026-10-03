@@ -46,10 +46,13 @@ def classify_time_series(body: Any) -> TimeSeriesProbe:
     if body.get("status") == "error" or code is not None:
         if code == 429 or "run out of api credits" in lowered or "api credits" in lowered:
             return TimeSeriesProbe(AccessState.QUOTA_EXHAUSTED, message or "credit limit")
-        if code == 401 or "apikey" in lowered or "api key" in lowered:
-            return TimeSeriesProbe(AccessState.ACCESS_UNVERIFIED, message or "key rejected")
+        # The docs (twelvedata.com/docs, "Error Codes", read 2026-10-03) define 403 as "API key
+        # lacks permissions for the requested resource (upgrade required)": a plan denial whose
+        # text contains "API key", so the code is read before any wording.
         if code == 403 or (code in (400, 404) and any(w in lowered for w in _PLAN_WORDS)):
             return TimeSeriesProbe(AccessState.PAID_ONLY, message or "plan excludes this symbol")
+        if code == 401 or "apikey" in lowered or "api key" in lowered:
+            return TimeSeriesProbe(AccessState.ACCESS_UNVERIFIED, message or "key rejected")
         if code in (400, 404):
             return TimeSeriesProbe(AccessState.NOT_COVERED, message or "symbol not found")
         return TimeSeriesProbe(AccessState.TEMPORARILY_FAILED, message or f"error code {code}")

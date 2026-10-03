@@ -1,0 +1,261 @@
+{
+ "_recorded": "2026-10-03 live POST https://api.openfigi.com/v3/mapping (with API key; key never recorded); data trimmed to 6 of 164 listings",
+ "headers": {
+  "ratelimit-policy": "250;w=60",
+  "ratelimit-limit": "250",
+  "ratelimit-remaining": "249",
+  "ratelimit-reset": "60",
+  "content-type": "application/json; charset=utf-8"
+ },
+ "GB00BH4HKS39": [
+  {
+   "data": [
+    {
+     "figi": "BBG000C6K6G9",
+     "name": "VODAFONE GROUP PLC",
+     "ticker": "VOD",
+     "exchCode": "LN",
+     "compositeFIGI": "BBG000C6K5W3",
+     "securityType": "Common Stock",
+     "marketSector": "Equity",
+     "shareClassFIGI": "BBG001S6PJ31",
+     "securityType2": "Common Stock",
+     "securityDescription": "VOD"
+    },
+    {
+     "figi": "BBG000DT2N99",
+     "name": "VODAFONE GROUP PLC",
+     "ticker": "VODI",
+     "exchCode": "GR",
+     "compositeFIGI": "BBG000DT2N99",
+     "securityType": "Common Stock",
+     "marketSector": "Equity",
+     "shareClassFIGI": "BBG001S6PJ31",
+     "securityType2": "Common Stock",
+     "securityDescription": "VODI"
+    },
+    {
+     "figi": "BBG000JK82B9",
+     "name": "VODAFONE GROUP PLC",
+     "ticker": "VODPF",
+     "exchCode": "US",
+     "compositeFIGI": "BBG000JK82B9",
+     "securityType": "Common Stock",
+     "marketSector": "Equity",
+     "shareClassFIGI": "BBG001S6PJ31",
+     "securityType2": "Common Stock",
+     "securityDescription": "VODPF"
+    },
+    {
+     "figi": "BBG000M2GV86",
+     "name": "VODAFONE GROUP PLC",
+     "ticker": "VODUSD",
+     "exchCode": "EO",
+     "compositeFIGI": "BBG000M2GV86",
+     "securityType": "Common Stock",
+     "marketSector": "Equity",
+     "shareClassFIGI": "BBG001S6PJ31",
+     "securityType2": "Common Stock",
+     "securityDescription": "VODUSD"
+    },
+    {
+     "figi": "BBG000N8CXQ2",
+     "name": "VODAFONE GROUP PLC",
+     "ticker": "VOD",
+     "exchCode": "EO",
+     "compositeFIGI": "BBG000N8CXQ2",
+     "securityType": "Common Stock",
+     "marketSector": "Equity",
+     "shareClassFIGI": "BBG001S6PJ31",
+     "securityType2": "Common Stock",
+     "securityDescription": "VOD"
+    },
+    {
+     "figi": "BBG000N9T529",
+     "name": "VODAFONE GROUP PLC",
+     "ticker": "VODEUR",
+     "exchCode": "EO",
+     "compositeFIGI": "BBG000N9T529",
+     "securityType": "Common Stock",
+     "marketSector": "Equity",
+     "shareClassFIGI": "BBG001S6PJ31",
+     "securityType2": "Common Stock",
+     "securityDescription": "VODEUR"
+    },
+    {
+     "figi": "BBG000NGBN87",
+     "name": "VODAFONE GROUP PLC",
+     "ticker": "VODGBP",
+     "exchCode": "EO",
+     "compositeFIGI": "BBG000NGBN87",
+     "securityType": "Common Stock",
+     "marketSector": "Equity",
+     "shareClassFIGI": "BBG001S6PJ31",
+     "securityType2": "Common Stock",
+     "securityDescription": "VODGBP"
+    },
+    {
+     "figi": "BBG000NY1YF7",
+     "name": "VODAFONE GROUP PLC",
+     "ticker": "VODPEN",
+     "exchCode": "EO",
+     "compositeFIGI": "BBG000NY1YF7",
+     "securityType": "Common Stock",
+     "marketSector": "Equity",
+     "shareClassFIGI": "BBG001S6PJ31",
+     "securityType2": "Common Stock",
+     "securityDescription": "VODPEN"
+    },
+    {
+     "figi": "BBG000P2Q8L8",
+     "name": "VODAFONE GROUP PLC",
+     "ticker": "VODSGD",
+     "exchCode": "EO",
+     "compositeFIGI": "BBG000P2Q8L8",
+     "securityType": "Common Stock",
+     "marketSector": "Equity",
+     "shareClassFIGI": "BBG001S6PJ31",
+     "securityType2": "Common Stock",
+     "securityDescription": "VODSGD"
+    },
+    {
+     "figi": "BBG006KZ01V9",
+     "name": "VODAFONE GROUP PLC",
+     "ticker": "VODPLN",
+     "exchCode": "EO",
+     "compositeFIGI": "BBG006KZ01V9",
+     "securityType": "Common Stock",
+     "marketSector": "Equity",
+     "shareClassFIGI": "BBG001S6PJ31",
+     "securityType2": "Common Stock",
+     "securityDescription": "VODPLN"
+    },
+    {
+     "figi": "BBG007F5TH52",
+     "name": "VODAFONE GROUP PLC",
+     "ticker": "VODCHF",
+     "exchCode": "EO",
+     "compositeFIGI": "BBG007F5TH52",
+     "securityType": "Common Stock",
+     "marketSector": "Equity",
+     "shareClassFIGI": "BBG001S6PJ31",
+     "securityType2": "Common Stock",
+     "securityDescription": "VODCHF"
+    },
+    {
+     "figi": "BBG007FL7X10",
+     "name": "VODAFONE GROUP PLC",
+     "ticker": "VODA",
+     "exchCode": "SW",
+     "compositeFIGI": "BBG007FL7X10",
+     "securityType": "Common Stock",
+     "marketSector": "Equity",
+     "shareClassFIGI": "BBG001S6PJ31",
+     "securityType2": "Common Stock",
+     "securityDescription": "VODA"
+    },
+    {
+     "figi": "BBG00JN771Q9",
+     "name": "VODAFONE GROUP PLC",
+     "ticker": "VODUSD",
+     "exchCode": "XX",
+     "compositeFIGI": "BBG000M2GV86",
+     "securityType": "Common Stock",
+     "marketSector": "Equity",
+     "shareClassFIGI": "BBG001S6PJ31",
+     "securityType2": "Common Stock",
+     "securityDescription": "VODUSD"
+    },
+    {
+     "figi": "BBG00JN7C9S4",
+     "name": "VODAFONE GROUP PLC",
+     "ticker": "VOD",
+     "exchCode": "XX",
+     "compositeFIGI": "BBG000N8CXQ2",
+     "securityType": "Common Stock",
+     "marketSector": "Equity",
+     "shareClassFIGI": "BBG001S6PJ31",
+     "securityType2": "Common Stock",
+     "securityDescription": "VOD"
+    },
+    {
+     "figi": "BBG00JN7F2L3",
+     "name": "VODAFONE GROUP PLC",
+     "ticker": "VODEUR",
+     "exchCode": "XX",
+     "compositeFIGI": "BBG000N9T529",
+     "securityType": "Common Stock",
+     "marketSector": "Equity",
+     "shareClassFIGI": "BBG001S6PJ31",
+     "securityType2": "Common Stock",
+     "securityDescription": "VODEUR"
+    },
+    {
+     "figi": "BBG00JN7KB19",
+     "name": "VODAFONE GROUP PLC",
+     "ticker": "VODGBP",
+     "exchCode": "XX",
+     "compositeFIGI": "BBG000NGBN87",
+     "securityType": "Common Stock",
+     "marketSector": "Equity",
+     "shareClassFIGI": "BBG001S6PJ31",
+     "securityType2": "Common Stock",
+     "securityDescription": "VODGBP"
+    },
+    {
+     "figi": "BBG00JN7NK43",
+     "name": "VODAFONE GROUP PLC",
+     "ticker": "VODPEN",
+     "exchCode": "XX",
+     "compositeFIGI": "BBG000NY1YF7",
+     "securityType": "Common Stock",
+     "marketSector": "Equity",
+     "shareClassFIGI": "BBG001S6PJ31",
+     "securityType2": "Common Stock",
+     "securityDescription": "VODPEN"
+    },
+    {
+     "figi": "BBG00JN7NVN8",
+     "name": "VODAFONE GROUP PLC",
+     "ticker": "VODSGD",
+     "exchCode": "XX",
+     "compositeFIGI": "BBG000P2Q8L8",
+     "securityType": "Common Stock",
+     "marketSector": "Equity",
+     "shareClassFIGI": "BBG001S6PJ31",
+     "securityType2": "Common Stock",
+     "securityDescription": "VODSGD"
+    },
+    {
+     "figi": "BBG00JN86X33",
+     "name": "VODAFONE GROUP PLC",
+     "ticker": "VODPLN",
+     "exchCode": "XX",
+     "compositeFIGI": "BBG006KZ01V9",
+     "securityType": "Common Stock",
+     "marketSector": "Equity",
+     "shareClassFIGI": "BBG001S6PJ31",
+     "securityType2": "Common Stock",
+     "securityDescription": "VODPLN"
+    },
+    {
+     "figi": "BBG00JN89078",
+     "name": "VODAFONE GROUP PLC",
+     "ticker": "VODCHF",
+     "exchCode": "XX",
+     "compositeFIGI": "BBG007F5TH52",
+     "securityType": "Common Stock",
+     "marketSector": "Equity",
+     "shareClassFIGI": "BBG001S6PJ31",
+     "securityType2": "Common Stock",
+     "securityDescription": "VODCHF"
+    }
+   ]
+  }
+ ],
+ "invalid_idValue": [
+  {
+   "error": "Invalid idValue format."
+  }
+ ]
+}

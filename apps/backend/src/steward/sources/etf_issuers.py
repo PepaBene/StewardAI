@@ -441,6 +441,24 @@ async def fetch_ishares(
         snapshot.raw["exposureBreakdowns"] = exposure
     except IssuerError as exc:
         snapshot.warnings.append(f"sector table unavailable: {exc}")
+    # The factsheet figures (expense ratio, net assets, benchmark, use of income) are not in the
+    # holdings component: they are in `keyFundFacts` (checked live 2026-10-03).
+    try:
+        facts = await _get_json(
+            http,
+            "iShares product-data API",
+            url,
+            _ishares_params(portfolio_id, "keyFundFacts", site, locale),
+            retries,
+            retry_delay,
+        )
+        assert snapshot.raw is not None
+        # `content` is the page's label and disclaimer text (most of the 360 KB), not data.
+        snapshot.raw["keyFundFacts"] = (
+            {k: v for k, v in facts.items() if k != "content"} if isinstance(facts, dict) else facts
+        )
+    except IssuerError as exc:
+        snapshot.warnings.append(f"key fund facts unavailable: {exc}")
     return snapshot
 
 
@@ -580,7 +598,8 @@ async def fetch_ishares_spreadsheet(
 
 VANGUARD_FUND_QUERY = (
     "query LookThroughFund($portIds: [String!]) { funds(portIds: $portIds) {"
-    " profile { fundFullName fundCurrency primarySectorEquityClassification }"
+    " profile { fundFullName fundCurrency primarySectorEquityClassification"
+    " distributionStrategy shareClassName }"
     " marketAllocation { date countryName countryCode holdingStatCode regionCode regionName"
     " fundMktPercent benchmarkMktPercent }"
     " sectorDiversification { date sectorName fundPercent benchmarkPercent } } }"

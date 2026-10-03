@@ -1,0 +1,53 @@
+{
+ "_recorded": "2026-10-03 live GET https://finnhub.io/api/v1/quote with the key in a header (free plan); key never recorded",
+ "quotes": {
+  "AAPL": {
+   "status": 200,
+   "body": "{\"c\":333.69,\"d\":3.37,\"dp\":1.0202,\"h\":334.54,\"l\":330.61,\"o\":333.26,\"pc\":330.32,\"t\":1790971200}",
+   "headers": {
+    "content-type": "application/json; charset=utf-8",
+    "x-ratelimit-limit": "60",
+    "x-ratelimit-remaining": "59",
+    "x-ratelimit-reset": "1791046650"
+   }
+  },
+  "SAP.DE": {
+   "status": 403,
+   "body": "{\"error\":\"You don't have access to this resource.\"}",
+   "headers": {
+    "content-type": "application/json; charset=utf-8"
+   }
+  },
+  "VOD.L": {
+   "status": 403,
+   "body": "{\"error\":\"You don't have access to this resource.\"}",
+   "headers": {
+    "content-type": "application/json; charset=utf-8"
+   }
+  },
+  "CEZ.PR": {
+   "status": 200,
+   "body": "{\"c\":1339,\"d\":-4,\"dp\":-0.2978,\"h\":1343,\"l\":1335,\"o\":1338,\"pc\":1343,\"t\":1790899200}",
+   "headers": {
+    "content-type": "application/json; charset=utf-8",
+    "x-ratelimit-limit": "60",
+    "x-ratelimit-remaining": "58",
+    "x-ratelimit-reset": "1791046650"
+   }
+  },
+  "ZZZZZ.XX": {
+   "status": 200,
+   "body": "{\"c\":0,\"d\":null,\"dp\":null,\"h\":0,\"l\":0,\"o\":0,\"pc\":0,\"t\":0}",
+   "headers": {
+    "content-type": "application/json; charset=utf-8",
+    "x-ratelimit-limit": "60",
+    "x-ratelimit-remaining": "57",
+    "x-ratelimit-reset": "1791046650"
+   }
+  }
+ },
+ "invalid_key": {
+  "status": 401,
+  "body": "{\"error\":\"Invalid API key.\"}"
+ }
+}

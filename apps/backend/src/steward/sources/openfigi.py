@@ -15,8 +15,10 @@ import httpx
 
 MAPPING_URL = "https://api.openfigi.com/v3/mapping"
 # Rate limits (https://www.openfigi.com/api/documentation): 25 mapping requests a minute
-# without a key, 25 per 6 seconds with one. Each request here is one job (the cap is 10 jobs
-# per request without a key, 100 with one) and a mapping job returns all its FIGIs, with no
+# without a key; with a key the live response says `ratelimit-policy: 250;w=60` (250 a minute,
+# checked 2026-10-03) with `ratelimit-limit`, `ratelimit-remaining` and `ratelimit-reset`
+# (seconds to the window's end) headers on every 200. Each request here is one job (the cap is
+# 10 jobs per request without a key, 100 with one) and a mapping job returns all its FIGIs, with no
 # pagination. A 429 is waited out (the `ratelimit-reset` header, in seconds) and retried,
 # so a first run over many holdings resolves them all rather than failing past the 25th.
 RATE_LIMIT_RETRIES = 3

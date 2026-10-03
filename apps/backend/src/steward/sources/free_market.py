@@ -338,9 +338,11 @@ async def eodhd_daily(http: httpx.AsyncClient, api_key: str, symbol: str) -> lis
                 _decimal(r["high"], "high"),
                 _decimal(r["low"], "low"),
                 _decimal(r["close"], "close"),
-                # EODHD's adjusted_close is adjusted for splits and dividends. Whether its
-                # plain `close` is split-adjusted is unverified without a live payload, so
-                # total return checks the raw series against confirmed splits before use.
+                # EODHD's docs (eodhd.com/financial-apis/api-for-historical-data-and-volumes,
+                # read 2026-10-03) say OHLC are "as traded - not adjusted" and `adjusted_close`
+                # is adjusted for splits AND dividends (volume for splits only). A live payload
+                # needs a key, so total return still checks the raw series against confirmed
+                # splits before use.
                 _decimal(r["adjusted_close"], "adjusted close")
                 if r.get("adjusted_close") is not None
                 else None,

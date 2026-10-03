@@ -20,14 +20,20 @@ Input is the existing RNS announcement stream (`news.regulatory` / `news.feeds.R
 whose Investegate headline is the announcement type): `is_pdmr_announcement` selects the
 items, and the announcement body is parsed here.
 
-Status of retrieval (an honest gap): the announcement headlines come from the Investegate
-company page the news pipeline already reads, but the announcement *body* page has not been
-shown to be retrievable and parseable without a browser. Nothing here has been run against
-the live site. Parsed notifications are persisted (`pdmr_notification` / `pdmr_transaction`)
-by `ownership.pdmr_collect` from the RNS stream and read back by
-`/holdings/{ticker}/pdmr-notifications`; every retrieval attempt, failed ones included, is
-recorded, and `ownership.pdmr_read.pdmr_access_from_db` derives the standing status from
-those attempts, so "available" only appears once a notification was really parsed.
+Status of retrieval (checked live, 2026-10-03): the announcement headlines come from the
+Investegate company page the news pipeline reads (its `robots.txt` allows `/company/` and
+`/announcement/`); an announcement page such as
+`/announcement/rns/vodafone-group--vod/director-pdmr-shareholding/9782046` is server-rendered
+HTML (HTTP 200, no JavaScript needed) that contains the MAR template, so the body IS
+retrievable and parseable without a browser. The live page showed two parser faults, fixed:
+the last field (place of the transaction) ran on into the issuer's boilerplate and the
+instrument kept the words "and identification code" of the label. The site asks private
+investors to use it personally and not to redistribute or process it commercially: one page per
+notification, at the news job's pace, no bulk crawling. Parsed notifications are persisted
+(`pdmr_notification` / `pdmr_transaction`) by `ownership.pdmr_collect` from the RNS stream
+and read back by `/holdings/{ticker}/pdmr-notifications`; every retrieval attempt, failed ones
+included, is recorded, and `ownership.pdmr_read.pdmr_access_from_db` derives the standing
+status from those attempts, so "available" only appears once a notification was really parsed.
 `fetch_pdmr` returns a typed `PdmrFetchResult`: a retrieved page that does not contain the
 template is `no_template` (access unverified), a 401/403 is `access_unverified`, a 429 is
 `quota_exhausted`; it never turns a failed fetch into an empty list of transactions. The
@@ -98,13 +104,13 @@ class PdmrFetchResult:
 
 
 def pdmr_access() -> AccessResult:
-    """Standing status of the UK PDMR pipeline: parser only, retrieval not demonstrated."""
+    """Standing status of the UK PDMR pipeline: until a notification is parsed, unverified."""
     return AccessResult(
         AccessState.ACCESS_UNVERIFIED,
-        "UK PDMR notifications: the MAR Article 19 template parser is implemented and tested "
-        "on a fixture and parsed notifications are stored, but retrieval of announcement "
-        "bodies is not demonstrated against the live site: until a notification has "
-        "been parsed, UK insider activity is not available.",
+        "UK PDMR notifications: announcement bodies are retrievable as server-rendered HTML "
+        "(checked live 2026-10-03) and the MAR Article 19 template parser reads them, but "
+        "no notification has been parsed by the job yet, so UK insider activity is not "
+        "demonstrated.",
     )
 
 
@@ -230,7 +236,12 @@ def parse_pdmr_notification(text: str) -> PdmrNotification | None:
     part1 = _section(flat, r"details of the (?:PDMR|person discharging)", r"\b2\.?\s+Reason for")
     part2 = _section(flat, r"\b2\.?\s+Reason for the notification", r"\b3\.?\s+Details of the")
     part3 = _section(flat, r"\b3\.?\s+Details of the issuer", r"\b4\.?\s+Details of the")
-    part4 = _section(flat, r"\b4\.?\s+Details of the transaction", None)
+    # Section 4 ends where the announcement does ("- ends -", then the issuer's boilerplate).
+    part4 = _section(
+        flat,
+        r"\b4\.?\s+Details of the transaction",
+        r"-\s*ends\s*-|\bFor (?:more|further) information\b",
+    )
     name = _after(r"a\)\s*Name", part1, r"$^")
     position = _after(r"a\)\s*Position(?:/status)?", part2, r"\bb\)")
     initial = _after(r"b\)\s*Initial notification\s*/?\s*Amendment", part2, r"$^") or ""
@@ -242,8 +253,10 @@ def parse_pdmr_notification(text: str) -> PdmrNotification | None:
     blocks = re.split(r"(?=\ba\)\s*Description of the financial instrument)", part4, flags=re.I)
     for block in (b for b in blocks if re.search(r"description of the financial", b, re.I)):
         instrument_text = _after(
-            r"a\)\s*Description of the financial instrument(?:,? type of instrument)?"
-            r"(?:\s*Identification code)?",
+            # The template's label is "Description of the financial instrument, type of
+            # instrument and identification code" (as published on Investegate, 2026-10-03).
+            r"a\)\s*Description of the financial instrument(?:,?\s*type of instrument)?"
+            r"(?:,?\s*(?:and\s+)?(?:an\s+)?identification code)?",
             block,
             r"\bb\)\s*Nature",
         )

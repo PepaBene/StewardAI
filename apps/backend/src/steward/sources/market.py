@@ -178,6 +178,11 @@ async def stooq_daily(
     if response.status_code != 200:
         raise MarketDataError(f"Stooq returned HTTP {response.status_code}")
     head = response.text.lstrip()[:200].lower()
+    if head.startswith("<") or "html" in response.headers.get("content-type", "").lower():
+        # Observed live (2026-10-03): HTTP 200 and an HTML page whose script computes a
+        # proof of work in the browser (`/__verify`), otherwise a connection reset. It is a
+        # block for non-browser clients, not an empty history, and is not worked around here.
+        raise MarketDataError("Stooq served an HTML bot-check page, not CSV (blocked)")
     if not head.startswith("date") and any(r in head for r in STOOQ_REFUSALS):
         # Not an empty history: storing nothing here would look like "no data" forever.
         raise MarketDataError(f"Stooq refused the download: {response.text.strip()[:120]}")
