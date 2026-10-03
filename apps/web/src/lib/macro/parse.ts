@@ -151,6 +151,45 @@ export function parseNextRelease(o: NextReleaseFields): NextRelease {
   return { kind: "unknown" };
 }
 
+/** Vintage sources and the primary provider whose card carries their values as `history`. */
+export const VINTAGE_PRIMARY_SOURCE: Readonly<Record<string, string>> = { alfred: "fred" };
+
+/**
+ * One card per series. The backend already folds a vintage source (ALFRED) into its primary
+ * provider's card (the FRED card's `history` holds the first-release values), so a vintage row
+ * normally never arrives. If one still does (an older backend), it is not a second card: it is
+ * dropped when the primary card exists, after lending it its history when that card has none.
+ * A vintage-only series (no primary card) keeps its own card.
+ */
+export function collapseVintageCards(points: readonly IndicatorPoint[]): IndicatorPoint[] {
+  const keyOf = (p: IndicatorPoint) => `${p.seriesId}|${p.geography.trim().toUpperCase()}`;
+  const primary = new Map<string, IndicatorPoint>();
+  for (const p of points) if (!(p.source in VINTAGE_PRIMARY_SOURCE)) primary.set(`${p.source}|${keyOf(p)}`, p);
+  const lent = new Map<string, readonly VintagePoint[]>();
+  const kept: IndicatorPoint[] = [];
+  for (const p of points) {
+    const home = VINTAGE_PRIMARY_SOURCE[p.source];
+    const card = home ? primary.get(`${home}|${keyOf(p)}`) : undefined;
+    if (!home || !card) {
+      kept.push(p);
+      continue;
+    }
+    if (card.history.length === 0 && p.history.length > 0) lent.set(`${home}|${keyOf(p)}`, p.history);
+  }
+  return kept.map((p) => {
+    const h = lent.get(`${p.source}|${keyOf(p)}`);
+    return h ? { ...p, history: h } : p;
+  });
+}
+
+/** Rows of a vintage source whose primary provider has the same series are the same series, not another one. */
+export function dropVintageDuplicates<T extends { seriesId: string; source: string }>(rows: readonly T[]): T[] {
+  return rows.filter((r) => {
+    const home = VINTAGE_PRIMARY_SOURCE[r.source];
+    return !home || !rows.some((o) => o.source === home && o.seriesId === r.seriesId);
+  });
+}
+
 export function parseMacroContext(body: Schemas["MacroContext"] | unknown): Parsed<HoldingMacroContext> {
   if (!isRecord(body)) return fail("The macro context response was not an object.");
   const { observations, coverage, effects, comparisons } = body;
@@ -160,7 +199,7 @@ export function parseMacroContext(body: Schemas["MacroContext"] | unknown): Pars
   if (!asOf) return fail("The macro context response has no as-of time.");
   return ok({
     asOf,
-    observations: b.observations.map((o): IndicatorPoint => {
+    observations: collapseVintageCards(b.observations.map((o): IndicatorPoint => {
       const s = toDataState(o.access_state);
       return {
         seriesId: o.series_id,
@@ -182,7 +221,7 @@ export function parseMacroContext(body: Schemas["MacroContext"] | unknown): Pars
         releaseCalendar: o.release_calendar ?? null,
         nextRelease: parseNextRelease(o),
       };
-    }),
+    })),
     coverage: b.coverage.map((c): CoverageRow => {
       const s = toDataState(c.state);
       return { provider: c.provider, dataset: c.dataset, geography: c.geography, state: s.state, rawState: c.state, reason: c.reason ?? s.reason, checkedAt: c.checked_at };
@@ -202,7 +241,7 @@ export function parseMacroContext(body: Schemas["MacroContext"] | unknown): Pars
         relatedSeries: e.related_series,
       }),
     ),
-    comparisons: b.comparisons.map(
+    comparisons: dropVintageDuplicates(b.comparisons.map(
       (c): ComparisonPoint => ({
         seriesId: c.series_id,
         source: c.source,
@@ -214,9 +253,9 @@ export function parseMacroContext(body: Schemas["MacroContext"] | unknown): Pars
         knownAt: c.known_at,
         sourceUrl: c.source_url,
       }),
-    ),
+    )),
     exposureUnknown: b.exposure_unknown === true,
-    seriesEffects: (b.series_effects ?? []).map(
+    seriesEffects: dropVintageDuplicates((b.series_effects ?? []).map(
       (s): SeriesEffect => ({
         seriesId: s.series_id,
         source: s.source,
@@ -225,7 +264,7 @@ export function parseMacroContext(body: Schemas["MacroContext"] | unknown): Pars
         coveredWeight: num(s.covered_weight),
         geographies: s.geographies,
       }),
-    ),
+    )),
   });
 }
 
@@ -339,6 +378,7 @@ export function parseExposureMappings(body: Schemas["ExposureResult"][] | unknow
     out.push({
       id: r.id,
       issuerId: r.issuer_id,
+      issuerName: typeof r.issuer_name === "string" && r.issuer_name.trim() ? r.issuer_name : null,
       segment: r.segment,
       geography: r.geography ?? null,
       hsRevision: r.hs_revision ?? null,

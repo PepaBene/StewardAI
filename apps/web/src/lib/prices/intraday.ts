@@ -59,11 +59,15 @@ export function stripTooltip(i: IndexQuote): string {
       ? `Yahoo Finance (unofficial${i.yahoo_symbol ? `, ${i.yahoo_symbol}` : ""})`
       : i.source === "Stooq"
         ? `Stooq (${i.symbol})`
-        : (i.source ?? "");
+        : i.source === "Prague Stock Exchange"
+          ? "Prague Stock Exchange (pse): one close stored per day since the app first read it; nothing earlier is backfilled"
+          : (i.source ?? "");
   const against =
     i.previous_close != null
       ? ` vs ${i.previous_date ? `close of ${shortDay(i.previous_date)}` : "previous close"}`
-      : "";
+      : i.last_close != null
+        ? " (no earlier close stored yet, so no change is shown)"
+        : "";
   return [`${i.label}: ${what}${zone}${against}`, source].filter(Boolean).join(" · ");
 }
 

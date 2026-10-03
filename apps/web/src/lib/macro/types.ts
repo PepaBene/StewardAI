@@ -207,6 +207,8 @@ export type PortfolioMacroCoverage = {
 export type ExposureMapping = {
   id: number;
   issuerId: number;
+  /** The issuer's legal name from the backend; null when it has none on record (never guessed). */
+  issuerName?: string | null;
   segment: string;
   geography: string | null;
   hsRevision: string | null;

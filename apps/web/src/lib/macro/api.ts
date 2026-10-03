@@ -81,6 +81,19 @@ export function runMacroCollect() {
   return api().POST("/jobs/macro-collect", {});
 }
 
+export type IssuerInfo = { id: number; name: string; lei: string | null; cik: string | null; country: string | null; tickers: string[] };
+
+/** Legal names (with LEI, CIK, country and held tickers) for issuer ids, from GET /macro/issuers. */
+export async function fetchIssuerNames(ids: readonly number[]): Promise<ApiResult<IssuerInfo[]>> {
+  if (ids.length === 0) return { data: [], response: new Response(null, { status: 200 }) };
+  const result = await api().GET("/macro/issuers", { params: { query: { ids: [...ids], limit: 500 } } });
+  if (!result.response.ok || result.data === undefined) return { error: result.error, response: result.response };
+  return {
+    data: result.data.map((i) => ({ id: i.id, name: i.name, lei: i.lei, cik: i.cik, country: i.country, tickers: i.tickers })),
+    response: result.response,
+  };
+}
+
 /** The names an issuer id carries today (legal name and aliases), to show which company an id belongs to. */
 export async function fetchIssuerName(issuerId: number): Promise<ApiResult<{ issuerId: number; names: string[] }>> {
   const result = await api().GET("/reference/issuers/{issuer_id}/as-of", { params: { path: { issuer_id: issuerId }, query: { date: new Date().toISOString().slice(0, 10) } } });

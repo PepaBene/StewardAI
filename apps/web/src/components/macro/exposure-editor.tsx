@@ -9,7 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { formatPct } from "@/lib/charts/format";
 import { useApiResource, type ApiResult } from "@/lib/hooks/use-api-resource";
-import { createExposure, deleteExposure, fetchIssuerName } from "@/lib/macro/api";
+import { createExposure, deleteExposure, fetchIssuerName, fetchIssuerNames, type IssuerInfo } from "@/lib/macro/api";
 import {
   apiErrorMessages,
   BASIS_LABELS,
@@ -117,11 +117,39 @@ export function ExposureEditor({
   });
   const t = today();
   const summaries = useMemo(() => summariseMappings(mappings, t), [mappings, t]);
-  const issuerLabel = (id: number) => (issuers.has(id) ? `${issuers.get(id)} (issuer ${id})` : `Issuer ${id}`);
   const set = <K extends keyof ExposureForm>(k: K, v: ExposureForm[K]) => (k === "issuerId" ? setIssuerTyped(v as string) : setForm((f) => ({ ...f, [k]: v })));
   const issuerNumber = /^\d+$/.test(form.issuerId.trim()) && Number(form.issuerId) >= 1 && Number.isSafeInteger(Number(form.issuerId)) ? Number(form.issuerId) : null;
   // Known issuers (id -> ticker): the page's own plus those that already carry mappings.
   const knownIssuers = useMemo(() => [...new Set([...issuers.keys(), ...mappings.map((m) => m.issuerId)])].sort((a, b) => a - b), [issuers, mappings]);
+  // Real issuer names: the mapping rows carry them; GET /macro/issuers fills the rest. An id with
+  // no name on record is labelled as unknown, never given an invented one.
+  const idsKey = knownIssuers.join(",");
+  const [looked, setLooked] = useState<{ key: string; rows: IssuerInfo[] } | null>(null);
+  useEffect(() => {
+    if (!idsKey) return;
+    let live = true;
+    fetchIssuerNames(idsKey.split(",").map(Number)).then(
+      (r) => live && setLooked({ key: idsKey, rows: r.data ?? [] }),
+      () => live && setLooked({ key: idsKey, rows: [] }),
+    );
+    return () => {
+      live = false;
+    };
+  }, [idsKey]);
+  const issuerNames = useMemo(() => {
+    const out = new Map<number, string>();
+    for (const i of looked?.rows ?? []) out.set(i.id, i.name);
+    for (const m of mappings) if (m.issuerName) out.set(m.issuerId, m.issuerName);
+    return out;
+  }, [looked, mappings]);
+  const namesSettled = looked !== null && looked.key === idsKey;
+  const issuerLabel = (id: number) => {
+    const name = issuerNames.get(id);
+    const tick = issuers.get(id);
+    if (name) return tick && tick !== name ? `${name} (${tick}, issuer ${id})` : `${name} (issuer ${id})`;
+    if (tick) return `${tick} (issuer ${id})`;
+    return namesSettled ? `Issuer ${id} (name unknown)` : `Issuer ${id}`;
+  };
 
   async function submit(e: FormEvent) {
     e.preventDefault();
@@ -274,7 +302,7 @@ export function ExposureEditor({
               </select>
             ) : null}
             {issuerNumber !== null && checkedId === issuerNumber ? <IssuerCheck key={issuerNumber} issuerId={issuerNumber} known={issuers.get(issuerNumber)} ticker={ticker} /> : issuerNumber !== null && issuers.has(issuerNumber) ? (
-              <p role="status" className="text-xs text-text">Issuer {issuerNumber}: {issuers.get(issuerNumber)}.{ticker && issuers.get(issuerNumber) !== ticker ? ` This is not ${ticker}.` : ""}</p>
+              <p role="status" className="text-xs text-text">Issuer {issuerNumber}: {issuerNames.get(issuerNumber) ? `${issuerNames.get(issuerNumber)} (${issuers.get(issuerNumber)})` : issuers.get(issuerNumber)}.{ticker && issuers.get(issuerNumber) !== ticker ? ` This is not ${ticker}.` : ""}</p>
             ) : null}
           </Field>
           <Field id="ex-segment" label="Segment" error={fieldErr("segment")}>

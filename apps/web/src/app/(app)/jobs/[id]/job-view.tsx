@@ -6,11 +6,13 @@ import { useCallback, useEffect, useRef } from "react";
 
 import { AlertMessage } from "@/components/alert-message";
 import { JobStatusBadge } from "@/components/jobs/job-status-badge";
+import { StepFindingsView } from "@/components/jobs/step-findings";
 import { PageHeader } from "@/components/page-header";
 import { Blueprint } from "@/components/ui/blueprint";
 import { Button } from "@/components/ui/button";
 import { getBrowserApiClient, type JobDetail, type JobStepOut } from "@/lib/api/client";
 import { formatDateTime, formatRelative } from "@/lib/format";
+import { INTERRUPTED_EXPLANATION, isInterruptedError } from "@/lib/jobs/step-findings";
 import { useApiResource } from "@/lib/hooks/use-api-resource";
 import { useNow } from "@/lib/hooks/use-now";
 import {
@@ -99,7 +101,7 @@ function Job({ job, running, onReload }: { job: JobDetail; running: boolean; onR
         title={
           <span className="flex flex-wrap items-center gap-x-3 gap-y-1">
             {jobTypeLabel(job.job_type)} <span className="num font-normal text-text-muted">#{job.id}</span>
-            <JobStatusBadge status={job.status} className="font-sans text-sm tracking-normal" />
+            <JobStatusBadge status={job.status} interrupted={isInterruptedError(job.error)} className="font-sans text-sm tracking-normal" />
           </span>
         }
         description={
@@ -134,7 +136,8 @@ function Job({ job, running, onReload }: { job: JobDetail; running: boolean; onR
       </Blueprint>
 
       {failure ? (
-        <AlertMessage title={failure.step ? `Failed at step “${failure.step}”` : "The run failed"}>
+        <AlertMessage tone={isInterruptedError(failure.error) ? "info" : undefined} title={isInterruptedError(failure.error) ? "The run was interrupted" : failure.step ? `Failed at step “${failure.step}”` : "The run failed"}>
+          {isInterruptedError(failure.error) ? <p className="mb-2 text-sm">{INTERRUPTED_EXPLANATION}</p> : null}
           <p className="font-mono text-xs whitespace-pre-wrap">{failure.error}</p>
         </AlertMessage>
       ) : null}
@@ -175,7 +178,7 @@ function Step({ step, now }: { step: JobStepOut; now: Date }) {
         <p className="flex flex-wrap items-center gap-2">
           <span className="num font-mono text-xs text-text-muted">{String(step.step_index + 1).padStart(2, "0")}</span>
           <span className="font-medium">{step.name}</span>
-          <JobStatusBadge status={step.status} />
+          <JobStatusBadge status={step.status} interrupted={isInterruptedError(step.error)} />
         </p>
         <p className="num flex flex-wrap gap-x-3 text-text-muted">
           <time dateTime={step.started_at}>{formatDateTime(step.started_at)}</time>
@@ -192,6 +195,7 @@ function Step({ step, now }: { step: JobStepOut; now: Date }) {
           <span className="font-mono text-xs whitespace-pre-wrap">{step.error}</span>
         </p>
       ) : null}
+      <StepFindingsView detail={step.detail} />
       {detail ? (
         <details>
           <summary className="cursor-pointer text-text-muted hover:text-text">Detail</summary>

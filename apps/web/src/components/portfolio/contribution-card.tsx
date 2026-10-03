@@ -5,6 +5,7 @@ import { useCallback, useState } from "react";
 
 import { AlertMessage } from "@/components/alert-message";
 import { ContributionWaterfall } from "@/components/portfolio/contribution-waterfall";
+import { ContributionGapNote, contributionGap } from "@/components/portfolio/contribution-gap";
 import { RangeButtons } from "@/components/portfolio/range-buttons";
 import { Button } from "@/components/ui/button";
 import { Blueprint, PanelHeading } from "@/components/ui/blueprint";
@@ -63,24 +64,8 @@ export function ContributionCard() {
 }
 
 export function ContributionContent({ data }: { data: ContributionReport }) {
-  // One snapshot has no period: the API answers with a zero for every holding and no gap. Those
-  // zeros are "nothing to attribute yet", not "no holding contributed"; they are never drawn.
-  if (!data.gap && data.holdings.length > 0 && data.period_start && data.as_of && data.period_start >= data.as_of) {
-    return (
-      <p className="text-sm text-text-muted">
-        Only one snapshot exists (as of {data.as_of}), so there is no period to attribute yet. Contributions appear after the next sync.
-      </p>
-    );
-  }
-  if (data.gap || data.holdings.length === 0) {
-    return (
-      <p className="text-sm text-text-muted">
-        {data.gap === "no position snapshot yet"
-          ? "No portfolio snapshot yet. The first Trading212 sync creates one."
-          : (data.gap ?? "No holdings with enough history in this range yet.")}
-      </p>
-    );
-  }
+  // Fewer than two snapshots: the API's gap says so and no holding is listed. Never a chart of zeros.
+  if (contributionGap(data)) return <ContributionGapNote data={data} />;
   return (
     <ContributionWaterfall
       holdings={data.holdings}

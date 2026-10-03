@@ -119,6 +119,12 @@ export function LeiHistory({ lei, asOfParam }: { lei: string; asOfParam: string 
   );
 }
 
+/** A register date or timestamp as sent; absent says "not reported", never an assumed date. */
+function registerTime(v: string | null | undefined): string {
+  if (!v) return "not reported";
+  return /^\d{4}-\d{2}-\d{2}$/.test(v) ? v : v.replace("T", " ").replace(/(\.\d+)?(Z|\+00:00)$/, " UTC");
+}
+
 export function ListingHistory({ isin, asOfParam }: { isin: string; asOfParam: string | undefined }) {
   const fetcher = useCallback(() => fetchListingHistory(isin, asOfParam), [isin, asOfParam]);
   const { state } = useApiResource(fetcher);
@@ -137,6 +143,17 @@ export function ListingHistory({ isin, asOfParam }: { isin: string; asOfParam: s
               {h.mic} · {h.status ?? "status ?"} · published {h.publication_date ?? "?"}
               {h.terminated_at ? ` · terminated ${formatDate(h.terminated_at)}` : ""}
               {h.issuer_lei ? ` · issuer LEI ${h.issuer_lei}` : ""} · <SourceLink href={h.source_url}>source</SourceLink>
+              {/* Records of one venue differ only in these four fields; a field the register did not report says so. */}
+              <dl className="m-0 mt-0.5 grid grid-cols-[auto_1fr] gap-x-3 text-text-muted" aria-label={`Dates of the ${h.mic} record published ${h.publication_date ?? "on an unknown date"}`}>
+                <dt>Register published at</dt>
+                <dd className="m-0 text-text">{registerTime(h.published_at)}</dd>
+                <dt>Valid from</dt>
+                <dd className="m-0 text-text">{registerTime(h.valid_from)}</dd>
+                <dt>Valid to</dt>
+                <dd className="m-0 text-text">{h.valid_to ? registerTime(h.valid_to) : "open or not reported"}</dd>
+                <dt>First trade</dt>
+                <dd className="m-0 text-text">{registerTime(h.first_trade_at)}</dd>
+              </dl>
             </li>
           ))}
         </ul>

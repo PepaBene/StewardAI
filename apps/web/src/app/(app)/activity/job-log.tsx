@@ -26,6 +26,7 @@ import {
 import { formatDateTime, formatRelative } from "@/lib/format";
 import { useNow } from "@/lib/hooks/use-now";
 import { formatCost, JOB_STATUS, jobHref, jobTypeLabel } from "@/lib/jobs/job-detail";
+import { isInterruptedError } from "@/lib/jobs/step-findings";
 import { latestOnly } from "@/lib/latest-request";
 import { appendUnique } from "@/lib/portfolio/transactions";
 import { cn } from "@/lib/utils";
@@ -217,7 +218,7 @@ export function JobLog() {
                   <tr key={j.id} className="border-b border-border align-top last:border-0">
                     <th scope="row" className="px-3 py-2 text-left font-normal">
                       <Link href={jobHref(j.id)} className="flex items-center gap-2 font-medium hover:text-accent-ink hover:underline">
-                        <JobStatusDot status={j.status} />
+                        <JobStatusDot status={j.status} interrupted={isInterruptedError(j.error)} />
                         {jobTypeLabel(j.job_type)} <span className="num text-text-muted">#{j.id}</span>
                       </Link>
                       <span className="block text-xs text-text-muted">
@@ -226,7 +227,7 @@ export function JobLog() {
                       </span>
                     </th>
                     <td className="px-3 py-2">
-                      <JobStatusBadge status={j.status} />
+                      <JobStatusBadge status={j.status} interrupted={isInterruptedError(j.error)} />
                     </td>
                     <td className="num px-3 py-2 whitespace-nowrap">
                       <time dateTime={j.created_at} title={formatDateTime(j.created_at)}>
@@ -239,6 +240,7 @@ export function JobLog() {
                     </td>
                     <td className="max-w-md px-3 py-2 text-xs">
                       {j.failed_step ? <span className="font-mono font-medium">{j.failed_step}</span> : null}
+                      {isInterruptedError(j.error) ? <span className="block text-text">Stopped before it finished; not a data error. The next run continues.</span> : null}
                       {j.error ? <span className="block break-words text-text-muted">{j.error}</span> : null}
                       {!j.failed_step && !j.error ? <span className="text-text-muted">—</span> : null}
                     </td>

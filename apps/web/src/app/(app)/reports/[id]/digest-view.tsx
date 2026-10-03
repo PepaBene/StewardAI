@@ -23,6 +23,7 @@ import { FeedbackControl } from "@/components/feedback/feedback-control";
 import { AsOfLabel } from "@/components/freshness/as-of-label";
 import { CitationLink } from "@/components/news/citation";
 import { SeverityBadge, TierBadge } from "@/components/news/severity-badge";
+import { ContributionGapNote, contributionGap } from "@/components/portfolio/contribution-gap";
 import { DigestIntradaySpark, ON_ACCENT } from "@/components/reports/digest-intraday";
 import { DigestShell } from "@/components/reports/digest-shell";
 import { usePortfolioHistory } from "@/components/reports/reports-shell";
@@ -511,8 +512,9 @@ function HeroStat({ label, value, sub, children }: { label: string; value: strin
 }
 
 /** Contribution of each holding to the latest session's return (`/portfolio/contribution?days=1`). */
-function Movers({ movers }: { movers: ContributionReport | null | undefined }) {
-  const rows = (movers?.holdings ?? []).filter((h) => h.contribution_pct !== null);
+export function Movers({ movers }: { movers: ContributionReport | null | undefined }) {
+  const gap = movers ? contributionGap(movers) : null;
+  const rows = gap ? [] : (movers?.holdings ?? []).filter((h) => h.contribution_pct !== null);
   const max = Math.max(1e-9, ...rows.map((h) => Math.abs(h.contribution_pct ?? 0)));
   const moved = rows.some((h) => (h.contribution_pct ?? 0) !== 0);
   return (
@@ -520,14 +522,14 @@ function Movers({ movers }: { movers: ContributionReport | null | undefined }) {
       <PanelHeading kicker="Movers" title={<span id="movers-heading">Contribution to the latest session</span>} />
       {movers === undefined ? <p className="text-sm text-text-muted">Loading…</p> : null}
       {movers === null ? <p className="text-sm text-text-muted">Contribution is unavailable.</p> : null}
-      {movers && movers.gap ? <p className="text-sm text-text-muted">{movers.gap}</p> : null}
-      {movers && !movers.gap ? (
+      {movers && gap ? <ContributionGapNote data={movers} /> : null}
+      {movers && !gap ? (
         <p className="num text-xs text-text-muted">
           {movers.period_start && movers.as_of ? `${formatDate(movers.period_start)} → ${formatDate(movers.as_of)}` : null}
           {" · "}percentage points of the portfolio; the latest session, not necessarily this digest&rsquo;s day.
         </p>
       ) : null}
-      {movers && !movers.gap && rows.length > 0 && !moved ? (
+      {movers && !gap && rows.length > 0 && !moved ? (
         <p className="text-sm text-text-muted">No holding moved between these snapshots (no trading session).</p>
       ) : null}
       {rows.length > 0 && moved ? (

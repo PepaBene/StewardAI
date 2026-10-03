@@ -2,6 +2,7 @@ import { DataStateBadge } from "@/components/data-state";
 import { ExternalLinkIcon } from "lucide-react";
 
 import { geographyName, outsideRange, pointChange, rangePosition } from "@/lib/macro/logic";
+import { VINTAGE_PRIMARY_SOURCE } from "@/lib/macro/parse";
 import { isExternalUrl } from "@/lib/sources/sources";
 import type { VintageMode } from "@/lib/macro/logic";
 import type { IndicatorPoint } from "@/lib/macro/types";
@@ -79,6 +80,12 @@ export function IndicatorCard({ point, mode = "latest", domain = null }: { point
       ) : (
         <p className="text-xs text-text-muted">No vintage history was returned for this series.</p>
       )}
+
+      {point.source in VINTAGE_PRIMARY_SOURCE ? (
+        <p className="text-[11px] text-text-muted">
+          Vintage source only: no {VINTAGE_PRIMARY_SOURCE[point.source].toUpperCase()} card exists for this series, so the history above is all there is.
+        </p>
+      ) : null}
 
       <dl className="num m-0 grid grid-cols-[auto_1fr] gap-x-3 gap-y-0.5 text-[11px] text-text-muted">
         <dt>Previous</dt>

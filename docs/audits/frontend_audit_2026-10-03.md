@@ -107,6 +107,28 @@ Contrast fixes are tokens only (`src/app/tokens.css`; `npm run lint:colors` pass
 
 **Backend findings from the live run** (not fixed here; see the report of this pass): `/macro/context/{ticker}` returned no effects for a mapping entered today because the query's `$2` parameter is inferred as `date` (`created_at <= $2` compares with midnight); `valuation_refresh` fails with `'float' object has no attribute 'get'` for AAPL; `/portfolio/contribution` returns zero rows for a single snapshot with `gap: null`; `unknown_value_base` is a float residual (-8.9e-14); the vintage source `alfred` appears as a second card for the same series with a conflicting next-release date; ESMA listing history has exact duplicate rows; `control_stakes` could not parse 6 of 6 13D/G candidates; `public_data_collect` skips World Bank, OECD and BIS although the probe says `available`.
 
+### Backend changes adopted by the web (2026-10-03, fifth pass)
+
+The backend answered the live-pass findings; the web adopted each, with a regression test that fails on the old behaviour.
+
+| # | Backend change | Web change | Test |
+| --- | --- | --- | --- |
+| 1 | `/portfolio/contribution` with fewer than two snapshots returns a gap, and a holding seen once is omitted | One shared `contributionGap` and `ContributionGapNote`: the overview card and the digest "Movers" panel show "Needs at least two snapshots" with the API's own gap text, never a chart or a row of zeros. The old wire (one snapshot, zero rows, no gap) is still caught, so it is never read as "no holding moved". There is no holdings-table consumer of this endpoint | `contribution-card.test.tsx`, `digest-movers.test.tsx` |
+| 2 | `GET /macro/issuers`, `issuer_name` on the exposure result | The exposure editor labels issuers by legal name (rows carry it, the lookup fills the rest), "Issuer N (name unknown)" when the backend has none; never invented | `exposure-issuer-names.test.tsx`, `parse.test.ts` |
+| 3 | The vintage source `alfred` is the FRED card's `history`, not a second card | `collapseVintageCards` and `dropVintageDuplicates` guard an older backend (one card per series, vintage rows folded in, vintage-only series keeps its card, labelled); keys stay unique | `vintage-collapse.test.ts`, `vintage-cards.test.tsx` |
+| 4 | Listing history rows carry `published_at`, `valid_from`, `valid_to`, `first_trade_at` | Each row shows the four fields ("not reported" when absent) so same-venue rows are distinguishable | `listing-history-dates.test.tsx` |
+| 5 | 13D/G parse; `parse_failed` reasons name the cause and URL | The stakes view shows the issuer CUSIP and points to the job run for skipped filings. Activity job steps list each unreadable filing with its cause and URL, and the skip counts, in plain words | `control-stakes.test.tsx`, `job-view.test.tsx`, `step-findings.test.ts` |
+| 6 | `^px` from source `pse`, history from the first day it runs | The market strip shows an index with a level but no earlier close as "level (first close, no change yet)" instead of hiding it, and its tooltip names the Prague Stock Exchange and says nothing earlier is backfilled. The price chart says "Only one stored close so far" for a one-bar series (it said "No priced bars are available") and carries a short-history note under 20 sessions | `market-strip.test.tsx`, `intraday.test.ts`, `short-history.test.ts` |
+| 7 | `deferred_by_issuer` in the insider step; interrupted runs closed as interrupted | Job log and job page show "Interrupted" (neutral) with an explanation for a run whose error starts "interrupted"; deferred filings are "Deferred to the next run: N filings. Not an error" by issuer CIK | `job-view.test.tsx` |
+| 8 | (web) disputed-story landmark regression test noted as missing | Every claim, contradiction and support region is named after its story | `disputed-view.test.tsx` |
+
+Still open after this pass:
+
+- The 13D/G API does not return skipped filings, only the job step does; the stakes panel points to the Activity job log rather than listing them.
+- The strip's PX level has no date-range chart anywhere: the price history endpoint's source list does not include `pse`, so the holding price chart cannot show an index.
+- A run is recognised as interrupted from the backend's error wording ("interrupted ..."); there is no dedicated status value.
+- The live browser pass was not repeated for these changes (DOM and unit tests only).
+
 ### Not verified
 
 - No screen reader (NVDA, VoiceOver, JAWS) was run: none is available in the sandbox. Roles, names and the semantics axe checks were verified; the spoken output was not.

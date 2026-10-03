@@ -74,6 +74,13 @@ and 390 px in light and dark; axe-core 4.13.
 - Automated: typecheck, lint (incl. colour-token check), 133 test files / 1,357 tests (jsdom DOM tests for focus
   management, scroll regions, meters, keys), production build.
 
+Fifth pass (backend changes adopted, DOM and unit tests, no live browser run): contribution with fewer than two
+snapshots shows "Needs at least two snapshots" and the API's gap text on the overview and in the digest (never zeros);
+exposure editor labels issuers by legal name or "name unknown"; one macro card per series (vintage as history, no
+duplicate keys); listing history shows published, valid from, valid to and first trade; unreadable 13D/G filings are
+listed on the job page with cause and URL; the market strip shows a first-day PX level with its source and "no change yet";
+job views show deferred filings and interrupted runs in plain words; the disputed-stories landmarks are covered by a test.
+
 ## Not checked
 
 - Screen readers (none available in the sandbox): roles, names and axe's semantic rules were checked, not

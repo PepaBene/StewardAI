@@ -1,4 +1,4 @@
-import { CircleCheckIcon, CircleDashedIcon, CircleXIcon, LoaderCircleIcon } from "lucide-react";
+import { CircleCheckIcon, CircleDashedIcon, CircleSlashIcon, CircleXIcon, LoaderCircleIcon } from "lucide-react";
 
 import { StatusDot } from "@/components/ui/status-dot";
 import type { JobStatus, JobStepOut } from "@/lib/api/client";
@@ -6,8 +6,8 @@ import { JOB_STATUS } from "@/lib/jobs/job-detail";
 import { cn } from "@/lib/utils";
 
 /** A job or step's status as a list/timeline marker — the same tone as JobStatusBadge. */
-export function JobStatusDot({ status, className }: { status: JobStatus | JobStepOut["status"]; className?: string }) {
-  return <StatusDot tone={JOB_STATUS[status].tone} className={className} />;
+export function JobStatusDot({ status, className, interrupted = false }: { status: JobStatus | JobStepOut["status"]; className?: string; interrupted?: boolean }) {
+  return <StatusDot tone={interrupted && status === "failed" ? "neutral" : JOB_STATUS[status].tone} className={className} />;
 }
 
 const ICONS = {
@@ -19,9 +19,19 @@ const ICONS = {
 } as const;
 
 /** A job's or a step's status: muted palette, an icon and a word. */
-export function JobStatusBadge({ status, className }: { status: JobStatus | JobStepOut["status"]; className?: string }) {
-  const { label, tone } = JOB_STATUS[status];
-  const Icon = ICONS[status];
+export function JobStatusBadge({
+  status,
+  className,
+  interrupted = false,
+}: {
+  status: JobStatus | JobStepOut["status"];
+  className?: string;
+  /** A failed run the system closed because its process stopped: shown as "Interrupted", not as a failure. */
+  interrupted?: boolean;
+}) {
+  const stopped = interrupted && status === "failed";
+  const { label, tone } = stopped ? { label: "Interrupted", tone: "neutral" as const } : JOB_STATUS[status];
+  const Icon = stopped ? CircleSlashIcon : ICONS[status];
   return (
     <span
       className={cn(

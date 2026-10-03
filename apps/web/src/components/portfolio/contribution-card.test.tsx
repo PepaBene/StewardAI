@@ -19,6 +19,22 @@ describe("ContributionContent", () => {
     render(<ContributionContent data={data} />);
     expect(screen.queryByTestId("waterfall")).toBeNull();
     expect(screen.getByText(/Only one snapshot exists/)).toBeTruthy();
+    expect(screen.getByText("Needs at least two snapshots")).toBeTruthy();
+  });
+  it("shows the API's gap text, with an explicit needs-two-snapshots state, and no row (new wire: gap set, holdings empty)", () => {
+    const gap = "only one position snapshot (2026-10-03) in this window; a contribution needs at least two snapshots to measure a change";
+    const data: ContributionReport = { as_of: "2026-10-03", period_start: "2026-10-03", base_currency: "CZK", holdings: [], gap };
+    render(<ContributionContent data={data} />);
+    expect(screen.queryByTestId("waterfall")).toBeNull();
+    expect(screen.getByText("Needs at least two snapshots")).toBeTruthy();
+    expect(screen.getByText(gap)).toBeTruthy();
+    expect(screen.queryByText(/\b0\b/)).toBeNull();
+  });
+  it("does not label other gaps as needing snapshots", () => {
+    const data: ContributionReport = { as_of: null, period_start: null, base_currency: null, holdings: [], gap: "no position snapshot yet" };
+    render(<ContributionContent data={data} />);
+    expect(screen.queryByText("Needs at least two snapshots")).toBeNull();
+    expect(screen.getByText(/No portfolio snapshot yet/)).toBeTruthy();
   });
   it("draws the chart when the period spans at least two snapshots", () => {
     const data: ContributionReport = { as_of: "2026-10-03", period_start: "2026-09-01", base_currency: "CZK", holdings: [{ ...row, contribution_base: 12 }], gap: null };

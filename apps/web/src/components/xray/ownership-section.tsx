@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useCallback, useMemo } from "react";
 
 import { DivergingBar, Legend } from "@/components/charts";
@@ -286,7 +287,7 @@ function ControlStakesBlock({ ticker }: { ticker: string }) {
   );
 }
 
-function ControlStakesBody({ data }: { data: ControlStakesOut }) {
+export function ControlStakesBody({ data }: { data: ControlStakesOut }) {
   const views = stakeViews(data.stakes);
   const newest = views[0]?.stake.filed ?? null;
   return (
@@ -297,7 +298,9 @@ function ControlStakesBody({ data }: { data: ControlStakesOut }) {
       description={`A separate channel: percent of one share class as the filer reports it. ${data.not_additive_with?.length ? `Never added to ${data.not_additive_with.join(", ")}.` : "Never added to 13F or fund figures."}`}
     >
       {views.length === 0 ? (
-        <p className="text-sm text-text-muted">No 13D/G filing is stored for this holding. That means none has been loaded, not that no one holds a large stake.</p>
+        <p className="text-sm text-text-muted">
+          No 13D/G filing is stored for this holding. That means none has been loaded, not that no one holds a large stake. <SkippedNote />
+        </p>
       ) : (
         <>
           <p className="text-xs text-text-muted">
@@ -334,7 +337,10 @@ function ControlStakesBody({ data }: { data: ControlStakesOut }) {
                 {date(v.stake.filed)}
                 <span className="block text-[11px] text-text-muted">event {date(v.stake.event_date)}</span>
               </span>,
-              v.stake.class_title ?? "class not stated",
+              <span key="cl">
+                {v.stake.class_title ?? "class not stated"}
+                <span className="block text-[11px] text-text-muted">{v.stake.issuer_cusip ? `CUSIP ${v.stake.issuer_cusip}` : "CUSIP not stated"}</span>
+              </span>,
               compact(v.shares),
               v.percent === null ? "—" : `${v.percent.toFixed(2)}%`,
               <span key="c" className="text-[11px]">
@@ -367,8 +373,22 @@ function ControlStakesBody({ data }: { data: ControlStakesOut }) {
           ) : null}
         </>
       )}
+      {views.length > 0 ? <p className="text-xs text-text-muted"><SkippedNote /></p> : null}
       <Limitations items={data.limitations} />
     </Panel>
+  );
+}
+
+/** Filings the collector skipped are not rows here: their reasons are in the job run. */
+function SkippedNote() {
+  return (
+    <>
+      A filing the collector could not read, or that is older than structured filings, is not listed here; the control stakes job run on Activity names each one with its cause and URL.{" "}
+      <Link href="/activity#job-log" className="text-accent-ink underline">
+        Open the job log
+      </Link>
+      .
+    </>
   );
 }
 

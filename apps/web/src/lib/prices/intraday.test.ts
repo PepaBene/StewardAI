@@ -96,7 +96,16 @@ describe("labels", () => {
       "STOXX Europe 600: intraday 11:13 (Zurich time) vs previous close · Yahoo Finance (unofficial, ^STOXX)",
     );
     const px = index({ symbol: "^px", label: "PX", yahoo_symbol: null, source: "Prague Stock Exchange", previous_date: null });
-    expect(stripTooltip(px)).toBe("PX: close of 25.09 vs previous close · Prague Stock Exchange");
+    expect(stripTooltip(px)).toBe(
+      "PX: close of 25.09 vs previous close · Prague Stock Exchange (pse): one close stored per day since the app first read it; nothing earlier is backfilled",
+    );
+  });
+
+  it("says a first-day series has no change yet instead of inventing one (PX history starts the day it first runs)", () => {
+    const first = index({ symbol: "^px", label: "PX", yahoo_symbol: null, source: "Prague Stock Exchange", previous_close: null, previous_date: null, change_pct: null });
+    expect(stripTooltip(first)).toBe(
+      "PX: close of 25.09 (no earlier close stored yet, so no change is shown) · Prague Stock Exchange (pse): one close stored per day since the app first read it; nothing earlier is backfilled",
+    );
   });
 });
 

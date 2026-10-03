@@ -146,6 +146,10 @@ describe("parseExposureMappings", () => {
     const r = parseExposureMappings([m]);
     expect(r.ok && r.value[0]).toMatchObject({ id: 1, issuerId: 3, weight: 0.5, validTo: null });
   });
+  it("reads the issuer legal name, and null (not a made-up name) when absent or blank", () => {
+    const r = parseExposureMappings([{ ...m, issuer_name: "SAP SE" }, { ...m, id: 2, issuer_name: null }, { ...m, id: 3, issuer_name: "  " }, { ...m, id: 4 }]);
+    expect(r.ok && r.value.map((x) => x.issuerName)).toEqual(["SAP SE", null, null, null]);
+  });
   it("accepts an empty list (nothing mapped is a valid state) and rejects non-arrays", () => {
     expect(parseExposureMappings([])).toEqual({ ok: true, value: [] });
     expect(parseExposureMappings({}).ok).toBe(false);

@@ -13,6 +13,8 @@ import { ACTION_GLYPHS, ACTION_LABELS, type CorporateAction, type PriceDiagnosti
 import { cn } from "@/lib/utils";
 
 const WIDTH = 880;
+/** Fewer stored sessions than this: say the history is short rather than let a flat stub look complete. */
+const SHORT_HISTORY = 20;
 const RANGES = [
   { id: "63", label: "3M" },
   { id: "126", label: "6M" },
@@ -72,7 +74,9 @@ export function PriceChartPanel({
       kicker={chosen ? `Series ${chosen.symbol}${chosen.mic ? ` · ${chosen.mic}` : ""}` : "Price series"}
       title={`${name ?? ticker} (${ticker})`}
       takeaway={
-        last && last.close !== null && change !== null
+        last && last.close !== null && bars.length === 1
+          ? `Only one stored close so far: ${quote ? describeQuote(last.close, quote) : formatNumber(last.close, 2)} on ${formatDay(last.date)}. No change is shown; nothing earlier is stored or filled in.`
+          : last && last.close !== null && change !== null
           ? `Last close ${quote ? describeQuote(last.close, quote) : formatNumber(last.close, 2)} on ${formatDay(last.date)}, ${formatPct(change, 1, true)} over ${bars.length} sessions on the ${basis} basis.`
           : "No priced bars are available."
       }
@@ -123,6 +127,11 @@ export function PriceChartPanel({
     >
       <div className="flex min-w-0 flex-col gap-1">
         <CandleChart bars={bars} label={`${ticker} (${basis}${quote ? `, ${quote}` : ""})`} width={WIDTH} maWindow={20} formatPrice={(v) => formatNumber(v, 2)} />
+        {all.length > 0 && all.length < SHORT_HISTORY ? (
+          <p role="note" className="text-xs text-text-muted">
+            Short history: {all.length} stored session{all.length === 1 ? "" : "s"}, from {formatDay(all[0].date)}. Nothing earlier is stored; no gap is backfilled or interpolated, and the series is from {prices.source}.
+          </p>
+        ) : null}
         {actions === null ? (
           <p role="status" className="text-xs text-text-muted">
             Corporate-action lane unavailable: {actionsReason ?? "the ledger could not be read"}.
