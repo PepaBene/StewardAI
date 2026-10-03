@@ -40,12 +40,18 @@ export function formatShare(v: number): string {
 }
 
 export type NextReleaseView = {
-  /** Short label of what the date is: "published date", "estimate" or "unknown". */
+  /** Short label of what the date is: "published date", "published rule", "estimate" or "unknown". */
   label: string;
-  /** The date (and time) text, e.g. "Sep 27, 2026, 14:15" or "about Sep 27, 2026". */
+  /** The date (and time, with its zone) text, e.g. "Sep 27, 2026, 14:15 (Europe/Prague, assumed from the bank's location)" or "about Sep 27, 2026". */
   text: string;
-  /** Plain-language sentence for screen readers and the table view; never calls an estimate a published date. */
+  /** Visible qualifier of how the date was obtained; null for a date the provider lists itself. */
+  qualifier: string | null;
+  /** Plain-language sentence for screen readers and the table view; never calls an assumption published. */
   sentence: string;
+  /** IANA zone shown with the time, or null. */
+  zone: string | null;
+  /** Table text for where the zone comes from. */
+  zoneSourceLabel: string;
   /** The provider calendar link, when there is one. */
   source: { provider: string; url: string; title: string | null } | null;
 };
@@ -56,19 +62,57 @@ function hhmm(time: string): string {
   return m ? m[1] : time;
 }
 
+export const RULE_QUALIFIER = "per the provider's published schedule rule";
+export const ESTIMATE_QUALIFIER = "estimate, based on observed cadence";
+const ASSUMED = "assumed from the bank's location";
+
 /**
  * How a series' next release reads. A provider-calendar date is shown as published (a date, not
- * a promise); an estimate is labelled as based on observed cadence; neither is unknown.
+ * a promise); a date from a rule the provider publishes says so; an estimate is labelled as based
+ * on observed cadence; neither is unknown. A stated zone is shown plainly, an assumed one with
+ * the assumption spelled out. Times are shown as published, never converted.
  */
 export function nextReleaseView(n: NextRelease): NextReleaseView {
-  if (n.kind === "calendar") {
+  if (n.kind === "calendar" || n.kind === "rule") {
     const date = day(n.date);
-    const text = n.time ? `${date}, ${hhmm(n.time)}` : date;
+    let text = date;
+    let timeNote = "";
+    let zoneSourceLabel = "n/a (no time given)";
+    if (n.time) {
+      const t = hhmm(n.time);
+      if (n.timezone && n.timezoneSource === "stated_by_provider") {
+        text = `${date}, ${t} (${n.timezone})`;
+        timeNote = `, time zone ${n.timezone} as stated by the provider`;
+        zoneSourceLabel = "Stated by provider";
+      } else if (n.timezone && n.timezoneSource === "agency_location") {
+        text = `${date}, ${t} (${n.timezone}, ${ASSUMED})`;
+        timeNote = `, time zone ${n.timezone} ${ASSUMED}, not stated by the provider`;
+        zoneSourceLabel = "Assumed from the bank's location";
+      } else {
+        text = `${date}, ${t} (time zone not given)`;
+        timeNote = ", time zone not given";
+        zoneSourceLabel = "Not given";
+      }
+    }
     const who = n.source ? `${n.source.provider} release calendar` : "the provider's release calendar";
+    if (n.kind === "rule") {
+      return {
+        label: "published rule",
+        text,
+        qualifier: RULE_QUALIFIER,
+        sentence: `Next release ${text.replace(/ \(.*\)$/, "")}${timeNote}, ${RULE_QUALIFIER} (${who}), not a date listed individually; the provider may still postpone it.`,
+        zone: n.timezone,
+        zoneSourceLabel,
+        source: n.source,
+      };
+    }
     return {
       label: "published date",
       text,
-      sentence: `Next release ${text}, as published in ${who}${n.time ? " (time as the provider states it)" : ""}; the provider may still reschedule it.`,
+      qualifier: null,
+      sentence: `Next release ${text.replace(/ \(.*\)$/, "")}${timeNote}, as published in ${who}; the provider may still reschedule it.`,
+      zone: n.timezone,
+      zoneSourceLabel,
       source: n.source,
     };
   }
@@ -77,9 +121,12 @@ export function nextReleaseView(n: NextRelease): NextReleaseView {
     return {
       label: "estimate",
       text,
+      qualifier: ESTIMATE_QUALIFIER,
       sentence: `Next release ${text}: an estimate based on observed cadence, not a published date.`,
+      zone: null,
+      zoneSourceLabel: "n/a",
       source: null,
     };
   }
-  return { label: "unknown", text: "unknown", sentence: "Next release unknown: no provider calendar entry and too little release history to estimate it.", source: null };
+  return { label: "unknown", text: "unknown", qualifier: null, sentence: "Next release unknown: no provider calendar entry or published rule, and too little release history to estimate it.", zone: null, zoneSourceLabel: "n/a", source: null };
 }

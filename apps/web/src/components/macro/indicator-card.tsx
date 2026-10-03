@@ -102,12 +102,12 @@ export function IndicatorCard({ point, mode = "latest", domain = null }: { point
         <dt>Next release</dt>
         <dd className="m-0 text-text" data-next-release={point.nextRelease.kind}>
           <span className="sr-only">{next.sentence}</span>
-          <span aria-hidden="true">{point.nextRelease.kind === "estimate" ? `${next.text} (estimate, based on observed cadence)` : next.text}</span>
+          <span aria-hidden="true">{next.qualifier ? `${next.text} (${next.qualifier})` : next.text}</span>
           {next.source && isExternalUrl(next.source.url) ? (
             <>
               {" "}
               <a href={next.source.url} target="_blank" rel="noreferrer noopener" className="inline-flex items-center gap-0.5 text-accent-ink hover:underline" title={next.source.title ?? undefined}>
-                {next.source.provider} calendar
+                {next.source.provider} {point.nextRelease.kind === "rule" ? "schedule rule" : "calendar"}
                 <ExternalLinkIcon aria-hidden="true" className="size-3" />
                 <span className="sr-only">(opens in a new tab)</span>
               </a>

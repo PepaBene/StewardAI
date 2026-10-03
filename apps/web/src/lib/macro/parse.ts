@@ -3,6 +3,7 @@ import { parseDataState, type DataState } from "@/lib/data-state/states";
 
 import type {
   BasisLabel,
+  ReleaseZoneSource,
   Claim,
   ClaimDomain,
   ComparisonPoint,
@@ -103,22 +104,50 @@ function parseVintage(v: Schemas["SeriesVintage"]): VintagePoint {
 
 const ISO_DAY = /^\d{4}-\d{2}-\d{2}/;
 
+function validZone(z: unknown): z is string {
+  if (typeof z !== "string" || z === "") return false;
+  try {
+    new Intl.DateTimeFormat("en", { timeZone: z });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+type NextReleaseFields = Pick<
+  Schemas["ContextPoint"],
+  "next_release" | "next_release_time" | "next_release_source" | "next_release_estimate" | "next_release_timezone" | "next_release_timezone_source" | "next_release_basis"
+>;
+
 /**
- * Next release from the backend's fields. A provider-calendar date wins; the observed-cadence
- * estimate is used only when no calendar date exists (the backend sets it only then), and is
- * returned as an estimate, never as a published date. Neither -> unknown.
+ * Next release from the backend's fields. A dated release is a provider-calendar date or, when
+ * the basis says `published_rule`, a date derived from the provider's own published rule; the
+ * observed-cadence estimate is used only when no such date exists and is returned as an estimate,
+ * never as a published date. A basis this client does not know degrades to unknown (nothing is
+ * claimed). A zone is kept only with a time, only if Intl accepts it, and only with a recognised
+ * source; otherwise the time is shown with no zone rather than with a guessed one.
  */
-export function parseNextRelease(o: Pick<Schemas["ContextPoint"], "next_release" | "next_release_time" | "next_release_source" | "next_release_estimate">): NextRelease {
-  if (typeof o.next_release === "string" && ISO_DAY.test(o.next_release)) {
+export function parseNextRelease(o: NextReleaseFields): NextRelease {
+  const basis: unknown = o.next_release_basis;
+  const known = basis === undefined || basis === null || basis === "provider_calendar" || basis === "published_rule" || basis === "observed_cadence";
+  if (!known) return { kind: "unknown" };
+  if (typeof o.next_release === "string" && ISO_DAY.test(o.next_release) && basis !== "observed_cadence") {
     const src = o.next_release_source;
+    const time = typeof o.next_release_time === "string" && o.next_release_time !== "" ? o.next_release_time : null;
+    const zoneSource: unknown = o.next_release_timezone_source;
+    const zoneOk = time !== null && validZone(o.next_release_timezone) && (zoneSource === "stated_by_provider" || zoneSource === "agency_location");
     return {
-      kind: "calendar",
+      kind: basis === "published_rule" ? "rule" : "calendar",
       date: o.next_release.slice(0, 10),
-      time: typeof o.next_release_time === "string" && o.next_release_time !== "" ? o.next_release_time : null,
+      time,
+      timezone: zoneOk ? (o.next_release_timezone as string) : null,
+      timezoneSource: zoneOk ? (zoneSource as ReleaseZoneSource) : null,
       source: src && typeof src.url === "string" ? { provider: src.provider, url: src.url, title: src.title ?? null } : null,
     };
   }
-  if (typeof o.next_release_estimate === "string" && ISO_DAY.test(o.next_release_estimate)) return { kind: "estimate", date: o.next_release_estimate.slice(0, 10) };
+  if (typeof o.next_release_estimate === "string" && ISO_DAY.test(o.next_release_estimate) && (basis === undefined || basis === null || basis === "observed_cadence")) {
+    return { kind: "estimate", date: o.next_release_estimate.slice(0, 10) };
+  }
   return { kind: "unknown" };
 }
 

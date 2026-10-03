@@ -5,7 +5,7 @@ import { describe, expect, it } from "vitest";
 import { ChoroplethMap } from "@/components/charts/choropleth-map";
 import { worldShapes } from "@/lib/charts/geo-world";
 import type { ResourceState } from "@/lib/hooks/use-api-resource";
-import type { Claim, HoldingMacroContext, IndicatorPoint, PortfolioCountryContext, TradeContext, TradeFlowPartners } from "@/lib/macro/types";
+import type { Claim, HoldingMacroContext, IndicatorPoint, NextRelease, PortfolioCountryContext, TradeContext, TradeFlowPartners } from "@/lib/macro/types";
 
 import { ClaimList } from "./context-cards";
 import { formatShare } from "./format";
@@ -389,7 +389,7 @@ describe("adoption: vintage small multiples", () => {
 });
 
 describe("third wave: next release display", () => {
-  const cal = { kind: "calendar" as const, date: "2026-10-14", time: "08:30:00", source: { provider: "fred", url: "https://fred.stlouisfed.org/releases/calendar", title: "CPI" } };
+  const cal = { kind: "calendar" as const, date: "2026-10-14", time: "08:30:00", timezone: null, timezoneSource: null, source: { provider: "fred", url: "https://fred.stlouisfed.org/releases/calendar", title: "CPI" } };
   it("shows the provider date with time and a source link, as published", () => {
     const html = clean(renderToStaticMarkup(createElement(IndicatorCard, { point: point({ nextRelease: cal }) })));
     expect(html).toContain("Oct 14, 2026, 08:30");
@@ -418,5 +418,55 @@ describe("third wave: next release display", () => {
     expect(html).toContain("Next release dates (table view)");
     expect(html).toContain("Provider&#x27;s published calendar");
     expect(html).toContain("Estimate based on observed cadence, not published");
+  });
+  const card = (n: NextRelease) => clean(renderToStaticMarkup(createElement(IndicatorCard, { point: point({ nextRelease: n }) })));
+  const stated = { ...cal, time: "12:00:00", timezone: "Europe/Berlin", timezoneSource: "stated_by_provider" as const };
+  const assumed = { ...cal, time: "14:30:00", timezone: "Europe/Prague", timezoneSource: "agency_location" as const };
+  const rule = { ...stated, kind: "rule" as const };
+  it("stated zone: shows the time with the zone, as stated by the provider", () => {
+    const html = card(stated);
+    expect(html).toContain("Oct 14, 2026, 12:00 (Europe/Berlin)");
+    expect(html).toContain("time zone Europe/Berlin as stated by the provider");
+    expect(html).not.toContain("assumed");
+  });
+  it("agency-location zone: the assumption is spelled out visibly and for screen readers", () => {
+    const html = card(assumed);
+    expect(html).toContain("Oct 14, 2026, 14:30 (Europe/Prague, assumed from the bank&#x27;s location)");
+    expect(html).toContain("not stated by the provider");
+  });
+  it("a time without a zone says the zone is not given rather than inventing one", () => {
+    const html = card({ ...cal });
+    expect(html).toContain("Oct 14, 2026, 08:30 (time zone not given)");
+  });
+  it("a date-only release has no time or zone text", () => {
+    const html = card({ ...cal, time: null });
+    expect(html).toContain("Oct 14, 2026");
+    expect(html).not.toContain("time zone");
+  });
+  it("published_rule: labelled as per the provider's schedule rule, linked, never estimate or published date", () => {
+    const html = card(rule);
+    expect(html).toContain("Oct 14, 2026, 12:00 (Europe/Berlin) (per the provider&#x27;s published schedule rule)");
+    expect(html).toContain("not a date listed individually");
+    expect(html).toContain('href="https://fred.stlouisfed.org/releases/calendar"');
+    expect(html).toContain('data-next-release="rule"');
+    expect(html).not.toMatch(/estimate/);
+    expect(html).not.toContain("as published in");
+  });
+  it("the table view has zone, zone-source and basis columns for every branch", () => {
+    const ctx = context({
+      observations: [
+        point({ seriesId: "a", nextRelease: stated }),
+        point({ seriesId: "b", nextRelease: assumed }),
+        point({ seriesId: "c", nextRelease: rule }),
+        point({ seriesId: "d", nextRelease: { kind: "estimate", date: "2026-10-20" } }),
+        point({ seriesId: "e" }),
+      ],
+    });
+    const html = clean(renderToStaticMarkup(createElement(HoldingMacroPanel, { ctx, ticker: "SAP" })));
+    for (const col of ["Time zone", "Zone source", "Basis"]) expect(html).toContain(`>${col}<`);
+    expect(html).toContain("Stated by provider");
+    expect(html).toContain("Assumed from the bank&#x27;s location");
+    expect(html).toContain("Per the provider&#x27;s published schedule rule");
+    expect(html).toContain("Europe/Prague");
   });
 });

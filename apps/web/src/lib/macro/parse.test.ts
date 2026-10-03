@@ -254,6 +254,8 @@ describe("third wave: next release from the provider calendar", () => {
       kind: "calendar",
       date: "2026-10-14",
       time: "08:30:00",
+      timezone: null,
+      timezoneSource: null,
       source: { provider: "fred", url: src.url, title: "Consumer Price Index" },
     });
   });
@@ -268,5 +270,41 @@ describe("third wave: next release from the provider calendar", () => {
     expect(next({})).toEqual({ kind: "unknown" });
     // a basis without a date does not manufacture one
     expect(next({ next_release_basis: "provider_calendar" })).toEqual({ kind: "unknown" });
+  });
+  it("a calendar date keeps a provider-stated zone and its source", () => {
+    expect(next({ next_release: "2026-10-14", next_release_time: "08:30:00", next_release_timezone: "America/New_York", next_release_timezone_source: "stated_by_provider", next_release_source: src, next_release_basis: "provider_calendar" })).toMatchObject({
+      kind: "calendar",
+      timezone: "America/New_York",
+      timezoneSource: "stated_by_provider",
+    });
+  });
+  it("an agency-location zone stays marked as assumed", () => {
+    expect(next({ next_release: "2026-10-14", next_release_time: "14:30:00", next_release_timezone: "Europe/Prague", next_release_timezone_source: "agency_location", next_release_basis: "provider_calendar" })).toMatchObject({
+      timezone: "Europe/Prague",
+      timezoneSource: "agency_location",
+    });
+  });
+  it("a published_rule date is a rule, not a calendar date", () => {
+    expect(next({ next_release: "2026-10-05", next_release_time: "12:00:00", next_release_timezone: "Europe/Berlin", next_release_timezone_source: "stated_by_provider", next_release_source: src, next_release_basis: "published_rule" })).toMatchObject({
+      kind: "rule",
+      date: "2026-10-05",
+      time: "12:00:00",
+      timezone: "Europe/Berlin",
+    });
+  });
+  it("a zone without a time, or with an unknown source or an invalid zone name, is dropped (never guessed)", () => {
+    expect(next({ next_release: "2026-10-14", next_release_time: null, next_release_timezone: "Europe/Prague", next_release_timezone_source: "agency_location" })).toMatchObject({ time: null, timezone: null, timezoneSource: null });
+    expect(next({ next_release: "2026-10-14", next_release_time: "14:30:00", next_release_timezone: "Europe/Prague", next_release_timezone_source: "guessed" })).toMatchObject({ time: "14:30:00", timezone: null, timezoneSource: null });
+    expect(next({ next_release: "2026-10-14", next_release_time: "14:30:00", next_release_timezone: "Not/AZone", next_release_timezone_source: "stated_by_provider" })).toMatchObject({ timezone: null, timezoneSource: null });
+    expect(next({ next_release: "2026-10-14", next_release_time: "14:30:00", next_release_timezone: 5, next_release_timezone_source: "stated_by_provider" })).toMatchObject({ timezone: null });
+  });
+  it("an unknown basis degrades to unknown instead of crashing or claiming a published date", () => {
+    expect(next({ next_release: "2026-10-14", next_release_basis: "crystal_ball" })).toEqual({ kind: "unknown" });
+    expect(next({ next_release: null, next_release_estimate: "2026-10-20", next_release_basis: "crystal_ball" })).toEqual({ kind: "unknown" });
+    expect(next({ next_release: "2026-10-14", next_release_basis: 7 })).toEqual({ kind: "unknown" });
+  });
+  it("an observed_cadence basis is never shown as a dated release", () => {
+    expect(next({ next_release: "2026-10-14", next_release_estimate: "2026-10-20", next_release_basis: "observed_cadence" })).toEqual({ kind: "estimate", date: "2026-10-20" });
+    expect(next({ next_release: "2026-10-14", next_release_basis: "observed_cadence" })).toEqual({ kind: "unknown" });
   });
 });

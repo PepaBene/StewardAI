@@ -121,15 +121,23 @@ export function HoldingMacroPanel({ ctx, ticker, pastAsOf = false }: { ctx: Hold
             <TableView
               summary="Next release dates (table view)"
               table={{
-                caption: "Next release of each country series: provider-calendar dates are published, estimates are labelled",
-                columns: ["Series", "Country", "Next release", "Basis", "Source"],
+                caption: "Next release of each country series: calendar dates and published-rule dates are labelled as such, assumed time zones are marked, estimates are labelled",
+                columns: ["Series", "Country", "Next release", "Time zone", "Zone source", "Basis", "Source"],
                 rows: ctx.observations.map((p) => {
                   const v = nextReleaseView(p.nextRelease);
                   return [
                     `${p.seriesId} (${p.source})`,
                     geographyName(p.geography),
                     v.text,
-                    p.nextRelease.kind === "calendar" ? "Provider's published calendar" : p.nextRelease.kind === "estimate" ? "Estimate based on observed cadence, not published" : "Unknown",
+                    v.zone ?? "n/a",
+                    v.zoneSourceLabel,
+                    p.nextRelease.kind === "calendar"
+                      ? "Provider's published calendar"
+                      : p.nextRelease.kind === "rule"
+                        ? "Per the provider's published schedule rule"
+                        : p.nextRelease.kind === "estimate"
+                          ? "Estimate based on observed cadence, not published"
+                          : "Unknown",
                     v.source ? `${v.source.provider}: ${v.source.url}` : "None",
                   ];
                 }),

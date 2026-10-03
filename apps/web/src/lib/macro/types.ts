@@ -56,13 +56,19 @@ export type IndicatorPoint = {
   nextRelease: NextRelease;
 };
 
+export type ReleaseZoneSource = "stated_by_provider" | "agency_location";
+export type ReleaseSource = { provider: string; url: string; title: string | null };
+
 /**
- * The next release of a series. `calendar` is a date the provider published (with the provider's
- * own time of day when it states one); `estimate` is a fallback computed from observed release
- * cadence and is never a published date; `unknown` has neither.
+ * The next release of a series. `calendar` is a date the provider listed in its calendar and
+ * `rule` a date derived from a schedule rule the provider itself publishes (for example "every
+ * TARGET business day"); both carry the provider's time of day, exactly as published, plus the
+ * IANA zone and whether the provider stated it or it is assumed from the agency's location.
+ * `estimate` is a fallback computed from observed release cadence and is never a published date;
+ * `unknown` has none of these (also what an unrecognised basis degrades to).
  */
 export type NextRelease =
-  | { kind: "calendar"; date: string; time: string | null; source: { provider: string; url: string; title: string | null } | null }
+  | { kind: "calendar" | "rule"; date: string; time: string | null; timezone: string | null; timezoneSource: ReleaseZoneSource | null; source: ReleaseSource | null }
   | { kind: "estimate"; date: string }
   | { kind: "unknown" };
 
