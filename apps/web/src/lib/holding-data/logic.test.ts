@@ -87,14 +87,14 @@ describe("disagreementRows", () => {
 describe("claimKnownAsOf", () => {
   const src = new Map<string, { as_of?: string | null }>([["S1", { as_of: "2025-03-01" }], ["S2", { as_of: "2025-06-30T12:00:00Z" }], ["S3", { as_of: null }], ["S4", { as_of: "Q2 2025" }]]);
   it("is the latest dated cited source", () => {
-    expect(claimKnownAsOf(["S1", "S2"], src)).toEqual({ date: "2025-06-30", cited: 2, undated: 0 });
+    expect(claimKnownAsOf(["S1", "S2"], src)).toEqual({ date: "2025-06-30", oldest: "2025-03-01", cited: 2, undated: 0 });
   });
   it("counts undated and unparseable citations instead of hiding them", () => {
-    expect(claimKnownAsOf(["S1", "S3", "S4"], src)).toEqual({ date: "2025-03-01", cited: 3, undated: 2 });
+    expect(claimKnownAsOf(["S1", "S3", "S4"], src)).toEqual({ date: "2025-03-01", oldest: "2025-03-01", cited: 3, undated: 2 });
   });
   it("ignores unknown ids and duplicates; no citation gives no date", () => {
-    expect(claimKnownAsOf(["S1", "S1", "ZZ"], src)).toEqual({ date: "2025-03-01", cited: 1, undated: 0 });
-    expect(claimKnownAsOf([], src)).toEqual({ date: null, cited: 0, undated: 0 });
+    expect(claimKnownAsOf(["S1", "S1", "ZZ"], src)).toEqual({ date: "2025-03-01", oldest: "2025-03-01", cited: 1, undated: 0 });
+    expect(claimKnownAsOf([], src)).toEqual({ date: null, oldest: null, cited: 0, undated: 0 });
   });
   it("source range reports min, max and undated", () => {
     expect(sourceDateRange([{ as_of: "2025-03-01" }, { as_of: "2025-01-05" }, { as_of: undefined }])).toEqual({ min: "2025-01-05", max: "2025-03-01", undated: 1 });

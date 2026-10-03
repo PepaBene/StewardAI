@@ -4,7 +4,7 @@ import { Blueprint, PanelHeading } from "@/components/ui/blueprint";
 import { ProvenanceFooter } from "@/components/data-state";
 import { formatPct } from "@/lib/charts/format";
 import { formatDate } from "@/lib/format";
-import { leadershipEntries, rankPeers, rowsState } from "@/lib/network/logic";
+import { leadershipEntries, peerTakeaway, rankPeers, rowsState } from "@/lib/network/logic";
 import type { BusinessNetwork, PatentOverlapRow } from "@/lib/network/types";
 
 import { RowStatusBadge, SourceLink } from "./badges";
@@ -25,7 +25,7 @@ export function PeerRanking({ rows, asOfDate }: { rows: readonly PatentOverlapRo
       takeaway={
         rows.length === 0
           ? "No confirmed peer or competitor edge is stored, so there is nothing to compare."
-          : `${rankedCount} of ${rows.length} confirmed peers have patent data; the top peer shares ${formatPct(ranked[0]?.overlapShare ?? 0, 0)} of this company's families by CPC subclass.`
+          : peerTakeaway(ranked, rows.length, formatPct)
       }
       units="Overlap share: part of this company's attributed families with at least one CPC subclass the peer also files in. Jaccard: shared subclasses over all subclasses."
       provenance={{
@@ -43,7 +43,7 @@ export function PeerRanking({ rows, asOfDate }: { rows: readonly PatentOverlapRo
         rows: ranked.map((r) => [
           r.peer,
           r.rank ?? "unranked",
-          r.overlapShare === null ? "no data" : formatPct(r.overlapShare, 1),
+          r.overlapShare === null ? "not ranked" : formatPct(r.overlapShare, 1),
           r.jaccard === null ? "no data" : r.jaccard.toFixed(2),
           r.peerFamilies,
           r.ownFamilies,
@@ -60,7 +60,7 @@ export function PeerRanking({ rows, asOfDate }: { rows: readonly PatentOverlapRo
               <HBar value={r.overlapShare} min={0} max={1} label={`${r.peer} overlap share`} formatValue={(v) => formatPct(v, 0)} />
             </span>
             <span className="num col-span-2 text-xs text-text-muted sm:col-span-1 sm:text-right">
-              {r.overlapShare === null ? "no patent data" : `${formatPct(r.overlapShare, 0)} · J ${r.jaccard?.toFixed(2) ?? "–"}`}
+              {r.overlapShare === null ? "not ranked: no attributed families on one side" : `${formatPct(r.overlapShare, 0)} · J ${r.jaccard?.toFixed(2) ?? "–"}`}
             </span>
           </li>
         ))}
@@ -99,7 +99,8 @@ export function LeadershipPanel({ net, asOfDate, knownAt }: { net: Pick<Business
                   <th scope="row" className="px-2 py-1.5 text-left font-medium">{e.name}</th>
                   <td className="px-2 py-1.5">{e.role ?? "role not stated"}</td>
                   <td className="num px-2 py-1.5 text-xs">
-                    {e.from ? formatDate(e.from) : "start unknown"} to {e.to ? formatDate(e.to) : "present"}
+                    {e.from ? formatDate(e.from) : "start unknown"}
+                    {e.endUnknown && !e.to ? ", end not stated" : ` to ${e.to ? formatDate(e.to) : "present"}`}
                   </td>
                   <td className="px-2 py-1.5"><RowStatusBadge status={e.status} /></td>
                   <td className="px-2 py-1.5 text-xs"><SourceLink href={e.sourceUrl}>{e.source}</SourceLink></td>

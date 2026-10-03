@@ -54,7 +54,7 @@ describe("holding data cards render in every state", () => {
   });
   it("network and patents: unreadable payloads are unavailable, never zero", () => {
     expect(render(h(NetworkPatentsCard, { network: null, patents: null, ticker: "X", asOf: null, knownAsOf: null }))).toContain("could be read");
-    const html = render(h(NetworkPatentsCard, { network: { edges: 3, byStatus: { confirmed: 1, suggested: 2 }, confirmed: 1, candidates: 2, events: 0, disclosures: 0, limitations: [] }, patents: { families: 0, attributed: 0, byLegalStatus: {}, latestKnownAt: null, trendRows: null }, ticker: "X", asOf: null, knownAsOf: null }));
+    const html = render(h(NetworkPatentsCard, { network: { edges: 3, live: 3, rejected: 0, byStatus: { confirmed: 1, suggested: 2 }, confirmed: 1, candidates: 2, events: 0, disclosures: 0, limitations: [] }, patents: { families: 0, attributed: 0, byLegalStatus: {}, latestKnownAt: null, trendRows: null }, ticker: "X", asOf: null, knownAsOf: null }));
     expect(html).toContain("1 of 3 graph edges are confirmed");
     expect(html).toContain("/holdings/X/network");
   });
@@ -101,7 +101,7 @@ describe("ClaimKnownAsOf", () => {
   ]);
   const r = (ids: string[] | undefined) => render(h(ClaimKnownAsOf, { ids, sources }));
   it("shows the latest cited date, counts undated citations, and is empty without citations", () => {
-    expect(r(["S1"])).toContain("Cited sources as of 2025-03-01");
+    expect(r(["S1"])).toContain("Source data dated 2025-03-01");
     expect(r(["S1", "S2"])).toContain("+1 undated");
     expect(r(["S2"])).toContain("Cited sources undated");
     expect(r([])).toBe("");

@@ -214,7 +214,7 @@ export function EdgeLedger({
           </div>
         )}
         {chosen ? (
-          <EdgeDetail ticker={ticker} edge={chosen} onChanged={onChanged} onClose={() => setSelected(null)} />
+          <EdgeDetail key={chosen.id} ticker={ticker} edge={chosen} readOnly={asOfDate !== null} onChanged={onChanged} onClose={() => setSelected(null)} />
         ) : visible.length > 0 ? (
           <p className="text-xs text-text-muted">Select a counterparty to open its source passage and decide on it.</p>
         ) : null}
@@ -245,7 +245,7 @@ function GroupRows({ header, children }: { header: { label: string; note: string
   );
 }
 
-function EdgeDetail({ ticker, edge, onChanged, onClose }: { ticker: string; edge: NetworkEdge; onChanged: () => void; onClose: () => void }) {
+function EdgeDetail({ ticker, edge, readOnly, onChanged, onClose }: { ticker: string; edge: NetworkEdge; readOnly: boolean; onChanged: () => void; onClose: () => void }) {
   void ticker;
   return (
     <section aria-label={`Evidence for ${edge.objectName}`} className={cn("flex flex-col gap-2 border p-3 text-sm", isFact(edge.status) ? "border-border" : "border-dashed border-neutral-signal")}>
@@ -313,6 +313,7 @@ function EdgeDetail({ ticker, edge, onChanged, onClose }: { ticker: string; edge
       {edge.rowId !== null ? (
         <DecisionControl
           status={edge.status}
+          readOnly={readOnly}
           supportsAll={!edge.legacy}
           needsReason={!edge.legacy}
           onDecide={(d, reason) => decideEdge(edge, d, reason)}

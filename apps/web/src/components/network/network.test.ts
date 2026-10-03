@@ -98,8 +98,8 @@ describe("peers and leadership", () => {
         asOfDate: null,
       }),
     );
-    expect(out).toContain("no patent data");
-    expect(out).toContain("1 of 2 confirmed peers have patent data");
+    expect(out).toContain("not ranked");
+    expect(out).toContain("1 of 2 confirmed peers can be ranked");
     expect(html(createElement(PeerRanking, { rows: [], asOfDate: null }))).toContain("nothing to compare");
   });
   it("renders leadership with an empty and a populated list", () => {

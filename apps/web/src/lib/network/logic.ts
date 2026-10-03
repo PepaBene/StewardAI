@@ -13,6 +13,23 @@ import type {
   RowStatus,
 } from "./types";
 
+/* ------------------------------------------------------------ resource states */
+
+type ParsedState = { kind: "loading" } | { kind: "ok"; data: { ok: boolean; reason?: string } } | { kind: "error"; title: string };
+
+/** "ok" only for a loaded, recognised response: loading, failure and a rejected shape are never an empty result. */
+export function resourceStatus(state: ParsedState): "ok" | "loading" | "unavailable" {
+  if (state.kind === "loading") return "loading";
+  if (state.kind === "ok" && state.data.ok) return "ok";
+  return "unavailable";
+}
+
+export function resourceReason(state: ParsedState): string | null {
+  if (state.kind === "error") return state.title;
+  if (state.kind === "ok" && !state.data.ok) return `unrecognised response: ${state.data.reason ?? "unknown shape"}`;
+  return null;
+}
+
 /* ---------------------------------------------------------------- as-of control */
 
 /** `YYYY-MM-DD` that is a real calendar date. */
@@ -26,8 +43,12 @@ export function isIsoDate(value: string | null | undefined): value is string {
  * The API's `as_of` query value for a chosen day: the end of that day (UTC), so everything
  * the app knew on that day is included. Empty or invalid input means "now" (no param).
  */
-export function asOfParam(date: string | null | undefined): string | undefined {
-  return isIsoDate(date) ? `${date}T23:59:59Z` : undefined;
+export function asOfParam(date: string | null | undefined, now: Date = new Date()): string | undefined {
+  if (!isIsoDate(date)) return undefined;
+  const instant = `${date}T23:59:59Z`;
+  // The API refuses an as_of after the present moment (422), compared in UTC: today (or a later
+  // day) has no completed end of day yet, so it means "now" and sends nothing.
+  return Date.parse(instant) > now.getTime() ? undefined : instant;
 }
 
 /* ------------------------------------------------------------------- edge groups */
@@ -196,6 +217,13 @@ export function rowsState(rows: readonly { status: RowStatus }[]): DataState {
   return live.every((r) => r.status === "confirmed") ? "verified" : "partial";
 }
 
+/** Provenance state of the passage review: every passage rejected or none stored is "not covered", never "verified". */
+export function reviewState(disclosures: readonly { status: RowStatus }[]): DataState {
+  const open = disclosures.filter((d) => d.status !== "rejected");
+  if (open.length === 0) return "not_covered";
+  return open.every((d) => d.status === "confirmed") ? "verified" : "partial";
+}
+
 /* ------------------------------------------------------------------ leadership */
 
 export type LeadershipEntry = {
@@ -205,6 +233,8 @@ export type LeadershipEntry = {
   status: RowStatus;
   from: string | null;
   to: string | null;
+  /** True when `to` is unknown because the row has no end date at all (events), not "still serving". */
+  endUnknown: boolean;
   source: string;
   sourceUrl: string | null;
   passage: string | null;
@@ -231,6 +261,7 @@ export function leadershipEntries(net: Pick<BusinessNetwork, "edges" | "events">
       status: e.status,
       from: e.validFrom,
       to: e.validTo,
+      endUnknown: false,
       source: e.source,
       sourceUrl: e.sourceUrl,
       passage: e.passage,
@@ -246,6 +277,7 @@ export function leadershipEntries(net: Pick<BusinessNetwork, "edges" | "events">
       status: ev.status,
       from: ev.effectiveAt ?? ev.announcedAt,
       to: null,
+      endUnknown: true,
       source: ev.source,
       sourceUrl: ev.sourceUrl,
       passage: null,
@@ -279,6 +311,15 @@ export function rankPeers(rows: readonly PatentOverlapRow[]): RankedPeer[] {
     .sort((a, b) => a.peer.localeCompare(b.peer))
     .map((r) => ({ ...r, rank: null, ranked: false }));
   return [...out, ...rest];
+}
+
+/** One-sentence peer summary; the top-peer clause appears only when some peer is actually ranked. */
+export function peerTakeaway(ranked: readonly RankedPeer[], total: number, fmtPct: (v: number, digits: number) => string): string {
+  const rankedRows = ranked.filter((r) => r.ranked);
+  const head = `${rankedRows.length} of ${total} confirmed peers can be ranked (patent families on both sides)`;
+  const top = rankedRows[0];
+  if (!top || top.overlapShare === null) return `${head}; no overlap share can be stated.`;
+  return `${head}; the top peer shares ${fmtPct(top.overlapShare, 0)} of this company's families by CPC subclass.`;
 }
 
 /* --------------------------------------------------------------- patent matrix */
@@ -316,6 +357,8 @@ export type PatentMatrix = {
   maxCitations: number;
   /** Families shown in rows beyond the row cap. */
   hiddenSubclasses: number;
+  /** Calendar years older than the drawn axis (the axis is capped at 60 years from the newest). */
+  olderYearsDropped: number;
 };
 
 export function cellKey(subclass: string, year: number): string {
@@ -328,6 +371,16 @@ export function cpcSubclass(code: string): string | null {
   return c.length >= 4 && /^[A-Za-z]/.test(c) ? c.slice(0, 4).toUpperCase() : null;
 }
 
+/** One row per family for the detail list: the attributed owner row wins, otherwise the first (same rule as the matrix). */
+export function familyDetailMap(patents: readonly PatentFamily[]): Map<string, PatentFamily> {
+  const out = new Map<string, PatentFamily>();
+  for (const p of patents) {
+    const have = out.get(p.familyKey);
+    if (!have || (!have.attributed && p.attributed)) out.set(p.familyKey, p);
+  }
+  return out;
+}
+
 /**
  * Technology class x priority-year matrix from distinct, attributed patent families. A family
  * with several CPC subclasses appears in each of them, so cell counts must not be summed across
@@ -335,9 +388,7 @@ export function cpcSubclass(code: string): string | null {
  * families; `maxRows` caps the grid and reports what was left out.
  */
 export function buildPatentMatrix(patents: readonly PatentFamily[], maxRows = 12): PatentMatrix {
-  const byKey = new Map<string, PatentFamily>();
-  for (const p of patents) if (!byKey.has(p.familyKey)) byKey.set(p.familyKey, p);
-  const all = [...byKey.values()];
+  const all = [...familyDetailMap(patents).values()];
   const attributed = all.filter((p) => p.attributed);
   let missingPriority = 0;
   let missingCpc = 0;
@@ -394,13 +445,15 @@ export function buildPatentMatrix(patents: readonly PatentFamily[], maxRows = 12
     maxFamilies: Math.max(0, ...visible.map((c) => c.families)),
     maxCitations: Math.max(0, ...visible.map((c) => c.citations)),
     hiddenSubclasses: ranked.length - subclasses.length,
+    olderYearsDropped: years.length ? Math.max(0, Math.max(...years) - Math.min(...years) + 1 - yearList.length) : 0,
   };
 }
 
+/** Years a..b, capped at 60 columns counted from the NEWEST year so the latest filings are never dropped. */
 function range(a: number, b: number): number[] {
   const out: number[] = [];
-  for (let y = a; y <= b && out.length < 60; y += 1) out.push(y);
-  return out;
+  for (let y = b; y >= a && out.length < 60; y -= 1) out.push(y);
+  return out.reverse();
 }
 
 /** 0 (no citations) .. 3, on a square-root scale so a few heavily cited cells do not flatten the rest. */
@@ -520,9 +573,11 @@ export type DealStage = { id: string; label: string; reach: StageReach; steps: D
  * that state exists; suggested-only stages stay visibly provisional; rejected or disputed
  * events never mark a stage.
  */
-export function dealStages(deal: Pick<Deal, "timeline">): DealStage[] {
+export function dealStages(deal: Pick<Deal, "timeline"> & { ignored?: Deal["ignored"] }): DealStage[] {
+  // Events the backend state machine ignored (out of order) never mark a stage as reached.
+  const ignored = new Set((deal.ignored ?? []).map((i) => i.eventId).filter((id): id is number => id !== null));
   return DEAL_STAGES.map((stage) => {
-    const steps = deal.timeline.filter((s) => (stage.states as readonly string[]).includes(s.state));
+    const steps = deal.timeline.filter((s) => (stage.states as readonly string[]).includes(s.state) && !(s.eventId !== null && ignored.has(s.eventId)));
     const reach: StageReach = steps.some((s) => s.status === "confirmed") ? "confirmed" : steps.some((s) => s.status === "suggested") ? "suggested" : "none";
     return { id: stage.id, label: stage.label, reach, steps };
   });
@@ -534,7 +589,7 @@ export function dealStateIsProvisional(deal: Pick<Deal, "state" | "confirmedStat
 }
 
 const MONEY_KEYS = new Set(["price_per_share", "total_value", "cash_value", "stock_value", "debt_assumed", "debt_raised", "facility_size", "target_ebitda"]);
-const PCT_KEYS = new Set(["cash_pct", "stock_pct"]);
+const PCT_KEYS = new Set(["cash_pct", "stock_pct", "ownership_pct", "interest_rate_pct"]);
 
 export type TermRow = { key: string; label: string; value: string };
 
@@ -561,22 +616,59 @@ export function eventTimelineDate(ev: Pick<NetworkEvent, "effectiveAt" | "announ
 
 /* ----------------------------------------------------------------- concentration */
 
+/**
+ * What one side (named or anonymous) of a concentration row can honestly say:
+ * `none` no counterparty on this side, `unknown` counterparties exist but no share was reported,
+ * `exact` every share on this side was reported, `floor` at least one share is missing so the sum is a lower bound.
+ */
+export type SideShare = { kind: "none" | "unknown" | "exact" | "floor"; value: number | null };
+
 export type ConcentrationRow = ConcentrationPeriod & {
-  /** The summed share is a floor: at least one disclosed counterparty reported none. */
+  /** At least one side's sum is a floor (some disclosed counterparty reported no share). */
   isFloor: boolean;
-  /** Share the named counterparties account for, or null when none reported a share. */
+  /** Some counterparty reported a share. */
   hasShare: boolean;
+  named: SideShare;
+  anonymous: SideShare;
 };
 
-/** Periods newest first; a sum over rows with missing shares is flagged as a floor. */
+function sideShare(count: number, sum: number | null, missing: number, otherCount: number): SideShare {
+  if (count <= 0) return { kind: "none", value: null };
+  // The API sends one missing count for both sides: with counterparties on the other side too, we
+  // cannot tell which side is missing, so any missing share makes both sides lower bounds.
+  const missingHere = otherCount <= 0 ? missing : missing > 0 ? 1 : 0;
+  const allMissing = otherCount <= 0 && missing >= count;
+  if (sum === null || allMissing || (sum === 0 && missing > 0)) return { kind: "unknown", value: null };
+  return { kind: missingHere > 0 ? "floor" : "exact", value: sum };
+}
+
+export function sideShareLabel(side: SideShare, fmt: (v: number) => string): string {
+  if (side.kind === "none") return "none disclosed";
+  if (side.kind === "unknown" || side.value === null) return "not reported";
+  return `${side.kind === "floor" ? "at least " : ""}${fmt(side.value)}`;
+}
+
+/** Periods newest first; a sum over rows with missing shares is flagged as a floor, never a total. */
 export function concentrationRows(periods: readonly ConcentrationPeriod[]): ConcentrationRow[] {
   return [...periods]
     .sort((a, b) => b.fiscalPeriod.localeCompare(a.fiscalPeriod) || a.relationship.localeCompare(b.relationship))
-    .map((p) => ({
-      ...p,
-      isFloor: p.missingShareCount > 0,
-      hasShare: p.reportedShareSum !== null && p.namedCount + p.anonymousCount > p.missingShareCount,
-    }));
+    .map((p) => {
+      const named = sideShare(p.namedCount, p.namedShareSum, p.missingShareCount, p.anonymousCount);
+      const anonymous = sideShare(p.anonymousCount, p.anonymousShareSum, p.missingShareCount, p.namedCount);
+      return {
+        ...p,
+        named,
+        anonymous,
+        isFloor: named.kind === "floor" || anonymous.kind === "floor",
+        hasShare: p.largestShare !== null || named.value !== null || anonymous.value !== null,
+      };
+    });
+}
+
+/** The largest single reported share over the periods that report one; null when none does. */
+export function largestReportedShare(rows: readonly Pick<ConcentrationPeriod, "largestShare">[]): number | null {
+  const v = rows.map((r) => r.largestShare).filter((x): x is number => x !== null);
+  return v.length ? Math.max(...v) : null;
 }
 
 export function shareBasisLabel(basis: string): string {

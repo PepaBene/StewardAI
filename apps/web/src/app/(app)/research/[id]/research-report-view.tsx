@@ -217,7 +217,7 @@ function Report({ report }: { report: ResearchReportOut }) {
           <h1 className="page-title text-balance">{body.headline || report.title}</h1>
           <p className="num mt-2 text-xs text-text-muted" data-testid="known-as-of-range">
             Report written {formatDate(new Date(report.created_at))}.{" "}
-            {dateRange.max ? `Cited sources are dated ${dateRange.min === dateRange.max ? dateRange.max : `${dateRange.min} to ${dateRange.max}`}${dateRange.undated > 0 ? `; ${dateRange.undated} of ${body.sources.length} sources have no usable date` : ""}.` : "No cited source carries a usable date."} The report stores no per-claim known-at date; each claim shows the latest date of the sources it cites.{" "}
+            {dateRange.max ? `Cited source data covers dates ${dateRange.min === dateRange.max ? dateRange.max : `${dateRange.min} to ${dateRange.max}`}${dateRange.undated > 0 ? `; ${dateRange.undated} of ${body.sources.length} sources have no usable date` : ""}.` : "No cited source carries a usable date."} The report stores no per-claim known-at date; each claim shows the date range of the source data it cites (period ends, snapshot, price-bar or publication dates, not when the claim became known).{" "}
             {body.owned ? (
               <Link href={`${holdingHref(body.ticker)}#evidence`} className={LINK}>
                 Evidence for {body.ticker}

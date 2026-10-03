@@ -21,11 +21,15 @@ export type EvidenceDomain = "filed-notes" | "positions" | "insider-activity" | 
 
 /** Counts from the untyped company-graph payload; null fields are "not reported", never 0. */
 export type NetworkSummary = {
+  /** All edges returned, rejected ones included. */
   edges: number;
+  /** Edges that are not rejected: the denominator of "confirmed of N". */
+  live: number;
+  rejected: number;
   /** Edge status in force at the cutoff -> count. */
   byStatus: Readonly<Record<string, number>>;
   confirmed: number;
-  /** Everything not confirmed: suggested, disputed, rejected (candidates, not facts). */
+  /** Live edges that are not confirmed: suggested, disputed or unrecognised (candidates, not facts); rejected edges are not candidates. */
   candidates: number;
   events: number;
   disclosures: number;

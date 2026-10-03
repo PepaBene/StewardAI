@@ -127,6 +127,8 @@ const DAY = /^\d{4}-\d{2}-\d{2}/;
 export type ClaimKnownAsOf = {
   /** Latest `as_of` (YYYY-MM-DD) among the cited sources that carry a date; null when none. */
   date: string | null;
+  /** Oldest dated cited source (YYYY-MM-DD); equals `date` when all share one day. */
+  oldest: string | null;
   cited: number;
   /** Cited sources with no usable date: the claim's known-as-of is then not fully known. */
   undated: number;
@@ -138,6 +140,7 @@ export type ClaimKnownAsOf = {
  */
 export function claimKnownAsOf(sourceIds: readonly string[], sources: ReadonlyMap<string, { as_of?: string | null }>): ClaimKnownAsOf {
   let date: string | null = null;
+  let oldest: string | null = null;
   let undated = 0;
   let cited = 0;
   for (const id of new Set(sourceIds)) {
@@ -150,8 +153,9 @@ export function claimKnownAsOf(sourceIds: readonly string[], sources: ReadonlyMa
       continue;
     }
     if (date === null || m[0] > date) date = m[0];
+    if (oldest === null || m[0] < oldest) oldest = m[0];
   }
-  return { date, cited, undated };
+  return { date, oldest, cited, undated };
 }
 
 /** Earliest and latest dated source of a whole report, or nulls when none is dated. */

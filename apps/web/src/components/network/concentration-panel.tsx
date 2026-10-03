@@ -2,12 +2,14 @@ import { ChartFrame } from "@/components/data-state";
 import { formatPct } from "@/lib/charts/format";
 import { Blueprint, PanelHeading } from "@/components/ui/blueprint";
 import { ProvenanceFooter } from "@/components/data-state";
-import { concentrationRows, directionLabel, humanize, shareBasisLabel } from "@/lib/network/logic";
+import { concentrationRows, directionLabel, humanize, largestReportedShare, shareBasisLabel, sideShareLabel } from "@/lib/network/logic";
 import type { ConcentrationPayload, KnockOnPayload } from "@/lib/network/types";
 
 function pct(v: number | null): string {
   return v === null ? "not reported" : formatPct(v, 1);
 }
+
+const side = (s: Parameters<typeof sideShareLabel>[0]) => sideShareLabel(s, (v) => formatPct(v, 1));
 
 /**
  * Customer and supplier concentration from confirmed, dated, directed, issuer-basis
@@ -24,7 +26,7 @@ export function ConcentrationPanel({ data, asOfDate }: { data: ConcentrationPayl
       title="Concentration from confirmed disclosures"
       takeaway={
         any
-          ? `${rows.length} fiscal-period disclosure ${rows.length === 1 ? "group is" : "groups are"} confirmed; the largest single reported share is ${pct(Math.max(...rows.map((r) => r.largestShare ?? 0)))}.`
+          ? `${rows.length} fiscal-period disclosure ${rows.length === 1 ? "group is" : "groups are"} confirmed; ${largestReportedShare(rows) === null ? "no counterparty reported a share." : `the largest single reported share is ${pct(largestReportedShare(rows))}.`}`
           : "No confirmed, dated customer or supplier disclosure is stored, so no concentration is shown."
       }
       units="Share as reported by the filer, against the company's own revenue (customers) or purchases (suppliers). Shares are never imputed."
@@ -45,8 +47,8 @@ export function ConcentrationPanel({ data, asOfDate }: { data: ConcentrationPayl
           shareBasisLabel(r.shareBasis),
           r.namedCount,
           r.anonymousCount,
-          `${r.isFloor ? "at least " : ""}${pct(r.namedShareSum)}`,
-          pct(r.anonymousShareSum),
+          side(r.named),
+          side(r.anonymous),
           pct(r.largestShare),
           r.openContradictions,
         ]),
@@ -54,8 +56,8 @@ export function ConcentrationPanel({ data, asOfDate }: { data: ConcentrationPayl
     >
       <ul className="flex flex-col gap-3">
         {rows.map((r) => {
-          const named = Math.min(1, Math.max(0, r.namedShareSum ?? 0));
-          const anon = Math.min(1 - named, Math.max(0, r.anonymousShareSum ?? 0));
+          const named = Math.min(1, Math.max(0, r.named.value ?? 0));
+          const anon = Math.min(1 - named, Math.max(0, r.anonymous.value ?? 0));
           return (
             <li key={`${r.fiscalPeriod}|${r.relationship}|${r.shareBasis}`} className="flex flex-col gap-1">
               <p className="flex flex-wrap items-baseline justify-between gap-x-3 text-sm">
@@ -68,15 +70,14 @@ export function ConcentrationPanel({ data, asOfDate }: { data: ConcentrationPayl
               </p>
               <div
                 role="img"
-                aria-label={`Named counterparties ${pct(r.namedShareSum)}, anonymous ${pct(r.anonymousShareSum)}${r.isFloor ? " (at least: some shares not reported)" : ""}`}
+                aria-label={`Named counterparties ${side(r.named)}, anonymous ${side(r.anonymous)}`}
                 className="flex h-3 w-full bg-surface-muted"
               >
                 <span className="h-3 bg-accent" style={{ width: `${named * 100}%` }} />
                 <span className="h-3 bg-categorical-4" style={{ width: `${anon * 100}%` }} />
               </div>
               <p className="num text-xs text-text-muted">
-                Named {r.isFloor ? "at least " : ""}
-                {pct(r.namedShareSum)} · anonymous {pct(r.anonymousShareSum)} · largest {pct(r.largestShare)}
+                Named {side(r.named)} · anonymous {side(r.anonymous)} · largest {pct(r.largestShare)}
                 {r.missingShareCount ? ` · ${r.missingShareCount} disclosed without a share (not imputed)` : ""}
               </p>
               {r.shareExceedsTotal ? <p className="text-xs text-text">The reported shares add up to more than 100%: a contradiction to review, not a figure to trust.</p> : null}

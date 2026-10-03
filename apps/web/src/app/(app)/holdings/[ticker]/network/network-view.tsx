@@ -34,7 +34,7 @@ import {
   fetchReconciliations,
   fetchReviewQueue,
 } from "@/lib/network/client";
-import { asOfParam, isIsoDate, latestDate } from "@/lib/network/logic";
+import { asOfParam, isIsoDate, latestDate, resourceReason, resourceStatus } from "@/lib/network/logic";
 
 /**
  * Business network and innovation for one holding (free-data plan, Phase 5): a time-aware
@@ -88,18 +88,18 @@ export function NetworkView({ ticker }: { ticker: string }) {
       <AsOfControl value={asOf} onChange={setAsOf} today={today} />
       {asOfDate ? (
         <AlertMessage tone="info" title={`Viewing the network as known on ${formatDate(asOfDate)}`}>
-          Rows learned of and decisions made after that day are not applied. The patent timing table ignores this date. Decisions you make here apply now.
+          Rows learned of and decisions made after that day are not applied. The patent timing table and the legal-structure block ignore this date and show the current state. Decisions you make here apply now.
         </AlertMessage>
       ) : null}
 
       <ResourceBoundary state={network.state} title="Relationships and patents" kicker="Entity graph">
         {(net) => (
           <>
-            <EdgeLedger ticker={ticker} edges={net.edges} asOfDate={asOfDate} limitations={net.limitations} knownAt={net.knownAsOf} onChanged={reloadAll} />
-            <ChangesList net={net} since={since} onSince={setSinceOverride} sinceOrigin={sinceOrigin} asOfDate={asOfDate} />
+            <EdgeLedger key={ticker} ticker={ticker} edges={net.edges} asOfDate={asOfDate} limitations={net.limitations} knownAt={net.knownAsOf} onChanged={reloadAll} />
+            <ChangesList key={ticker} net={net} since={since} onSince={setSinceOverride} sinceOrigin={sinceOrigin} asOfDate={asOfDate} />
             <LeadershipPanel net={net} asOfDate={asOfDate} knownAt={net.knownAsOf} />
-            <PatentMatrix patents={net.patents} trends={trendRows} asOfDate={asOfDate} knownAt={net.knownAsOf} limitations={[]} />
-            <ReviewPanel ticker={ticker} disclosures={net.disclosures} queue={queue.state.kind === "ok" && queue.state.data.ok ? queue.state.data.value : null} asOfDate={asOfDate} onChanged={reloadAll} />
+            <PatentMatrix key={ticker} patents={net.patents} trends={trendRows} trendsStatus={resourceStatus(trends.state)} asOfDate={asOfDate} knownAt={net.knownAsOf} limitations={[]} />
+            <ReviewPanel key={ticker} ticker={ticker} disclosures={net.disclosures} queue={queue.state.kind === "ok" && queue.state.data.ok ? queue.state.data.value : null} queueStatus={resourceStatus(queue.state)} queueReason={resourceReason(queue.state)} asOfDate={asOfDate} onChanged={reloadAll} />
           </>
         )}
       </ResourceBoundary>
@@ -109,7 +109,7 @@ export function NetworkView({ ticker }: { ticker: string }) {
       </ResourceBoundary>
 
       <ResourceBoundary state={deals.state} title="Deals and financing" kicker="Transactions">
-        {(data) => <DealsTimeline ticker={ticker} data={data} asOfDate={asOfDate} onChanged={reloadAll} />}
+        {(data) => <DealsTimeline key={ticker} ticker={ticker} data={data} asOfDate={asOfDate} onChanged={reloadAll} />}
       </ResourceBoundary>
 
       <ResourceBoundary state={concentration.state} title="Customer and supplier concentration" kicker="Customers and suppliers">
@@ -129,6 +129,7 @@ export function NetworkView({ ticker }: { ticker: string }) {
           <ResearchPanel
             observations={obs}
             reconciliations={reconciliations.state.kind === "ok" && reconciliations.state.data.ok ? reconciliations.state.data.value : []}
+            reconciliationsStatus={resourceStatus(reconciliations.state)}
             asOfDate={asOfDate}
           />
         )}
@@ -139,8 +140,8 @@ export function NetworkView({ ticker }: { ticker: string }) {
         <AlertMessage title="Legal structure is unavailable">{identity.state.title}. {identity.state.detail}</AlertMessage>
       ) : null}
 
-      <RecordForms ticker={ticker} onRecorded={reloadAll} />
-      <RefreshActions ticker={ticker} onDone={reloadAll} />
+      <RecordForms key={ticker} ticker={ticker} onRecorded={reloadAll} />
+      <RefreshActions key={ticker} ticker={ticker} onDone={reloadAll} />
     </div>
   );
 }

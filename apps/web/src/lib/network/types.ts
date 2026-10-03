@@ -8,7 +8,7 @@
 /** Status of a graph row. `unrecognised` is never shown as confirmed. */
 export type RowStatus = "confirmed" | "suggested" | "disputed" | "rejected" | "unrecognised";
 
-export type EvidenceTier = "primary" | "regulatory" | "owner_review" | "vendor" | "community" | "candidate" | "unknown";
+export type EvidenceTier = "primary" | "regulatory" | "owner_review" | "vendor" | "community" | "candidate" | "unverified" | "unknown";
 
 export type NetworkEdge = {
   /** "12" for a normalised edge, "legacy:5" for an entity_relationship row (GLEIF/Wikidata). */
@@ -199,7 +199,9 @@ export type KpiLink = {
   kpiId: string;
   kpiLabel: string | null;
   kpiDefined: boolean;
-  latestVerdict: { status: string; observed: number | null; threshold: number | null; fiscalPeriod: string | null } | null;
+  latestVerdict: { status: string; observed: number | null; threshold: number | null; operator: string | null; fiscalPeriod: string | null } | null;
+  /** Unit of the KPI when the thesis states one. */
+  kpiUnit: string | null;
   newsClusters: { id: number; headline: string; status: string | null; eventDate: string | null }[];
   /** Only a confirmed event with linked primary evidence may support a thesis breach. */
   canSupportBreach: boolean;

@@ -5,7 +5,7 @@ import { useMemo, useState } from "react";
 import { ChartFrame, Segmented } from "@/components/data-state";
 import { formatDate } from "@/lib/format";
 import { formatNumber } from "@/lib/charts/format";
-import { bubbleSize, buildPatentMatrix, cellKey, citationLevel, humanize, type MatrixCell, type PatentColourMode } from "@/lib/network/logic";
+import { bubbleSize, buildPatentMatrix, cellKey, citationLevel, familyDetailMap, humanize, type MatrixCell, type PatentColourMode } from "@/lib/network/logic";
 import type { PatentFamily, PatentTrendRow } from "@/lib/network/types";
 import { cn } from "@/lib/utils";
 
@@ -43,12 +43,14 @@ function cellColour(cell: MatrixCell, mode: PatentColourMode, maxCitations: numb
 export function PatentMatrix({
   patents,
   trends,
+  trendsStatus = "ok",
   asOfDate,
   knownAt,
   limitations,
 }: {
   patents: readonly PatentFamily[];
   trends: readonly PatentTrendRow[] | null;
+  trendsStatus?: "ok" | "loading" | "unavailable";
   asOfDate: string | null;
   knownAt: string | null;
   limitations: readonly string[];
@@ -56,7 +58,7 @@ export function PatentMatrix({
   const [mode, setMode] = useState<PatentColourMode>("citations");
   const [pick, setPick] = useState<{ subclass: string; year: number } | null>(null);
   const m = useMemo(() => buildPatentMatrix(patents), [patents]);
-  const byKey = useMemo(() => new Map(patents.map((p) => [p.familyKey, p])), [patents]);
+  const byKey = useMemo(() => familyDetailMap(patents), [patents]);
   const picked = pick ? m.cells.get(cellKey(pick.subclass, pick.year)) : undefined;
   const sources = [...new Set(patents.map((p) => p.source))].join(", ") || "EPO OPS and owner entries";
 
@@ -73,7 +75,7 @@ export function PatentMatrix({
       kicker="Innovation"
       title="Patent landscape"
       takeaway={takeaway}
-      units={`Rows: CPC subclass. Columns: priority year. Bubble area: distinct families (largest cell ${m.maxFamilies}). Colour: ${mode === "citations" ? "forward citations summed over the cell's families" : "legal status"}. ${m.attributedFamilies} attributed families; ${m.placedFamilies} placed${m.missingPriorityDate ? `, ${m.missingPriorityDate} without a priority date` : ""}${m.missingCpc ? `, ${m.missingCpc} without a CPC class` : ""}${m.unattributedFamilies ? `; ${m.unattributedFamilies} listed families have no dated ownership path and are excluded` : ""}.`}
+      units={`Rows: CPC subclass. Columns: priority year. Bubble area: distinct families (largest cell ${m.maxFamilies}). Colour: ${mode === "citations" ? "forward citations summed over the cell's families" : "legal status"}. ${m.attributedFamilies} attributed families; ${m.placedFamilies} placed${m.missingPriorityDate ? `, ${m.missingPriorityDate} without a priority date` : ""}${m.missingCpc ? `, ${m.missingCpc} without a CPC class` : ""}${m.unattributedFamilies ? `; ${m.unattributedFamilies} listed families have no dated ownership path and are excluded` : ""}. Families from a source that supplies no citation counts (EPO OPS) show citations as unknown, never as zero.`}
       provenance={{
         source: `Patent families (${sources}), reconciled to the issuer`,
         asOf: asOfDate,
@@ -104,7 +106,7 @@ export function PatentMatrix({
             c.subclass,
             c.year,
             c.families,
-            formatNumber(c.citations),
+            c.citationsUnknown === c.families ? "unknown" : formatNumber(c.citations),
             c.citationsUnknown,
             Object.entries(c.statusCounts)
               .map(([k, v]) => `${k} ${v}`)
@@ -162,13 +164,14 @@ export function PatentMatrix({
             </tbody>
           </table>
         </div>
+        {m.olderYearsDropped > 0 ? <p className="text-xs text-text-muted">The year axis is capped at 60 years from the newest; families with a priority year before {m.years[0]} are counted but not drawn.</p> : null}
         {m.hiddenSubclasses > 0 ? <p className="text-xs text-text-muted">{m.hiddenSubclasses} smaller technology classes are not drawn; the table view lists only the drawn ones.</p> : null}
         <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-text-muted" aria-label="Legend">
           {mode === "citations"
             ? CITATION_BG.map((cls, i) => (
                 <span key={i} className="inline-flex items-center gap-1.5">
                   <span className={cn("inline-block size-3 rounded-full", cls)} aria-hidden="true" />
-                  {i === 0 ? "No or unknown citations" : i === 1 ? "Few" : i === 2 ? "Some" : "Many (relative to the most-cited cell)"}
+                  {i === 0 ? "No citations, or counts not provided by the source" : i === 1 ? "Few" : i === 2 ? "Some" : "Many (relative to the most-cited cell)"}
                 </span>
               ))
             : [...new Set([...statusKinds, "mixed"])].map((k) => (
@@ -211,6 +214,7 @@ export function PatentMatrix({
           Patent counts and citations are research signals, not a measure of patent value, and not a freedom-to-operate or infringement opinion.
         </p>
         {trends && trends.length > 0 ? <TrendTable rows={trends} /> : null}
+        {trendsStatus === "unavailable" ? <p role="alert" className="text-xs text-text">Grant and expiry timing could not be loaded; its absence here does not mean there is none.</p> : null}
         {limitations.length ? <p className="text-xs text-text-muted">{limitations.join(" ")}</p> : null}
       </div>
     </ChartFrame>

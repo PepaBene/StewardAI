@@ -36,7 +36,7 @@ export function DealsTimeline({ ticker, data, asOfDate, onChanged }: { ticker: s
       </p>
       <ul className="flex flex-col gap-4">
         {data.deals.map((d) => (
-          <DealCard key={d.dealKey} ticker={ticker} deal={d} onChanged={onChanged} />
+          <DealCard key={d.dealKey} ticker={ticker} deal={d} readOnly={asOfDate !== null} onChanged={onChanged} />
         ))}
       </ul>
       {data.limitations.length ? <p className="text-xs text-text-muted">{data.limitations.join(" ")}</p> : null}
@@ -55,7 +55,7 @@ export function DealsTimeline({ ticker, data, asOfDate, onChanged }: { ticker: s
   );
 }
 
-function DealCard({ ticker, deal, onChanged }: { ticker: string; deal: Deal; onChanged: () => void }) {
+function DealCard({ ticker, deal, readOnly, onChanged }: { ticker: string; deal: Deal; readOnly: boolean; onChanged: () => void }) {
   const stages = dealStages(deal);
   const provisional = dealStateIsProvisional(deal);
   const terms = termRows(deal.confirmedTerms, (n) => formatNumber(n, Number.isInteger(n) ? 0 : 2));
@@ -79,7 +79,7 @@ function DealCard({ ticker, deal, onChanged }: { ticker: string; deal: Deal; onC
             </span>
             <span className="text-[11px] text-text-muted">{REACH_LABEL[s.reach]}</span>
             {s.steps.map((st) => (
-              <StepEntry key={`${st.eventId}-${st.state}`} ticker={ticker} step={st} onChanged={onChanged} />
+              <StepEntry key={`${st.eventId}-${st.state}`} ticker={ticker} step={st} readOnly={readOnly} onChanged={onChanged} />
             ))}
           </li>
         ))}
@@ -111,7 +111,7 @@ function DealCard({ ticker, deal, onChanged }: { ticker: string; deal: Deal; onC
   );
 }
 
-function StepEntry({ ticker, step, onChanged }: { ticker: string; step: Deal["timeline"][number]; onChanged: () => void }) {
+function StepEntry({ ticker, step, readOnly, onChanged }: { ticker: string; step: Deal["timeline"][number]; readOnly: boolean; onChanged: () => void }) {
   const decidable = step.eventId !== null;
   return (
     <div className={cn("flex flex-col gap-1 border-t border-border-soft pt-1 text-xs", step.status !== "confirmed" && "border-dashed")}>
@@ -125,7 +125,7 @@ function StepEntry({ ticker, step, onChanged }: { ticker: string; step: Deal["ti
       {decidable ? (
         <details>
           <summary className="cursor-pointer text-accent-ink select-none hover:underline">Decide</summary>
-          <DecisionControl status={step.status} onDecide={(d, r) => decideEvent(ticker, step.eventId as number, d, r)} onDone={onChanged} />
+          <DecisionControl status={step.status} readOnly={readOnly} onDecide={(d, r) => decideEvent(ticker, step.eventId as number, d, r)} onDone={onChanged} />
         </details>
       ) : null}
     </div>

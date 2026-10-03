@@ -1,4 +1,6 @@
-import type { ReactNode } from "react";
+"use client";
+
+import { useEffect, type ReactNode } from "react";
 
 import { ProvenanceFooter } from "@/components/data-state";
 import { Blueprint, PanelHeading } from "@/components/ui/blueprint";
@@ -76,4 +78,21 @@ export function SourceLink({ url, label }: { url: string | null | undefined; lab
       {label}
     </a>
   );
+}
+
+/**
+ * Sections of the holding page mount only after their request finishes, so the browser's one-shot
+ * hash scroll (`#evidence`) misses them. Rendered inside a loaded section, this scrolls to the
+ * element the URL hash names once it exists.
+ */
+export function ScrollToHash() {
+  useEffect(() => {
+    try {
+      const id = decodeURIComponent(window.location.hash.slice(1));
+      if (id) document.getElementById(id)?.scrollIntoView();
+    } catch {
+      // A malformed hash is not worth a crash.
+    }
+  }, []);
+  return null;
 }

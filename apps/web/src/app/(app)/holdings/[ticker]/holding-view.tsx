@@ -186,7 +186,8 @@ export function HoldingContent({
   const intraday = useHoldingIntraday(ticker);
 
   // The as-of day of the data-context and evidence sections ("" = now), kept in ?asof=.
-  const today = isoDay(now);
+  // UTC day: the API compares the cutoff against the current UTC instant, not the local date.
+  const today = now.toISOString().slice(0, 10);
   const [asOfDay, setAsOfDayState] = useState(() => {
     const v = typeof window === "undefined" ? "" : (new URLSearchParams(window.location.search).get("asof") ?? "");
     return isIsoDate(v) ? v : "";
@@ -198,7 +199,8 @@ export function HoldingContent({
     else url.searchParams.delete("asof");
     window.history.replaceState(null, "", url);
   }, []);
-  // The API refuses a future as_of; ask for "now" instead of sending it.
+  // The API refuses a future as_of; ask for "now" instead of sending it. (A day equal to today
+  // is also sent as "now": its end of day has not happened yet; see asOfParam.)
   const requestedDay = isFutureDay(asOfDay, today) ? "" : asOfDay;
   const dataContext = useHoldingDataContext(ticker, requestedDay).state;
   const evidence = useEvidenceSummary(ticker, requestedDay).state;

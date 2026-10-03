@@ -104,7 +104,7 @@ export function toStatus(v: unknown): RowStatus {
   return v === "confirmed" || v === "suggested" || v === "disputed" || v === "rejected" ? v : "unrecognised";
 }
 
-const TIERS: readonly EvidenceTier[] = ["primary", "regulatory", "owner_review", "vendor", "community", "candidate"];
+const TIERS: readonly EvidenceTier[] = ["primary", "regulatory", "owner_review", "vendor", "community", "candidate", "unverified"];
 export function toTier(v: unknown): EvidenceTier {
   return typeof v === "string" && (TIERS as readonly string[]).includes(v) ? (v as EvidenceTier) : "unknown";
 }
@@ -207,6 +207,14 @@ function parseDisclosure(raw: unknown, i: number): NetworkDisclosure {
   };
 }
 
+/**
+ * EPO OPS bibliographic data carries no forward citations: the backend stores 0 for them. A 0 from
+ * that source is "not provided", not "uncited".
+ */
+export function forwardCitations(value: number | null, source: string | null): number | null {
+  return value === 0 && source !== null && source.toLowerCase().startsWith("epo_ops") ? null : value;
+}
+
 function parsePatent(raw: unknown, i: number): PatentFamily {
   const p = `patents[${i}]`;
   const r = rec(raw, p);
@@ -217,7 +225,7 @@ function parsePatent(raw: unknown, i: number): PatentFamily {
     title: optStr(r.family_title),
     cpcCodes: strList(r.cpc_codes),
     jurisdictions: strList(r.jurisdictions),
-    citationsForward: num(r.citations_forward),
+    citationsForward: forwardCitations(num(r.citations_forward), optStr(r.source)),
     citationsBackward: num(r.citations_backward),
     legalStatus: optStr(r.legal_status) ?? "unknown",
     source: optStr(r.source) ?? "unknown source",
@@ -405,12 +413,14 @@ export function parseKpiLinks(raw: unknown): Parsed<KpiLink[]> {
         date: optStr(l.date),
         kpiId: reqStr(l.kpi_id, `${p}.kpi_id`),
         kpiLabel: typeof l.kpi === "string" ? l.kpi : isRecord(l.kpi) ? optStr(l.kpi.label ?? l.kpi.name) : null,
+        kpiUnit: isRecord(l.kpi) ? optStr(l.kpi.unit) : null,
         kpiDefined: l.kpi_defined === true,
         latestVerdict: v
           ? {
               status: optStr(v.status) ?? "unknown",
               observed: num(v.observed_value),
               threshold: num(v.threshold),
+              operator: optStr(v.operator),
               fiscalPeriod: optStr(v.fiscal_period),
             }
           : null,

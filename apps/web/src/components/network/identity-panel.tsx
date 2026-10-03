@@ -47,6 +47,11 @@ export function IdentityPanel({ identity, asOfParam, asOfDate }: { identity: Hol
   return (
     <Blueprint as="section" aria-labelledby="network-identity-heading" className="flex flex-col gap-4 px-5 py-5">
       <PanelHeading kicker="Legal structure" title={<span id="network-identity-heading">Consolidation, control and identity</span>} />
+      {asOfDate ? (
+        <p className="border-l-2 border-border pl-3 text-xs text-text">
+          Current structure, not as of {formatDate(asOfDate)}: the parents, subsidiaries and owners below are today&apos;s confirmed records. Only the two history lists are limited to that date.
+        </p>
+      ) : null}
       <p className="max-w-prose text-sm text-text">
         {identity.legal_entity
           ? `${identity.legal_entity.legal_name} (LEI ${identity.legal_entity.lei}): ${identity.parents.length} consolidating parent${identity.parents.length === 1 ? "" : "s"}, ${identity.subsidiary_count} subsidiar${identity.subsidiary_count === 1 ? "y" : "ies"}.`
@@ -77,7 +82,8 @@ export function IdentityPanel({ identity, asOfParam, asOfDate }: { identity: Hol
       <ProvenanceFooter
         provenance={{
           source: "GLEIF level 1 and 2, Wikidata (tier 3), registries",
-          asOf: asOfDate,
+          // The structure itself is always current; stamping it with the picked date would be false.
+          asOf: null,
           method: "GLEIF and filings are tier 1; Wikidata is tier 3 and cannot establish ownership. Owner decisions win.",
           state: all.length === 0 ? "not_covered" : rowsState(all.map((r) => ({ status: r.status as RowStatus }))),
           reason: identity.identity_error,

@@ -27,16 +27,29 @@ export function parseNetworkSummary(body: unknown): NetworkSummary | null {
   if (!edges || !events || !disclosures) return null;
   const byStatus = tally(edges, "status");
   const confirmed = byStatus.confirmed ?? 0;
+  const rejected = byStatus.rejected ?? 0;
+  const live = edges.length - rejected;
   const limitations = Array.isArray(body.limitations) ? body.limitations.filter((x): x is string => typeof x === "string") : [];
-  return { edges: edges.length, byStatus, confirmed, candidates: edges.length - confirmed, events: events.length, disclosures: disclosures.length, limitations };
+  return { edges: edges.length, live, rejected, byStatus, confirmed, candidates: live - confirmed, events: events.length, disclosures: disclosures.length, limitations };
 }
 
-/** `HoldingDataContext.patents` (`{families, trend}`); null for any other shape. */
+/**
+ * `HoldingDataContext.patents` (`{families, trend}`); null for any other shape. The backend lists
+ * one row per owner row of a family, so rows are deduplicated by `family_key` (a family counts as
+ * attributed when any of its rows is).
+ */
 export function parsePatentSummary(body: unknown): PatentSummary | null {
   if (!isRecord(body)) return null;
-  const families = records(body.families);
-  if (!families) return null;
-  const known = families.map((f) => f.known_at).filter((x): x is string => typeof x === "string").sort();
+  const rows = records(body.families);
+  if (!rows) return null;
+  const byFamily = new Map<string, Record<string, unknown>>();
+  rows.forEach((r, i) => {
+    const key = typeof r.family_key === "string" && r.family_key ? r.family_key : `row-${i}`;
+    const have = byFamily.get(key);
+    if (!have || (have.attributed !== true && r.attributed === true)) byFamily.set(key, r);
+  });
+  const families = [...byFamily.values()];
+  const known = rows.map((f) => f.known_at).filter((x): x is string => typeof x === "string").sort();
   return {
     families: families.length,
     attributed: families.filter((f) => f.attributed === true).length,

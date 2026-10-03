@@ -34,7 +34,7 @@ export function NetworkPatentsCard({
       takeaway={
         network === null
           ? "The company-graph payload was not in a shape this view understands, so no count is shown."
-          : `${network.confirmed} of ${network.edges} graph edges are confirmed; ${network.candidates} are candidates, not facts. ${patents ? `${patents.attributed} of ${patents.families} patent families are attributed to the issuer.` : "Patent families could not be read."}`
+          : `${network.confirmed} of ${network.live} graph edges are confirmed; ${network.candidates} are candidates, not facts${network.rejected ? ` (${network.rejected} rejected edge${network.rejected === 1 ? " is" : "s are"} not counted)` : ""}. ${patents ? `${patents.attributed} of ${patents.families} patent families are attributed to the issuer.` : "Patent families could not be read."}`
       }
       action={
         <Link href={href} className="text-xs text-accent-ink hover:underline">
@@ -47,17 +47,17 @@ export function NetworkPatentsCard({
           asOf,
           knownAt: knownAsOf,
           method: "Status in force at the cutoff; a confirmation or rejection made later is not applied.",
-          state: network === null ? "unavailable" : network.edges === 0 ? "not_covered" : network.confirmed === 0 ? "partial" : "verified",
-          reason: network === null ? "Unexpected payload shape." : network.edges === 0 ? "No graph edge is stored for this holding." : network.confirmed === 0 ? "Only candidate edges exist; none is confirmed." : null,
-          coverage: network && network.edges > 0 ? { covered: network.confirmed, total: network.edges, unit: "graph edges confirmed" } : null,
+          state: network === null ? "unavailable" : network.live === 0 ? "not_covered" : network.confirmed === 0 ? "partial" : network.confirmed < network.live ? "partial" : "verified",
+          reason: network === null ? "Unexpected payload shape." : network.live === 0 ? "No live (non-rejected) graph edge is stored for this holding." : network.confirmed === 0 ? "Only candidate edges exist; none is confirmed." : null,
+          coverage: network && network.live > 0 ? { covered: network.confirmed, total: network.live, unit: "graph edges confirmed" } : null,
         },
         {
           source: "Patent families attributed to the issuer (stored patent records)",
           asOf,
           knownAt: patents?.latestKnownAt ?? null,
           method: "Counts and citations are signals, not patent valuation or freedom-to-operate advice.",
-          state: patents === null ? "unavailable" : patents.families === 0 ? "not_covered" : "verified",
-          reason: patents === null ? "Unexpected payload shape." : patents.families === 0 ? "No patent family is attributed to the issuer by the cutoff." : null,
+          state: patents === null ? "unavailable" : patents.families === 0 ? "not_covered" : patents.attributed === 0 ? "partial" : patents.attributed < patents.families ? "partial" : "verified",
+          reason: patents === null ? "Unexpected payload shape." : patents.families === 0 ? "No patent family is stored for this issuer by the cutoff." : patents.attributed === 0 ? "Families are listed, but none has a dated ownership path to the issuer." : null,
           coverage: patents && patents.families > 0 ? { covered: patents.attributed, total: patents.families, unit: "families attributed" } : null,
         },
       ]}
@@ -70,8 +70,8 @@ export function NetworkPatentsCard({
             <h3 className="kicker">Graph edges by status</h3>
             {network === null ? (
               <p className="text-sm text-text-muted">Unavailable.</p>
-            ) : network.edges === 0 ? (
-              <p className="text-sm text-text-muted">No edge stored. Deals: {network.events}, disclosures: {network.disclosures}.</p>
+            ) : network.live === 0 ? (
+              <p className="text-sm text-text-muted">No live edge stored{network.rejected ? ` (${network.rejected} rejected)` : ""}. Deals: {network.events}, disclosures: {network.disclosures}.</p>
             ) : (
               <>
                 <ul className="num mt-1 text-sm">
@@ -91,10 +91,10 @@ export function NetworkPatentsCard({
             {patents === null ? (
               <p className="text-sm text-text-muted">Unavailable.</p>
             ) : patents.families === 0 ? (
-              <p className="text-sm text-text-muted">No family attributed by the cutoff.</p>
+              <p className="text-sm text-text-muted">No patent family stored by the cutoff.</p>
             ) : (
               <>
-                <p className="num mt-1 text-sm">{patents.families} families, {patents.attributed} attributed to the issuer</p>
+                <p className="num mt-1 text-sm">{patents.families} distinct families, {patents.attributed} attributed to the issuer</p>
                 <ul className="num text-xs text-text-muted">
                   {entries(patents.byLegalStatus).map(([k, n]) => (
                     <li key={k}>{k}: {n}</li>

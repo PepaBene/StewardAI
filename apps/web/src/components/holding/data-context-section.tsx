@@ -15,6 +15,7 @@ import { EvidenceLedger } from "./evidence-ledger";
 import { ExposureCard } from "./exposure-card";
 import { FinancialHistoryCard } from "./financial-history-card";
 import { GapsList } from "./gaps-list";
+import { ScrollToHash } from "./shared";
 import { HoldingAsOfBar } from "./holding-as-of-bar";
 import { NetworkPatentsCard } from "./network-patents-card";
 import { OwnershipSummaryCard } from "./ownership-summary-card";
@@ -50,6 +51,7 @@ export function DataContextSections({ ticker, asOf, context, evidence }: { ticke
       <ResourceBoundary state={context} label="Data context">
         {(ctx) => (
           <>
+            <ScrollToHash />
             <FinancialHistoryCard history={ctx.financial_history} ticker={ticker} />
             <ResourceBoundary state={peers.state} label="Peer card">
               {(p) => <PeerTable data={p} ticker={ticker} />}
@@ -71,7 +73,7 @@ export function DataContextSections({ ticker, asOf, context, evidence }: { ticke
           {() => <PriceDiagnosticsPanel ticker={ticker} rows={diag ?? []} listing={listingData} listingNote={listing.state.kind === "loading" ? "Loading the derived listing…" : listingParsed && !listingParsed.ok ? `The listing response did not match the expected shape (${listingParsed.reason}).` : listing.state.kind === "error" ? (listing.state.status === 404 ? "No listing has been derived for this holding yet." : `The listing could not be read: ${listing.state.title}.`) : null} />}
         </ResourceBoundary>
       </div>
-      {context.kind !== "loading" || evidence.kind !== "loading" ? <GapsList gaps={gaps} /> : null}
+      <GapsList gaps={gaps} complete={context.kind === "ok" && evidence.kind === "ok"} loading={context.kind === "loading" || evidence.kind === "loading"} />
     </div>
   );
 }
@@ -82,6 +84,7 @@ export function EvidenceSections({ ticker, evidence }: { ticker: string; evidenc
     <ResourceBoundary state={evidence} label="Evidence">
       {(s) => (
         <>
+          <ScrollToHash />
           <OwnershipSummaryCard summary={s} ticker={ticker} />
           <EvidenceLedger summary={s} />
         </>

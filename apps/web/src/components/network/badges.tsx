@@ -50,6 +50,7 @@ export const TIER_LABEL: Record<EvidenceTier, { label: string; hint: string }> =
   vendor: { label: "Vendor", hint: "Derived by a data vendor (for example Diffbot). Needs confirmation." },
   community: { label: "Community", hint: "Community-edited (for example Wikidata). Candidate discovery only." },
   candidate: { label: "Candidate", hint: "An unconfirmed lead without a primary source." },
+  unverified: { label: "Unverified", hint: "Stored without a verified evidence tier. Needs a source check before it counts." },
   unknown: { label: "Tier not stated", hint: "The API did not state an evidence tier." },
 };
 

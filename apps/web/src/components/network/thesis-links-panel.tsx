@@ -15,7 +15,7 @@ export function KpiLinksPanel({ links, asOfDate }: { links: readonly KpiLink[]; 
       <p className="max-w-prose text-sm text-text">
         {links.length === 0
           ? "No company event is linked to a thesis KPI."
-          : `${links.length} linked events; ${links.filter((l) => l.canSupportBreach).length} are confirmed with primary evidence and may support a KPI breach. A suggested or disputed link can prompt a review only.`}
+          : `${links.length} linked events; ${links.filter((l) => l.canSupportBreach).length} are confirmed with linked evidence and may support a KPI breach. A suggested or disputed link can prompt a review only.`}
       </p>
       {links.length > 0 ? (
         <ul className="flex flex-col">
@@ -26,7 +26,7 @@ export function KpiLinksPanel({ links, asOfDate }: { links: readonly KpiLink[]; 
                 {!l.kpiDefined ? <span className="block text-xs text-text">This KPI is not in the active thesis.</span> : null}
                 <span className="num block text-xs text-text-muted">
                   {l.date ? formatDate(l.date) : "undated"}
-                  {l.latestVerdict ? ` · latest verdict ${l.latestVerdict.status}${l.latestVerdict.observed !== null ? ` (observed ${formatNumber(l.latestVerdict.observed, 2)}${l.latestVerdict.threshold !== null ? `, threshold ${formatNumber(l.latestVerdict.threshold, 2)}` : ""})` : ""}` : " · no verdict yet"}
+                  {l.latestVerdict ? ` · latest verdict ${l.latestVerdict.status}${l.latestVerdict.observed !== null ? ` (observed ${formatNumber(l.latestVerdict.observed, 2)}${l.kpiUnit ? ` ${l.kpiUnit}` : ""}${l.latestVerdict.threshold !== null ? `, threshold ${l.latestVerdict.operator ? `${l.latestVerdict.operator} ` : ""}${formatNumber(l.latestVerdict.threshold, 2)}${l.kpiUnit ? ` ${l.kpiUnit}` : ""}` : ""})` : ""}` : " · no verdict yet"}
                 </span>
                 {l.newsClusters.length ? <span className="block text-xs text-text-muted">News: {l.newsClusters.map((c) => c.headline).join(" · ")}</span> : null}
                 {l.sourceUrl ? <SourceLink href={l.sourceUrl}>source</SourceLink> : null}
@@ -43,7 +43,7 @@ export function KpiLinksPanel({ links, asOfDate }: { links: readonly KpiLink[]; 
         provenance={{
           source: "Company events, thesis KPIs, KPI verdicts and news clusters",
           asOf: asOfDate,
-          method: "An event supports a breach only when confirmed with linked primary evidence.",
+          method: "An event supports a breach only when confirmed with linked evidence (the server checks a confirmed status and a linked evidence document, not the evidence tier).",
           state: links.length === 0 ? "not_covered" : "verified",
         }}
       />
@@ -57,10 +57,13 @@ const SHOWN_METRICS = ["employee_count", "total_funding_raised"];
 export function ResearchPanel({
   observations,
   reconciliations,
+  reconciliationsStatus = "ok",
   asOfDate,
 }: {
   observations: readonly ResearchObservation[];
   reconciliations: readonly Reconciliation[];
+  /** A failed or loading reconciliation request is not "none open". */
+  reconciliationsStatus?: "ok" | "loading" | "unavailable";
   asOfDate: string | null;
 }) {
   const shown = observations.filter((o) => SHOWN_METRICS.includes(o.metric));
@@ -104,7 +107,11 @@ export function ResearchPanel({
       </div>
       <div>
         <h3 className="text-sm font-semibold">Parent or successor changes no closed deal explains</h3>
-        {reconciliations.length === 0 ? (
+        {reconciliationsStatus !== "ok" ? (
+          <p role={reconciliationsStatus === "loading" ? "status" : "alert"} className="text-xs text-text">
+            {reconciliationsStatus === "loading" ? "Loading…" : "Open reconciliations could not be loaded, so none can be said to be absent."}
+          </p>
+        ) : reconciliations.length === 0 ? (
           <p className="text-xs text-text-muted">None open.</p>
         ) : (
           <ul className="mt-1 flex flex-col">
@@ -125,7 +132,7 @@ export function ResearchPanel({
           source: "Diffbot and People Data Labs observations; GLEIF and deal reconciliation",
           asOf: asOfDate,
           method: "Observations are appended with a match confidence; unchanged re-fetches keep the earliest known-at date.",
-          state: shown.length === 0 && reconciliations.length === 0 ? "not_covered" : "partial",
+          state: reconciliationsStatus !== "ok" ? "unavailable" : shown.length === 0 && reconciliations.length === 0 ? "not_covered" : "partial",
           reason: "Vendor-derived and unconfirmed.",
         }}
       />

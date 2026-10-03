@@ -1,7 +1,7 @@
 "use client";
 
 import { LoaderCircleIcon } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import { Blueprint, PanelHeading } from "@/components/ui/blueprint";
 import { Button } from "@/components/ui/button";
@@ -44,9 +44,25 @@ export function RefreshActions({ ticker, onDone }: { ticker: string; onDone: () 
   const [pending, setPending] = useState<Provider["id"] | null>(null);
   const [results, setResults] = useState<Partial<Record<Provider["id"], ActionResult>>>({});
 
+  // Arming swaps the trigger for the confirm button (and back): focus follows so it is never dropped.
+  const triggers = useRef<Partial<Record<Provider["id"], HTMLButtonElement | null>>>({});
+  const confirms = useRef<Partial<Record<Provider["id"], HTMLButtonElement | null>>>({});
+  const focusAfter = useRef<{ id: Provider["id"]; to: "confirm" | "trigger" } | null>(null);
+  useEffect(() => {
+    const f = focusAfter.current;
+    if (!f) return;
+    (f.to === "confirm" ? confirms : triggers).current[f.id]?.focus();
+    focusAfter.current = null;
+  }, [armed, pending]);
+  function arm(id: Provider["id"] | null, back?: Provider["id"]) {
+    focusAfter.current = id ? { id, to: "confirm" } : back ? { id: back, to: "trigger" } : null;
+    setArmed(id);
+  }
+
   async function confirm(p: Provider) {
     setPending(p.id);
     const r = await p.run(ticker);
+    focusAfter.current = { id: p.id, to: "trigger" };
     setPending(null);
     setArmed(null);
     setResults((prev) => ({ ...prev, [p.id]: r }));
@@ -65,16 +81,16 @@ export function RefreshActions({ ticker, onDone }: { ticker: string; onDone: () 
             <div className="flex flex-wrap items-center gap-2">
               {armed === p.id ? (
                 <>
-                  <Button type="button" size="sm" disabled={pending !== null} onClick={() => void confirm(p)}>
+                  <Button ref={(el) => { confirms.current[p.id] = el; }} type="button" size="sm" disabled={pending !== null} onClick={() => void confirm(p)}>
                     {pending === p.id ? <LoaderCircleIcon aria-hidden="true" className="animate-spin" /> : null}
                     Confirm: spend free quota
                   </Button>
-                  <Button type="button" size="sm" variant="outline" disabled={pending !== null} onClick={() => setArmed(null)}>
+                  <Button type="button" size="sm" variant="outline" disabled={pending !== null} onClick={() => arm(null, p.id)}>
                     Cancel
                   </Button>
                 </>
               ) : (
-                <Button type="button" size="sm" variant="outline" disabled={pending !== null} onClick={() => setArmed(p.id)}>
+                <Button ref={(el) => { triggers.current[p.id] = el; }} type="button" size="sm" variant="outline" disabled={pending !== null} onClick={() => arm(p.id)}>
                   Refresh…
                 </Button>
               )}
