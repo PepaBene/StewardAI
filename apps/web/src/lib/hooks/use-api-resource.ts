@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 
+import { errorMessage } from "@/lib/api/error-message";
 import { useSyncStatus } from "@/components/sync/sync-status-provider";
 
 export type ApiResult<T> = { data?: T; error?: unknown; response: Response };
@@ -14,8 +15,7 @@ export type ResourceState<T> =
 function describeError(result: ApiResult<unknown>): { title: string; detail: string; status: number } {
   const status = result.response.status;
   const error = result.error;
-  const detail =
-    error && typeof error === "object" && "detail" in error ? String(error.detail) : "";
+  const detail = errorMessage(error);
   if (status === 401 || status === 403) {
     return { title: "Not authorised", detail: detail || "Sign in again (with MFA) and retry.", status };
   }
