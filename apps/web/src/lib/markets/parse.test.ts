@@ -119,3 +119,28 @@ describe("listing and sessions", () => {
     expect(parseExpectedSessions({ mic: "XPRA", start: "2026-10-01", end: "2026-10-02", count: 1, basis: "b", days: ["nope"] }).ok).toBe(false);
   });
 });
+
+describe("returns reasons per basis (audit F3-6)", () => {
+  it("takes the raw return's reason from missing_actions.price_raw when the route sends none", () => {
+    const r = parseReturns({
+      ticker: "ABC",
+      known_as_of: "2026-10-03",
+      results: [
+        {
+          symbol: "abc",
+          source: "stooq",
+          start: "2026-01-01",
+          end: "2026-10-03",
+          action_coverage: "available",
+          raw_price_return: null,
+          price_return: 0.1,
+          total_return: null,
+          missing_actions: { price_raw: ["no raw bars"], price_adjusted: [], total_return: ["split not valued"] },
+        },
+      ],
+    });
+    expect(r.ok && r.data.result?.rawPriceReturn.reason).toBe("no raw bars");
+    expect(r.ok && r.data.result?.totalReturn.reason).toBe("split not valued");
+    expect(r.ok && r.data.result?.priceReturn.reason).toBeNull();
+  });
+});

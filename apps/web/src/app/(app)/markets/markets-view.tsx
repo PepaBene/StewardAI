@@ -14,7 +14,7 @@ import { lastGood, ParsedGate, ResourceGate } from "@/components/markets/resourc
 import { ReturnsPanel } from "@/components/markets/returns-panel";
 import { SessionStrip } from "@/components/markets/session-strip";
 import { PageHeader } from "@/components/page-header";
-import { assembleCorrelation, addDays, buildSessionCells, chosenSeries, eventStudyGate, todayIso } from "@/lib/markets/logic";
+import { assembleCorrelation, addDays, buildSessionCells, chosenSeries, eventStudyGate, eventStudyWindow, resolveSelection, returnsWindow, todayIso } from "@/lib/markets/logic";
 import {
   useCorporateActions,
   useCorrelationRows,
@@ -29,7 +29,8 @@ import {
   usePortfolioRisk,
   usePriceDiagnostics,
 } from "@/lib/markets/use-markets";
-import type { Parsed, PriceDiagnostic } from "@/lib/markets/types";
+import type { EventStudyGate } from "@/lib/markets/logic";
+import type { CorporateAction, Parsed, PriceDiagnostic, PriceHistory } from "@/lib/markets/types";
 
 const RETURN_WINDOWS = [
   { id: "30", label: "1M" },
@@ -48,6 +49,7 @@ export function MarketsView() {
   const holdings = usePortfolioHoldings();
   const [selected, setSelected] = useState<string | null>(null);
   const known = lastGood(holdings.state);
+  const shownTicker = known ? resolveSelection(selected, known.holdings.map((h) => h.ticker)) : null;
 
   return (
     <div className="flex flex-col gap-5">
@@ -57,7 +59,7 @@ export function MarketsView() {
         description="Defensible prices and returns: raw and adjusted figures kept apart, every corporate action sourced, and a gap on a real trading day told apart from a holiday."
         aside={
           known ? (
-            <HoldingSelect holdings={known.holdings.map((h) => ({ ticker: h.ticker, name: h.name }))} value={selected} onChange={setSelected} />
+            <HoldingSelect holdings={known.holdings.map((h) => ({ ticker: h.ticker, name: h.name }))} value={shownTicker} onChange={setSelected} />
           ) : null
         }
       />
@@ -67,12 +69,12 @@ export function MarketsView() {
           if (list.length === 0) {
             return <StatePlaceholder state="not_covered" reason="The latest portfolio snapshot has no open positions, so there is nothing to price. Sync the portfolio first." />;
           }
-          const current = list.find((h) => h.ticker === selected) ?? list[0];
+          const current = list.find((h) => h.ticker === shownTicker) ?? list[0];
           return (
             <>
               <HoldingSection key={current.ticker} ticker={current.ticker} name={current.name} />
               <CorrelationSection holdings={list.map((h) => ({ ticker: h.ticker, name: h.name }))} />
-              <CoverageSection onSelect={setSelected} />
+              <CoverageSection onSelect={setSelected} quotes={Object.fromEntries(list.map((h) => [h.ticker, h.instrument_currency]))} />
             </>
           );
         }}
@@ -111,17 +113,17 @@ function HoldingSection({ ticker, name }: { ticker: string; name: string | null 
   const diagnostics = usePriceDiagnostics(ticker);
   const actions = useCorporateActions(ticker);
   const listing = useHoldingListing(ticker);
-  const [windowId, setWindowId] = useState<(typeof RETURN_WINDOWS)[number]["id"]>("365");
-  const today = useMemo(() => todayIso(), []);
-  const returns = useHoldingReturns(ticker, addDays(today, -Number(windowId)), today);
+  // Bumped after an owner decision: the returns figures depend on the confirmed actions.
+  const [decisions, setDecisions] = useState(0);
 
   const diagRows: readonly PriceDiagnostic[] | null = lastGood(diagnostics.state);
   const actionList = parsedOr(lastGood(actions.state) ?? undefined);
   const actionsReason = actions.state.kind === "error" && !actions.state.previous ? actions.state.title : actions.state.kind === "loading" ? "still loading" : actionList.reason;
-  const returnsParsed = parsedOr(lastGood(returns.state) ?? undefined);
   const listingParsed = parsedOr(lastGood(listing.state) ?? undefined);
   const chosen = diagRows ? chosenSeries(diagRows) : null;
-  const mic = chosen?.mic ?? listingParsed.data?.listing?.mic ?? null;
+  // Only a confirmed listing may supply the venue; a suggested or rejected one is a guess.
+  const confirmedListing = listingParsed.data?.status === "confirmed" ? listingParsed.data.listing : null;
+  const mic = chosen?.mic ?? confirmedListing?.mic ?? null;
 
   return (
     <>
@@ -130,29 +132,7 @@ function HoldingSection({ ticker, name }: { ticker: string; name: string | null 
           <>
             <PriceChartPanel ticker={ticker} name={name} prices={p} diagnostics={diagRows} actions={actionList.data} actionsReason={actionsReason} />
             <div className="grid grid-cols-1 items-start gap-5 xl:grid-cols-2">
-              <ResourceGate state={returns.state} label="returns">
-                {(r) => (
-                  <ParsedGate parsed={r} label="returns">
-                    {(report) => (
-                      <ReturnsPanel
-                        report={report}
-                        windowControl={<Segmented label="Return window" value={windowId} onChange={setWindowId} options={RETURN_WINDOWS} />}
-                      />
-                    )}
-                  </ParsedGate>
-                )}
-              </ResourceGate>
-              <EventStudyPanel
-                ticker={ticker}
-                source={`${p.source}${p.symbol ? ` · ${p.symbol}` : ""}`}
-                bars={p.bars}
-                actions={actionList.data ?? []}
-                gate={eventStudyGate({
-                  hasAdjustedBars: p.bars.length > 0,
-                  returns: returnsParsed.data,
-                  actions: actionList.data ?? [],
-                })}
-              />
+              <ReturnsAndStudy ticker={ticker} prices={p} actions={actionList.data} refreshKey={decisions} />
             </div>
             {mic ? (
               <SessionSection ticker={ticker} mic={mic} barDates={p.bars.map((b) => b.date)} firstBar={p.bars[0]?.date ?? null} asOf={p.as_of} />
@@ -164,7 +144,7 @@ function HoldingSection({ ticker, name }: { ticker: string; name: string | null 
       </ResourceGate>
 
       <ResourceGate state={actions.state} label="corporate actions">
-        {(a) => <ParsedGate parsed={a} label="corporate-actions">{(list) => <ActionLedger ticker={ticker} actions={list} onChanged={actions.reload} />}</ParsedGate>}
+        {(a) => <ParsedGate parsed={a} label="corporate-actions">{(list) => <ActionLedger ticker={ticker} actions={list} onChanged={() => { actions.reload(); setDecisions((n) => n + 1); }} />}</ParsedGate>}
       </ResourceGate>
 
       <ResourceGate state={diagnostics.state} label="price diagnostics">
@@ -187,6 +167,39 @@ function HoldingSection({ ticker, name }: { ticker: string; name: string | null 
           />
         )}
       </ResourceGate>
+    </>
+  );
+}
+
+/**
+ * The Returns panel (user-chosen window) and the event study. The study's gate reads its own
+ * returns request spanning every bar it draws, so the Returns window control cannot open or close
+ * it. Both windows end on the last stored bar.
+ */
+function ReturnsAndStudy({ ticker, prices: p, actions, refreshKey }: { ticker: string; prices: PriceHistory; actions: CorporateAction[] | null; refreshKey: number }) {
+  const [windowId, setWindowId] = useState<(typeof RETURN_WINDOWS)[number]["id"]>("365");
+  const today = useMemo(() => todayIso(), []);
+  const win = returnsWindow(p.as_of, today, Number(windowId));
+  const returns = useHoldingReturns(ticker, win.start, win.end, refreshKey);
+  const span = eventStudyWindow(p.bars, p.as_of, today);
+  const study = useHoldingReturns(ticker, span.start, span.end, refreshKey);
+  const studyParsed = parsedOr(lastGood(study.state) ?? undefined);
+  const gate: EventStudyGate = (() => {
+    if (actions === null) return { allowed: false, reason: "The corporate-action ledger is not loaded, so the series cannot be judged reconciled." };
+    if (study.state.kind === "loading") return { allowed: false, reason: "Checking corporate-action coverage over the span the study draws…" };
+    if (study.state.kind === "error" && !studyParsed.data) return { allowed: false, reason: `Corporate-action coverage could not be read: ${study.state.title}.` };
+    return eventStudyGate({ hasAdjustedBars: p.bars.length > 0, returns: studyParsed.data, actions });
+  })();
+  return (
+    <>
+      <ResourceGate state={returns.state} label="returns">
+        {(r) => (
+          <ParsedGate parsed={r} label="returns">
+            {(report) => <ReturnsPanel report={report} windowControl={<Segmented label="Return window" value={windowId} onChange={setWindowId} options={RETURN_WINDOWS} />} />}
+          </ParsedGate>
+        )}
+      </ResourceGate>
+      <EventStudyPanel ticker={ticker} source={`${p.source}${p.symbol ? ` · ${p.symbol}` : ""}`} bars={p.bars} actions={actions ?? []} gate={gate} />
     </>
   );
 }
@@ -253,7 +266,7 @@ function CorrelationSection({ holdings }: { holdings: { ticker: string; name: st
   );
 }
 
-function CoverageSection({ onSelect }: { onSelect: (ticker: string) => void }) {
+function CoverageSection({ onSelect, quotes }: { onSelect: (ticker: string) => void; quotes: Record<string, string> }) {
   const prices = usePortfolioHoldingsPrices(30);
-  return <ResourceGate state={prices.state} label="portfolio prices">{(data) => <PortfolioCoveragePanel data={data} onSelect={onSelect} />}</ResourceGate>;
+  return <ResourceGate state={prices.state} label="portfolio prices">{(data) => <PortfolioCoveragePanel data={data} onSelect={onSelect} quotes={quotes} />}</ResourceGate>;
 }

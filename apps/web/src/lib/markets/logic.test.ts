@@ -19,6 +19,13 @@ import {
   sessionCounts,
   unexplainedJumps,
   weekdaysBetween,
+  daysBetween,
+  eventStudyWindow,
+  mapLimit,
+  parseEvidenceId,
+  resolveSelection,
+  returnsWindow,
+  todayIso,
 } from "./logic";
 import type { CorporateAction, HoldingPrices, PriceDiagnostic, ReturnsReport } from "./types";
 
@@ -313,5 +320,84 @@ describe("portfolio price coverage", () => {
     const c = portfolioPriceCoverage([h("A", "2026-10-02", 20), h("B", null, 0), h("C", "2026-09-20", 10)]);
     expect(c).toMatchObject({ total: 3, withBars: 2, withoutBars: ["B"], stale: ["C"], newestAsOf: "2026-10-02" });
     expect(portfolioPriceCoverage([])).toMatchObject({ total: 0, withBars: 0, newestAsOf: null });
+  });
+});
+
+describe("audit F3 regressions", () => {
+  it("todayIso is the UTC date whatever the viewer's timezone", () => {
+    // 23:30 UTC on 3 Oct is already 4 Oct in Auckland; the backend date is still 3 Oct.
+    expect(todayIso(new Date("2026-10-03T23:30:00Z"))).toBe("2026-10-03");
+    expect(todayIso(new Date("2026-10-04T00:30:00Z"))).toBe("2026-10-04");
+  });
+  it("the returns window ends on the last stored bar, not on a day without one", () => {
+    expect(returnsWindow("2026-10-02", "2026-10-06", 30)).toEqual({ start: "2026-09-02", end: "2026-10-02" });
+    expect(returnsWindow(null, "2026-10-06", 30).end).toBe("2026-10-06");
+    expect(returnsWindow("2026-10-09", "2026-10-06", 30).end).toBe("2026-10-06");
+  });
+  it("the event-study gate window spans the first bar and ignores the Returns control", () => {
+    const bars = [{ date: "2025-09-01" }, { date: "2026-10-02" }];
+    expect(eventStudyWindow(bars, "2026-10-02", "2026-10-06")).toEqual({ start: "2025-09-01", end: "2026-10-02" });
+  });
+  it("blocks the event study on a suggested merger or spin-off", () => {
+    const returns: ReturnsReport = {
+      ticker: "ABC", knownAsOf: null, reason: null,
+      result: {
+        symbol: "abc", source: "s", currency: "USD", mic: null,
+        priceReturn: { value: 0.1, reason: null }, rawPriceReturn: { value: null, reason: null }, totalReturn: { value: null, reason: null },
+        actionCoverage: "available", coverage: 1, expectedSessions: 1, observedSessions: 1, calendarBasis: null,
+        missingActions: { priceRaw: [], priceAdjusted: [], totalReturn: [] }, start: "2025-01-01", end: "2026-01-01",
+      },
+    };
+    expect(eventStudyGate({ hasAdjustedBars: true, returns, actions: [] })).toEqual({ allowed: true });
+    for (const type of ["merger", "spin_off"] as const) {
+      expect(eventStudyGate({ hasAdjustedBars: true, returns, actions: [action({ type, status: "suggested" })] }).allowed).toBe(false);
+    }
+    expect(eventStudyGate({ hasAdjustedBars: true, returns, actions: [action({ type: "merger", status: "rejected" })] }).allowed).toBe(true);
+  });
+  it("a weekend ex-date split explains the jump on the next session", () => {
+    const bars = [{ date: "2026-03-06", close: 100 }, { date: "2026-03-09", close: 40 }];
+    expect(unexplainedJumps(bars, [action({ exDate: "2026-03-08" })])).toEqual([]);
+    expect(unexplainedJumps(bars, [])).toHaveLength(1);
+    expect(unexplainedJumps(bars, [action({ exDate: "2026-03-08", status: "rejected" })])).toHaveLength(1);
+  });
+  it("validates evidence ids as plain digits", () => {
+    expect(parseEvidenceId("42")).toBe(42);
+    for (const bad of ["1e3", "0x10", "-1", "0", "", "1.5", " "]) expect(parseEvidenceId(bad)).toBeNull();
+  });
+  it("mapLimit never runs more than the cap at once and keeps order", async () => {
+    let live = 0;
+    let peak = 0;
+    const out = await mapLimit([1, 2, 3, 4, 5, 6, 7, 8, 9], 3, async (n) => {
+      live += 1;
+      peak = Math.max(peak, live);
+      await new Promise((r) => setTimeout(r, 2));
+      live -= 1;
+      return n * 2;
+    });
+    expect(peak).toBeLessThanOrEqual(3);
+    expect(out).toEqual([2, 4, 6, 8, 10, 12, 14, 16, 18]);
+    expect(await mapLimit([], 4, async (x) => x)).toEqual([]);
+  });
+  it("the selector falls back to the first holding when the selected one is gone", () => {
+    expect(resolveSelection("B", ["A", "B"])).toBe("B");
+    expect(resolveSelection("Z", ["A", "B"])).toBe("A");
+    expect(resolveSelection(null, [])).toBeNull();
+  });
+  it("a trailing session after the last bar is stale, not a gap; a confirmed weekend session is drawn", () => {
+    const start = "2026-10-02";
+    const end = "2026-10-07";
+    const cells = buildSessionCells({
+      mic: "XTST", start, end, today: "2026-10-08", sessions: [], calendar: { closures: [], suggestions: [] }, firstBar: "2026-09-01",
+      // Sat 2026-10-03 is a confirmed open session; the series stops on Mon 10-05.
+      expected: { mic: "XTST", start, end, count: 4, basis: "partial_confirmed_calendar", confirmedDays: 1, days: ["2026-10-02", "2026-10-03", "2026-10-05", "2026-10-06", "2026-10-07"] },
+      barDates: ["2026-10-02", "2026-10-05"],
+    });
+    const st = (d: string) => cells.find((c) => c.date === d)?.status;
+    expect(st("2026-10-06")).toBe("stale_session");
+    expect(st("2026-10-07")).toBe("stale_session");
+    expect(st("2026-10-03")).toBe("missing_bar"); // inside the history: a real gap
+    expect(st("2026-10-04")).toBeUndefined(); // an unexpected Sunday stays out
+    expect(sessionCounts(cells).missing_bar).toBe(1);
+    expect(daysBetween("2026-10-02", "2026-10-04")).toHaveLength(3);
   });
 });

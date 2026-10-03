@@ -1,14 +1,16 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import { AlertMessage } from "@/components/alert-message";
 import { Blueprint, PanelHeading } from "@/components/ui/blueprint";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { getBrowserApiClient } from "@/lib/api/client";
+import { errorMessage } from "@/lib/api/error-message";
 import { formatDay } from "@/lib/charts/time";
-import { describeAction } from "@/lib/markets/logic";
+import { describeAction, parseEvidenceId } from "@/lib/markets/logic";
+import { isExternalUrl } from "@/lib/sources/sources";
 import { ACTION_GLYPHS, ACTION_LABELS, type ActionStatus, type CorporateAction } from "@/lib/markets/types";
 import { cn } from "@/lib/utils";
 
@@ -32,7 +34,9 @@ export function ActionLedger({ ticker, actions, onChanged }: { ticker: string; a
     <Blueprint as="section" aria-labelledby="actions-ledger-heading" className="flex flex-col gap-3 px-5 py-5">
       <PanelHeading kicker="Corporate-action ledger" title={<span id="actions-ledger-heading">{ticker}: actions and their evidence</span>} />
       {actions.length === 0 ? (
-        <p className="text-sm text-text-muted">No corporate action is recorded for this holding. That is not evidence that none happened: coverage is verified separately (see the returns panel).</p>
+        <p className="text-sm text-text-muted">
+          No corporate action is recorded for this holding. That is not evidence that none happened: coverage is verified separately (see the returns panel).
+        </p>
       ) : (
         <ul className="m-0 flex list-none flex-col gap-2 p-0 text-sm">
           {actions.map((a) => (
@@ -51,7 +55,22 @@ function ActionRow({ ticker, action: a, onChanged }: { ticker: string; action: C
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const evidenceId = a.evidenceId ?? (evidence.trim() !== "" && Number.isInteger(Number(evidence)) && Number(evidence) > 0 ? Number(evidence) : null);
+  // What the owner just decided, shown until the re-read ledger reports a different status.
+  const [decided, setDecided] = useState<{
+    from: ActionStatus;
+    to: Decision;
+  } | null>(null);
+  const reasonRef = useRef<HTMLInputElement>(null);
+  const decisionsRef = useRef<HTMLDivElement>(null);
+  const wasPending = useRef(false);
+  // The decision buttons are replaced by the form (and back): keep keyboard focus on the control.
+  useEffect(() => {
+    if (pending !== null) reasonRef.current?.focus();
+    else if (wasPending.current) decisionsRef.current?.querySelector("button")?.focus();
+    wasPending.current = pending !== null;
+  }, [pending]);
+
+  const evidenceId = a.evidenceId ?? parseEvidenceId(evidence);
   const needsEvidence = pending === "confirmed" && evidenceId === null;
   const reasonOk = reason.trim().length >= 10;
 
@@ -62,13 +81,17 @@ function ActionRow({ ticker, action: a, onChanged }: { ticker: string; action: C
     try {
       const { response, error: apiError } = await getBrowserApiClient().POST("/holdings/{ticker}/corporate-actions/{action_id}/decision", {
         params: { path: { ticker, action_id: a.id } },
-        body: { decision: pending, reason: reason.trim(), evidence_id: a.evidenceId === null ? evidenceId : null },
+        body: {
+          decision: pending,
+          reason: reason.trim(),
+          evidence_id: a.evidenceId === null ? evidenceId : null,
+        },
       });
       if (!response.ok) {
-        const detail = apiError && typeof apiError === "object" && "detail" in apiError ? String(apiError.detail) : `HTTP ${response.status}`;
-        setError(detail);
+        setError(errorMessage(apiError, `HTTP ${response.status}`));
         return;
       }
+      setDecided({ from: a.status, to: pending });
       setPending(null);
       setReason("");
       onChanged?.();
@@ -79,8 +102,15 @@ function ActionRow({ ticker, action: a, onChanged }: { ticker: string; action: C
     }
   }
 
+  const inFlight = decided !== null && decided.from === a.status ? decided.to : null;
+  const status: ActionStatus = inFlight ?? a.status;
   const decisions: { id: Decision; label: string }[] =
-    a.status === "suggested" ? [{ id: "confirmed", label: "Confirm…" }, { id: "rejected", label: "Reject…" }] : [{ id: "suggested", label: "Return to review…" }];
+    a.status === "suggested"
+      ? [
+          { id: "confirmed", label: "Confirm…" },
+          { id: "rejected", label: "Reject…" },
+        ]
+      : [{ id: "suggested", label: "Return to review…" }];
 
   return (
     <li className="flex flex-col gap-1.5 border-b border-border-soft pb-2 last:border-0">
@@ -91,10 +121,14 @@ function ActionRow({ ticker, action: a, onChanged }: { ticker: string; action: C
         <span className="font-medium">{ACTION_LABELS[a.type]}</span>
         <span className="num text-text-muted">ex {formatDay(a.exDate)}</span>
         <span className="num">{describeAction(a) ?? "amount not recorded"}</span>
-        <span className={cn("text-xs", a.status === "confirmed" ? "text-text-muted" : "font-medium text-text")}>{STATUS_LABEL[a.status]}</span>
+        <span className={cn("text-xs", status === "confirmed" ? "text-text-muted" : "font-medium text-text")}>
+          {STATUS_LABEL[status]}
+          {inFlight ? " · saved, refreshing…" : ""}
+        </span>
       </div>
       <p className="m-0 min-w-0 text-xs text-text-muted">
-        Source {a.sourceUrl ? (
+        Source{" "}
+        {isExternalUrl(a.sourceUrl) ? (
           <a href={a.sourceUrl} target="_blank" rel="noreferrer noopener" className="break-all text-accent-ink hover:underline">
             {a.source}
             <span className="sr-only"> (opens in a new tab)</span>
@@ -109,12 +143,14 @@ function ActionRow({ ticker, action: a, onChanged }: { ticker: string; action: C
         {a.decidedAt && a.decisionReason ? ` · decided: ${a.decisionReason}` : ""}
       </p>
       {pending === null ? (
-        <div className="flex flex-wrap gap-2">
-          {decisions.map((d) => (
-            <Button key={d.id} variant="outline" size="sm" onClick={() => setPending(d.id)}>
-              {d.label}
-            </Button>
-          ))}
+        <div ref={decisionsRef} className="flex flex-wrap gap-2">
+          {inFlight
+            ? null
+            : decisions.map((d) => (
+                <Button key={d.id} variant="outline" size="sm" onClick={() => setPending(d.id)}>
+                  {d.label}
+                </Button>
+              ))}
         </div>
       ) : (
         <form
@@ -129,7 +165,7 @@ function ActionRow({ ticker, action: a, onChanged }: { ticker: string; action: C
           </p>
           <label className="flex flex-col gap-1 text-xs text-text-muted">
             Reason (at least 10 characters; stored with the decision)
-            <Input value={reason} onChange={(e) => setReason(e.target.value)} maxLength={2000} aria-invalid={reason !== "" && !reasonOk} />
+            <Input ref={reasonRef} value={reason} onChange={(e) => setReason(e.target.value)} maxLength={2000} aria-invalid={reason !== "" && !reasonOk} />
           </label>
           {pending === "confirmed" && a.evidenceId === null ? (
             <label className="flex flex-col gap-1 text-xs text-text-muted">
@@ -142,7 +178,16 @@ function ActionRow({ ticker, action: a, onChanged }: { ticker: string; action: C
             <Button type="submit" size="sm" disabled={busy || !reasonOk || needsEvidence}>
               {busy ? "Saving…" : "Save decision"}
             </Button>
-            <Button type="button" variant="ghost" size="sm" disabled={busy} onClick={() => { setPending(null); setError(null); }}>
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              disabled={busy}
+              onClick={() => {
+                setPending(null);
+                setError(null);
+              }}
+            >
               Cancel
             </Button>
           </div>

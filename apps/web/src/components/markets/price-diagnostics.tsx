@@ -68,7 +68,7 @@ export function PriceDiagnosticsPanel({
               <caption className="sr-only">Every stored price series of {ticker}</caption>
               <thead>
                 <tr className="border-b border-border text-[11px] tracking-[0.08em] text-text-muted uppercase">
-                  {["Source", "Symbol", "Bars", "Unit", "Last session", "Sessions", "Missing", "Differ >2%", "Access"].map((c, i) => (
+                  {["Source", "Symbol", "Bar type", "Unit", "Last session", "Sessions", "Missing", "Differ >2%", "Access"].map((c, i) => (
                     <th key={c} scope="col" className={i < 2 ? "px-2 py-1.5 text-left font-medium" : "px-2 py-1.5 text-right font-medium"}>
                       {c}
                     </th>

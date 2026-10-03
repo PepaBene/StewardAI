@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import { AlertMessage } from "@/components/alert-message";
 import { ChartFrame } from "@/components/data-state";
@@ -16,10 +16,28 @@ import type { HoldingsPrices } from "@/lib/markets/types";
  * stored bars in the window, how many, the latest close and its source. A holding with no bars
  * is named, never counted as flat. A confirmed action starts the price-history job.
  */
-export function PortfolioCoveragePanel({ data, onSelect }: { data: HoldingsPrices; onSelect?: (ticker: string) => void }) {
+export function PortfolioCoveragePanel({
+  data,
+  onSelect,
+  quotes,
+}: {
+  data: HoldingsPrices;
+  onSelect?: (ticker: string) => void;
+  /** Quote currency / unit per ticker (the instrument currency of the holding), when known. */
+  quotes?: Readonly<Record<string, string>>;
+}) {
   const cov = portfolioPriceCoverage(data.holdings);
   const [armed, setArmed] = useState(false);
   const [busy, setBusy] = useState(false);
+  const triggerRef = useRef<HTMLButtonElement>(null);
+  const confirmRef = useRef<HTMLButtonElement>(null);
+  const wasArmed = useRef(false);
+  // The trigger is replaced by the confirm button (and back): keep keyboard focus on the control.
+  useEffect(() => {
+    if (armed) confirmRef.current?.focus();
+    else if (wasArmed.current) triggerRef.current?.focus();
+    wasArmed.current = armed;
+  }, [armed]);
   const [message, setMessage] = useState<{ ok: boolean; text: string } | null>(null);
 
   async function run() {
@@ -54,7 +72,7 @@ export function PortfolioCoveragePanel({ data, onSelect }: { data: HoldingsPrice
         armed ? (
           <>
             <span className="text-xs text-text-muted">Collect price and FX history now?</span>
-            <Button size="sm" disabled={busy} onClick={() => void run()}>
+            <Button ref={confirmRef} size="sm" disabled={busy} onClick={() => void run()}>
               {busy ? "Queuing…" : "Yes, run job"}
             </Button>
             <Button size="sm" variant="ghost" disabled={busy} onClick={() => setArmed(false)}>
@@ -62,7 +80,7 @@ export function PortfolioCoveragePanel({ data, onSelect }: { data: HoldingsPrice
             </Button>
           </>
         ) : (
-          <Button size="sm" variant="outline" onClick={() => setArmed(true)}>
+          <Button ref={triggerRef} size="sm" variant="outline" onClick={() => setArmed(true)}>
             Refresh price history…
           </Button>
         )
@@ -77,14 +95,14 @@ export function PortfolioCoveragePanel({ data, onSelect }: { data: HoldingsPrice
       }}
       table={{
         caption: "Stored prices per holding",
-        columns: ["Holding", "Source", "Bars", "Last close", "As of", "Day change"],
+        columns: ["Holding", "Source", "Bars", "Last close (quote unit)", "As of", "Day change"],
         rows: data.holdings.map((h) => [
           h.ticker,
           h.source ?? "none",
           h.bars.length,
-          h.last_close === null ? "none" : h.last_close.toLocaleString("en-US", { maximumFractionDigits: 2 }),
+          h.last_close === null ? "none" : `${h.last_close.toLocaleString("en-US", { maximumFractionDigits: 2 })} ${quotes?.[h.ticker] ?? "(unit not reported)"}`,
           h.as_of ? formatDay(h.as_of) : "none",
-          h.day_change_pct === null ? "n/a" : formatPct(h.day_change_pct / 100, 2, true),
+          h.day_change_pct === null ? "n/a" : formatPct(h.day_change_pct, 2, true),
         ]),
       }}
     >

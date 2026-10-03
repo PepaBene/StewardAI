@@ -141,6 +141,7 @@ export type SessionStatus =
   | "national_holiday_open"
   | "exchange_closure"
   | "missing_bar"
+  | "stale_session"
   | "upcoming"
   | "before_history";
 

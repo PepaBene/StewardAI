@@ -187,13 +187,68 @@ describe("correlation and portfolio coverage", () => {
     const data: HoldingsPrices = {
       days: 30,
       holdings: [
-        { ticker: "A", name: null, symbol: "a.us", source: "Stooq", as_of: "2026-10-02", last_close: 10, previous_close: 9, day_change_pct: 11.1, bars },
+        { ticker: "A", name: null, symbol: "a.us", source: "Stooq", as_of: "2026-10-02", last_close: 10, previous_close: 9, day_change_pct: 0.111, bars },
         { ticker: "B", name: null, symbol: null, source: null, as_of: null, last_close: null, previous_close: null, day_change_pct: null, bars: [] },
       ],
     };
     const out = html(createElement(PortfolioCoveragePanel, { data }));
     expect(out).toContain("No stored bars");
     expect(out).toContain("1 of 2 holdings");
+    // The backend sends a fraction: 0.111 is +11.1 %, not +0.11 %.
+    expect(out).toContain("+11.10%");
+    expect(out).not.toContain("+0.11%");
+    // Last close carries its quote unit; unknown stays honest.
+    const withQuote = html(createElement(PortfolioCoveragePanel, { data, quotes: { A: "GBX" } }));
+    expect(withQuote).toContain("10 GBX");
+    expect(out).toContain("(unit not reported)");
     expect(html(createElement(PortfolioCoveragePanel, { data: { days: 30, holdings: [] } }))).toContain("Not covered");
+  });
+});
+
+describe("audit F3 regressions", () => {
+  it("labels the correlation scale -1..+1, not percent", () => {
+    const grid = assembleCorrelation([
+      { ticker: "A", correlations: [{ ticker: "B", correlation: 0.7 }] },
+      { ticker: "B", correlations: [{ ticker: "A", correlation: 0.7 }] },
+    ]);
+    const out = html(createElement(CorrelationPanel, { grid, names: {}, asOf: null, source: null, failed: [], risk: null }));
+    expect(out).not.toContain("−100%");
+    expect(out).not.toContain("+100%");
+    expect(out).toContain('<span class="num">−1</span>');
+    expect(out).toContain('<span class="num">+1</span>');
+  });
+  it("gives the raw price return the backend's price_raw reason, not 'No reason given'", () => {
+    const base: ReturnsReport = {
+      ticker: "ABC",
+      knownAsOf: "2026-10-03",
+      reason: null,
+      result: {
+        symbol: "abc.us", source: "stooq", currency: "USD", mic: "XNAS",
+        priceReturn: { value: 0.1, reason: null },
+        rawPriceReturn: { value: null, reason: "no raw bars stored for abc.us" },
+        totalReturn: { value: null, reason: "split not valued" },
+        actionCoverage: "available", coverage: 1, expectedSessions: 10, observedSessions: 10, calendarBasis: null,
+        missingActions: { priceRaw: [], priceAdjusted: [], totalReturn: [] }, start: "2026-09-01", end: "2026-10-03",
+      },
+    };
+    const out = html(createElement(ReturnsPanel, { report: base }));
+    expect(out).toContain("no raw bars stored for abc.us");
+    expect(out).not.toContain("No reason given by the backend");
+  });
+  it("ignores a javascript: source URL in the action ledger", () => {
+    const out = html(createElement(ActionLedger, { ticker: "ABC", actions: [{ ...action, sourceUrl: "javascript:alert(1)" }] }));
+    expect(out).not.toContain("javascript:");
+  });
+  it("draws a stale (not collected yet) session distinctly from a missing bar", () => {
+    const days = ["2026-09-28", "2026-09-29", "2026-09-30"];
+    const cells = buildSessionCells({
+      mic: "XNAS", start: "2026-09-28", end: "2026-09-30", today: "2026-10-05",
+      expected: { mic: "XNAS", start: "2026-09-28", end: "2026-09-30", count: 3, basis: "confirmed_calendar", confirmedDays: 3, days },
+      sessions: [], calendar: { closures: [], suggestions: [] }, barDates: ["2026-09-28"], firstBar: "2026-09-01",
+    });
+    const out = html(createElement(SessionStrip, { ticker: "ABC", mic: "XNAS", cells, basis: "confirmed_calendar", confirmedDays: 3, suggestionsNote: "n", asOf: "2026-09-28" }));
+    expect(out).toContain("Not collected yet");
+    expect(out).not.toContain("without a bar (");
+    expect(out).toContain("1 of 1 expected sessions held");
   });
 });

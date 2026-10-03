@@ -7,7 +7,7 @@ import { formatDay } from "@/lib/charts/time";
 import type { ReturnFigure, ReturnsReport } from "@/lib/markets/types";
 import type { DataState } from "@/lib/data-state/states";
 
-function Row({ label, basis, fig, note }: { label: string; basis: string; fig: ReturnFigure; note?: string }) {
+function Row({ label, basis, fig, note, missing = [], fallback }: { label: string; basis: string; fig: ReturnFigure; note?: string; missing?: readonly string[]; fallback: string }) {
   return (
     <tr className="border-b border-border-soft last:border-0 align-top">
       <th scope="row" className="py-2 pr-3 text-left font-normal">
@@ -15,7 +15,16 @@ function Row({ label, basis, fig, note }: { label: string; basis: string; fig: R
         <span className="block text-xs text-text-muted">{basis}</span>
       </th>
       <td className="num py-2 pr-3 text-right text-lg">{fig.value === null ? "unavailable" : formatPct(fig.value, 2, true)}</td>
-      <td className="py-2 text-xs text-text-muted">{fig.value === null ? (fig.reason ?? "No reason given by the backend.") : (note ?? "")}</td>
+      <td className="py-2 text-xs text-text-muted">
+        {fig.value === null ? (fig.reason ?? fallback) : (note ?? "")}
+        {fig.value !== null && missing.length > 0 ? (
+          <ul className="m-0 mt-1 flex list-none flex-col gap-0.5 border-l-[3px] border-l-warning-signal bg-warning-signal-subtle p-0 px-2 py-1 text-text">
+            {missing.map((m) => (
+              <li key={m}>{m}</li>
+            ))}
+          </ul>
+        ) : null}
+      </td>
     </tr>
   );
 }
@@ -56,19 +65,12 @@ export function ReturnsPanel({ report, windowControl }: { report: ReturnsReport;
                 </tr>
               </thead>
               <tbody>
-                <Row label="Raw price return" basis="Closes as stored, no action applied" fig={r.rawPriceReturn} note="A split in the window shows as a fall here." />
-                <Row label="Adjusted price return" basis="Adjusted closes (served series)" fig={r.priceReturn} />
-                <Row label="Total return" basis="Raw closes + confirmed actions, dividends reinvested" fig={r.totalReturn} />
+                <Row label="Raw price return" basis="Closes as stored, no action applied" fig={r.rawPriceReturn} note="A split in the window shows as a fall here." missing={r.missingActions.priceRaw} fallback="No raw (unadjusted) closes are stored: the price endpoint serves adjusted bars only, so this basis is usually unavailable. The backend gave no further reason." />
+                <Row label="Adjusted price return" basis="Adjusted closes (served series)" fig={r.priceReturn} missing={r.missingActions.priceAdjusted} fallback="The backend gave no reason." />
+                <Row label="Total return" basis="Raw closes + confirmed actions, dividends reinvested" fig={r.totalReturn} missing={r.missingActions.totalReturn} fallback="The backend gave no reason." />
               </tbody>
             </table>
           </div>
-          {r.missingActions.totalReturn.length + r.missingActions.priceAdjusted.length + r.missingActions.priceRaw.length > 0 ? (
-            <ul className="m-0 flex list-none flex-col gap-1 border-l-[3px] border-l-warning-signal bg-warning-signal-subtle p-0 px-3 py-1.5 text-sm">
-              {[...new Set([...r.missingActions.priceRaw, ...r.missingActions.priceAdjusted, ...r.missingActions.totalReturn])].map((m) => (
-                <li key={m}>{m}</li>
-              ))}
-            </ul>
-          ) : null}
           <p className="m-0 text-xs text-text-muted">
             Corporate-action coverage: {r.actionCoverage === "available" ? "verified by the owner through the window end" : "not verified through the window end, so total return is withheld"}. Calendar basis: {r.calendarBasis ?? "not reported"}.
           </p>

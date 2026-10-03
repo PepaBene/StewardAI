@@ -27,11 +27,61 @@ export function addDays(iso: string, days: number): string {
   return new Date(toMs(iso) + days * DAY_MS).toISOString().slice(0, 10);
 }
 
-/** The local calendar date as YYYY-MM-DD (the user's "today", used for windows). */
+/**
+ * Today's UTC calendar date as YYYY-MM-DD. The backend dates everything in UTC / exchange dates,
+ * so a viewer ahead of UTC must not send a date that does not exist yet for the backend.
+ */
 export function todayIso(now: Date = new Date()): string {
-  const m = String(now.getMonth() + 1).padStart(2, "0");
-  const d = String(now.getDate()).padStart(2, "0");
-  return `${now.getFullYear()}-${m}-${d}`;
+  return now.toISOString().slice(0, 10);
+}
+
+/**
+ * Window of a returns request. It ends on the last stored bar (else today's UTC date), never on
+ * the viewer's local date: a window ending on a day with no bar yet reads as incomplete coverage.
+ */
+export function returnsWindow(asOf: string | null, today: string, days: number): { start: string; end: string } {
+  const end = asOf && asOf <= today ? asOf : today;
+  return { start: addDays(end, -days), end };
+}
+
+/** Window the event-study gate is judged on: from the first bar the study draws to the last, independent of the Returns control. */
+export function eventStudyWindow(bars: readonly { date: string }[], asOf: string | null, today: string): { start: string; end: string } {
+  const { end } = returnsWindow(asOf, today, 0);
+  return { start: bars[0]?.date ?? addDays(end, -400), end };
+}
+
+/** The ticker the selector shows: the chosen one while it is still held, else the first holding. */
+export function resolveSelection(selected: string | null, tickers: readonly string[]): string | null {
+  return selected !== null && tickers.includes(selected) ? selected : (tickers[0] ?? null);
+}
+
+/** Runs `fn` over `items` with at most `limit` calls in flight; results keep the input order. */
+export async function mapLimit<T, R>(items: readonly T[], limit: number, fn: (item: T) => Promise<R>): Promise<R[]> {
+  const out: R[] = new Array(items.length);
+  let next = 0;
+  const worker = async () => {
+    while (next < items.length) {
+      const i = next++;
+      out[i] = await fn(items[i]);
+    }
+  };
+  await Promise.all(Array.from({ length: Math.max(1, Math.min(limit, items.length)) }, worker));
+  return out;
+}
+
+/** A positive integer evidence id typed by the owner; "1e3", "0x10", "-1" and "" are not ids. */
+export function parseEvidenceId(text: string): number | null {
+  const t = text.trim();
+  if (!/^\d+$/.test(t)) return null;
+  const n = Number(t);
+  return Number.isSafeInteger(n) && n > 0 ? n : null;
+}
+
+/** Every date in [start, end], inclusive. */
+export function daysBetween(start: string, end: string): string[] {
+  const out: string[] = [];
+  for (let t = toMs(start); t <= toMs(end); t += DAY_MS) out.push(new Date(t).toISOString().slice(0, 10));
+  return out;
 }
 
 /** Monday-to-Friday dates in [start, end], inclusive. */
@@ -138,7 +188,12 @@ export function unexplainedJumps(
   actions: readonly CorporateAction[],
   threshold = 0.3,
 ): { date: string; change: number }[] {
-  const explained = new Set(actions.filter((a) => a.status !== "rejected").map((a) => a.exDate));
+  // A jump is explained by the bar the marker is drawn on: an ex-date that is not itself a bar
+  // (weekend, holiday) is placed at the next session, exactly where the step appears.
+  const explained = new Set<string>();
+  for (const p of placeActions(bars, actions.filter((a) => a.status !== "rejected"))) {
+    if (p.index !== null && p.index >= 0) explained.add(bars[p.index].date);
+  }
   const out: { date: string; change: number }[] = [];
   for (let i = 1; i < bars.length; i++) {
     const prev = bars[i - 1].close;
@@ -197,7 +252,9 @@ export type EventStudyGate = { allowed: true } | { allowed: false; reason: strin
 /**
  * An event study is shown only where the backend says the adjusted series is reconciled: the
  * owner verified corporate-action coverage through the window end (`action_coverage`), the
- * adjusted return has no missing-action flag, and no split is left unconfirmed. Otherwise a split
+ * adjusted return has no missing-action flag, and no split, merger or spin-off is left unconfirmed.
+ * `returns` must come from a window that spans every bar the study draws, never from the Returns
+ * panel's user-selected window. Otherwise a split
  * would read as a -75% "event reaction" and the reason replaces the panel.
  */
 export function eventStudyGate(input: { hasAdjustedBars: boolean; returns: ReturnsReport | null; actions: readonly CorporateAction[] }): EventStudyGate {
@@ -208,8 +265,8 @@ export function eventStudyGate(input: { hasAdjustedBars: boolean; returns: Retur
     return { allowed: false, reason: "Corporate-action coverage is not verified through the window end, so the adjusted series is not reconciled." };
   }
   if (r.missingActions.priceAdjusted.length > 0) return { allowed: false, reason: `The backend flags the adjusted series: ${r.missingActions.priceAdjusted.join("; ")}.` };
-  const open = input.actions.filter((a) => (a.type === "split" || a.type === "stock_dividend") && (a.status === "suggested" || a.status === "disputed"));
-  if (open.length > 0) return { allowed: false, reason: `${open.length} split or stock dividend ${open.length === 1 ? "is" : "are"} unconfirmed: the adjustment cannot be trusted yet.` };
+  const open = input.actions.filter((a) => (a.type === "split" || a.type === "stock_dividend" || a.type === "merger" || a.type === "spin_off") && (a.status === "suggested" || a.status === "disputed"));
+  if (open.length > 0) return { allowed: false, reason: `${open.length} split, stock dividend, merger or spin-off ${open.length === 1 ? "is" : "are"} unconfirmed: the adjustment cannot be trusted yet.` };
   return { allowed: true };
 }
 
@@ -330,7 +387,13 @@ export function buildSessionCells(i: SessionInputs): SessionCell[] {
     const prev = rowFor.get(r.sessionDate);
     if (!prev || (r.confirmed && !prev.confirmed)) rowFor.set(r.sessionDate, r);
   }
-  return weekdaysBetween(i.start, i.end).map((date): SessionCell => {
+  const lastBar = [...have].reduce<string | null>((m, d) => (m === null || d > m ? d : m), null);
+  // Weekdays, plus any weekend day the backend expects (a confirmed `open` row).
+  const dates = daysBetween(i.start, i.end).filter((d) => {
+    const dow = new Date(`${d}T00:00:00Z`).getUTCDay();
+    return (dow !== 0 && dow !== 6) || expected.has(d);
+  });
+  return dates.map((date): SessionCell => {
     const row = rowFor.get(date);
     const holiday = closed.get(date);
     if (!expected.has(date)) {
@@ -346,6 +409,9 @@ export function buildSessionCells(i: SessionInputs): SessionCell[] {
     if (date > i.today || (date === i.today && !have.has(date))) return { date, status: "upcoming", note: null };
     const nat = national.get(date);
     if (!have.has(date)) {
+      // Past the last stored bar the series is behind (job lag), which the backend reports as
+      // stale sessions, not as missing days between the first and last bar.
+      if (lastBar !== null && date > lastBar) return { date, status: "stale_session", note: "After the last stored bar: not collected yet" };
       return { date, status: "missing_bar", note: nat ? `${nat} is a national holiday, but the exchange is expected open: still a gap` : "Venue expected open, no bar held" };
     }
     if (row?.state === "half_day") return { date, status: "half_day", note: row.reason };
@@ -361,6 +427,7 @@ export function sessionCounts(cells: readonly SessionCell[]): Record<SessionStat
     national_holiday_open: 0,
     exchange_closure: 0,
     missing_bar: 0,
+    stale_session: 0,
     upcoming: 0,
     before_history: 0,
   };

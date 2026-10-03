@@ -30,12 +30,18 @@ const STATUS: Record<SessionStatus, StatusStyle> = {
     cell: "bg-accent-200 border border-text-muted",
     description: "A national holiday suggestion falls on this date but the exchange is expected open and a bar is held.",
   },
-  missing_bar: { label: "Missing bar", glyph: "!", cell: "bg-surface border-2 border-loss text-loss", description: "The exchange was expected open and no bar is held: a genuine gap." },
-  upcoming: { label: "Upcoming", glyph: "·", cell: "bg-surface border border-dashed border-border text-text-faint", description: "Not yet complete; not counted." },
-  before_history: { label: "Before stored history", glyph: "–", cell: "bg-surface-muted text-text-faint", description: "Earlier than the first stored bar; not counted as missing." },
+  missing_bar: { label: "Missing bar", glyph: "!", cell: "bg-surface border-2 border-loss text-text", description: "The exchange was expected open and no bar is held: a genuine gap." },
+  stale_session: {
+    label: "Not collected yet",
+    glyph: "?",
+    cell: "bg-surface border-2 border-dashed border-warning-signal text-text",
+    description: "An expected session after the last stored bar (the price job is behind). Not counted as a gap inside the history.",
+  },
+  upcoming: { label: "Upcoming", glyph: "·", cell: "bg-surface border border-dashed border-border text-text-muted", description: "Not yet complete; not counted." },
+  before_history: { label: "Before stored history", glyph: "–", cell: "bg-surface-muted text-text-muted", description: "Earlier than the first stored bar; not counted as missing." },
 };
 
-const ORDER: SessionStatus[] = ["trading", "half_day", "national_holiday_open", "exchange_holiday", "exchange_closure", "missing_bar", "upcoming", "before_history"];
+const ORDER: SessionStatus[] = ["trading", "half_day", "national_holiday_open", "exchange_holiday", "exchange_closure", "missing_bar", "stale_session", "upcoming", "before_history"];
 
 const BASIS_TEXT: Record<string, string> = {
   confirmed_calendar: "every weekday has a confirmed exchange record",
@@ -69,6 +75,7 @@ export function SessionStrip({
   const counts = sessionCounts(cells);
   const { held, expected, share } = sessionCompleteness(cells);
   const missing = cells.filter((c) => c.status === "missing_bar");
+  const trailing = counts.stale_session;
   const closed = counts.exchange_holiday + counts.exchange_closure;
   const weeks: SessionCell[][] = [];
   for (const c of cells) {
@@ -76,7 +83,7 @@ export function SessionStrip({
     if (weeks.length === 0 || dow === 1) weeks.push([]);
     weeks[weeks.length - 1].push(c);
   }
-  const state: DataState = expected === 0 ? "not_covered" : missing.length > 0 ? "partial" : basis === "weekdays_minus_configured_closures" ? "partial" : "verified";
+  const state: DataState = expected === 0 ? "not_covered" : missing.length > 0 ? "partial" : trailing > 0 ? "stale" : basis === "weekdays_minus_configured_closures" ? "partial" : "verified";
 
   return (
     <ChartFrame
@@ -88,9 +95,11 @@ export function SessionStrip({
           ? "No past expected session falls inside the stored history in this window."
           : missing.length > 0
             ? `${missing.length} expected session${missing.length === 1 ? "" : "s"} without a bar (${missing.slice(0, 6).map((m) => formatDay(m.date)).join(", ")}${missing.length > 6 ? ", …" : ""}); ${closed} closed day${closed === 1 ? "" : "s"} explained by the exchange calendar.`
-            : `Every expected session in the window has a bar; ${closed} closed day${closed === 1 ? "" : "s"} explained by the exchange calendar.`
+            : trailing > 0
+              ? `No gap inside the stored history, but the last ${trailing} expected session${trailing === 1 ? "" : "s"} ${trailing === 1 ? "has" : "have"} no bar yet (the series is behind); ${closed} closed day${closed === 1 ? "" : "s"} explained by the exchange calendar.`
+              : `Every expected session in the window has a bar; ${closed} closed day${closed === 1 ? "" : "s"} explained by the exchange calendar.`
       }
-      units={`Weekdays ${cells[0] ? formatDay(cells[0].date) : ""} to ${cells.length ? formatDay(cells[cells.length - 1].date) : ""} · ${held} of ${expected} expected sessions held${share === null ? "" : ` (${formatPct(share, 1)})`}`}
+      units={`Sessions ${cells[0] ? formatDay(cells[0].date) : ""} to ${cells.length ? formatDay(cells[cells.length - 1].date) : ""} · ${held} of ${expected} expected sessions held${share === null ? "" : ` (${formatPct(share, 1)})`}`}
       hasValue={cells.length > 0}
       provenance={{
         source: `Exchange calendar ${mic} (GET /exchange-sessions/${mic} and /expected) · closures from /calendar/exchanges`,
@@ -102,7 +111,9 @@ export function SessionStrip({
             ? "No confirmed exchange records cover this window, so an unconfirmed holiday would show here as a missing bar."
             : missing.length > 0
               ? `${missing.length} expected session${missing.length === 1 ? "" : "s"} without a bar.`
-              : null,
+              : trailing > 0
+                ? `${trailing} expected session${trailing === 1 ? "" : "s"} after the last stored bar.`
+                : null,
         coverage: expected > 0 ? { covered: held, total: expected, unit: "expected sessions" } : null,
       }}
       table={{
@@ -115,7 +126,7 @@ export function SessionStrip({
         <ol className="m-0 flex list-none gap-1.5 p-0" aria-label={`${mic} weekly session strip`}>
           {weeks.map((w) => (
             <li key={w[0].date} className="flex flex-col gap-0.5">
-              <span className="num text-center text-[10px] text-text-faint">{formatDay(w[0].date).slice(0, 6)}</span>
+              <span className="num text-center text-[10px] text-text-muted">{formatDay(w[0].date).slice(0, 6)}</span>
               <ul className="m-0 flex list-none gap-0.5 p-0">
                 {w.map((c) => {
                   const s = STATUS[c.status];

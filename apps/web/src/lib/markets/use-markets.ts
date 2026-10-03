@@ -12,7 +12,7 @@ import {
   parseListing,
   parseReturns,
 } from "./parse";
-import type { CorrelationRow } from "./logic";
+import { mapLimit, type CorrelationRow } from "./logic";
 import type { Parsed } from "./types";
 
 /*
@@ -48,10 +48,12 @@ export function useCorporateActions(ticker: string) {
   return useApiResource(fetcher);
 }
 
-export function useHoldingReturns(ticker: string, start: string, end: string) {
+/** `refreshKey` is bumped after an owner decision so the figures are re-read (it only keys the fetcher). */
+export function useHoldingReturns(ticker: string, start: string, end: string, refreshKey = 0) {
   const fetcher = useCallback(
     () => parsed(api().GET("/holdings/{ticker}/returns", { params: { path: { ticker }, query: { start, end } } }), parseReturns),
-    [ticker, start, end],
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- refreshKey is deliberately part of the query identity
+    [ticker, start, end, refreshKey],
   );
   return useApiResource(fetcher);
 }
@@ -92,6 +94,8 @@ export function usePortfolioRisk(days: number) {
   return useApiResource(fetcher);
 }
 
+const CORRELATION_CONCURRENCY = 4;
+
 export type CorrelationLoad = { rows: CorrelationRow[]; failed: string[]; asOf: string | null; source: string | null };
 
 /**
@@ -105,15 +109,14 @@ export function useCorrelationRows(tickers: readonly string[]) {
   const list = useCallback(() => tickers, [key]);
   const fetcher = useCallback(async (): Promise<ApiResult<CorrelationLoad>> => {
     const names = list();
-    const results = await Promise.all(
-      names.map(async (ticker) => {
-        try {
-          return { ticker, r: await api().GET("/holdings/{ticker}/prices", { params: { path: { ticker }, query: { days: 365 } } }) };
-        } catch {
-          return { ticker, r: null };
-        }
-      }),
-    );
+    // Each response makes the backend load every other holding's series, so the fan-out is capped.
+    const results = await mapLimit(names, CORRELATION_CONCURRENCY, async (ticker) => {
+      try {
+        return { ticker, r: await api().GET("/holdings/{ticker}/prices", { params: { path: { ticker }, query: { days: 365 } } }) };
+      } catch {
+        return { ticker, r: null };
+      }
+    });
     const good = results.filter((x) => x.r && x.r.response.ok && x.r.data !== undefined);
     if (good.length === 0) {
       const first = results.find((x) => x.r)?.r;

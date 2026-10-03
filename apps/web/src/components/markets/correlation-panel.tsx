@@ -1,6 +1,6 @@
-import { Heatmap } from "@/components/charts";
+import { Heatmap, HeatScale } from "@/components/charts";
 import { ChartFrame } from "@/components/data-state";
-import { formatNumber, formatPct } from "@/lib/charts/format";
+import { formatNumber, formatPct, formatSigned } from "@/lib/charts/format";
 import { formatDay } from "@/lib/charts/time";
 import { clusterOrder, type CorrelationGrid } from "@/lib/markets/logic";
 import type { PortfolioRisk } from "@/lib/markets/types";
@@ -83,7 +83,9 @@ export function CorrelationPanel({
         rows: tickers.flatMap((a, i) => tickers.slice(i + 1).map((b, k) => [`${label(a)} / ${label(b)}`, matrix[i][i + 1 + k] === null ? "no backend value" : formatNumber(matrix[i][i + 1 + k]!, 2)])),
       }}
     >
-      <Heatmap rows={tickers.map((t, i) => ({ label: t, cells: matrix[i] }))} columns={tickers} columnNames={tickers.map(label)} cap={1} formatCell={(v) => formatNumber(v, 2)} caption="Correlation matrix, clustered" />
+      {/* The default scale key prints percent ("-100% to +100%"); a correlation runs -1 to +1. */}
+      <HeatScale cap={1} format={(v) => formatSigned(v, 0)} className="self-end" />
+      <Heatmap rows={tickers.map((t, i) => ({ label: t, cells: matrix[i] }))} columns={tickers} columnNames={tickers.map(label)} cap={1} formatCell={(v) => formatNumber(v, 2)} scale={false} caption="Correlation matrix, clustered" />
       {risk ? (
         <p className="m-0 text-xs text-text-muted">
           Portfolio context (GET /portfolio/risk, {risk.days} days

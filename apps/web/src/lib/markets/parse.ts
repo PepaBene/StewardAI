@@ -106,6 +106,10 @@ function figure(value: unknown, reason: unknown): ReturnFigure {
   return { value: asNumber(value), reason: asString(reason) };
 }
 
+function joined(list: readonly string[]): string | null {
+  return list.length > 0 ? list.join("; ") : null;
+}
+
 function stringList(v: unknown): string[] {
   return Array.isArray(v) ? v.filter((x): x is string => typeof x === "string") : [];
 }
@@ -126,14 +130,17 @@ export function parseReturns(body: unknown): Parsed<ReturnsReport> {
   const cov = r.action_coverage;
   if (cov !== "available" && cov !== "incomplete") return fail("returns: unknown action_coverage");
   const missing = isRec(r.missing_actions) ? r.missing_actions : {};
+  const missingLists = { price_raw: stringList(missing.price_raw), price_adjusted: stringList(missing.price_adjusted), total_return: stringList(missing.total_return) };
   const result: ReturnsResult = {
     symbol,
     source,
     currency: asString(r.currency),
     mic: asString(r.mic),
-    priceReturn: figure(r.price_return, r.price_return_reason),
-    rawPriceReturn: figure(r.raw_price_return, null),
-    totalReturn: figure(r.total_return, r.total_return_reason),
+    // The route returns a reason only for adjusted and total return; the raw return's reason is
+    // the backend's `missing_actions.price_raw` list.
+    priceReturn: figure(r.price_return, asString(r.price_return_reason) ?? joined(missingLists.price_adjusted)),
+    rawPriceReturn: figure(r.raw_price_return, asString(r.raw_price_return_reason) ?? joined(missingLists.price_raw)),
+    totalReturn: figure(r.total_return, asString(r.total_return_reason) ?? joined(missingLists.total_return)),
     actionCoverage: cov,
     coverage: asNumber(r.coverage),
     expectedSessions: asNumber(r.expected_sessions),

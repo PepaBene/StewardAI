@@ -122,14 +122,18 @@ export function PriceChartPanel({
             <line x1={0} x2={WIDTH - CANDLE_RIGHT} y1={4} y2={4} className="stroke-border" strokeWidth={1} />
             {visible.map((p) => {
               const cx = band.x(p.index!) + band.bandwidth / 2;
+              // Markers on the same bar sit side by side, and none is clipped at the lane's edges.
+              const sameBar = visible.filter((q) => q.index === p.index);
+              const slot = sameBar.indexOf(p) - (sameBar.length - 1) / 2;
+              const bx = Math.min(Math.max(cx + slot * 18, 9), WIDTH - CANDLE_RIGHT - 9);
               const confirmed = p.action.status === "confirmed";
               return (
                 <g key={p.action.id}>
-                  <line x1={cx} x2={cx} y1={4} y2={11} className="stroke-text" strokeWidth={1} />
-                  <rect x={cx - 8} y={11} width={16} height={16} className={cn("fill-surface-raised", confirmed ? "stroke-text" : "stroke-text-muted")} strokeWidth={1.25} strokeDasharray={confirmed ? undefined : "2 2"}>
+                  <line x1={cx} x2={bx} y1={4} y2={11} className="stroke-text" strokeWidth={1} />
+                  <rect x={bx - 8} y={11} width={16} height={16} className={cn("fill-surface-raised", confirmed ? "stroke-text" : "stroke-text-muted")} strokeWidth={1.25} strokeDasharray={confirmed ? undefined : "2 2"}>
                     <title>{`${ACTION_LABELS[p.action.type]} · ex ${formatDay(p.action.exDate)}${p.shifted ? " (non-session date: drawn at the next session)" : ""} · ${describeAction(p.action) ?? "amount not recorded"} · ${p.action.status} · ${p.action.source}`}</title>
                   </rect>
-                  <text x={cx} y={23} textAnchor="middle" fontSize={11} className="fill-text font-mono font-semibold">
+                  <text x={bx} y={23} textAnchor="middle" fontSize={11} className="fill-text font-mono font-semibold">
                     {ACTION_GLYPHS[p.action.type]}
                   </text>
                 </g>
