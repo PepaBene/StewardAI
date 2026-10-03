@@ -27,8 +27,13 @@ export function toNumber(value: unknown): number | null {
 
 const ENTITY_KINDS: readonly EntityKind[] = ["security", "geography", "other"];
 
-/** `GET /data/coverage` row -> CoverageEntry. An available entry with ratio < 1 is "partial". */
-export function adaptCoverage(row: Schemas["DataCoverage"]): CoverageEntry {
+/**
+ * `GET /data/coverage` row -> CoverageEntry. An available entry with ratio < 1 is "partial".
+ * A usable (verified / partial) entry whose backend `stale` flag is true reads "stale" with the
+ * reason "last checked N h ago, older than X h (twice the scheduled refresh gap)"; gap states (failed, paid only, ...)
+ * keep their own state. `stale` null = age not judged (no job cadence known), never fresh.
+ */
+export function adaptCoverage(row: Schemas["DataCoverage"], now: number = Date.now()): CoverageEntry {
   const expected = toNumber(row.expected_periods);
   const available = toNumber(row.available_periods);
   const ratio = toNumber(row.coverage_ratio);
@@ -37,13 +42,26 @@ export function adaptCoverage(row: Schemas["DataCoverage"]): CoverageEntry {
     ratio !== null && expected !== null && expected > 0 && available !== null
       ? { covered: available, total: expected, unit: "periods" }
       : null;
+  const stale = row.stale === true ? true : row.stale === false ? false : null;
+  const staleAfterHours = toNumber(row.stale_after_hours);
+  const stateAfterCoverage = stateWithCoverage(base, coverage);
+  const usable = stateAfterCoverage === "verified" || stateAfterCoverage === "partial";
+  const checkedMs = Date.parse(row.checked_at);
+  const ageHours = Number.isFinite(checkedMs) ? Math.max(0, Math.round((now - checkedMs) / 3_600_000)) : null;
+  const staleReason =
+    stale === true && staleAfterHours !== null
+      ? `last checked ${ageHours === null ? "an unknown time" : `${ageHours} h`} ago, older than ${staleAfterHours} h (twice the scheduled refresh gap)`
+      : null;
   return {
     id: `${row.provider}:${row.dataset}:${row.entity_key}`,
     provider: row.provider,
     dataset: row.dataset,
     entityKey: row.entity_key,
     entityKind: ENTITY_KINDS.includes(row.entity_kind) ? row.entity_kind : "other",
-    state: stateWithCoverage(base, coverage),
+    state: stale === true && usable ? "stale" : stateAfterCoverage,
+    stale,
+    staleAfterHours,
+    staleReason: stale === true && usable ? staleReason ?? "last check is older than the expected interval" : null,
     rawState: row.state,
     expectedPeriods: expected,
     availablePeriods: available,

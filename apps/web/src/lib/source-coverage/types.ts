@@ -33,6 +33,12 @@ export type CoverageEntry = {
   entityKind: EntityKind;
   /** The adapted state; an available entry with a known ratio below 1 is "partial". */
   state: DataState;
+  /** Backend flag: latest check older than staleAfterHours. null = unknown (no job cadence), NOT false. */
+  stale: boolean | null;
+  /** Hours after a check at which the row counts as stale; null = no expected interval known. */
+  staleAfterHours: number | null;
+  /** Why the row reads Stale ("last checked N h ago, older than X h (twice the scheduled refresh gap)"); null when it does not. */
+  staleReason: string | null;
   /** The backend's own string (available, temporarily_failed, ...). */
   rawState: string;
   expectedPeriods: number | null;

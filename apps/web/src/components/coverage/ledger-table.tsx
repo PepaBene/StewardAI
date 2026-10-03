@@ -84,9 +84,9 @@ export function LedgerTable({
                   </Link>
                 </td>
                 <td className="px-2 py-1.5">
-                  <DataStateBadge state={e.state} reason={e.reason} />
+                  <DataStateBadge state={e.state} reason={e.staleReason ?? e.reason} />
                   <p className="mt-1 max-w-[22rem] text-text-muted">
-                    {e.reason ??
+                    {e.staleReason ?? e.reason ??
                       `No reason recorded (ledger state "${e.rawState}").`}
                   </p>
                 </td>
@@ -118,6 +118,11 @@ export function LedgerTable({
                   <time dateTime={e.checkedAt}>
                     {formatDateTime(e.checkedAt)}
                   </time>
+                  <span className="block text-text-muted">
+                    {e.staleAfterHours !== null
+                      ? `stale after ${e.staleAfterHours} h`
+                      : "age not judged (no refresh cadence known)"}
+                  </span>
                 </td>
                 <td className="num px-2 py-1.5">
                   {e.lastGoodObservationId !== null

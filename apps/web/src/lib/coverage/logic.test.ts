@@ -161,3 +161,16 @@ describe("fix pass: scorecard honesty", () => {
     expect(gapsFirst(many)).toHaveLength(LEDGER_ROW_CAP);
   });
 });
+
+describe("summary request", () => {
+  it("passes the selected entity kind to the summary endpoint", async () => {
+    const { vi } = await import("vitest");
+    const get = vi.fn();
+    vi.doMock("@/lib/api/client", () => ({ getBrowserApiClient: () => ({ GET: get }) }));
+    vi.doMock("@/lib/hooks/use-api-resource", () => ({ useApiResource: (f: () => unknown) => (f(), { state: { kind: "loading" }, reload: () => {} }) }));
+    vi.doMock("react", async (orig) => ({ ...(await orig<typeof import("react")>()), useCallback: (f: unknown) => f, useMemo: (f: () => unknown) => f() }));
+    const { useCoverageSummary } = await import("./hooks");
+    useCoverageSummary("source", { provider: "", dataset: "", state: "", period: "", entity: "", kind: "geography" });
+    expect(get).toHaveBeenCalledWith("/data/coverage/summary", { params: { query: expect.objectContaining({ entity_kind: "geography" }) } });
+  });
+});

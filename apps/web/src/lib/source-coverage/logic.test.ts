@@ -29,6 +29,9 @@ function entry(over: Partial<CoverageEntry> & Pick<CoverageEntry, "provider" | "
     entityKind: "security",
     state: "verified",
     rawState: "available",
+    stale: null,
+    staleAfterHours: null,
+    staleReason: null,
     expectedPeriods: null,
     availablePeriods: null,
     coverageRatio: null,
@@ -305,6 +308,37 @@ describe("adapters", () => {
     expect(noPeriods.state).toBe("verified");
     expect(noPeriods.coverageRatio).toBeNull();
     expect(adaptCoverage({ ...base, state: "mystery" }).state).toBe("unavailable");
+  });
+
+  it("derives Stale from the backend stale flag, with a reason; null stale stays unjudged", () => {
+    const base = {
+      provider: "fmp",
+      dataset: "profile",
+      entity_key: "AAPL_US_EQ",
+      state: "available",
+      expected_periods: 10,
+      available_periods: 10,
+      earliest_period: null,
+      latest_period: "2026-09-30",
+      last_good_observation_id: 3,
+      reason: null,
+      checked_at: "2026-10-01T00:00:00Z",
+      entity_kind: "security" as const,
+      coverage_ratio: 1,
+      stale_after_hours: 48 as number | null,
+    };
+    const now = Date.parse("2026-10-04T00:00:00Z");
+    const stale = adaptCoverage({ ...base, stale: true }, now);
+    expect(stale.state).toBe("stale");
+    expect(stale.staleReason).toBe("last checked 72 h ago, older than 48 h (twice the scheduled refresh gap)");
+    expect(stale.staleAfterHours).toBe(48);
+    expect(adaptCoverage({ ...base, stale: false }, now).state).toBe("verified");
+    const unknown = adaptCoverage({ ...base, stale: null, stale_after_hours: null }, now);
+    expect(unknown.state).toBe("verified");
+    expect(unknown.stale).toBeNull();
+    expect(adaptCoverage({ ...base }, now).stale).toBeNull();
+    // a gap state is not hidden behind Stale
+    expect(adaptCoverage({ ...base, state: "temporarily_failed", stale: true }, now).state).toBe("unavailable");
   });
 
   it("adapts access rows and lets freshness override a stale or never-used available endpoint", () => {

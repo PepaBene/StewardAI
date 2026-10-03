@@ -156,11 +156,6 @@ export function CoverageAtlas() {
 
       <Blueprint as="section" aria-labelledby="summary-heading" id="summary" className="flex scroll-mt-24 flex-col gap-3 px-5 py-5">
         <PanelHeading kicker="Summary" title={<span id="summary-heading">Entries grouped by {filters.group}</span>} />
-        {filters.kind !== "any" ? (
-          <p role="note" className="text-xs text-text-muted">
-            The entity-kind filter is not applied here: the summary endpoint has no entity-kind parameter, so these counts cover every entity kind while the matrix and rows above show only {filters.kind}.
-          </p>
-        ) : null}
         <ResourceGate state={summary.state} label="coverage summary">
           {(d) => (d.totalEntries === 0 ? <p className="text-sm text-text-muted">The ledger has no entry for these filters.</p> : <SummaryStrip data={d} />)}
         </ResourceGate>

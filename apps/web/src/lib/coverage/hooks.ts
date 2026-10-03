@@ -22,7 +22,8 @@ export function coverageQuery(f: Pick<AtlasFilters, "provider" | "dataset" | "st
 }
 
 /** `GET /data/coverage/summary?group_by=...` with the atlas filters applied by the backend. */
-export function useCoverageSummary(groupBy: SummaryGroupBy, filters?: Pick<AtlasFilters, "provider" | "dataset" | "state" | "period" | "entity">) {
+export function useCoverageSummary(groupBy: SummaryGroupBy, filters?: Pick<AtlasFilters, "provider" | "dataset" | "state" | "period" | "entity" | "kind">) {
+  const kind = filters?.kind ?? "any";
   const provider = filters?.provider ?? "";
   const dataset = filters?.dataset ?? "";
   const state = filters?.state ?? "";
@@ -31,9 +32,9 @@ export function useCoverageSummary(groupBy: SummaryGroupBy, filters?: Pick<Atlas
   const fetcher = useCallback(
     () =>
       getBrowserApiClient().GET("/data/coverage/summary", {
-        params: { query: { group_by: groupBy, ...coverageQuery({ provider, dataset, state, period, entity }) } },
+        params: { query: { group_by: groupBy, ...coverageQuery({ provider, dataset, state, period, entity }), entity_kind: kind === "any" ? undefined : kind } },
       }),
-    [groupBy, provider, dataset, state, period, entity],
+    [groupBy, provider, dataset, state, period, entity, kind],
   );
   const { state: raw, reload } = useApiResource(fetcher);
   const result = useMemo(() => mapResource(raw, (b): CoverageSummaryData => adaptSummary(b)), [raw]);

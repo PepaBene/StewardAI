@@ -19,6 +19,9 @@ const entry = (over: Partial<CoverageEntry>): CoverageEntry => ({
   entityKind: "geography",
   state: "paid_only",
   rawState: "paid_only",
+  stale: null,
+  staleAfterHours: null,
+  staleReason: null,
   expectedPeriods: null,
   availablePeriods: null,
   coverageRatio: null,
@@ -68,6 +71,10 @@ describe("fix pass: coverage components", () => {
     const html = renderToStaticMarkup(createElement(LedgerTable, { entries: [entry({})], totalMatching: 1200, caption: "c" }));
     expect(html).toContain("Showing 1 of 1200");
     expect(renderToStaticMarkup(createElement(LedgerTable, { entries: [entry({})], totalMatching: 1, caption: "c" }))).not.toContain("left out");
+    const staleHtml = renderToStaticMarkup(createElement(LedgerTable, { entries: [entry({ state: "stale", stale: true, staleAfterHours: 48, staleReason: "last checked 72 h ago, older than 48 h (twice the scheduled refresh gap)" })], caption: "c" }));
+    expect(staleHtml).toContain("last checked 72 h ago, older than 48 h (twice the scheduled refresh gap)");
+    expect(staleHtml).toContain("stale after 48 h");
+    expect(renderToStaticMarkup(createElement(LedgerTable, { entries: [entry({})], caption: "c" }))).toContain("age not judged");
   });
   it("F7-9: a summary strip carries its own pattern definitions (no atlas matrix needed)", () => {
     const data = { groupBy: "source" as const, totalEntries: 2, note: "n", groups: [{ key: "fred", entries: 2, byState: { paid_only: 1, available: 1 }, expectedPeriods: null, availablePeriods: null, entriesWithExpected: 0, availableEntries: 1, coverageRatio: null }] };
