@@ -8,6 +8,24 @@ from pydantic import BaseModel, Field
 
 from steward.macro.exposure import Exposure, exposure_summary, weighted_effect
 
+HISTORY_MAX = 60
+
+
+class SeriesVintage(BaseModel):
+    """One period of a series with the value first published and the latest known by `as_of`.
+
+    `value_first_release` is null when the first publication was not archived (the oldest
+    stored row has no release date: a backfill or a provider that keeps no history); then
+    `vintage_unavailable` is true and nothing may be drawn as a "first release"."""
+
+    period: dt.date
+    value_latest: Decimal
+    value_first_release: Decimal | None
+    vintage_unavailable: bool
+    released_at: dt.datetime | None  # when the first release was published
+    revised_at: dt.datetime | None  # when the latest value became known; null if never revised
+    revision_count: int  # stored revisions after the first row (0: never revised)
+
 
 class ContextPoint(BaseModel):
     series_id: str
@@ -27,6 +45,11 @@ class ContextPoint(BaseModel):
     # The period before `period` (latest vintage of each), for the change a mapping weights.
     previous_period: dt.date | None = None
     previous_value: Decimal | None = None
+    # Oldest first, at most `history` periods (request parameter; empty when 0). Only records
+    # known by `as_of`. `release_calendar` is the provider's published schedule as text: no
+    # machine-readable next-release date is stored.
+    history: list[SeriesVintage] = Field(default_factory=list)
+    release_calendar: str | None = None
 
 
 class HoldingEffect(BaseModel):
@@ -90,7 +113,9 @@ class MacroContext(BaseModel):
     series_effects: list[SeriesEffect] = Field(default_factory=list)
 
 
-async def context_for_holding(pool: asyncpg.Pool, ticker: str, as_of: dt.datetime) -> MacroContext:
+async def context_for_holding(
+    pool: asyncpg.Pool, ticker: str, as_of: dt.datetime, history: int = 0
+) -> MacroContext:
     # A mapping counts from the day it was entered (created_at), not from its valid_from, so a
     # mapping entered after `as_of` can never leak into an earlier view.
     mapping = await pool.fetch(
@@ -141,10 +166,15 @@ async def context_for_holding(pool: asyncpg.Pool, ticker: str, as_of: dt.datetim
                       e.known_at,e.source_url,e.previous_period,e.previous_value,
                       r.low5 five_year_low,r.high5 five_year_high,
                       r.low10 ten_year_low,r.high10 ten_year_high,
-                      coalesce(pa.state,'available') access_state
+                      coalesce(pa.state,'access_unverified') access_state
                from newest e join ranges r using(series_id,source,geography)
-               left join public.provider_access pa on pa.provider=e.source
-                 and pa.endpoint in ('indicators','sdmx')
+               -- One row per provider, whatever endpoints it has: the most recently probed
+               -- one (never-probed last), then by endpoint name. No row: never probed.
+               left join lateral (
+                 select a.state from public.provider_access a
+                 where a.provider=e.source and a.endpoint in ('indicators','sdmx')
+                 order by a.tested_at desc nulls last, a.endpoint limit 1
+               ) pa on true
                order by e.series_id,e.geography""",
             geographies,
             as_of,
@@ -152,6 +182,7 @@ async def context_for_holding(pool: asyncpg.Pool, ticker: str, as_of: dt.datetim
         if geographies
         else []
     )
+    histories = await _vintage_history(pool, rows, as_of, history) if history > 0 else {}
     observed_geographies = {row["geography"] for row in rows}
     decorated_mapping = []
     for row in mapping:
@@ -233,7 +264,13 @@ async def context_for_holding(pool: asyncpg.Pool, ticker: str, as_of: dt.datetim
     )
     return MacroContext(
         as_of=as_of,
-        observations=[ContextPoint(**dict(row)) for row in rows],
+        observations=[
+            ContextPoint(
+                **dict(row),
+                **histories.get((row["series_id"], row["source"], row["geography"]), {}),
+            )
+            for row in rows
+        ],
         coverage=[MacroCoverage(**dict(row)) for row in coverage],
         effects=[HoldingEffect(**row) for row in decorated_mapping],
         comparisons=[MacroComparison(**dict(row)) for row in comparisons],
@@ -241,6 +278,72 @@ async def context_for_holding(pool: asyncpg.Pool, ticker: str, as_of: dt.datetim
         exposure=summary,
         series_effects=series_effects,
     )
+
+
+async def _vintage_history(
+    pool: asyncpg.Pool, rows: list[asyncpg.Record], as_of: dt.datetime, limit: int
+) -> dict[tuple[str, str, str], dict[str, object]]:
+    """Per series, the last `limit` periods (oldest first) with first-release and latest value,
+    from the rows known by `as_of` only."""
+    if not rows:
+        return {}
+    keys = {(r["series_id"], r["source"], r["geography"]) for r in rows}
+    stored = await pool.fetch(
+        """with known as (
+             select m.*,
+               row_number() over (partition by m.series_id,m.source,m.geography,m.period
+                 order by m.revision desc,m.known_at desc,m.id desc) latest_rn,
+               row_number() over (partition by m.series_id,m.source,m.geography,m.period
+                 order by m.revision,m.known_at,m.id) first_rn,
+               count(*) over (partition by m.series_id,m.source,m.geography,m.period) n
+             from public.macro_observation m
+             where m.known_at <= $2 and m.series_id = any($1::text[])
+               and m.geography = any($3::text[]) and m.source = any($4::text[])
+               and m.value is not null
+           ), paired as (
+             select l.series_id,l.source,l.geography,l.period,l.value value_latest,
+                    l.known_at latest_known_at,f.value first_value,f.release_at first_release_at,
+                    l.n,
+                    row_number() over (partition by l.series_id,l.source,l.geography
+                      order by l.period desc) recent
+             from known l join known f on f.series_id=l.series_id and f.source=l.source
+               and f.geography=l.geography and f.period=l.period and f.first_rn=1
+             where l.latest_rn=1
+           )
+           select p.series_id,p.source,p.geography,p.period,p.value_latest,p.first_value,
+                  p.first_release_at,p.latest_known_at,p.n,md.release_calendar
+           from paired p
+           left join public.macro_series_metadata md on md.series_id=p.series_id
+             and md.source=p.source
+           where p.recent <= $5
+           order by p.series_id,p.source,p.geography,p.period""",
+        sorted({k[0] for k in keys}),
+        as_of,
+        sorted({k[2] for k in keys}),
+        sorted({k[1] for k in keys}),
+        min(limit, HISTORY_MAX),
+    )
+    out: dict[tuple[str, str, str], dict[str, object]] = {}
+    for row in stored:
+        key = (row["series_id"], row["source"], row["geography"])
+        if key not in keys:
+            continue
+        archived = row["first_release_at"] is not None
+        entry = out.setdefault(key, {"history": [], "release_calendar": row["release_calendar"]})
+        history = entry["history"]
+        assert isinstance(history, list)
+        history.append(
+            SeriesVintage(
+                period=row["period"],
+                value_latest=row["value_latest"],
+                value_first_release=row["first_value"] if archived else None,
+                vintage_unavailable=not archived,
+                released_at=row["first_release_at"],
+                revised_at=row["latest_known_at"] if row["n"] > 1 else None,
+                revision_count=row["n"] - 1,
+            )
+        )
+    return out
 
 
 def _series_effects(exposures: list[Exposure], rows: list[asyncpg.Record]) -> list[SeriesEffect]:

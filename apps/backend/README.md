@@ -101,6 +101,8 @@ STEWARD_TEST_DATABASE_URL=postgresql://postgres:postgres@localhost:5432/postgres
 uv run ruff check . && uv run ruff format --check . && uv run mypy
 ```
 
+The test database server must use UTF8 encoding (`initdb -E UTF8 --locale=C.UTF-8`). On an `SQL_ASCII` cluster about 49 tests fail with `UntranslatableCharacterError` or `requested character too large for encoding`; that is a setup problem, not a code bug. Use a throwaway server, never the project's `DATABASE_URL`. The `pgmq` tests skip when the extension is not installed (the OS PostgreSQL package does not include it).
+
 The DB tests create a throwaway database, apply a small Supabase stand-in
 (`tests/sql/supabase_shim.sql`: roles, `auth.uid()`, default grants) and every migration
 in `supabase/migrations`, then check the access model as `app_backend`, `authenticated`

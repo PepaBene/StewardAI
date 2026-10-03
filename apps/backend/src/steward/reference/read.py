@@ -22,6 +22,7 @@ from steward.reference.price_series import (
 )
 from steward.reference.prices import CHECKS_KEY, GAPS_KEY, NO_STOOQ_SYMBOL, SOURCES_KEY
 from steward.sources.esma import MIC_COUNTRY
+from steward.sources.market import quote_unit_of
 
 RelationshipType = Literal[
     "parent", "ultimate_parent", "subsidiary", "owner", "competitor", "supplier", "customer"
@@ -374,6 +375,23 @@ class PlausibilityCheck(BaseModel):
     flagged: bool = Field(description="Beyond the configured tolerance.")
 
 
+class RawBars(BaseModel):
+    """The unadjusted bars of the same series as `PriceHistory.bars`, when the source stored
+    them (EODHD, Alpha Vantage). Stooq and Yahoo store adjusted closes only: `bars` is then
+    empty and `reason` says so. Raw bars are never spliced with adjusted ones."""
+
+    available: bool
+    source: str | None = Field(default=None, description="Whose raw bars (the series' source).")
+    symbol: str | None = None
+    quote_unit: str | None = Field(
+        default=None,
+        description="Unit the prices are quoted in: GBX (pence), ZAC, ILA, or an ISO currency.",
+    )
+    currency: str | None = Field(default=None, description="Quote currency code as stored.")
+    reason: str | None = Field(default=None, description="Why there are no raw bars.")
+    bars: list[PriceBarOut] = Field(description="Raw OHLC, oldest first; same window as `bars`.")
+
+
 class PriceHistory(BaseModel):
     ticker: str
     symbol: str | None = Field(
@@ -388,6 +406,15 @@ class PriceHistory(BaseModel):
     yahoo_symbol: str | None = None
     fallback_reason: str | None = Field(
         default=None, description="Why Stooq's closes are not the ones shown."
+    )
+    quote_currency: str | None = Field(
+        default=None,
+        description="Unit `bars` are quoted in (GBX = pence, ZAC, ILA, or an ISO code), from "
+        "the stored series; null when unknown.",
+    )
+    raw_bars: RawBars | None = Field(
+        default=None,
+        description="Unadjusted bars of the same series where stored; see `RawBars`.",
     )
     as_of: dt.date | None = Field(description="Date of the latest stored close.")
     fetched_at: dt.datetime | None
@@ -456,6 +483,63 @@ async def load_bars(pool: asyncpg.Pool, symbol: str | SeriesRef) -> list[PriceBa
     ]
 
 
+async def series_quote_unit(
+    pool: asyncpg.Pool, symbol: str, source: str, bar_type: str = "adjusted"
+) -> tuple[str | None, str | None]:
+    """(quote unit, currency code) of a stored series' latest bar that states one."""
+    row = await pool.fetchrow(
+        "select quote_unit, currency from public.price_bar where symbol = $1 and source = $2"
+        " and bar_type = $3 and (quote_unit is not null or currency is not null)"
+        " order by date desc limit 1",
+        symbol,
+        source,
+        bar_type,
+    )
+    if row is None:
+        return None, None
+    unit = row["quote_unit"] or quote_unit_of(row["currency"])
+    return unit, row["currency"]
+
+
+async def load_raw_bars(pool: asyncpg.Pool, ref: SeriesRef | None, since: dt.date) -> RawBars:
+    """The raw bars of the chosen series itself (never another source's)."""
+    if ref is None:
+        return RawBars(available=False, reason="no price series is stored", bars=[])
+    rows = await pool.fetch(
+        "select date, open, high, low, close, volume from public.price_bar"
+        " where symbol = $1 and source = $2 and bar_type = 'raw' and date >= $3 order by date",
+        ref.symbol,
+        ref.source,
+        since,
+    )
+    if not rows:
+        reason = (
+            f"{ref.name} stores adjusted closes only"
+            if ref.source in ("stooq", "yahoo")
+            else f"no raw bars stored for {ref.symbol} from {ref.name}"
+        )
+        return RawBars(available=False, source=ref.name, symbol=ref.symbol, reason=reason, bars=[])
+    unit, currency = await series_quote_unit(pool, ref.symbol, ref.source, "raw")
+    return RawBars(
+        available=True,
+        source=ref.name,
+        symbol=ref.symbol,
+        quote_unit=unit,
+        currency=currency,
+        bars=[
+            PriceBarOut(
+                date=r["date"],
+                close=float(r["close"]),
+                open=_opt(r["open"]),
+                high=_opt(r["high"]),
+                low=_opt(r["low"]),
+                volume=_opt(r["volume"]),
+            )
+            for r in rows
+        ],
+    )
+
+
 async def _state(pool: asyncpg.Pool, key: str) -> dict[str, Any]:
     raw = await pool.fetchval("select value from public.sync_state where key = $1", key)
     return dict(json.loads(raw)) if raw else {}
@@ -513,6 +597,8 @@ async def price_history(pool: asyncpg.Pool, ticker: str, days: int) -> PriceHist
                 Correlation(ticker=other, correlation=risk.correlation(series, other_series))
             )
     figures = risk.figures(series, bench or None) if series else None
+    quote_unit = (await series_quote_unit(pool, ref.symbol, ref.source))[0] if ref else None
+    raw_bars = await load_raw_bars(pool, ref, since)
     gap = None
     if not series:
         gap = (gaps.get(ticker) or {}).get("reason") or (
@@ -531,6 +617,8 @@ async def price_history(pool: asyncpg.Pool, ticker: str, days: int) -> PriceHist
         stooq_symbol=symbols.stooq,
         yahoo_symbol=symbols.yahoo,
         fallback_reason=fallback_reason,
+        quote_currency=quote_unit,
+        raw_bars=raw_bars,
         as_of=series[-1][0] if series else None,
         fetched_at=fetched,
         bars=[b for b in stored_bars if b.date >= since],

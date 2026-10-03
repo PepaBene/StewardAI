@@ -37,6 +37,7 @@ from steward.reference.price_series import (
     yahoo_mic,
 )
 from steward.reference.read import PricePoint
+from steward.sources.market import quote_unit_of
 from steward.sources.yahoo import SOURCE_LABEL as YAHOO_LABEL
 
 CHANGE_HELP = "Fraction (0.012 = +1.2 %) of the latest against the previous value."
@@ -87,6 +88,15 @@ class HoldingPrices(BaseModel):
     source: Literal["Stooq", "Yahoo", "EODHD", "Alpha Vantage"] | None = Field(
         default=None, description="Whose daily closes; null when none are stored."
     )
+    quote_currency: str | None = Field(
+        default=None,
+        description="Unit `bars`, `last_close` and `previous_close` are quoted in: GBX (pence), "
+        "ZAC, ILA, or an ISO currency code (USD, EUR, ...). From the stored series' own "
+        "currency; falls back to the instrument's currency; null when neither is known.",
+    )
+    quote_currency_basis: Literal["series", "instrument"] | None = Field(
+        default=None, description="Where `quote_currency` comes from."
+    )
     as_of: dt.date | None = Field(description="Date of the latest stored close.")
     last_close: float | None
     previous_close: float | None = Field(description="The stored close before `as_of`.")
@@ -112,7 +122,7 @@ class HoldingsPrices(BaseModel):
 async def _current_holdings(pool: asyncpg.Pool) -> list[asyncpg.Record]:
     """The latest sync's positions (as the Holdings page lists them), largest first."""
     rows: list[asyncpg.Record] = await pool.fetch(
-        "select p.ticker, i.name from public.position_snapshot p"
+        "select p.ticker, i.name, i.currency as instrument_currency from public.position_snapshot p"
         " left join public.instrument i on i.t212_ticker = p.ticker"
         " where p.snapshot_date = (select max(snapshot_date) from public.account_snapshot)"
         " order by p.value_base desc, p.ticker"
@@ -185,6 +195,19 @@ async def holdings_prices(
             bars.setdefault(key, []).append((r["date"], r["close"]))
         if r["rn"] <= 2:
             latest.setdefault(key, {})[r["rn"]] = (r["date"], r["close"])
+    unit_rows = await pool.fetch(
+        "select distinct on (b.symbol, b.source) b.symbol, b.source, b.quote_unit, b.currency"
+        " from public.price_bar b join (select * from unnest($1::text[], $2::text[])"
+        " as w(symbol, source)) w on w.symbol = b.symbol and w.source = b.source"
+        " where b.bar_type = 'adjusted' and (b.quote_unit is not null or b.currency is not null)"
+        " order by b.symbol, b.source, b.date desc",
+        [r.symbol for r in refs],
+        [r.source for r in refs],
+    )
+    units = {
+        SeriesRef(r["symbol"], r["source"]): r["quote_unit"] or quote_unit_of(r["currency"])
+        for r in unit_rows
+    }
     quotes = (
         await yahoo_quotes(pool, sorted({s.yahoo for s in symbols.values() if s.yahoo}), now)
         if intraday_on
@@ -198,9 +221,15 @@ async def holdings_prices(
         series = bars.get(ref, []) if ref else []
         ends = latest.get(ref, {}) if ref else {}
         last, previous = ends.get(1), ends.get(2)
+        series_unit = units.get(ref) if ref else None
+        unit = series_unit or quote_unit_of(h["instrument_currency"])
         out.append(
             HoldingPrices(
                 ticker=h["ticker"],
+                quote_currency=unit,
+                quote_currency_basis=(
+                    None if unit is None else "series" if series_unit else "instrument"
+                ),
                 name=h["name"],
                 symbol=ref.symbol if ref else (own.stooq if own else None),
                 source=ref.name if ref else None,

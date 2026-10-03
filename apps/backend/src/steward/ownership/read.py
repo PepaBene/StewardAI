@@ -45,6 +45,20 @@ class TopHolder(BaseModel):
     shares: Decimal
     value_usd: Decimal | None
     accession: str = Field(description="The filing the position is read from.")
+    filed: dt.date | None = Field(
+        default=None,
+        description="Latest filing date among this manager's effective filings of the period "
+        "(an original 13F-HR or amendments).",
+    )
+    filing_lag_days: int | None = Field(
+        default=None, description="`filed` minus the report period end, in days."
+    )
+    previous_period_end: dt.date | None = Field(
+        default=None,
+        description="The report period `prev_shares` / `shares_change_pct` are measured "
+        "against (the previous period loaded, not necessarily the adjacent quarter); null "
+        "when no earlier period is loaded.",
+    )
     prev_shares: Decimal | None = Field(
         default=None,
         description="The same manager's shares in the previous report period loaded "
@@ -69,6 +83,22 @@ class OwnershipPeriod(BaseModel):
     shares: Decimal
     value_usd: Decimal
     latest_filed: dt.date | None
+    earliest_filed: dt.date | None = Field(
+        default=None, description="Earliest filing date of any manager's effective filing."
+    )
+    latest_filing_lag_days: int | None = Field(
+        default=None,
+        description="`latest_filed` minus `period`, in days: the latest filing of the period "
+        "(including late amendments), not a single filing.",
+    )
+    earliest_filing_lag_days: int | None = Field(
+        default=None, description="`earliest_filed` minus `period`, in days."
+    )
+    previous_period: dt.date | None = Field(
+        default=None,
+        description="The period the `*_change` figures are measured against (previous period "
+        "loaded, possibly not the adjacent quarter); null for the oldest period loaded.",
+    )
     holders_change: int | None = Field(description="Against the previous period loaded.")
     shares_change: Decimal | None
     new_holders: int | None
@@ -146,10 +176,10 @@ async def not_applicable_reason(pool: asyncpg.Pool, ticker: str) -> str | None:
 
 async def _period_figures(
     pool: asyncpg.Pool, period: dt.date, cusips: list[str]
-) -> tuple[int, Decimal, Decimal, dt.date | None, set[str]]:
+) -> tuple[int, Decimal, Decimal, dt.date | None, set[str], dt.date | None]:
     rows = await pool.fetch(
         EFFECTIVE + " select e.cik, sum(h.shares) as shares, sum(h.value_usd) as value,"  # noqa: S608 - constant SQL, values bound as parameters
-        " max(f.filed) as filed from effective e"
+        " max(f.filed) as filed, min(f.filed) as first_filed from effective e"
         " join public.institutional_holding h on h.accession = e.accession"
         " join public.form13f_filing f on f.accession = e.accession"
         " where h.cusip = any($2::text[]) and h.shares_type = 'SH' and h.put_call is null"
@@ -161,7 +191,8 @@ async def _period_figures(
     shares = sum((r["shares"] or Decimal(0) for r in rows), Decimal(0))
     value = sum((r["value"] or Decimal(0) for r in rows), Decimal(0))
     filed = max((r["filed"] for r in rows), default=None)
-    return len(holders), shares, value, filed, holders
+    first_filed = min((r["first_filed"] for r in rows), default=None)
+    return len(holders), shares, value, filed, holders, first_filed
 
 
 async def holding_ownership(
@@ -185,7 +216,9 @@ async def holding_ownership(
     ]
     figures = [(p, *await _period_figures(pool, p, cusips)) for p in found]
     out: list[OwnershipPeriod] = []
-    for i, (period, holders, shares, value, filed, ciks) in enumerate(figures[:periods]):
+    for i, (period, holders, shares, value, filed, ciks, first_filed) in enumerate(
+        figures[:periods]
+    ):
         prev = figures[i + 1] if i + 1 < len(figures) else None
         out.append(
             OwnershipPeriod(
@@ -194,6 +227,10 @@ async def holding_ownership(
                 shares=shares,
                 value_usd=value,
                 latest_filed=filed,
+                earliest_filed=first_filed,
+                latest_filing_lag_days=(filed - period).days if filed else None,
+                earliest_filing_lag_days=(first_filed - period).days if first_filed else None,
+                previous_period=prev[0] if prev else None,
                 holders_change=holders - prev[1] if prev else None,
                 shares_change=shares - prev[2] if prev else None,
                 new_holders=len(ciks - prev[5]) if prev else None,
@@ -205,7 +242,8 @@ async def holding_ownership(
         top_rows = await pool.fetch(
             EFFECTIVE  # noqa: S608 - constant SQL, values bound as parameters
             + " select e.cik, max(f.manager_name) as manager_name, sum(h.shares) as shares,"
-            " sum(h.value_usd) as value, max(e.accession) as accession from effective e"
+            " sum(h.value_usd) as value, max(e.accession) as accession,"
+            " max(f.filed) as filed from effective e"
             " join public.institutional_holding h on h.accession = e.accession"
             " join public.form13f_filing f on f.accession = e.accession"
             " where h.cusip = any($2::text[]) and h.shares_type = 'SH' and h.put_call is null"
@@ -257,6 +295,9 @@ async def holding_ownership(
                 shares=r["shares"],
                 value_usd=r["value"],
                 accession=r["accession"],
+                filed=r["filed"],
+                filing_lag_days=(r["filed"] - found[0]).days if r["filed"] else None,
+                previous_period_end=previous,
                 prev_shares=prev_shares.get(r["cik"]),
                 shares_change_pct=share_change(r["shares"], prev_shares.get(r["cik"])),
                 pct_of_shares_outstanding=(

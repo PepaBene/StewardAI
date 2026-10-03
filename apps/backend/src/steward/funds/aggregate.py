@@ -131,6 +131,16 @@ class ExposureView(BaseModel):
     dimension: Dimension
     buckets: list[Bucket]
     reconciles: bool = Field(description="Buckets add up to the total within tolerance.")
+    issuer_buckets: dict[str, dict[str, float]] = Field(
+        default_factory=dict,
+        description="Per returned issuer (`issuers[].key`): bucket key -> that issuer's weight "
+        "in this bucket, as a fraction of total portfolio value. Additive per row, so an "
+        "issuer split across buckets (e.g. 'Technology' and 'Information Technology', an "
+        "ADR + ordinary in two currencies) appears in each; summed over ALL issuers a bucket's "
+        "value equals `buckets[].weight` minus its non-issuer part (cash, fund cash, unknown "
+        "fund weight are not issuers). Only the top `top` issuers are listed, so the rest of a "
+        "bucket is `bucket.weight - sum(listed)`.",
+    )
 
 
 class FundAsOf(BaseModel):
@@ -271,6 +281,9 @@ class _IssuerAcc:
     country: str | None = None
     currency: str | None = None
     names: list[str] = field(default_factory=list)
+    by_dim: dict[str, dict[str, float]] = field(
+        default_factory=lambda: {d: defaultdict(float) for d in DIMENSIONS}
+    )
 
 
 class _Buckets:
@@ -374,6 +387,13 @@ def aggregate_exposure(
             sec.ticker = ticker
         sec.ticker = sec.ticker or ticker
         sec.via[via] += weight
+        for dim, bucket_key in (
+            ("country", country),
+            ("region", region_of(country)),
+            ("sector", sector),
+            ("currency", currency),
+        ):
+            acc.by_dim[dim][bucket_key or UNCLASSIFIED] += weight
         if name:
             acc.names.append(name)
         acc.sector = acc.sector or sector
@@ -594,6 +614,7 @@ def aggregate_exposure(
 
     # ---- dimensions ----
     views: list[ExposureView] = []
+    shown_issuers = exposures_out[:top]
     for d in DIMENSIONS:
         keys = set(buckets[d].direct) | set(buckets[d].fund)
         items: list[Bucket] = []
@@ -619,6 +640,12 @@ def aggregate_exposure(
                 dimension=d,
                 buckets=items,
                 reconciles=abs(sum(b.weight for b in items) - (1.0 + over_total)) <= tol,
+                issuer_buckets={
+                    e.key: {
+                        k: v for k, v in sorted(issuers[e.key].by_dim[d].items()) if abs(v) > 1e-12
+                    }
+                    for e in shown_issuers
+                },
             )
         )
 
@@ -672,7 +699,7 @@ def aggregate_exposure(
         method=METHOD,
         funds=funds_out,
         stale_funds=stale_funds,
-        issuers=exposures_out[:top],
+        issuers=shown_issuers,
         overlap=overlap[:top],
         exposures=views,
         fees=fees,

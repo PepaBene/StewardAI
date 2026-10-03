@@ -12,6 +12,7 @@ from fastapi import APIRouter, Depends, Path, Query
 from api.auth import Owner
 from api.db import Pool
 from steward import __version__
+from steward.portfolio.correlation import PortfolioCorrelation, portfolio_correlation
 from steward.portfolio.quotes import HoldingsPrices, MarketStrip, holdings_prices, market_strip
 from steward.reference.intraday import (
     HoldingIntraday,
@@ -47,6 +48,22 @@ async def get_holdings_prices(
     intraday quote when intraday prices are on. A holding with no stored prices is listed
     with no bars and null figures."""
     return await holdings_prices(pool, days)
+
+
+@router.get("/portfolio/correlation", tags=["portfolio"])
+async def get_portfolio_correlation(
+    pool: Pool,
+    _owner: Owner,
+    days: Annotated[int, Query(ge=30, le=3700, description="Calendar days of history.")] = 365,
+    min_shared: Annotated[
+        int, Query(ge=2, le=1000, description="Fewest shared daily returns for a pair.")
+    ] = 20,
+) -> PortfolioCorrelation:
+    """The correlation matrix of the current holdings, computed server-side from stored
+    adjusted closes (daily simple returns on the days both traded). A pair with fewer than
+    `min_shared` shared returns is null, never 0; `counts` gives every pair's sample size and
+    `notes` the reason for a null. Ordering by cluster is left to the client."""
+    return await portfolio_correlation(pool, days, min_shared)
 
 
 @router.get("/market/strip", tags=["market"])

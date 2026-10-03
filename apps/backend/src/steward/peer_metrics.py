@@ -106,6 +106,10 @@ FLOW_INPUTS = (
     "capex",
 )
 
+# Bump when a formula in FORMULAS changes meaning, so a stored or cached per-peer value can be
+# told from one computed under another definition.
+DEFINITION_VERSION = "peer_metrics_v1"
+
 FORMULAS = {
     "gross_margin": "gross profit / revenue (revenue > 0)",
     "revenue_growth": (
@@ -577,8 +581,23 @@ def peer_comparison(
             if value is None:
                 reasons[peer] = period["not_meaningful"].get(name, "metric not computable")
         mean = compatible_peer_mean(values, metric=name, reasons=reasons)
+        # Per-peer values (fractions, like the mean) so a caller can rank peers; a peer with no
+        # comparable value is listed with `value` null and the reason.
+        per_peer = [
+            {
+                "ticker": peer,
+                "basis": (peer_periods[peer] or {}).get("basis"),
+                "period": (peer_periods[peer] or {}).get("period_end"),
+                "period_start": (peer_periods[peer] or {}).get("period_start"),
+                "value": value,
+                "definition_version": DEFINITION_VERSION,
+                "reason": None if value is not None else reasons.get(peer),
+            }
+            for peer, value, _definition in values
+        ]
         output[name] = {
             **mean,
+            "peers": per_peer,
             "holding_value": latest.get(name) if latest else None,
             "holding_reason": (latest or {}).get("not_meaningful", {}).get(name),
             "period_end": latest["period_end"] if latest else None,

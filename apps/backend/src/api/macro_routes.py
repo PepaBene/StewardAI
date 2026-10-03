@@ -13,7 +13,12 @@ from api.db import DbId, Pool
 from api.routes import _enqueue
 from steward.macro.hs import normalize_hs_revision
 from steward.macro.providers import TradePoint, flow_totals, trade_metrics
-from steward.macro.read import MacroContext, context_for_holding
+from steward.macro.read import HISTORY_MAX, MacroContext, context_for_holding
+from steward.macro.trade_partners import (
+    DEFAULT_HISTORY_PERIODS,
+    TradeFlowPartners,
+    partner_breakdown,
+)
 from steward.portfolio.read import JobSummary
 
 router = APIRouter()
@@ -61,19 +66,42 @@ class ProviderStatus(BaseModel):
     month_credits: Decimal
 
 
+class ReporterWideTrade(BaseModel):
+    """The same figures over every product stored for the reporter. They move when another
+    product is collected, so they are context, not a property of the requested product."""
+
+    periods: int
+    hs_revision: str
+    products: int = Field(description="Distinct HS codes stored for the reporter.")
+    metrics: dict[str, Decimal | None]
+
+
 class TradeContext(BaseModel):
+    """Everything outside `reporter_wide` describes the requested `hs_code` only.
+
+    Units: values are USD; growth, share, hhi and unmapped_share are fractions (0.18 = 18%);
+    hhi is on a 0..1 scale (x10,000 for the classic index)."""
+
     reporter: str
     hs_code: str
-    hs_revision: str
+    hs_revision: str  # revision(s) of this product's rows, "mixed" when several
     partner: str | None
-    periods: int
+    periods: int  # distinct periods stored for this product
     latest_period: dt.date | None
     latest_value: Decimal | None  # exports of the product in its latest period
     latest_value_by_flow: dict[str, Decimal] = Field(default_factory=dict)
     latest_value_currency: str = "USD"
+    # Growth, partner concentration and export share of this product. `product_mix_change`
+    # compares the mix of products, which one product cannot have: null here, see reporter_wide.
     metrics: dict[str, Decimal | None]
-    source_url: str | None
-    known_at: dt.datetime | None
+    source_url: str | None  # of this product's most recently known row
+    known_at: dt.datetime | None  # when this product's most recent row became known
+    reporter_wide: ReporterWideTrade | None = None
+    partners: list[TradeFlowPartners] = Field(
+        default_factory=list,
+        description="Per flow: latest-period partner rows with share of the product's total, "
+        "the unmapped remainder (never folded into a partner) and a per-period hhi history.",
+    )
     notice: str = "National trade statistics do not establish an issuer contract."
 
 
@@ -95,9 +123,13 @@ async def get_macro_context(
     pool: Pool,
     _owner: Owner,
     as_of: Annotated[dt.datetime | None, Query()] = None,
+    history: Annotated[int, Query(ge=0, le=HISTORY_MAX)] = 0,
 ) -> MacroContext:
-    """Latest point-in-time country context, ranges, provenance and mapped exposure."""
-    return await context_for_holding(pool, ticker, as_of or dt.datetime.now(dt.UTC))
+    """Latest point-in-time country context, ranges, provenance and mapped exposure.
+
+    `history=N` (0 = off, max 60) adds per series the last N periods with first-release and
+    latest values, known by `as_of` only."""
+    return await context_for_holding(pool, ticker, as_of or dt.datetime.now(dt.UTC), history)
 
 
 @router.get("/macro/coverage/portfolio", response_model=PortfolioMacroCoverage, tags=["macro"])
@@ -274,8 +306,10 @@ async def get_trade_context(
     pool: Pool,
     _owner: Owner,
     partner: str | None = None,
+    history_periods: Annotated[int, Query(ge=0, le=60)] = DEFAULT_HISTORY_PERIODS,
 ) -> TradeContext:
-    """Product value plus reporter-wide trade metrics; no issuer contract is inferred.
+    """Trade of one product (value, metrics, partners, concentration trend); no issuer contract
+    is inferred. Reporter-wide aggregates are kept apart under `reporter_wide`.
 
     `reporter` and `partner` may be an ISO alpha-2 code or the UN M49 number Comtrade uses.
     Only the latest revision of each observation is used."""
@@ -316,20 +350,31 @@ async def get_trade_context(
         totals = flow_totals(product, flow)
         if latest_period in totals:
             by_flow[flow] = totals[latest_period]
-    last_row = max(rows, key=lambda row: row["known_at"])
-    revisions = {point.hs_revision for point in points}
+    product_rows = [row for row in rows if row["hs_code"] == hs_code]
+    last_row = max(product_rows, key=lambda row: row["known_at"])
+    revisions = {point.hs_revision for point in product}
+    all_revisions = {point.hs_revision for point in points}
+    # Product mix is a property of the whole reporter; a single product has none.
+    product_metrics = trade_metrics(product) | {"product_mix_change": None}
     return TradeContext(
         reporter=reporter,
         hs_code=hs_code,
         hs_revision=next(iter(revisions)) if len(revisions) == 1 else "mixed",
         partner=partner,
-        periods=len({point.period for point in points}),
+        periods=len({point.period for point in product}),
         latest_period=latest_period,
         latest_value=by_flow.get("export"),
         latest_value_by_flow=by_flow,
-        metrics=trade_metrics(points),
+        metrics=product_metrics,
         source_url=last_row["source_url"],
         known_at=last_row["known_at"],
+        reporter_wide=ReporterWideTrade(
+            periods=len({point.period for point in points}),
+            hs_revision=next(iter(all_revisions)) if len(all_revisions) == 1 else "mixed",
+            products=len({point.hs_code for point in points}),
+            metrics=trade_metrics(points),
+        ),
+        partners=partner_breakdown(product, history_periods),
     )
 
 

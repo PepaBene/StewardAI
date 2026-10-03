@@ -1594,3 +1594,56 @@ class JobsConfig(ConfigModel):
             None, moment + dt.timedelta(seconds=1)
         )
         return fire
+
+
+# Which scheduled job refreshes the `coverage_status` rows of a provider (the writer of the
+# row: macro/collect.py, macro/public_collect.py, reference/prices.py). The job's cadence is
+# the only documented basis for "how often should this row be re-checked"; a provider that
+# is not listed (owner-confirmed rows such as `owner_review`, exchange probes, ...) has no
+# expected interval, and its rows report `stale = null` (unknown), never a guess.
+COVERAGE_PROVIDER_JOB: dict[str, str] = {
+    "eurostat": "macro_collect",
+    "fred": "macro_collect",
+    "ecb": "macro_collect",
+    "cnb": "macro_collect",
+    "world_bank": "public_data_collect",
+    "oecd": "public_data_collect",
+    "bis": "public_data_collect",
+    "un_comtrade": "public_data_collect",
+    "eodhd": "price_history",
+    "alpha_vantage": "price_history",
+}
+# A row is stale once it is older than this many times the job's longest gap between two
+# scheduled runs (one missed run is tolerated; two in a row are not).
+COVERAGE_STALE_GRACE = 2
+
+
+def longest_gap_hours(schedule: JobSchedule, *, samples: int = 64) -> int | None:
+    """Longest gap, in whole hours (rounded up), between consecutive scheduled runs over the
+    next `samples` runs; None for a disabled schedule or one with fewer than two runs."""
+    if not schedule.enabled:
+        return None
+    trigger = schedule.trigger()
+    previous: dt.datetime | None = None
+    moment = dt.datetime(2026, 1, 1, tzinfo=dt.UTC)
+    longest = dt.timedelta(0)
+    for _ in range(samples):
+        fire = trigger.get_next_fire_time(previous, moment)
+        if fire is None:
+            break
+        if previous is not None:
+            longest = max(longest, fire - previous)
+        previous, moment = fire, fire + dt.timedelta(seconds=1)
+    if longest <= dt.timedelta(0):
+        return None
+    return -(-int(longest.total_seconds()) // 3600)
+
+
+def coverage_stale_after_hours(jobs: JobsConfig, provider: str) -> int | None:
+    """Age in hours after which a coverage row of `provider` counts as stale: the refreshing
+    job's longest gap between runs times COVERAGE_STALE_GRACE. None when no enabled job is
+    known to refresh the provider (stale is then unknown)."""
+    job = COVERAGE_PROVIDER_JOB.get(provider)
+    schedule = jobs.worker_schedules().get(job) if job else None
+    gap = longest_gap_hours(schedule) if schedule else None
+    return gap * COVERAGE_STALE_GRACE if gap else None

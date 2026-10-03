@@ -27,7 +27,7 @@ async def get_pdmr_notifications(
 ) -> HoldingPdmrOut:
     """UK PDMR notifications parsed from the RNS stream, with the status of every attempt
     (an announcement that could not be read is listed with why, never dropped)."""
-    return await holding_pdmr(pool, ticker.upper(), limit=limit)
+    return await holding_pdmr(pool, ticker, limit=limit)
 
 
 @router.post("/jobs/pdmr-uk", tags=["jobs"], status_code=status.HTTP_202_ACCEPTED)

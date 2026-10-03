@@ -5,7 +5,7 @@ free-text fields (provider detail, denial text, coverage reasons) pass through `
 only typed columns are selected.
 """
 
-from datetime import date, datetime
+from datetime import UTC, date, datetime
 from decimal import Decimal
 from typing import Annotated, Literal
 
@@ -14,6 +14,8 @@ from pydantic import BaseModel, Field
 
 from api.auth import Owner
 from api.db import Pool
+from steward.config.jobs import COVERAGE_PROVIDER_JOB, JobsConfig, coverage_stale_after_hours
+from steward.config.store import load_active
 from steward.geo_codes import has_iso_columns
 from steward.redact import redact
 
@@ -95,6 +97,18 @@ class DataCoverage(BaseModel):
     )
     age_days: int | None = Field(
         default=None, description="Days from latest_period to today; null without a period."
+    )
+    stale_after_hours: int | None = Field(
+        default=None,
+        description="Hours after `checked_at` at which the row counts as stale: twice the "
+        "longest gap between scheduled runs of the job that refreshes this provider "
+        "(config/jobs.py, see COVERAGE_PROVIDER_JOB). Null when no enabled job is known to "
+        "refresh the provider.",
+    )
+    stale: bool | None = Field(
+        default=None,
+        description="True when `checked_at` is older than `stale_after_hours`; null (unknown, "
+        "not false) when there is no expected interval.",
     )
 
 
@@ -299,9 +313,15 @@ async def get_data_coverage(
         entity_kind,
     )
     today = date.today()
+    now = datetime.now(UTC)
+    stored = await load_active(pool, "jobs", JobsConfig)
+    jobs = stored.body if stored else JobsConfig()
+    after_by_provider = {p: coverage_stale_after_hours(jobs, p) for p in COVERAGE_PROVIDER_JOB}
     out: list[DataCoverage] = []
     for row in rows:
         item = dict(row)
+        stale_after = after_by_provider.get(item["provider"])
+        checked: datetime = item["checked_at"]
         expected, available = item["expected_periods"], item["available_periods"]
         latest: date | None = item["latest_period"]
         out.append(
@@ -315,6 +335,12 @@ async def get_data_coverage(
                     else None
                 ),
                 age_days=(today - latest).days if latest else None,
+                stale_after_hours=stale_after,
+                stale=(
+                    (now - checked).total_seconds() > stale_after * 3600
+                    if stale_after is not None
+                    else None
+                ),
             )
         )
     return out
@@ -345,13 +371,18 @@ async def get_data_coverage_summary(
     entity_key: str | None = None,
     state: str | None = None,
     period: date | None = None,
+    entity_kind: Annotated[
+        Literal["security", "geography", "other"] | None,
+        Query(description="Same meaning as on GET /data/coverage."),
+    ] = None,
 ) -> CoverageSummary:
     sql = coverage_base(await has_iso_columns(pool)) + SUMMARY_SQL.replace(
         "__KEY__", GROUP_KEYS[group_by]
-    )
+    ).replace("from c group", "from c where ($6::text is null or entity_kind=$6) group")
     rows = await pool.fetch(
         sql,
         *_filters(provider, dataset, entity_key, state, period),
+        entity_kind,
     )
     groups: dict[str | None, CoverageGroup] = {}
     for row in rows:

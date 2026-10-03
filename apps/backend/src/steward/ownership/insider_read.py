@@ -330,8 +330,9 @@ async def holding_insider_activity(
                   f.amendment_link_status, t.*
            from public.insider_filing f join public.insider_transaction t using (accession)
            left join public.insider_filing sup on sup.accession = f.superseded_by_accession
-           where (f.ticker = $1 or exists (select 1 from public.insider_filing_ticker l
-                                           where l.accession = f.accession and l.ticker = $1))
+           where (lower(f.ticker) = lower($1)
+                  or exists (select 1 from public.insider_filing_ticker l
+                             where l.accession = f.accession and lower(l.ticker) = lower($1)))
              and coalesce(t.transaction_date, f.filed) between $2 and $3
              and ($4::date is null or f.filed <= $4::date)
            order by coalesce(t.transaction_date, f.filed) desc, f.filed desc,

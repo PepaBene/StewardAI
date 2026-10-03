@@ -23,7 +23,7 @@ from steward.data_context.research import claim_sentence, company_context
 from steward.earnings.metrics import BASE_METRICS
 from steward.ownership.read import holding_ownership
 from steward.reference.read import holding_identity, price_history
-from steward.research.sources import CitedSentence, Registry, sec_filing_url
+from steward.research.sources import CitedSentence, Registry, iso_known_at, sec_filing_url
 
 SEC_13F_INDEX = "https://www.sec.gov/data-research/sec-markets-data/form-13f-data-sets"
 VOTING_RIGHTS = re.compile(
@@ -91,7 +91,8 @@ def _qi(f: asyncpg.Record) -> int | None:
 async def _facts(pool: asyncpg.Pool, ticker: str) -> list[asyncpg.Record]:
     rows: list[asyncpg.Record] = await pool.fetch(
         "select id, metric, fiscal_year, fiscal_period, period, value_units, value_as_written,"
-        " scale, unit, currency, snippet, source_url from public.fact where ticker = $1"
+        " scale, unit, currency, snippet, source_url, extracted_at"
+        " from public.fact where ticker = $1"
         " and status = 'verified' and basis = 'reported' and metric = any($2::text[])"
         " order by fiscal_year desc, fiscal_period desc, id desc",
         ticker,
@@ -110,6 +111,7 @@ def _fact_source(reg: Registry, f: asyncpg.Record) -> str:
         tier=1,
         snippet=f["snippet"],
         as_of=f["period"],
+        known_at=iso_known_at(f["extracted_at"]),
     )
 
 
@@ -157,11 +159,12 @@ async def _price(
             tier=1,
             snippet=f"current price {position['current_price']} {position['instrument_currency']}",
             as_of=str(position["snapshot_date"]),
+            known_at=iso_known_at(position["captured_at"]),
         )
         return position["current_price"], position["instrument_currency"], sid
     if symbol:
         bar = await pool.fetchrow(
-            "select date, close from public.price_bar where symbol = $1"
+            "select date, close, fetched_at from public.price_bar where symbol = $1"
             " and (bar_type = 'adjusted' or (source = 'eodhd' and bar_type = 'raw'))"
             " order by date desc limit 1",
             symbol,
@@ -175,6 +178,7 @@ async def _price(
                 tier=2,
                 snippet=f"close {bar['close']} on {bar['date']}",
                 as_of=str(bar["date"]),
+                known_at=iso_known_at(bar["fetched_at"]),
             )
             return bar["close"], None, sid
     return None, None, None
@@ -267,7 +271,8 @@ async def valuation(
             )
     if "dividend_yield_ttm" in methods:
         rows = await pool.fetch(
-            "select id, occurred_at, (raw ->> 'grossAmountPerShare')::numeric as per_share"
+            "select id, occurred_at, created_at,"
+            " (raw ->> 'grossAmountPerShare')::numeric as per_share"
             " from public.transaction where type = 'dividend' and ticker = $1"
             " and occurred_at >= now() - interval '365 days'"
             " and raw ? 'grossAmountPerShare' order by occurred_at",
@@ -284,6 +289,7 @@ async def valuation(
                 tier=1,
                 snippet=f"gross {r['per_share']} per share",
                 as_of=str(r["occurred_at"].date()),
+                known_at=iso_known_at(r["created_at"]),
             )
             for r in rows
         ]
@@ -349,7 +355,8 @@ async def ownership(pool: asyncpg.Pool, reg: Registry, ticker: str, top: int = 3
                 )
             )
     notices = await pool.fetch(
-        "select id, url, headline, summary, outlet, tier, published_at from public.news_item"
+        "select id, url, headline, summary, outlet, tier, published_at, first_seen_at"
+        " from public.news_item"
         " where $1 = any(tickers) and published_at >= now() - interval '365 days'"
         " order by published_at desc limit 200",
         ticker,
@@ -363,6 +370,7 @@ async def ownership(pool: asyncpg.Pool, reg: Registry, ticker: str, top: int = 3
             tier=n["tier"],
             snippet=n["summary"],
             as_of=str(n["published_at"].date()),
+            known_at=iso_known_at(n["first_seen_at"]),
         )
         section.sentences.append(
             CitedSentence(
@@ -385,6 +393,12 @@ async def relationships(
         section.note = "No identity data is stored for this ticker."
         return section, peers
     tier_of = {"gleif": 1, "edgar": 1, "owner": 1, "wikidata": 3}
+    created = {
+        r["id"]: r["created_at"]
+        for r in await pool.fetch(
+            "select id, created_at from public.entity_relationship where ticker = $1", ticker
+        )
+    }
 
     def rel_source(r: Any) -> str:
         return reg.add(
@@ -396,6 +410,7 @@ async def relationships(
             tier=r.tier,
             snippet=f"{r.type} {r.object_name}, source {r.source}, as of {r.as_of}",
             as_of=str(r.as_of) if r.as_of else None,
+            known_at=iso_known_at(created.get(r.id)),
         )
 
     for r in identity.parents:
@@ -465,6 +480,15 @@ async def risk(pool: asyncpg.Pool, reg: Registry, ticker: str) -> tuple[CodeSect
         tier=2 if history.source == "Stooq" else 3,
         snippet=f"{len(history.bars)} daily closes; last {history.bars[-1].close} on {last}",
         as_of=str(last),
+        known_at=iso_known_at(
+            await pool.fetchval(
+                "select max(fetched_at) from public.price_bar where symbol = $1"
+                " and date between $2 and $3",
+                history.symbol,
+                first,
+                last,
+            )
+        ),
     )
     r = history.risk
     parts = []
@@ -521,6 +545,7 @@ async def liquidity(
         snippet=f"liquid {row['liquid']}, average daily turnover {row['avg_daily_turnover']} "
         f"{row['turnover_currency']}, {row['period_from']} to {row['period_to']}",
         as_of=str(row["period_to"]) if row["period_to"] else None,
+        known_at=iso_known_at(row["fetched_at"]),
     )
     text = (
         f"ESMA classifies the share as {'liquid' if row['liquid'] else 'not liquid'}, with "
@@ -544,6 +569,7 @@ async def liquidity(
                 tier=1,
                 snippet=f"value {position['value']} {position['instrument_currency']}",
                 as_of=str(position["snapshot_date"]),
+                known_at=iso_known_at(position["captured_at"]),
             )
         )
     section.sentences.append(CitedSentence(text=text + ".", source_ids=ids))
@@ -571,6 +597,7 @@ async def data_context_section(
             tier=1 if claim.provenance == "primary" else 2,
             snippet=claim_sentence(claim),
             as_of=str(claim.known_as_of),
+            known_at=iso_known_at(claim.known_as_of),
         )
         section.sentences.append(CitedSentence(text=claim_sentence(claim), source_ids=[sid]))
     if not section.sentences:
@@ -649,7 +676,7 @@ async def gather(
             f"{'; '.join(thesis.exit_conditions) or 'none'}.",
         )
         verdicts = await pool.fetch(
-            "select distinct on (kpi_id) id, kpi_id, status, period, rationale from"
+            "select distinct on (kpi_id) id, kpi_id, status, period, rationale, created_at from"
             " public.verdict where ticker = $1 order by kpi_id, id desc",
             ticker,
         )
@@ -661,6 +688,7 @@ async def gather(
                 app_path=f"/holdings/{ticker}",
                 tier=1,
                 snippet=v["rationale"],
+                known_at=iso_known_at(v["created_at"]),
             )
     strategy_sid = None
     if strategy is not None:
@@ -679,7 +707,8 @@ async def gather(
             f"Rules: {rules or 'none'}.",
         )
     news = await pool.fetch(
-        "select id, url, headline, summary, outlet, tier, published_at from public.news_item"
+        "select id, url, headline, summary, outlet, tier, published_at, first_seen_at"
+        " from public.news_item"
         " where $1 = any(tickers) and tier = any($2::int[])"
         " order by published_at desc limit 15",
         ticker,
@@ -694,6 +723,7 @@ async def gather(
             tier=n["tier"],
             snippet=(n["summary"] or "")[:800] or None,
             as_of=str(n["published_at"].date()),
+            known_at=iso_known_at(n["first_seen_at"]),
         )
         for n in news
     ]

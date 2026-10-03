@@ -7,6 +7,7 @@ backs it. The report's source sidebar is this list, and every claim-level citati
 to one of its entries.
 """
 
+import datetime as dt
 from typing import Any, Literal
 
 from pydantic import BaseModel, Field
@@ -41,7 +42,52 @@ class Source(BaseModel):
     )
     tier: int | None = None
     snippet: str | None = Field(default=None, description="The stored text it rests on.")
-    as_of: str | None = None
+    as_of: str | None = Field(
+        default=None,
+        description="The date the record is about (period end, snapshot, bar or publication "
+        "date): not when the app learned of it.",
+    )
+    known_at: str | None = Field(
+        default=None,
+        description="ISO 8601 time the stored record became known to the app (ingestion time). "
+        "Null when the source has no such time (13F data, web search, thesis, strategy) or the "
+        "report predates the field; never inferred.",
+    )
+
+
+def iso_known_at(value: dt.datetime | dt.date | None) -> str | None:
+    """A stored timestamp as an ISO string (UTC for datetimes), None when absent."""
+    if value is None:
+        return None
+    if isinstance(value, dt.datetime):
+        if value.tzinfo is None:
+            value = value.replace(tzinfo=dt.UTC)
+        return value.astimezone(dt.UTC).isoformat()
+    return value.isoformat()
+
+
+def _known_key(value: str) -> dt.datetime | None:
+    try:
+        parsed = dt.datetime.fromisoformat(value)
+    except ValueError:
+        return None
+    return parsed if parsed.tzinfo else parsed.replace(tzinfo=dt.UTC)
+
+
+def known_at_range(sources: list[Source], source_ids: list[str]) -> tuple[str | None, str | None]:
+    """(oldest, newest) `known_at` over the cited sources; (None, None) when nothing is cited,
+    a cited source is unknown or any cited source has no usable known_at."""
+    by_id = {s.id: s for s in sources}
+    keyed: list[tuple[dt.datetime, str]] = []
+    for sid in source_ids:
+        source = by_id.get(sid)
+        key = _known_key(source.known_at) if source and source.known_at else None
+        if source is None or source.known_at is None or key is None:
+            return None, None
+        keyed.append((key, source.known_at))
+    if not keyed:
+        return None, None
+    return min(keyed)[1], max(keyed)[1]
 
 
 class CitedSentence(BaseModel):
@@ -50,6 +96,16 @@ class CitedSentence(BaseModel):
     written_by: Literal["code", "model"] = "code"
     check: CheckStatus | None = None
     check_reason: str | None = None
+    known_at_min: str | None = Field(
+        default=None,
+        description="Oldest known_at over the cited sources (ISO 8601); null when any cited "
+        "source has no known_at. Derived, never stored by the writer.",
+    )
+    known_at_max: str | None = Field(
+        default=None,
+        description="Newest known_at over the cited sources: the claim as a whole was known "
+        "to the app from this time on. Null when any cited source has no known_at.",
+    )
 
 
 class Registry:

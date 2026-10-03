@@ -58,7 +58,7 @@ async def store_patent_family(
     title: str | None,
     cpc_codes: list[str],
     jurisdictions: list[str],
-    forward_citations: int,
+    forward_citations: int | None,
     backward_citations: int,
     legal_status: str,
     source: str,
@@ -280,6 +280,7 @@ def patent_trend(
                 {
                     "families": set(),
                     "forward_citations": 0,
+                    "families_with_citation_data": 0,
                     "status": dict.fromkeys(LEGAL_STATUSES, 0),
                     "years_to_grant": [],
                     "expiring_5y": 0,
@@ -288,9 +289,10 @@ def patent_trend(
                 },
             )
             item["families"].add(key)
-            item["forward_citations"] += int(
-                row.get("citations_forward") or 0  # type: ignore[call-overload]
-            )
+            cited = row.get("citations_forward")
+            if cited is not None:  # NULL = the source could not supply it: unknown, not 0
+                item["forward_citations"] += int(cited)  # type: ignore[call-overload]
+                item["families_with_citation_data"] += 1
             item["status"][status] += 1
             if isinstance(grant, dt.date) and grant >= priority:
                 item["years_to_grant"].append(_years(priority, grant))
@@ -305,7 +307,10 @@ def patent_trend(
             "cpc": cpc,
             "year": year,
             "families": len(cast("set[str]", item["families"])),
-            "forward_citations": item["forward_citations"],
+            "forward_citations": (
+                item["forward_citations"] if item["families_with_citation_data"] else None
+            ),
+            "families_with_citation_data": item["families_with_citation_data"],
             "legal_status_counts": item["status"],
             "median_years_to_grant": (
                 round(statistics.median(item["years_to_grant"]), 2)

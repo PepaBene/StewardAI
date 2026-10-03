@@ -1079,7 +1079,7 @@ async def test_epo_collector_stores_families_publications_and_attribution(
     assert fam["family_id_source"] == "ops_family_id"
     assert fam["jurisdictions"] == ["EP", "US"]
     assert fam["priority_date"] == dt.date(2005, 11, 15) and fam["citations_backward"] == 3
-    assert fam["citations_forward"] == 0 and "not provided" in fam["raw"]
+    assert fam["citations_forward"] is None and "not provided" in fam["raw"]
     assert fam["grant_date"] == dt.date(2012, 2, 28)
     assert fam["legal_status"] == "expired"  # a lapse event in the legal-service response
     pubs = {

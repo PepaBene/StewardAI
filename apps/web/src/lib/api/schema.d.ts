@@ -232,6 +232,29 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/portfolio/correlation": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Portfolio Correlation
+         * @description The correlation matrix of the current holdings, computed server-side from stored
+         *     adjusted closes (daily simple returns on the days both traded). A pair with fewer than
+         *     `min_shared` shared returns is null, never 0; `counts` gives every pair's sample size and
+         *     `notes` the reason for a null. Ordering by cluster is left to the client.
+         */
+        get: operations["get_portfolio_correlation"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/market/strip": {
         parameters: {
             query?: never;
@@ -356,6 +379,9 @@ export interface paths {
         /**
          * Get Macro Context
          * @description Latest point-in-time country context, ranges, provenance and mapped exposure.
+         *
+         *     `history=N` (0 = off, max 60) adds per series the last N periods with first-release and
+         *     latest values, known by `as_of` only.
          */
         get: operations["get_macro_context"];
         put?: never;
@@ -464,7 +490,8 @@ export interface paths {
         };
         /**
          * Get Trade Context
-         * @description Product value plus reporter-wide trade metrics; no issuer contract is inferred.
+         * @description Trade of one product (value, metrics, partners, concentration trend); no issuer contract
+         *     is inferred. Reporter-wide aggregates are kept apart under `reporter_wide`.
          *
          *     `reporter` and `partner` may be an ISO alpha-2 code or the UN M49 number Comtrade uses.
          *     Only the latest revision of each observation is used.
@@ -3677,11 +3704,19 @@ export interface paths {
         get: operations["get_coverage_ledger"];
         /**
          * Put Coverage Entry
-         * @description Record an owner-verified ledger row; a refresh never overwrites it.
+         * @description Record an owner-verified ledger row; a refresh never overwrites it (DELETE the same
+         *     subject to revert to the derived row).
          */
         put: operations["put_coverage_entry"];
         post?: never;
-        delete?: never;
+        /**
+         * Delete Coverage Entry
+         * @description Remove an owner-entered ledger row and restore the derived row (re-derived from the
+         *     Jobs config and the stored snapshots). Idempotent: with no manual row for the subject
+         *     nothing is deleted (a derived row is never removed here) and the ledger is returned
+         *     unchanged apart from the refresh of derived rows.
+         */
+        delete: operations["delete_coverage_entry"];
         options?: never;
         head?: never;
         patch?: never;
@@ -5157,6 +5192,16 @@ export interface components {
             check?: ("supported" | "unsupported" | "unchecked") | null;
             /** Check Reason */
             check_reason?: string | null;
+            /**
+             * Known At Min
+             * @description Oldest known_at over the cited sources (ISO 8601); null when any cited source has no known_at. Derived, never stored by the writer.
+             */
+            known_at_min?: string | null;
+            /**
+             * Known At Max
+             * @description Newest known_at over the cited sources: the claim as a whole was known to the app from this time on. Null when any cited source has no known_at.
+             */
+            known_at_max?: string | null;
         };
         /** Claim */
         Claim: {
@@ -5709,6 +5754,10 @@ export interface components {
             previous_period?: string | null;
             /** Previous Value */
             previous_value?: number | string | null;
+            /** History */
+            history?: components["schemas"]["SeriesVintage"][];
+            /** Release Calendar */
+            release_calendar?: string | null;
         };
         /** ContradictionResolution */
         ContradictionResolution: {
@@ -5877,7 +5926,10 @@ export interface components {
             decision: "confirmed" | "rejected" | "suggested";
             /** Reason */
             reason: string;
-            /** Evidence Id */
+            /**
+             * Evidence Id
+             * @description Id of an existing source evidence row; 422 when it does not exist.
+             */
             evidence_id?: number | null;
         };
         /** CorporateActionInput */
@@ -5941,6 +5993,31 @@ export interface components {
             ticker: string;
             /** Correlation */
             correlation: number | null;
+        };
+        /** CorrelationHolding */
+        CorrelationHolding: {
+            /** Ticker */
+            ticker: string;
+            /**
+             * Symbol
+             * @description Symbol of the series used; null when none is stored.
+             */
+            symbol: string | null;
+            /**
+             * Source
+             * @description Whose daily closes (Stooq, Yahoo, ...); null if none.
+             */
+            source: string | null;
+            /**
+             * As Of
+             * @description Date of the latest close inside the window.
+             */
+            as_of: string | null;
+            /**
+             * Observations
+             * @description Closes of this series inside the window.
+             */
+            observations: number;
         };
         /**
          * CorroborationRules
@@ -6209,6 +6286,16 @@ export interface components {
              * @description Days from latest_period to today; null without a period.
              */
             age_days?: number | null;
+            /**
+             * Stale After Hours
+             * @description Hours after `checked_at` at which the row counts as stale: twice the longest gap between scheduled runs of the job that refreshes this provider (config/jobs.py, see COVERAGE_PROVIDER_JOB). Null when no enabled job is known to refresh the provider.
+             */
+            stale_after_hours?: number | null;
+            /**
+             * Stale
+             * @description True when `checked_at` is older than `stale_after_hours`; null (unknown, not false) when there is no expected interval.
+             */
+            stale?: boolean | null;
         };
         /** DayCount */
         DayCount: {
@@ -7644,6 +7731,15 @@ export interface components {
              * @description Buckets add up to the total within tolerance.
              */
             reconciles: boolean;
+            /**
+             * Issuer Buckets
+             * @description Per returned issuer (`issuers[].key`): bucket key -> that issuer's weight in this bucket, as a fraction of total portfolio value. Additive per row, so an issuer split across buckets (e.g. 'Technology' and 'Information Technology', an ADR + ordinary in two currencies) appears in each; summed over ALL issuers a bucket's value equals `buckets[].weight` minus its non-issuer part (cash, fund cash, unknown fund weight are not issuers). Only the top `top` issuers are listed, so the rest of a bucket is `bucket.weight - sum(listed)`.
+             */
+            issuer_buckets?: {
+                [key: string]: {
+                    [key: string]: number;
+                };
+            };
         };
         /** FactCheck */
         FactCheck: {
@@ -9116,6 +9212,18 @@ export interface components {
             as_of: string;
             /** Positions */
             positions: components["schemas"]["FundPosition"][];
+            /**
+             * Matching Positions
+             * @description Positions matching this holding across the loaded funds (ignores `limit`).
+             * @default 0
+             */
+            matching_positions: number;
+            /**
+             * Truncated
+             * @description True when `matching_positions` exceeds the returned positions (`limit` cut rows off).
+             * @default false
+             */
+            truncated: boolean;
             coverage: components["schemas"]["NportCoverage"];
         };
         /** HoldingIdentity */
@@ -9323,7 +9431,10 @@ export interface components {
         HoldingPdmrOut: {
             /** Ticker */
             ticker: string;
+            /** @description Channel-wide (all issuers) counts and state, not specific to `ticker`; see `ticker_status` for this holding. */
             status: components["schemas"]["PdmrStatus"];
+            /** @description The same counts restricted to this ticker (case-insensitive). `state` is `available` once one of this ticker's announcements was parsed, else `access_unverified`. */
+            ticker_status?: components["schemas"]["PdmrStatus"] | null;
             /** Notifications */
             notifications: components["schemas"]["PdmrNotificationOut"][];
             /** Limitations */
@@ -9345,6 +9456,16 @@ export interface components {
              * @description Whose daily closes; null when none are stored.
              */
             source?: ("Stooq" | "Yahoo" | "EODHD" | "Alpha Vantage") | null;
+            /**
+             * Quote Currency
+             * @description Unit `bars`, `last_close` and `previous_close` are quoted in: GBX (pence), ZAC, ILA, or an ISO currency code (USD, EUR, ...). From the stored series' own currency; falls back to the instrument's currency; null when neither is known.
+             */
+            quote_currency?: string | null;
+            /**
+             * Quote Currency Basis
+             * @description Where `quote_currency` comes from.
+             */
+            quote_currency_basis?: ("series" | "instrument") | null;
             /**
              * As Of
              * @description Date of the latest stored close.
@@ -11951,6 +12072,26 @@ export interface components {
             /** Latest Filed */
             latest_filed: string | null;
             /**
+             * Earliest Filed
+             * @description Earliest filing date of any manager's effective filing.
+             */
+            earliest_filed?: string | null;
+            /**
+             * Latest Filing Lag Days
+             * @description `latest_filed` minus `period`, in days: the latest filing of the period (including late amendments), not a single filing.
+             */
+            latest_filing_lag_days?: number | null;
+            /**
+             * Earliest Filing Lag Days
+             * @description `earliest_filed` minus `period`, in days.
+             */
+            earliest_filing_lag_days?: number | null;
+            /**
+             * Previous Period
+             * @description The period the `*_change` figures are measured against (previous period loaded, possibly not the adjacent quarter); null for the oldest period loaded.
+             */
+            previous_period?: string | null;
+            /**
              * Holders Change
              * @description Against the previous period loaded.
              */
@@ -12020,9 +12161,9 @@ export interface components {
             jurisdictions?: string[];
             /**
              * Forward Citations
-             * @default 0
+             * @description Null = the source does not supply it (unknown, not 0).
              */
-            forward_citations: number;
+            forward_citations?: number | null;
             /**
              * Backward Citations
              * @default 0
@@ -12278,6 +12419,55 @@ export interface components {
             hhi_denominator: number | string;
             /** Note */
             note: string;
+        };
+        /** PortfolioCorrelation */
+        PortfolioCorrelation: {
+            /** Days */
+            days: number;
+            /** Min Shared */
+            min_shared: number;
+            /**
+             * Start
+             * @description First day of the window (latest close - days).
+             */
+            start: string | null;
+            /**
+             * End
+             * @description Latest stored close among the holdings.
+             */
+            end: string | null;
+            /**
+             * Max Returns
+             * @description Most recent shared returns used per pair (days scaled to trading days).
+             */
+            max_returns: number;
+            /** Method */
+            method: string;
+            /**
+             * Tickers
+             * @description Current holdings in row/column order (by ticker).
+             */
+            tickers: string[];
+            /**
+             * Holdings
+             * @description Same order as `tickers`.
+             */
+            holdings: components["schemas"]["CorrelationHolding"][];
+            /**
+             * Matrix
+             * @description matrix[i][j]: correlation (-1..1, unitless) of tickers i and j; null when the pair shares fewer than `min_shared` returns or a series is flat. The diagonal is 1.0 when the holding has enough returns.
+             */
+            matrix: (number | null)[][];
+            /**
+             * Counts
+             * @description counts[i][j]: shared daily returns used for the pair (0 when no series).
+             */
+            counts: number[][];
+            /**
+             * Notes
+             * @description notes[i][j]: why matrix[i][j] is null, and a caution when the two series come from different sources (their adjustments can differ); null when nothing to say.
+             */
+            notes: (string | null)[][];
         };
         /** PortfolioDataContext */
         PortfolioDataContext: {
@@ -12791,6 +12981,13 @@ export interface components {
              */
             fallback_reason?: string | null;
             /**
+             * Quote Currency
+             * @description Unit `bars` are quoted in (GBX = pence, ZAC, ILA, or an ISO code), from the stored series; null when unknown.
+             */
+            quote_currency?: string | null;
+            /** @description Unadjusted bars of the same series where stored; see `RawBars`. */
+            raw_bars?: components["schemas"]["RawBars"] | null;
+            /**
              * As Of
              * @description Date of the latest stored close.
              */
@@ -13072,6 +13269,43 @@ export interface components {
              * @example Europe/Prague
              */
             timezone: string;
+        };
+        /**
+         * RawBars
+         * @description The unadjusted bars of the same series as `PriceHistory.bars`, when the source stored
+         *     them (EODHD, Alpha Vantage). Stooq and Yahoo store adjusted closes only: `bars` is then
+         *     empty and `reason` says so. Raw bars are never spliced with adjusted ones.
+         */
+        RawBars: {
+            /** Available */
+            available: boolean;
+            /**
+             * Source
+             * @description Whose raw bars (the series' source).
+             */
+            source?: string | null;
+            /** Symbol */
+            symbol?: string | null;
+            /**
+             * Quote Unit
+             * @description Unit the prices are quoted in: GBX (pence), ZAC, ILA, or an ISO currency.
+             */
+            quote_unit?: string | null;
+            /**
+             * Currency
+             * @description Quote currency code as stored.
+             */
+            currency?: string | null;
+            /**
+             * Reason
+             * @description Why there are no raw bars.
+             */
+            reason?: string | null;
+            /**
+             * Bars
+             * @description Raw OHLC, oldest first; same window as `bars`.
+             */
+            bars: components["schemas"]["PriceBarOut"][];
         };
         /** ReadinessResponse */
         ReadinessResponse: {
@@ -13516,6 +13750,26 @@ export interface components {
              * @description Digests: the distinct sources it cites, counted by URL across its news sources (sources[].url) and the filings of its cited facts (fact_sources[].source_url); several facts from one filing count once. Null for report kinds without a source list.
              */
             citation_count?: number | null;
+        };
+        /**
+         * ReporterWideTrade
+         * @description The same figures over every product stored for the reporter. They move when another
+         *     product is collected, so they are context, not a property of the requested product.
+         */
+        ReporterWideTrade: {
+            /** Periods */
+            periods: number;
+            /** Hs Revision */
+            hs_revision: string;
+            /**
+             * Products
+             * @description Distinct HS codes stored for the reporter.
+             */
+            products: number;
+            /** Metrics */
+            metrics: {
+                [key: string]: number | string | null;
+            };
         };
         /** ReportingExceptionOut */
         ReportingExceptionOut: {
@@ -14240,6 +14494,33 @@ export interface components {
             /** Geographies */
             geographies: string[];
         };
+        /**
+         * SeriesVintage
+         * @description One period of a series with the value first published and the latest known by `as_of`.
+         *
+         *     `value_first_release` is null when the first publication was not archived (the oldest
+         *     stored row has no release date: a backfill or a provider that keeps no history); then
+         *     `vintage_unavailable` is true and nothing may be drawn as a "first release".
+         */
+        SeriesVintage: {
+            /**
+             * Period
+             * Format: date
+             */
+            period: string;
+            /** Value Latest */
+            value_latest: number | string;
+            /** Value First Release */
+            value_first_release: number | string | null;
+            /** Vintage Unavailable */
+            vintage_unavailable: boolean;
+            /** Released At */
+            released_at: string | null;
+            /** Revised At */
+            revised_at: string | null;
+            /** Revision Count */
+            revision_count: number;
+        };
         /** SeverityDay */
         SeverityDay: {
             /**
@@ -14509,8 +14790,16 @@ export interface components {
              * @description The stored text it rests on.
              */
             snippet?: string | null;
-            /** As Of */
+            /**
+             * As Of
+             * @description The date the record is about (period end, snapshot, bar or publication date): not when the app learned of it.
+             */
             as_of?: string | null;
+            /**
+             * Known At
+             * @description ISO 8601 time the stored record became known to the app (ingestion time). Null when the source has no such time (13F data, web search, thesis, strategy) or the report predates the field; never inferred.
+             */
+            known_at?: string | null;
         };
         /** SourceAccess */
         SourceAccess: {
@@ -15145,6 +15434,21 @@ export interface components {
              */
             accession: string;
             /**
+             * Filed
+             * @description Latest filing date among this manager's effective filings of the period (an original 13F-HR or amendments).
+             */
+            filed?: string | null;
+            /**
+             * Filing Lag Days
+             * @description `filed` minus the report period end, in days.
+             */
+            filing_lag_days?: number | null;
+            /**
+             * Previous Period End
+             * @description The report period `prev_shares` / `shares_change_pct` are measured against (the previous period loaded, not necessarily the adjacent quarter); null when no earlier period is loaded.
+             */
+            previous_period_end?: string | null;
+            /**
              * Prev Shares
              * @description The same manager's shares in the previous report period loaded (`top_holders_previous_period`); null when it held none then or no earlier period is loaded.
              */
@@ -15186,7 +15490,13 @@ export interface components {
             /** Name */
             name: string;
         };
-        /** TradeContext */
+        /**
+         * TradeContext
+         * @description Everything outside `reporter_wide` describes the requested `hs_code` only.
+         *
+         *     Units: values are USD; growth, share, hhi and unmapped_share are fractions (0.18 = 18%);
+         *     hhi is on a 0..1 scale (x10,000 for the classic index).
+         */
         TradeContext: {
             /** Reporter */
             reporter: string;
@@ -15219,6 +15529,12 @@ export interface components {
             source_url: string | null;
             /** Known At */
             known_at: string | null;
+            reporter_wide?: components["schemas"]["ReporterWideTrade"] | null;
+            /**
+             * Partners
+             * @description Per flow: latest-period partner rows with share of the product's total, the unmapped remainder (never folded into a partner) and a per-period hhi history.
+             */
+            partners?: components["schemas"]["TradeFlowPartners"][];
             /**
              * Notice
              * @default National trade statistics do not establish an issuer contract.
@@ -15248,6 +15564,97 @@ export interface components {
             notice: string;
             /** Gap */
             gap?: string | null;
+        };
+        /** TradeFlowPartners */
+        TradeFlowPartners: {
+            /** Flow */
+            flow: string;
+            /**
+             * Period
+             * Format: date
+             * @description Latest period with a value for this flow.
+             */
+            period: string;
+            summary: components["schemas"]["TradePartnerPeriod"];
+            /**
+             * Partners
+             * @description Latest period, largest first.
+             */
+            partners: components["schemas"]["TradePartner"][];
+            /**
+             * History
+             * @description Per-period totals, unmapped remainder and hhi, oldest first, bounded; includes the latest period.
+             */
+            history: components["schemas"]["TradePartnerPeriod"][];
+        };
+        /** TradePartner */
+        TradePartner: {
+            /**
+             * Partner
+             * @description Partner code as stored (UN M49 number for Comtrade).
+             */
+            partner: string;
+            /**
+             * Partner Iso
+             * @description ISO alpha-2 when the code is a single country, else null (e.g. areas nes).
+             */
+            partner_iso: string | null;
+            /**
+             * Value
+             * @description Trade value in USD.
+             */
+            value: number | string;
+            /**
+             * Share
+             * @description Fraction (0..1) of the product's reporter total for this flow and period.
+             */
+            share: number | string | null;
+        };
+        /** TradePartnerPeriod */
+        TradePartnerPeriod: {
+            /**
+             * Period
+             * Format: date
+             */
+            period: string;
+            /**
+             * Total
+             * @description Reporter total in USD (World row, else partner sum).
+             */
+            total: number | string | null;
+            /**
+             * Total Basis
+             * @enum {string}
+             */
+            total_basis: "world_row" | "partner_sum";
+            /**
+             * Mapped Value
+             * @description Sum of the reported partner rows, USD.
+             */
+            mapped_value: number | string;
+            /**
+             * Unmapped Value
+             * @description total - mapped_value (>= 0); null when no World total was reported.
+             */
+            unmapped_value: number | string | null;
+            /**
+             * Unmapped Share
+             * @description unmapped_value / total, a fraction.
+             */
+            unmapped_share: number | string | null;
+            /** Partner Count */
+            partner_count: number;
+            /**
+             * Hhi
+             * @description Herfindahl index (0..1 fraction, x10,000 for the classic scale) over the reported partners' shares of mapped_value; the World aggregate is not a partner.
+             */
+            hhi: number | string | null;
+            /**
+             * Partners Exceed Total
+             * @description Partner rows add up to more than the World row (bad data).
+             * @default false
+             */
+            partners_exceed_total: boolean;
         };
         /** TradeRow */
         TradeRow: {
@@ -16354,6 +16761,40 @@ export interface operations {
             };
         };
     };
+    get_portfolio_correlation: {
+        parameters: {
+            query?: {
+                /** @description Calendar days of history. */
+                days?: number;
+                /** @description Fewest shared daily returns for a pair. */
+                min_shared?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PortfolioCorrelation"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     get_market_strip: {
         parameters: {
             query?: never;
@@ -16492,6 +16933,7 @@ export interface operations {
         parameters: {
             query?: {
                 as_of?: string | null;
+                history?: number;
             };
             header?: never;
             path: {
@@ -16667,6 +17109,7 @@ export interface operations {
         parameters: {
             query?: {
                 partner?: string | null;
+                history_periods?: number;
             };
             header?: never;
             path: {
@@ -16833,6 +17276,8 @@ export interface operations {
                 entity_key?: string | null;
                 state?: string | null;
                 period?: string | null;
+                /** @description Same meaning as on GET /data/coverage. */
+                entity_kind?: ("security" | "geography" | "other") | null;
             };
             header?: never;
             path?: never;
@@ -22180,6 +22625,38 @@ export interface operations {
                 "application/json": components["schemas"]["LedgerEntryInput"];
             };
         };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CoverageLedger"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_coverage_entry: {
+        parameters: {
+            query: {
+                subject_kind: "fund" | "index";
+                subject_key: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
         responses: {
             /** @description Successful Response */
             200: {

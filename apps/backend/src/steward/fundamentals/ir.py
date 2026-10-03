@@ -52,6 +52,7 @@ from steward.documents.fetch import (
     resolve_host,
 )
 from steward.documents.text import html_to_text
+from steward.forward_consensus import vintage_date
 from steward.free_sources import ForwardValue, store_forward_value
 from steward.jobs.runner import JobContext
 from steward.sources.documents import link_public_document
@@ -829,7 +830,8 @@ async def actual_vs_consensus(
         return {"state": "unsupported_metric", "metric": metric}
     actual = await pool.fetchrow(
         """select id,value,unit,currency,period_end,known_at,accession,source,
-                  coalesce((validation->>'reconciled')::boolean,false) reconciled
+                  coalesce((validation->>'reconciled')::boolean,false) reconciled,
+                  (validation->>'reconciled')::boolean reconciled_raw
            from public.financial_statement_fact
            where ticker=$1 and line_item=$2 and fiscal_period=$3 and value is not null
              and not (jsonb_array_length(coalesce(dimensions->'members','[]'::jsonb))>0)
@@ -861,8 +863,22 @@ async def actual_vs_consensus(
             "known_at": actual["known_at"],
             "accession": actual["accession"],
             "reconciled": actual["reconciled"],
+            # unchecked = no reconciliation ran (reconciled stays false for compatibility);
+            # failed = a check ran and the figures disagreed; passed = a check agreed.
+            "reconciliation_state": (
+                "unchecked"
+                if actual["reconciled_raw"] is None
+                else "passed"
+                if actual["reconciled_raw"]
+                else "failed"
+            ),
         },
     }
+    consensus_row = (
+        {**dict(consensus), "vintage_date": vintage_date(consensus["vintage"])}
+        if consensus is not None
+        else None
+    )
     if consensus is None:
         return {
             **result,
@@ -873,7 +889,7 @@ async def actual_vs_consensus(
         return {
             **result,
             "state": "currency_mismatch",
-            "consensus": dict(consensus),
+            "consensus": consensus_row,
             "reason": f"consensus in {consensus['currency']}, actual in {actual['currency']}",
         }
     expected = Decimal(consensus["value"])
@@ -881,7 +897,7 @@ async def actual_vs_consensus(
     return {
         **result,
         "state": "available",
-        "consensus": dict(consensus),
+        "consensus": consensus_row,
         "surprise": surprise,
         "surprise_percent": (surprise / abs(expected)) if expected != 0 else None,
     }

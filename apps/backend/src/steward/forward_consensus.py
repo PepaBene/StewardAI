@@ -21,6 +21,17 @@ from decimal import Decimal
 from typing import Any
 
 
+def vintage_date(vintage: str | None) -> str | None:
+    """The ISO date (YYYY-MM-DD) a free-text vintage starts with, else None: "2026-03-01" and
+    "2026-03-01 post-earnings" are dated, "Q1 2026 preview" is only a label. Never guessed."""
+    if not vintage:
+        return None
+    try:
+        return dt.date.fromisoformat(vintage.strip()[:10]).isoformat()
+    except ValueError:
+        return None
+
+
 def _number(value: Decimal | float | int | str | None) -> str:
     """Number as PostgreSQL's `trim_scale(x)::text` writes it ('1.5', '100', '')."""
     if value is None:

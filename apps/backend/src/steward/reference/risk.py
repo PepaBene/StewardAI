@@ -90,12 +90,22 @@ def beta(series: Series, benchmark: Series, window: int = TRADING_DAYS) -> float
     return _cov(x, y) / var if var > 0 else None
 
 
-def correlation(a: Series, b: Series, window: int = TRADING_DAYS) -> float | None:
+def paired_correlation(
+    a: Series, b: Series, window: int = TRADING_DAYS, min_shared: int = 20
+) -> tuple[float | None, int]:
+    """Pearson correlation of the paired daily simple returns and the number of pairs used.
+    The correlation is None (never 0) below `min_shared` pairs or when either side is flat."""
     x, y = _paired(a, b, window)
-    if len(x) < 20:
-        return None
+    if len(x) < min_shared or len(x) < 2:
+        return None, len(x)
     vx, vy = _cov(x, x), _cov(y, y)
-    return _cov(x, y) / math.sqrt(vx * vy) if vx > 0 and vy > 0 else None
+    if vx > 0 and vy > 0:
+        return _cov(x, y) / math.sqrt(vx * vy), len(x)
+    return None, len(x)
+
+
+def correlation(a: Series, b: Series, window: int = TRADING_DAYS) -> float | None:
+    return paired_correlation(a, b, window)[0]
 
 
 def figures(series: Series, benchmark: Series | None) -> RiskFigures:

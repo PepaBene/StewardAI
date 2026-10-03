@@ -72,7 +72,16 @@ class PdmrStatus(BaseModel):
 
 class HoldingPdmrOut(BaseModel):
     ticker: str
-    status: PdmrStatus
+    status: PdmrStatus = Field(
+        description="Channel-wide (all issuers) counts and state, not specific to `ticker`; "
+        "see `ticker_status` for this holding."
+    )
+    ticker_status: PdmrStatus | None = Field(
+        default=None,
+        description="The same counts restricted to this ticker (case-insensitive). `state` is "
+        "`available` once one of this ticker's announcements was parsed, else "
+        "`access_unverified`.",
+    )
     notifications: list[PdmrNotificationOut]
     limitations: list[str]
 
@@ -109,7 +118,7 @@ async def pdmr_access_from_db(pool: asyncpg.Pool) -> AccessResult:
 
 async def holding_pdmr(pool: asyncpg.Pool, ticker: str, *, limit: int = 100) -> HoldingPdmrOut:
     rows = await pool.fetch(
-        "select * from public.pdmr_notification where ticker = $1"
+        "select * from public.pdmr_notification where lower(ticker) = lower($1)"
         " order by announced_at desc nulls last, id desc limit $2",
         ticker,
         limit,
@@ -129,8 +138,22 @@ async def holding_pdmr(pool: asyncpg.Pool, ticker: str, *, limit: int = 100) -> 
     )
     by_status = {r["status"]: int(r["n"]) for r in status_rows}
     access = access_from_counts(by_status)
+    own_rows = await pool.fetch(
+        "select status, count(*) as n from public.pdmr_notification"
+        " where lower(ticker) = lower($1) group by status",
+        ticker,
+    )
+    own = {r["status"]: int(r["n"]) for r in own_rows}
+    own_access = access_from_counts(own)
     return HoldingPdmrOut(
         ticker=ticker,
+        ticker_status=PdmrStatus(
+            state=own_access.state.value,
+            detail=own_access.detail,
+            parsed=own.get("parsed", 0),
+            attempted=sum(own.values()),
+            by_status=own,
+        ),
         status=PdmrStatus(
             state=access.state.value,
             detail=access.detail,

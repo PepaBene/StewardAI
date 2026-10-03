@@ -17,7 +17,7 @@ import math
 from dataclasses import dataclass
 from typing import Any
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 
 from steward.ai import AINotConfigured, create_client
 from steward.config.holding_profiles import HoldingProfilesConfig
@@ -31,7 +31,7 @@ from steward.config.verification import VerificationConfig
 from steward.jobs.runner import JobContext, JobFailed
 from steward.news.normalize import host_of
 from steward.research.gather import Gathered, Valuation, gather
-from steward.research.sources import CitedSentence, Registry, Source
+from steward.research.sources import CitedSentence, Registry, Source, known_at_range
 from steward.research.writer import (
     SECTION_TITLES,
     ClaudeResearchWriter,
@@ -78,6 +78,17 @@ class ResearchBody(BaseModel):
         default=0, description="Model sentences removed for citing nothing checkable."
     )
     notes: list[str] = Field(default_factory=list)
+
+    @model_validator(mode="after")
+    def _derive_known_at(self) -> "ResearchBody":
+        """Per-sentence known-at bounds from the cited sources (old reports: sources carry no
+        known_at, so the bounds are null; nothing is invented)."""
+        for section in self.sections:
+            for sentence in section.sentences:
+                sentence.known_at_min, sentence.known_at_max = known_at_range(
+                    self.sources, sentence.source_ids
+                )
+        return self
 
 
 @dataclass

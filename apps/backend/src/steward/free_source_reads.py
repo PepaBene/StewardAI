@@ -13,7 +13,7 @@ from typing import Any
 import asyncpg
 
 from steward.db_json import decode_jsonb_object, decode_structured_rows
-from steward.forward_consensus import consensus_series
+from steward.forward_consensus import consensus_series, vintage_date
 from steward.geo_codes import has_column
 
 
@@ -88,7 +88,10 @@ async def forward_rows(
         ticker,
         as_of,
     )
-    return decode_structured_rows(rows, ("raw",))
+    out = decode_structured_rows(rows, ("raw",))
+    for row in out:
+        row["vintage_date"] = vintage_date(row.get("vintage"))
+    return out
 
 
 async def forward_payload(

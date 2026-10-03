@@ -32,6 +32,4 @@ async def get_insider_activity(
     limit: Annotated[int, Query(ge=1, le=500)] = 200,
 ) -> InsiderActivityOut:
     """Insider transactions by economic class and net discretionary (open-market) activity."""
-    return await holding_insider_activity(
-        pool, ticker.upper(), since=since, until=until, limit=limit
-    )
+    return await holding_insider_activity(pool, ticker, since=since, until=until, limit=limit)

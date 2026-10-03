@@ -69,12 +69,13 @@ async def get_insider_trades(
                   t.transaction_code, t.shares, t.price_per_share, t.acquired_disposed,
                   t.shares_owned_after, t.direct_indirect, t.derivative
            from public.insider_filing f join public.insider_transaction t using (accession)
-           where (f.ticker = $1 or exists (select 1 from public.insider_filing_ticker l
-                                           where l.accession = f.accession and l.ticker = $1))
+           where (lower(f.ticker) = lower($1)
+                  or exists (select 1 from public.insider_filing_ticker l
+                             where l.accession = f.accession and lower(l.ticker) = lower($1)))
              and f.form = any($2::text[])
            order by coalesce(t.transaction_date, f.filed) desc, f.filed desc, f.accession desc,
                     t.row_index limit $3""",
-        ticker.upper(),
+        ticker,
         selected,
         limit,
     )

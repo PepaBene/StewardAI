@@ -213,6 +213,21 @@ async def refresh_ledger(
     return entries
 
 
+async def delete_manual_entry(
+    pool: asyncpg.Pool, subject_kind: SubjectKind, subject_key: str
+) -> bool:
+    """Remove an owner-entered (manual) row; derived rows are never deleted here. True when a
+    manual row existed. The caller re-derives the row (`refresh_ledger`) so the derived entry
+    comes back from the stored snapshots; calling again is a no-op."""
+    result: str = await pool.execute(
+        "delete from public.fund_index_coverage where subject_kind = $1 and subject_key = $2"
+        " and origin = 'manual'",
+        subject_kind,
+        subject_key,
+    )
+    return result.endswith(" 1")
+
+
 class LedgerRow(BaseModel):
     subject_kind: SubjectKind
     subject_key: str

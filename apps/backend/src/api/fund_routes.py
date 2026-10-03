@@ -5,6 +5,7 @@ of `router` in api/main.py."""
 
 import datetime as dt
 import json
+import logging
 from decimal import Decimal
 from typing import Annotated, Any, Literal
 
@@ -25,6 +26,7 @@ from steward.funds.drift import read_audit
 from steward.lookthrough.coverage import (
     CoverageLedger,
     LedgerEntry,
+    delete_manual_entry,
     read_ledger,
     refresh_ledger,
     save_entry,
@@ -35,6 +37,7 @@ from steward.lookthrough.read import load_portfolio
 from steward.lookthrough.retention import pin_snapshot, pin_snapshots_as_of
 
 router = APIRouter()
+log = logging.getLogger(__name__)
 IsinPath = Annotated[str, Path(pattern=r"^[A-Z]{2}[A-Z0-9]{9}[0-9]$")]
 AsOf = Annotated[dt.date | None, Query(description="Answer as of this date (point-in-time).")]
 
@@ -108,7 +111,9 @@ class LedgerEntryInput(BaseModel):
 
 @router.put("/funds/coverage-ledger", tags=["funds"])
 async def put_coverage_entry(pool: Pool, _owner: Owner, body: LedgerEntryInput) -> CoverageLedger:
-    """Record an owner-verified ledger row; a refresh never overwrites it."""
+    """Record an owner-verified ledger row; a refresh never overwrites it (DELETE the same
+    subject to revert to the derived row)."""
+    log.info("coverage ledger manual row saved %s/%s", body.subject_kind, body.subject_key)
     await save_entry(
         pool,
         LedgerEntry(
@@ -123,6 +128,32 @@ async def put_coverage_entry(pool: Pool, _owner: Owner, body: LedgerEntryInput) 
             historical_constituents=body.historical_constituents,
             source_url=body.source_url,
         ),
+    )
+    return await read_ledger(pool)
+
+
+@router.delete("/funds/coverage-ledger", tags=["funds"])
+async def delete_coverage_entry(
+    pool: Pool,
+    _owner: Owner,
+    subject_kind: Annotated[Literal["fund", "index"], Query()],
+    subject_key: Annotated[str, Query(min_length=1, max_length=80)],
+) -> CoverageLedger:
+    """Remove an owner-entered ledger row and restore the derived row (re-derived from the
+    Jobs config and the stored snapshots). Idempotent: with no manual row for the subject
+    nothing is deleted (a derived row is never removed here) and the ledger is returned
+    unchanged apart from the refresh of derived rows."""
+    removed = await delete_manual_entry(pool, subject_kind, subject_key)
+    stored = await load_active(pool, "jobs", JobsConfig)
+    config = stored.body if stored else JobsConfig()
+    await refresh_ledger(
+        pool, config.look_through, config.prices.benchmark_symbols, await load_portfolio(pool)
+    )
+    log.info(
+        "coverage ledger manual row %s %s/%s",
+        "reverted" if removed else "not present",
+        subject_kind,
+        subject_key,
     )
     return await read_ledger(pool)
 

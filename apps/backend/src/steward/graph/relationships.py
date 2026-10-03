@@ -248,6 +248,15 @@ async def concentration(
                 anonymous_share_sum,
               coalesce(sum(reported_share),0) reported_share_sum,
               count(*) filter(where reported_share is null)::int missing_share_count,
+              count(*) filter(where not anonymous_counterparty
+                              and reported_share is null)::int named_missing_share_count,
+              count(*) filter(where anonymous_counterparty
+                              and reported_share is null)::int anonymous_missing_share_count,
+              sum(reported_share) filter(where not anonymous_counterparty)
+                named_reported_share_sum,
+              sum(reported_share) filter(where anonymous_counterparty)
+                anonymous_reported_share_sum,
+              sum(reported_share) total_reported_share_sum,
               max(reported_share) largest_share
            from public.relationship_disclosure
            where ticker=$1 and status='confirmed' and direction<>'unknown'
@@ -271,6 +280,11 @@ async def concentration(
     out: list[dict[str, Any]] = []
     for r in rows:
         item = dict(r)
+        # A side with an undisclosed share is only a lower bound; with nothing reported the
+        # sum is unknown (None), never 0.
+        item["named_at_least"] = item["named_missing_share_count"] > 0
+        item["anonymous_at_least"] = item["anonymous_missing_share_count"] > 0
+        item["total_at_least"] = item["missing_share_count"] > 0
         item["share_exceeds_total"] = Decimal(item["reported_share_sum"]) > 1
         item["open_contradictions"] = open_by_key.get(
             (item["fiscal_period"], item["relationship"]), 0

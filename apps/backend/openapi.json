@@ -626,6 +626,73 @@
         }
       }
     },
+    "/portfolio/correlation": {
+      "get": {
+        "tags": [
+          "portfolio"
+        ],
+        "summary": "Get Portfolio Correlation",
+        "description": "The correlation matrix of the current holdings, computed server-side from stored\nadjusted closes (daily simple returns on the days both traded). A pair with fewer than\n`min_shared` shared returns is null, never 0; `counts` gives every pair's sample size and\n`notes` the reason for a null. Ordering by cluster is left to the client.",
+        "operationId": "get_portfolio_correlation",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "days",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 3700,
+              "minimum": 30,
+              "description": "Calendar days of history.",
+              "default": 365,
+              "title": "Days"
+            },
+            "description": "Calendar days of history."
+          },
+          {
+            "name": "min_shared",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 1000,
+              "minimum": 2,
+              "description": "Fewest shared daily returns for a pair.",
+              "default": 20,
+              "title": "Min Shared"
+            },
+            "description": "Fewest shared daily returns for a pair."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PortfolioCorrelation"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/market/strip": {
       "get": {
         "tags": [
@@ -844,7 +911,7 @@
           "macro"
         ],
         "summary": "Get Macro Context",
-        "description": "Latest point-in-time country context, ranges, provenance and mapped exposure.",
+        "description": "Latest point-in-time country context, ranges, provenance and mapped exposure.\n\n`history=N` (0 = off, max 60) adds per series the last N periods with first-release and\nlatest values, known by `as_of` only.",
         "operationId": "get_macro_context",
         "security": [
           {
@@ -876,6 +943,18 @@
                 }
               ],
               "title": "As Of"
+            }
+          },
+          {
+            "name": "history",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 60,
+              "minimum": 0,
+              "default": 0,
+              "title": "History"
             }
           }
         ],
@@ -1108,7 +1187,7 @@
           "macro"
         ],
         "summary": "Get Trade Context",
-        "description": "Product value plus reporter-wide trade metrics; no issuer contract is inferred.\n\n`reporter` and `partner` may be an ISO alpha-2 code or the UN M49 number Comtrade uses.\nOnly the latest revision of each observation is used.",
+        "description": "Trade of one product (value, metrics, partners, concentration trend); no issuer contract\nis inferred. Reporter-wide aggregates are kept apart under `reporter_wide`.\n\n`reporter` and `partner` may be an ISO alpha-2 code or the UN M49 number Comtrade uses.\nOnly the latest revision of each observation is used.",
         "operationId": "get_trade_context",
         "security": [
           {
@@ -1148,6 +1227,18 @@
                 }
               ],
               "title": "Partner"
+            }
+          },
+          {
+            "name": "history_periods",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 60,
+              "minimum": 0,
+              "default": 12,
+              "title": "History Periods"
             }
           }
         ],
@@ -1636,6 +1727,29 @@
               ],
               "title": "Period"
             }
+          },
+          {
+            "name": "entity_kind",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "enum": [
+                    "security",
+                    "geography",
+                    "other"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Same meaning as on GET /data/coverage.",
+              "title": "Entity Kind"
+            },
+            "description": "Same meaning as on GET /data/coverage."
           }
         ],
         "responses": {
@@ -11118,6 +11232,11 @@
         "summary": "Get Coverage Ledger",
         "description": "Where each fund's/index's constituents come from, and which benchmarks lack total\nreturn or historical constituents before performance/backtest use.",
         "operationId": "get_coverage_ledger",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
         "responses": {
           "200": {
             "description": "Successful Response",
@@ -11129,29 +11248,29 @@
               }
             }
           }
-        },
-        "security": [
-          {
-            "HTTPBearer": []
-          }
-        ]
+        }
       },
       "put": {
         "tags": [
           "funds"
         ],
         "summary": "Put Coverage Entry",
-        "description": "Record an owner-verified ledger row; a refresh never overwrites it.",
+        "description": "Record an owner-verified ledger row; a refresh never overwrites it (DELETE the same\nsubject to revert to the derived row).",
         "operationId": "put_coverage_entry",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
         "requestBody": {
+          "required": true,
           "content": {
             "application/json": {
               "schema": {
                 "$ref": "#/components/schemas/LedgerEntryInput"
               }
             }
-          },
-          "required": true
+          }
         },
         "responses": {
           "200": {
@@ -11174,12 +11293,68 @@
               }
             }
           }
-        },
+        }
+      },
+      "delete": {
+        "tags": [
+          "funds"
+        ],
+        "summary": "Delete Coverage Entry",
+        "description": "Remove an owner-entered ledger row and restore the derived row (re-derived from the\nJobs config and the stored snapshots). Idempotent: with no manual row for the subject\nnothing is deleted (a derived row is never removed here) and the ledger is returned\nunchanged apart from the refresh of derived rows.",
+        "operationId": "delete_coverage_entry",
         "security": [
           {
             "HTTPBearer": []
           }
-        ]
+        ],
+        "parameters": [
+          {
+            "name": "subject_kind",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "enum": [
+                "fund",
+                "index"
+              ],
+              "type": "string",
+              "title": "Subject Kind"
+            }
+          },
+          {
+            "name": "subject_key",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 80,
+              "title": "Subject Key"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CoverageLedger"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
       }
     },
     "/funds/coverage-ledger/refresh": {
@@ -15262,6 +15437,30 @@
               }
             ],
             "title": "Check Reason"
+          },
+          "known_at_min": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Known At Min",
+            "description": "Oldest known_at over the cited sources (ISO 8601); null when any cited source has no known_at. Derived, never stored by the writer."
+          },
+          "known_at_max": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Known At Max",
+            "description": "Newest known_at over the cited sources: the claim as a whole was known to the app from this time on. Null when any cited source has no known_at."
           }
         },
         "type": "object",
@@ -16809,6 +17008,24 @@
               }
             ],
             "title": "Previous Value"
+          },
+          "history": {
+            "items": {
+              "$ref": "#/components/schemas/SeriesVintage"
+            },
+            "type": "array",
+            "title": "History"
+          },
+          "release_calendar": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Release Calendar"
           }
         },
         "type": "object",
@@ -17303,13 +17520,16 @@
           "evidence_id": {
             "anyOf": [
               {
-                "type": "integer"
+                "type": "integer",
+                "maximum": 9.223372036854776e+18,
+                "minimum": 1.0
               },
               {
                 "type": "null"
               }
             ],
-            "title": "Evidence Id"
+            "title": "Evidence Id",
+            "description": "Id of an existing source evidence row; 422 when it does not exist."
           }
         },
         "type": "object",
@@ -17516,6 +17736,65 @@
           "correlation"
         ],
         "title": "Correlation"
+      },
+      "CorrelationHolding": {
+        "properties": {
+          "ticker": {
+            "type": "string",
+            "title": "Ticker"
+          },
+          "symbol": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Symbol",
+            "description": "Symbol of the series used; null when none is stored."
+          },
+          "source": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source",
+            "description": "Whose daily closes (Stooq, Yahoo, ...); null if none."
+          },
+          "as_of": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "As Of",
+            "description": "Date of the latest close inside the window."
+          },
+          "observations": {
+            "type": "integer",
+            "title": "Observations",
+            "description": "Closes of this series inside the window."
+          }
+        },
+        "type": "object",
+        "required": [
+          "ticker",
+          "symbol",
+          "source",
+          "as_of",
+          "observations"
+        ],
+        "title": "CorrelationHolding"
       },
       "CorroborationRules": {
         "properties": {
@@ -18180,6 +18459,30 @@
             ],
             "title": "Age Days",
             "description": "Days from latest_period to today; null without a period."
+          },
+          "stale_after_hours": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Stale After Hours",
+            "description": "Hours after `checked_at` at which the row counts as stale: twice the longest gap between scheduled runs of the job that refreshes this provider (config/jobs.py, see COVERAGE_PROVIDER_JOB). Null when no enabled job is known to refresh the provider."
+          },
+          "stale": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Stale",
+            "description": "True when `checked_at` is older than `stale_after_hours`; null (unknown, not false) when there is no expected interval."
           }
         },
         "type": "object",
@@ -21820,6 +22123,17 @@
             "type": "boolean",
             "title": "Reconciles",
             "description": "Buckets add up to the total within tolerance."
+          },
+          "issuer_buckets": {
+            "additionalProperties": {
+              "additionalProperties": {
+                "type": "number"
+              },
+              "type": "object"
+            },
+            "type": "object",
+            "title": "Issuer Buckets",
+            "description": "Per returned issuer (`issuers[].key`): bucket key -> that issuer's weight in this bucket, as a fraction of total portfolio value. Additive per row, so an issuer split across buckets (e.g. 'Technology' and 'Information Technology', an ADR + ordinary in two currencies) appears in each; summed over ALL issuers a bucket's value equals `buckets[].weight` minus its non-issuer part (cash, fund cash, unknown fund weight are not issuers). Only the top `top` issuers are listed, so the rest of a bucket is `bucket.weight - sum(listed)`."
           }
         },
         "type": "object",
@@ -25954,6 +26268,18 @@
             "type": "array",
             "title": "Positions"
           },
+          "matching_positions": {
+            "type": "integer",
+            "title": "Matching Positions",
+            "description": "Positions matching this holding across the loaded funds (ignores `limit`).",
+            "default": 0
+          },
+          "truncated": {
+            "type": "boolean",
+            "title": "Truncated",
+            "description": "True when `matching_positions` exceeds the returned positions (`limit` cut rows off).",
+            "default": false
+          },
           "coverage": {
             "$ref": "#/components/schemas/NportCoverage"
           }
@@ -26570,7 +26896,19 @@
             "title": "Ticker"
           },
           "status": {
-            "$ref": "#/components/schemas/PdmrStatus"
+            "$ref": "#/components/schemas/PdmrStatus",
+            "description": "Channel-wide (all issuers) counts and state, not specific to `ticker`; see `ticker_status` for this holding."
+          },
+          "ticker_status": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/PdmrStatus"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The same counts restricted to this ticker (case-insensitive). `state` is `available` once one of this ticker's announcements was parsed, else `access_unverified`."
           },
           "notifications": {
             "items": {
@@ -26642,6 +26980,34 @@
             ],
             "title": "Source",
             "description": "Whose daily closes; null when none are stored."
+          },
+          "quote_currency": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Quote Currency",
+            "description": "Unit `bars`, `last_close` and `previous_close` are quoted in: GBX (pence), ZAC, ILA, or an ISO currency code (USD, EUR, ...). From the stored series' own currency; falls back to the instrument's currency; null when neither is known."
+          },
+          "quote_currency_basis": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "series",
+                  "instrument"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Quote Currency Basis",
+            "description": "Where `quote_currency` comes from."
           },
           "as_of": {
             "anyOf": [
@@ -34060,6 +34426,56 @@
             ],
             "title": "Latest Filed"
           },
+          "earliest_filed": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Earliest Filed",
+            "description": "Earliest filing date of any manager's effective filing."
+          },
+          "latest_filing_lag_days": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Latest Filing Lag Days",
+            "description": "`latest_filed` minus `period`, in days: the latest filing of the period (including late amendments), not a single filing."
+          },
+          "earliest_filing_lag_days": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Earliest Filing Lag Days",
+            "description": "`earliest_filed` minus `period`, in days."
+          },
+          "previous_period": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Previous Period",
+            "description": "The period the `*_change` figures are measured against (previous period loaded, possibly not the adjacent quarter); null for the oldest period loaded."
+          },
           "holders_change": {
             "anyOf": [
               {
@@ -34235,10 +34651,17 @@
             "title": "Jurisdictions"
           },
           "forward_citations": {
-            "type": "integer",
-            "minimum": 0.0,
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
             "title": "Forward Citations",
-            "default": 0
+            "description": "Null = the source does not supply it (unknown, not 0)."
           },
           "backward_citations": {
             "type": "integer",
@@ -35075,6 +35498,131 @@
           "note"
         ],
         "title": "PortfolioConcentration"
+      },
+      "PortfolioCorrelation": {
+        "properties": {
+          "days": {
+            "type": "integer",
+            "title": "Days"
+          },
+          "min_shared": {
+            "type": "integer",
+            "title": "Min Shared"
+          },
+          "start": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Start",
+            "description": "First day of the window (latest close - days)."
+          },
+          "end": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "End",
+            "description": "Latest stored close among the holdings."
+          },
+          "max_returns": {
+            "type": "integer",
+            "title": "Max Returns",
+            "description": "Most recent shared returns used per pair (days scaled to trading days)."
+          },
+          "method": {
+            "type": "string",
+            "title": "Method"
+          },
+          "tickers": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Tickers",
+            "description": "Current holdings in row/column order (by ticker)."
+          },
+          "holdings": {
+            "items": {
+              "$ref": "#/components/schemas/CorrelationHolding"
+            },
+            "type": "array",
+            "title": "Holdings",
+            "description": "Same order as `tickers`."
+          },
+          "matrix": {
+            "items": {
+              "items": {
+                "anyOf": [
+                  {
+                    "type": "number"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "type": "array"
+            },
+            "type": "array",
+            "title": "Matrix",
+            "description": "matrix[i][j]: correlation (-1..1, unitless) of tickers i and j; null when the pair shares fewer than `min_shared` returns or a series is flat. The diagonal is 1.0 when the holding has enough returns."
+          },
+          "counts": {
+            "items": {
+              "items": {
+                "type": "integer"
+              },
+              "type": "array"
+            },
+            "type": "array",
+            "title": "Counts",
+            "description": "counts[i][j]: shared daily returns used for the pair (0 when no series)."
+          },
+          "notes": {
+            "items": {
+              "items": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "type": "array"
+            },
+            "type": "array",
+            "title": "Notes",
+            "description": "notes[i][j]: why matrix[i][j] is null, and a caution when the two series come from different sources (their adjustments can differ); null when nothing to say."
+          }
+        },
+        "type": "object",
+        "required": [
+          "days",
+          "min_shared",
+          "start",
+          "end",
+          "max_returns",
+          "method",
+          "tickers",
+          "holdings",
+          "matrix",
+          "counts",
+          "notes"
+        ],
+        "title": "PortfolioCorrelation"
       },
       "PortfolioDataContext": {
         "properties": {
@@ -36617,6 +37165,29 @@
             "title": "Fallback Reason",
             "description": "Why Stooq's closes are not the ones shown."
           },
+          "quote_currency": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Quote Currency",
+            "description": "Unit `bars` are quoted in (GBX = pence, ZAC, ILA, or an ISO code), from the stored series; null when unknown."
+          },
+          "raw_bars": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/RawBars"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Unadjusted bars of the same series where stored; see `RawBars`."
+          },
           "as_of": {
             "anyOf": [
               {
@@ -37323,6 +37894,88 @@
         "additionalProperties": false,
         "type": "object",
         "title": "QuietHours"
+      },
+      "RawBars": {
+        "properties": {
+          "available": {
+            "type": "boolean",
+            "title": "Available"
+          },
+          "source": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source",
+            "description": "Whose raw bars (the series' source)."
+          },
+          "symbol": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Symbol"
+          },
+          "quote_unit": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Quote Unit",
+            "description": "Unit the prices are quoted in: GBX (pence), ZAC, ILA, or an ISO currency."
+          },
+          "currency": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Currency",
+            "description": "Quote currency code as stored."
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason",
+            "description": "Why there are no raw bars."
+          },
+          "bars": {
+            "items": {
+              "$ref": "#/components/schemas/PriceBarOut"
+            },
+            "type": "array",
+            "title": "Bars",
+            "description": "Raw OHLC, oldest first; same window as `bars`."
+          }
+        },
+        "type": "object",
+        "required": [
+          "available",
+          "bars"
+        ],
+        "title": "RawBars",
+        "description": "The unadjusted bars of the same series as `PriceHistory.bars`, when the source stored\nthem (EODHD, Alpha Vantage). Stooq and Yahoo store adjusted closes only: `bars` is then\nempty and `reason` says so. Raw bars are never spliced with adjusted ones."
       },
       "ReadinessResponse": {
         "properties": {
@@ -38580,6 +39233,50 @@
           "delivery"
         ],
         "title": "ReportSummary"
+      },
+      "ReporterWideTrade": {
+        "properties": {
+          "periods": {
+            "type": "integer",
+            "title": "Periods"
+          },
+          "hs_revision": {
+            "type": "string",
+            "title": "Hs Revision"
+          },
+          "products": {
+            "type": "integer",
+            "title": "Products",
+            "description": "Distinct HS codes stored for the reporter."
+          },
+          "metrics": {
+            "additionalProperties": {
+              "anyOf": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "string",
+                  "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "type": "object",
+            "title": "Metrics"
+          }
+        },
+        "type": "object",
+        "required": [
+          "periods",
+          "hs_revision",
+          "products",
+          "metrics"
+        ],
+        "title": "ReporterWideTrade",
+        "description": "The same figures over every product stored for the reporter. They move when another\nproduct is collected, so they are context, not a property of the requested product."
       },
       "ReportingExceptionOut": {
         "properties": {
@@ -40410,6 +41107,86 @@
         "title": "SeriesEffect",
         "description": "Exposure-weighted latest change of one country series: sum of weight x (latest minus\nprevious period) over the mapped geographies that have both. `covered_weight` is the share\nof the issuer those geographies represent; the rest is unknown, not unchanged."
       },
+      "SeriesVintage": {
+        "properties": {
+          "period": {
+            "type": "string",
+            "format": "date",
+            "title": "Period"
+          },
+          "value_latest": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              }
+            ],
+            "title": "Value Latest"
+          },
+          "value_first_release": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Value First Release"
+          },
+          "vintage_unavailable": {
+            "type": "boolean",
+            "title": "Vintage Unavailable"
+          },
+          "released_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Released At"
+          },
+          "revised_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Revised At"
+          },
+          "revision_count": {
+            "type": "integer",
+            "title": "Revision Count"
+          }
+        },
+        "type": "object",
+        "required": [
+          "period",
+          "value_latest",
+          "value_first_release",
+          "vintage_unavailable",
+          "released_at",
+          "revised_at",
+          "revision_count"
+        ],
+        "title": "SeriesVintage",
+        "description": "One period of a series with the value first published and the latest known by `as_of`.\n\n`value_first_release` is null when the first publication was not archived (the oldest\nstored row has no release date: a backfill or a provider that keeps no history); then\n`vintage_unavailable` is true and nothing may be drawn as a \"first release\"."
+      },
       "SeverityDay": {
         "properties": {
           "date": {
@@ -41088,7 +41865,20 @@
                 "type": "null"
               }
             ],
-            "title": "As Of"
+            "title": "As Of",
+            "description": "The date the record is about (period end, snapshot, bar or publication date): not when the app learned of it."
+          },
+          "known_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Known At",
+            "description": "ISO 8601 time the stored record became known to the app (ingestion time). Null when the source has no such time (13F data, web search, thesis, strategy) or the report predates the field; never inferred."
           }
         },
         "type": "object",
@@ -42912,6 +43702,44 @@
             "title": "Accession",
             "description": "The filing the position is read from."
           },
+          "filed": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Filed",
+            "description": "Latest filing date among this manager's effective filings of the period (an original 13F-HR or amendments)."
+          },
+          "filing_lag_days": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Filing Lag Days",
+            "description": "`filed` minus the report period end, in days."
+          },
+          "previous_period_end": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Previous Period End",
+            "description": "The report period `prev_shares` / `shares_change_pct` are measured against (the previous period loaded, not necessarily the adjacent quarter); null when no earlier period is loaded."
+          },
           "prev_shares": {
             "anyOf": [
               {
@@ -43155,6 +43983,24 @@
             ],
             "title": "Known At"
           },
+          "reporter_wide": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ReporterWideTrade"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "partners": {
+            "items": {
+              "$ref": "#/components/schemas/TradeFlowPartners"
+            },
+            "type": "array",
+            "title": "Partners",
+            "description": "Per flow: latest-period partner rows with share of the product's total, the unmapped remainder (never folded into a partner) and a per-period hhi history."
+          },
           "notice": {
             "type": "string",
             "title": "Notice",
@@ -43174,7 +44020,8 @@
           "source_url",
           "known_at"
         ],
-        "title": "TradeContext"
+        "title": "TradeContext",
+        "description": "Everything outside `reporter_wide` describes the requested `hs_code` only.\n\nUnits: values are USD; growth, share, hhi and unmapped_share are fractions (0.18 = 18%);\nhhi is on a 0..1 scale (x10,000 for the classic index)."
       },
       "TradeExposure": {
         "properties": {
@@ -43267,6 +44114,222 @@
           "rows"
         ],
         "title": "TradeExposure"
+      },
+      "TradeFlowPartners": {
+        "properties": {
+          "flow": {
+            "type": "string",
+            "title": "Flow"
+          },
+          "period": {
+            "type": "string",
+            "format": "date",
+            "title": "Period",
+            "description": "Latest period with a value for this flow."
+          },
+          "summary": {
+            "$ref": "#/components/schemas/TradePartnerPeriod"
+          },
+          "partners": {
+            "items": {
+              "$ref": "#/components/schemas/TradePartner"
+            },
+            "type": "array",
+            "title": "Partners",
+            "description": "Latest period, largest first."
+          },
+          "history": {
+            "items": {
+              "$ref": "#/components/schemas/TradePartnerPeriod"
+            },
+            "type": "array",
+            "title": "History",
+            "description": "Per-period totals, unmapped remainder and hhi, oldest first, bounded; includes the latest period."
+          }
+        },
+        "type": "object",
+        "required": [
+          "flow",
+          "period",
+          "summary",
+          "partners",
+          "history"
+        ],
+        "title": "TradeFlowPartners"
+      },
+      "TradePartner": {
+        "properties": {
+          "partner": {
+            "type": "string",
+            "title": "Partner",
+            "description": "Partner code as stored (UN M49 number for Comtrade)."
+          },
+          "partner_iso": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Partner Iso",
+            "description": "ISO alpha-2 when the code is a single country, else null (e.g. areas nes)."
+          },
+          "value": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              }
+            ],
+            "title": "Value",
+            "description": "Trade value in USD."
+          },
+          "share": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Share",
+            "description": "Fraction (0..1) of the product's reporter total for this flow and period."
+          }
+        },
+        "type": "object",
+        "required": [
+          "partner",
+          "partner_iso",
+          "value",
+          "share"
+        ],
+        "title": "TradePartner"
+      },
+      "TradePartnerPeriod": {
+        "properties": {
+          "period": {
+            "type": "string",
+            "format": "date",
+            "title": "Period"
+          },
+          "total": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Total",
+            "description": "Reporter total in USD (World row, else partner sum)."
+          },
+          "total_basis": {
+            "type": "string",
+            "enum": [
+              "world_row",
+              "partner_sum"
+            ],
+            "title": "Total Basis"
+          },
+          "mapped_value": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              }
+            ],
+            "title": "Mapped Value",
+            "description": "Sum of the reported partner rows, USD."
+          },
+          "unmapped_value": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Unmapped Value",
+            "description": "total - mapped_value (>= 0); null when no World total was reported."
+          },
+          "unmapped_share": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Unmapped Share",
+            "description": "unmapped_value / total, a fraction."
+          },
+          "partner_count": {
+            "type": "integer",
+            "title": "Partner Count"
+          },
+          "hhi": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Hhi",
+            "description": "Herfindahl index (0..1 fraction, x10,000 for the classic scale) over the reported partners' shares of mapped_value; the World aggregate is not a partner."
+          },
+          "partners_exceed_total": {
+            "type": "boolean",
+            "title": "Partners Exceed Total",
+            "description": "Partner rows add up to more than the World row (bad data).",
+            "default": false
+          }
+        },
+        "type": "object",
+        "required": [
+          "period",
+          "total",
+          "total_basis",
+          "mapped_value",
+          "unmapped_value",
+          "unmapped_share",
+          "partner_count",
+          "hhi"
+        ],
+        "title": "TradePartnerPeriod"
       },
       "TradeRow": {
         "properties": {

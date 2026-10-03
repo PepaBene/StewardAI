@@ -160,7 +160,12 @@ class CorporateActionDecision(BaseModel):
 
     decision: Literal["confirmed", "rejected", "suggested"]
     reason: str = Field(min_length=10, max_length=2000)
-    evidence_id: int | None = None
+    evidence_id: int | None = Field(
+        default=None,
+        ge=1,
+        le=9_223_372_036_854_775_807,
+        description="Id of an existing source evidence row; 422 when it does not exist.",
+    )
 
 
 class ListingDecision(BaseModel):
@@ -329,7 +334,9 @@ class PatentFamilyInput(BaseModel):
     title: str | None = Field(default=None, max_length=2000)
     cpc_codes: list[str] = Field(default_factory=list, max_length=100)
     jurisdictions: list[str] = Field(default_factory=list, max_length=100)
-    forward_citations: int = Field(default=0, ge=0)
+    forward_citations: int | None = Field(
+        default=None, ge=0, description="Null = the source does not supply it (unknown, not 0)."
+    )
     backward_citations: int = Field(default=0, ge=0)
     legal_status: Literal["application", "granted", "active", "expired", "unknown"] = "unknown"
     source: str = Field(min_length=2, max_length=80)
@@ -785,6 +792,23 @@ async def peer_metrics(
         as_of,
     )
     peer_tickers = sorted({row["peer_ticker"] for row in peers})
+    # peer_set is unique on (ticker, peer, basis, source): one peer can be listed twice (a vendor
+    # suggestion the owner re-added). Counts and rankings are per distinct peer, so the rows are
+    # merged per ticker and the other sources are kept in `sources`.
+    merged: dict[str, dict[str, Any]] = {}
+    for row in peers:
+        entry = merged.setdefault(row["peer_ticker"], {**dict(row), "sources": []})
+        if row["source"] not in entry["sources"]:
+            entry["sources"].append(row["source"])
+    names: dict[str, str] = {}
+    for r in await pool.fetch(
+        "select t212_ticker, short_name, name from public.instrument"
+        " where short_name=any($1::text[]) or t212_ticker=any($1::text[])",
+        peer_tickers,
+    ):
+        for key in (r["short_name"], r["t212_ticker"]):
+            if key and r["name"]:
+                names.setdefault(key, r["name"])
     tickers = sorted(set(peer_tickers) | {ticker})
     # jsonb arrives as text (no pool codec): `dimensions` and `validation` are decoded by
     # `financial_peer_metrics`, which skips segment facts and failed reconciliations.
@@ -799,10 +823,13 @@ async def peer_metrics(
     )
     metrics = financial_peer_metrics([dict(row) for row in facts], reconciled_only=reconciled_only)
     comparison = peer_comparison(ticker, peer_tickers, metrics)
+    for metric_entry in comparison["metrics"].values():
+        for item in metric_entry["peers"]:
+            item["name"] = names.get(item["ticker"])
     return {
         "ticker": ticker,
         "known_as_of": as_of,
-        "confirmed_peers": [dict(row) for row in peers],
+        "confirmed_peers": [merged[t] for t in peer_tickers],
         "covered_peer_metrics": comparison["metrics"],
         "excluded_peers": comparison["excluded_peers"],
         "holding_period": comparison["holding_period"],
@@ -1009,6 +1036,10 @@ async def decide_corporate_action(
     )
     if current is None:
         raise HTTPException(404, "corporate action not found for this holding")
+    if body.evidence_id is not None and not await pool.fetchval(
+        "select exists(select 1 from public.source_evidence where id = $1)", body.evidence_id
+    ):
+        raise HTTPException(422, f"evidence {body.evidence_id} does not exist")
     evidence_id = body.evidence_id or current["evidence_id"]
     if body.decision == "confirmed" and evidence_id is None:
         raise HTTPException(422, "confirming an action requires linked source evidence")
@@ -1569,6 +1600,10 @@ async def relationship_concentration(
             " another filer's revenue is that filer's concentration, not this holding's.",
             "Anonymous counterparties keep their reported share but are never merged with named"
             " ones; shares are not imputed where none was reported.",
+            "Shares are fractions of revenue/purchases. `named_`/`anonymous_`/`total_` "
+            "`reported_share_sum` is null when no share was reported on that side; "
+            "`*_missing_share_count` counts its counterparties with no share and `*_at_least` "
+            "is true when the sum is therefore only a lower bound.",
         ],
     }
 

@@ -759,7 +759,7 @@ async def collect_epo_patents(
             title=family.title,
             cpc_codes=sorted(family.cpc_codes),
             jurisdictions=family.jurisdictions,
-            forward_citations=0,
+            forward_citations=None,  # OPS bibliographic data cannot supply it
             backward_citations=len(family.cited),
             legal_status=status,
             source="epo_ops",

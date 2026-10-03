@@ -73,6 +73,16 @@ class HoldingFundPositions(BaseModel):
     )
     as_of: dt.date
     positions: list[FundPosition]
+    matching_positions: int = Field(
+        default=0,
+        description="Positions matching this holding across the loaded funds (ignores `limit`).",
+    )
+    truncated: bool = Field(
+        default=False,
+        description=(
+            "True when `matching_positions` exceeds the returned positions (`limit` cut rows off)."
+        ),
+    )
     coverage: NportCoverage
 
 
@@ -112,6 +122,14 @@ async def holding_fund_positions(
         ticker,
         securities,
         limit,
+    )
+    total = await pool.fetchval(
+        LATEST  # noqa: S608 - constant SQL, values bound as parameters
+        + """select count(*) from latest f join public.nport_holding h using (accession)
+             where h.held_ticker = $2 or h.security_id = any($3::bigint[])""",
+        as_of,
+        ticker,
+        securities,
     )
     positions = [
         FundPosition(
@@ -160,6 +178,8 @@ async def holding_fund_positions(
         ticker=ticker,
         as_of=as_of,
         positions=positions,
+        matching_positions=int(total or 0),
+        truncated=int(total or 0) > len(positions),
         coverage=NportCoverage(
             state=state,
             funds_loaded=len(periods),

@@ -258,7 +258,7 @@ def _fact(fact_id: int, value: str) -> dict[str, Any]:
         "id": fact_id, "metric": "revenue", "fiscal_year": 2026, "fiscal_period": "Q1",
         "period": "FY2026 Q1", "value_units": Decimal(value), "value_as_written": value,
         "scale": "units", "unit": "currency", "currency": "USD", "snippet": value,
-        "source_url": "https://sec.test",
+        "source_url": "https://sec.test", "extracted_at": None,
     }  # fmt: skip
 
 
