@@ -1,0 +1,602 @@
+{
+  "meta": {
+    "schema": "https://raw.githubusercontent.com/sdmx-twg/sdmx-json/master/data-message/tools/schemas/2.0.0/sdmx-json-data-schema.json",
+    "id": "IREF015923",
+    "prepared": "2026-10-03T17:07:54Z",
+    "test": false,
+    "contentLanguages": [
+      "en",
+      "en-US"
+    ],
+    "sender": {
+      "id": "Disseminate_Final_DMZ",
+      "name": "unknown",
+      "names": {
+        "en-US": "unknown"
+      }
+    }
+  },
+  "data": {
+    "dataSets": [
+      {
+        "structure": 0,
+        "action": "Information",
+        "links": [
+          {
+            "rel": "datastructure",
+            "urn": "urn:sdmx:org.sdmx.infomodel.datastructure.DataStructure=OECD.SDD.TPS:DSD_EAR(1.0)"
+          }
+        ],
+        "annotations": [
+          7,
+          0,
+          1,
+          2,
+          3,
+          4,
+          5,
+          6
+        ],
+        "attributes": [],
+        "dimensionGroupAttributes": {
+          "~:0:~:~:~:~:~:~": [
+            8
+          ],
+          "0:~:~:~:~:~:~:~": [
+            8
+          ]
+        },
+        "observations": {
+          "0:0:0:0:0:0:0:0": [
+            151.1157,
+            0,
+            0,
+            0,
+            0
+          ],
+          "0:0:0:0:0:0:0:1": [
+            149.7206,
+            0,
+            0,
+            0,
+            0
+          ],
+          "0:0:0:0:0:0:0:2": [
+            148.3889,
+            0,
+            0,
+            0,
+            0
+          ],
+          "0:0:0:0:0:0:0:3": [
+            146.9621,
+            0,
+            0,
+            0,
+            0
+          ],
+          "0:0:0:0:0:0:0:4": [
+            153.6523,
+            0,
+            0,
+            0,
+            0
+          ],
+          "0:0:0:0:0:0:0:5": [
+            152.3523,
+            0,
+            0,
+            0,
+            0
+          ]
+        }
+      }
+    ],
+    "structures": [
+      {
+        "name": "Hourly earnings",
+        "names": {
+          "en": "Hourly earnings"
+        },
+        "description": "<p>The Hourly Earnings dataset contains predominantly monthly statistics, and associated statistical methodological information, for the OECD member countries and for selected non-member economies. </p><p>The Hourly Earnings dataset provides monthly and quarterly data on employees' earnings series. It includes earnings series in manufacturing and for the private economic sector. Mostly the sources of the data are business surveys covering different economic sectors, but in some cases administrative data are also used. </p><p>The target series for hourly earnings correspond to seasonally adjusted average total earnings paid per employed person per hour, including overtime pay and regularly recurring cash supplements. Where hourly earnings series are not available, a series could refer to weekly or monthly earnings. In this case, a series for full-time or full-time equivalent employees is preferred to an all employees series.</p>",
+        "descriptions": {
+          "en": "<p>The Hourly Earnings dataset contains predominantly monthly statistics, and associated statistical methodological information, for the OECD member countries and for selected non-member economies. </p><p>The Hourly Earnings dataset provides monthly and quarterly data on employees' earnings series. It includes earnings series in manufacturing and for the private economic sector. Mostly the sources of the data are business surveys covering different economic sectors, but in some cases administrative data are also used. </p><p>The target series for hourly earnings correspond to seasonally adjusted average total earnings paid per employed person per hour, including overtime pay and regularly recurring cash supplements. Where hourly earnings series are not available, a series could refer to weekly or monthly earnings. In this case, a series for full-time or full-time equivalent employees is preferred to an all employees series.</p>"
+        },
+        "links": [
+          {
+            "rel": "datastructure",
+            "urn": "urn:sdmx:org.sdmx.infomodel.datastructure.Dataflow=OECD.SDD.TPS:DSD_EAR@DF_HOU_EAR(1.0)"
+          }
+        ],
+        "dimensions": {
+          "dataSet": [],
+          "series": [],
+          "observation": [
+            {
+              "id": "REF_AREA",
+              "name": "Reference area",
+              "names": {
+                "en": "Reference area"
+              },
+              "keyPosition": 0,
+              "roles": [
+                "REF_AREA"
+              ],
+              "values": [
+                {
+                  "id": "USA",
+                  "order": 37,
+                  "name": "United States",
+                  "names": {
+                    "en": "United States"
+                  },
+                  "annotations": [
+                    9
+                  ]
+                }
+              ]
+            },
+            {
+              "id": "MEASURE",
+              "name": "Measure",
+              "names": {
+                "en": "Measure"
+              },
+              "keyPosition": 1,
+              "roles": [
+                "MEASURE"
+              ],
+              "values": [
+                {
+                  "id": "EAR",
+                  "order": 25,
+                  "name": "Earnings",
+                  "names": {
+                    "en": "Earnings"
+                  },
+                  "annotations": [
+                    10
+                  ]
+                }
+              ]
+            },
+            {
+              "id": "UNIT_MEASURE",
+              "name": "Unit of measure",
+              "names": {
+                "en": "Unit of measure"
+              },
+              "keyPosition": 2,
+              "roles": [
+                "UNIT_MEASURE"
+              ],
+              "values": [
+                {
+                  "id": "IX",
+                  "order": 667,
+                  "name": "Index",
+                  "names": {
+                    "en": "Index"
+                  },
+                  "annotations": [
+                    11
+                  ]
+                }
+              ]
+            },
+            {
+              "id": "ADJUSTMENT",
+              "name": "Adjustment",
+              "names": {
+                "en": "Adjustment"
+              },
+              "keyPosition": 3,
+              "roles": [
+                "ADJUSTMENT"
+              ],
+              "values": [
+                {
+                  "id": "Y",
+                  "order": 15,
+                  "name": "Calendar and seasonally adjusted",
+                  "names": {
+                    "en": "Calendar and seasonally adjusted"
+                  },
+                  "annotations": [
+                    12
+                  ]
+                }
+              ]
+            },
+            {
+              "id": "ACTIVITY",
+              "name": "Economic activity",
+              "names": {
+                "en": "Economic activity"
+              },
+              "keyPosition": 4,
+              "roles": [
+                "ACTIVITY"
+              ],
+              "values": [
+                {
+                  "id": "_Z",
+                  "order": 957,
+                  "name": "Not applicable",
+                  "names": {
+                    "en": "Not applicable"
+                  },
+                  "annotations": [
+                    13
+                  ]
+                }
+              ]
+            },
+            {
+              "id": "SECTOR",
+              "name": "Institutional sector",
+              "names": {
+                "en": "Institutional sector"
+              },
+              "keyPosition": 5,
+              "roles": [
+                "SECTOR"
+              ],
+              "values": [
+                {
+                  "id": "S1D",
+                  "order": 161,
+                  "name": "Private sector",
+                  "names": {
+                    "en": "Private sector"
+                  },
+                  "parent": "S1",
+                  "parents": [
+                    "S1"
+                  ],
+                  "annotations": [
+                    14
+                  ]
+                },
+                {
+                  "id": "S1",
+                  "order": 1,
+                  "name": "Total economy",
+                  "names": {
+                    "en": "Total economy"
+                  },
+                  "annotations": [
+                    15,
+                    16
+                  ]
+                }
+              ]
+            },
+            {
+              "id": "FREQ",
+              "name": "Frequency of observation",
+              "names": {
+                "en": "Frequency of observation"
+              },
+              "keyPosition": 6,
+              "roles": [
+                "FREQ"
+              ],
+              "values": [
+                {
+                  "id": "Q",
+                  "order": 10,
+                  "name": "Quarterly",
+                  "names": {
+                    "en": "Quarterly"
+                  }
+                }
+              ]
+            },
+            {
+              "id": "TIME_PERIOD",
+              "name": "Time period",
+              "names": {
+                "en": "Time period"
+              },
+              "keyPosition": 7,
+              "roles": [
+                "TIME_PERIOD"
+              ],
+              "values": [
+                {
+                  "start": "2025-10-01T00:00:00",
+                  "end": "2025-12-31T23:59:59",
+                  "id": "2025-Q4",
+                  "name": "2025-Q4",
+                  "names": {
+                    "en-US": "2025-Q4"
+                  }
+                },
+                {
+                  "start": "2025-07-01T00:00:00",
+                  "end": "2025-09-30T23:59:59",
+                  "id": "2025-Q3",
+                  "name": "2025-Q3",
+                  "names": {
+                    "en-US": "2025-Q3"
+                  }
+                },
+                {
+                  "start": "2025-04-01T00:00:00",
+                  "end": "2025-06-30T23:59:59",
+                  "id": "2025-Q2",
+                  "name": "2025-Q2",
+                  "names": {
+                    "en-US": "2025-Q2"
+                  }
+                },
+                {
+                  "start": "2025-01-01T00:00:00",
+                  "end": "2025-03-31T23:59:59",
+                  "id": "2025-Q1",
+                  "name": "2025-Q1",
+                  "names": {
+                    "en-US": "2025-Q1"
+                  }
+                },
+                {
+                  "start": "2026-04-01T00:00:00",
+                  "end": "2026-06-30T23:59:59",
+                  "id": "2026-Q2",
+                  "name": "2026-Q2",
+                  "names": {
+                    "en-US": "2026-Q2"
+                  }
+                },
+                {
+                  "start": "2026-01-01T00:00:00",
+                  "end": "2026-03-31T23:59:59",
+                  "id": "2026-Q1",
+                  "name": "2026-Q1",
+                  "names": {
+                    "en-US": "2026-Q1"
+                  }
+                }
+              ]
+            }
+          ]
+        },
+        "attributes": {
+          "dataSet": [],
+          "dimensionGroup": [],
+          "series": [],
+          "observation": [
+            {
+              "id": "BASE_PER",
+              "name": "Base period",
+              "names": {
+                "en": "Base period"
+              },
+              "isMandatory": false,
+              "roles": [
+                "BASE_PER"
+              ],
+              "relationship": {
+                "dimensions": [
+                  "UNIT_MEASURE"
+                ]
+              },
+              "values": [
+                {
+                  "value": "2015"
+                }
+              ]
+            },
+            {
+              "id": "UNIT_MULT",
+              "name": "Unit multiplier",
+              "names": {
+                "en": "Unit multiplier"
+              },
+              "isMandatory": true,
+              "roles": [
+                "UNIT_MULT"
+              ],
+              "relationship": {
+                "dimensions": [
+                  "UNIT_MEASURE"
+                ]
+              },
+              "values": [
+                {
+                  "id": "0",
+                  "order": 0,
+                  "name": "Units",
+                  "names": {
+                    "en": "Units"
+                  }
+                }
+              ]
+            },
+            {
+              "id": "DECIMALS",
+              "name": "Decimals",
+              "names": {
+                "en": "Decimals"
+              },
+              "isMandatory": false,
+              "roles": [
+                "DECIMALS"
+              ],
+              "relationship": {
+                "dimensions": [
+                  "UNIT_MEASURE"
+                ]
+              },
+              "values": [
+                {
+                  "id": "2",
+                  "order": 2,
+                  "name": "Two",
+                  "names": {
+                    "en": "Two"
+                  }
+                }
+              ]
+            },
+            {
+              "id": "OBS_STATUS",
+              "name": "Observation status",
+              "names": {
+                "en": "Observation status"
+              },
+              "isMandatory": false,
+              "roles": [
+                "OBS_STATUS"
+              ],
+              "relationship": {
+                "observation": {}
+              },
+              "values": [
+                {
+                  "id": "A",
+                  "order": 0,
+                  "name": "Normal value",
+                  "names": {
+                    "en": "Normal value"
+                  }
+                }
+              ]
+            }
+          ]
+        },
+        "annotations": [
+          {
+            "type": "NonProductionDataflow",
+            "text": "true",
+            "texts": {
+              "en": "true"
+            }
+          },
+          {
+            "id": "@SDMX",
+            "title": "REF_AREA,AGE",
+            "type": "LAYOUT_ROW"
+          },
+          {
+            "id": "@SDMX",
+            "title": "TIME_PERIOD",
+            "type": "LAYOUT_COLUMN"
+          },
+          {
+            "id": "@SDMX",
+            "title": "MEASURE,UNIT_MEASURE",
+            "type": "LAYOUT_ROW_SECTION"
+          },
+          {
+            "id": "@SDMX",
+            "title": "OBS_STATUS=A,UNIT_MULT=0,TRANSFORMATION=_Z,ACTIVITY=_Z",
+            "type": "NOT_DISPLAYED"
+          },
+          {
+            "id": "@SDMX",
+            "title": "FREQ=M,LASTNPERIODS=13,MEASURE=EAR,ADJUSTMENT=Y,TRANSFORMATION=IX",
+            "type": "DEFAULT"
+          },
+          {
+            "title": "COMBINED_MEASURE:MEASURE,ACTIVITY;COMBINED_UNIT_MEASURE:UNIT_MEASURE,UNIT_MULT,ADJUSTMENT",
+            "type": "COMBINED_CONCEPTS",
+            "text": "COMBINED_MEASURE:Measure;COMBINED_UNIT_MEASURE:Unit of measure",
+            "texts": {
+              "en": "COMBINED_MEASURE:Measure;COMBINED_UNIT_MEASURE:Unit of measure"
+            }
+          },
+          {
+            "title": "urn:sdmx:org.sdmx.infomodel.metadatastructure.MetadataStructure=OECD:MSD_REF_METADATA(1.0)",
+            "type": "METADATA"
+          },
+          {
+            "type": "HAS_METADATA"
+          },
+          {
+            "id": "@SDMX",
+            "type": "ORDER",
+            "text": "380",
+            "texts": {
+              "en": "380"
+            }
+          },
+          {
+            "id": "@SDMX",
+            "type": "ORDER",
+            "text": "26",
+            "texts": {
+              "en": "26"
+            }
+          },
+          {
+            "id": "@SDMX",
+            "type": "ORDER",
+            "text": "6680",
+            "texts": {
+              "en": "6680"
+            }
+          },
+          {
+            "id": "@SDMX",
+            "type": "ORDER",
+            "text": "30",
+            "texts": {
+              "en": "30"
+            }
+          },
+          {
+            "id": "@SDMX",
+            "type": "ORDER",
+            "text": "9580",
+            "texts": {
+              "en": "9580"
+            }
+          },
+          {
+            "id": "@SDMX",
+            "type": "ORDER",
+            "text": "1870",
+            "texts": {
+              "en": "1870"
+            }
+          },
+          {
+            "id": "SDMX",
+            "title": "S1=S11+S12+S13+S14+S15+S1N",
+            "type": "COMP_RULE"
+          },
+          {
+            "id": "@SDMX",
+            "type": "ORDER",
+            "text": "10",
+            "texts": {
+              "en": "10"
+            }
+          }
+        ],
+        "measures": {
+          "observation": [
+            {
+              "id": "OBS_VALUE",
+              "name": "Observation value",
+              "names": {
+                "en": "Observation value"
+              },
+              "isMandatory": false,
+              "roles": [
+                "OBS_VALUE"
+              ],
+              "values": null
+            }
+          ]
+        },
+        "dataSets": [
+          0
+        ]
+      }
+    ]
+  },
+  "errors": []
+}

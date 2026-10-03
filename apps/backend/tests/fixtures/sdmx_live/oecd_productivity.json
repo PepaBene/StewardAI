@@ -1,0 +1,570 @@
+{
+  "meta": {
+    "schema": "https://raw.githubusercontent.com/sdmx-twg/sdmx-json/master/data-message/tools/schemas/2.0.0/sdmx-json-data-schema.json",
+    "id": "IREF015559",
+    "prepared": "2026-10-03T17:07:52Z",
+    "test": false,
+    "contentLanguages": [
+      "en",
+      "en-US"
+    ],
+    "sender": {
+      "id": "Disseminate_Final_DMZ",
+      "name": "unknown",
+      "names": {
+        "en-US": "unknown"
+      }
+    }
+  },
+  "data": {
+    "dataSets": [
+      {
+        "structure": 0,
+        "action": "Information",
+        "links": [
+          {
+            "rel": "datastructure",
+            "urn": "urn:sdmx:org.sdmx.infomodel.datastructure.DataStructure=OECD.SDD.TPS:DSD_PDB(2.0)"
+          }
+        ],
+        "annotations": [
+          7,
+          0,
+          1,
+          2,
+          3,
+          4,
+          5,
+          6
+        ],
+        "attributes": [],
+        "observations": {
+          "0:0:0:0:0:0:0:0:0:0": [
+            85.60236428340167,
+            0,
+            0,
+            0,
+            0
+          ],
+          "0:0:0:0:0:0:0:0:0:1": [
+            84.1147144673672,
+            0,
+            0,
+            0,
+            0
+          ],
+          "0:0:0:0:0:0:0:0:0:2": [
+            82.26885599486027,
+            0,
+            0,
+            0,
+            0
+          ]
+        }
+      }
+    ],
+    "structures": [
+      {
+        "name": "Productivity database",
+        "names": {
+          "en": "Productivity database"
+        },
+        "description": "The OECD Productivity Database is the successor to the previous edition, offering improved coverage and detail. It consolidates and replaces earlier datasets, including those on productivity levels, productivity growth rates, and productivity by industry. The goal is to provide users with the most comprehensive, up-to-date, and granular productivity estimates available. Data are released on a rolling basis: each variable is published as soon as its underlying source is updated. The database includes annual labour productivity data -measured using both employment and hours worked - as well as detailed components of labour and capital inputs. In addition, quarterly estimates are available in a separate database covering productivity and unit labour costs.",
+        "descriptions": {
+          "en": "The OECD Productivity Database is the successor to the previous edition, offering improved coverage and detail. It consolidates and replaces earlier datasets, including those on productivity levels, productivity growth rates, and productivity by industry. The goal is to provide users with the most comprehensive, up-to-date, and granular productivity estimates available. Data are released on a rolling basis: each variable is published as soon as its underlying source is updated. The database includes annual labour productivity data -measured using both employment and hours worked - as well as detailed components of labour and capital inputs. In addition, quarterly estimates are available in a separate database covering productivity and unit labour costs."
+        },
+        "links": [
+          {
+            "rel": "datastructure",
+            "urn": "urn:sdmx:org.sdmx.infomodel.datastructure.Dataflow=OECD.SDD.TPS:DSD_PDB@DF_PDB(2.0)"
+          }
+        ],
+        "dimensions": {
+          "dataSet": [],
+          "series": [],
+          "observation": [
+            {
+              "id": "REF_AREA",
+              "name": "Reference area",
+              "names": {
+                "en": "Reference area"
+              },
+              "keyPosition": 0,
+              "roles": [
+                "REF_AREA"
+              ],
+              "values": [
+                {
+                  "id": "USA",
+                  "order": 37,
+                  "name": "United States",
+                  "names": {
+                    "en": "United States"
+                  },
+                  "annotations": [
+                    8
+                  ]
+                }
+              ]
+            },
+            {
+              "id": "FREQ",
+              "name": "Frequency of observation",
+              "names": {
+                "en": "Frequency of observation"
+              },
+              "keyPosition": 1,
+              "roles": [
+                "FREQ"
+              ],
+              "values": [
+                {
+                  "id": "A",
+                  "order": 0,
+                  "name": "Annual",
+                  "names": {
+                    "en": "Annual"
+                  }
+                }
+              ]
+            },
+            {
+              "id": "MEASURE",
+              "name": "Measure",
+              "names": {
+                "en": "Measure"
+              },
+              "keyPosition": 2,
+              "roles": [
+                "MEASURE"
+              ],
+              "values": [
+                {
+                  "id": "GDPHRS",
+                  "order": 5,
+                  "name": "GDP per hour worked",
+                  "names": {
+                    "en": "GDP per hour worked"
+                  }
+                }
+              ]
+            },
+            {
+              "id": "ACTIVITY",
+              "name": "Economic activity",
+              "names": {
+                "en": "Economic activity"
+              },
+              "keyPosition": 3,
+              "roles": [
+                "ACTIVITY"
+              ],
+              "values": [
+                {
+                  "id": "_T",
+                  "order": 0,
+                  "name": "Total - all activities",
+                  "names": {
+                    "en": "Total - all activities"
+                  },
+                  "annotations": [
+                    9
+                  ]
+                }
+              ]
+            },
+            {
+              "id": "UNIT_MEASURE",
+              "name": "Unit of measure",
+              "names": {
+                "en": "Unit of measure"
+              },
+              "keyPosition": 4,
+              "roles": [
+                "UNIT_MEASURE"
+              ],
+              "values": [
+                {
+                  "id": "USD_PPP_H",
+                  "order": 318,
+                  "name": "US dollars per hour, PPP converted",
+                  "names": {
+                    "en": "US dollars per hour, PPP converted"
+                  },
+                  "annotations": [
+                    10
+                  ]
+                }
+              ]
+            },
+            {
+              "id": "PRICE_BASE",
+              "name": "Price base",
+              "names": {
+                "en": "Price base"
+              },
+              "keyPosition": 5,
+              "roles": [
+                "PRICE_BASE"
+              ],
+              "values": [
+                {
+                  "id": "LR",
+                  "order": 3,
+                  "name": "Chain linked volume (rebased)",
+                  "names": {
+                    "en": "Chain linked volume (rebased)"
+                  },
+                  "annotations": [
+                    11
+                  ]
+                }
+              ]
+            },
+            {
+              "id": "TRANSFORMATION",
+              "name": "Transformation",
+              "names": {
+                "en": "Transformation"
+              },
+              "keyPosition": 6,
+              "roles": [
+                "TRANSFORMATION"
+              ],
+              "values": [
+                {
+                  "id": "N",
+                  "order": 49,
+                  "name": "Non transformed data",
+                  "names": {
+                    "en": "Non transformed data"
+                  },
+                  "annotations": [
+                    12
+                  ]
+                }
+              ]
+            },
+            {
+              "id": "ASSET_CODE",
+              "name": "Asset type",
+              "names": {
+                "en": "Asset type"
+              },
+              "keyPosition": 7,
+              "roles": [
+                "ASSET_CODE"
+              ],
+              "values": [
+                {
+                  "id": "_Z",
+                  "order": 1,
+                  "name": "Not applicable",
+                  "names": {
+                    "en": "Not applicable"
+                  },
+                  "annotations": [
+                    13
+                  ]
+                }
+              ]
+            },
+            {
+              "id": "CONVERSION_TYPE",
+              "name": "Conversion type",
+              "names": {
+                "en": "Conversion type"
+              },
+              "keyPosition": 8,
+              "roles": [
+                "CONVERSION_TYPE"
+              ],
+              "values": [
+                {
+                  "id": "PPP",
+                  "order": 1,
+                  "name": "PPP converted",
+                  "names": {
+                    "en": "PPP converted"
+                  },
+                  "annotations": [
+                    11
+                  ]
+                }
+              ]
+            },
+            {
+              "id": "TIME_PERIOD",
+              "name": "Time period",
+              "names": {
+                "en": "Time period"
+              },
+              "keyPosition": 9,
+              "roles": [
+                "TIME_PERIOD"
+              ],
+              "values": [
+                {
+                  "start": "2025-01-01T00:00:00",
+                  "end": "2025-12-31T23:59:59",
+                  "id": "2025",
+                  "name": "2025",
+                  "names": {
+                    "en-US": "2025"
+                  }
+                },
+                {
+                  "start": "2024-01-01T00:00:00",
+                  "end": "2024-12-31T23:59:59",
+                  "id": "2024",
+                  "name": "2024",
+                  "names": {
+                    "en-US": "2024"
+                  }
+                },
+                {
+                  "start": "2023-01-01T00:00:00",
+                  "end": "2023-12-31T23:59:59",
+                  "id": "2023",
+                  "name": "2023",
+                  "names": {
+                    "en-US": "2023"
+                  }
+                }
+              ]
+            }
+          ]
+        },
+        "attributes": {
+          "dataSet": [],
+          "dimensionGroup": [],
+          "series": [],
+          "observation": [
+            {
+              "id": "UNIT_MULT",
+              "name": "Unit multiplier",
+              "names": {
+                "en": "Unit multiplier"
+              },
+              "isMandatory": false,
+              "roles": [
+                "UNIT_MULT"
+              ],
+              "relationship": {
+                "dimensions": [
+                  "MEASURE",
+                  "UNIT_MEASURE"
+                ]
+              },
+              "values": [
+                {
+                  "id": "0",
+                  "order": 0,
+                  "name": "Units",
+                  "names": {
+                    "en": "Units"
+                  }
+                }
+              ]
+            },
+            {
+              "id": "BASE_PER",
+              "name": "Base period",
+              "names": {
+                "en": "Base period"
+              },
+              "isMandatory": false,
+              "roles": [
+                "BASE_PER"
+              ],
+              "relationship": {
+                "dimensions": [
+                  "UNIT_MEASURE",
+                  "MEASURE",
+                  "REF_AREA"
+                ]
+              },
+              "values": [
+                {
+                  "value": "2020"
+                }
+              ]
+            },
+            {
+              "id": "DECIMALS",
+              "name": "Decimals",
+              "names": {
+                "en": "Decimals"
+              },
+              "isMandatory": false,
+              "roles": [
+                "DECIMALS"
+              ],
+              "relationship": {
+                "dimensions": [
+                  "REF_AREA",
+                  "FREQ",
+                  "MEASURE",
+                  "ACTIVITY",
+                  "UNIT_MEASURE",
+                  "PRICE_BASE",
+                  "TRANSFORMATION",
+                  "ASSET_CODE",
+                  "CONVERSION_TYPE"
+                ]
+              },
+              "values": [
+                {
+                  "id": "2",
+                  "order": 2,
+                  "name": "Two",
+                  "names": {
+                    "en": "Two"
+                  }
+                }
+              ]
+            },
+            {
+              "id": "OBS_STATUS",
+              "name": "Observation status",
+              "names": {
+                "en": "Observation status"
+              },
+              "isMandatory": true,
+              "roles": [
+                "OBS_STATUS"
+              ],
+              "relationship": {
+                "observation": {}
+              },
+              "values": [
+                {
+                  "id": "A",
+                  "order": 0,
+                  "name": "Normal value",
+                  "names": {
+                    "en": "Normal value"
+                  }
+                }
+              ]
+            }
+          ]
+        },
+        "annotations": [
+          {
+            "type": "NonProductionDataflow",
+            "text": "true",
+            "texts": {
+              "en": "true"
+            }
+          },
+          {
+            "id": "@SDMX",
+            "title": "REF_AREA",
+            "type": "LAYOUT_ROW"
+          },
+          {
+            "id": "@SDMX",
+            "title": "TIME_PERIOD",
+            "type": "LAYOUT_COLUMN"
+          },
+          {
+            "id": "@SDMX",
+            "title": "MEASURE",
+            "type": "LAYOUT_ROW_SECTION"
+          },
+          {
+            "id": "@SDMX",
+            "title": "OBS_STATUS=A,UNIT_MULT=0,TRANSFORMATION=_Z,ADJUSTMENT=_Z,PRICE_BASE=_Z,CONVERSION_TYPE=_Z,ASSET_CODE=_Z",
+            "type": "NOT_DISPLAYED"
+          },
+          {
+            "id": "@SDMX",
+            "title": "MEASURE=GVAHRS,ACTIVITY=_T,TRANSFORMATION=N,UNIT_MEASURE=XDC_H",
+            "type": "DEFAULT"
+          },
+          {
+            "title": "COMBINED_UNIT_MEASURE:UNIT_MEASURE,PRICE_BASE,UNIT_MULT,BASE_PER,CONVERSION_TYPE",
+            "type": "COMBINED_CONCEPTS",
+            "text": "COMBINED_UNIT_MEASURE:Combined unit of measure",
+            "texts": {
+              "en": "COMBINED_UNIT_MEASURE:Combined unit of measure"
+            }
+          },
+          {
+            "title": "urn:sdmx:org.sdmx.infomodel.metadatastructure.MetadataStructure=OECD:MSD_REF_METADATA(1.0)",
+            "type": "METADATA"
+          },
+          {
+            "id": "@SDMX",
+            "type": "ORDER",
+            "text": "380",
+            "texts": {
+              "en": "380"
+            }
+          },
+          {
+            "id": "@SDMX",
+            "type": "ORDER",
+            "text": "10",
+            "texts": {
+              "en": "10"
+            }
+          },
+          {
+            "id": "@SDMX",
+            "type": "ORDER",
+            "text": "3190",
+            "texts": {
+              "en": "3190"
+            }
+          },
+          {
+            "id": "@SDMX",
+            "type": "ORDER",
+            "text": "20",
+            "texts": {
+              "en": "20"
+            }
+          },
+          {
+            "id": "@SDMX",
+            "type": "ORDER",
+            "text": "500",
+            "texts": {
+              "en": "500"
+            }
+          },
+          {
+            "id": "@SDMX",
+            "type": "ORDER",
+            "text": "20",
+            "texts": {
+              "en": "20"
+            }
+          }
+        ],
+        "measures": {
+          "observation": [
+            {
+              "id": "OBS_VALUE",
+              "name": "Observation value",
+              "names": {
+                "en": "Observation value"
+              },
+              "isMandatory": false,
+              "roles": [
+                "OBS_VALUE"
+              ],
+              "values": null
+            }
+          ]
+        },
+        "dataSets": [
+          0
+        ]
+      }
+    ]
+  },
+  "errors": []
+}

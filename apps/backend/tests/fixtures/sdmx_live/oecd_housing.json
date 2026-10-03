@@ -1,0 +1,632 @@
+{
+  "meta": {
+    "schema": "https://raw.githubusercontent.com/sdmx-twg/sdmx-json/master/data-message/tools/schemas/2.0.0/sdmx-json-data-schema.json",
+    "id": "IREF015719",
+    "prepared": "2026-10-03T17:07:56Z",
+    "test": false,
+    "contentLanguages": [
+      "en",
+      "en-US"
+    ],
+    "sender": {
+      "id": "Disseminate_Final_DMZ",
+      "name": "unknown",
+      "names": {
+        "en-US": "unknown"
+      }
+    }
+  },
+  "data": {
+    "dataSets": [
+      {
+        "structure": 0,
+        "action": "Information",
+        "links": [
+          {
+            "rel": "datastructure",
+            "urn": "urn:sdmx:org.sdmx.infomodel.datastructure.DataStructure=OECD.SDD.TPS:DSD_RHPI(1.1)"
+          }
+        ],
+        "annotations": [
+          9,
+          0,
+          1,
+          2,
+          3,
+          4,
+          5,
+          6,
+          7,
+          8
+        ],
+        "attributes": [],
+        "dimensionGroupAttributes": {
+          "~:~:~:~:~:~:~:~:~:~": [
+            10
+          ]
+        },
+        "observations": {
+          "0:0:0:0:0:0:0:0:0:0": [
+            202.134,
+            0,
+            0,
+            0,
+            0
+          ],
+          "0:0:0:0:0:0:0:0:0:1": [
+            199.98,
+            0,
+            0,
+            0,
+            0
+          ],
+          "0:0:0:0:0:0:0:0:0:2": [
+            198.582,
+            0,
+            0,
+            0,
+            0
+          ],
+          "0:0:0:0:0:0:0:0:0:3": [
+            197.408,
+            0,
+            0,
+            0,
+            0
+          ],
+          "0:0:0:0:0:0:0:0:0:4": [
+            196.187,
+            0,
+            0,
+            0,
+            0
+          ],
+          "0:0:0:0:0:0:0:0:0:5": [
+            193.303,
+            0,
+            0,
+            0,
+            0
+          ]
+        }
+      }
+    ],
+    "structures": [
+      {
+        "name": "National and regional house price indices",
+        "names": {
+          "en": "National and regional house price indices"
+        },
+        "description": "<p style='margin-top:0cm;margin-right:0cm;margin-bottom:8.0pt;margin-left:0cm;font-size:11.0pt;font-family:\"Calibri\",sans-serif;text-align:justify;'>Residential Property Price Indices (RPPIs) &ndash; also named House price indices (HPIs), are index numbers measuring the evolution of residential property prices over time. RPPIs are key statistics not only for citizens and households across the world, but also for economic and monetary policy makers. Among their professional uses, they serve, for example, to monitor macroeconomic imbalances and risk exposure of the financial sector.</p><p style='margin-top:0cm;margin-right:0cm;margin-bottom:8.0pt;margin-left:0cm;font-size:11.0pt;font-family:\"Calibri\",sans-serif;text-align:justify;'>&ldquo;National and Regional House Price Indices&rdquo; datasets include RPPI compiled by official statistical agencies following international statistical guidelines. It covers all OECD member countries and some non-member countries. Whenever possible, these RPPIs are broken down by region, dwelling type (single- and multi-family dwellings) and vintage (new and existing dwellings).</p><p style='margin-top:0cm;margin-right:0cm;margin-bottom:8.0pt;margin-left:0cm;font-size:11.0pt;font-family:\"Calibri\",sans-serif;text-align:justify;'>The dataset called &ldquo;National and Regional House Price Indices&rdquo; contains the full list of available RPPIs.</p>",
+        "descriptions": {
+          "en": "<p style='margin-top:0cm;margin-right:0cm;margin-bottom:8.0pt;margin-left:0cm;font-size:11.0pt;font-family:\"Calibri\",sans-serif;text-align:justify;'>Residential Property Price Indices (RPPIs) &ndash; also named House price indices (HPIs), are index numbers measuring the evolution of residential property prices over time. RPPIs are key statistics not only for citizens and households across the world, but also for economic and monetary policy makers. Among their professional uses, they serve, for example, to monitor macroeconomic imbalances and risk exposure of the financial sector.</p><p style='margin-top:0cm;margin-right:0cm;margin-bottom:8.0pt;margin-left:0cm;font-size:11.0pt;font-family:\"Calibri\",sans-serif;text-align:justify;'>&ldquo;National and Regional House Price Indices&rdquo; datasets include RPPI compiled by official statistical agencies following international statistical guidelines. It covers all OECD member countries and some non-member countries. Whenever possible, these RPPIs are broken down by region, dwelling type (single- and multi-family dwellings) and vintage (new and existing dwellings).</p><p style='margin-top:0cm;margin-right:0cm;margin-bottom:8.0pt;margin-left:0cm;font-size:11.0pt;font-family:\"Calibri\",sans-serif;text-align:justify;'>The dataset called &ldquo;National and Regional House Price Indices&rdquo; contains the full list of available RPPIs.</p>"
+        },
+        "links": [
+          {
+            "rel": "datastructure",
+            "urn": "urn:sdmx:org.sdmx.infomodel.datastructure.Dataflow=OECD.SDD.TPS:DSD_RHPI@DF_RHPI_ALL(1.1)"
+          }
+        ],
+        "dimensions": {
+          "dataSet": [],
+          "series": [],
+          "observation": [
+            {
+              "id": "REF_AREA_TYPE",
+              "name": "Reference area type",
+              "names": {
+                "en": "Reference area type"
+              },
+              "keyPosition": 0,
+              "roles": [
+                "REF_AREA_TYPE"
+              ],
+              "values": [
+                {
+                  "id": "COU",
+                  "order": 0,
+                  "name": "Country",
+                  "names": {
+                    "en": "Country"
+                  }
+                }
+              ]
+            },
+            {
+              "id": "REF_AREA",
+              "name": "Reference area",
+              "names": {
+                "en": "Reference area"
+              },
+              "keyPosition": 1,
+              "roles": [
+                "REF_AREA"
+              ],
+              "values": [
+                {
+                  "id": "USA",
+                  "order": 424,
+                  "name": "United States",
+                  "names": {
+                    "en": "United States"
+                  },
+                  "annotations": [
+                    11
+                  ]
+                }
+              ]
+            },
+            {
+              "id": "FREQ",
+              "name": "Frequency of observation",
+              "names": {
+                "en": "Frequency of observation"
+              },
+              "keyPosition": 2,
+              "roles": [
+                "FREQ"
+              ],
+              "values": [
+                {
+                  "id": "Q",
+                  "order": 10,
+                  "name": "Quarterly",
+                  "names": {
+                    "en": "Quarterly"
+                  }
+                }
+              ]
+            },
+            {
+              "id": "MEASURE",
+              "name": "Measure",
+              "names": {
+                "en": "Measure"
+              },
+              "keyPosition": 3,
+              "roles": [
+                "MEASURE"
+              ],
+              "values": [
+                {
+                  "id": "RHPI",
+                  "order": 0,
+                  "name": "House price index",
+                  "names": {
+                    "en": "House price index"
+                  },
+                  "annotations": [
+                    12
+                  ]
+                }
+              ]
+            },
+            {
+              "id": "UNIT_MEASURE",
+              "name": "Unit of measure",
+              "names": {
+                "en": "Unit of measure"
+              },
+              "keyPosition": 4,
+              "roles": [
+                "UNIT_MEASURE"
+              ],
+              "values": [
+                {
+                  "id": "IX",
+                  "order": 838,
+                  "name": "Index",
+                  "names": {
+                    "en": "Index"
+                  },
+                  "annotations": [
+                    13
+                  ]
+                }
+              ]
+            },
+            {
+              "id": "ADJUSTMENT",
+              "name": "Adjustment",
+              "names": {
+                "en": "Adjustment"
+              },
+              "keyPosition": 5,
+              "roles": [
+                "ADJUSTMENT"
+              ],
+              "values": [
+                {
+                  "id": "N",
+                  "order": 6,
+                  "name": "Neither seasonally adjusted nor calendar adjusted",
+                  "names": {
+                    "en": "Neither seasonally adjusted nor calendar adjusted"
+                  },
+                  "annotations": [
+                    14
+                  ]
+                }
+              ]
+            },
+            {
+              "id": "TRANSFORMATION",
+              "name": "Transformation",
+              "names": {
+                "en": "Transformation"
+              },
+              "keyPosition": 6,
+              "roles": [
+                "TRANSFORMATION"
+              ],
+              "values": [
+                {
+                  "id": "_Z",
+                  "order": 57,
+                  "name": "Not applicable",
+                  "names": {
+                    "en": "Not applicable"
+                  },
+                  "annotations": [
+                    15
+                  ]
+                }
+              ]
+            },
+            {
+              "id": "VINTAGE",
+              "name": "Vintage",
+              "names": {
+                "en": "Vintage"
+              },
+              "keyPosition": 7,
+              "roles": [
+                "VINTAGE"
+              ],
+              "values": [
+                {
+                  "id": "EXISTING",
+                  "order": 1,
+                  "name": "Existing",
+                  "names": {
+                    "en": "Existing"
+                  },
+                  "annotations": [
+                    16
+                  ]
+                }
+              ]
+            },
+            {
+              "id": "DWELLINGS",
+              "name": "Dwellings",
+              "names": {
+                "en": "Dwellings"
+              },
+              "keyPosition": 8,
+              "roles": [
+                "DWELLINGS"
+              ],
+              "values": [
+                {
+                  "id": "SINGLE_F",
+                  "order": 1,
+                  "name": "Single family",
+                  "names": {
+                    "en": "Single family"
+                  },
+                  "annotations": [
+                    16
+                  ]
+                }
+              ]
+            },
+            {
+              "id": "TIME_PERIOD",
+              "name": "Time period",
+              "names": {
+                "en": "Time period"
+              },
+              "keyPosition": 9,
+              "roles": [
+                "TIME_PERIOD"
+              ],
+              "values": [
+                {
+                  "start": "2026-04-01T00:00:00",
+                  "end": "2026-06-30T23:59:59",
+                  "id": "2026-Q2",
+                  "name": "2026-Q2",
+                  "names": {
+                    "en-US": "2026-Q2"
+                  }
+                },
+                {
+                  "start": "2026-01-01T00:00:00",
+                  "end": "2026-03-31T23:59:59",
+                  "id": "2026-Q1",
+                  "name": "2026-Q1",
+                  "names": {
+                    "en-US": "2026-Q1"
+                  }
+                },
+                {
+                  "start": "2025-10-01T00:00:00",
+                  "end": "2025-12-31T23:59:59",
+                  "id": "2025-Q4",
+                  "name": "2025-Q4",
+                  "names": {
+                    "en-US": "2025-Q4"
+                  }
+                },
+                {
+                  "start": "2025-07-01T00:00:00",
+                  "end": "2025-09-30T23:59:59",
+                  "id": "2025-Q3",
+                  "name": "2025-Q3",
+                  "names": {
+                    "en-US": "2025-Q3"
+                  }
+                },
+                {
+                  "start": "2025-04-01T00:00:00",
+                  "end": "2025-06-30T23:59:59",
+                  "id": "2025-Q2",
+                  "name": "2025-Q2",
+                  "names": {
+                    "en-US": "2025-Q2"
+                  }
+                },
+                {
+                  "start": "2025-01-01T00:00:00",
+                  "end": "2025-03-31T23:59:59",
+                  "id": "2025-Q1",
+                  "name": "2025-Q1",
+                  "names": {
+                    "en-US": "2025-Q1"
+                  }
+                }
+              ]
+            }
+          ]
+        },
+        "attributes": {
+          "dataSet": [],
+          "dimensionGroup": [],
+          "series": [],
+          "observation": [
+            {
+              "id": "DECIMALS",
+              "name": "Decimals",
+              "names": {
+                "en": "Decimals"
+              },
+              "isMandatory": false,
+              "roles": [
+                "DECIMALS"
+              ],
+              "relationship": {
+                "dimensions": [
+                  "REF_AREA_TYPE",
+                  "REF_AREA",
+                  "FREQ",
+                  "MEASURE",
+                  "UNIT_MEASURE",
+                  "ADJUSTMENT",
+                  "TRANSFORMATION",
+                  "VINTAGE",
+                  "DWELLINGS"
+                ]
+              },
+              "values": [
+                {
+                  "id": "1",
+                  "order": 1,
+                  "name": "One",
+                  "names": {
+                    "en": "One"
+                  }
+                }
+              ]
+            },
+            {
+              "id": "BASE_PER",
+              "name": "Base period",
+              "names": {
+                "en": "Base period"
+              },
+              "isMandatory": false,
+              "roles": [
+                "BASE_PER"
+              ],
+              "relationship": {
+                "dimensions": [
+                  "UNIT_MEASURE"
+                ]
+              },
+              "values": [
+                {
+                  "value": "2015"
+                }
+              ]
+            },
+            {
+              "id": "OBS_STATUS",
+              "name": "Observation status",
+              "names": {
+                "en": "Observation status"
+              },
+              "isMandatory": false,
+              "roles": [
+                "OBS_STATUS"
+              ],
+              "relationship": {
+                "observation": {}
+              },
+              "values": [
+                {
+                  "id": "A",
+                  "order": 0,
+                  "name": "Normal value",
+                  "names": {
+                    "en": "Normal value"
+                  }
+                }
+              ]
+            },
+            {
+              "id": "UNIT_MULT",
+              "name": "Unit multiplier",
+              "names": {
+                "en": "Unit multiplier"
+              },
+              "isMandatory": false,
+              "roles": [
+                "UNIT_MULT"
+              ],
+              "relationship": {
+                "observation": {}
+              },
+              "values": [
+                {
+                  "id": "0",
+                  "order": 0,
+                  "name": "Units",
+                  "names": {
+                    "en": "Units"
+                  }
+                }
+              ]
+            }
+          ]
+        },
+        "annotations": [
+          {
+            "type": "NonProductionDataflow",
+            "text": "true",
+            "texts": {
+              "en": "true"
+            }
+          },
+          {
+            "id": "@SDMX",
+            "title": "DWELLINGS,VINTAGE",
+            "type": "LAYOUT_ROW"
+          },
+          {
+            "id": "@SDMX",
+            "title": "TIME_PERIOD",
+            "type": "LAYOUT_COLUMN"
+          },
+          {
+            "id": "@SDMX",
+            "title": "REF_AREA,UNIT_MEASURE,TRANSFORMATION,ADJUSTMENT",
+            "type": "LAYOUT_ROW_SECTION"
+          },
+          {
+            "id": "@SDMX",
+            "title": "OBS_STATUS=A,ADJUSTMENT=N,TRANSFORMATION=_Z,UNIT_MULT=0",
+            "type": "NOT_DISPLAYED"
+          },
+          {
+            "id": "@SDMX",
+            "title": "FREQ=Q,MEASURE=RHPI,REF_AREA_TYPE=COU,TRANSFORMATION=GY,LASTNPERIODS=9",
+            "type": "DEFAULT"
+          },
+          {
+            "title": "COMBINED_UNIT_MEASURE:UNIT_MEASURE,BASE_PER,TRANSFORMATION,ADJUSTMENT",
+            "type": "COMBINED_CONCEPTS",
+            "text": "COMBINED_UNIT_MEASURE:Combined unit of measure",
+            "texts": {
+              "en": "COMBINED_UNIT_MEASURE:Combined unit of measure"
+            }
+          },
+          {
+            "id": "@SDMX",
+            "title": "REF_AREA:OECD.SDD.TPS:HCL_AREA_RHPI(1.1).H",
+            "type": "HIER_CONTEXT"
+          },
+          {
+            "title": "10000",
+            "type": "MAX_TABLE_DATA"
+          },
+          {
+            "title": "urn:sdmx:org.sdmx.infomodel.metadatastructure.MetadataStructure=OECD:MSD_REF_METADATA(1.0)",
+            "type": "METADATA"
+          },
+          {
+            "type": "HAS_METADATA"
+          },
+          {
+            "id": "@SDMX",
+            "type": "ORDER",
+            "text": "4380",
+            "texts": {
+              "en": "4380"
+            }
+          },
+          {
+            "id": "@SDMX",
+            "type": "ORDER",
+            "text": "10",
+            "texts": {
+              "en": "10"
+            }
+          },
+          {
+            "id": "@SDMX",
+            "type": "ORDER",
+            "text": "8390",
+            "texts": {
+              "en": "8390"
+            }
+          },
+          {
+            "id": "@SDMX",
+            "type": "ORDER",
+            "text": "60",
+            "texts": {
+              "en": "60"
+            }
+          },
+          {
+            "id": "@SDMX",
+            "type": "ORDER",
+            "text": "580",
+            "texts": {
+              "en": "580"
+            }
+          },
+          {
+            "id": "@SDMX",
+            "type": "ORDER",
+            "text": "20",
+            "texts": {
+              "en": "20"
+            }
+          }
+        ],
+        "measures": {
+          "observation": [
+            {
+              "id": "OBS_VALUE",
+              "name": "Observation value",
+              "names": {
+                "en": "Observation value"
+              },
+              "isMandatory": false,
+              "roles": [
+                "OBS_VALUE"
+              ],
+              "values": null
+            }
+          ]
+        },
+        "dataSets": [
+          0
+        ]
+      }
+    ]
+  },
+  "errors": []
+}

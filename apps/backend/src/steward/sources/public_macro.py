@@ -10,6 +10,7 @@ import httpx
 
 from steward.macro.geo import ISO3_TO_ISO2
 from steward.macro.providers import parse_comtrade, parse_sdmx_json, parse_world_bank
+from steward.macro.sdmx_keys import data_request
 from steward.sources.base import (
     AccessResult,
     AccessState,
@@ -127,7 +128,7 @@ class SdmxAdapter(PublicMacroAdapter):
         self.base_url = base_url.rstrip("/")
 
     async def fetch(self, request: dict[str, Any]) -> FetchResult:
-        url = f"{self.base_url}/data/{request['flow']}/{request['key']}"
+        url, accept = data_request(self.provider, self.base_url, request["flow"], request["key"])
         response = await self.http.get(
             url,
             params={
@@ -136,7 +137,7 @@ class SdmxAdapter(PublicMacroAdapter):
                 # One observation per dimension combination: the area comes from the response.
                 "dimensionAtObservation": "AllDimensions",
             },
-            headers={"Accept": "application/vnd.sdmx.data+json;version=2.0.0"},
+            headers={"Accept": accept},
         )
         body = _json_body(response) if response.status_code == 200 else {}
         if body is None:

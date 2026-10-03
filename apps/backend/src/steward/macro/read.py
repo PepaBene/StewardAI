@@ -37,9 +37,12 @@ class NextReleaseSource(BaseModel):
     """Where a `next_release` date comes from: the provider's own published calendar."""
 
     provider: str = Field(
-        description="Provider whose calendar names the date (fred, eurostat, ecb, bis)."
+        description="Provider whose calendar names the date (fred, eurostat, ecb, bis, cnb)."
     )
-    url: str = Field(description="The provider's calendar page the date was read from.")
+    url: str = Field(
+        description="The provider's calendar page the date was read from (for a "
+        "`published_rule`, the page that states the rule)."
+    )
     title: str | None = Field(default=None, description="The calendar entry's own label.")
 
 
@@ -72,14 +75,30 @@ class ContextPoint(BaseModel):
         "published release calendar: the earliest stored calendar date on or after the UTC date "
         "of `as_of`, from calendar rows known by `as_of` and not superseded (rescheduled) by "
         "then. A date, not a promise: the provider may still reschedule it. Null when no "
-        "calendar entry is stored for the series (then see `next_release_estimate`). "
-        "`next_release_basis` is `provider_calendar` whenever this is set.",
+        "calendar entry or published rule is stored for the series (then see "
+        "`next_release_estimate`). `next_release_basis` is `provider_calendar` or "
+        "`published_rule` whenever this is set.",
     )
     next_release_time: dt.time | None = Field(
         default=None,
-        description="Time of day of `next_release` exactly as the provider publishes it (the "
-        "publisher's local time; the ECB calendar does not state a zone). Null when the calendar "
-        "gives only a date (FRED, Eurostat, BIS) or `next_release` is null.",
+        description="Wall-clock time of day of `next_release` exactly as the provider publishes "
+        "it, never converted. The zone it is a time in is `next_release_timezone`. Null when "
+        "the calendar gives only a date (FRED, Eurostat, BIS, ECB meeting days) or "
+        "`next_release` is null.",
+    )
+    next_release_timezone: str | None = Field(
+        default=None,
+        description="IANA time zone of `next_release_time` (for example Europe/Prague). Set only "
+        "when `next_release_time` is set; null for a date-only release. "
+        "`next_release_timezone_source` says whether the provider stated it or it was assumed "
+        "from where the publishing agency is located: show an assumed zone as assumed.",
+    )
+    next_release_timezone_source: Literal["stated_by_provider", "agency_location"] | None = Field(
+        default=None,
+        description="`stated_by_provider`: the provider's calendar names the zone (BLS iCal "
+        "TZID US-Eastern; ECB yield curves 'CET'). `agency_location`: the provider states a "
+        "time but no zone, so the zone is that of the publishing agency's seat (ECB Frankfurt, "
+        "ČNB Prague, DG ECFIN Brussels, ...), an assumption. Null with `next_release_timezone`.",
     )
     next_release_source: NextReleaseSource | None = Field(
         default=None,
@@ -95,12 +114,17 @@ class ContextPoint(BaseModel):
         "non-positive median gap, or when the estimate is already before `as_of` (the series "
         "is overdue or no longer published). An estimate, not a provider announcement.",
     )
-    next_release_basis: Literal["provider_calendar", "observed_cadence"] | None = Field(
+    next_release_basis: (
+        Literal["provider_calendar", "published_rule", "observed_cadence"] | None
+    ) = Field(
         default=None,
         description="Where the returned next-release date comes from: `provider_calendar` "
-        "(`next_release`, the provider's published schedule) or `observed_cadence` "
+        "(`next_release`, a date in the provider's published schedule), `published_rule` "
+        "(`next_release`, derived from a release rule and a holiday list the provider "
+        "itself publishes, for example 'every TARGET business day' with the ECB's closing "
+        "days; the date can still move when the provider postpones) or `observed_cadence` "
         "(`next_release_estimate`, the median gap of stored first releases; a fallback only "
-        "when no calendar entry exists). Null when both are null.",
+        "when no calendar entry or rule exists). Null when both are null.",
     )
 
 
@@ -365,11 +389,15 @@ def _with_calendar(cadence: dict[str, object], entry: NextRelease | None) -> dic
     return {
         "next_release": entry.release_date,
         "next_release_time": entry.release_time,
+        "next_release_timezone": entry.release_timezone if entry.release_time else None,
+        "next_release_timezone_source": entry.release_timezone_source
+        if entry.release_time
+        else None,
         "next_release_source": NextReleaseSource(
             provider=entry.provider, url=entry.source_url, title=entry.title
         ),
         "next_release_estimate": None,
-        "next_release_basis": "provider_calendar",
+        "next_release_basis": entry.basis,
     }
 
 

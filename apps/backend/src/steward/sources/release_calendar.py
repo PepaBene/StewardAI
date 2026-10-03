@@ -4,6 +4,12 @@ Every source here is free (a free FRED key, or keyless) and was verified live on
 docs/data/macro-release-calendar.md records the evidence. Providers without a free
 machine-readable calendar (OECD, World Bank, UN Comtrade) have no adapter on purpose.
 
+Basis of a stored date (`CalendarEntry.basis`, the `source` column): `provider_calendar` (a date the
+provider lists) or `published_rule` (derived from a release rule AND a holiday list that the
+provider itself publishes: ECB yield curves "every TARGET business day" with the ECB's TARGET
+closing days; ČNB CZEONIA "the next working day" with the ČNB bank holiday list). A rule is only
+used when both pages still say what was verified (otherwise drift: nothing stored).
+
 * FRED: `/fred/series/release` (series -> release id), then `/fred/release/dates` with
   `include_release_dates_with_no_data=true` (future dates). JSON, free API key.
 * Eurostat: the iCalendar export of the release calendar (euro indicators), keyless.
@@ -16,6 +22,8 @@ machine-readable calendar (OECD, World Bank, UN Comtrade) have no adapter on pur
 * DG ECFIN (European Commission): the business and consumer survey "Publication dates <year>"
   PDF (date and time), the source of the Economic Sentiment Indicator (`ei_bssi_m_r2`).
 * ČNB: the Bank Board monetary-policy meeting dates on the "Bank Board decisions" page.
+* BLS: the iCalendar release schedule (CPI, Employment Situation: 08:30 `TZID=US-Eastern`),
+  needs a User-Agent with a contact address (BLS answers 403 without one).
 
 A parser raises `CalendarDrift` when the shape is not the verified one (a missing field, a
 changed format, no entries at all); the caller quarantines the payload and stores nothing. A
@@ -33,6 +41,7 @@ import re
 from collections.abc import Awaitable, Callable, Mapping, Sequence
 from dataclasses import dataclass, field
 from typing import Any
+from zoneinfo import ZoneInfo
 
 import httpx
 
@@ -72,6 +81,53 @@ ECFIN_PDF = (
     "Publication%20dates%20{year}.pdf"
 )
 CNB_BANK_BOARD = "https://www.cnb.cz/en/monetary-policy/bank-board-decisions/"
+BLS_ICS = "https://www.bls.gov/schedule/news_release/bls.ics"
+ECB_YIELD_PAGE = (
+    "https://www.ecb.europa.eu/stats/financial_markets_and_interest_rates/euro_area_yield_curves/"
+    "html/index.en.html"
+)
+ECB_TARGET_PAGE = "https://www.ecb.europa.eu/paym/target/t2/html/index.en.html"
+CNB_HOLIDAYS = (
+    "https://www.cnb.cz/en/public/media-service/schedules-and-other-info/"
+    "bank-holidays-in-the-czech-republic/"
+)
+CNB_CZEONIA_METHOD = (
+    "https://www.cnb.cz/en/financial-markets/money-market/czeonia-reference-interest-rate/"
+    "calculation-methodology-for-the-czeonia-reference-rate/"
+)
+
+BASIS_CALENDAR = "provider_calendar"
+BASIS_RULE = "published_rule"
+TZ_STATED = "stated_by_provider"
+TZ_AGENCY = "agency_location"
+
+# The zone of a published release time. ONE table, keyed by the publishing agency (the calendar the
+# time is read from). A zone the provider itself states (BLS iCal TZID, "CET" on the ECB yield
+# curve page) always wins and is stored as `stated_by_provider`; otherwise the zone is that of the
+# agency's seat and is stored as `agency_location`, an assumption that a client must show as
+# assumed. A zone is only ever attached to a release that has a time.
+AGENCY_TIMEZONES: dict[str, str] = {
+    "ecb": "Europe/Berlin",  # Frankfurt (same offsets as CET/CEST)
+    "cnb": "Europe/Prague",
+    "ecfin": "Europe/Brussels",  # DG ECFIN, European Commission
+    "eurostat": "Europe/Luxembourg",
+    "bis": "Europe/Zurich",  # Basel
+    "bls": "America/New_York",
+    "fred": "America/New_York",
+    "bea": "America/New_York",
+    "oecd": "Europe/Paris",
+    "world_bank": "America/New_York",
+    "imf": "America/New_York",
+    "un_comtrade": "America/New_York",
+}
+
+
+def agency_timezone(agency: str) -> str:
+    """The IANA zone of an agency's seat (`AGENCY_TIMEZONES`); KeyError for an unknown agency."""
+    zone = AGENCY_TIMEZONES[agency]
+    ZoneInfo(zone)  # must be a real IANA name
+    return zone
+
 
 # Our series (config keys) -> the provider's calendar entries. Only series whose release the
 # provider's calendar names unambiguously are listed; everything else has no calendar entry
@@ -131,7 +187,21 @@ BIS_FLOW_CATEGORY: dict[str, str] = {
     "WS_DEBT_SEC2_PUB": "IDS",  # International debt securities (BIS-compiled)
     "WS_GLI": "GLI",  # Global liquidity indicators
     "WS_LONG_CPI": "CPI",  # Consumer prices statistics
+    "WS_SPP": "RPP",  # Selected residential property prices
 }
+# BIS release_type values of the rows that update a dataflow (default: "Release"). The RPP category
+# carries the detailed dataset (WS_DPP: "Detailed residential release") and the selected one
+# (WS_SPP: the three rows below), see data.bis.org/topics/RPP.
+BIS_RELEASE_TYPES: dict[str, frozenset[str]] = {
+    "WS_SPP": frozenset(
+        {
+            "Selected residential standard release",
+            "Selected residential, partial update 1",
+            "Selected residential, partial update 2",
+        }
+    ),
+}
+BIS_DEFAULT_RELEASE_TYPES = frozenset({"Release"})
 # The shipped configuration (PublicDataSettings.sdmx): series key -> dataflow id.
 DEFAULT_BIS_FLOWS: dict[str, str] = {
     "total_credit": "WS_TC",
@@ -139,7 +209,7 @@ DEFAULT_BIS_FLOWS: dict[str, str] = {
     "banking_claims": "WS_LBS_D_PUB",
     "debt_securities": "WS_DEBT_SEC2_PUB",
     "global_liquidity": "WS_GLI",
-    "property_prices": "WS_LONG_CPI",
+    "property_prices": "WS_SPP",
 }
 ECFIN_SERIES = "sentiment"
 ECFIN_KEY = "bcs-publication-dates"
@@ -161,6 +231,27 @@ class CalendarEntry:
     release_time: dt.time | None = None
     title: str | None = None
     reference_period: str | None = None
+    basis: str = BASIS_CALENDAR  # provider_calendar | published_rule
+    # The calendar (publishing agency) the time is read from, a key of AGENCY_TIMEZONES; defaults
+    # to `provider` (DG ECFIN rows are stored under `eurostat`, BLS rows under `fred`).
+    agency: str | None = None
+    # A zone the provider itself states (an IANA name); wins over the agency's location.
+    stated_timezone: str | None = None
+    release_timezone: str | None = field(default=None, init=False)
+    release_timezone_source: str | None = field(default=None, init=False)
+
+    def __post_init__(self) -> None:
+        if self.basis not in (BASIS_CALENDAR, BASIS_RULE):
+            raise ValueError(f"unknown basis {self.basis!r}")
+        if self.release_time is None:
+            return  # a date-only release gets no zone
+        if self.stated_timezone:
+            ZoneInfo(self.stated_timezone)
+            zone, source = self.stated_timezone, TZ_STATED
+        else:
+            zone, source = agency_timezone(self.agency or self.provider), TZ_AGENCY
+        object.__setattr__(self, "release_timezone", zone)
+        object.__setattr__(self, "release_timezone_source", source)
 
     @property
     def identity(self) -> tuple[str, str, str, dt.date]:
@@ -459,6 +550,217 @@ def parse_cnb_bank_board(page: str) -> tuple[list[dt.date], dt.time | None]:
     return sorted(days), decided
 
 
+# ------------------------------------------------------------------- published rules (dates)
+RULE_HORIZON_DAYS = 14  # a rule is turned into dates for this many days ahead, re-derived daily
+ECB_YIELD_SERIES = "euro_area_10y_yield"
+ECB_YIELD_KEY = "rule:target-business-day"
+ECB_YIELD_TIME = dt.time(12, 0)
+CNB_CZEONIA_SERIES = "czeonia"
+CNB_CZEONIA_KEY = "rule:czech-working-day"
+
+
+def easter_sunday(year: int) -> dt.date:
+    """Gregorian Easter Sunday (anonymous / Meeus-Jones-Butcher algorithm)."""
+    a, b, c = year % 19, year // 100, year % 100
+    d, e = divmod(b, 4)
+    f = (b + 8) // 25
+    g = (b - f + 1) // 3
+    h = (19 * a + b - d - g + 15) % 30
+    i, k = divmod(c, 4)
+    ell = (32 + 2 * e + 2 * i - h - k) % 7
+    m = (a + 11 * h + 22 * ell) // 451
+    month, day = divmod(h + ell - 7 * m + 114, 31)
+    return dt.date(year, month, day + 1)
+
+
+def target_closing_days(year: int) -> set[dt.date]:
+    """The days besides Saturdays and Sundays on which T2/TARGET is closed for euro settlement, as
+    the ECB lists them: 1 January, Good Friday, Easter Monday, 1 May, 25 and 26 December."""
+    easter = easter_sunday(year)
+    return {
+        dt.date(year, 1, 1),
+        easter - dt.timedelta(days=2),
+        easter + dt.timedelta(days=1),
+        dt.date(year, 5, 1),
+        dt.date(year, 12, 25),
+        dt.date(year, 12, 26),
+    }
+
+
+def is_target_business_day(day: dt.date) -> bool:
+    return day.weekday() < 5 and day not in target_closing_days(day.year)
+
+
+def _plain(page: str) -> str:
+    return re.sub(r"\s+", " ", html.unescape(re.sub(r"<[^>]+>", " ", page))).strip()
+
+
+_TARGET_CLOSED = (
+    "T2 is open from Monday to Friday and closed on Saturday and Sunday",
+    "1 January (New Year's Day)",
+    "Good Friday",
+    "Easter Monday",
+    "1 May (Labour Day)",
+    "25 December (Christmas Day)",
+    "26 December (Boxing Day)",
+)
+
+
+def verify_ecb_target_rule(yield_page: str, target_page: str) -> None:
+    """The two ECB pages must still say what the rule was verified against (2026-10-03): the yield
+    curve page "updated every TARGET business day at noon (12:00 CET)" and the T2 page's list of
+    closing days. Anything else is drift (the rule is not applied to a changed statement)."""
+    text = _plain(yield_page) if isinstance(yield_page, str) else ""
+    if "updated every TARGET business day at noon (12:00 CET)" not in text:
+        raise CalendarDrift("ECB yield curves: the TARGET business day rule is no longer stated")
+    closed = _plain(target_page) if isinstance(target_page, str) else ""
+    at = closed.find(_TARGET_CLOSED[0])
+    if at < 0:
+        raise CalendarDrift("ECB T2: opening hours statement not found")
+    for phrase in _TARGET_CLOSED[1:]:
+        found = closed.find(phrase, at)
+        if found < 0:
+            raise CalendarDrift(f"ECB T2: closing day {phrase!r} is no longer listed")
+        at = found
+
+
+def ecb_yield_rule_entries(today: dt.date) -> list[CalendarEntry]:
+    """One entry per TARGET business day from `today` for RULE_HORIZON_DAYS days: 12:00 CET."""
+    out: list[CalendarEntry] = []
+    for offset in range(RULE_HORIZON_DAYS + 1):
+        day = today + dt.timedelta(days=offset)
+        if is_target_business_day(day):
+            out.append(
+                CalendarEntry(
+                    "ecb",
+                    ECB_YIELD_SERIES,
+                    ECB_YIELD_KEY,
+                    day,
+                    ECB_YIELD_PAGE,
+                    release_time=ECB_YIELD_TIME,
+                    title="Euro area yield curves: updated every TARGET business day at noon "
+                    f"(12:00 CET); TARGET closing days as listed by the ECB at {ECB_TARGET_PAGE}; "
+                    "an update may be delayed or postponed to the next TARGET business day",
+                    basis=BASIS_RULE,
+                    agency="ecb",
+                    stated_timezone="Europe/Berlin",  # the page states "CET"
+                )
+            )
+    return out
+
+
+_CNB_YEAR = re.compile(r"<div>\s*(\d{4})\s*</div>")
+_CNB_HOLIDAY = re.compile(
+    r"<p>\s*(\d{1,2}) ([A-Z][a-z]+) \u2013 [^<(]+\((Monday|Tuesday|Wednesday|Thursday|Friday|"
+    r"Saturday|Sunday)\)\s*</p>"
+)
+_WEEKDAYS = ("Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday")
+
+
+def parse_cnb_holidays(page: str) -> dict[int, set[dt.date]]:
+    """Per year, the ČNB's list of Czech bank holidays: exactly 13 per year, each weekday as the
+    page states it, the sliding-holiday sentence present, and Good Friday and Easter Monday equal to
+    the dates computed from Easter (a changed layout or list is drift)."""
+    if not isinstance(page, str) or "sliding holiday" not in page:
+        raise CalendarDrift("CNB holidays: the no-sliding-holiday statement is not on the page")
+    if "There are 13 bank holidays" not in page:
+        raise CalendarDrift("CNB holidays: the count statement is not on the page")
+    years = list(_CNB_YEAR.finditer(page))
+    if not years:
+        raise CalendarDrift("CNB holidays: no year sections")
+    out: dict[int, set[dt.date]] = {}
+    for position, match in enumerate(years):
+        year = int(match.group(1))
+        end = years[position + 1].start() if position + 1 < len(years) else len(page)
+        days: set[dt.date] = set()
+        for number, month, weekday in _CNB_HOLIDAY.findall(page[match.end() : end]):
+            if month not in _MONTHS:
+                raise CalendarDrift(f"CNB holidays: unknown month {month!r}")
+            try:
+                day = dt.date(year, _MONTHS[month], int(number))
+            except ValueError as exc:
+                raise CalendarDrift("CNB holidays: bad date") from exc
+            if _WEEKDAYS[day.weekday()] != weekday:
+                raise CalendarDrift(f"CNB holidays: {day} is not a {weekday}")
+            days.add(day)
+        if len(days) != 13:
+            raise CalendarDrift(f"CNB holidays: {year} lists {len(days)} holidays, expected 13")
+        easter = easter_sunday(year)
+        if not {easter - dt.timedelta(days=2), easter + dt.timedelta(days=1)} <= days:
+            raise CalendarDrift(f"CNB holidays: {year} Good Friday / Easter Monday disagree")
+        out[year] = days
+    return out
+
+
+def verify_cnb_czeonia_rule(method_page: str) -> None:
+    text = _plain(method_page) if isinstance(method_page, str) else ""
+    if (
+        "on day D are published on the immediately following working day, D+1" not in text
+        or "usually by 9.30 a.m. local time" not in text
+    ):
+        raise CalendarDrift("CNB CZEONIA: the D+1 working day publication rule is not stated")
+
+
+def cnb_czeonia_rule_entries(
+    holidays: Mapping[int, set[dt.date]], today: dt.date
+) -> list[CalendarEntry]:
+    """One entry per Czech working day (not Saturday/Sunday, not a listed bank holiday) from `today`
+    for RULE_HORIZON_DAYS days, only for years whose holiday list the ČNB has published. No time:
+    the ČNB says "usually by 9.30 a.m." (an upper bound, not a release time)."""
+    out: list[CalendarEntry] = []
+    for offset in range(RULE_HORIZON_DAYS + 1):
+        day = today + dt.timedelta(days=offset)
+        if day.year not in holidays:
+            break  # beyond the published holiday lists
+        if day.weekday() < 5 and day not in holidays[day.year]:
+            out.append(
+                CalendarEntry(
+                    "cnb",
+                    CNB_CZEONIA_SERIES,
+                    CNB_CZEONIA_KEY,
+                    day,
+                    CNB_CZEONIA_METHOD,
+                    title="CZEONIA of the previous working day: published each Czech working day "
+                    "(D+1), usually by 9.30 a.m. local time; working days = not Saturday/Sunday "
+                    f"and not a bank holiday listed at {CNB_HOLIDAYS}",
+                    basis=BASIS_RULE,
+                )
+            )
+    return out
+
+
+BLS_RELEASES: dict[str, tuple[str, str]] = {
+    # FRED series id -> (our calendar key, the BLS event title)
+    "CPIAUCSL": ("bls:cpi", "Consumer Price Index"),
+    "UNRATE": ("bls:empsit", "Employment Situation"),
+}
+BLS_ZONE = "America/New_York"  # the iCal's TZID "US-Eastern" (EST/EDT rules in its VTIMEZONE)
+_BLS_START = re.compile(r"^DTSTART;TZID=([^:\n]+):(\d{8})T(\d{6})\s*$", re.M)
+
+
+def parse_bls_ics(text: str) -> list[tuple[str, dt.date, dt.time]]:
+    """(title, date, local time) of every BLS release-schedule event. Every event must carry a
+    `DTSTART;TZID=US-Eastern` (the only zone the calendar declares), else drift."""
+    if not isinstance(text, str) or not text.lstrip().startswith("BEGIN:VCALENDAR"):
+        raise CalendarDrift("BLS calendar: not an iCalendar document")
+    if "Bureau of Labor Statistics" not in text[:400] or "TZID:US-Eastern" not in text:
+        raise CalendarDrift("BLS calendar: unexpected PRODID or time zone")
+    events: list[tuple[str, dt.date, dt.time]] = []
+    for block in _ICS_EVENT.findall(_unfold(text)):
+        summary = re.search(r"^SUMMARY[^:\n]*:(.*)$", block, re.M)
+        start = _BLS_START.search(block)
+        if summary is None or start is None or start.group(1) != "US-Eastern":
+            raise CalendarDrift("BLS calendar: event without SUMMARY or a US-Eastern DTSTART")
+        try:
+            when = dt.datetime.strptime(start.group(2) + start.group(3), "%Y%m%d%H%M%S")
+        except ValueError as exc:
+            raise CalendarDrift("BLS calendar: bad DTSTART") from exc
+        events.append((_ics_unescape(summary.group(1).strip()), when.date(), when.time()))
+    if not events:
+        raise CalendarDrift("BLS calendar: no events")
+    return events
+
+
 # ------------------------------------------------------------------------------------ fetching
 def _outcome(response: httpx.Response, *, has_rows: bool = True) -> AccessResult:
     return access_from_http(
@@ -671,9 +973,44 @@ async def fetch_ecb(
                             reference_period=reference,
                         )
                     )
+    if failure is None or failure.state not in (AccessState.PAID_ONLY, AccessState.QUOTA_EXHAUSTED):
+        rule_failure = await _ecb_yield_rule(http, fetch, before_call, today)
+        failure = failure or rule_failure
     if failure is not None:
         fetch.access = failure
     return fetch
+
+
+async def _ecb_yield_rule(
+    http: httpx.AsyncClient, fetch: CalendarFetch, before_call: BeforeCall, today: dt.date
+) -> AccessResult | None:
+    """The yield-curve release rule ("every TARGET business day at noon") with the ECB's TARGET
+    closing days: two page reads, both checked against the verified wording. None on success (the
+    dates are in `fetch`), else the failure to report."""
+    pages: list[str] = []
+    for url in (ECB_YIELD_PAGE, ECB_TARGET_PAGE):
+        sub = CalendarFetch("ecb", AccessResult(AccessState.AVAILABLE))
+        response = await _get(http, sub, before_call, url)
+        fetch.calls += sub.calls
+        fetch.response_bytes += sub.response_bytes
+        fetch.status_code = sub.status_code or fetch.status_code
+        if response is None:
+            return sub.access
+        pages.append(response.text)
+    try:
+        verify_ecb_target_rule(pages[0], pages[1])
+    except CalendarDrift as exc:
+        drifted = _drift(
+            CalendarFetch("ecb", fetch.access),
+            exc,
+            {"yield_curve": pages[0][:100_000], "t2": pages[1][:100_000]},
+        )
+        fetch.drift = fetch.drift or drifted.drift
+        fetch.raw = fetch.raw or drifted.raw
+        return drifted.access
+    fetch.covered.add((ECB_YIELD_SERIES, ECB_YIELD_KEY))
+    fetch.entries.extend(ecb_yield_rule_entries(today))
+    return None
 
 
 def _ecb_decision_entries(
@@ -704,10 +1041,12 @@ async def fetch_bis(
     """`flows`: our BIS series key -> the SDMX dataflow id it is collected from (the shipped
     defaults when omitted). A series whose dataflow has no known calendar category gets no entry."""
     fetch = CalendarFetch("bis", AccessResult(AccessState.AVAILABLE))
+    chosen = DEFAULT_BIS_FLOWS if flows is None else flows
     series = {
-        key: BIS_FLOW_CATEGORY[flow]
-        for key, flow in (DEFAULT_BIS_FLOWS if flows is None else flows).items()
-        if flow in BIS_FLOW_CATEGORY
+        key: BIS_FLOW_CATEGORY[flow] for key, flow in chosen.items() if flow in BIS_FLOW_CATEGORY
+    }
+    types = {
+        key: BIS_RELEASE_TYPES.get(flow, BIS_DEFAULT_RELEASE_TYPES) for key, flow in chosen.items()
     }
     response = await _get(http, fetch, before_call, BIS_API)
     if response is None:
@@ -727,7 +1066,7 @@ async def fetch_bis(
             )
         fetch.covered.add((series_id, category))
         for category_id, release_type, day, period in rows:
-            if category_id == category and release_type == "Release" and day >= today:
+            if category_id == category and release_type in types[series_id] and day >= today:
                 fetch.entries.append(
                     CalendarEntry(
                         "bis",
@@ -788,6 +1127,7 @@ async def fetch_ecfin(
                         ECFIN_PDF.format(year=year),
                         release_time=time,
                         title="Business and consumer survey results (ESI)",
+                        agency="ecfin",
                     )
                 )
     return fetch
@@ -803,29 +1143,128 @@ def ecfin_pdf_text_safe(response: httpx.Response) -> str:
 async def fetch_cnb(
     http: httpx.AsyncClient, today: dt.date, before_call: BeforeCall
 ) -> CalendarFetch:
-    """The ČNB Bank Board monetary-policy meeting dates (the repo-rate decision days)."""
+    """The ČNB Bank Board monetary-policy meeting dates (the repo-rate decision days) and the
+    CZEONIA publication rule (every Czech working day, from the ČNB's bank holiday list). A page
+    that fails or drifts leaves the other usable."""
     fetch = CalendarFetch("cnb", AccessResult(AccessState.AVAILABLE))
-    response = await _get(http, fetch, before_call, CNB_BANK_BOARD)
+    failure: AccessResult | None = None
+
+    async def read(url: str) -> httpx.Response | None:
+        nonlocal failure
+        sub = CalendarFetch("cnb", AccessResult(AccessState.AVAILABLE))
+        response = await _get(http, sub, before_call, url)
+        fetch.calls += sub.calls
+        fetch.response_bytes += sub.response_bytes
+        fetch.status_code = sub.status_code or fetch.status_code
+        if response is None:
+            failure = failure or sub.access
+        return response
+
+    def drifted(exc: CalendarDrift, raw: Any) -> None:
+        nonlocal failure
+        marked = _drift(CalendarFetch("cnb", fetch.access), exc, raw)
+        failure = failure or marked.access
+        fetch.drift = fetch.drift or marked.drift
+        fetch.raw = fetch.raw or marked.raw
+
+    response = await read(CNB_BANK_BOARD)
+    if response is not None:
+        try:
+            days, decided = parse_cnb_bank_board(response.text)
+        except CalendarDrift as exc:
+            drifted(exc, {"raw_text": response.text[:200_000]})
+        else:
+            fetch.covered.add((CNB_SERIES, CNB_KEY))
+            fetch.entries.extend(
+                CalendarEntry(
+                    "cnb",
+                    CNB_SERIES,
+                    CNB_KEY,
+                    day,
+                    CNB_BANK_BOARD,
+                    release_time=decided,
+                    title="Bank Board monetary policy meeting (rate decision)",
+                )
+                for day in days
+                if day >= today
+            )
+    if failure is None or failure.state not in (AccessState.PAID_ONLY, AccessState.QUOTA_EXHAUSTED):
+        holidays_page = await read(CNB_HOLIDAYS)
+        method_page = await read(CNB_CZEONIA_METHOD) if holidays_page is not None else None
+        if holidays_page is not None and method_page is not None:
+            try:
+                verify_cnb_czeonia_rule(method_page.text)
+                holidays = parse_cnb_holidays(holidays_page.text)
+            except CalendarDrift as exc:
+                drifted(
+                    exc,
+                    {
+                        "holidays": holidays_page.text[:100_000],
+                        "methodology": method_page.text[:100_000],
+                    },
+                )
+            else:
+                fetch.covered.add((CNB_CZEONIA_SERIES, CNB_CZEONIA_KEY))
+                fetch.entries.extend(cnb_czeonia_rule_entries(holidays, today))
+    if failure is not None:
+        fetch.access = failure
+    return fetch
+
+
+async def fetch_bls(
+    http: httpx.AsyncClient,
+    today: dt.date,
+    before_call: BeforeCall,
+    fred_series: Mapping[str, str],
+    user_agent: str | None,
+) -> CalendarFetch:
+    """The BLS release schedule (iCalendar) for the FRED series that BLS publishes (CPI, Employment
+    Situation): date and 08:30 local time, `TZID=US-Eastern`. The rows are stored under provider
+    `fred` (the observation source of the series) with calendar key `bls:...`, and the read path
+    prefers them over FRED's date-only rows. BLS answers 403 without a User-Agent that carries a
+    contact address, so no request is made without one."""
+    fetch = CalendarFetch("bls", AccessResult(AccessState.AVAILABLE), rows_provider="fred")
+    if not user_agent or "@" not in user_agent:
+        fetch.access = AccessResult(
+            AccessState.ACCESS_UNVERIFIED,
+            "BLS_USER_AGENT (or SEC_USER_AGENT) with a contact address is not configured: "
+            "BLS refuses requests without one",
+        )
+        return fetch
+    mapped = {key: BLS_RELEASES[fid] for key, fid in fred_series.items() if fid in BLS_RELEASES}
+    response = await _get(http, fetch, before_call, BLS_ICS, headers={"User-Agent": user_agent})
     if response is None:
         return fetch
     try:
-        days, decided = parse_cnb_bank_board(response.text)
+        events = parse_bls_ics(response.text)
     except CalendarDrift as exc:
         return _drift(fetch, exc, {"raw_text": response.text[:200_000]})
-    fetch.covered.add((CNB_SERIES, CNB_KEY))
-    fetch.entries.extend(
-        CalendarEntry(
-            "cnb",
-            CNB_SERIES,
-            CNB_KEY,
-            day,
-            CNB_BANK_BOARD,
-            release_time=decided,
-            title="Bank Board monetary policy meeting (rate decision)",
-        )
-        for day in days
-        if day >= today
-    )
+    by_title: dict[str, list[tuple[dt.date, dt.time]]] = {}
+    for title, day, when in events:
+        by_title.setdefault(title, []).append((day, when))
+    for series_id, (calendar_key, title) in mapped.items():
+        if title not in by_title:
+            return _drift(
+                fetch,
+                CalendarDrift(f"BLS calendar: event {title!r} is missing"),
+                {"raw_text": response.text[:200_000]},
+            )
+        fetch.covered.add((series_id, calendar_key))
+        for day, when in sorted(set(by_title[title])):
+            if day >= today:
+                fetch.entries.append(
+                    CalendarEntry(
+                        "fred",
+                        series_id,
+                        calendar_key,
+                        day,
+                        BLS_ICS,
+                        release_time=when,
+                        title=f"BLS release: {title}",
+                        agency="bls",
+                        stated_timezone=BLS_ZONE,
+                    )
+                )
     return fetch
 
 
@@ -833,13 +1272,17 @@ def series_with_calendar(provider: str, keys: Sequence[str]) -> list[str]:
     """Which of our series keys a provider's mapping covers (the rest has no calendar)."""
     known: set[str]
     if provider == "ecb":
-        known = {s for _, (_, ids) in ECB_PAGES.items() for s in ids} | set(ECB_DECISION_SERIES)
+        known = (
+            {s for _, (_, ids) in ECB_PAGES.items() for s in ids}
+            | set(ECB_DECISION_SERIES)
+            | {ECB_YIELD_SERIES}
+        )
     elif provider == "eurostat":
         known = set(EUROSTAT_EVENTS) | set(EUROSTAT_GEO_EVENTS) | {ECFIN_SERIES}
     elif provider == "bis":
         known = {k for k, flow in DEFAULT_BIS_FLOWS.items() if flow in BIS_FLOW_CATEGORY}
     elif provider == "cnb":
-        known = {CNB_SERIES}
+        known = {CNB_SERIES, CNB_CZEONIA_SERIES}
     else:
         known = set(keys)  # FRED: any configured series has a release
     return [k for k in keys if k in known]

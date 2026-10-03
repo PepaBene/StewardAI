@@ -210,7 +210,15 @@ class SdmxAmbiguousError(ValueError):
     does not pin every dimension, so a value cannot be attributed to one series."""
 
 
-GEO_DIMENSIONS = ("REF_AREA", "BORROWERS_CTY", "COUNTRY", "LOCATION", "JURISDICTION")
+GEO_DIMENSIONS = (
+    "REF_AREA",
+    "BORROWERS_CTY",
+    "L_CP_COUNTRY",
+    "ISSUER_RES",
+    "COUNTRY",
+    "LOCATION",
+    "JURISDICTION",
+)
 TIME_DIMENSIONS = ("TIME_PERIOD", "TIME")
 FREQ_CODES = {
     "A": "annual",

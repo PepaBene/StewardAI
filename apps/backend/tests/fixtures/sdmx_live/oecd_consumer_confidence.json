@@ -1,0 +1,628 @@
+{
+  "meta": {
+    "schema": "https://raw.githubusercontent.com/sdmx-twg/sdmx-json/master/data-message/tools/schemas/2.0.0/sdmx-json-data-schema.json",
+    "id": "IREF015715",
+    "prepared": "2026-10-03T17:07:54Z",
+    "test": false,
+    "contentLanguages": [
+      "en",
+      "en-US"
+    ],
+    "sender": {
+      "id": "Disseminate_Final_DMZ",
+      "name": "unknown",
+      "names": {
+        "en-US": "unknown"
+      }
+    }
+  },
+  "data": {
+    "dataSets": [
+      {
+        "structure": 0,
+        "action": "Information",
+        "links": [
+          {
+            "rel": "datastructure",
+            "urn": "urn:sdmx:org.sdmx.infomodel.datastructure.DataStructure=OECD.SDD.STES:DSD_STES(4.0)"
+          }
+        ],
+        "annotations": [
+          6,
+          0,
+          1,
+          2,
+          3,
+          4,
+          5
+        ],
+        "attributes": [],
+        "dimensionGroupAttributes": {
+          "~:~:~:0:0:~:~:~:~:~": [
+            7
+          ],
+          "0:~:0:0:0:~:~:~:~:~": [
+            7
+          ]
+        },
+        "observations": {
+          "0:0:0:0:0:0:0:0:0:0": [
+            48.20228,
+            0,
+            0,
+            0
+          ],
+          "0:0:0:0:0:0:0:0:0:1": [
+            53.25921,
+            0,
+            0,
+            0
+          ],
+          "0:0:0:0:0:0:0:0:0:2": [
+            59.39209,
+            0,
+            0,
+            0
+          ],
+          "0:0:0:0:0:0:0:0:0:3": [
+            55.62629,
+            0,
+            0,
+            0
+          ],
+          "0:0:0:0:0:0:0:0:0:4": [
+            60.68322,
+            0,
+            0,
+            0
+          ],
+          "0:0:0:0:0:0:0:0:0:5": [
+            60.89841,
+            0,
+            0,
+            0
+          ],
+          "0:0:0:0:0:0:0:0:0:6": [
+            57.3478,
+            0,
+            0,
+            0
+          ],
+          "0:0:0:0:0:0:0:0:0:7": [
+            53.582,
+            0,
+            0,
+            0
+          ]
+        }
+      }
+    ],
+    "structures": [
+      {
+        "name": "Consumer opinion surveys",
+        "names": {
+          "en": "Consumer opinion surveys"
+        },
+        "description": "The consumer opinion survey indicators cover a restricted set of indicators on consumer confidence, expected economic situation and price expectations.<p />Consumer opinion surveys provide qualitative information that has proved useful for monitoring the current economic situation. Typically they are based on a sample of households and respondents are asked about their assessments of the current situation and expectations for the immediate future.  In the case of consumer surveys their intentions concerning major purposes, economic situation now compared with the recent past and expectations for the immediate future.  Many survey series provide advance warning of turning points in aggregate economic activity as measured by GDP or industrial production. Such series are known as leading indicators in cyclical analysis. These types of survey series are widely used as component series in composite leading indicators. The main characteristic of these types of surveys is that instead of asking for exact figures, they usually ask for the direction of change e.g. a question on tendency by reference to a “normal” state, e.g. of production level.  Possible answers are generally of the five point scale type e.g. increase sharply/increase slightly/remain the same/fall slightly/fall sharply for consumer surveys.  In presenting the results as a time series, only the balance is shown. That is “same” or “normal” answers are ignored and the balance is obtained by taking the difference between percentages of respondents giving favourable and unfavourable answers.Virtually all consumer opinion survey data are presented as time series of balances in this dataset, either in raw or seasonally adjusted form.  Very few series are presented as indices, and where these exist they have generally been converted from underlying balances by countries before submitting the data to the OECD.<p /><a href=mailto:stat.contact@oecd.org>OECD statistics contact</a><p /><a href=\"http://www.oecd.org/sdd\">Statistics and Data Directorate</a>",
+        "descriptions": {
+          "en": "The consumer opinion survey indicators cover a restricted set of indicators on consumer confidence, expected economic situation and price expectations.<p />Consumer opinion surveys provide qualitative information that has proved useful for monitoring the current economic situation. Typically they are based on a sample of households and respondents are asked about their assessments of the current situation and expectations for the immediate future.  In the case of consumer surveys their intentions concerning major purposes, economic situation now compared with the recent past and expectations for the immediate future.  Many survey series provide advance warning of turning points in aggregate economic activity as measured by GDP or industrial production. Such series are known as leading indicators in cyclical analysis. These types of survey series are widely used as component series in composite leading indicators. The main characteristic of these types of surveys is that instead of asking for exact figures, they usually ask for the direction of change e.g. a question on tendency by reference to a “normal” state, e.g. of production level.  Possible answers are generally of the five point scale type e.g. increase sharply/increase slightly/remain the same/fall slightly/fall sharply for consumer surveys.  In presenting the results as a time series, only the balance is shown. That is “same” or “normal” answers are ignored and the balance is obtained by taking the difference between percentages of respondents giving favourable and unfavourable answers.Virtually all consumer opinion survey data are presented as time series of balances in this dataset, either in raw or seasonally adjusted form.  Very few series are presented as indices, and where these exist they have generally been converted from underlying balances by countries before submitting the data to the OECD.<p /><a href=mailto:stat.contact@oecd.org>OECD statistics contact</a><p /><a href=\"http://www.oecd.org/sdd\">Statistics and Data Directorate</a>"
+        },
+        "links": [
+          {
+            "rel": "datastructure",
+            "urn": "urn:sdmx:org.sdmx.infomodel.datastructure.Dataflow=OECD.SDD.STES:DSD_STES@DF_CS(4.0)"
+          }
+        ],
+        "dimensions": {
+          "dataSet": [],
+          "series": [],
+          "observation": [
+            {
+              "id": "REF_AREA",
+              "name": "Reference area",
+              "names": {
+                "en": "Reference area"
+              },
+              "keyPosition": 0,
+              "roles": [
+                "REF_AREA"
+              ],
+              "values": [
+                {
+                  "id": "USA",
+                  "order": 37,
+                  "name": "United States",
+                  "names": {
+                    "en": "United States"
+                  },
+                  "annotations": [
+                    8
+                  ]
+                }
+              ]
+            },
+            {
+              "id": "FREQ",
+              "name": "Frequency of observation",
+              "names": {
+                "en": "Frequency of observation"
+              },
+              "keyPosition": 1,
+              "roles": [
+                "FREQ"
+              ],
+              "values": [
+                {
+                  "id": "M",
+                  "order": 11,
+                  "name": "Monthly",
+                  "names": {
+                    "en": "Monthly"
+                  }
+                }
+              ]
+            },
+            {
+              "id": "MEASURE",
+              "name": "Measure",
+              "names": {
+                "en": "Measure"
+              },
+              "keyPosition": 2,
+              "roles": [
+                "MEASURE"
+              ],
+              "values": [
+                {
+                  "id": "CCICP",
+                  "order": 14,
+                  "name": "Composite consumer confidence",
+                  "names": {
+                    "en": "Composite consumer confidence"
+                  },
+                  "annotations": [
+                    9
+                  ]
+                }
+              ]
+            },
+            {
+              "id": "UNIT_MEASURE",
+              "name": "Unit of measure",
+              "names": {
+                "en": "Unit of measure"
+              },
+              "keyPosition": 3,
+              "roles": [
+                "UNIT_MEASURE"
+              ],
+              "values": [
+                {
+                  "id": "PB",
+                  "order": 565,
+                  "name": "Percentage balance",
+                  "names": {
+                    "en": "Percentage balance"
+                  },
+                  "annotations": [
+                    10
+                  ]
+                }
+              ]
+            },
+            {
+              "id": "ACTIVITY",
+              "name": "Economic activity",
+              "names": {
+                "en": "Economic activity"
+              },
+              "keyPosition": 4,
+              "roles": [
+                "ACTIVITY"
+              ],
+              "values": [
+                {
+                  "id": "_Z",
+                  "order": 957,
+                  "name": "Not applicable",
+                  "names": {
+                    "en": "Not applicable"
+                  },
+                  "annotations": [
+                    11
+                  ]
+                }
+              ]
+            },
+            {
+              "id": "ADJUSTMENT",
+              "name": "Adjustment",
+              "names": {
+                "en": "Adjustment"
+              },
+              "keyPosition": 5,
+              "roles": [
+                "ADJUSTMENT"
+              ],
+              "values": [
+                {
+                  "id": "Y",
+                  "order": 15,
+                  "name": "Calendar and seasonally adjusted",
+                  "names": {
+                    "en": "Calendar and seasonally adjusted"
+                  },
+                  "annotations": [
+                    12
+                  ]
+                }
+              ]
+            },
+            {
+              "id": "TRANSFORMATION",
+              "name": "Transformation",
+              "names": {
+                "en": "Transformation"
+              },
+              "keyPosition": 6,
+              "roles": [
+                "TRANSFORMATION"
+              ],
+              "values": [
+                {
+                  "id": "_Z",
+                  "order": 57,
+                  "name": "Not applicable",
+                  "names": {
+                    "en": "Not applicable"
+                  },
+                  "annotations": [
+                    13
+                  ]
+                }
+              ]
+            },
+            {
+              "id": "TIME_HORIZ",
+              "name": "Time horizon",
+              "names": {
+                "en": "Time horizon"
+              },
+              "keyPosition": 7,
+              "roles": [
+                "TIME_HORIZ"
+              ],
+              "values": [
+                {
+                  "id": "_Z",
+                  "order": 3,
+                  "name": "Not applicable",
+                  "names": {
+                    "en": "Not applicable"
+                  }
+                }
+              ]
+            },
+            {
+              "id": "METHODOLOGY",
+              "name": "Calculation methodology",
+              "names": {
+                "en": "Calculation methodology"
+              },
+              "keyPosition": 8,
+              "roles": [
+                "METHODOLOGY"
+              ],
+              "values": [
+                {
+                  "id": "N",
+                  "order": 1,
+                  "name": "National",
+                  "names": {
+                    "en": "National"
+                  }
+                }
+              ]
+            },
+            {
+              "id": "TIME_PERIOD",
+              "name": "Time period",
+              "names": {
+                "en": "Time period"
+              },
+              "keyPosition": 9,
+              "roles": [
+                "TIME_PERIOD"
+              ],
+              "values": [
+                {
+                  "start": "2026-05-01T00:00:00",
+                  "end": "2026-05-31T23:59:59",
+                  "id": "2026-05",
+                  "name": "2026-05",
+                  "names": {
+                    "en-US": "2026-05"
+                  }
+                },
+                {
+                  "start": "2026-06-01T00:00:00",
+                  "end": "2026-06-30T23:59:59",
+                  "id": "2026-06",
+                  "name": "2026-06",
+                  "names": {
+                    "en-US": "2026-06"
+                  }
+                },
+                {
+                  "start": "2026-07-01T00:00:00",
+                  "end": "2026-07-31T23:59:59",
+                  "id": "2026-07",
+                  "name": "2026-07",
+                  "names": {
+                    "en-US": "2026-07"
+                  }
+                },
+                {
+                  "start": "2026-08-01T00:00:00",
+                  "end": "2026-08-31T23:59:59",
+                  "id": "2026-08",
+                  "name": "2026-08",
+                  "names": {
+                    "en-US": "2026-08"
+                  }
+                },
+                {
+                  "start": "2026-01-01T00:00:00",
+                  "end": "2026-01-31T23:59:59",
+                  "id": "2026-01",
+                  "name": "2026-01",
+                  "names": {
+                    "en-US": "2026-01"
+                  }
+                },
+                {
+                  "start": "2026-02-01T00:00:00",
+                  "end": "2026-02-28T23:59:59",
+                  "id": "2026-02",
+                  "name": "2026-02",
+                  "names": {
+                    "en-US": "2026-02"
+                  }
+                },
+                {
+                  "start": "2026-03-01T00:00:00",
+                  "end": "2026-03-31T23:59:59",
+                  "id": "2026-03",
+                  "name": "2026-03",
+                  "names": {
+                    "en-US": "2026-03"
+                  }
+                },
+                {
+                  "start": "2026-04-01T00:00:00",
+                  "end": "2026-04-30T23:59:59",
+                  "id": "2026-04",
+                  "name": "2026-04",
+                  "names": {
+                    "en-US": "2026-04"
+                  }
+                }
+              ]
+            }
+          ]
+        },
+        "attributes": {
+          "dataSet": [],
+          "dimensionGroup": [],
+          "series": [],
+          "observation": [
+            {
+              "id": "UNIT_MULT",
+              "name": "Unit multiplier",
+              "names": {
+                "en": "Unit multiplier"
+              },
+              "isMandatory": true,
+              "roles": [
+                "UNIT_MULT"
+              ],
+              "relationship": {
+                "dimensions": [
+                  "REF_AREA",
+                  "FREQ",
+                  "MEASURE",
+                  "UNIT_MEASURE",
+                  "ACTIVITY",
+                  "ADJUSTMENT",
+                  "TRANSFORMATION",
+                  "TIME_HORIZ",
+                  "METHODOLOGY"
+                ]
+              },
+              "values": [
+                {
+                  "id": "0",
+                  "order": 0,
+                  "name": "Units",
+                  "names": {
+                    "en": "Units"
+                  }
+                }
+              ]
+            },
+            {
+              "id": "DECIMALS",
+              "name": "Decimals",
+              "names": {
+                "en": "Decimals"
+              },
+              "isMandatory": false,
+              "roles": [
+                "DECIMALS"
+              ],
+              "relationship": {
+                "dimensions": [
+                  "METHODOLOGY",
+                  "TIME_HORIZ",
+                  "TRANSFORMATION",
+                  "ADJUSTMENT",
+                  "ACTIVITY",
+                  "UNIT_MEASURE",
+                  "MEASURE",
+                  "FREQ",
+                  "REF_AREA"
+                ]
+              },
+              "values": [
+                {
+                  "id": "2",
+                  "order": 2,
+                  "name": "Two",
+                  "names": {
+                    "en": "Two"
+                  }
+                }
+              ]
+            },
+            {
+              "id": "OBS_STATUS",
+              "name": "Observation status",
+              "names": {
+                "en": "Observation status"
+              },
+              "isMandatory": false,
+              "roles": [
+                "OBS_STATUS"
+              ],
+              "relationship": {
+                "observation": {}
+              },
+              "values": [
+                {
+                  "id": "A",
+                  "order": 0,
+                  "name": "Normal value",
+                  "names": {
+                    "en": "Normal value"
+                  }
+                }
+              ]
+            }
+          ]
+        },
+        "annotations": [
+          {
+            "type": "NonProductionDataflow",
+            "text": "true",
+            "texts": {
+              "en": "true"
+            }
+          },
+          {
+            "id": "@SDMX",
+            "title": "REF_AREA,ACTIVITY,MEASURE,TIME_HORIZ,SOURCE",
+            "type": "LAYOUT_ROW"
+          },
+          {
+            "id": "@SDMX",
+            "title": "TIME_PERIOD",
+            "type": "LAYOUT_COLUMN"
+          },
+          {
+            "id": "@SDMX",
+            "title": "UNIT_MULT=0,OBS_STATUS=A,METHODOLOGY=N",
+            "type": "NOT_DISPLAYED"
+          },
+          {
+            "id": "@SDMX",
+            "title": "MEASURE=CCICP,FREQ=M",
+            "type": "DEFAULT"
+          },
+          {
+            "title": "COMBINED_UNIT_MEASURE:UNIT_MEASURE,ADJUSTMENT,UNIT_MULT",
+            "type": "COMBINED_CONCEPTS",
+            "text": "COMBINED_UNIT_MEASURE:Unit of measure",
+            "texts": {
+              "en": "COMBINED_UNIT_MEASURE:Unit of measure"
+            }
+          },
+          {
+            "title": "urn:sdmx:org.sdmx.infomodel.metadatastructure.MetadataStructure=OECD:MSD_REF_METADATA(1.0)",
+            "type": "METADATA"
+          },
+          {
+            "type": "HAS_METADATA"
+          },
+          {
+            "id": "@SDMX",
+            "type": "ORDER",
+            "text": "380",
+            "texts": {
+              "en": "380"
+            }
+          },
+          {
+            "id": "@SDMX",
+            "type": "ORDER",
+            "text": "15",
+            "texts": {
+              "en": "15"
+            }
+          },
+          {
+            "id": "@SDMX",
+            "type": "ORDER",
+            "text": "5660",
+            "texts": {
+              "en": "5660"
+            }
+          },
+          {
+            "id": "@SDMX",
+            "type": "ORDER",
+            "text": "9580",
+            "texts": {
+              "en": "9580"
+            }
+          },
+          {
+            "id": "@SDMX",
+            "type": "ORDER",
+            "text": "30",
+            "texts": {
+              "en": "30"
+            }
+          },
+          {
+            "id": "@SDMX",
+            "type": "ORDER",
+            "text": "580",
+            "texts": {
+              "en": "580"
+            }
+          }
+        ],
+        "measures": {
+          "observation": [
+            {
+              "id": "OBS_VALUE",
+              "name": "Observation value",
+              "names": {
+                "en": "Observation value"
+              },
+              "isMandatory": false,
+              "roles": [
+                "OBS_VALUE"
+              ],
+              "values": null
+            }
+          ]
+        },
+        "dataSets": [
+          0
+        ]
+      }
+    ]
+  },
+  "errors": []
+}

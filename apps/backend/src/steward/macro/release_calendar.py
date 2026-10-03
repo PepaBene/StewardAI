@@ -16,7 +16,7 @@ import logging
 from collections.abc import Iterable
 from dataclasses import dataclass
 from decimal import Decimal
-from typing import Any
+from typing import Any, Literal
 
 import asyncpg
 import httpx
@@ -271,6 +271,9 @@ class NextRelease(BaseModel):
     release_time: dt.time | None
     source_url: str
     title: str | None
+    release_timezone: str | None = None
+    release_timezone_source: Literal["stated_by_provider", "agency_location"] | None = None
+    basis: Literal["provider_calendar", "published_rule"] = "provider_calendar"
 
 
 def series_base(series_id: str) -> str:
@@ -284,7 +287,9 @@ async def next_releases(
     """Per (source, observation series id): the earliest stored release on or after the UTC date
     of `as_of`, from calendar rows known by `as_of` and not yet superseded at `as_of`. A row
     stored for the exact series id ('hicp:EA21': the euro area also has flash estimates) wins over
-    the row of its dataset ('hicp')."""
+    the row of its dataset ('hicp'). For the BLS series (CPI, Employment Situation) the BLS's own
+    rows (calendar key 'bls:...', with the 08:30 time) win over FRED's date-only rows: the agency
+    that publishes the release is the authority on its date."""
     wanted = sorted(set(keys))
     ids = sorted(
         {(source, series_id) for source, series_id in wanted}
@@ -295,13 +300,16 @@ async def next_releases(
     as_of_utc = as_of.astimezone(dt.UTC) if as_of.tzinfo else as_of.replace(tzinfo=dt.UTC)
     rows = await pool.fetch(
         """select distinct on (c.provider,c.series_id)
-                  c.provider,c.series_id,c.release_date,c.release_time,c.source_url,c.title
+                  c.provider,c.series_id,c.release_date,c.release_time,c.source_url,c.title,
+                  c.release_timezone,c.release_timezone_source,c.source as basis
            from public.macro_release_calendar c
            join unnest($1::text[],$2::text[]) k(provider,series_id)
              on k.provider=c.provider and k.series_id=c.series_id
            where c.known_at <= $3 and (c.superseded_at is null or c.superseded_at > $3)
              and c.release_date >= $4
-           order by c.provider,c.series_id,c.release_date,c.release_time nulls last,c.id""",
+           order by c.provider,c.series_id,
+                    (c.calendar_key like 'bls:%') desc,
+                    c.release_date,c.release_time nulls last,c.id""",
         [i[0] for i in ids],
         [i[1] for i in ids],
         as_of_utc,

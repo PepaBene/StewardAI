@@ -25,7 +25,7 @@ from steward.macro.providers import (
     parse_world_bank,
     world_bank_header,
 )
-from steward.macro.sdmx_keys import SdmxKeyError, pin_key
+from steward.macro.sdmx_keys import SdmxKeyError, data_request, pin_key
 from steward.macro.store import (
     MacroRow,
     store_macro_rows,
@@ -365,11 +365,13 @@ async def _sdmx_step(
     except QuotaExceeded as exc:
         step.detail["skipped"] = str(exc)
         return
-    url = f"{str(series.base_url).rstrip('/')}/data/{pinned.flow}/{pinned.key}"
+    url, accept = data_request(series.provider, str(series.base_url), pinned.flow, pinned.key)
+    unit = pinned.unit or series.unit
+    definition = pinned.definition or series.definition
     response = await deps.http.get(
         url,
         params={"startPeriod": str(now.year - 10), "dimensionAtObservation": "AllDimensions"},
-        headers={"Accept": "application/vnd.sdmx.data+json;version=2.0.0"},
+        headers={"Accept": accept},
     )
     body = await _json(response, {})
     if not isinstance(body, dict):
@@ -399,7 +401,7 @@ async def _sdmx_step(
                 source=series.provider,
                 series_id=series.key,
                 geography=series.geography,
-                unit=series.unit,
+                unit=unit,
                 frequency=series.frequency,
                 source_url=str(response.url),
                 vintage=now.date().isoformat(),
@@ -421,9 +423,9 @@ async def _sdmx_step(
         source=series.provider,
         series_id=series.key,
         label=series.label,
-        definition=series.definition,
+        definition=definition,
         frequency=series.frequency,
-        unit=series.unit,
+        unit=unit,
         consumer=series.consumer,
         unit_multiplier=sample.unit_multiplier if sample else Decimal(1),
         seasonal_adjustment=sample.seasonal_adjustment if sample else None,
