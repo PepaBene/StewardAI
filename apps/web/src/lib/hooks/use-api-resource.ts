@@ -41,15 +41,33 @@ async function settle<T>(fetcher: () => Promise<ApiResult<T>>): Promise<Resource
 }
 
 /**
+ * The state after a settled request: a failure keeps the last good data beside the error, and
+ * a second failure in a row keeps it too. Pure, so the rule is unit-tested.
+ */
+export function mergeSettled<T>(prev: ResourceState<T>, next: ResourceState<T>): ResourceState<T> {
+  if (next.kind !== "error") return next;
+  if (prev.kind === "ok") return { ...next, previous: prev.data };
+  if (prev.kind === "error") return { ...next, previous: prev.previous };
+  return next;
+}
+
+/**
  * Fetches an API resource once, and again whenever a portfolio sync succeeds, so data on
  * screen follows the latest snapshot without a reload. If a refetch fails, the previous
  * data stays on screen next to the error.
  *
- * `fetcher` must be stable (define it at module level).
+ * `fetcher` identifies the query: when it changes (another ticker, as-of date or filter) the
+ * state returns to "loading" at once and the old query's data is never shown, not even as
+ * `previous` beside an error — data for one query must not appear under another's label.
+ * Memoise the fetcher with `useCallback` over the query inputs (or define it at module level).
  */
 export function useApiResource<T>(fetcher: () => Promise<ApiResult<T>>) {
   const { lastSuccessJobId } = useSyncStatus();
-  const [state, setState] = useState<ResourceState<T>>({ kind: "loading" });
+  // The state is tagged with the fetcher that produced it; a different fetcher reads as loading.
+  const [held, setHeld] = useState<{ fetcher: typeof fetcher; state: ResourceState<T> }>({
+    fetcher,
+    state: { kind: "loading" },
+  });
   // Only the newest request's result is applied.
   const sequence = useRef(0);
 
@@ -57,19 +75,22 @@ export function useApiResource<T>(fetcher: () => Promise<ApiResult<T>>) {
     const mine = ++sequence.current;
     const next = await settle(fetcher);
     if (mine !== sequence.current) return;
-    setState((prev) =>
-      next.kind === "error" && prev.kind === "ok" ? { ...next, previous: prev.data } : next,
-    );
+    setHeld((prev) => ({
+      fetcher,
+      state: mergeSettled(prev.fetcher === fetcher ? prev.state : { kind: "loading" }, next),
+    }));
   }, [fetcher]);
 
   useEffect(() => {
     void fetchAndApply();
   }, [fetchAndApply, lastSuccessJobId]);
 
+  const state: ResourceState<T> = held.fetcher === fetcher ? held.state : { kind: "loading" };
+
   const reload = useCallback(() => {
-    setState((prev) => (prev.kind === "ok" ? prev : { kind: "loading" }));
+    setHeld((prev) => (prev.fetcher === fetcher && prev.state.kind === "ok" ? prev : { fetcher, state: { kind: "loading" } }));
     void fetchAndApply();
-  }, [fetchAndApply]);
+  }, [fetcher, fetchAndApply]);
 
   return { state, reload };
 }
