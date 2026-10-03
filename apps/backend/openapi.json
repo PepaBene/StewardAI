@@ -1009,6 +1009,104 @@
         ]
       }
     },
+    "/macro/issuers": {
+      "get": {
+        "tags": [
+          "macro"
+        ],
+        "summary": "List Issuers",
+        "description": "Issuer names for labelling exposure mappings (id to legal name, with identifiers and the\nheld tickers that resolve to the issuer), by id list and/or a name search.",
+        "operationId": "list_issuers",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "ids",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "array",
+                  "items": {
+                    "type": "integer",
+                    "maximum": 9223372036854775807,
+                    "minimum": 1
+                  }
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Only these issuer ids.",
+              "title": "Ids"
+            },
+            "description": "Only these issuer ids."
+          },
+          {
+            "name": "q",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 80
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Name contains (any case).",
+              "title": "Q"
+            },
+            "description": "Name contains (any case)."
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 500,
+              "minimum": 1,
+              "default": 200,
+              "title": "Limit"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/IssuerName"
+                  },
+                  "title": "Response List Issuers"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/macro/exposures": {
       "get": {
         "tags": [
@@ -25094,6 +25192,18 @@
           "id": {
             "type": "integer",
             "title": "Id"
+          },
+          "issuer_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Issuer Name",
+            "description": "The issuer's legal name, so a mapping can be labelled by name."
           }
         },
         "type": "object",
@@ -35153,6 +35263,71 @@
         ],
         "title": "IssuerIrSources"
       },
+      "IssuerName": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name",
+            "description": "Legal name."
+          },
+          "lei": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Lei"
+          },
+          "cik": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cik"
+          },
+          "country": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Country"
+          },
+          "tickers": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Tickers",
+            "description": "Held instruments whose confirmed security link belongs to this issuer."
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "name",
+          "lei",
+          "cik",
+          "country",
+          "tickers"
+        ],
+        "title": "IssuerName",
+        "description": "An issuer as the exposure editor names it."
+      },
       "IssuerRelationshipOut": {
         "properties": {
           "id": {
@@ -36880,7 +37055,8 @@
         "properties": {
           "mic": {
             "type": "string",
-            "title": "Mic"
+            "title": "Mic",
+            "description": "Trading venue (market identifier code) the record is for."
           },
           "publication_date": {
             "anyOf": [
@@ -36893,6 +37069,58 @@
               }
             ],
             "title": "Publication Date"
+          },
+          "published_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Published At",
+            "description": "The register's publication timestamp of this record."
+          },
+          "valid_from": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Valid From",
+            "description": "Start of the window the record was in force (FIRDS)."
+          },
+          "valid_to": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Valid To",
+            "description": "End of that window; null while open or unreported."
+          },
+          "first_trade_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "First Trade At",
+            "description": "The venue's reported trading start for the instrument."
           },
           "status": {
             "anyOf": [
@@ -44307,7 +44535,7 @@
         "additionalProperties": false,
         "type": "object",
         "title": "ProviderJobSettings",
-        "description": "A free provider is opt-in until its account-specific endpoint audit passes."
+        "description": "A free provider with an account or key is opt-in until its account-specific endpoint audit\npasses; the keyless public statistics providers (World Bank, OECD, BIS) default to on and\nare still held shut by the access gate until their endpoint probe says available."
       },
       "ProviderStatus": {
         "properties": {

@@ -394,8 +394,16 @@ async def _index_quote(
     for live in live_rows:
         if live is None:
             continue
+        # PX's own daily series is this page's close, stored once per session: for that day the
+        # page's richer reading (time, zone, the stated previous close) is the same value.
+        same_page = (
+            live["source"] == "pse"
+            and ref is not None
+            and ref.source == "pse"
+            and live["session_date"] == quote.as_of
+        )
         # A daily close stays the value of record for its own day.
-        if quote.as_of is not None and live["session_date"] <= quote.as_of:
+        if not same_page and quote.as_of is not None and live["session_date"] <= quote.as_of:
             continue
         kind = quote_kind(live, now) if live["source"] == "yahoo" else live["kind"]
         prev_value = live["previous_close"]

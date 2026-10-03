@@ -51,6 +51,22 @@ class ExposureInput(BaseModel):
 
 class ExposureResult(ExposureInput):
     id: int
+    issuer_name: str | None = Field(
+        default=None, description="The issuer's legal name, so a mapping can be labelled by name."
+    )
+
+
+class IssuerName(BaseModel):
+    """An issuer as the exposure editor names it."""
+
+    id: int
+    name: str = Field(description="Legal name.")
+    lei: str | None
+    cik: str | None
+    country: str | None
+    tickers: list[str] = Field(
+        description="Held instruments whose confirmed security link belongs to this issuer."
+    )
 
 
 class ProviderStatus(BaseModel):
@@ -242,12 +258,45 @@ async def get_portfolio_macro_coverage(pool: Pool, _owner: Owner) -> PortfolioMa
     )
 
 
+@router.get("/macro/issuers", tags=["macro"])
+async def list_issuers(
+    pool: Pool,
+    _owner: Owner,
+    ids: Annotated[list[DbId] | None, Query(description="Only these issuer ids.")] = None,
+    q: Annotated[
+        str | None, Query(min_length=1, max_length=80, description="Name contains (any case).")
+    ] = None,
+    limit: Annotated[int, Query(ge=1, le=500)] = 200,
+) -> list[IssuerName]:
+    """Issuer names for labelling exposure mappings (id to legal name, with identifiers and the
+    held tickers that resolve to the issuer), by id list and/or a name search."""
+    rows = await pool.fetch(
+        """select i.id, i.legal_name as name, i.lei, i.cik, i.country,
+                  coalesce((select array_agg(distinct isl.ticker order by isl.ticker)
+                              from public.security s
+                              join public.instrument_security_link isl
+                                on isl.security_id = s.id and isl.status = 'confirmed'
+                             where s.issuer_id = i.id and isl.ticker is not null),
+                           '{}') as tickers
+           from public.issuer i
+           where ($1::bigint[] is null or i.id = any($1::bigint[]))
+             and ($2::text is null or strpos(lower(i.legal_name), lower($2)) > 0)
+           order by lower(i.legal_name), i.id
+           limit $3""",
+        ids,
+        q,
+        limit,
+    )
+    return [IssuerName(**dict(row)) for row in rows]
+
+
 @router.get("/macro/exposures", tags=["macro"])
 async def list_exposures(pool: Pool, _owner: Owner) -> list[ExposureResult]:
     rows = await pool.fetch(
-        "select id,issuer_id,segment,geography,hs_revision,hs_code,basis,weight,"
-        "valid_from,valid_to "
-        "from public.exposure_mapping order by issuer_id,segment"
+        "select e.id,e.issuer_id,i.legal_name as issuer_name,e.segment,e.geography,"
+        "e.hs_revision,e.hs_code,e.basis,e.weight,e.valid_from,e.valid_to "
+        "from public.exposure_mapping e left join public.issuer i on i.id=e.issuer_id"
+        " order by e.issuer_id,e.segment"
     )
     return [ExposureResult(**dict(row)) for row in rows]
 
@@ -260,8 +309,9 @@ async def create_exposure(body: ExposureInput, pool: Pool, owner: Owner) -> Expo
         row = await pool.fetchrow(
             """insert into public.exposure_mapping
                (issuer_id,segment,geography,hs_revision,hs_code,basis,weight,valid_from,valid_to,created_by)
-               values($1,$2,$3,$4,$5,$6,$7,$8,$9,$10) returning id,issuer_id,segment,geography,
-               hs_revision,hs_code,basis,weight,valid_from,valid_to""",
+               values($1,$2,$3,$4,$5,$6,$7,$8,$9,$10) returning id,issuer_id,
+               (select legal_name from public.issuer where id=issuer_id) as issuer_name,
+               segment,geography,hs_revision,hs_code,basis,weight,valid_from,valid_to""",
             body.issuer_id,
             body.segment,
             body.geography,

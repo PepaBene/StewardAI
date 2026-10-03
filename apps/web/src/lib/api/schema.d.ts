@@ -412,6 +412,27 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/macro/issuers": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Issuers
+         * @description Issuer names for labelling exposure mappings (id to legal name, with identifiers and the
+         *     held tickers that resolve to the issuer), by id list and/or a name search.
+         */
+        get: operations["list_issuers"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/macro/exposures": {
         parameters: {
             query?: never;
@@ -8732,6 +8753,11 @@ export interface components {
             valid_to?: string | null;
             /** Id */
             id: number;
+            /**
+             * Issuer Name
+             * @description The issuer's legal name, so a mapping can be labelled by name.
+             */
+            issuer_name?: string | null;
         };
         /** ExposureRow */
         ExposureRow: {
@@ -12034,6 +12060,30 @@ export interface components {
             /** Sources */
             sources: components["schemas"]["IssuerIrSource"][];
         };
+        /**
+         * IssuerName
+         * @description An issuer as the exposure editor names it.
+         */
+        IssuerName: {
+            /** Id */
+            id: number;
+            /**
+             * Name
+             * @description Legal name.
+             */
+            name: string;
+            /** Lei */
+            lei: string | null;
+            /** Cik */
+            cik: string | null;
+            /** Country */
+            country: string | null;
+            /**
+             * Tickers
+             * @description Held instruments whose confirmed security link belongs to this issuer.
+             */
+            tickers: string[];
+        };
         /** IssuerRelationshipOut */
         IssuerRelationshipOut: {
             /** Id */
@@ -12643,10 +12693,33 @@ export interface components {
         };
         /** ListingLifecyclePoint */
         ListingLifecyclePoint: {
-            /** Mic */
+            /**
+             * Mic
+             * @description Trading venue (market identifier code) the record is for.
+             */
             mic: string;
             /** Publication Date */
             publication_date: string | null;
+            /**
+             * Published At
+             * @description The register's publication timestamp of this record.
+             */
+            published_at?: string | null;
+            /**
+             * Valid From
+             * @description Start of the window the record was in force (FIRDS).
+             */
+            valid_from?: string | null;
+            /**
+             * Valid To
+             * @description End of that window; null while open or unreported.
+             */
+            valid_to?: string | null;
+            /**
+             * First Trade At
+             * @description The venue's reported trading start for the instrument.
+             */
+            first_trade_at?: string | null;
             /** Status */
             status: string | null;
             /** Terminated At */
@@ -15336,7 +15409,9 @@ export interface components {
         };
         /**
          * ProviderJobSettings
-         * @description A free provider is opt-in until its account-specific endpoint audit passes.
+         * @description A free provider with an account or key is opt-in until its account-specific endpoint audit
+         *     passes; the keyless public statistics providers (World Bank, OECD, BIS) default to on and
+         *     are still held shut by the access gate until their endpoint probe says available.
          */
         ProviderJobSettings: {
             /**
@@ -19587,6 +19662,41 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["PortfolioMacroCoverage"];
+                };
+            };
+        };
+    };
+    list_issuers: {
+        parameters: {
+            query?: {
+                /** @description Only these issuer ids. */
+                ids?: number[] | null;
+                /** @description Name contains (any case). */
+                q?: string | null;
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IssuerName"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };

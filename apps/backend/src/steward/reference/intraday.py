@@ -411,6 +411,25 @@ async def refresh_pse_px(
             value.at.date(),
             value.previous_close,
         )
+        if kind == "close":
+            # The close is the day's bar: PSE publishes no history, so the series is built one
+            # session at a time from here (an intraday value is never stored as a close).
+            await conn.execute(
+                "insert into public.price_bar (symbol, date, open, high, low, close, source,"
+                " currency, session_date, mic, quote_unit, bar_type, access_state,"
+                " source_timestamp) values ($1, $2, $3, $4, $5, $6, 'pse', 'CZK', $2, 'XPRA',"
+                " 'CZK', 'adjusted', 'available', $7)"
+                " on conflict (symbol, date, source, bar_type) do update set open = excluded.open,"
+                " high = excluded.high, low = excluded.low, close = excluded.close,"
+                " source_timestamp = excluded.source_timestamp, fetched_at = now()",
+                PSE_SYMBOL,
+                value.at.date(),
+                value.open,
+                value.high,
+                value.low,
+                value.value,
+                value.at,
+            )
     detail["pse_px"] = {"value": float(value.value), "at": value.at.isoformat(), "kind": kind}
     return True
 

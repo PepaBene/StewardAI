@@ -355,6 +355,7 @@ async def _run_locked(
             " and status = 'running'",
             job_id,
         )
+    await close_superseded_running(pool, job_type, params, job_id)
     ctx = JobContext(
         pool=pool,
         job_id=job_id,
@@ -387,6 +388,33 @@ async def _run_locked(
     await _finish(pool, job_id, "succeeded", None)
     logger.info("job %s (%s) succeeded", job_id, job_type)
     return "succeeded"
+
+
+async def close_superseded_running(
+    pool: asyncpg.Pool, job_type: str, params: dict[str, Any], job_id: int
+) -> list[int]:
+    """With this run holding the job's lock, any other row of the same lock key still marked
+    `running` belongs to a process that died (a live run would hold the lock and this one would
+    be waiting): close it as interrupted so a killed run never stays `running` forever.
+    Runs on every start of that job, so the next run of a job cleans up after the last."""
+    ticker = params.get("ticker")
+    rows = await pool.fetch(
+        "select id from public.job where job_type = $1 and id <> $2 and status = 'running'"
+        " and (params ->> 'ticker') is not distinct from $3 order by id",
+        job_type,
+        job_id,
+        ticker if isinstance(ticker, str) and ticker else None,
+    )
+    closed: list[int] = []
+    for row in rows:
+        if await _fail_open(
+            pool,
+            row["id"],
+            f"interrupted (the process that started it stopped; run {job_id} began)",
+        ):
+            closed.append(row["id"])
+            logger.warning("job %s (%s) was left running; marked failed", row["id"], job_type)
+    return closed
 
 
 async def close_interrupted_runs(

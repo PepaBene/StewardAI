@@ -428,8 +428,9 @@ async def test_a_holding_with_one_snapshot_in_window_has_no_measurable_contribut
     )  # fmt: skip
 
     result = await contribution_to_return(backend_pool, 365)
-    [holding] = result.holdings
-    assert holding.contribution_base == 0.0
+    # One snapshot has no change to measure: a gap with its reason, never a 0.0 contribution.
+    assert result.holdings == []
+    assert result.gap is not None and "at least two snapshots" in result.gap
 
 
 @pytestmark_db

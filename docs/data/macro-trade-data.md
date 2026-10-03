@@ -70,3 +70,15 @@ Everything here is built on documented formats and recorded/hand-written fixture
 the BIS/OECD dimension orders outside the four BIS flows above, the SDMX-JSON version each API
 actually serves for the `Accept` header, Comtrade's response fields beyond those used here
 (no provider vintage is available per row), ALFRED paging on very long histories.
+
+
+## ALFRED over many vintage dates (2026-10-03)
+
+FRED refuses a real-time range holding more than 2000 vintage dates with HTTP 400 (live: `DFF` has
+5138 since 2005; `CPIAUCSL` is accepted in one request). `store_fred_vintages` first asks for the
+whole range; on that 400 it lists the series' vintage dates (`fred/series/vintagedates`) and fetches
+chunks of 1800, merging a window that continues across a chunk boundary (clipped to the chunk start)
+into one. Live check: 3928 `DFF` windows for ten years, no duplicate (observation, vintage).
+ECB: all nine configured flow keys answered 200 live (one transient 504 on
+`MIR/M.U2.B.A2C.AM.R.A.2250.EUR.N` that succeeded on retry). Point-in-time context compares
+`exposure_mapping.created_at` as a timestamp (a mapping entered today is visible today).

@@ -1,12 +1,16 @@
 """Which stored daily price series a holding or an index uses, and its Yahoo symbol.
 
-Daily closes come from up to four sources, each under its own provider symbol in `price_bar`:
+Daily closes come from up to five sources, each under its own provider symbol in `price_bar`:
 
 - Stooq (`cez.cz`), the source of record;
 - Yahoo Finance (`CEZ.PR`, unofficial), collected only when Stooq refuses, cannot be reached
   or has no symbol for the holding;
 - EODHD (`CEZ.PSE`) and Alpha Vantage (`CEZ.PRG`), gap fallbacks under free-tier budgets,
-  used only for holdings whose profile names their exact provider symbol.
+  used only for holdings whose profile names their exact provider symbol;
+- the Prague Stock Exchange's own page, for the PX index only (`^px`): no free API carries PX
+  (Stooq wants a key, Yahoo's `^PX` is an unrelated CBOE symbol), so each day's close is read
+  off the page after the session and stored as that day's bar. History therefore starts on the
+  first day the job ran; nothing earlier is invented.
 
 A series is never stitched from several (their adjustments differ, so a stitch could show a
 false jump). Every reader picks one whole series per holding with `choose_series`: the one
@@ -30,12 +34,13 @@ import asyncpg
 from steward.config.holding_profiles import HoldingProfilesConfig
 from steward.config.jobs import PriceSettings
 
-PriceSource = Literal["stooq", "yahoo", "eodhd", "alpha_vantage"]
+PriceSource = Literal["stooq", "yahoo", "eodhd", "alpha_vantage", "pse"]
 SOURCE_NAME: dict[PriceSource, str] = {
     "stooq": "Stooq",
     "yahoo": "Yahoo",
     "eodhd": "EODHD",
     "alpha_vantage": "Alpha Vantage",
+    "pse": "Prague Stock Exchange",
 }
 
 # Stooq market suffix -> Yahoo suffix (US listings are bare on Yahoo).
@@ -104,7 +109,10 @@ def yahoo_mic(symbol: str) -> str | None:
 
 
 # Source preference when two series are equally recent.
-SOURCE_ORDER: tuple[PriceSource, ...] = ("stooq", "yahoo", "eodhd", "alpha_vantage")
+SOURCE_ORDER: tuple[PriceSource, ...] = ("stooq", "yahoo", "eodhd", "alpha_vantage", "pse")
+# The one index no free daily-history API carries: PX, read once a day off the PSE page.
+PSE_INDEX_SYMBOL = "^px"
+PSE_MIC = "XPRA"
 
 
 def series_mic(symbol: str, source: str) -> str | None:
@@ -116,6 +124,8 @@ def series_mic(symbol: str, source: str) -> str | None:
     if source == "stooq":
         counterpart = yahoo_from_stooq(symbol)
         return yahoo_mic(counterpart) if counterpart else None
+    if source == "pse":
+        return PSE_MIC
     return None
 
 
@@ -125,6 +135,7 @@ class PriceSymbols:
     yahoo: str | None
     eodhd: str | None = None
     alpha_vantage: str | None = None
+    pse: str | None = None
 
     def refs(self) -> list["SeriesRef"]:
         """Every series that could exist for this holding, in source order."""
@@ -183,7 +194,11 @@ async def holding_symbols(
 
 
 def index_symbols(settings: PriceSettings, symbol: str) -> PriceSymbols:
-    return PriceSymbols(stooq=symbol, yahoo=settings.index_yahoo(symbol))
+    return PriceSymbols(
+        stooq=symbol,
+        yahoo=settings.index_yahoo(symbol),
+        pse=symbol if symbol == PSE_INDEX_SYMBOL else None,
+    )
 
 
 async def latest_dates(

@@ -310,3 +310,15 @@ provider stated it. A null time means the calendar gives a date only, and then t
   dates, `earliest_period`/`latest_period` = first and last upcoming date). Its stale threshold
   comes from `COVERAGE_DEFAULT_REFRESH_HOURS["macro_release_calendar"]` = 24 h (basis: the job
   runs daily and providers change calendars at most daily), so a row older than 48 h is stale.
+
+
+## One card per series: ALFRED is history, not a second card (2026-10-03, browser pass)
+
+`/macro/context/{ticker}` used to return `alfred` (the vintage source) as a second observation card
+next to `fred` for the same series, and the calendar (keyed by provider) gave the ALFRED card only an
+observed-cadence estimate next to FRED's published date. Design: the vintage source never makes a
+second card. `VINTAGE_PRIMARY_SOURCE = {"alfred": "fred"}` (`steward.macro.read`): a vintage row is
+dropped from `observations`, `comparisons` and `series_effects` when its primary provider has the
+series; its real-time windows become the primary card's `history` (true first-release values);
+the card's calendar is the primary provider's. A vintage-only series keeps its card, with the
+primary provider's calendar. The wire shape is unchanged (fewer rows, richer `history`).

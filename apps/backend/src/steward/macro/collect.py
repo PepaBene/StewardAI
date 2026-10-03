@@ -376,6 +376,109 @@ def derive_pc1_vintages(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
     return out
 
 
+FRED_VINTAGEDATES_URL = "https://api.stlouisfed.org/fred/series/vintagedates"
+# FRED refuses a real-time range holding more than 2000 vintage dates (HTTP 400, verified live
+# 2026-10-03 for DFF: 5138 dates, a daily series revised in small steps); chunks stay under it.
+FRED_MAX_VINTAGE_DATES = 2000
+FRED_CHUNK_VINTAGE_DATES = 1800
+
+
+def merge_realtime_chunks(
+    chunks: list[tuple[dt.date, list[dict[str, Any]]]],
+) -> list[dict[str, Any]]:
+    """One row list from observation responses fetched over consecutive real-time chunks.
+
+    A window that continues across a chunk boundary is clipped to the second chunk's
+    `realtime_start`, so it reappears there as a row that starts on the boundary with the value
+    its previous row ended on (the day before): that is the same window, not a new vintage, and
+    only its end moves. A row on the boundary with a different value is a real revision."""
+    out: list[dict[str, Any]] = []
+    last_row: dict[tuple[str, str], dict[str, Any]] = {}
+    for chunk_start, rows in chunks:
+        boundary_end = (chunk_start - dt.timedelta(days=1)).isoformat()
+        current: dict[tuple[str, str], dict[str, Any]] = {}
+        for row in rows:
+            date = str(row.get("date"))
+            previous = last_row.get((date, "last"))
+            if (
+                previous is not None
+                and row.get("realtime_start") == chunk_start.isoformat()
+                and previous.get("realtime_end") == boundary_end
+                and previous.get("value") == row.get("value")
+            ):
+                previous["realtime_end"] = row.get("realtime_end")  # the same window, longer
+                current[(date, "last")] = previous
+                continue
+            out.append(dict(row))
+            current[(date, "last")] = out[-1]
+        for key, kept in current.items():
+            last_row[key] = kept
+    return out
+
+
+async def _alfred_observations(
+    http: httpx.AsyncClient,
+    series_id: str,
+    api_key: str,
+    first_observation: dt.date,
+    today: dt.date,
+) -> dict[str, Any]:
+    """The `output_type=1` observation windows of one series over the whole real-time history.
+
+    One request when FRED accepts the range; for a series with more than 2000 vintage dates
+    (daily series: DFF) the range is cut at the vintage dates FRED lists, 1800 per request."""
+
+    def params(realtime_start: str, realtime_end: str) -> dict[str, str]:
+        return {
+            "series_id": series_id,
+            "api_key": api_key,
+            "file_type": "json",
+            "output_type": "1",
+            "units": "lin",
+            "observation_start": first_observation.isoformat(),
+            "realtime_start": realtime_start,
+            "realtime_end": realtime_end,
+            "limit": str(FRED_MAX_LIMIT),
+        }
+
+    response = await http.get(FRED_URL, params=params(FRED_EARLIEST_REALTIME, today.isoformat()))
+    if response.status_code == 200:
+        body: dict[str, Any] = response.json()
+        return body
+    if response.status_code != 400 or "vintage dates" not in response.text:
+        raise MacroError(f"ALFRED {series_id} returned HTTP {response.status_code}")
+    listing = await http.get(
+        FRED_VINTAGEDATES_URL,
+        params={
+            "series_id": series_id,
+            "api_key": api_key,
+            "file_type": "json",
+            "realtime_start": FRED_EARLIEST_REALTIME,
+            "realtime_end": today.isoformat(),
+            "limit": "10000",
+        },
+    )
+    if listing.status_code != 200:
+        raise MacroError(f"ALFRED {series_id} vintage dates returned HTTP {listing.status_code}")
+    listed = listing.json()
+    vintage_dates = [dt.date.fromisoformat(d) for d in listed.get("vintage_dates") or []]
+    if int(listed.get("count") or 0) > len(vintage_dates):
+        raise MacroError(f"ALFRED {series_id}: more vintage dates than one listing returns")
+    starts = [vintage_dates[i] for i in range(FRED_CHUNK_VINTAGE_DATES, len(vintage_dates),
+                                              FRED_CHUNK_VINTAGE_DATES)]  # fmt: skip
+    edges = [dt.date.fromisoformat(FRED_EARLIEST_REALTIME), *starts]
+    chunks: list[tuple[dt.date, list[dict[str, Any]]]] = []
+    last: dict[str, Any] = {}
+    for position, start in enumerate(edges):
+        end = (edges[position + 1] - dt.timedelta(days=1)) if position + 1 < len(edges) else today
+        part = await http.get(FRED_URL, params=params(start.isoformat(), end.isoformat()))
+        if part.status_code != 200:
+            raise MacroError(f"ALFRED {series_id} returned HTTP {part.status_code}")
+        last = part.json()
+        chunks.append((start, list(last.get("observations") or [])))
+    return {**last, "observations": merge_realtime_chunks(chunks)}
+
+
 async def store_fred_vintages(
     pool: asyncpg.Pool,
     http: httpx.AsyncClient,
@@ -402,24 +505,8 @@ async def store_fred_vintages(
     start = dt.date(today.year - history_years, 1, 1)
     # pc1 needs the level a year before the first observation kept
     first_observation = dt.date(start.year - 1, 1, 1) if series.units == "pc1" else start
-    response = await http.get(
-        FRED_URL,
-        params={
-            "series_id": series.series_id,
-            "api_key": api_key,
-            "file_type": "json",
-            "output_type": "1",
-            "units": "lin",
-            "observation_start": first_observation.isoformat(),
-            "realtime_start": FRED_EARLIEST_REALTIME,
-            "realtime_end": today.isoformat(),
-            "limit": str(FRED_MAX_LIMIT),
-        },
-    )
-    if response.status_code != 200:
-        raise MacroError(f"ALFRED {series.series_id} returned HTTP {response.status_code}")
+    body = await _alfred_observations(http, series.series_id, api_key, first_observation, today)
     skipped: list[str] = []
-    body = response.json()
     if series.units == "pc1":
         body = {
             **body,

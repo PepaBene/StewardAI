@@ -212,10 +212,12 @@ def test_reconciliation_and_unknown_exposure() -> None:
     assert weighted_effect(rows, {}) is None
 
 
-def test_new_providers_are_disabled_by_default() -> None:
+def test_new_providers_are_disabled_by_default_except_the_keyless_public_ones() -> None:
     config = JobsConfig()
     assert len(config.providers) == 13
-    assert all(not provider.enabled for provider in config.providers.values())
+    # Keyless public statistics have no account to audit (the access gate still applies).
+    keyless = {"world_bank", "oecd", "bis"}
+    assert {n for n, p in config.providers.items() if p.enabled} == keyless
     assert len(config.public_data.world_bank) == 9
     assert all(item.consumer for item in config.public_data.world_bank)
     assert not config.public_data_collect.enabled

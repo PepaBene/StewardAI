@@ -1,8 +1,10 @@
 """Daily ingestion of structured SEC insider ownership Forms 3, 4 and 5."""
 
+import asyncio
 import datetime as dt
 import json
-from collections.abc import Mapping, Sequence
+import time
+from collections.abc import Callable, Mapping, Sequence
 from itertools import pairwise
 from typing import Any, cast
 
@@ -253,28 +255,39 @@ async def relink_amendments(
         )
 
 
+def _is_ownership_document(body: bytes) -> bool:
+    return b"ownershipdocument" in body.lower()
+
+
 async def _load_filing(edgar: EdgarClient, filing: Filing) -> tuple[bytes, str]:
-    names = await edgar.filing_files(filing)
-    # EDGAR lists a Form 3/4/5's primary document as its rendered view, "xslF345X06/doc4.xml"
-    # (an HTML transform, checked live 2026-10-03); the structured XML is the same file name at
-    # the folder root.
+    """The structured XML of one Form 3/4/5.
+
+    EDGAR lists a Form 3/4/5's primary document as its rendered view, "xslF345X06/doc4.xml"
+    (an HTML transform, checked live 2026-10-03); the structured XML is the same file name at
+    the folder root. That file is asked for first, alone: only when it is missing or is not an
+    ownership document is the folder's file list fetched, so the usual filing costs one request
+    (it used to cost two, and the SEC's 10 requests per second is the job's whole budget)."""
     primary = filing.primary_document.rsplit("/", 1)[-1]
-    candidates = [
-        primary,
-        *[name for name in names if name.lower().endswith(".xml")],
-    ]
-    seen: set[str] = set()
-    for name in candidates:
-        if name in seen or not name.lower().endswith(".xml"):
-            continue
-        seen.add(name)
+    tried: set[str] = set()
+
+    async def attempt(name: str) -> tuple[bytes, str] | None:
+        if name in tried or not name.lower().endswith(".xml"):
+            return None
+        tried.add(name)
         url = filing.url(name)
         try:
             body = await edgar.document(url, max_bytes=8 * 1024 * 1024)
-            if b"ownershipDocument" in body or b"ownershipdocument" in body.lower():
-                return body, url
         except (EdgarError, httpx.HTTPError):
-            continue
+            return None
+        return (body, url) if _is_ownership_document(body) else None
+
+    found = await attempt(primary)
+    if found is not None:
+        return found
+    for name in await edgar.filing_files(filing):
+        found = await attempt(name)
+        if found is not None:
+            return found
     raise EdgarError(f"No structured ownership XML found for {filing.accession}")
 
 
@@ -288,14 +301,40 @@ async def collect_insiders(ctx: JobContext) -> None:
         )
 
 
-async def run_insider_filings(ctx: JobContext, edgar: EdgarClient) -> None:
+# A run is bounded three ways, so one slow or very active issuer cannot hold the job open for
+# hours (the first run backfills five years: a large issuer files hundreds of Form 4s a year):
+# a wall-clock budget, a cap on new filings per issuer per run, and a few downloads in flight
+# (the client spaces every request start, so concurrency overlaps latency without ever
+# exceeding the SEC's 10 requests per second).  Filings are taken oldest first, so what a run
+# leaves undone is always newer than what it stored and the next run resumes from there.
+INSIDER_RUN_SECONDS = 600.0
+INSIDER_MAX_NEW_PER_ISSUER = 400
+INSIDER_CONCURRENCY = 4
+
+
+async def run_insider_filings(
+    ctx: JobContext,
+    edgar: EdgarClient,
+    *,
+    clock: Callable[[], float] = time.monotonic,
+    max_seconds: float = INSIDER_RUN_SECONDS,
+    max_new_per_issuer: int = INSIDER_MAX_NEW_PER_ISSUER,
+    concurrency: int = INSIDER_CONCURRENCY,
+) -> None:
     """Fetch, parse and store the Forms 3/4/5 of every held issuer (testable with a fake
-    EDGAR client)."""
+    EDGAR client and a fake clock)."""
+    started = clock()
     issuers = tickers_by_cik(await _issuers(ctx.pool))
     async with ctx.step("issuer-filings") as step:
         step.detail["issuers"] = len(issuers)
         imported = 0
         failed: list[dict[str, str]] = []
+        deferred: dict[str, int] = {}
+        write_lock = asyncio.Lock()  # amendment relinking reads then rewrites a whole group
+
+        def out_of_time() -> bool:
+            return clock() - started >= max_seconds
+
         for cik, tickers in issuers.items():
             latest = await ctx.pool.fetchval(
                 "select max(f.filed) from public.insider_filing f"
@@ -318,41 +357,77 @@ async def run_insider_filings(ctx: JobContext, edgar: EdgarClient) -> None:
             )
             if unenriched is not None:
                 since = min(since, unenriched)
+            if out_of_time():
+                deferred[cik] = -1  # not even listed: the whole issuer waits for the next run
+                continue
             try:
-                filings = [
-                    f for f in await edgar.filings(cik, since=since) if f.form in INSIDER_FORMS
-                ]
+                filings = sorted(
+                    (f for f in await edgar.filings(cik, since=since) if f.form in INSIDER_FORMS),
+                    key=lambda f: (f.filing_date, f.accession),
+                )
             except (EdgarError, httpx.HTTPError, ValueError) as exc:
                 failed.append({"cik": cik, "error": f"{type(exc).__name__}: {exc}"[:300]})
                 continue
+            done = {
+                r["accession"]
+                for r in await ctx.pool.fetch(
+                    "select accession from public.insider_filing"
+                    " where accession = any($1::text[]) and enriched_at is not null",
+                    [f.accession for f in filings],
+                )
+            }
             for filing in filings:
-                # One bad filing is recorded and skipped; it never aborts the run or
-                # blocks the filings behind it (B35).
-                try:
-                    exists = await ctx.pool.fetchval(
-                        "select exists(select 1 from public.insider_filing"
-                        " where accession = $1 and enriched_at is not null)",
-                        filing.accession,
-                    )
-                    if exists:
-                        await link_tickers(ctx.pool, filing.accession, tickers)
-                        continue
-                    body, url = await _load_filing(edgar, filing)
-                    parsed = parse_ownership_xml(body, filing)
-                    await _upsert(ctx.pool, tickers, filing, url, body, parsed)
-                    imported += 1
-                except (EdgarError, httpx.HTTPError, ValueError, asyncpg.PostgresError) as exc:
-                    failed.append(
-                        {
-                            "accession": filing.accession,
-                            "cik": cik,
-                            "error": f"{type(exc).__name__}: {exc}"[:300],
-                        }
-                    )
+                if filing.accession in done:
+                    await link_tickers(ctx.pool, filing.accession, tickers)
+            todo = [f for f in filings if f.accession not in done]
+            budget, over_cap = todo[:max_new_per_issuer], todo[max_new_per_issuer:]
+            gate = asyncio.Semaphore(max(1, concurrency))
+            skipped: list[Filing] = []
+
+            async def one(
+                filing: Filing,
+                cik: str = cik,
+                tickers: list[str] = tickers,
+                gate: asyncio.Semaphore = gate,
+                skipped: list[Filing] = skipped,
+            ) -> int:
+                async with gate:
+                    if out_of_time():
+                        skipped.append(filing)
+                        return 0
+                    # One bad filing is recorded and skipped; it never aborts the run or
+                    # blocks the filings behind it (B35).
+                    try:
+                        body, url = await _load_filing(edgar, filing)
+                        parsed = parse_ownership_xml(body, filing)
+                        async with write_lock:
+                            await _upsert(ctx.pool, tickers, filing, url, body, parsed)
+                        return 1
+                    except (EdgarError, httpx.HTTPError, ValueError, asyncpg.PostgresError) as exc:
+                        failed.append(
+                            {
+                                "accession": filing.accession,
+                                "cik": cik,
+                                "error": f"{type(exc).__name__}: {exc}"[:300],
+                            }
+                        )
+                        return 0
+
+            imported += sum(await asyncio.gather(*(one(f) for f in budget)))
+            if skipped or over_cap:
+                deferred[cik] = len(skipped) + len(over_cap)
         step.detail["filings_imported"] = imported
         step.detail["filings_failed"] = len(failed)
         if failed:
             step.detail["failures"] = failed[:50]
+        if deferred:
+            # Not an error: the rest is read by the next run (oldest first, so nothing is skipped).
+            step.detail["deferred_by_issuer"] = deferred
+            step.detail["deferred_reason"] = (
+                f"run budget ({max_seconds:.0f} s) or {max_new_per_issuer} new filings per issuer "
+                "reached; the next run continues"
+            )
+        step.detail["elapsed_seconds"] = round(clock() - started, 1)
 
 
 async def insider_trades_handler(ctx: JobContext) -> None:

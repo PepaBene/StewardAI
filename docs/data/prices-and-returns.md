@@ -112,3 +112,18 @@ EODHD/Alpha Vantage payloads were modelled on the documented formats, not record
 EODHD's `close` split basis, LSE pence quoting at both providers, the exact wording of Alpha
 Vantage's `Information` texts, Finnhub's empty-quote and 403 behaviour per exchange, and Twelve
 Data's plan messages. Finnhub symbol suffixes for the probe are assumed to equal Yahoo's.
+
+
+## PX (Prague Stock Exchange index): one close per session, from the first day it was read
+
+No free keyless API carries PX history (checked live 2026-10-03): Stooq answers `^px` only with an
+apikey; Yahoo's `^PX` is an unrelated CBOE series (`WCB`, USD, price 0) and `PX.PR`, `^PX50`,
+`PX.PS`, `^PXI` are 404; Yahoo search finds no Prague index; PSE's detail page
+(`pse.cz/en/indices/index-values/detail/XC0009698371`) shows the current value but loads its
+history table from `/api/`, which robots.txt disallows; PSE's anonymous FTP price list
+(`ftp.pse.cz/results.ak`) holds issues, not indices. The page is therefore the source, and
+`price_history`'s `pse_px` step now stores each after-close reading as that day's bar (`price_bar`
+source `pse`, `bar_type adjusted`, CZK, MIC XPRA, with the page's open/high/low and timestamp;
+migration `20261007171000`). The series starts the first day the job ran and is never backfilled
+or interpolated; an intraday reading is never stored as a close. The market strip keeps the page's
+stated previous close for the day.

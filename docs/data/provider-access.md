@@ -91,7 +91,10 @@ success for your account.
 
 1. **Credential** in the environment (or none for keyless providers).
 2. **Config switch**: `JobsConfig.providers[<name>].enabled` (default `false` for every free
-   provider; edit in `/config/jobs` or `PUT /config/jobs`) with its `daily_quota`/`monthly_quota`
+   provider that needs an account or key; `true` for the keyless public statistics providers
+   World Bank, OECD and BIS, which have no account for an audit to qualify and are held shut
+   by the gate below; migration `20261007170000` flips a jobs config saved earlier with the old
+   default; edit in `/config/jobs` or `PUT /config/jobs`) with its `daily_quota`/`monthly_quota`
    reserve (defaults: Alpha Vantage 25/day, EODHD 20/day, FMP 250/day, Comtrade 500/day,
    Diffbot 10,000/month, PDL 100/month).
 3. **Provider gate**: `public.provider_gate_open(provider, endpoint)` (Python:
@@ -105,7 +108,8 @@ success for your account.
    provider named, which the request governor enforces. The `source_audit` job (schedule
    disabled by default) or `POST /jobs/source-audit` probes the endpoint with your credential.
    `public_data_collect` (World Bank, OECD, BIS, Comtrade) skips any series whose provider is
-   disabled or whose gate is closed; its schedule is also disabled by default (Sundays 04:00 when
+   disabled or whose gate is closed, and the step says which ("provider disabled in the jobs
+   config (providers.oecd.enabled is false)" or "access gate closed for bis/sdmx: <reason>"); its schedule is also disabled by default (Sundays 04:00 when
    switched on). Owner-triggered POST routes return `409` when their key is missing.
 
 ### Removal and disable behaviour
@@ -140,8 +144,8 @@ Jobs (schedule defaults are from `config/jobs.py`; times are cron in the Jobs co
 | `source_audit` | disabled (`0 3 1 * *`) | credentials of the probed providers | endpoint-level access probes into `provider_access` |
 | `sec_xbrl` | Tue 05:40 | `SEC_USER_AGENT` | shares outstanding, revenue by region/segment |
 | `valuation_refresh` | daily 07:45 | `SEC_USER_AGENT` (SEC part) | P/E, P/B, yield inputs; ETF provider figures |
-| `insider_trades` | daily 06:30 | `SEC_USER_AGENT` | Forms 3/4/5 for held issuers |
-| `control_stakes` | daily 06:45 | `SEC_USER_AGENT` | Schedule 13D/G for held issuers and tracked managers; never added to 13F or fund data |
+| `insider_trades` | daily 06:30 | `SEC_USER_AGENT` | Forms 3/4/5 for held issuers. A run is bounded: 10 minutes wall clock, 400 new filings per issuer, 4 downloads in flight (the client still spaces request starts at 0.15 s, under the SEC's 10 requests per second), one request per filing. Oldest filings first, so the next run resumes; the step lists `deferred_by_issuer`. A run a killed process left `running` is closed as interrupted by the next start of the job |
+| `control_stakes` | daily 06:45 | `SEC_USER_AGENT` | Schedule 13D/G for held issuers and tracked managers; never added to 13F or fund data. The submissions API's primary document is the SEC's rendered HTML (`xslSCHEDULE_13G_X02/primary_doc.xml`); the collector reads the raw `primary_doc.xml` beside it. A `parse_failed` filing now records why (and the URL) in its skip row and in the step's `parse_failures` |
 | `nport_holdings` | Sat 05:15 | `SEC_USER_AGENT` | SEC N-PORT positions of held US funds without an issuer snapshot (UCITS do not file N-PORT); about 60 days public lag |
 | `fund_probes` | disabled (`0 4 * * 0`) | `FINNHUB_API_KEY` and/or `FMP_API_KEY` | probes optional fund/index/ownership endpoints; 402/403 is `paid_only` and is not retried |
 | `fund_characteristics_audit` | daily 07:30 | none | compares issuer fund P/E and P/B payload shape and rules against the last observation: `parser_drift` or `methodology_change` is flagged for review instead of being treated as a value change |
