@@ -95,11 +95,11 @@ export function NetworkView({ ticker }: { ticker: string }) {
       <ResourceBoundary state={network.state} title="Relationships and patents" kicker="Entity graph">
         {(net) => (
           <>
-            <EdgeLedger key={ticker} ticker={ticker} edges={net.edges} asOfDate={asOfDate} limitations={net.limitations} knownAt={net.knownAsOf} onChanged={reloadAll} />
-            <ChangesList key={ticker} net={net} since={since} onSince={setSinceOverride} sinceOrigin={sinceOrigin} asOfDate={asOfDate} />
+            <EdgeLedger key={`edges-${ticker}`} ticker={ticker} edges={net.edges} asOfDate={asOfDate} limitations={net.limitations} knownAt={net.knownAsOf} onChanged={reloadAll} />
+            <ChangesList key={`changes-${ticker}`} net={net} since={since} onSince={setSinceOverride} sinceOrigin={sinceOrigin} asOfDate={asOfDate} />
             <LeadershipPanel net={net} asOfDate={asOfDate} knownAt={net.knownAsOf} />
-            <PatentMatrix key={ticker} patents={net.patents} trends={trendRows} trendsStatus={resourceStatus(trends.state)} asOfDate={asOfDate} knownAt={net.knownAsOf} limitations={[]} />
-            <ReviewPanel key={ticker} ticker={ticker} disclosures={net.disclosures} queue={queue.state.kind === "ok" && queue.state.data.ok ? queue.state.data.value : null} queueStatus={resourceStatus(queue.state)} queueReason={resourceReason(queue.state)} asOfDate={asOfDate} onChanged={reloadAll} />
+            <PatentMatrix key={`patents-${ticker}`} patents={net.patents} trends={trendRows} trendsStatus={resourceStatus(trends.state)} asOfDate={asOfDate} knownAt={net.knownAsOf} limitations={[]} />
+            <ReviewPanel key={`review-${ticker}`} ticker={ticker} disclosures={net.disclosures} queue={queue.state.kind === "ok" && queue.state.data.ok ? queue.state.data.value : null} queueStatus={resourceStatus(queue.state)} queueReason={resourceReason(queue.state)} asOfDate={asOfDate} onChanged={reloadAll} />
           </>
         )}
       </ResourceBoundary>
@@ -109,7 +109,7 @@ export function NetworkView({ ticker }: { ticker: string }) {
       </ResourceBoundary>
 
       <ResourceBoundary state={deals.state} title="Deals and financing" kicker="Transactions">
-        {(data) => <DealsTimeline key={ticker} ticker={ticker} data={data} asOfDate={asOfDate} onChanged={reloadAll} />}
+        {(data) => <DealsTimeline key={`deals-${ticker}`} ticker={ticker} data={data} asOfDate={asOfDate} onChanged={reloadAll} />}
       </ResourceBoundary>
 
       <ResourceBoundary state={concentration.state} title="Customer and supplier concentration" kicker="Customers and suppliers">
@@ -140,8 +140,8 @@ export function NetworkView({ ticker }: { ticker: string }) {
         <AlertMessage title="Legal structure is unavailable">{identity.state.title}. {identity.state.detail}</AlertMessage>
       ) : null}
 
-      <RecordForms key={ticker} ticker={ticker} onRecorded={reloadAll} />
-      <RefreshActions key={ticker} ticker={ticker} onDone={reloadAll} />
+      <RecordForms key={`record-${ticker}`} ticker={ticker} onRecorded={reloadAll} />
+      <RefreshActions key={`refresh-${ticker}`} ticker={ticker} onDone={reloadAll} />
     </div>
   );
 }
