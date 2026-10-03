@@ -2,14 +2,20 @@
 
 Every source here is free (a free FRED key, or keyless) and was verified live on 2026-10-03;
 docs/data/macro-release-calendar.md records the evidence. Providers without a free
-machine-readable calendar (OECD, World Bank, UN Comtrade, ČNB) have no adapter on purpose.
+machine-readable calendar (OECD, World Bank, UN Comtrade) have no adapter on purpose.
 
 * FRED: `/fred/series/release` (series -> release id), then `/fred/release/dates` with
   `include_release_dates_with_no_data=true` (future dates). JSON, free API key.
 * Eurostat: the iCalendar export of the release calendar (euro indicators), keyless.
 * ECB: the statistical-calendar pages (`/press/calendars/statscal/mfm/html/<page>.en.html`),
   structured HTML (`<dt>dd/mm/yyyy hh:mm</dt><dd>... (Dataset: BSI)`), keyless.
-* BIS: `data.bis.org/api/v0/releasecalendar`, JSON, keyless.
+* ECB Governing Council meeting calendar (`/press/calendars/mgcgc/`): the monetary policy
+  decision days behind `ecb_deposit_rate`.
+* BIS: `data.bis.org/api/v0/releasecalendar`, JSON, keyless; our series map to a calendar
+  category through the dataflow each series is actually collected from.
+* DG ECFIN (European Commission): the business and consumer survey "Publication dates <year>"
+  PDF (date and time), the source of the Economic Sentiment Indicator (`ei_bssi_m_r2`).
+* ČNB: the Bank Board monetary-policy meeting dates on the "Bank Board decisions" page.
 
 A parser raises `CalendarDrift` when the shape is not the verified one (a missing field, a
 changed format, no entries at all); the caller quarantines the payload and stores nothing. A
@@ -21,6 +27,7 @@ from __future__ import annotations
 
 import datetime as dt
 import html
+import io
 import logging
 import re
 from collections.abc import Awaitable, Callable, Mapping, Sequence
@@ -59,6 +66,12 @@ EUROSTAT_PAGE = "https://ec.europa.eu/eurostat/web/main/news/release-calendar"
 ECB_CALENDAR = "https://www.ecb.europa.eu/press/calendars/statscal/mfm/html/{page}.en.html"
 BIS_API = "https://data.bis.org/api/v0/releasecalendar"
 BIS_PAGE = "https://data.bis.org/release-calendar"
+ECB_MEETINGS = "https://www.ecb.europa.eu/press/calendars/mgcgc/html/index.en.html"
+ECFIN_PDF = (
+    "https://ec.europa.eu/economy_finance/db_indicators/surveys/documents/calendar/"
+    "Publication%20dates%20{year}.pdf"
+)
+CNB_BANK_BOARD = "https://www.cnb.cz/en/monetary-policy/bank-board-decisions/"
 
 # Our series (config keys) -> the provider's calendar entries. Only series whose release the
 # provider's calendar names unambiguously are listed; everything else has no calendar entry
@@ -77,24 +90,61 @@ ECB_PAGES: dict[str, tuple[str, tuple[str, ...]]] = {
     ),
     "stpbls": ("BLS", ("ea_bls_enterprise_credit_standards",)),
 }
-# Eurostat euro-indicator event titles (the calendar carries no dataset code).
+# The ECB's monetary policy decision (Governing Council meeting, Day 2, press conference) behind
+# the deposit facility rate.
+ECB_DECISION_SERIES = ("ecb_deposit_rate",)
+ECB_DECISION_KEY = "mgcgc:monetary-policy-decision"
+# Eurostat euro-indicator event titles (the calendar carries no dataset code; the link of each
+# title to the dataset was read from the euro-indicator release pages, which name their source
+# datasets: docs/data/macro-release-calendar.md).
 EUROSTAT_EVENTS: dict[str, tuple[str, ...]] = {
     "hicp": ("Inflation (HICP)",),
     "unemployment": ("Unemployment",),
     "industrial_production": ("Industrial production",),
+    # namq_10_gdp is updated by all three: the preliminary flash (t+30, euro area, EU and member
+    # states), the flash (t+45) and the full release (t+65).
     "gdp": (
+        "Preliminary flash estimate GDP - EU and euro area",
         "Flash estimate GDP and employment - EU and euro area",
         "GDP main aggregates and employment",
     ),
 }
-# BIS release category ids ("Release" rows only, not "Revision" rows).
-BIS_CATEGORIES: dict[str, str] = {
-    "total_credit": "TOTAL_CREDIT",
-    "debt_service": "DSR",
-    "banking_claims": "LBS",
-    "debt_securities": "DSS",
-    "global_liquidity": "GLI",
+# prc_hicp_minr is also updated by the flash estimate, but only for the euro area and its member
+# states (checked on 2026-10-03: exactly these 25 areas already carried 2026-09 after the flash of
+# 2026-10-02, Czechia did not). Those areas get the flash dates in addition to the full release.
+EURO_AREA_GEOS = (
+    "EA", "EA19", "EA20", "EA21", "AT", "BE", "BG", "CY", "DE", "EE", "EL", "ES", "FI", "FR",
+    "HR", "IE", "IT", "LT", "LU", "LV", "MT", "NL", "PT", "SI", "SK",
+)  # fmt: skip
+EUROSTAT_GEO_EVENTS: dict[str, tuple[str, ...]] = {
+    f"hicp:{geo}": ("Inflation (HICP)", "Flash estimate inflation euro area")
+    for geo in EURO_AREA_GEOS
 }
+# BIS release category per SDMX dataflow ("Release" rows only, not "Revision" rows). A series is
+# mapped through the dataflow it is really collected from, never through its label: the dataflow
+# names are those of stats.bis.org/api/v2/structure/dataflow/BIS and the categories those of the
+# release calendar (names in docs/data/macro-release-calendar.md).
+BIS_FLOW_CATEGORY: dict[str, str] = {
+    "WS_TC": "TOTAL_CREDIT",  # Total credit
+    "WS_DSR": "DSR",  # Debt service ratios
+    "WS_LBS_D_PUB": "LBS",  # Locational banking
+    "WS_DEBT_SEC2_PUB": "IDS",  # International debt securities (BIS-compiled)
+    "WS_GLI": "GLI",  # Global liquidity indicators
+    "WS_LONG_CPI": "CPI",  # Consumer prices statistics
+}
+# The shipped configuration (PublicDataSettings.sdmx): series key -> dataflow id.
+DEFAULT_BIS_FLOWS: dict[str, str] = {
+    "total_credit": "WS_TC",
+    "debt_service": "WS_DSR",
+    "banking_claims": "WS_LBS_D_PUB",
+    "debt_securities": "WS_DEBT_SEC2_PUB",
+    "global_liquidity": "WS_GLI",
+    "property_prices": "WS_LONG_CPI",
+}
+ECFIN_SERIES = "sentiment"
+ECFIN_KEY = "bcs-publication-dates"
+CNB_SERIES = "cnb_repo_2w"
+CNB_KEY = "bank-board-monetary-policy"
 
 
 class CalendarDrift(ValueError):
@@ -127,6 +177,10 @@ class CalendarFetch:
 
     provider: str
     access: AccessResult
+    # The provider value of the stored rows (the observation source of the series). It differs
+    # from `provider` (the endpoint that was called) when one source serves another's series:
+    # the DG ECFIN calendar dates the `eurostat` sentiment series.
+    rows_provider: str = ""
     entries: list[CalendarEntry] = field(default_factory=list)
     covered: set[tuple[str, str]] = field(default_factory=set)
     drift: str | None = None
@@ -134,6 +188,9 @@ class CalendarFetch:
     calls: int = 0
     status_code: int | None = None
     response_bytes: int = 0
+
+    def __post_init__(self) -> None:
+        self.rows_provider = self.rows_provider or self.provider
 
 
 BeforeCall = Callable[[], Awaitable[None]]
@@ -257,6 +314,149 @@ def parse_bis_calendar(body: object) -> list[tuple[str, str, dt.date, str]]:
             raise CalendarDrift(f"BIS calendar: bad date {row['release_date']!r}") from exc
         out.append((row["category_id"], row["release_type"], day, row["time_period"]))
     return out
+
+
+_ECB_MEETING = re.compile(r"<dt>\s*(\d{2})/(\d{2})/(\d{4})\s*</dt>\s*<dd>(.*?)</dd>", re.S)
+
+
+def parse_ecb_decisions(page: str) -> list[dt.date]:
+    """Dates of the monetary policy decisions on the Governing Council meeting calendar: Day 2 of
+    a monetary policy meeting, "followed by press conference". The page gives dates only. Every
+    Day 2 must follow a monetary policy meeting entry of the previous day, otherwise the layout
+    changed (drift). (The live page has a Day 1 without its "(Day 1)" label, 2028-10-11.)"""
+    if "definition-list" not in page or "<dl" not in page:
+        raise CalendarDrift("ECB meetings: no definition list")
+    entries: list[tuple[dt.date, str]] = []
+    for day, month, year, body in _ECB_MEETING.findall(page):
+        text = re.sub(r"\s+", " ", html.unescape(re.sub(r"<[^>]+>", " ", body))).strip()
+        try:
+            entries.append((dt.date(int(year), int(month), int(day)), text))
+        except ValueError as exc:
+            raise CalendarDrift("ECB meetings: bad date") from exc
+    if not entries:
+        raise CalendarDrift("ECB meetings: no entries")
+    day_one = {d for d, t in entries if "monetary policy meeting" in t and "(Day 2)" not in t}
+    decisions: list[dt.date] = []
+    for day, text in entries:
+        if "monetary policy meeting" in text and "(Day 2)" in text:
+            if "press conference" not in text or day - dt.timedelta(days=1) not in day_one:
+                raise CalendarDrift(
+                    "ECB meetings: Day 2 entry without its Day 1 or press conference"
+                )
+            decisions.append(day)
+    if not decisions:
+        raise CalendarDrift("ECB meetings: no monetary policy decision")
+    return sorted(decisions)
+
+
+_MONTHS = {
+    name: number
+    for number, name in enumerate(
+        "January February March April May June July August September October November"
+        " December".split(),
+        1,
+    )
+}
+_ECFIN_ROW = re.compile(
+    r"^(?P<m1>[A-Z][a-z]+) (?P<d1>\d{1,2}) (?P<n1>[A-Z][a-z]+) (?P<y1>\d{4})"
+    r" (?P<h1>\d{2})h(?P<i1>\d{2}) (?P<m2>[A-Z][a-z]+)(?: \d\))*"
+    r" (?P<d2>\d{1,2}) (?P<n2>[A-Z][a-z]+) (?P<y2>\d{4})"
+    r" (?P<h2>\d{2})h(?P<i2>\d{2})$"
+)
+
+
+def parse_ecfin_calendar(text: str, year: int) -> list[tuple[dt.date, dt.time]]:
+    """(date, time) of the monthly business and consumer survey results (ESI, the right-hand
+    column) from the text of the DG ECFIN "Publication dates <year>" PDF. Exactly twelve months in
+    calendar order, a matching month in both columns, and the heading must be present."""
+    if not isinstance(text, str) or f"Publication dates {year}" not in text:
+        raise CalendarDrift("ECFIN calendar: heading not found")
+    if "Business and consumer survey results" not in text:
+        raise CalendarDrift("ECFIN calendar: results column not found")
+    out: list[tuple[dt.date, dt.time]] = []
+    for line in text.splitlines():
+        row = _ECFIN_ROW.match(line.strip())
+        if row is None:
+            continue
+        g = row.groupdict()
+        if g["m1"] != g["m2"] or g["n1"] not in _MONTHS or g["n2"] not in _MONTHS:
+            raise CalendarDrift("ECFIN calendar: month columns do not agree")
+        try:
+            out.append(
+                (
+                    dt.date(int(g["y2"]), _MONTHS[g["n2"]], int(g["d2"])),
+                    dt.time(int(g["h2"]), int(g["i2"])),
+                )
+            )
+        except ValueError as exc:
+            raise CalendarDrift("ECFIN calendar: bad date or time") from exc
+    if len(out) != 12:
+        raise CalendarDrift(f"ECFIN calendar: expected 12 monthly releases, got {len(out)}")
+    # January to November are released in their own month; December's results may come in January.
+    if [(d.year, d.month) for d, _ in out[:11]] != [(year, m) for m in range(1, 12)]:
+        raise CalendarDrift("ECFIN calendar: releases are not in calendar order")
+    if (out[11][0].year, out[11][0].month) not in ((year, 12), (year + 1, 1)):
+        raise CalendarDrift("ECFIN calendar: the December release is out of place")
+    return out
+
+
+def ecfin_pdf_text(content: bytes) -> str:
+    """Text of the first page of the ECFIN calendar PDF (pypdf, already a dependency)."""
+    from pypdf import PdfReader
+    from pypdf.errors import PyPdfError
+
+    try:
+        reader = PdfReader(io.BytesIO(content))
+        return "\n".join(page.extract_text() or "" for page in reader.pages[:2])
+    except (PyPdfError, ValueError, KeyError, OSError) as exc:
+        raise CalendarDrift(f"ECFIN calendar: unreadable PDF ({type(exc).__name__})") from exc
+
+
+_CNB_BLOCK = re.compile(
+    r"<h2><strong>Bank Board meetings on monetary policy in (\d{4})</strong></h2>"
+    r"(.*?)(?=</div>\s*</div>)",
+    re.S,
+)
+_CNB_DAY = re.compile(r">\s*(\d{1,2}) ([A-Z][a-z]+)\s*(?:</div>|$)")
+_CNB_TIME = re.compile(
+    r"monetary policy decision is published after the end of monetary policy meeting,"
+    r" at (\d{1,2}):(\d{2}) ([ap])\.m\."
+)
+
+
+def parse_cnb_bank_board(page: str) -> tuple[list[dt.date], dt.time | None]:
+    """(meeting dates, decision time) from the ČNB "Bank Board decisions" page: the lists headed
+    "Bank Board meetings on monetary policy in <year>" (one per year), strictly increasing within a
+    year. The decision time (Czech local time) is read from the page's own sentence and is None
+    when that sentence is absent."""
+    blocks = _CNB_BLOCK.findall(page) if isinstance(page, str) else []
+    if not blocks:
+        raise CalendarDrift("CNB bank board: no meeting list")
+    days: list[dt.date] = []
+    for year, body in blocks:
+        listed = _CNB_DAY.findall(body)
+        if not listed:
+            raise CalendarDrift("CNB bank board: empty meeting list")
+        year_days: list[dt.date] = []
+        for number, month in listed:
+            if month not in _MONTHS:
+                raise CalendarDrift(f"CNB bank board: unknown month {month!r}")
+            try:
+                year_days.append(dt.date(int(year), _MONTHS[month], int(number)))
+            except ValueError as exc:
+                raise CalendarDrift("CNB bank board: bad date") from exc
+        if year_days != sorted(set(year_days)):
+            raise CalendarDrift("CNB bank board: meetings not strictly increasing")
+        days.extend(year_days)
+    when = _CNB_TIME.search(re.sub(r"\s+", " ", html.unescape(re.sub(r"<[^>]+>", " ", page))))
+    decided: dt.time | None = None
+    if when is not None:
+        hour = int(when.group(1)) % 12 + (12 if when.group(3) == "p" else 0)
+        try:
+            decided = dt.time(hour, int(when.group(2)))
+        except ValueError as exc:
+            raise CalendarDrift("CNB bank board: bad decision time") from exc
+    return sorted(days), decided
 
 
 # ------------------------------------------------------------------------------------ fetching
@@ -402,7 +602,7 @@ async def fetch_eurostat(
     by_title: dict[str, list[dt.date]] = {}
     for title, day in events:
         by_title.setdefault(title, []).append(day)
-    for series_id, titles in EUROSTAT_EVENTS.items():
+    for series_id, titles in {**EUROSTAT_EVENTS, **EUROSTAT_GEO_EVENTS}.items():
         for title in titles:
             if title not in by_title:
                 # The calendar no longer names a release we rely on: that is drift, not "none".
@@ -423,12 +623,14 @@ async def fetch_eurostat(
 async def fetch_ecb(
     http: httpx.AsyncClient, today: dt.date, before_call: BeforeCall
 ) -> CalendarFetch:
-    """One request per statistical-calendar page. A page that fails or drifts leaves the others
-    usable: its series simply stay uncovered (no supersede, no new rows)."""
+    """One request per statistical-calendar page, plus the Governing Council meeting calendar. A
+    page that fails or drifts leaves the others usable: its series simply stay uncovered (no
+    supersede, no new rows)."""
     fetch = CalendarFetch("ecb", AccessResult(AccessState.AVAILABLE))
     failure: AccessResult | None = None
-    for page, (dataset, series_ids) in ECB_PAGES.items():
-        url = ECB_CALENDAR.format(page=page)
+    pages: list[tuple[str, str]] = [(page, ECB_CALENDAR.format(page=page)) for page in ECB_PAGES]
+    pages.append(("mgcgc", ECB_MEETINGS))
+    for page, url in pages:
         sub = CalendarFetch("ecb", AccessResult(AccessState.AVAILABLE))
         response = await _get(http, sub, before_call, url)
         fetch.calls += sub.calls
@@ -440,6 +642,10 @@ async def fetch_ecb(
                 break
             continue
         try:
+            if page == "mgcgc":
+                _ecb_decision_entries(fetch, parse_ecb_decisions(response.text), today, url)
+                continue
+            dataset, series_ids = ECB_PAGES[page]
             rows = parse_ecb_calendar_html(response.text, dataset)
         except CalendarDrift as exc:
             drifted = _drift(
@@ -470,10 +676,39 @@ async def fetch_ecb(
     return fetch
 
 
+def _ecb_decision_entries(
+    fetch: CalendarFetch, decisions: Sequence[dt.date], today: dt.date, url: str
+) -> None:
+    for series_id in ECB_DECISION_SERIES:
+        fetch.covered.add((series_id, ECB_DECISION_KEY))
+        fetch.entries.extend(
+            CalendarEntry(
+                "ecb",
+                series_id,
+                ECB_DECISION_KEY,
+                day,
+                url,
+                title="Governing Council monetary policy meeting (Day 2), press conference",
+            )
+            for day in decisions
+            if day >= today
+        )
+
+
 async def fetch_bis(
-    http: httpx.AsyncClient, today: dt.date, before_call: BeforeCall
+    http: httpx.AsyncClient,
+    today: dt.date,
+    before_call: BeforeCall,
+    flows: Mapping[str, str] | None = None,
 ) -> CalendarFetch:
+    """`flows`: our BIS series key -> the SDMX dataflow id it is collected from (the shipped
+    defaults when omitted). A series whose dataflow has no known calendar category gets no entry."""
     fetch = CalendarFetch("bis", AccessResult(AccessState.AVAILABLE))
+    series = {
+        key: BIS_FLOW_CATEGORY[flow]
+        for key, flow in (DEFAULT_BIS_FLOWS if flows is None else flows).items()
+        if flow in BIS_FLOW_CATEGORY
+    }
     response = await _get(http, fetch, before_call, BIS_API)
     if response is None:
         return fetch
@@ -483,7 +718,7 @@ async def fetch_bis(
     except CalendarDrift as exc:
         return _drift(fetch, exc, {"body": body})
     categories = {row[0] for row in rows}
-    for series_id, category in BIS_CATEGORIES.items():
+    for series_id, category in series.items():
         if category not in categories:
             return _drift(
                 fetch,
@@ -507,15 +742,104 @@ async def fetch_bis(
     return fetch
 
 
+async def fetch_ecfin(
+    http: httpx.AsyncClient, today: dt.date, before_call: BeforeCall
+) -> CalendarFetch:
+    """The DG ECFIN publication-date PDF of this year and (when published) of the next. The rows
+    belong to the `eurostat` sentiment series (`ei_bssi_m_r2`). A missing next-year PDF is normal
+    (not published yet); a missing or unreadable current-year PDF is not."""
+    fetch = CalendarFetch("ecfin", AccessResult(AccessState.AVAILABLE), rows_provider="eurostat")
+    published: dict[int, list[tuple[dt.date, dt.time]]] = {}
+    for year in (today.year, today.year + 1):
+        url = ECFIN_PDF.format(year=year)
+        sub = CalendarFetch("ecfin", AccessResult(AccessState.AVAILABLE))
+        response = await _get(http, sub, before_call, url)
+        fetch.calls += sub.calls
+        fetch.response_bytes += sub.response_bytes
+        fetch.status_code = sub.status_code or fetch.status_code
+        if response is None:
+            if year > today.year and sub.status_code in (301, 302, 404):
+                # Next year's calendar is not out yet: the server answers 404, or redirects to the
+                # surveys home page (observed 2026-10-03 for the 2027 file).
+                continue
+            fetch.access = sub.access
+            return fetch
+        try:
+            published[year] = parse_ecfin_calendar(ecfin_pdf_text(response.content), year)
+        except CalendarDrift as exc:
+            return _drift(fetch, exc, {"source": url, "text": ecfin_pdf_text_safe(response)})
+    if today.year not in published:
+        fetch.access = AccessResult(AccessState.NOT_COVERED, "no calendar PDF for this year")
+        return fetch
+    fetch.covered.add((ECFIN_SERIES, ECFIN_KEY))
+    for year, rows in published.items():
+        for day, time in rows:
+            # December's results may be dated January of the next year: that date comes from the
+            # next year's PDF once it exists.
+            if day.year != year and year + 1 in published:
+                continue
+            if day >= today:
+                fetch.entries.append(
+                    CalendarEntry(
+                        "eurostat",
+                        ECFIN_SERIES,
+                        ECFIN_KEY,
+                        day,
+                        ECFIN_PDF.format(year=year),
+                        release_time=time,
+                        title="Business and consumer survey results (ESI)",
+                    )
+                )
+    return fetch
+
+
+def ecfin_pdf_text_safe(response: httpx.Response) -> str:
+    try:
+        return ecfin_pdf_text(response.content)[:50_000]
+    except CalendarDrift:
+        return ""
+
+
+async def fetch_cnb(
+    http: httpx.AsyncClient, today: dt.date, before_call: BeforeCall
+) -> CalendarFetch:
+    """The ČNB Bank Board monetary-policy meeting dates (the repo-rate decision days)."""
+    fetch = CalendarFetch("cnb", AccessResult(AccessState.AVAILABLE))
+    response = await _get(http, fetch, before_call, CNB_BANK_BOARD)
+    if response is None:
+        return fetch
+    try:
+        days, decided = parse_cnb_bank_board(response.text)
+    except CalendarDrift as exc:
+        return _drift(fetch, exc, {"raw_text": response.text[:200_000]})
+    fetch.covered.add((CNB_SERIES, CNB_KEY))
+    fetch.entries.extend(
+        CalendarEntry(
+            "cnb",
+            CNB_SERIES,
+            CNB_KEY,
+            day,
+            CNB_BANK_BOARD,
+            release_time=decided,
+            title="Bank Board monetary policy meeting (rate decision)",
+        )
+        for day in days
+        if day >= today
+    )
+    return fetch
+
+
 def series_with_calendar(provider: str, keys: Sequence[str]) -> list[str]:
     """Which of our series keys a provider's mapping covers (the rest has no calendar)."""
     known: set[str]
     if provider == "ecb":
-        known = {s for _, (_, ids) in ECB_PAGES.items() for s in ids}
+        known = {s for _, (_, ids) in ECB_PAGES.items() for s in ids} | set(ECB_DECISION_SERIES)
     elif provider == "eurostat":
-        known = set(EUROSTAT_EVENTS)
+        known = set(EUROSTAT_EVENTS) | set(EUROSTAT_GEO_EVENTS) | {ECFIN_SERIES}
     elif provider == "bis":
-        known = set(BIS_CATEGORIES)
+        known = {k for k, flow in DEFAULT_BIS_FLOWS.items() if flow in BIS_FLOW_CATEGORY}
+    elif provider == "cnb":
+        known = {CNB_SERIES}
     else:
         known = set(keys)  # FRED: any configured series has a release
     return [k for k in keys if k in known]

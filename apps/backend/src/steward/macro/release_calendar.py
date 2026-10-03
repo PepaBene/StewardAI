@@ -33,7 +33,9 @@ from steward.sources.release_calendar import (
     CalendarEntry,
     CalendarFetch,
     fetch_bis,
+    fetch_cnb,
     fetch_ecb,
+    fetch_ecfin,
     fetch_eurostat,
     fetch_fred,
 )
@@ -43,16 +45,21 @@ log = logging.getLogger(__name__)
 
 ENDPOINT = "release_calendar"
 COVERAGE_PROVIDER = "macro_release_calendar"
-CALENDAR_PROVIDERS = ("fred", "eurostat", "ecb", "bis")
+# `ecfin` is the DG ECFIN survey calendar: it is called and gated as its own endpoint, but its rows
+# date the `eurostat` sentiment series (the observation source), see CalendarFetch.rows_provider.
+CALENDAR_PROVIDERS = ("fred", "eurostat", "ecb", "bis", "ecfin", "cnb")
 
 # The collector's own hard stop per provider (the ledger rows in provider_access declare FRED's
 # published 120 requests per minute; the others publish no limit). A daily run needs 1 request
-# (Eurostat, BIS), 3 (ECB) or 2 per series (FRED), so these leave room for a few manual runs.
+# (Eurostat, BIS, ČNB), 2 (ECFIN: this and next year's PDF), 4 (ECB) or 2 per series (FRED), so
+# these leave room for a few manual runs.
 CALENDAR_BUDGETS: dict[str, Budget] = {
     "fred": Budget(per_minute=Decimal(30), daily=Decimal(60)),
     "eurostat": Budget(daily=Decimal(6)),
     "ecb": Budget(daily=Decimal(15)),
     "bis": Budget(daily=Decimal(6)),
+    "ecfin": Budget(daily=Decimal(6)),
+    "cnb": Budget(daily=Decimal(6)),
 }
 
 
@@ -75,6 +82,7 @@ async def store_calendar(pool: asyncpg.Pool, fetch: CalendarFetch, now: dt.datet
     completely-read calendar no longer lists. Past dates are never superseded: they happened."""
     today = now.astimezone(dt.UTC).date()
     inserted = superseded = unchanged = 0
+    provider = fetch.rows_provider
     fresh: dict[tuple[str, str], dict[dt.date, CalendarEntry]] = {}
     for entry in fetch.entries:
         fresh.setdefault((entry.series_id, entry.calendar_key), {})[entry.release_date] = entry
@@ -87,7 +95,7 @@ async def store_calendar(pool: asyncpg.Pool, fetch: CalendarFetch, now: dt.datet
                     """select id,release_date from public.macro_release_calendar
                        where provider=$1 and series_id=$2 and calendar_key=$3
                          and superseded_at is null""",
-                    fetch.provider,
+                    provider,
                     series_id,
                     calendar_key,
                 )
@@ -147,6 +155,7 @@ async def _provider_step(
     now: dt.datetime,
     provider: str,
     fred_series: dict[str, str],
+    bis_flows: dict[str, str],
     step: Any,
 ) -> None:
     decision = await provider_gate(ctx.pool, provider, ENDPOINT)
@@ -169,8 +178,12 @@ async def _provider_step(
         fetch = await fetch_eurostat(deps.http, today, before_call)
     elif provider == "ecb":
         fetch = await fetch_ecb(deps.http, today, before_call)
+    elif provider == "ecfin":
+        fetch = await fetch_ecfin(deps.http, today, before_call)
+    elif provider == "cnb":
+        fetch = await fetch_cnb(deps.http, today, before_call)
     else:
-        fetch = await fetch_bis(deps.http, today, before_call)
+        fetch = await fetch_bis(deps.http, today, before_call, bis_flows)
     if fetch.calls:
         await record_access(
             ctx.pool,
@@ -223,9 +236,15 @@ async def run_release_calendar(ctx: JobContext, deps: CalendarDeps) -> None:
     now = deps.now or dt.datetime.now(dt.UTC)
     governor = PostgresRequestGovernor(ctx.pool)
     fred_series = {s.key: s.series_id for s in jobs.macro.fred}
+    # "BIS,WS_TC,2.0" -> "WS_TC": the dataflow a BIS series is really collected from.
+    bis_flows = {
+        s.key: s.flow.split(",")[1] if s.flow.count(",") >= 1 else s.flow
+        for s in jobs.public_data.sdmx
+        if s.provider == "bis"
+    }
     for provider in CALENDAR_PROVIDERS:
         async with ctx.step(f"{provider}:{ENDPOINT}") as step:
-            await _provider_step(ctx, deps, governor, now, provider, fred_series, step)
+            await _provider_step(ctx, deps, governor, now, provider, fred_series, bis_flows, step)
 
 
 async def macro_release_calendar_handler(ctx: JobContext) -> None:
@@ -263,9 +282,15 @@ async def next_releases(
     pool: asyncpg.Pool, keys: Iterable[tuple[str, str]], as_of: dt.datetime
 ) -> dict[tuple[str, str], NextRelease]:
     """Per (source, observation series id): the earliest stored release on or after the UTC date
-    of `as_of`, from calendar rows known by `as_of` and not yet superseded at `as_of`."""
-    pairs = sorted({(source, series_base(series_id)) for source, series_id in keys})
-    if not pairs:
+    of `as_of`, from calendar rows known by `as_of` and not yet superseded at `as_of`. A row
+    stored for the exact series id ('hicp:EA21': the euro area also has flash estimates) wins over
+    the row of its dataset ('hicp')."""
+    wanted = sorted(set(keys))
+    ids = sorted(
+        {(source, series_id) for source, series_id in wanted}
+        | {(source, series_base(series_id)) for source, series_id in wanted}
+    )
+    if not ids:
         return {}
     as_of_utc = as_of.astimezone(dt.UTC) if as_of.tzinfo else as_of.replace(tzinfo=dt.UTC)
     rows = await pool.fetch(
@@ -277,14 +302,15 @@ async def next_releases(
            where c.known_at <= $3 and (c.superseded_at is null or c.superseded_at > $3)
              and c.release_date >= $4
            order by c.provider,c.series_id,c.release_date,c.release_time nulls last,c.id""",
-        [p[0] for p in pairs],
-        [p[1] for p in pairs],
+        [i[0] for i in ids],
+        [i[1] for i in ids],
         as_of_utc,
         as_of_utc.date(),
     )
     found = {(r["provider"], r["series_id"]): NextRelease(**dict(r)) for r in rows}
-    return {
-        (source, series_id): found[(source, series_base(series_id))]
-        for source, series_id in keys
-        if (source, series_base(series_id)) in found
-    }
+    out: dict[tuple[str, str], NextRelease] = {}
+    for source, series_id in wanted:
+        hit = found.get((source, series_id)) or found.get((source, series_base(series_id)))
+        if hit is not None:
+            out[(source, series_id)] = hit
+    return out

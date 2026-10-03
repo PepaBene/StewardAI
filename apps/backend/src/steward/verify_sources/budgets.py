@@ -55,7 +55,7 @@ NO_OVERAGE_PROVIDERS: dict[str, str] = {
 BUDGET_SITES: dict[str, int] = {
     "steward/free_sources.py": 2,
     "steward/macro/public_collect.py": 1,
-    "steward/macro/release_calendar.py": 4,
+    "steward/macro/release_calendar.py": 6,
     "steward/news/feeds.py": 1,
     "steward/reference/exchange_probes.py": 2,
     "steward/reference/prices.py": 3,

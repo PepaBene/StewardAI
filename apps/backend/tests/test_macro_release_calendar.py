@@ -34,7 +34,9 @@ from steward.sources.release_calendar import (
     CalendarEntry,
     CalendarFetch,
     fetch_bis,
+    fetch_cnb,
     fetch_ecb,
+    fetch_ecfin,
     fetch_eurostat,
     fetch_fred,
     parse_bis_calendar,
@@ -112,7 +114,7 @@ def test_bis_calendar_rows_parse_with_slash_dates() -> None:
     assert ("TOTAL_CREDIT", "Release", dt.date(2026, 12, 7), "2026-Q2") in {
         (c, t, d, p) for c, t, d, p in rows
     } or any(c == "TOTAL_CREDIT" and t == "Release" for c, t, _d, _p in rows)
-    assert {c for c, *_ in rows} >= {"TOTAL_CREDIT", "DSR", "LBS", "DSS", "GLI", "CPI"}
+    assert {c for c, *_ in rows} >= {"TOTAL_CREDIT", "DSR", "LBS", "DSS", "IDS", "GLI", "CPI"}
 
 
 # ---------------------------------------------------------------------------------------
@@ -161,7 +163,7 @@ async def test_drifted_payloads_come_back_quarantined_with_no_entries() -> None:
             return httpx.Response(200, json={"releases": []})
         if host == "ec.europa.eu":
             return httpx.Response(200, text="<html>not a calendar</html>")
-        if host == "www.ecb.europa.eu":
+        if host in ("www.ecb.europa.eu", "www.cnb.cz"):
             return httpx.Response(200, text="<html>redesigned</html>")
         return httpx.Response(200, json={"unexpected": True})
 
@@ -171,6 +173,8 @@ async def test_drifted_payloads_come_back_quarantined_with_no_entries() -> None:
             await fetch_eurostat(http, TODAY, _allow),
             await fetch_ecb(http, TODAY, _allow),
             await fetch_bis(http, TODAY, _allow),
+            await fetch_ecfin(http, TODAY, _allow),
+            await fetch_cnb(http, TODAY, _allow),
         ]
     for result in fetched:
         assert result.entries == [] and result.covered == set(), result.provider
@@ -207,6 +211,8 @@ async def test_a_refused_reservation_means_no_request_and_a_typed_quota_result()
             await fetch_eurostat(http, TODAY, refuse),
             await fetch_ecb(http, TODAY, refuse),
             await fetch_bis(http, TODAY, refuse),
+            await fetch_ecfin(http, TODAY, refuse),
+            await fetch_cnb(http, TODAY, refuse),
         ):
             assert result.access.state == AccessState.QUOTA_EXHAUSTED
             assert result.entries == [] and result.calls == 0
@@ -282,13 +288,23 @@ def _provider_transport() -> httpx.MockTransport:
             name = {"10": "cpi_10", "50": "employment_50", "18": "h15_18"}[rid]
             assert url.params["include_release_dates_with_no_data"] == "true"
             return httpx.Response(200, text=_text(f"fred_release_dates_{name}.json"))
+        if url.host == "ec.europa.eu" and "economy_finance" in url.path:
+            if "2026" not in url.path:  # next year's PDF is not published yet
+                return httpx.Response(404, text="not found")
+            return httpx.Response(
+                200, content=(FIXTURES / "ecfin_publication_dates_2026.pdf").read_bytes()
+            )
         if url.host == "ec.europa.eu":
             return httpx.Response(200, text=_text("eurostat_euro_indicators.ics"))
         if url.host == "www.ecb.europa.eu":
             page = url.path.rsplit("/", 1)[1].split(".")[0]
+            if "/mgcgc/" in url.path:
+                page = "mgcgc"
             return httpx.Response(200, text=_text(f"ecb_{page}.html"))
         if url.host == "data.bis.org":
             return httpx.Response(200, text=_text("bis_releasecalendar.json"))
+        if url.host == "www.cnb.cz":
+            return httpx.Response(200, text=_text("cnb_bank_board.html"))
         return httpx.Response(404)
 
     return httpx.MockTransport(serve)
@@ -301,7 +317,9 @@ async def test_every_provider_maps_to_its_series_and_keeps_only_upcoming_dates()
         eurostat = await fetch_eurostat(http, TODAY, _allow)
         ecb = await fetch_ecb(http, TODAY, _allow)
         bis = await fetch_bis(http, TODAY, _allow)
-    for result in (fred, eurostat, ecb, bis):
+        ecfin = await fetch_ecfin(http, TODAY, _allow)
+        cnb = await fetch_cnb(http, TODAY, _allow)
+    for result in (fred, eurostat, ecb, bis, ecfin, cnb):
         assert result.access.state == AccessState.AVAILABLE and result.drift is None
         assert result.entries and all(e.release_date >= TODAY for e in result.entries)
     assert fred.calls == 6  # 3 series/release + 3 release/dates
@@ -313,14 +331,18 @@ async def test_every_provider_maps_to_its_series_and_keeps_only_upcoming_dates()
         "us_unemployment": dt.date(2026, 11, 6),
         "fed_funds": dt.date(2026, 10, 5),
     }
-    assert {e.series_id for e in eurostat.entries} == {
+    assert {e.series_id for e in eurostat.entries} >= {
         "hicp",
+        "hicp:EA21",
+        "hicp:DE",
         "unemployment",
         "industrial_production",
         "gdp",
     }
+    assert not any(e.series_id == "hicp:CZ" for e in eurostat.entries)
     gdp = sorted(e.release_date for e in eurostat.entries if e.series_id == "gdp")
-    assert gdp[0] == dt.date(2026, 11, 13)  # the earliest of the two mapped GDP releases
+    # The preliminary flash (t+30) already updates namq_10_gdp: it is the next GDP release.
+    assert gdp[0] == dt.date(2026, 10, 30)
     assert {e.series_id for e in ecb.entries} == {
         "euro_area_m3_growth",
         "euro_area_private_credit",
@@ -329,6 +351,7 @@ async def test_every_provider_maps_to_its_series_and_keeps_only_upcoming_dates()
         "ea_household_overnight_deposit_rate",
         "ea_corporate_term_deposit_rate",
         "ea_bls_enterprise_credit_standards",
+        "ecb_deposit_rate",
     }
     m3 = min(
         (e for e in ecb.entries if e.series_id == "euro_area_m3_growth"),
@@ -341,8 +364,10 @@ async def test_every_provider_maps_to_its_series_and_keeps_only_upcoming_dates()
         "banking_claims",
         "debt_securities",
         "global_liquidity",
-    }  # no calendar entry for property_prices: not mapped
-    assert not any(e.series_id == "ecb_deposit_rate" for e in ecb.entries)
+        "property_prices",  # collected from WS_LONG_CPI: BIS category CPI, not residential
+    }
+    decisions = sorted(e.release_date for e in ecb.entries if e.series_id == "ecb_deposit_rate")
+    assert decisions[0] == dt.date(2026, 10, 29)  # Day 2 of the meeting, not Day 1
 
 
 # ---------------------------------------------------------------------------------------
@@ -587,7 +612,7 @@ async def test_job_stores_every_provider_calendar_and_writes_coverage_and_usage(
             "select provider, count(*) n from macro_release_calendar group by 1"
         )
     }
-    assert set(stored) == {"fred", "eurostat", "ecb", "bis"} and all(stored.values())
+    assert set(stored) == {"fred", "eurostat", "ecb", "bis", "cnb"} and all(stored.values())
     # Known-at is the retrieval time of this run; the source is always the provider calendar.
     row = await backend_pool.fetchrow(
         "select known_at, retrieved_at, source from macro_release_calendar limit 1"
@@ -599,7 +624,7 @@ async def test_job_stores_every_provider_calendar_and_writes_coverage_and_usage(
             "select * from coverage_status where provider='macro_release_calendar'"
         )
     }
-    assert set(coverage) == {"fred", "eurostat", "ecb", "bis"}
+    assert set(coverage) == {"fred", "eurostat", "ecb", "bis", "ecfin", "cnb"}
     assert all(c["state"] == "available" and c["available_periods"] for c in coverage.values())
     usage = {
         r["provider"]: r["credits"]
@@ -610,7 +635,8 @@ async def test_job_stores_every_provider_calendar_and_writes_coverage_and_usage(
             " group by provider"
         )
     }
-    assert usage["fred"] == 6 and usage["eurostat"] == 1 and usage["ecb"] == 3 and usage["bis"] == 1
+    assert usage["fred"] == 6 and usage["eurostat"] == 1 and usage["ecb"] == 4 and usage["bis"] == 1
+    assert usage["ecfin"] == 2 and usage["cnb"] == 1  # this year's PDF and the unpublished next
     # The key is nowhere in the audit trail.
     audit = await backend_pool.fetchval(
         "select string_agg(coalesce(error_redacted,''),' ') from provider_fetch_audit"
@@ -764,7 +790,7 @@ async def test_job_without_a_fred_key_skips_fred_and_still_reads_the_keyless_cal
         r["provider"]
         for r in await backend_pool.fetch("select distinct provider from macro_release_calendar")
     }
-    assert providers == {"eurostat", "ecb", "bis"}
+    assert providers == {"eurostat", "ecb", "bis", "cnb"}
 
 
 # ---------------------------------------------------------------------------------------
@@ -802,11 +828,13 @@ async def test_zero_cost_gate_passes_with_the_calendar_endpoints_and_fails_if_on
         ("eurostat", "available", False, "free"),
         ("ecb", "available", False, "free"),
         ("bis", "available", False, "free"),
+        ("ecfin", "available", False, "free"),
+        ("cnb", "available", False, "free"),
     }
     manifest = await backend_pool.fetchval(
         "select count(*) from provider_endpoint_manifest where endpoint='release_calendar'"
     )
-    assert manifest == 4
+    assert manifest == 6
     gate = (await client.get("/verification/zero-cost-gate")).json()
     assert gate["passed"] is True
     assert not [
@@ -814,7 +842,7 @@ async def test_zero_cost_gate_passes_with_the_calendar_endpoints_and_fails_if_on
         for f in gate["findings"]
         if f["endpoint"] == "release_calendar" and f["severity"] == "violation"
     ]
-    # FRED's published free limit is on the ledger; the other three publish none.
+    # FRED's published free limit is on the ledger; the others publish none.
     quota = await backend_pool.fetchrow(
         "select quota, quota_period from provider_access where provider='fred'"
         " and endpoint='release_calendar'"

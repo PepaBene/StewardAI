@@ -955,8 +955,9 @@ NON_ADAPTER_MODULES: dict[str, str] = {
     "network contract of its own",
     "steward.sources.xbrl_concepts": "static XBRL concept classification table: no parser and no "
     "network contract of its own (the parsers that use it are covered under steward.sources.xbrl)",
-    "steward.sources.release_calendar": "four calendar parsers and fetchers with their own "
-    "recorded fixtures, drift, typed-denial and quota cases in test_macro_release_calendar",
+    "steward.sources.release_calendar": "calendar parsers and fetchers (FRED, Eurostat, ECB, BIS, "
+    "DG ECFIN, ČNB) with their own recorded fixtures, drift, typed-denial and quota cases in "
+    "test_macro_release_calendar and test_macro_release_calendar_second_pass",
 }
 
 # (status, body, allowed states) for the two probe classifiers.
