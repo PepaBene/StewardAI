@@ -11,8 +11,8 @@ import { formatDate } from "@/lib/format";
 
 /**
  * Measured reach by jurisdiction and metric (GET /verification/coverage): observations, distinct
- * entities, unknown values, sources, period span and newest known-at. The API has no exchange or
- * asset-class dimension, which is stated here. A jurisdiction that is absent has no stored
+ * entities, unknown values, sources, period span and newest known-at. Exchange and asset-class cuts
+ * come from GET /data/reach (the reach dashboard). A jurisdiction that is absent has no stored
  * observation: that is "no coverage measured", not a share of the world.
  */
 export function GlobalReach({ rows }: { rows: readonly MeasuredCoverageRow[] }) {
@@ -20,14 +20,14 @@ export function GlobalReach({ rows }: { rows: readonly MeasuredCoverageRow[] }) 
   const shown = filterMeasured(rows, q);
   return (
     <Blueprint as="section" aria-labelledby="reach-heading" id="reach" className="flex scroll-mt-24 flex-col gap-3 px-5 py-5">
-      <PanelHeading kicker="Global reach" title={<span id="reach-heading">Measured coverage by jurisdiction and metric</span>} />
+      <PanelHeading kicker="Observations" title={<span id="reach-heading">Measured coverage by jurisdiction and metric</span>} />
       <p className="max-w-prose text-sm text-text">
         {rows.length === 0
           ? "No observation rows are stored yet."
           : `${new Set(rows.map((r) => r.jurisdiction)).size} jurisdictions have stored observations across ${rows.length} jurisdiction-metric rows. Absent jurisdictions are unmeasured, and no row is extrapolated to a global percentage.`}
       </p>
       <p className="text-xs text-text-muted">
-        Dimensions the API provides: jurisdiction, domain, metric. No endpoint returns coverage by exchange or by asset class, nor a tested-symbol count, so those cuts are not shown.
+        Observation rows only (jurisdiction, domain, metric). Coverage by exchange, country and asset class, with tested-symbol counts, is in the reach dashboard above.
       </p>
       {rows.length === 0 ? (
         <StatePlaceholder state="not_covered" reason="Nothing has been measured yet; run the source collectors and the shadow collection." />

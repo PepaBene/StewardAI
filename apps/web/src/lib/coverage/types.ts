@@ -82,9 +82,9 @@ export type MeasuredCoverageRow = {
 /**
  * met / not_met: a measured figure against the plan's threshold. reported: a measured figure
  * whose target is qualitative (shown, not judged). unavailable: the endpoint failed or has no
- * data. not_measured: no API endpoint returns this figure.
+ * data (unknown, never zero).
  */
-export type ScoreStatus = "met" | "not_met" | "reported" | "unavailable" | "not_measured";
+export type ScoreStatus = "met" | "not_met" | "reported" | "unavailable";
 
 export type ScoreItem = {
   id: string;

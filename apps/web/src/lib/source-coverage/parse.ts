@@ -8,6 +8,7 @@ import type {
   CoverageEntry,
   EntityKind,
   GateFinding,
+  StaleBasis,
   SourceStatusRow,
   UsageWindow,
   ZeroCostGate,
@@ -25,12 +26,23 @@ export function toNumber(value: unknown): number | null {
   return null;
 }
 
+/**
+ * The parenthetical that says where a stale threshold comes from, in the backend's own terms:
+ * both bases are twice a refresh gap (config/jobs.py COVERAGE_STALE_GRACE); `job_schedule` is the
+ * refreshing job's cron, `documented_default` the documented interval table. null basis -> no claim.
+ */
+export function staleBasisPhrase(basis: StaleBasis | null): string | null {
+  if (basis === "job_schedule") return "twice the scheduled refresh gap";
+  if (basis === "documented_default") return "twice the documented default refresh interval";
+  return null;
+}
+
 const ENTITY_KINDS: readonly EntityKind[] = ["security", "geography", "other"];
 
 /**
  * `GET /data/coverage` row -> CoverageEntry. An available entry with ratio < 1 is "partial".
  * A usable (verified / partial) entry whose backend `stale` flag is true reads "stale" with the
- * reason "last checked N h ago, older than X h (twice the scheduled refresh gap)"; gap states (failed, paid only, ...)
+ * reason "last checked N h ago, older than X h (twice the scheduled refresh gap)" for a job-schedule basis or "(twice the documented default refresh interval)" for a documented default; gap states (failed, paid only, ...)
  * keep their own state. `stale` null = age not judged (no job cadence known), never fresh.
  */
 export function adaptCoverage(row: Schemas["DataCoverage"], now: number = Date.now()): CoverageEntry {
@@ -48,9 +60,11 @@ export function adaptCoverage(row: Schemas["DataCoverage"], now: number = Date.n
   const usable = stateAfterCoverage === "verified" || stateAfterCoverage === "partial";
   const checkedMs = Date.parse(row.checked_at);
   const ageHours = Number.isFinite(checkedMs) ? Math.max(0, Math.round((now - checkedMs) / 3_600_000)) : null;
+  const staleBasis: StaleBasis | null = row.stale_basis === "job_schedule" || row.stale_basis === "documented_default" ? row.stale_basis : null;
+  const phrase = staleBasisPhrase(staleBasis);
   const staleReason =
     stale === true && staleAfterHours !== null
-      ? `last checked ${ageHours === null ? "an unknown time" : `${ageHours} h`} ago, older than ${staleAfterHours} h (twice the scheduled refresh gap)`
+      ? `last checked ${ageHours === null ? "an unknown time" : `${ageHours} h`} ago, older than ${staleAfterHours} h${phrase ? ` (${phrase})` : ""}`
       : null;
   return {
     id: `${row.provider}:${row.dataset}:${row.entity_key}`,
@@ -61,6 +75,7 @@ export function adaptCoverage(row: Schemas["DataCoverage"], now: number = Date.n
     state: stale === true && usable ? "stale" : stateAfterCoverage,
     stale,
     staleAfterHours,
+    staleBasis,
     staleReason: stale === true && usable ? staleReason ?? "last check is older than the expected interval" : null,
     rawState: row.state,
     expectedPeriods: expected,

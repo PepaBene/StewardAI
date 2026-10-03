@@ -22,6 +22,7 @@ import {
   type CoverageRatio,
 } from "@/lib/activity/overview";
 import { formatPct } from "@/lib/charts/format";
+import { useIdentityReview, usePriceCoverage } from "@/lib/coverage/hooks";
 import { useApiResource } from "@/lib/hooks/use-api-resource";
 import { useNow } from "@/lib/hooks/use-now";
 import { formatCost, jobTypeLabel } from "@/lib/jobs/job-detail";
@@ -32,7 +33,6 @@ type CostSummary = components["schemas"]["CostSummary"];
 const fetchCosts = () => getBrowserApiClient().GET("/costs/summary");
 const fetchCoverage = () => getBrowserApiClient().GET("/activity/coverage");
 const fetchHealth = () => getBrowserApiClient().GET("/news/sources/health");
-const fetchGaps = () => getBrowserApiClient().GET("/reference/gaps");
 
 const JOB_PAGE_LIMIT = 200;
 const MAX_PAGES = 10;
@@ -242,10 +242,11 @@ export function JobGridPanel() {
 export function CoverageRings() {
   const coverage = useApiResource(fetchCoverage).state;
   const health = useApiResource(fetchHealth).state;
-  const gaps = useApiResource(fetchGaps).state;
+  const priceCov = usePriceCoverage().state;
+  const identity = useIdentityReview().state;
   const cov = coverage.kind === "ok" ? coverage.data : null;
   const rings: { title: string; ratio: CoverageRatio | null; loading: boolean; href: string }[] = [
-    { title: "Prices", ratio: cov ? priceCoverage(cov) : null, loading: coverage.kind === "loading", href: "#coverage" },
+    { title: "Prices", ratio: priceCov.kind === "ok" ? priceCoverage(priceCov.data) : null, loading: priceCov.kind === "loading", href: "/coverage#price-coverage" },
     { title: "Earnings checks", ratio: cov ? earningsCoverage(cov) : null, loading: coverage.kind === "loading", href: "#coverage" },
     {
       title: "News sources",
@@ -255,15 +256,15 @@ export function CoverageRings() {
     },
     {
       title: "Identity",
-      ratio: cov && gaps.kind === "ok" ? identityCoverage(cov, gaps.data) : null,
-      loading: coverage.kind === "loading" || gaps.kind === "loading",
-      href: "/status",
+      ratio: identity.kind === "ok" ? identityCoverage(identity.data) : null,
+      loading: identity.kind === "loading",
+      href: "/coverage#identity-review",
     },
   ];
   return (
     <section aria-label="Coverage" className="grid grid-cols-1 gap-5 sm:grid-cols-2 xl:grid-cols-4">
       {rings.map((r) => {
-        const pct = r.ratio && r.ratio.total > 0 ? r.ratio.value / r.ratio.total : null;
+        const pct = r.ratio && r.ratio.total > 0 ? (r.ratio.share ?? r.ratio.value / r.ratio.total) : null;
         return (
           <div key={r.title} className="blueprint flex items-center gap-4 px-5 py-4">
             <BlueprintCorners />
@@ -283,9 +284,7 @@ export function CoverageRings() {
               <p className="text-xs text-text-muted">
                 {r.ratio ? (
                   <>
-                    <span className="num">
-                      {r.ratio.value} of {r.ratio.total}
-                    </span>{" "}
+                    <span className="num">{r.ratio.figure ?? `${r.ratio.value} of ${r.ratio.total}`}</span>{" "}
                     · {r.ratio.note}
                   </>
                 ) : r.loading ? (

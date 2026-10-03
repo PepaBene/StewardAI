@@ -240,3 +240,33 @@ describe("adoption: vintage history and trade partners", () => {
     expect(r.ok && r.value.reporterWide).toBeNull();
   });
 });
+
+describe("third wave: next release from the provider calendar", () => {
+  const src = { provider: "fred", url: "https://fred.stlouisfed.org/releases/calendar", title: "Consumer Price Index" };
+  const obsBody = (o: Record<string, unknown>) => ({ as_of: "2026-10-03T10:00:00Z", observations: [{ ...obs, ...o }], coverage: [], effects: [], comparisons: [], exposure_unknown: false, series_effects: [] });
+  const next = (o: Record<string, unknown>) => {
+    const r = parseMacroContext(obsBody(o));
+    if (!r.ok) throw new Error("did not parse");
+    return r.value.observations[0].nextRelease;
+  };
+  it("a provider-calendar date carries its time and source", () => {
+    expect(next({ next_release: "2026-10-14", next_release_time: "08:30:00", next_release_source: src, next_release_basis: "provider_calendar" })).toEqual({
+      kind: "calendar",
+      date: "2026-10-14",
+      time: "08:30:00",
+      source: { provider: "fred", url: src.url, title: "Consumer Price Index" },
+    });
+  });
+  it("a date-only calendar entry has no time (never invented)", () => {
+    expect(next({ next_release: "2026-10-14", next_release_time: null, next_release_source: src })).toMatchObject({ kind: "calendar", time: null });
+  });
+  it("only an estimate is an estimate, never a published date", () => {
+    expect(next({ next_release: null, next_release_estimate: "2026-10-20", next_release_basis: "observed_cadence" })).toEqual({ kind: "estimate", date: "2026-10-20" });
+  });
+  it("the calendar date wins over a stray estimate; neither is unknown", () => {
+    expect(next({ next_release: "2026-10-14", next_release_estimate: "2026-10-20" })).toMatchObject({ kind: "calendar", date: "2026-10-14" });
+    expect(next({})).toEqual({ kind: "unknown" });
+    // a basis without a date does not manufacture one
+    expect(next({ next_release_basis: "provider_calendar" })).toEqual({ kind: "unknown" });
+  });
+});

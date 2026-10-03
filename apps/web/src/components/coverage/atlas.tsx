@@ -14,7 +14,8 @@ import { SummaryStrip } from "@/components/coverage/summary-strip";
 import { ChartFrame } from "@/components/data-state";
 import { PageHeader } from "@/components/page-header";
 import { Blueprint, PanelHeading } from "@/components/ui/blueprint";
-import { useDataContext, useHeldPriceCount, useIdentityGaps, useMeasuredCoverage, useCoverageSummary } from "@/lib/coverage/hooks";
+import { IdentityReviewPanel, PriceCoveragePanel, ProvenancePanel, ReachPanel } from "@/components/coverage/measured-panels";
+import { useCoverageSummary, useDataContext, useDataReach, useIdentityReview, useMeasuredCoverage, usePriceCoverage, useProvenanceCompleteness } from "@/lib/coverage/hooks";
 import { LEDGER_ROW_CAP, atlasFooterState, buildAtlas, gapsFirst, costScore, drillEntries, globalReachScore, identityScore, priceScore, provenanceScore, returnWindowScore } from "@/lib/coverage/logic";
 import { atlasQuery, parseAtlasParams } from "@/lib/coverage/url";
 import type { AtlasDrill, AtlasFilters } from "@/lib/coverage/types";
@@ -51,17 +52,19 @@ export function CoverageAtlas() {
   const summary = useCoverageSummary(filters.group, filters);
 
   const dataContext = useDataContext();
-  const identityGaps = useIdentityGaps();
-  const heldPrices = useHeldPriceCount();
+  const identityReview = useIdentityReview();
+  const priceCoverage = usePriceCoverage();
+  const reach = useDataReach();
+  const provenance = useProvenanceCompleteness();
   const gate = useZeroCostGate();
   const measured = useMeasuredCoverage();
 
   const scoreItems = [
-    identityScore(lastGood(dataContext.state), lastGood(identityGaps)),
-    provenanceScore(),
-    priceScore(lastGood(heldPrices)),
+    identityScore(lastGood(identityReview.state)),
+    provenanceScore(lastGood(provenance.state)),
+    priceScore(lastGood(priceCoverage.state)),
     returnWindowScore(lastGood(dataContext.state)),
-    globalReachScore(lastGood(measured.state)),
+    globalReachScore(lastGood(reach.state)),
     costScore(lastGood(gate.state)),
   ];
 
@@ -160,6 +163,22 @@ export function CoverageAtlas() {
           {(d) => (d.totalEntries === 0 ? <p className="text-sm text-text-muted">The ledger has no entry for these filters.</p> : <SummaryStrip data={d} />)}
         </ResourceGate>
       </Blueprint>
+
+      <ResourceGate state={priceCoverage.state} label="price coverage">
+        {(d) => <PriceCoveragePanel data={d} />}
+      </ResourceGate>
+
+      <ResourceGate state={identityReview.state} label="identity review">
+        {(d) => <IdentityReviewPanel data={d} />}
+      </ResourceGate>
+
+      <ResourceGate state={provenance.state} label="provenance completeness">
+        {(d) => <ProvenancePanel data={d} />}
+      </ResourceGate>
+
+      <ResourceGate state={reach.state} label="data reach">
+        {(d) => <ReachPanel data={d} />}
+      </ResourceGate>
 
       <ResourceGate state={measured.state} label="measured coverage">
         {(rows) => <GlobalReach rows={rows} />}

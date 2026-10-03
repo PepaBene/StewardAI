@@ -6,7 +6,10 @@ import { buildBudgets, buildMatrix, tickerSet } from "@/lib/source-coverage/logi
 import type { AccessRow, CoverageEntry } from "@/lib/source-coverage/types";
 
 import { BudgetBurn } from "./budget-burn";
+import { knownAtLabel } from "@/lib/sources/sources";
+
 import { CoverageMatrix } from "./coverage-matrix";
+import { SourceKnownAt } from "./source-list";
 
 const now = new Date("2026-10-03T12:00:00Z");
 
@@ -21,6 +24,7 @@ function entry(state: CoverageEntry["state"], key: string, over: Partial<Coverag
     rawState: state,
     stale: null,
     staleAfterHours: null,
+    staleBasis: null,
     staleReason: null,
     expectedPeriods: null,
     availablePeriods: null,
@@ -119,5 +123,23 @@ describe("BudgetBurn SSR", () => {
 
   it("renders with no budgets at all", () => {
     expect(renderToStaticMarkup(createElement(BudgetBurn, { budgets: [] }))).toContain("No endpoint publishes");
+  });
+});
+
+describe("third wave: source known-at", () => {
+  it("a 13F filing date is date-only: shown as a date, flagged, no invented time", () => {
+    const html = renderToStaticMarkup(createElement(SourceKnownAt, { known: "2026-08-14" }));
+    expect(html).toContain("known Aug 14, 2026 (date only)");
+    expect(html).not.toMatch(/\d{2}:\d{2}/);
+    expect(knownAtLabel("2026-08-14")).toMatchObject({ dateOnly: true });
+  });
+  it("a thesis/strategy/search timestamp keeps its time; missing or malformed is 'not recorded'", () => {
+    const label = knownAtLabel("2026-10-01T09:30:00+00:00");
+    expect(label?.dateOnly).toBe(false);
+    expect(label?.text).toMatch(/Oct 1, 2026|1 Oct 2026/);
+    expect(label?.text).toMatch(/\d{2}:\d{2}/);
+    expect(renderToStaticMarkup(createElement(SourceKnownAt, { known: null }))).toContain("known-at not recorded");
+    expect(knownAtLabel("not a date")).toBeNull();
+    expect(knownAtLabel("")).toBeNull();
   });
 });

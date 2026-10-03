@@ -2,6 +2,7 @@ import Link from "next/link";
 
 import { DataStateBadge } from "@/components/data-state";
 import { formatDate, formatDateTime } from "@/lib/format";
+import { staleBasisPhrase } from "@/lib/source-coverage/parse";
 import { providerLabel } from "@/lib/source-coverage/providers";
 import type { CoverageEntry } from "@/lib/source-coverage/types";
 
@@ -120,7 +121,7 @@ export function LedgerTable({
                   </time>
                   <span className="block text-text-muted">
                     {e.staleAfterHours !== null
-                      ? `stale after ${e.staleAfterHours} h`
+                      ? `stale after ${e.staleAfterHours} h${staleBasisPhrase(e.staleBasis) ? ` (${staleBasisPhrase(e.staleBasis)})` : ""}`
                       : "age not judged (no refresh cadence known)"}
                   </span>
                 </td>

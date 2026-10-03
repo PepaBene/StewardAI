@@ -22,7 +22,7 @@ import { JobStatusBadge } from "@/components/jobs/job-status-badge";
 import { TierBadge } from "@/components/news/severity-badge";
 import { ClaimKnownAsOf } from "@/components/holding/claim-known-as-of";
 import { sourceDateRange } from "@/lib/holding-data/logic";
-import { SourceChips, SourceLinksLine } from "@/components/sources/source-list";
+import { SourceChips, SourceKnownAt, SourceLinksLine } from "@/components/sources/source-list";
 import { Blueprint, BlueprintCorners } from "@/components/ui/blueprint";
 import { Button } from "@/components/ui/button";
 import { checkedTextClass, ClaimsSummaryLine, SentenceCheckMark } from "@/components/verify/sentence-check";
@@ -217,7 +217,7 @@ function Report({ report }: { report: ResearchReportOut }) {
           <h1 className="page-title text-balance">{body.headline || report.title}</h1>
           <p className="num mt-2 text-xs text-text-muted" data-testid="known-as-of-range">
             Report written {formatDate(new Date(report.created_at))}.{" "}
-            {dateRange.max ? `Cited source data covers dates ${dateRange.min === dateRange.max ? dateRange.max : `${dateRange.min} to ${dateRange.max}`}${dateRange.undated > 0 ? `; ${dateRange.undated} of ${body.sources.length} sources have no usable date` : ""}.` : "No cited source carries a usable date."} The report stores no per-claim known-at date; each claim shows the date range of the source data it cites (period ends, snapshot, price-bar or publication dates, not when the claim became known).{" "}
+            {dateRange.max ? `Cited source data covers dates ${dateRange.min === dateRange.max ? dateRange.max : `${dateRange.min} to ${dateRange.max}`}${dateRange.undated > 0 ? `; ${dateRange.undated} of ${body.sources.length} sources have no usable date` : ""}.` : "No cited source carries a usable date."} Each claim shows two separate things: when the app learned of the records it cites (known to the app, from the report&apos;s own per-claim bounds), and the dates of that source data (period ends, snapshot, price-bar or publication dates). A date-only known-at, such as a 13F filing date, is shown as a date with no time.{" "}
             {body.owned ? (
               <Link href={`${holdingHref(body.ticker)}#evidence`} className={LINK}>
                 Evidence for {body.ticker}
@@ -483,6 +483,7 @@ function SourcesPanel({ index }: { index: CitationIndex }) {
                 <span className="font-mono">{s.id}</span>· {sourceKindLabel(s.kind)} ·{" "}
                 {typeof s.tier === "number" ? <TierBadge tier={s.tier} className="text-[11px]" /> : <span>no tier</span>}
                 {s.as_of ? <span>· as of {/^\d{4}-\d{2}-\d{2}$/.test(s.as_of) ? formatDate(s.as_of) : s.as_of}</span> : null}
+                <SourceKnownAt known={s.known_at} />
                 <span>· {citedBy === 0 ? "not cited in the text" : `cited ${citedBy}×`}</span>
               </p>
               {s.snippet ? <p className="line-clamp-2 text-xs text-text-muted" title={s.snippet}>{s.snippet}</p> : null}

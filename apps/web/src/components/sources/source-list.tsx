@@ -10,6 +10,7 @@ import { formatDate } from "@/lib/format";
 import {
   chipsFor,
   hostOf,
+  knownAtLabel,
   sourceKindLabel,
   sourceLinks,
   sourcePreview,
@@ -57,6 +58,21 @@ export function SourceChips({
           </span>
         ),
       )}
+    </span>
+  );
+}
+
+/**
+ * "known <date>" for a cited source: when the app learned of it. A date-only value (13F filing
+ * date) reads as a date with no time; no value says so rather than guessing.
+ */
+export function SourceKnownAt({ known, lead = true }: { known: string | null | undefined; /** Prefix a "·" separator (inline after other metadata). */ lead?: boolean }) {
+  const k = knownAtLabel(known);
+  if (!k) return <span>{lead ? "· " : ""}known-at not recorded</span>;
+  return (
+    <span title={k.dateOnly ? "Date only: the source records a date, so no time of day is shown." : undefined}>
+      {lead ? "· " : ""}known {k.text}
+      {k.dateOnly ? " (date only)" : ""}
     </span>
   );
 }

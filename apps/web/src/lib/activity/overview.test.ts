@@ -117,10 +117,21 @@ describe("coverage ratios", () => {
   const cov = {
     holdings: [h("A", {}), h("B", { prices_gap: true, earnings_last_status: "failed" }), h("C", { price_symbol: null, earnings_last_check: null, earnings_last_status: null })],
   };
-  it("counts holdings with current prices, successful earnings checks and resolved identity", () => {
-    expect(priceCoverage(cov)).toEqual({ value: 1, total: 3, note: "gap: B, C" });
+  it("counts holdings with successful earnings checks", () => {
     expect(earningsCoverage(cov)).toEqual({ value: 1, total: 3, note: "1 failed, 1 never checked" });
-    expect(identityCoverage(cov, { identity: [{ ticker: "B", name: null, problem: "x" }] })).toMatchObject({ value: 2, total: 3 });
+  });
+  it("price ring is the backend's value-weighted share, not a holding count (regression)", () => {
+    const pc = { usable_share: 0.9, holdings_usable: 1, holdings_total: 3, max_stale_sessions: 3, holdings: [{ ticker: "A", state: "usable" }, { ticker: "B", state: "stale" }, { ticker: "C", state: "no_price" }] } as never;
+    const r = priceCoverage(pc);
+    // 1 of 3 holdings is usable, but they hold 90% of the value: the ring says 90%, not 33%
+    expect(r).toMatchObject({ share: 0.9, value: 1, total: 3, figure: "90.0% of held value" });
+    expect(r?.note).toBe("1 of 3 holdings usable; gap: B, C");
+    expect(priceCoverage({ ...(pc as object), usable_share: null } as never)).toBeNull();
+    expect(priceCoverage({ ...(pc as object), holdings_total: 0 } as never)).toBeNull();
+  });
+  it("identity ring is the reviewed-path count from the identity review; no positions is unknown", () => {
+    expect(identityCoverage({ held_positions: 3, reviewed: 2, unresolved: [{ ticker: "B" }] } as never)).toEqual({ value: 2, total: 3, note: "unresolved: B" });
+    expect(identityCoverage({ held_positions: 0, reviewed: 0, unresolved: [] })).toBeNull();
   });
   it("counts healthy enabled feeds", () => {
     const src = (enabled: boolean, healthy: boolean) => ({ enabled, healthy });

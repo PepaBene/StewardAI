@@ -21,6 +21,9 @@ export type CoverageFilters = {
   entityKind?: EntityKind;
 };
 
+/** Backend `stale_basis`: the refreshing job's cron, or the documented default interval table. */
+export type StaleBasis = "job_schedule" | "documented_default";
+
 export type EntityKind = "security" | "geography" | "other";
 
 /** One coverage-ledger entry: (provider, dataset, entity). */
@@ -37,6 +40,8 @@ export type CoverageEntry = {
   stale: boolean | null;
   /** Hours after a check at which the row counts as stale; null = no expected interval known. */
   staleAfterHours: number | null;
+  /** Where staleAfterHours comes from (backend `stale_basis`); null when no interval is known. */
+  staleBasis: StaleBasis | null;
   /** Why the row reads Stale ("last checked N h ago, older than X h (twice the scheduled refresh gap)"); null when it does not. */
   staleReason: string | null;
   /** The backend's own string (available, temporarily_failed, ...). */

@@ -13,6 +13,7 @@ import type {
   ExposureMapping,
   HoldingMacroContext,
   IndicatorPoint,
+  NextRelease,
   PortfolioConcentration,
   PortfolioCountryContext,
   PortfolioMacroCoverage,
@@ -100,6 +101,27 @@ function parseVintage(v: Schemas["SeriesVintage"]): VintagePoint {
   };
 }
 
+const ISO_DAY = /^\d{4}-\d{2}-\d{2}/;
+
+/**
+ * Next release from the backend's fields. A provider-calendar date wins; the observed-cadence
+ * estimate is used only when no calendar date exists (the backend sets it only then), and is
+ * returned as an estimate, never as a published date. Neither -> unknown.
+ */
+export function parseNextRelease(o: Pick<Schemas["ContextPoint"], "next_release" | "next_release_time" | "next_release_source" | "next_release_estimate">): NextRelease {
+  if (typeof o.next_release === "string" && ISO_DAY.test(o.next_release)) {
+    const src = o.next_release_source;
+    return {
+      kind: "calendar",
+      date: o.next_release.slice(0, 10),
+      time: typeof o.next_release_time === "string" && o.next_release_time !== "" ? o.next_release_time : null,
+      source: src && typeof src.url === "string" ? { provider: src.provider, url: src.url, title: src.title ?? null } : null,
+    };
+  }
+  if (typeof o.next_release_estimate === "string" && ISO_DAY.test(o.next_release_estimate)) return { kind: "estimate", date: o.next_release_estimate.slice(0, 10) };
+  return { kind: "unknown" };
+}
+
 export function parseMacroContext(body: Schemas["MacroContext"] | unknown): Parsed<HoldingMacroContext> {
   if (!isRecord(body)) return fail("The macro context response was not an object.");
   const { observations, coverage, effects, comparisons } = body;
@@ -129,6 +151,7 @@ export function parseMacroContext(body: Schemas["MacroContext"] | unknown): Pars
         stateReason: s.reason,
         history: (o.history ?? []).map(parseVintage),
         releaseCalendar: o.release_calendar ?? null,
+        nextRelease: parseNextRelease(o),
       };
     }),
     coverage: b.coverage.map((c): CoverageRow => {

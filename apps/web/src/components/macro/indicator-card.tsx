@@ -6,7 +6,7 @@ import { isExternalUrl } from "@/lib/sources/sources";
 import type { VintageMode } from "@/lib/macro/logic";
 import type { IndicatorPoint } from "@/lib/macro/types";
 
-import { day, formatChange, formatFigure } from "./format";
+import { day, formatChange, formatFigure, nextReleaseView } from "./format";
 import { VintageChart } from "./vintage-chart";
 
 /** A marker on the range strip: a pointer-free tick at `pos` (0..1). */
@@ -31,6 +31,7 @@ export function IndicatorCard({ point, mode = "latest", domain = null }: { point
   const innerWidth = inner && span > 0 ? Math.min(1, (inner.high - outer!.low) / span) - innerLeft : 0;
   const change = pointChange(point);
   const odd = outsideRange(point.value, outer);
+  const next = nextReleaseView(point.nextRelease);
 
   const aria =
     point.value === null
@@ -98,6 +99,21 @@ export function IndicatorCard({ point, mode = "latest", domain = null }: { point
         <dd className="m-0 text-text">{point.releaseAt ? day(point.releaseAt) : "release date not recorded"}</dd>
         <dt>Known since</dt>
         <dd className="m-0 text-text">{day(point.knownAt)}</dd>
+        <dt>Next release</dt>
+        <dd className="m-0 text-text" data-next-release={point.nextRelease.kind}>
+          <span className="sr-only">{next.sentence}</span>
+          <span aria-hidden="true">{point.nextRelease.kind === "estimate" ? `${next.text} (estimate, based on observed cadence)` : next.text}</span>
+          {next.source && isExternalUrl(next.source.url) ? (
+            <>
+              {" "}
+              <a href={next.source.url} target="_blank" rel="noreferrer noopener" className="inline-flex items-center gap-0.5 text-accent-ink hover:underline" title={next.source.title ?? undefined}>
+                {next.source.provider} calendar
+                <ExternalLinkIcon aria-hidden="true" className="size-3" />
+                <span className="sr-only">(opens in a new tab)</span>
+              </a>
+            </>
+          ) : null}
+        </dd>
         <dt>Release calendar</dt>
         <dd className="m-0 text-text">{point.releaseCalendar ?? "not stated"}</dd>
       </dl>

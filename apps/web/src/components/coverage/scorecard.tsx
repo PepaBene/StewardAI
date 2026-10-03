@@ -1,4 +1,4 @@
-import { CircleCheckIcon, CircleDashedIcon, CircleHelpIcon, CircleXIcon, ScrollTextIcon, type LucideIcon } from "lucide-react";
+import { CircleCheckIcon, CircleHelpIcon, CircleXIcon, ScrollTextIcon, type LucideIcon } from "lucide-react";
 
 import { Blueprint, PanelHeading } from "@/components/ui/blueprint";
 import type { ScoreItem, ScoreStatus } from "@/lib/coverage/types";
@@ -10,20 +10,19 @@ const STATUS: Record<ScoreStatus, { label: string; Icon: LucideIcon; cls: string
   not_met: { label: "Target not met", Icon: CircleXIcon, cls: "border-warning-signal/40 bg-warning-signal-subtle" },
   reported: { label: "Reported, no threshold", Icon: ScrollTextIcon, cls: "border-info-signal/40 bg-info-signal-subtle" },
   unavailable: { label: "Unavailable", Icon: CircleHelpIcon, cls: "border-border bg-neutral-signal-subtle" },
-  not_measured: { label: "Not measured by the API", Icon: CircleDashedIcon, cls: "border-border bg-neutral-signal-subtle" },
 };
 
 /**
  * The plan's release targets, each beside the figure the API returned for it (or the reason none
- * exists). Nothing here is estimated: a target without an endpoint says so instead of a number.
+ * exists). Nothing here is estimated: a figure that could not be measured says so instead of a number.
  */
 export function Scorecard({ items }: { items: readonly ScoreItem[] }) {
   return (
     <Blueprint as="section" aria-labelledby="scorecard-heading" id="scorecard" className="flex scroll-mt-24 flex-col gap-3 px-5 py-5">
       <PanelHeading kicker="Plan release targets" title={<span id="scorecard-heading">Measured coverage scorecard</span>} />
       <p className="max-w-prose text-sm text-text">
-        {items.filter((i) => i.status === "met").length} of {items.length} targets are met on API figures;{" "}
-        {items.filter((i) => i.status === "not_measured").length} have no API figure yet. Targets come from the free-data plan; figures come only from the backend.
+        {items.filter((i) => i.status === "met").length} of {items.length} targets are met, {items.filter((i) => i.status === "not_met").length} are not met,{" "}
+        {items.filter((i) => i.status === "reported").length} are reported without a threshold and {items.filter((i) => i.status === "unavailable").length} are unavailable (unknown, not zero). Targets come from the free-data plan; every figure is computed by the backend from stored rows.
       </p>
       <ul className="m-0 grid list-none grid-cols-1 gap-3 p-0 md:grid-cols-2">
         {items.map((i) => {

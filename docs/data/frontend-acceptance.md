@@ -10,12 +10,12 @@ from the backend API; there are no fixtures or sample figures in `apps/web/src`.
 | --- | --- | --- | --- |
 | Source coverage and request budget | Activity `#source-coverage` | `/data/coverage`, `/sources/access`, `/sources/usage`, `/sources/status`, `/verification/zero-cost-gate` | Empty ledger = "unknown, not covered"; endpoint without a cap shows "No published cap" |
 | Decision trail | Activity `#decision-trail` | `/alerts/free-source-trail` | Empty list; below-threshold outcomes are not stored and say so |
-| Macro and trade, country choropleth | `/macro` | `/portfolio/data-context`, `/macro/context/{ticker}`, `/macro/exposures`, `/macro/trade/...`, `/research-context/*` | "Not covered" per panel; country with no mapping is hatched, a real zero is outlined |
+| Macro and trade, country choropleth | `/macro` | `/portfolio/data-context`, `/macro/context/{ticker}` (next release: calendar date and source, labelled estimate, or unknown), `/macro/exposures`, `/macro/trade/...`, `/research-context/*` | "Not covered" per panel; country with no mapping is hatched, a real zero is outlined |
 | Price coverage | `/markets` | `/holdings/{t}/prices`, `.../prices/diagnostics`, `.../corporate-actions`, `.../returns`, `/exchange-sessions/*`, `/calendar/exchanges` | Correlation matrix, raw bars and shared-observation counts are shown as unavailable (no endpoint) |
 | Financials | `/financials` | `.../financial-history`, `.../segments`, `.../forward-data/consensus`, `.../actual-vs-consensus`, `.../peer-set`, `.../peer-metrics` | Cash walk and debt ladder draw only when they reconcile to filed totals; peers show the mean only (API returns no per-peer values) |
 | Business network and innovation | `/holdings/{t}/network` | `.../business-network`, `.../deals`, `.../patent-*`, `/company-graph/*`, `/relationship-review/*` | Wrong-shaped body = "Temporarily unavailable", never an empty graph |
 | Funds and ownership | `/xray` | `/funds/*`, `.../ownership`, `.../control-stakes`, `.../insider-activity`, `.../pdmr-notifications` | Cash, unlooked-through funds and unknown weight stay separate; channels are never summed |
-| Coverage atlas | `/coverage` | `/data/coverage(/summary)`, `/portfolio/data-context`, `/verification/*` | Scorecard items with no API figure say which endpoint is missing |
+| Coverage atlas | `/coverage` | `/data/coverage(/summary)` (incl. `stale_basis`; ledger rows of `macro_release_calendar` per fred/eurostat/ecb/bis), `/portfolio/price-coverage?max_stale_sessions=3`, `/portfolio/identity-review`, `/data/provenance-completeness`, `/data/reach`, `/portfolio/data-context`, `/verification/*` | A figure the backend could not give (no positions, empty table, failed request) is "unavailable", never zero |
 | Screens | `/screens` | `/portfolio/holdings`, `/watchlist`, `.../valuation`, `/data/coverage` | Missing metric is excluded or shown as unknown, never pass or zero |
 | Holding page sections | `/holdings/{t}` anchors `#data-context`... | `.../data-context`, `.../evidence-summary`, `/macro/context/{t}` | Gaps listed explicitly |
 | Overview panels | `/` | `/portfolio/data-context`, `/macro/coverage/portfolio` | Zero denominator shows "n/a" |
@@ -48,7 +48,9 @@ body generated from `apps/backend/openapi.json`. Each page at 1280px light, 1280
 
 ## Known backend limits surfaced in the UI
 
-Research claims carry no per-claim `known_at` (the date shown is the latest cited-source date);
-no portfolio correlation matrix endpoint; no raw (unadjusted) bar endpoint; no per-peer metric
-values; no value-weighted price coverage, exchange/asset-class reach or provenance-completeness
-endpoint; vintage history is not exposed (only the latest point and its previous value).
+See `docs/audits/frontend_audit_2026-10-03.md` for what is still open. Resolved in the third wave:
+provider-calendar next-release dates (estimate only as a labelled fallback), value-weighted price
+coverage, exchange/country/asset-class reach, provenance completeness, identity review share,
+`stale_basis`, and `known_at` on 13F, search, thesis and strategy sources (13F is date-only and is
+shown as a date). The third-wave views were checked by unit and render tests; not against a live
+backend with data.

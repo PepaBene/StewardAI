@@ -18,6 +18,7 @@ export const PROVIDER_LABELS: Readonly<Record<string, string>> = {
   cnb: "ČNB",
   ted: "TED",
   rss: "RSS",
+  macro_release_calendar: "Macro release calendar",
 };
 
 export function providerLabel(provider: string): string {

@@ -50,9 +50,21 @@ export type IndicatorPoint = {
   stateReason: string | null;
   /** Vintage history, oldest first; empty when not requested or not stored. */
   history: readonly VintagePoint[];
-  /** Free text from the backend; there is no machine-readable next release. */
+  /** Free text from the backend (`release_calendar`); the machine-readable date is `nextRelease`. */
   releaseCalendar: string | null;
+  /** The next release of this series: a published date, a labelled estimate, or unknown. */
+  nextRelease: NextRelease;
 };
+
+/**
+ * The next release of a series. `calendar` is a date the provider published (with the provider's
+ * own time of day when it states one); `estimate` is a fallback computed from observed release
+ * cadence and is never a published date; `unknown` has neither.
+ */
+export type NextRelease =
+  | { kind: "calendar"; date: string; time: string | null; source: { provider: string; url: string; title: string | null } | null }
+  | { kind: "estimate"; date: string }
+  | { kind: "unknown" };
 
 export type CoverageRow = {
   provider: string;

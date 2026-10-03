@@ -1,4 +1,5 @@
 import type { Source, SourceKind } from "@/lib/api/client";
+import { formatDate, formatDateTime } from "@/lib/format";
 import type { CitationPreview } from "@/lib/news/digest";
 
 /*
@@ -173,4 +174,16 @@ export function chipsFor(ids: readonly string[] | null | undefined, index: Citat
     const card = index.byId.get(id) ?? null;
     return { id, label: card ? String(card.number) : id, href: card ? `#${card.anchor}` : null, card };
   });
+}
+
+/**
+ * When the app learned of a cited record (`Source.known_at`). A date-only value (a 13F filing
+ * date) is shown as a date and flagged date-only: no time of day is invented for it. A full
+ * timestamp is shown with its time. null/unparseable -> null (the caller says "not recorded").
+ */
+export function knownAtLabel(known: string | null | undefined): { text: string; dateOnly: boolean } | null {
+  if (typeof known !== "string" || known === "") return null;
+  if (/^\d{4}-\d{2}-\d{2}$/.test(known)) return { text: formatDate(known), dateOnly: true };
+  if (Number.isNaN(new Date(known).getTime())) return null;
+  return { text: formatDateTime(known), dateOnly: false };
 }

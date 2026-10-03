@@ -29,49 +29,23 @@ export function adaptSummary(body: Schemas["CoverageSummary"]): CoverageSummaryD
   };
 }
 
-function isRecord(v: unknown): v is Record<string, unknown> {
-  return typeof v === "object" && v !== null && !Array.isArray(v);
-}
-
-function count(v: unknown): number | null {
-  const n = toNumber(v);
-  return n !== null && Number.isInteger(n) && n >= 0 ? n : null;
-}
-
-function isoOrNull(v: unknown): string | null {
-  return typeof v === "string" && v !== "" ? v : null;
-}
-
 /**
- * Narrows `GET /verification/coverage` (untyped in OpenAPI). One malformed row rejects the whole
- * body (null): a half-parsed table could pass for a complete one. `entities` null is kept as
- * "not applicable"; a missing count is never turned into zero.
+ * `GET /verification/coverage` (typed in OpenAPI since the third backend wave) -> rows. `entities`
+ * null stays "not applicable" (macro series have no entity); nothing is turned into zero.
  */
-export function parseMeasuredCoverage(body: unknown): MeasuredCoverageRow[] | null {
-  if (!Array.isArray(body)) return null;
-  const rows: MeasuredCoverageRow[] = [];
-  for (const r of body) {
-    if (!isRecord(r) || typeof r.jurisdiction !== "string" || typeof r.domain !== "string" || typeof r.metric !== "string") return null;
-    const observations = count(r.observations);
-    const unknownValues = count(r.unknown_values);
-    const sources = count(r.sources);
-    const entities = r.entities === null || r.entities === undefined ? null : count(r.entities);
-    if (observations === null || unknownValues === null || sources === null) return null;
-    if (r.entities !== null && r.entities !== undefined && entities === null) return null;
-    rows.push({
-      jurisdiction: r.jurisdiction,
-      domain: r.domain,
-      metric: r.metric,
-      observations,
-      entities,
-      unknownValues,
-      sources,
-      earliestPeriod: isoOrNull(r.earliest_period),
-      latestPeriod: isoOrNull(r.latest_period),
-      newestKnownAt: isoOrNull(r.newest_known_at),
-    });
-  }
-  return rows;
+export function adaptMeasuredCoverage(rows: readonly Schemas["MeasuredCoverageRow"][]): MeasuredCoverageRow[] {
+  return rows.map((r) => ({
+    jurisdiction: r.jurisdiction,
+    domain: r.domain,
+    metric: r.metric,
+    observations: r.observations,
+    entities: r.entities,
+    unknownValues: r.unknown_values,
+    sources: r.sources,
+    earliestPeriod: r.earliest_period || null,
+    latestPeriod: r.latest_period || null,
+    newestKnownAt: r.newest_known_at || null,
+  }));
 }
 
 /** A ratio shown with its numerator and denominator (backend `Share`). */

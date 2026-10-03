@@ -79,6 +79,7 @@ function point(over: Partial<IndicatorPoint> = {}): IndicatorPoint {
     stateReason: null,
     history: [],
     releaseCalendar: null,
+    nextRelease: { kind: "unknown" },
     ...over,
   };
 }

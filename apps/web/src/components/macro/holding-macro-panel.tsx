@@ -13,7 +13,7 @@ import type { HoldingMacroContext } from "@/lib/macro/types";
 import { cn } from "@/lib/utils";
 
 import { ExposureTag } from "./exposure-tag";
-import { day, formatChange, formatFigure } from "./format";
+import { day, formatChange, formatFigure, nextReleaseView } from "./format";
 import { IndicatorCard } from "./indicator-card";
 
 /** Same-geography test across spellings (DE, DEU, 276). */
@@ -117,6 +117,25 @@ export function HoldingMacroPanel({ ctx, ticker, pastAsOf = false }: { ctx: Hold
               </section>
             ))
           )}
+          {ctx.observations.length > 0 ? (
+            <TableView
+              summary="Next release dates (table view)"
+              table={{
+                caption: "Next release of each country series: provider-calendar dates are published, estimates are labelled",
+                columns: ["Series", "Country", "Next release", "Basis", "Source"],
+                rows: ctx.observations.map((p) => {
+                  const v = nextReleaseView(p.nextRelease);
+                  return [
+                    `${p.seriesId} (${p.source})`,
+                    geographyName(p.geography),
+                    v.text,
+                    p.nextRelease.kind === "calendar" ? "Provider's published calendar" : p.nextRelease.kind === "estimate" ? "Estimate based on observed cadence, not published" : "Unknown",
+                    v.source ? `${v.source.provider}: ${v.source.url}` : "None",
+                  ];
+                }),
+              }}
+            />
+          ) : null}
           {mappedGeos.filter((g) => !groups.some((x) => sameGeography(g, x.geography))).length > 0 ? (
             <p className="text-xs text-text-muted">
               No series stored for: {mappedGeos.filter((g) => !groups.some((x) => sameGeography(g, x.geography))).map((g) => geographyName(g)).join(", ")}. These are not-covered, not zero.

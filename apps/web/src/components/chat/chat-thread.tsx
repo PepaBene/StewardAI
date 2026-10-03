@@ -17,7 +17,7 @@ import { useCallback, useEffect, useId, useMemo, useRef, useState, type FormEven
 import { AlertMessage } from "@/components/alert-message";
 import { JobStatusBadge } from "@/components/jobs/job-status-badge";
 import { CitationLink } from "@/components/news/citation";
-import { SourceLinksLine } from "@/components/sources/source-list";
+import { SourceKnownAt, SourceLinksLine } from "@/components/sources/source-list";
 import { BlueprintCorners } from "@/components/ui/blueprint";
 import { Button } from "@/components/ui/button";
 import {
@@ -541,6 +541,9 @@ function SourceCard({ source: s, index }: { source: Source; index: number }) {
       </p>
       <p className="font-medium text-text">{s.title}</p>
       {s.as_of ? <p className="num text-text-muted">As of {s.as_of}</p> : null}
+      <p className="num text-text-muted">
+        <SourceKnownAt known={s.known_at} lead={false} />
+      </p>
       <SourceLinksLine source={s} />
     </li>
   );

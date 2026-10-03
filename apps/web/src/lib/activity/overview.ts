@@ -1,4 +1,4 @@
-import type { ActivityCoverage, JobListItem, ReferenceGaps } from "@/lib/api/client";
+import type { ActivityCoverage, JobListItem } from "@/lib/api/client";
 import type { components } from "@/lib/api/schema";
 import { durationBetween, formatDuration } from "@/lib/jobs/job-detail";
 
@@ -123,12 +123,26 @@ export function spend(summary: Pick<CostSummary, "total_usd" | "cap_usd" | "peri
 // Coverage rings
 // ---------------------------------------------------------------------------
 
-export type CoverageRatio = { value: number; total: number; note: string };
+type PriceCoverage = components["schemas"]["PriceCoverage"];
+type IdentityReview = components["schemas"]["IdentityReview"];
 
-export function priceCoverage(c: Pick<ActivityCoverage, "holdings">): CoverageRatio {
-  const ok = c.holdings.filter((h) => h.price_symbol && !h.prices_gap);
-  const missing = c.holdings.filter((h) => !h.price_symbol || h.prices_gap).map((h) => h.ticker);
-  return { value: ok.length, total: c.holdings.length, note: missing.length ? `gap: ${missing.join(", ")}` : "every holding current" };
+/**
+ * One ring. `value` of `total` is the count shown; `share` (0..1), when given, is the ring's fill
+ * instead of value/total (the price ring is value-weighted, not a holding count).
+ */
+export type CoverageRatio = { value: number; total: number; note: string; share?: number; figure?: string };
+
+/** Share of held market value with a usable latest close, from `GET /portfolio/price-coverage`; null share = unknown, no ring. */
+export function priceCoverage(pc: Pick<PriceCoverage, "usable_share" | "holdings_usable" | "holdings_total" | "holdings" | "max_stale_sessions">): CoverageRatio | null {
+  if (pc.usable_share === null || pc.holdings_total === 0) return null;
+  const gaps = pc.holdings.filter((h) => h.state !== "usable").map((h) => h.ticker);
+  return {
+    value: pc.holdings_usable,
+    total: pc.holdings_total,
+    share: pc.usable_share,
+    figure: `${(pc.usable_share * 100).toFixed(1)}% of held value`,
+    note: gaps.length ? `${pc.holdings_usable} of ${pc.holdings_total} holdings usable; gap: ${gaps.join(", ")}` : `every holding has a close within ${pc.max_stale_sessions} sessions`,
+  };
 }
 
 export function earningsCoverage(c: Pick<ActivityCoverage, "holdings">): CoverageRatio {
@@ -148,13 +162,13 @@ export function sourceCoverage(h: Pick<SourcesHealth, "sources" | "window_hours"
   };
 }
 
-export function identityCoverage(c: Pick<ActivityCoverage, "holdings">, gaps: Pick<ReferenceGaps, "identity">): CoverageRatio {
-  const bad = new Set(gaps.identity.map((g) => g.ticker));
-  const held = c.holdings.map((h) => h.ticker);
-  const unresolved = held.filter((t) => bad.has(t));
+/** Held positions with a confirmed issuer/security/listing path, from `GET /portfolio/identity-review`; null = no positions. */
+export function identityCoverage(ir: Pick<IdentityReview, "held_positions" | "reviewed" | "unresolved">): CoverageRatio | null {
+  if (ir.held_positions === 0) return null;
+  const unresolved = ir.unresolved.map((u) => u.ticker);
   return {
-    value: held.length - unresolved.length,
-    total: held.length,
-    note: unresolved.length ? `unresolved: ${unresolved.join(", ")}` : "FIGI, LEI and ISIN resolved",
+    value: ir.reviewed,
+    total: ir.held_positions,
+    note: unresolved.length ? `unresolved: ${unresolved.join(", ")}` : "every position has a reviewed path",
   };
 }

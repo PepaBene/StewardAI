@@ -43,6 +43,7 @@ export const JOB_TYPES = [
   "price_history",
   "holiday_refresh",
   "macro_collect",
+  "macro_release_calendar",
   "monitor",
   "research",
   "ownership_13f",

@@ -18,7 +18,7 @@ import {
   usedFraction,
 } from "./logic";
 import type { components } from "@/lib/api/schema";
-import { adaptAccess, adaptCoverage, adaptUsage, parseZeroCostGate, toNumber } from "./parse";
+import { adaptAccess, adaptCoverage, adaptUsage, parseZeroCostGate, staleBasisPhrase, toNumber } from "./parse";
 import type { AccessRow, CoverageEntry, EntityScopes } from "./types";
 
 // ---- small local builders -----------------------------------------------------------
@@ -31,6 +31,7 @@ function entry(over: Partial<CoverageEntry> & Pick<CoverageEntry, "provider" | "
     rawState: "available",
     stale: null,
     staleAfterHours: null,
+    staleBasis: null,
     staleReason: null,
     expectedPeriods: null,
     availablePeriods: null,
@@ -326,6 +327,7 @@ describe("adapters", () => {
       entity_kind: "security" as const,
       coverage_ratio: 1,
       stale_after_hours: 48 as number | null,
+      stale_basis: "job_schedule" as const,
     };
     const now = Date.parse("2026-10-04T00:00:00Z");
     const stale = adaptCoverage({ ...base, stale: true }, now);
@@ -339,6 +341,37 @@ describe("adapters", () => {
     expect(adaptCoverage({ ...base }, now).stale).toBeNull();
     // a gap state is not hidden behind Stale
     expect(adaptCoverage({ ...base, state: "temporarily_failed", stale: true }, now).state).toBe("unavailable");
+  });
+
+  it("stale wording comes from the backend's stale_basis, not a fixed phrase", () => {
+    const base = {
+      provider: "macro_release_calendar",
+      dataset: "fred",
+      entity_key: "calendar",
+      state: "available",
+      expected_periods: null,
+      available_periods: 3,
+      earliest_period: null,
+      latest_period: null,
+      last_good_observation_id: null,
+      reason: null,
+      checked_at: "2026-10-01T00:00:00Z",
+      entity_kind: "other" as const,
+      stale: true,
+      stale_after_hours: 48,
+    };
+    const now = Date.parse("2026-10-04T00:00:00Z");
+    const job = adaptCoverage({ ...base, stale_basis: "job_schedule" }, now);
+    expect(job.staleReason).toBe("last checked 72 h ago, older than 48 h (twice the scheduled refresh gap)");
+    expect(job.staleBasis).toBe("job_schedule");
+    const dflt = adaptCoverage({ ...base, stale_basis: "documented_default" }, now);
+    expect(dflt.staleReason).toBe("last checked 72 h ago, older than 48 h (twice the documented default refresh interval)");
+    expect(dflt.staleReason).not.toMatch(/scheduled refresh gap/);
+    // no basis stated: the threshold is shown, but no explanation is invented
+    const none = adaptCoverage({ ...base, stale_basis: null }, now);
+    expect(none.staleReason).toBe("last checked 72 h ago, older than 48 h");
+    expect(adaptCoverage({ ...base, stale_basis: "something_new" as never }, now).staleBasis).toBeNull();
+    expect(staleBasisPhrase(null)).toBeNull();
   });
 
   it("adapts access rows and lets freshness override a stale or never-used available endpoint", () => {

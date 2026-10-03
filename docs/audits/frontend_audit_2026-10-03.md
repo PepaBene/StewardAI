@@ -52,12 +52,22 @@ The items below were backend gaps that the frontend could only label honestly. A
 | Correlation matrix, raw bars, quote unit | `GET /portfolio/correlation` (matrix, counts, notes); `raw_bars` and `quote_currency` on prices; `quote_currency(_basis)` on holdings prices | One request, truthful Raw/Adjusted switch, units on Last close |
 | F3-7 evidence id 500 | Validated: 422 | Digits-only check plus `errorMessage` |
 
-### Still open (genuinely not available)
+### Resolved in the third backend wave (commit `b72e06b`)
 
-- No machine-readable next-release date for macro series (only the provider's free-text schedule, shown as `release_calendar`).
-- Research `known_at` stays null for sources with no stored ingestion time (13F filings, web search, thesis, strategy, report); a claim citing one shows "Known-at not recorded for N cited source(s)".
-- `stale_after_hours` is null (age not judged) for providers with no refresh job or a disabled one, and it is twice the scheduled gap, not the cadence itself.
-- 66 of 234 backend operations still have no structured response schema (listed in the backend audit); the frontend parses them with guards.
+| Was open | Now |
+| --- | --- |
+| No machine-readable next-release date for macro series | `next_release` (provider calendar: FRED, Eurostat, ECB, BIS), `next_release_time`, `next_release_source`, `next_release_basis`. The macro card shows the published date with its time (as the provider states it, no zone conversion) and a link to the calendar; when only `next_release_estimate` exists it reads "estimate, based on observed cadence, not a published date"; with neither it reads "unknown". A table view lists every series. The free-text `release_calendar` row is kept. |
+| Scorecard approximations (held-position count for price coverage, `/reference/gaps` for identity, no provenance or reach figure) | `/coverage` reads `GET /portfolio/price-coverage?max_stale_sessions=3`, `/portfolio/identity-review`, `/data/provenance-completeness` and `/data/reach`. Price coverage is value-weighted with the unknown bucket; a missing figure (no positions, empty table, failed request) is "unavailable", never zero. Holding states go through `toDataState`. The Activity price and identity rings use the same endpoints; the old client-side counts (`useHeldPriceCount`, `useIdentityGaps`) are removed. |
+| Stale threshold wording was fixed text | The ledger reason and the "stale after" line use the backend's `stale_basis`: "twice the scheduled refresh gap" for `job_schedule`, "twice the documented default refresh interval" for `documented_default`, no explanation when the basis is null. Providers with no job and no documented default stay "age not judged". |
+| Research `known_at` null for 13F, search, thesis, strategy | Sources now carry `known_at`. Source cards in research reports and chat show "known <date>"; a 13F filing date is date-only and is shown as a date flagged "(date only)", never with an invented time. The report header no longer says the report stores no per-claim known-at: each claim shows the backend's `known_at_min`/`known_at_max` and the source data dates separately. A source still without `known_at` says "known-at not recorded". |
+| Untyped responses | `GET /verification/coverage` is read through the typed client (the hand-written guard is removed). |
+
+### Still open
+
+- Guards are kept where the wire is quirky or the guard checks meaning, not shape: factsheet `charges` (a JSON string), identity-decision `score` (a decimal string), the business-network, financial-history and markets parsers (legacy zeros read as unknown, derived fields), and the zero-cost-gate parser (it rejects a "passed" gate that lists violations). These stay hand-written on purpose.
+- `stale_after_hours` is null (age not judged) for providers with no refresh job and no documented default, and it is twice a refresh gap, not the cadence itself.
+- `next_release` is a date, not a promise: the provider may reschedule. The ECB calendar states no time zone; none is shown.
+- The release-calendar collector needs the `macro_release_calendar` job to have run; until then every series reads "unknown" or an estimate, and the `macro_release_calendar` rows in the coverage ledger show the per-provider state.
 - Provider-payload assumptions remain unverified against live providers (see the backend audit).
 
 ### Not verified

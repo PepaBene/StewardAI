@@ -1,6 +1,7 @@
 import { formatNumber, formatPct } from "@/lib/charts/format";
 import { isFiniteNumber } from "@/lib/charts/scale";
 import { formatDate } from "@/lib/format";
+import type { NextRelease } from "@/lib/macro/types";
 
 /** A figure with digits that scale to its size, so 0.043 and 4,310 both keep their meaning. */
 export function formatFigure(value: number | null | undefined): string {
@@ -36,4 +37,49 @@ export function formatShare(v: number): string {
   if (a < 1e-6) return `${v < 0 ? "−" : ""}<0.0001%`;
   const digits = a >= 1e-3 ? 1 : a >= 1e-4 ? 3 : 4;
   return formatPct(v, digits);
+}
+
+export type NextReleaseView = {
+  /** Short label of what the date is: "published date", "estimate" or "unknown". */
+  label: string;
+  /** The date (and time) text, e.g. "Sep 27, 2026, 14:15" or "about Sep 27, 2026". */
+  text: string;
+  /** Plain-language sentence for screen readers and the table view; never calls an estimate a published date. */
+  sentence: string;
+  /** The provider calendar link, when there is one. */
+  source: { provider: string; url: string; title: string | null } | null;
+};
+
+/** "14:15:00" -> "14:15"; the provider's time exactly as published, never converted. */
+function hhmm(time: string): string {
+  const m = /^(\d{2}:\d{2})(:\d{2}(\.\d+)?)?$/.exec(time);
+  return m ? m[1] : time;
+}
+
+/**
+ * How a series' next release reads. A provider-calendar date is shown as published (a date, not
+ * a promise); an estimate is labelled as based on observed cadence; neither is unknown.
+ */
+export function nextReleaseView(n: NextRelease): NextReleaseView {
+  if (n.kind === "calendar") {
+    const date = day(n.date);
+    const text = n.time ? `${date}, ${hhmm(n.time)}` : date;
+    const who = n.source ? `${n.source.provider} release calendar` : "the provider's release calendar";
+    return {
+      label: "published date",
+      text,
+      sentence: `Next release ${text}, as published in ${who}${n.time ? " (time as the provider states it)" : ""}; the provider may still reschedule it.`,
+      source: n.source,
+    };
+  }
+  if (n.kind === "estimate") {
+    const text = `about ${day(n.date)}`;
+    return {
+      label: "estimate",
+      text,
+      sentence: `Next release ${text}: an estimate based on observed cadence, not a published date.`,
+      source: null,
+    };
+  }
+  return { label: "unknown", text: "unknown", sentence: "Next release unknown: no provider calendar entry and too little release history to estimate it.", source: null };
 }

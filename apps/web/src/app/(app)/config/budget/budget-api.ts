@@ -26,6 +26,7 @@ export const JOB_TYPES = [
   "price_history",
   "holiday_refresh",
   "macro_collect",
+  "macro_release_calendar",
   "event_escalation",
   "monitor",
   "news_ingest",

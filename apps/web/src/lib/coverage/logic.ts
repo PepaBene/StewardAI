@@ -1,4 +1,5 @@
-import { DATA_STATES, type DataState } from "@/lib/data-state/states";
+import type { components } from "@/lib/api/schema";
+import { DATA_STATES, toDataState, type DataState } from "@/lib/data-state/states";
 import { cellState, gateVerdict } from "@/lib/source-coverage/logic";
 import type { CoverageEntry, EntityKind, ZeroCostGate } from "@/lib/source-coverage/types";
 
@@ -93,63 +94,112 @@ function shareText(s: ShareFigure): string {
   return ratio === null ? `no denominator (${s.basis})` : `${pct(ratio)} of ${s.basis}`;
 }
 
-export const MISSING_ENDPOINT = "No API endpoint returns this figure";
+type Schemas = components["schemas"];
 
-export function identityScore(ctx: DataContextFigures | null, unresolvedHoldings: number | null): ScoreItem {
-  const base = {
-    id: "identity",
-    title: "Identity",
-    target: "100% of held positions have a reviewed issuer/security/listing path or a visible unresolved exception.",
-    source: "GET /portfolio/data-context (identity_coverage), GET /reference/gaps",
-    asOf: ctx?.snapshotDate ?? null,
-  };
-  const share = ctx?.identity ?? null;
-  if (!ctx || !share || share.denominator <= 0) {
-    return { ...base, status: "unavailable", measured: null, share: null, detail: ctx?.gaps.find((g) => g.domain === "portfolio")?.reason ?? "The API returned no identity share (no snapshot or zero portfolio value)." };
-  }
-  const ratio = share.ratio ?? share.numerator / share.denominator;
-  const unresolved = unresolvedHoldings === null ? "the unresolved-holding list could not be loaded" : `${unresolvedHoldings} holding${unresolvedHoldings === 1 ? "" : "s"} listed as an unresolved exception`;
-  return {
-    ...base,
-    // Without the unresolved list (loading or failed) a full share cannot be called met or not met.
-    status: unresolvedHoldings === null ? "unavailable" : ratio >= 1 && unresolvedHoldings === 0 ? "met" : "not_met",
-    measured: shareText(share),
-    share: Math.min(1, Math.max(0, ratio)),
-    detail: `Share of portfolio value in positions with a confirmed issuer link; the API does not report a separate "reviewed" flag. ${unresolved}.`,
-  };
+const num0 = (v: number) => v.toLocaleString("en-GB", { maximumFractionDigits: 0 });
+
+/**
+ * Shown state of a price-coverage holding, through `toDataState` (the one adapter to the nine
+ * states). The backend's own words are mapped to its vocabulary first: a usable close is
+ * "available", no stored close is "not_covered" (a gap, not a zero price), a close without a
+ * currency is "partial" (the number exists but cannot be used). Unknown strings stay unknown.
+ */
+export function priceHoldingState(state: string): DataState {
+  const backend: Record<string, string> = { usable: "available", stale: "stale", no_price: "not_covered", basis_unknown: "partial" };
+  return toDataState(Object.hasOwn(backend, state) ? backend[state] : state);
 }
 
-export function provenanceScore(): ScoreItem {
-  return {
-    id: "provenance",
-    title: "Provenance",
-    target: "100% of displayed new facts and derived figures carry source, as-of date, method and access state.",
-    status: "not_measured",
-    measured: null,
-    share: null,
-    detail: "Each view shows provenance beside its figures, but the backend returns no count of displayed facts with and without it, so no percentage is stated.",
-    source: `${MISSING_ENDPOINT} (provenance completeness).`,
-    asOf: null,
-  };
-}
-
-export type HeldPriceCount = { withClose: number; total: number; newestAsOf: string | null };
-
-export function priceScore(count: HeldPriceCount | null): ScoreItem {
+/** Held-value price coverage (`GET /portfolio/price-coverage`), against the plan's 95% target. */
+export function priceScore(pc: Schemas["PriceCoverage"] | null): ScoreItem {
   const base = {
     id: "price",
     title: "Price coverage of held market value",
     target: "At least 95% of held market value has a usable latest close with explicit currency and adjustment basis; the rest is shown as an unknown bucket.",
-    source: `GET /portfolio/holdings/prices (per-holding last close). ${MISSING_ENDPOINT} for the value-weighted share.`,
-    asOf: count?.newestAsOf ?? null,
+    source: "GET /portfolio/price-coverage",
+    asOf: pc?.snapshot_date ?? null,
   };
-  if (!count || count.total === 0) return { ...base, status: "unavailable", measured: null, share: null, detail: "No held positions or no price response, so nothing is measured." };
+  if (!pc) return { ...base, status: "unavailable", measured: null, share: null, detail: "The price-coverage response could not be loaded, so nothing is measured." };
+  if (pc.holdings_total === 0 || pc.usable_share === null) {
+    return { ...base, status: "unavailable", measured: null, share: null, detail: "No held positions in the latest snapshot, so no share can be stated (unknown, not zero)." };
+  }
+  const cur = pc.base_currency ? ` ${pc.base_currency}` : "";
+  const unknown = pc.unknown_share === null ? "" : `${pct(pc.unknown_share)} of held value (${num0(pc.unknown_value_base)}${cur}) is the unknown bucket: ${pc.holdings_stale} stale, ${pc.holdings_no_price} with no stored close, ${pc.holdings_basis_unknown} with no recorded currency`;
   return {
     ...base,
-    status: "not_measured",
-    measured: `${count.withClose} of ${count.total} held positions have a stored latest close (count of positions, not value-weighted)`,
-    share: count.withClose / count.total,
-    detail: "The 95% target is a share of market value. The API returns per-holding closes but no value-weighted share, so the target is not judged here.",
+    status: pc.meets_target ? "met" : "not_met",
+    measured: `${pct(pc.usable_share)} of held market value (${num0(pc.usable_value_base)} of ${num0(pc.denominator_base)}${cur}) has a usable latest close; ${unknown}`,
+    share: Math.min(1, Math.max(0, pc.usable_share)),
+    detail: `Usable means a stored adjusted close with a recorded currency, at most ${pc.max_stale_sessions} exchange sessions old. ${pc.holdings_usable} of ${pc.holdings_total} holdings are usable. The unknown bucket is never blended into a return.`,
+  };
+}
+
+/** Reviewed identity path share (`GET /portfolio/identity-review`). */
+export function identityScore(ir: Schemas["IdentityReview"] | null): ScoreItem {
+  const base = {
+    id: "identity",
+    title: "Identity",
+    target: "100% of held positions have a reviewed issuer/security/listing path or a visible unresolved exception.",
+    source: "GET /portfolio/identity-review",
+    asOf: ir?.snapshot_date ?? null,
+  };
+  if (!ir) return { ...base, status: "unavailable", measured: null, share: null, detail: "The identity-review response could not be loaded, so nothing is measured." };
+  if (ir.held_positions === 0 || ir.reviewed_share === null) {
+    return { ...base, status: "unavailable", measured: null, share: null, detail: "No held positions in the latest snapshot, so no share can be stated (unknown, not zero)." };
+  }
+  const accounted = ir.accounted_share === null ? "" : ` ${pct(ir.accounted_share)} of positions are either reviewed or a visible unresolved exception.`;
+  return {
+    ...base,
+    status: ir.meets_target ? "met" : "not_met",
+    measured: `${ir.reviewed} of ${ir.held_positions} held positions have a confirmed issuer/security/listing path (${ir.owner_reviewed} confirmed by you, ${ir.auto_confirmed} by the matcher's evidence rules); ${ir.unresolved_count} unresolved`,
+    share: Math.min(1, Math.max(0, ir.reviewed_share)),
+    detail: `The target is judged strictly: every held position needs a reviewed path.${accounted}`,
+  };
+}
+
+/** Provenance completeness of the displayed fact tables (`GET /data/provenance-completeness`). */
+export function provenanceScore(pv: Schemas["ProvenanceCompleteness"] | null): ScoreItem {
+  const base = {
+    id: "provenance",
+    title: "Provenance",
+    target: "100% of displayed new facts and derived figures carry source, as-of date, method and access state.",
+    source: "GET /data/provenance-completeness",
+    asOf: null,
+  };
+  if (!pv) return { ...base, status: "unavailable", measured: null, share: null, detail: "The provenance response could not be loaded, so nothing is measured." };
+  const nonEmpty = pv.tables.filter((t) => t.rows > 0);
+  if (nonEmpty.length === 0) return { ...base, status: "unavailable", measured: null, share: null, detail: "Every fact table is empty, so no completeness can be stated (unknown, not complete)." };
+  const noColumn = nonEmpty.filter((t) => t.dimensions.some((d) => d.column === null)).map((t) => t.table);
+  const parts = [
+    pv.empty_tables.length ? `Empty tables (not judged): ${pv.empty_tables.join(", ")}.` : null,
+    noColumn.length ? `Tables with no column for some dimension (counted as not carried): ${noColumn.join(", ")}.` : null,
+  ].filter(Boolean);
+  return {
+    ...base,
+    status: pv.meets_target ? "met" : "not_met",
+    measured: `${pv.tables_meeting_target} of ${nonEmpty.length} non-empty fact tables carry source, as-of, known-at, method and access state on every row`,
+    share: pv.tables_meeting_target / nonEmpty.length,
+    detail: parts.length ? parts.join(" ") : "Every non-empty table carries every dimension on every row.",
+  };
+}
+
+/** Global reach (`GET /data/reach`): reported, never judged and never turned into a global share. */
+export function globalReachScore(r: Schemas["DataReach"] | null): ScoreItem {
+  const base = {
+    id: "reach",
+    title: "Global reach",
+    target: "A dashboard by exchange, country, asset class and metric: tested symbols, valid records, history length and freshness. The 30-security audit sample is never extrapolated into a global percentage.",
+    source: "GET /data/reach",
+    asOf: r?.as_of ?? null,
+  };
+  if (!r) return { ...base, status: "unavailable", measured: null, share: null, detail: "The reach response could not be loaded, so nothing is measured." };
+  if (r.tested_symbols === 0) return { ...base, status: "unavailable", measured: null, share: null, detail: r.universe_note };
+  const known = (rows: readonly Schemas["ReachRow"][], pick: (x: Schemas["ReachRow"]) => string | null) => new Set(rows.map(pick).filter((v): v is string => v !== null)).size;
+  return {
+    ...base,
+    status: "reported",
+    measured: `${r.tested_symbols} tested symbols (${r.held_tickers} held, ${r.watchlist_tickers} on the watchlist) across ${known(r.by_exchange, (x) => x.exchange_mic)} exchanges, ${known(r.by_country, (x) => x.country)} countries and ${known(r.by_asset_class, (x) => x.asset_class)} asset classes`,
+    share: null,
+    detail: r.universe_note,
   };
 }
 
@@ -192,28 +242,6 @@ export function costScore(gate: ZeroCostGate | null): ScoreItem {
     measured: `${gate.checked} endpoints audited: ${gate.freeAvailable} free and available, ${gate.disabledOk} disabled, ${gate.gatedUnverified} gated and unverified; ${gate.violationCount} violations, ${gate.warningCount} warnings`,
     share: null,
     detail: "The gate audits the endpoint manifest and reports credits and findings. It does not report dollars.",
-  };
-}
-
-export function globalReachScore(rows: readonly MeasuredCoverageRow[] | null): ScoreItem {
-  const base = {
-    id: "reach",
-    title: "Global reach",
-    target: "A dashboard by exchange, country, asset class and metric: tested symbols, valid records, history length and freshness. The 30-security audit sample is never extrapolated into a global percentage.",
-    source: `GET /verification/coverage (jurisdiction x metric). ${MISSING_ENDPOINT} for exchange or asset class.`,
-    asOf: null,
-  };
-  if (!rows) return { ...base, status: "unavailable", measured: null, share: null, detail: "The measured-coverage response was missing or malformed." };
-  if (rows.length === 0) return { ...base, status: "unavailable", measured: null, share: null, detail: "No observation rows exist yet, so no jurisdiction is measured." };
-  const jurisdictions = new Set(rows.map((r) => r.jurisdiction)).size;
-  const metrics = new Set(rows.map((r) => `${r.domain}/${r.metric}`)).size;
-  return {
-    ...base,
-    status: "reported",
-    measured: `${jurisdictions} jurisdictions and ${metrics} metrics have stored observations`,
-    share: null,
-    detail: "These are measured rows only. A jurisdiction not listed has no stored observation, which says nothing about its global share.",
-    asOf: rows.map((r) => r.newestKnownAt).filter((v): v is string => v !== null).sort().at(-1) ?? null,
   };
 }
 

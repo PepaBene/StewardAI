@@ -28,7 +28,7 @@ const clean = (html: string) => {
 };
 
 function point(over: Partial<IndicatorPoint> = {}): IndicatorPoint {
-  return { seriesId: "cpi", source: "oecd", geography: "DE", unit: "percent", period: "2026-08-31", value: 2.1, releaseAt: "2026-09-12T08:00:00Z", knownAt: "2026-09-12T09:00:00Z", sourceUrl: "https://x.test", previousPeriod: "2026-07-31", previousValue: 2.4, fiveYear: { low: -0.5, high: 9 }, tenYear: { low: -1, high: 10 }, state: "verified", stateReason: null, history: [], releaseCalendar: null, ...over };
+  return { seriesId: "cpi", source: "oecd", geography: "DE", unit: "percent", period: "2026-08-31", value: 2.1, releaseAt: "2026-09-12T08:00:00Z", knownAt: "2026-09-12T09:00:00Z", sourceUrl: "https://x.test", previousPeriod: "2026-07-31", previousValue: 2.4, fiveYear: { low: -0.5, high: 9 }, tenYear: { low: -1, high: 10 }, state: "verified", stateReason: null, history: [], releaseCalendar: null, nextRelease: { kind: "unknown" }, ...over };
 }
 
 function context(over: Partial<HoldingMacroContext> = {}): HoldingMacroContext {
@@ -385,5 +385,38 @@ describe("adoption: vintage small multiples", () => {
   });
   it("renders access_unverified through the shared state vocabulary", () => {
     expect(clean(renderToStaticMarkup(createElement(IndicatorCard, { point: point({ state: "access_unverified" }) })))).toContain("Access unverified");
+  });
+});
+
+describe("third wave: next release display", () => {
+  const cal = { kind: "calendar" as const, date: "2026-10-14", time: "08:30:00", source: { provider: "fred", url: "https://fred.stlouisfed.org/releases/calendar", title: "CPI" } };
+  it("shows the provider date with time and a source link, as published", () => {
+    const html = clean(renderToStaticMarkup(createElement(IndicatorCard, { point: point({ nextRelease: cal }) })));
+    expect(html).toContain("Oct 14, 2026, 08:30");
+    expect(html).toContain('href="https://fred.stlouisfed.org/releases/calendar"');
+    expect(html).toContain("as published in fred release calendar");
+    expect(html).not.toMatch(/estimate/);
+  });
+  it("labels an estimate plainly and never presents it as a published date", () => {
+    const html = clean(renderToStaticMarkup(createElement(IndicatorCard, { point: point({ nextRelease: { kind: "estimate", date: "2026-10-20" } }) })));
+    expect(html).toContain("about Oct 20, 2026 (estimate, based on observed cadence)");
+    expect(html).toContain("not a published date");
+    expect(html).not.toContain("as published");
+  });
+  it("shows unknown when neither exists", () => {
+    const html = clean(renderToStaticMarkup(createElement(IndicatorCard, { point: point() })));
+    expect(html).toContain('data-next-release="unknown"');
+    expect(html).toContain("Next release unknown");
+  });
+  it("an unsafe calendar url is not linked", () => {
+    const html = renderToStaticMarkup(createElement(IndicatorCard, { point: point({ nextRelease: { ...cal, source: { provider: "fred", url: "javascript:alert(1)", title: null } } }) }));
+    expect(html).not.toContain("javascript:");
+  });
+  it("the panel has a table equivalent listing every series' next release and its basis", () => {
+    const ctx = context({ observations: [point({ nextRelease: cal }), point({ seriesId: "rate", nextRelease: { kind: "estimate", date: "2026-10-20" } })] });
+    const html = clean(renderToStaticMarkup(createElement(HoldingMacroPanel, { ctx, ticker: "SAP" })));
+    expect(html).toContain("Next release dates (table view)");
+    expect(html).toContain("Provider&#x27;s published calendar");
+    expect(html).toContain("Estimate based on observed cadence, not published");
   });
 });
