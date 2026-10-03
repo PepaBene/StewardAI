@@ -110,7 +110,7 @@ export function LookThroughSankeyChart({ sankey, label, className }: { sankey: L
             y={12}
             fontSize={11}
             textAnchor={c === 0 ? "start" : "start"}
-            className="fill-text-faint font-mono uppercase"
+            className="fill-text-muted font-mono uppercase"
             letterSpacing="0.06em"
           >
             {h}

@@ -42,6 +42,7 @@ export type FactsheetRow = {
   fundName: string | null;
   totalAssets: number | null;
   totalAssetsCurrency: string | null;
+  totalAssetsAsOf: string | null;
   expenseRatio: number | null;
   benchmarkName: string | null;
   distributionPolicy: string | null;
@@ -80,6 +81,11 @@ export type AuditRow = {
   fingerprint: string | null;
   basis: string | null;
   rules: Record<string, unknown>;
+  /** Rules of the previous observation; only a methodology change carries them. */
+  previousRules: Record<string, unknown> | null;
+  /** value_change reasons that come with no per-metric comparison. */
+  asOfMovedBackwards: boolean;
+  restatedForSameAsOf: boolean;
   pe: number | null;
   pb: number | null;
   indexPe: number | null;

@@ -11,6 +11,7 @@ import { DataTable, Facts } from "./facts";
 import { LookThroughSankeyChart } from "./lookthrough-sankey";
 import { NestedTreemap } from "./nested-treemap";
 import { RankFlowChart } from "./rank-flow";
+import { SafeLink } from "./safe-link";
 import { ResourceShell } from "./resource-shell";
 
 const report = {
@@ -102,5 +103,20 @@ describe("xray building blocks", () => {
     const kept = renderToStaticMarkup(ResourceShell<string>({ state: { kind: "error", title: "Boom", detail: "d", previous: "kept" }, label: "Thing", children: child }));
     expect(kept).toContain("kept (last good)");
     expect(kept).toContain("Showing the last value that loaded");
+  });
+});
+
+describe("F7-8 treemap focus, F7-10 safe links", () => {
+  it("the nested treemap is one tab stop, not one per tile", () => {
+    const map = buildExposureTreemap(report, "sector")!;
+    const html = renderToStaticMarkup(createElement(NestedTreemap, { map, label: "Exposure" }));
+    expect((html.match(/tabindex="0"/g) ?? []).length).toBe(1);
+    expect(html).toContain("arrow keys");
+  });
+  it("a javascript: source URL is text, an https one is a link", () => {
+    const bad = renderToStaticMarkup(createElement(SafeLink, { href: "javascript:alert(1)", className: "text-accent-ink" }, "filing"));
+    expect(bad).not.toContain("<a");
+    const ok = renderToStaticMarkup(createElement(SafeLink, { href: "https://www.sec.gov/x" }, "filing"));
+    expect(ok).toContain('href="https://www.sec.gov/x"');
   });
 });

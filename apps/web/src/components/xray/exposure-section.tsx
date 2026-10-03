@@ -15,6 +15,8 @@ import {
   fundDataState,
   fundStatusLabel,
   oldestFundAsOf,
+  treemapNotes,
+  usableOverlap,
   type Dimension,
 } from "@/lib/xray/exposure";
 import { compact, date, pct, weightPct } from "@/lib/xray/format";
@@ -49,6 +51,7 @@ export function ExposureSection({ asOf, onAsOfChange }: { asOf: string; onAsOfCh
   const overlap = useOverlap(asOf);
   const overlapData: FundOverlapReport | null =
     overlap.state.kind === "ok" ? overlap.state.data : overlap.state.kind === "error" ? overlap.state.previous : null;
+  const overlapLoading = overlap.state.kind === "loading";
   return (
     <div className="flex flex-col gap-5">
       <Panel
@@ -78,13 +81,25 @@ export function ExposureSection({ asOf, onAsOfChange }: { asOf: string; onAsOfCh
         </div>
       </Panel>
       <ResourceShell state={aggregate.state} label="Fund aggregate">
-        {(report, lastGood) => <AggregateBody report={report} overlap={overlapData} lastGood={lastGood} />}
+        {(report, lastGood) => (
+          <AggregateBody key={report.as_of} report={report} overlap={usableOverlap(report, overlapData)} overlapLoading={overlapLoading} lastGood={lastGood} />
+        )}
       </ResourceShell>
     </div>
   );
 }
 
-function AggregateBody({ report, overlap, lastGood }: { report: AggregateReport; overlap: FundOverlapReport | null; lastGood: boolean }) {
+function AggregateBody({
+  report,
+  overlap,
+  overlapLoading,
+  lastGood,
+}: {
+  report: AggregateReport;
+  overlap: FundOverlapReport | null;
+  overlapLoading: boolean;
+  lastGood: boolean;
+}) {
   const [dimension, setDimension] = useState<Dimension>("sector");
   const provenance = useMemo(() => {
     const p = aggregateProvenance(report);
@@ -148,7 +163,7 @@ function AggregateBody({ report, overlap, lastGood }: { report: AggregateReport;
         kicker="X-Ray"
         title={`Issuer exposure by ${DIMENSION_LABEL[dimension].toLowerCase()}`}
         takeaway={treemapTakeaway}
-        units={`% of total portfolio value${cov ? `, ${cov.covered} of ${cov.total} funds looked through` : ""}. ${treemap?.shownIssuers ?? 0} named issuers.`}
+        units={`% of total portfolio value${cov ? `, ${cov.covered} of ${cov.total} funds looked through` : ""}. ${treemap?.shownIssuers ?? 0} named issuers. Report as of ${date(report.as_of)}.`}
         provenance={provenance}
         hasValue={treemap !== null}
         controls={
@@ -178,14 +193,17 @@ function AggregateBody({ report, overlap, lastGood }: { report: AggregateReport;
         {treemap ? (
           <>
             <NestedTreemap map={treemap} label={`Nested treemap of exposure by ${dimension}, then issuer`} />
-            {!treemap.reconciles ? (
-              <p role="status" className="text-xs text-warning-signal">
-                The buckets do not add up to the total within tolerance; the difference is not drawn.
+            {treemapNotes(treemap).map((n, i) => (
+              <p key={i} role="status" className="text-xs text-text">
+                <span aria-hidden="true" className="text-warning-signal">▲ </span>
+                {n}
               </p>
-            ) : null}
+            ))}
             {treemap.groups.some((g) => g.overflow) ? (
-              <p role="status" className="text-xs text-warning-signal">
-                For some groups the named issuers add up to more than the bucket; check the table below.
+              <p role="status" className="text-xs text-text">
+                <span aria-hidden="true" className="text-warning-signal">▲ </span>
+                An issuer whose rows are classified into more than one {dimension} bucket is drawn whole in one of them, so for some groups the named issuers
+                were scaled down to fit the bucket (the tile says so); the table lists the exact bucket weights.
               </p>
             ) : null}
             <Legend
@@ -233,12 +251,17 @@ function AggregateBody({ report, overlap, lastGood }: { report: AggregateReport;
             <LookThroughSankeyChart sankey={sankey} label="Look-through flows from portfolio positions through funds to underlying issuers" />
             <Legend items={SANKEY_LEGEND} />
             {sankey.notes.map((n, i) => (
-              <p key={i} role="status" className="text-xs text-warning-signal">
+              <p key={i} role="status" className="text-xs text-text">
+                <span aria-hidden="true" className="text-warning-signal">▲ </span>
                 {n}
               </p>
             ))}
             {!overlap ? (
-              <p className="text-xs text-text-muted">Fund overlap data did not load, so each fund&apos;s cash and derivatives are not split from its other issuers.</p>
+              <p className="text-xs text-text-muted">
+                {overlapLoading
+                  ? "Fund overlap data is still loading; until it arrives each fund's cash and derivatives are not split from its other issuers."
+                  : "Fund overlap data for this date did not load, so each fund's cash and derivatives are not split from its other issuers."}
+              </p>
             ) : null}
           </>
         ) : null}
@@ -280,7 +303,7 @@ function FundsAsOf({ report }: { report: AggregateReport }) {
               <span className="font-medium text-text">{f.label}</span>
               <span className="block font-mono text-[11px] text-text-muted">{f.isin}</span>
               {f.warnings.map((w, i) => (
-                <span key={i} className="block text-[11px] text-warning-signal">
+                <span key={i} className="block text-[11px] text-text font-medium">
                   {w}
                 </span>
               ))}

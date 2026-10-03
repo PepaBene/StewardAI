@@ -16,6 +16,7 @@ import {
   nportState,
   ownershipProvenance,
   quarterLabel,
+  stakePercentNote,
   stakeViews,
 } from "@/lib/xray/ownership";
 import { toNum } from "@/lib/xray/parse";
@@ -25,8 +26,11 @@ import { formatOutstandingPct } from "@/lib/reference/shares-outstanding";
 
 import { JobTrigger } from "./confirm-action";
 import { DataTable } from "./facts";
+import { SafeLink } from "./safe-link";
 import { Panel, ResourceShell } from "./resource-shell";
 import { RankFlowChart } from "./rank-flow";
+
+const POSITION_LIMIT = 50;
 
 export function OwnershipSection({ ticker }: { ticker: string }) {
   return (
@@ -43,9 +47,9 @@ export function OwnershipSection({ ticker }: { ticker: string }) {
           <JobTrigger job="control-stakes" />
         </div>
       </Panel>
-      <InstitutionalBlock ticker={ticker} />
-      <FundPositionsBlock ticker={ticker} />
-      <ControlStakesBlock ticker={ticker} />
+      <InstitutionalBlock key={`13f-${ticker}`} ticker={ticker} />
+      <FundPositionsBlock key={`nport-${ticker}`} ticker={ticker} />
+      <ControlStakesBlock key={`13dg-${ticker}`} ticker={ticker} />
     </div>
   );
 }
@@ -77,7 +81,7 @@ function InstitutionalBody({ own, lastGood }: { own: HoldingOwnership; lastGood:
   const breadthTakeaway = latest
     ? `${latest.holders} managers held ${compact(latest.shares)} shares at the ${latest.quarter} quarter end${
         latest.holdersChange === null ? "" : `, ${signedInt(latest.holdersChange)} managers against the previous loaded quarter`
-      }. The filing came ${latest.lagDays === null ? "at an unknown lag" : `${latest.lagDays} days`} after quarter end.`
+      }. The latest filing of the quarter was filed ${latest.lagDays === null ? "at an unknown lag" : `${latest.lagDays} days`} after quarter end (late amendments included).`
     : undefined;
 
   return (
@@ -94,7 +98,7 @@ function InstitutionalBody({ own, lastGood }: { own: HoldingOwnership; lastGood:
         hasValue={hasPeriods && own.applicable}
         table={{
           caption: "13F holders by quarter",
-          columns: ["Quarter end", "Filed (lag)", "Holders", "Holders change", "New / exited", "Shares", "Shares change", "% of outstanding"],
+          columns: ["Quarter end", "Latest filing (lag)", "Holders", "Holders change", "New / exited", "Shares", "Shares change", "% of outstanding"],
           rows: rows
             .slice()
             .reverse()
@@ -138,8 +142,14 @@ function InstitutionalBody({ own, lastGood }: { own: HoldingOwnership; lastGood:
           </p>
         ) : null}
         {rows.some((r) => (r.quartersSincePrevious ?? 1) > 1) ? (
-          <p role="status" className="text-xs text-warning-signal">
+          <p role="status" className="text-xs text-text font-medium">
             A quarter is missing between some loaded quarters, so those changes span more than one quarter.
+          </p>
+        ) : null}
+        {rows.some((r) => r.changeSpanUnknown) ? (
+          <p role="status" className="text-xs text-text">
+            <span aria-hidden="true" className="text-warning-signal">▲ </span>
+            The oldest row&apos;s change was computed against an earlier quarter that is not in this list, so how many quarters it spans is unknown.
           </p>
         ) : null}
         <Legend
@@ -176,9 +186,9 @@ function InstitutionalBody({ own, lastGood }: { own: HoldingOwnership; lastGood:
                 .map((x, i) => (
                   <span key={x.r.cik}>
                     {i > 0 ? ", " : ""}
-                    <a href={x.url as string} target="_blank" rel="noreferrer noopener" className="text-accent-ink hover:underline">
+                    <SafeLink href={x.url} className="text-accent-ink hover:underline">
                       {x.r.name}
-                    </a>
+                    </SafeLink>
                   </span>
                 ))
             : null}
@@ -192,7 +202,7 @@ function InstitutionalBody({ own, lastGood }: { own: HoldingOwnership; lastGood:
 
 function FundPositionsBlock({ ticker }: { ticker: string }) {
   const fetcher = useCallback(
-    () => getBrowserApiClient().GET("/holdings/{ticker}/fund-positions", { params: { path: { ticker }, query: { limit: 50 } } }),
+    () => getBrowserApiClient().GET("/holdings/{ticker}/fund-positions", { params: { path: { ticker }, query: { limit: POSITION_LIMIT } } }),
     [ticker],
   );
   const resource = useApiResource(fetcher);
@@ -221,6 +231,10 @@ function FundPositionsBody({ data, lastGood }: { data: HoldingFundPositions; las
           data.positions.length === 0 ? (
             <p className="text-sm text-text-muted">No tracked fund reports a position. This is not evidence that no fund holds it.</p>
           ) : (
+            <>
+            {data.positions.length >= POSITION_LIMIT ? (
+              <p className="text-xs text-text-muted">Showing the {POSITION_LIMIT} requested rows; more funds may report a position (the API does not say).</p>
+            ) : null}
             <DataTable
               caption="N-PORT fund positions with report date and filing lag. Not additive."
               minWidth="60rem"
@@ -241,7 +255,7 @@ function FundPositionsBody({ data, lastGood }: { data: HoldingFundPositions; las
                 </span>,
                 <span key="r">
                   {date(p.report_period_end)}
-                  <span className={p.stale ? "block text-[11px] text-warning-signal" : "block text-[11px] text-text-muted"}>
+                  <span className={p.stale ? "block text-[11px] text-text font-medium" : "block text-[11px] text-text-muted"}>
                     {p.age_days} d old{p.stale ? " · stale" : ""}
                   </span>
                 </span>,
@@ -253,6 +267,7 @@ function FundPositionsBody({ data, lastGood }: { data: HoldingFundPositions; las
                 p.map_basis ?? "—",
               ])}
             />
+            </>
           )
         ) : null}
       <ProvenanceFooter provenance={provenance} />
@@ -302,19 +317,24 @@ function ControlStakesBody({ data }: { data: ControlStakesOut }) {
               { label: "Filed / event", align: "right" },
               { label: "Class" },
               { label: "Shares", align: "right" },
-              { label: "% of class (as filed)", align: "right" },
+              { label: "% of class (largest single reporting person)", align: "right" },
               { label: "Cross-check" },
               { label: "Purpose and changes" },
             ]}
             rows={views.map((v) => [
               <span key="p">
                 {v.stake.holders.length === 0 ? "Not parsed" : v.stake.holders.map((h) => h.person_name).join(", ")}
-                {v.isGroup ? <span className="block text-[11px] text-text-muted">Group of {v.ownersCount}; percent is the group&apos;s, not per person.</span> : null}
+                {stakePercentNote(v) ? <span className="block text-[11px] text-text-muted">{stakePercentNote(v)}</span> : null}
+                {v.isGroup && v.stake.holders.some((h) => toNum(h.percent_of_class) !== null) ? (
+                  <span className="block text-[11px] text-text-muted">
+                    {v.stake.holders.map((h) => `${h.person_name} ${toNum(h.percent_of_class) === null ? "—" : `${toNum(h.percent_of_class)}%`}`).join(" · ")}
+                  </span>
+                ) : null}
               </span>,
-              <a key="f" href={v.stake.source_url} target="_blank" rel="noreferrer noopener" className="text-accent-ink hover:underline">
+              <SafeLink key="f" href={v.stake.source_url} className="text-accent-ink hover:underline">
                 {v.stake.form}
                 {v.stake.is_amendment ? ` amendment ${v.stake.amendment_no ?? ""}` : " initial"}
-              </a>,
+              </SafeLink>,
               <span key="d">
                 {date(v.stake.filed)}
                 <span className="block text-[11px] text-text-muted">event {date(v.stake.event_date)}</span>
@@ -324,7 +344,7 @@ function ControlStakesBody({ data }: { data: ControlStakesOut }) {
               v.percent === null ? "—" : `${v.percent.toFixed(2)}%`,
               <span key="c" className="text-[11px]">
                 {v.checkLabel}
-                {v.stake.reconciliation.class_status === "class_unreconciled" ? <span className="block text-warning-signal">share class not reconciled to the issuer</span> : null}
+                {v.stake.reconciliation.class_status === "class_unreconciled" ? <span className="block text-text font-medium">share class not reconciled to the issuer</span> : null}
               </span>,
               <span key="i" className="text-[11px] text-text-muted">
                 {v.stake.intent_text ?? "No purpose text parsed"}

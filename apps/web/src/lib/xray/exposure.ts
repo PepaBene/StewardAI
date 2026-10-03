@@ -54,17 +54,30 @@ export function fundsLookedThrough(funds: readonly FundAsOf[]): { covered: numbe
 export function aggregateProvenance(report: AggregateReport): DataProvenance {
   const cov = fundsLookedThrough(report.funds);
   const unknown = report.unknown?.unknown_fund_weight ?? 0;
+  const over = report.unknown?.over_reported_weight ?? 0;
+  const overFunds = report.funds.filter((f) => f.reconciles === false && f.rows_total_weight !== null && f.rows_total_weight > 1 + EPS);
   let state: DataState = "verified";
   let reason: string | null = null;
   if (!report.available) {
     state = "not_covered";
     reason = report.notes[0] ?? "No portfolio snapshot is known at this date.";
-  } else if (report.stale_funds.length > 0) {
-    state = "stale";
-    reason = `Stale fund holdings: ${report.stale_funds.join(", ")}.`;
-  } else if (cov.covered < cov.total || unknown > 0.0005) {
-    state = "partial";
-    reason = `${(unknown * 100).toFixed(1)}% of portfolio value is unknown fund weight (not looked through or not accounted for by the published rows).`;
+  } else {
+    // Every problem is reported, never just the first: a stale fund must not hide unknown weight.
+    const reasons: string[] = [];
+    if (report.stale_funds.length > 0) {
+      state = "stale";
+      reasons.push(`Stale fund holdings: ${report.stale_funds.join(", ")}.`);
+    }
+    if (cov.covered < cov.total || unknown > 0.0005) {
+      if (state === "verified") state = "partial";
+      reasons.push(`${(unknown * 100).toFixed(1)}% of portfolio value is unknown fund weight (not looked through or not accounted for by the published rows).`);
+    }
+    if (over > 0.0005 || overFunds.length > 0) {
+      if (state === "verified") state = "partial";
+      const names = overFunds.map((f) => f.label).join(", ");
+      reasons.push(`Published rows of ${names || "a fund"} add up to more than 100% of its net assets${over > 0 ? ` (${(over * 100).toFixed(1)}% of portfolio value over-reported)` : ""}, so the buckets can total more than 100%.`);
+    }
+    reason = reasons.length > 0 ? reasons.join(" ") : null;
   }
   return {
     source: AGGREGATE_SOURCE,
@@ -93,6 +106,12 @@ export type TreemapGroup = {
   children: TreemapLeaf[];
   /** Named issuers add up to more than the bucket (rounding or an inconsistent report). */
   overflow: boolean;
+  /**
+   * The leaves were scaled down to the bucket weight: the backend adds each fund row to the
+   * row's own bucket, but an issuer carries only its first-seen sector/country/currency, so an
+   * issuer whose rows are classified differently is drawn whole in one bucket.
+   */
+  scaled: boolean;
 };
 export type ExposureTreemap = {
   dimension: Dimension;
@@ -103,6 +122,8 @@ export type ExposureTreemap = {
   shownIssuers: number;
   /** Buckets with a zero/negative/non-finite weight that cannot be drawn. */
   dropped: number;
+  /** Those buckets, with their signed weights (a negative fund derivative offset is real). */
+  droppedBuckets: { label: string; weight: number }[];
 };
 
 function issuerKey(issuer: IssuerExposure, dim: Dimension): string {
@@ -124,23 +145,29 @@ export function buildExposureTreemap(report: AggregateReport, dim: Dimension): E
     byKey.set(k, [...(byKey.get(k) ?? []), i]);
   }
   let dropped = 0;
+  const droppedBuckets: { label: string; weight: number }[] = [];
   const groups: TreemapGroup[] = [];
   for (const b of view.buckets) {
     if (!finitePositive(b.weight)) {
       dropped++;
+      if (Number.isFinite(b.weight) && Math.abs(b.weight) > EPS) droppedBuckets.push({ label: b.label, weight: b.weight });
       continue;
     }
     const named = (byKey.get(b.key) ?? []).sort((a, c) => c.weight - a.weight);
+    const isSpecial = b.kind !== "classified" && b.kind !== "unclassified";
+    const namedTotal = named.reduce((s, i) => s + i.weight, 0);
+    // An issuer is placed by its first-seen key, so its whole weight can exceed this bucket
+    // while the rest of it sits in another bucket of the backend: cap the leaves at the bucket.
+    const scale = !isSpecial && namedTotal > b.weight * (1 + 0.0005) + EPS ? b.weight / namedTotal : 1;
     const children: TreemapLeaf[] = named.map((i) => ({
       id: `${b.key}/${i.key}`,
       label: i.label,
-      weight: i.weight,
+      weight: i.weight * scale,
       kind: "issuer",
-      detail: `${i.merged_securities > 1 ? `${i.merged_securities} securities merged · ` : ""}direct ${(i.direct_weight * 100).toFixed(2)}% · via funds ${(i.fund_weight * 100).toFixed(2)}%`,
+      detail: `${scale < 1 ? `issuer total ${(i.weight * 100).toFixed(2)}%, scaled to fit this bucket (part of it is classified in another bucket) · ` : ""}${i.merged_securities > 1 ? `${i.merged_securities} securities merged · ` : ""}direct ${(i.direct_weight * 100).toFixed(2)}% · via funds ${(i.fund_weight * 100).toFixed(2)}%`,
     }));
-    const shown = named.reduce((s, i) => s + i.weight, 0);
+    const shown = namedTotal * scale;
     const rest = b.weight - shown;
-    const isSpecial = b.kind !== "classified" && b.kind !== "unclassified";
     if (!isSpecial && rest > EPS) {
       children.push({
         id: `${b.key}/__rest__`,
@@ -158,7 +185,8 @@ export function buildExposureTreemap(report: AggregateReport, dim: Dimension): E
       directWeight: b.direct_weight,
       fundWeight: b.fund_weight,
       children,
-      overflow: !isSpecial && rest < -0.0005,
+      overflow: !isSpecial && scale < 1,
+      scaled: scale < 1,
     });
   }
   groups.sort((a, c) => specialRank(a.kind) - specialRank(c.kind) || c.weight - a.weight);
@@ -170,7 +198,25 @@ export function buildExposureTreemap(report: AggregateReport, dim: Dimension): E
     reconciles: view.reconciles,
     shownIssuers: issuers.length,
     dropped,
+    droppedBuckets,
   };
+}
+
+/**
+ * Plain-language caveats for the treemap: buckets that cannot be drawn (a negative fund
+ * derivative offset), and the drawn total when it is not 100% (the tiles fill the canvas
+ * whatever they sum to, so area is a share of the drawn total, not of the portfolio).
+ */
+export function treemapNotes(map: ExposureTreemap): string[] {
+  const notes: string[] = [];
+  for (const d of map.droppedBuckets) {
+    notes.push(`${d.label}: ${(d.weight * 100).toFixed(2)}% of portfolio value cannot be drawn as a tile${d.weight < 0 ? " (a negative offset, for example a swap-based fund whose equity rows add up to more than its net assets)" : ""}.`);
+  }
+  if (Math.abs(map.drawn - 1) > 0.005) {
+    notes.push(`The drawn tiles add up to ${(map.drawn * 100).toFixed(1)}% of portfolio value, not 100%; tile area is a share of that drawn total.`);
+  }
+  if (!map.reconciles) notes.push("The buckets do not add up to the total within tolerance; the difference is not drawn.");
+  return notes;
 }
 
 function specialRank(kind: ExposureBucket["kind"]): number {
@@ -223,6 +269,32 @@ export type LookThroughSankey = {
 
 export const SANKEY_TOP_ISSUERS = 10;
 
+/** An overlap report from another as-of date must not feed this date's aggregate (cash/derivative weights differ). */
+export function usableOverlap(report: Pick<AggregateReport, "as_of">, overlap: FundOverlapReport | null): FundOverlapReport | null {
+  return overlap && overlap.as_of === report.as_of ? overlap : null;
+}
+
+/**
+ * One row per fund ISIN. The backend emits one FundAsOf per position ticker, so the same fund
+ * held on two listings appears twice with the same ISIN; the flows and remainders are per ISIN,
+ * so weights add up here (subtracting an ISIN's shown issuer weight once per row would lose flow).
+ */
+export function mergeFundsByIsin(funds: readonly FundAsOf[]): FundAsOf[] {
+  const out = new Map<string, FundAsOf>();
+  for (const f of funds) {
+    const cur = out.get(f.isin);
+    if (!cur) {
+      out.set(f.isin, { ...f });
+    } else {
+      cur.weight += f.weight;
+      cur.value_base += f.value_base;
+      cur.unknown_weight += f.unknown_weight;
+      cur.ticker = cur.ticker ?? f.ticker;
+    }
+  }
+  return [...out.values()];
+}
+
 export function buildLookThroughSankey(
   report: AggregateReport,
   overlap: FundOverlapReport | null,
@@ -261,8 +333,9 @@ export function buildLookThroughSankey(
     addNode("src:direct", "Direct holdings", 1, "direct_source");
     link("pos:direct", "src:direct", directTotal);
   }
+  const fundRows = mergeFundsByIsin(report.funds);
   const coverageByIsin = new Map((overlap?.funds ?? []).map((f) => [f.isin, f]));
-  for (const f of report.funds) {
+  for (const f of fundRows) {
     if (!finitePositive(f.weight)) continue;
     const short = f.ticker ?? f.label;
     addNode(`pos:${f.isin}`, short, 0, "position");
@@ -294,7 +367,7 @@ export function buildLookThroughSankey(
   }
 
   // Per fund remainders: never merged into issuers, never redistributed.
-  for (const f of report.funds) {
+  for (const f of fundRows) {
     if (!finitePositive(f.weight)) continue;
     const src = `src:${f.isin}`;
     if (f.status === "missing" || f.status === "not_configured") {

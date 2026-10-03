@@ -6,8 +6,8 @@ import { ChartFrame, DataStateBadge, Segmented } from "@/components/data-state";
 import { getBrowserApiClient } from "@/lib/api/client";
 import type { DataProvenance } from "@/lib/data-state/provenance";
 import { useApiResource } from "@/lib/hooks/use-api-resource";
-import { AUDIT_VERDICT_META, auditCounts, buildOverlapMatrix, lagText, latestAuditByFund, latestFactsheetVersions, rulesText } from "@/lib/xray/funds";
-import { date, num, pct, weightPct } from "@/lib/xray/format";
+import { AUDIT_VERDICT_META, auditCounts, auditExplanation, buildOverlapMatrix, lagText, latestAuditByFund, latestFactsheetVersions, rulesText } from "@/lib/xray/funds";
+import { compact, date, num, pct, weightPct } from "@/lib/xray/format";
 import { parseAudit, parseFactsheet } from "@/lib/xray/parse";
 import type { AuditRow, FactsheetRow, FundOverlapReport } from "@/lib/xray/types";
 
@@ -22,10 +22,13 @@ export function FundsSection({ asOf }: { asOf: string }) {
   const overlap = useApiResource(overlapFetcher);
   return (
     <div className="flex flex-col gap-5">
+      <p className="text-xs text-text-muted">
+        {asOf ? `Fund overlap as of ${date(asOf)} (the date chosen on the Exposure tab).` : "Fund overlap for the latest stored data (no as-of date chosen on the Exposure tab)."}
+      </p>
       <ResourceShell state={overlap.state} label="Fund overlap">
         {(report, lastGood) => (
           <>
-            <OverlapBlock report={report} lastGood={lastGood} />
+            <OverlapBlock key={report.as_of} report={report} lastGood={lastGood} />
             <FactsheetBlock funds={report.funds.map((f) => ({ isin: f.isin, label: f.label }))} />
           </>
         )}
@@ -98,8 +101,8 @@ function OverlapBlock({ report, lastGood }: { report: FundOverlapReport; lastGoo
                       const p = m.cell(a, b);
                       return (
                         <td key={b} className="num border border-border-soft px-2 py-1.5 text-right" title={p ? `${p.shared_issuers} shared issuers; as of ${p.as_of_a} and ${p.as_of_b}` : undefined}>
-                          {a === b ? <span className="text-text-faint">—</span> : p ? weightPct(p.overlap) : <span className="text-text-muted">no data</span>}
-                          {p && !p.same_date ? <span className="block text-[10px] text-warning-signal">different dates</span> : null}
+                          {a === b ? <span className="text-text-muted">—</span> : p ? weightPct(p.overlap) : <span className="text-text-muted">no data</span>}
+                          {p && !p.same_date ? <span className="block text-[10px] text-text font-medium">different dates</span> : null}
                         </td>
                       );
                     })}
@@ -112,7 +115,7 @@ function OverlapBlock({ report, lastGood }: { report: FundOverlapReport; lastGoo
           <p className="text-sm text-text-muted">Only one fund has stored holdings, so there is no pair to compare.</p>
         )}
         {m.mixedDates ? (
-          <p role="status" className="text-xs text-warning-signal">
+          <p role="status" className="text-xs text-text font-medium">
             Some pairs compare holdings from different dates; read those cells as approximate.
           </p>
         ) : null}
@@ -147,7 +150,7 @@ function OverlapBlock({ report, lastGood }: { report: FundOverlapReport; lastGoo
             f.label,
             <span key="d">
               {date(f.as_of)}
-              <span className={f.stale ? "block text-[11px] text-warning-signal" : "block text-[11px] text-text-muted"}>
+              <span className={f.stale ? "block text-[11px] text-text font-medium" : "block text-[11px] text-text-muted"}>
                 {lagText(f.lag_days)}
                 {f.stale ? " · stale" : ""}
               </span>
@@ -167,6 +170,11 @@ function OverlapBlock({ report, lastGood }: { report: FundOverlapReport; lastGoo
 }
 
 function FactsheetBlock({ funds }: { funds: { isin: string; label: string }[] }) {
+  // The hook-holding panel only mounts when there is a fund: no request for an empty ISIN.
+  return funds.length === 0 ? null : <FactsheetPanel funds={funds} />;
+}
+
+function FactsheetPanel({ funds }: { funds: { isin: string; label: string }[] }) {
   const [isin, setIsin] = useState(funds[0]?.isin ?? "");
   const selected = funds.some((f) => f.isin === isin) ? isin : (funds[0]?.isin ?? "");
   const fetcher = useCallback(
@@ -174,7 +182,6 @@ function FactsheetBlock({ funds }: { funds: { isin: string; label: string }[] })
     [selected],
   );
   const resource = useApiResource(fetcher);
-  if (funds.length === 0) return null;
   return (
     <Panel
       id="funds-factsheet"
@@ -188,7 +195,7 @@ function FactsheetBlock({ funds }: { funds: { isin: string; label: string }[] })
       }
     >
       <ResourceShell state={resource.state} label="Factsheet history">
-        {(body) => <FactsheetTable parsed={parseFactsheet(body)} />}
+        {(body) => <FactsheetTable key={selected} parsed={parseFactsheet(body)} />}
       </ResourceShell>
     </Panel>
   );
@@ -203,7 +210,7 @@ function FactsheetTable({ parsed }: { parsed: ReturnType<typeof parseFactsheet> 
   const unverified = rows.some((r) => !r.fieldNamesVerified);
   return (
     <>
-      {parsed.rejected > 0 ? <p className="text-xs text-warning-signal">{parsed.rejected} rows were not in the expected shape and are left out.</p> : null}
+      {parsed.rejected > 0 ? <p className="text-xs text-text font-medium">{parsed.rejected} rows were not in the expected shape and are left out.</p> : null}
       {unverified ? (
         <p className="text-xs text-text-muted">The issuer payload field names for some rows are unverified candidates; the row says so.</p>
       ) : null}
@@ -224,7 +231,7 @@ function FactsheetTable({ parsed }: { parsed: ReturnType<typeof parseFactsheet> 
           date(r.asOf),
           <span key="s" className="text-[11px]">
             {r.source}
-            {!r.fieldNamesVerified ? <span className="block text-warning-signal">field names unverified</span> : null}
+            {!r.fieldNamesVerified ? <span className="block text-text font-medium">field names unverified</span> : null}
             {r.extractionWarnings.map((w, i) => (
               <span key={i} className="block text-text-muted">
                 {w}
@@ -232,7 +239,7 @@ function FactsheetTable({ parsed }: { parsed: ReturnType<typeof parseFactsheet> 
             ))}
           </span>,
           r.expenseRatio === null ? "unknown" : pct(r.expenseRatio, 2),
-          r.totalAssets === null ? "unknown" : `${num(r.totalAssets / 1e9, 2)} bn ${r.totalAssetsCurrency ?? ""}`,
+          r.totalAssets === null ? "unknown" : `${compact(r.totalAssets)} ${r.totalAssetsCurrency ?? ""}${r.totalAssetsAsOf ? ` (as of ${date(r.totalAssetsAsOf)})` : ""}`,
           r.benchmarkName ?? "—",
           r.distributionPolicy ?? "—",
           r.reconciles === null ? "unknown" : r.reconciles ? "yes" : "no",
@@ -271,7 +278,7 @@ function AuditBlock() {
       }
     >
       <ResourceShell state={resource.state} label="Characteristics audit">
-        {(body) => <AuditTable parsed={parseAudit(body)} />}
+        {(body) => <AuditTable key={alertsOnly} parsed={parseAudit(body)} />}
       </ResourceShell>
     </Panel>
   );
@@ -314,6 +321,11 @@ function AuditTable({ parsed }: { parsed: ReturnType<typeof parseAudit> }) {
           {r.changes.map((c) => `${c.metric}: ${c.from === null ? "—" : num(c.from, 2)} → ${c.to === null ? "removed" : num(c.to, 2)}`).join("; ")}
         </span>
       ) : null}
+      {auditExplanation(r).map((line, i) => (
+        <span key={i} className="block text-text">
+          {line}
+        </span>
+      ))}
     </span>,
     date(r.observedAt),
   ];
@@ -322,7 +334,7 @@ function AuditTable({ parsed }: { parsed: ReturnType<typeof parseAudit> }) {
       <p className="num text-sm">
         <span className="font-medium">{counts.alerts}</span> alerts and <span className="font-medium">{counts.drift}</span> parser-drift observations in the {parsed.rows.length} rows shown across {latest.length} funds.
       </p>
-      {parsed.rejected > 0 ? <p className="text-xs text-warning-signal">{parsed.rejected} rows were not in the expected shape and are left out.</p> : null}
+      {parsed.rejected > 0 ? <p className="text-xs text-text font-medium">{parsed.rejected} rows were not in the expected shape and are left out.</p> : null}
       <DataTable
         caption="Fund characteristics audit observations, newest first"
         minWidth="56rem"

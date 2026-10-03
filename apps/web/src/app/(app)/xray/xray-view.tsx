@@ -13,7 +13,7 @@ import { PageHeader } from "@/components/page-header";
 import { Segmented, StatePlaceholder } from "@/components/data-state";
 import { getBrowserApiClient } from "@/lib/api/client";
 import { useApiResource } from "@/lib/hooks/use-api-resource";
-import { holdingChoices, TABS, type TabId } from "@/lib/xray/view";
+import { holdingChoices, TABS, validAsOf, type TabId } from "@/lib/xray/view";
 
 const TAB_IDS = TABS.map((t) => t.id) as readonly string[];
 
@@ -38,7 +38,7 @@ export function XrayView() {
   const params = useSearchParams();
   const initialTab = params.get("tab");
   const [tab, setTab] = useState<TabId>(TAB_IDS.includes(initialTab ?? "") ? (initialTab as TabId) : "exposure");
-  const [asOf, setAsOf] = useState(params.get("as_of") ?? "");
+  const [asOf, setAsOf] = useState(() => validAsOf(params.get("as_of")));
   const [pickedTicker, setPickedTicker] = useState(params.get("ticker") ?? "");
 
   const holdingsFetcher = useCallback(() => getBrowserApiClient().GET("/portfolio/holdings"), []);
@@ -53,8 +53,9 @@ export function XrayView() {
     setParam("tab", tab === "exposure" ? "" : tab);
   }, [tab]);
   const changeAsOf = (v: string) => {
-    setAsOf(v);
-    setParam("as_of", v);
+    const valid = validAsOf(v);
+    setAsOf(valid);
+    setParam("as_of", valid);
   };
   const changeTicker = (v: string) => {
     setPickedTicker(v);
@@ -100,9 +101,9 @@ export function XrayView() {
           {() =>
             choices && choices.length > 0 && ticker ? (
               tab === "ownership" ? (
-                <OwnershipSection ticker={ticker} />
+                <OwnershipSection key={ticker} ticker={ticker} />
               ) : (
-                <InsiderSection ticker={ticker} />
+                <InsiderSection key={ticker} ticker={ticker} />
               )
             ) : (
               <StatePlaceholder state="not_covered" reason="The portfolio has no directly held company to show ownership for (funds are not covered by 13F, 13D/G or Form 4)." />

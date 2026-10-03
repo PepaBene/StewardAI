@@ -4,13 +4,15 @@ import { useCallback, useState } from "react";
 
 import { ChartFrame, DataStateBadge } from "@/components/data-state";
 import { getBrowserApiClient } from "@/lib/api/client";
+import { errorMessage } from "@/lib/api/error-message";
 import { useApiResource } from "@/lib/hooks/use-api-resource";
-import { backtestBlocked, LEDGER_TIER_META, LEDGER_TIERS, ledgerCounts, ledgerProvenance } from "@/lib/xray/funds";
+import { backtestBlocked, LEDGER_TIER_META, LEDGER_TIERS, ledgerCounts, ledgerProvenance, normaliseSubjectKey, overrideNote, subjectKeyProblem } from "@/lib/xray/funds";
 import { date } from "@/lib/xray/format";
-import type { CoverageLedger } from "@/lib/xray/types";
+import type { CoverageLedger, LedgerRow } from "@/lib/xray/types";
 
 import { ConfirmAction, JobTrigger } from "./confirm-action";
 import { DataTable } from "./facts";
+import { SafeLink } from "./safe-link";
 import { Panel, ResourceShell } from "./resource-shell";
 
 /** Fund and index coverage ledger, with owner-confirmed refresh, manual rows and snapshot pins. */
@@ -65,7 +67,7 @@ function LedgerBody({ ledger, lastGood, reload }: { ledger: CoverageLedger; last
             confirmLabel="Refresh"
             run={async () => {
               const r = await getBrowserApiClient().POST("/funds/coverage-ledger/refresh");
-              if (!r.data) throw new Error(`The refresh failed (HTTP ${r.response.status}).`);
+              if (!r.data) throw new Error(`The refresh failed (HTTP ${r.response.status}${errorMessage(r.error) ? `: ${errorMessage(r.error)}` : ""}).`);
               reload();
               return "Ledger refreshed.";
             }}
@@ -113,9 +115,9 @@ function LedgerBody({ ledger, lastGood, reload }: { ledger: CoverageLedger; last
               {e.source_url ? (
                 <>
                   {" "}
-                  <a href={e.source_url} target="_blank" rel="noreferrer noopener" className="text-accent-ink hover:underline">
+                  <SafeLink href={e.source_url} className="text-accent-ink hover:underline">
                     source
-                  </a>
+                  </SafeLink>
                 </>
               ) : null}
               <span className="block">Checked {date(e.checked_at)}</span>
@@ -125,39 +127,43 @@ function LedgerBody({ ledger, lastGood, reload }: { ledger: CoverageLedger; last
                 usable
               </span>
             ) : (
-              <span key="b" className="text-[11px] text-warning-signal">
+              <span key="b" className="text-[11px] text-text font-medium">
                 flagged: {e.backtest_flags.join("; ") || "review before use"}
               </span>
             ),
           ])}
         />
       </ChartFrame>
-      <ManualEntry reload={reload} />
+      <ManualEntry reload={reload} entries={ledger.entries} />
     </>
   );
 }
 
 const ISIN = /^[A-Z]{2}[A-Z0-9]{9}[0-9]$/;
 
-function ManualEntry({ reload }: { reload: () => void }) {
+function ManualEntry({ reload, entries }: { reload: () => void; entries: readonly LedgerRow[] }) {
   const [kind, setKind] = useState<"fund" | "index">("fund");
   const [key, setKey] = useState("");
   const [label, setLabel] = useState("");
-  const [tier, setTier] = useState<keyof typeof LEDGER_TIER_META>("official_holdings");
+  const [tier, setTier] = useState<"" | keyof typeof LEDGER_TIER_META>("");
   const [reason, setReason] = useState("");
   const [proxy, setProxy] = useState("");
   const [totalReturn, setTotalReturn] = useState<"" | "yes" | "no">("");
   const [historical, setHistorical] = useState<"" | "yes" | "no">("");
   const [source, setSource] = useState("");
   const proxyOk = proxy === "" || ISIN.test(proxy);
-  const valid = key.trim() !== "" && label.trim() !== "" && reason.trim().length >= 3 && proxyOk;
+  const normKey = normaliseSubjectKey(kind, key, entries);
+  const keyProblem = key.trim() === "" ? null : subjectKeyProblem(kind, normKey);
+  const existing = entries.find((e) => e.subject_kind === kind && e.subject_key === normKey);
+  const override = overrideNote(existing);
+  const valid = normKey !== "" && keyProblem === null && label.trim() !== "" && tier !== "" && reason.trim().length >= 3 && proxyOk;
   const tri = (v: "" | "yes" | "no") => (v === "" ? null : v === "yes");
   return (
     <Panel
       id="coverage-manual"
       kicker="Owner-verified row"
       title="Record a ledger row"
-      description="Use this when you have checked a fund's or index's source yourself. A later refresh never overwrites it."
+      description="Use this when you have checked a fund's or index's source yourself. A later refresh never overwrites it. Saving over an existing derived row replaces it for good: there is no revert from this screen (the API has no delete)."
     >
       <details className="border border-border-soft">
         <summary className="cursor-pointer px-3 py-1.5 text-xs font-medium text-accent-ink select-none hover:underline">Open the form</summary>
@@ -172,13 +178,15 @@ function ManualEntry({ reload }: { reload: () => void }) {
             </select>
           </Field>
           <Field label="Subject key (ISIN or index symbol)">
-            <input value={key} maxLength={80} onChange={(e) => setKey(e.target.value)} className={INPUT} />
+            <input value={key} maxLength={80} onChange={(e) => setKey(e.target.value)} aria-invalid={keyProblem !== null} className={INPUT} />
+            {keyProblem ? <span className="text-text">{keyProblem}</span> : normKey !== key.trim() ? <span>Saved as {normKey}.</span> : null}
           </Field>
           <Field label="Label">
             <input value={label} maxLength={120} onChange={(e) => setLabel(e.target.value)} className={INPUT} />
           </Field>
           <Field label="Source tier">
             <select value={tier} onChange={(e) => setTier(e.target.value as keyof typeof LEDGER_TIER_META)} className={INPUT}>
+              <option value="">Choose a tier…</option>
               {LEDGER_TIERS.map((t) => (
                 <option key={t} value={t}>
                   {LEDGER_TIER_META[t].label}
@@ -214,16 +222,21 @@ function ManualEntry({ reload }: { reload: () => void }) {
               label="Review and save"
               variant="default"
               confirmTitle={`Save the ledger row for ${label || key || "this subject"}?`}
-              confirmBody="This records an owner-verified row. It replaces an earlier manual row for the same subject and is kept through refreshes."
+              confirmBody={
+                <>
+                  This records an owner-verified row under <span className="font-mono">{normKey || "the key above"}</span> and keeps it through refreshes.{" "}
+                  {override ?? "No row exists for this key yet, so a new row is created."}
+                </>
+              }
               confirmLabel="Save row"
               run={async () => {
-                if (!valid) throw new Error("Fill in the key, label, a reason of at least 3 characters and a valid proxy ISIN.");
+                if (!valid) throw new Error(keyProblem ?? "Fill in the key, label, a source tier, a reason of at least 3 characters and a valid proxy ISIN.");
                 const r = await getBrowserApiClient().PUT("/funds/coverage-ledger", {
                   body: {
                     subject_kind: kind,
-                    subject_key: key.trim(),
+                    subject_key: normKey,
                     label: label.trim(),
-                    tier,
+                    tier: tier as keyof typeof LEDGER_TIER_META,
                     reason: reason.trim(),
                     proxy_fund_isin: proxy || null,
                     total_return_available: tri(totalReturn),
@@ -231,7 +244,7 @@ function ManualEntry({ reload }: { reload: () => void }) {
                     source_url: source.trim() || null,
                   },
                 });
-                if (!r.data) throw new Error(`The row could not be saved (HTTP ${r.response.status}).`);
+                if (!r.data) throw new Error(`The row could not be saved (HTTP ${r.response.status}${errorMessage(r.error) ? `: ${errorMessage(r.error)}` : ""}).`);
                 reload();
                 return "Row saved.";
               }}
@@ -288,7 +301,7 @@ function PinPanel() {
                 const r = await getBrowserApiClient().POST("/funds/snapshots/pin", {
                   body: { ref_kind: kind, ref_id: refId.trim(), as_of: asOf, reason: reason.trim() || null },
                 });
-                if (!r.data) throw new Error(`The snapshots could not be pinned (HTTP ${r.response.status}).`);
+                if (!r.data) throw new Error(`The snapshots could not be pinned (HTTP ${r.response.status}${errorMessage(r.error) ? `: ${errorMessage(r.error)}` : ""}).`);
                 const n = (r.data as { pinned?: number[] }).pinned?.length ?? 0;
                 return n === 0 ? "No snapshot was known on that date, so nothing was pinned." : `Pinned ${n} snapshot${n === 1 ? "" : "s"}.`;
               }}

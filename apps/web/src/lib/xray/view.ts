@@ -20,3 +20,14 @@ export function holdingChoices(holdings: readonly { ticker: string; name: string
     .filter((h) => !FUND_TYPE.test(h.security_type ?? ""))
     .map((h) => ({ ticker: h.ticker, label: formatTickerLabel(h.ticker, h.name) }));
 }
+
+/**
+ * An `as_of` taken from the URL: a real calendar date, not in the future. Anything else is
+ * dropped (the page then shows the latest) instead of being sent to the API as a 422.
+ */
+export function validAsOf(value: string | null | undefined, today: Date = new Date()): string {
+  if (!value || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return "";
+  const d = new Date(`${value}T00:00:00Z`);
+  if (Number.isNaN(d.getTime()) || d.toISOString().slice(0, 10) !== value) return "";
+  return value > today.toISOString().slice(0, 10) ? "" : value;
+}

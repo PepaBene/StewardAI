@@ -1,3 +1,7 @@
+"use client";
+
+import { useState, type KeyboardEvent } from "react";
+
 import { squarify } from "@/lib/charts/squarify";
 import { SrTable } from "@/components/charts";
 import type { ExposureTreemap, TreemapGroup, TreemapLeaf } from "@/lib/xray/exposure";
@@ -70,6 +74,10 @@ export function NestedTreemap({
   label: string;
   className?: string;
 }) {
+  // One tab stop for the whole chart (arrow keys move between tiles, a readout names the
+  // active one); the exact values are also in the hidden table.
+  const [active, setActive] = useState<string | null>(null);
+  const [focused, setFocused] = useState(false);
   const groupTiles = squarify(map.groups, (g) => g.weight, { x: 0, y: 0, w: W, h: H });
   // Colour slot per classified group, in layout (largest first) order.
   const colourOf = new Map<string, number>();
@@ -80,9 +88,32 @@ export function NestedTreemap({
     [`${gt.item.label} (${GROUP_KIND_LABEL[gt.item.kind]})`, weightPct(gt.item.weight), `${gt.item.children.length} tiles`] as const,
     ...gt.item.children.map((c) => [`${gt.item.label} › ${c.label}`, weightPct(c.weight), c.kind === "remainder" ? "remainder" : "issuer"] as const),
   ]);
+  const order = groupTiles.flatMap((gt) => gt.item.children.map((c) => ({ id: c.id, text: `${gt.item.label}, ${c.label}: ${weightPct(c.weight)} of portfolio value. ${c.detail}` })));
+  const activeIndex = order.findIndex((o) => o.id === active);
+  const readout = activeIndex >= 0 ? order[activeIndex].text : null;
+  const onKey = (e: KeyboardEvent) => {
+    if (order.length === 0) return;
+    const move = (to: number) => {
+      e.preventDefault();
+      setActive(order[Math.max(0, Math.min(order.length - 1, to))].id);
+    };
+    if (e.key === "ArrowRight" || e.key === "ArrowDown") move(activeIndex < 0 ? 0 : activeIndex + 1);
+    else if (e.key === "ArrowLeft" || e.key === "ArrowUp") move(activeIndex < 0 ? 0 : activeIndex - 1);
+    else if (e.key === "Home") move(0);
+    else if (e.key === "End") move(order.length - 1);
+  };
   return (
     <figure className={cn("m-0 relative overflow-x-auto", className)}>
-      <svg viewBox={`0 0 ${W} ${H}`} role="img" aria-label={label} className="block h-auto w-full min-w-[640px]">
+      <svg
+        viewBox={`0 0 ${W} ${H}`}
+        role="group"
+        aria-label={`${label}. One tab stop: use the arrow keys to move between tiles; the exact values are in the table below.`}
+        tabIndex={0}
+        onKeyDown={onKey}
+        onFocus={() => setFocused(true)}
+        onBlur={() => setFocused(false)}
+        className="block h-auto w-full min-w-[640px] outline-hidden focus-visible:outline-2 focus-visible:outline-focus"
+      >
         {groupTiles.map((gt) => {
           const g = gt.item;
           const s = styleFor(g, colourOf.get(g.key) ?? 0);
@@ -122,7 +153,7 @@ export function NestedTreemap({
                 const roomy = lt.w > 64 && lt.h > 30;
                 const tip = `${leaf.label}\n${weightPct(leaf.weight)} of portfolio value · ${leaf.detail}`;
                 return (
-                  <g key={leaf.id} tabIndex={0} role="img" aria-label={`${g.label}, ${leaf.label}, ${weightPct(leaf.weight)}`} className="outline-hidden focus-visible:[&>rect]:stroke-text">
+                  <g key={leaf.id} onClick={() => setActive(leaf.id)} data-active={focused && active === leaf.id ? "true" : undefined} className="data-[active=true]:[&>rect]:stroke-text data-[active=true]:[&>rect]:stroke-[3px]">
                     <title>{tip}</title>
                     <rect
                       x={lt.x + 0.75}
@@ -156,6 +187,9 @@ export function NestedTreemap({
           );
         })}
       </svg>
+      <p aria-live="polite" className="mt-1 min-h-[2.5rem] text-xs text-text-muted">
+        {readout ?? "Focus the chart and use the arrow keys, or click a tile, to read its name and weight."}
+      </p>
       <SrTable caption={label} columns={["Group or issuer", "Share of portfolio value", "Kind"]} rows={rows} />
     </figure>
   );

@@ -2,10 +2,11 @@
 
 import { LoaderCircleIcon } from "lucide-react";
 import Link from "next/link";
-import { useId, useState, type ReactNode } from "react";
+import { useEffect, useId, useRef, useState, type ReactNode } from "react";
 
 import { Button } from "@/components/ui/button";
 import { getBrowserApiClient } from "@/lib/api/client";
+import { errorMessage } from "@/lib/api/error-message";
 import { jobHref } from "@/lib/jobs/job-detail";
 
 /**
@@ -33,6 +34,16 @@ export function ConfirmAction({
   const [result, setResult] = useState<ReactNode>(null);
   const [error, setError] = useState("");
   const id = useId();
+  const triggerRef = useRef<HTMLButtonElement>(null);
+  const confirmRef = useRef<HTMLButtonElement>(null);
+  // Focus follows the swap: into the confirmation when it opens, back to the trigger when it
+  // closes (otherwise the focused button unmounts and focus falls to the page body).
+  const wasOpen = useRef(false);
+  useEffect(() => {
+    if (open) confirmRef.current?.focus();
+    else if (wasOpen.current) triggerRef.current?.focus();
+    wasOpen.current = open;
+  }, [open]);
 
   async function go() {
     setBusy(true);
@@ -41,7 +52,7 @@ export function ConfirmAction({
       setResult(await run());
       setOpen(false);
     } catch (e) {
-      setError(e instanceof Error ? e.message : "The request failed.");
+      setError(errorMessage(e instanceof Error ? e.message : e, "The request failed."));
     } finally {
       setBusy(false);
     }
@@ -50,7 +61,7 @@ export function ConfirmAction({
   return (
     <div className="flex min-w-0 flex-col gap-2">
       <div className="flex flex-wrap items-center gap-3">
-        <Button size="sm" variant={variant} aria-expanded={open} aria-controls={id} onClick={() => { setOpen((o) => !o); setResult(null); setError(""); }}>
+        <Button ref={triggerRef} size="sm" variant={variant} aria-expanded={open} aria-controls={id} onClick={() => { setOpen((o) => !o); setResult(null); setError(""); }}>
           {label}
         </Button>
         {result ? (
@@ -64,7 +75,7 @@ export function ConfirmAction({
           <p className="font-medium text-text">{confirmTitle}</p>
           <div className="text-xs text-text-muted">{confirmBody}</div>
           <div className="flex flex-wrap gap-2">
-            <Button size="sm" disabled={busy} onClick={() => void go()}>
+            <Button ref={confirmRef} size="sm" disabled={busy} onClick={() => void go()}>
               {busy ? <LoaderCircleIcon aria-hidden="true" className="animate-spin" /> : null}
               {confirmLabel}
             </Button>
@@ -120,7 +131,7 @@ export function JobTrigger({ job }: { job: OwnerJob }) {
       confirmLabel="Queue job"
       run={async () => {
         const result = await post(job);
-        if (!result.data) throw new Error(`The job could not be queued (HTTP ${result.response.status}).`);
+        if (!result.data) throw new Error(`The job could not be queued (HTTP ${result.response.status}${errorMessage(result.error) ? `: ${errorMessage(result.error)}` : ""}).`);
         const id = result.data.id;
         return (
           <Link href={jobHref(id)} className="text-accent-ink hover:underline">

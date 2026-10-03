@@ -39,7 +39,7 @@ export function RankFlowChart({ flow, label, className }: { flow: RankFlow; labe
         <text x={X0} y={28} textAnchor="end" fontSize={11} className="num fill-text-muted">
           {flow.previousPeriod ? `quarter end ${date(flow.previousPeriod)}` : "not loaded"}
         </text>
-        <text x={X0} y={41} textAnchor="end" fontSize={11} className="num fill-text-faint">
+        <text x={X0} y={41} textAnchor="end" fontSize={11} className="num fill-text-muted">
           {lagText(flow.previousLagDays)}
         </text>
         <text x={X1} y={14} fontSize={12} className="fill-text font-semibold">
@@ -48,7 +48,7 @@ export function RankFlowChart({ flow, label, className }: { flow: RankFlow; labe
         <text x={X1} y={28} fontSize={11} className="num fill-text-muted">
           {flow.latestPeriod ? `quarter end ${date(flow.latestPeriod)}` : ""}
         </text>
-        <text x={X1} y={41} fontSize={11} className="num fill-text-faint">
+        <text x={X1} y={41} fontSize={11} className="num fill-text-muted">
           {lagText(flow.latestLagDays)}
         </text>
         {flow.rows.map((r) => {

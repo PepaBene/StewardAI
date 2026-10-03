@@ -57,6 +57,8 @@ export type BreadthRow = {
   pctOfOutstanding: number | null;
   /** Quarters between this period and the one it is compared with (>1 = a quarter is not loaded). */
   quartersSincePrevious: number | null;
+  /** The change was computed against an earlier quarter that is not in the returned list: its span is unknown. */
+  changeSpanUnknown: boolean;
 };
 
 function monthsBetween(a: string, b: string): number {
@@ -80,6 +82,7 @@ export function breadthRows(periods: readonly OwnershipPeriod[]): BreadthRow[] {
     exitedHolders: p.exited_holders,
     pctOfOutstanding: p.pct_of_shares_outstanding ?? null,
     quartersSincePrevious: i > 0 ? Math.round(monthsBetween(sorted[i - 1].period, p.period) / 3) : null,
+    changeSpanUnknown: i === 0 && (p.holders_change !== null || toNum(p.shares_change) !== null),
   }));
 }
 
@@ -200,10 +203,17 @@ export type StakeView = {
   shares: number | null;
   /** Percent as filed vs the cross-check: a flagged disagreement, never silently replaced. */
   checkLabel: string;
+  /** More than one reporting person, or a member of a group: the percent is one person's figure. */
   isGroup: boolean;
   intentChanged: boolean;
   ownersCount: number;
 };
+
+/** What the filing-level percent is, per the backend: the largest single reporting-person figure. */
+export function stakePercentNote(v: Pick<StakeView, "isGroup" | "ownersCount">): string | null {
+  if (!v.isGroup) return null;
+  return `${v.ownersCount > 1 ? `${v.ownersCount} reporting persons` : "Member of a group"}; the percent is the largest single reporting person's figure. Members report overlapping holdings and are never summed, so the group's total is at least this.`;
+}
 
 export function stakeViews(stakes: readonly ControlStake[]): StakeView[] {
   return [...stakes]

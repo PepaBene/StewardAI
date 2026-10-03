@@ -8,12 +8,26 @@ import { getBrowserApiClient } from "@/lib/api/client";
 import type { DataProvenance } from "@/lib/data-state/provenance";
 import { useApiResource } from "@/lib/hooks/use-api-resource";
 import { compact, date, num, signedInt } from "@/lib/xray/format";
-import { classMeta, classTotals, INSIDER_GROUP_LABEL, PDMR_STATUS_LABEL, pdmrState, type InsiderGroup } from "@/lib/xray/insider";
+import {
+  classMeta,
+  classTotals,
+  countsTowardNetText,
+  exclusionText,
+  INSIDER_GROUP_LABEL,
+  insiderProvenance,
+  netValueNote,
+  netValueText,
+  PDMR_STATUS_LABEL,
+  pdmrHoldingState,
+  tickerCaseCaveat,
+  type InsiderGroup,
+} from "@/lib/xray/insider";
 import { toNum } from "@/lib/xray/parse";
 import type { HoldingPdmrOut, InsiderActivityOut } from "@/lib/xray/types";
 
 import { JobTrigger } from "./confirm-action";
 import { DataTable } from "./facts";
+import { SafeLink } from "./safe-link";
 import { Limitations } from "./ownership-section";
 import { Panel, ResourceShell } from "./resource-shell";
 
@@ -52,28 +66,11 @@ function InsiderBody({ data, lastGood }: { data: InsiderActivityOut; lastGood: b
   const nd = data.net_discretionary;
   const { totals, superseded } = useMemo(() => classTotals(data.transactions), [data.transactions]);
   const hasRows = data.transactions.length > 0;
-  const truncated = data.transactions.length >= ROW_LIMIT;
   const net = toNum(nd.net_shares);
   const bought = toNum(nd.bought_shares);
   const sold = toNum(nd.sold_shares);
 
-  const provenance: DataProvenance = {
-    source: "SEC EDGAR Forms 3/4/5, classified by economic purpose (StewardAI)",
-    asOf: nd.until,
-    knownAt: data.transactions.map((t) => t.filed).sort().pop() ?? null,
-    method: "A transaction code says how a trade was reported, not why: code and footnotes map to an economic class. Only open-market buys and sells count toward the net figure.",
-    state: lastGood ? "unavailable" : !hasRows ? "not_covered" : nd.plan_status_unknown_rows > 0 || truncated ? "partial" : "verified",
-    reason: lastGood
-      ? "The refresh failed; this is the last value that loaded."
-      : !hasRows
-        ? "No insider transaction is stored for this holding in the window. None loaded is not the same as no insider trading."
-        : truncated
-          ? `Only the newest ${ROW_LIMIT} rows were requested; older rows in the window are not counted in the class table.`
-          : nd.plan_status_unknown_rows > 0
-            ? `${nd.plan_status_unknown_rows} counted rows do not state whether a Rule 10b5-1 plan applied.`
-            : null,
-    coverage: null,
-  };
+  const provenance = insiderProvenance(data, { lastGood, rowLimit: ROW_LIMIT });
 
   return (
     <>
@@ -86,26 +83,31 @@ function InsiderBody({ data, lastGood }: { data: InsiderActivityOut; lastGood: b
             ? `${nd.buy_rows} open-market buys (${compact(bought)} shares) and ${nd.sell_rows} sales (${compact(sold)} shares) from ${date(nd.since)} to ${date(nd.until)}: net ${signedInt(net)} shares. Grants, option exercises, gifts and tax withholding are not in this figure.`
             : undefined
         }
-        units={`Shares, ${date(nd.since)} to ${date(nd.until)}. Net value ${nd.net_value === null ? "is not computed because some counted rows have no price" : `${compact(toNum(nd.net_value))} at reported prices`}.`}
+        units={`Shares, ${date(nd.since)} to ${date(nd.until)}. Net value ${netValueText(nd, compact(toNum(nd.net_value)))}. Newest stored filing ${date(provenance.knownAt)}.`}
         provenance={provenance}
         hasValue={hasRows}
         table={{
           caption: "Insider activity by economic class",
           columns: ["Economic class", "Counts toward net", "Rows", "Shares"],
-          rows: totals.map((t) => [t.label, t.group === "discretionary" ? "yes" : "no", String(t.rows), t.shares === null ? "no share count" : compact(t.shares)]),
+          rows: totals.map((t) => [
+            t.label,
+            `${countsTowardNetText(t)}${exclusionText(t) ? ` (excluded: ${exclusionText(t)})` : ""}`,
+            String(t.rows),
+            t.shares === null ? "no share count" : `${compact(t.shares)}${t.derivativeLegRows > 0 ? ` (${t.derivativeLegRows} derivative legs not added)` : ""}`,
+          ]),
         }}
       >
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
           <Figure label="Bought (open market)" value={compact(bought)} note={`${nd.buy_rows} rows`} />
           <Figure label="Sold (open market)" value={compact(sold)} note={`${nd.sell_rows} rows`} />
-          <Figure label="Net shares" value={signedInt(net)} note={nd.value_complete ? "every counted row has a price" : "value incomplete: some rows have no price"} />
+          <Figure label="Net shares" value={signedInt(net)} note={netValueNote(nd)} />
         </div>
         <ul aria-label="Insider activity by economic class" className="m-0 flex list-none flex-col gap-1.5 p-0">
           {totals.map((t) => {
             const max = Math.max(...totals.map((x) => Math.abs(x.shares ?? 0)), 1);
             const share = t.shares === null ? 0 : Math.abs(t.shares) / max;
             return (
-              <li key={t.economicClass} className="grid grid-cols-[minmax(0,12rem)_1fr_6rem] items-center gap-2.5 text-xs sm:grid-cols-[14rem_1fr_7rem]">
+              <li key={t.economicClass} className="grid grid-cols-[minmax(0,12rem)_1fr_7rem] items-center gap-2.5 text-xs sm:grid-cols-[14rem_1fr_9rem]">
                 <span className="truncate" title={t.label}>
                   {t.label}
                 </span>
@@ -114,6 +116,11 @@ function InsiderBody({ data, lastGood }: { data: InsiderActivityOut; lastGood: b
                 </span>
                 <span className="num text-right">
                   {t.shares === null ? "no count" : compact(t.shares)} <span className="text-text-muted">· {t.rows}</span>
+                  {t.group === "discretionary" && t.countedRows < t.rows ? (
+                    <span className="block text-[11px] text-text-muted">
+                      {t.countedRows} counted{exclusionText(t) ? `, ${exclusionText(t)}` : ""}
+                    </span>
+                  ) : null}
                 </span>
               </li>
             );
@@ -186,13 +193,13 @@ function InsiderBody({ data, lastGood }: { data: InsiderActivityOut; lastGood: b
               t.ownership,
               <span key="n" className="text-[11px] text-text-muted">
                 {t.classification_basis ?? t.interpretation}
-                {t.superseded_by ? <span className="block text-warning-signal">superseded by {t.superseded_by}</span> : null}
+                {t.superseded_by ? <span className="block text-text font-medium">superseded by {t.superseded_by}</span> : null}
                 {!t.counts_toward_net_discretionary && t.exclusion_reason ? <span className="block">excluded: {t.exclusion_reason}</span> : null}
                 {t.rule_10b5_1_plan === true ? <span className="block">Rule 10b5-1 plan</span> : null}
                 {t.footnote_text ? <span className="block">{t.footnote_text}</span> : null}
-                <a href={t.source_url} target="_blank" rel="noreferrer noopener" className="text-accent-ink hover:underline">
+                <SafeLink href={t.source_url} className="text-accent-ink hover:underline">
                   filing
-                </a>
+                </SafeLink>
               </span>,
             ])}
           />
@@ -236,21 +243,22 @@ function PdmrBlock({ ticker }: { ticker: string }) {
   const resource = useApiResource(fetcher);
   return (
     <ResourceShell state={resource.state} label="UK PDMR notifications">
-      {(data, lastGood) => <PdmrBody data={data} lastGood={lastGood} />}
+      {(data, lastGood) => <PdmrBody data={data} lastGood={lastGood} ticker={ticker} />}
     </ResourceShell>
   );
 }
 
-function PdmrBody({ data, lastGood }: { data: HoldingPdmrOut; lastGood: boolean }) {
-  const state = pdmrState(data.status);
+function PdmrBody({ data, lastGood, ticker }: { data: HoldingPdmrOut; lastGood: boolean; ticker: string }) {
+  const holding = pdmrHoldingState(data);
+  const state = holding.state;
   const dates = data.notifications.map((n) => n.announced_at).filter((d): d is string => !!d).sort();
   const provenance: DataProvenance = {
     source: "UK MAR Article 19 PDMR notifications from the RNS stream",
     asOf: dates.length ? dates[dates.length - 1].slice(0, 10) : null,
     method: "Notifications are parsed from announcement text; one that cannot be read is listed with why, never dropped.",
     state: lastGood ? "unavailable" : state,
-    reason: lastGood ? "The refresh failed; this is the last value that loaded." : data.status.detail,
-    coverage: data.status.attempted > 0 ? { covered: data.status.parsed, total: data.status.attempted, unit: "announcements parsed" } : null,
+    reason: lastGood ? "The refresh failed; this is the last value that loaded." : holding.reason,
+    coverage: holding.total > 0 ? { covered: holding.parsed, total: holding.total, unit: "of this holding's announcements parsed" } : null,
   };
   return (
     <Panel
@@ -261,7 +269,8 @@ function PdmrBody({ data, lastGood }: { data: HoldingPdmrOut; lastGood: boolean 
     >
       {data.notifications.length === 0 ? (
         <p className="text-sm text-text-muted">
-          {data.status.state === "available" ? "No PDMR announcement is stored for this holding." : "No notification is available: see the status below."}
+          {data.status.state === "available" ? "No PDMR announcement is stored for this holding." : "No notification is available: see the channel status below."}
+          {tickerCaseCaveat(ticker) ? ` The API looks tickers up in upper case (${ticker.toUpperCase()}), so a holding whose stored ticker has a lower-case exchange suffix may be missed here even though announcements exist.` : ""}
         </p>
       ) : (
         <DataTable
@@ -271,9 +280,9 @@ function PdmrBody({ data, lastGood }: { data: HoldingPdmrOut; lastGood: boolean 
           rows={data.notifications.map((n) => [
             <span key="a">
               {date(n.announced_at)}
-              <a href={n.source_url} target="_blank" rel="noreferrer noopener" className="block text-[11px] text-accent-ink hover:underline">
+              <SafeLink href={n.source_url} className="block text-[11px] text-accent-ink hover:underline">
                 {n.headline ?? "announcement"}
-              </a>
+              </SafeLink>
             </span>,
             <span key="p">
               {n.person_name ?? "not parsed"}
@@ -302,9 +311,9 @@ function PdmrBody({ data, lastGood }: { data: HoldingPdmrOut; lastGood: boolean 
         />
       )}
       <div className="flex flex-wrap items-center gap-2 text-xs text-text-muted">
-        <DataStateBadge state={state} reason={data.status.detail} />
+        <DataStateBadge state={state} reason={holding.reason ?? undefined} />
         <span className="num">
-          {data.status.parsed} parsed of {data.status.attempted} attempted
+          This holding: {holding.parsed} parsed of {holding.total} announcements. Channel status, all issuers: {data.status.parsed} parsed of {data.status.attempted} attempted
           {Object.keys(data.status.by_status).length > 0 ? ` (${Object.entries(data.status.by_status).map(([k, v]) => `${PDMR_STATUS_LABEL[k] ?? k} ${v}`).join(", ")})` : ""}
         </span>
       </div>

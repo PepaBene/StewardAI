@@ -159,3 +159,46 @@ export function latestFactsheetVersions(rows: readonly FactsheetRow[]): Factshee
   }
   return [...best.values()].sort((a, b) => b.asOf.localeCompare(a.asOf) || a.source.localeCompare(b.source));
 }
+
+/** Extra explanation lines for an audit row: the rule diff and the as-of flags of a value change. */
+export function auditExplanation(r: Pick<AuditRow, "verdict" | "rules" | "previousRules" | "asOfMovedBackwards" | "restatedForSameAsOf">): string[] {
+  const lines: string[] = [];
+  if (r.verdict === "methodology_change") {
+    lines.push(r.previousRules ? `Rules changed from: ${rulesText(r.previousRules)}` : "Rules changed; the previous rules were not returned.");
+    lines.push(`to: ${rulesText(r.rules)}`);
+  }
+  if (r.asOfMovedBackwards) lines.push("The issuer's as-of date moved backwards compared with the last observation.");
+  if (r.restatedForSameAsOf) lines.push("Figures were restated for the same as-of date.");
+  return lines;
+}
+
+// ---- manual ledger rows ----------------------------------------------------------------------
+
+export const FUND_ISIN = /^[A-Z]{2}[A-Z0-9]{9}[0-9]$/;
+
+/**
+ * The key a manual save is stored under. A fund key is an ISIN (trimmed, upper-case); an index
+ * key reuses the spelling of an existing row that matches case-insensitively, so a typo in case
+ * does not create a second row beside the derived one.
+ */
+export function normaliseSubjectKey(kind: "fund" | "index", raw: string, existing: readonly Pick<LedgerRow, "subject_kind" | "subject_key">[]): string {
+  const trimmed = raw.trim();
+  if (kind === "fund") return trimmed.toUpperCase();
+  const match = existing.find((e) => e.subject_kind === kind && e.subject_key.toLowerCase() === trimmed.toLowerCase());
+  return match ? match.subject_key : trimmed;
+}
+
+export function subjectKeyProblem(kind: "fund" | "index", key: string): string | null {
+  if (key === "") return "Enter the subject key.";
+  if (kind === "fund" && !FUND_ISIN.test(key)) return "A fund key must be a 12-character ISIN (for example IE00B5BMR087).";
+  return null;
+}
+
+/** What a manual save does to an existing row; null when the key is new. */
+export function overrideNote(existing: Pick<LedgerRow, "origin" | "tier" | "latest_holdings_as_of" | "subject_key"> | undefined): string | null {
+  if (!existing) return null;
+  if (existing.origin === "derived") {
+    return `This overrides the derived row for ${existing.subject_key} (${LEDGER_TIER_META[existing.tier].label}${existing.latest_holdings_as_of ? `, holdings as of ${existing.latest_holdings_as_of}` : ""}). Its holdings as-of date is cleared (the form cannot set one) and refreshes no longer update it. There is no way to revert it from here.`;
+  }
+  return `This replaces your earlier manual row for ${existing.subject_key}.`;
+}
