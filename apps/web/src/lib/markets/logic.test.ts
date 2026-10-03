@@ -2,7 +2,6 @@ import { describe, expect, it } from "vitest";
 
 import {
   addDays,
-  assembleCorrelation,
   buildSessionCells,
   chosenSeries,
   clusterOrder,
@@ -21,7 +20,8 @@ import {
   weekdaysBetween,
   daysBetween,
   eventStudyWindow,
-  mapLimit,
+  readCorrelation,
+  describeLastClose,
   parseEvidenceId,
   resolveSelection,
   returnsWindow,
@@ -198,36 +198,47 @@ describe("event study", () => {
   });
 });
 
-describe("correlation arrangement", () => {
-  const rows = [
-    { ticker: "A", correlations: [{ ticker: "B", correlation: 0.8 }, { ticker: "C", correlation: null }] },
-    { ticker: "B", correlations: [{ ticker: "A", correlation: 0.8 }, { ticker: "C", correlation: -0.2 }] },
-    { ticker: "C", correlations: [{ ticker: "A", correlation: null }, { ticker: "B", correlation: -0.2 }] },
-    { ticker: "D", correlations: null },
-  ];
-  it("keeps backend values, mirrors a one-sided pair, leaves blanks null and drops series-less holdings", () => {
-    const g = assembleCorrelation(rows);
-    expect(g.tickers).toEqual(["A", "B", "C"]);
-    expect(g.matrix).toEqual([
+describe("correlation reading", () => {
+  const body = {
+    tickers: ["A", "B", "C"],
+    holdings: [
+      { ticker: "A", source: "Stooq", observations: 200 },
+      { ticker: "B", source: "Yahoo", observations: 200 },
+      { ticker: "C", source: null, observations: 0 },
+    ],
+    matrix: [
       [1, 0.8, null],
-      [0.8, 1, -0.2],
-      [null, -0.2, 1],
-    ]);
-    expect(g.withoutSeries).toEqual(["D"]);
-    expect(g.asymmetricPairs).toBe(0);
+      [0.8, 1, null],
+      [null, null, null],
+    ],
+    counts: [
+      [199, 150, 0],
+      [150, 199, 0],
+      [0, 0, 0],
+    ],
+    notes: [
+      [null, "series from different sources (Stooq, Yahoo); adjustments can differ", "no stored series for C"],
+      ["series from different sources (Stooq, Yahoo); adjustments can differ", null, "no stored series for C"],
+      [null, null, null],
+    ],
+  };
+  it("keeps the backend's values, counts and notes; a null stays null (never 0)", () => {
+    const g = readCorrelation(body)!;
+    expect(g.matrix[0][2]).toBeNull();
+    expect(g.matrix[2][2]).toBeNull();
+    expect(g.counts[0][1]).toBe(150);
+    expect(g.notes[0][2]).toBe("no stored series for C");
+    expect(g.withoutSeries).toEqual(["C"]);
+    expect(g.sources).toEqual(["Stooq", "Yahoo"]);
   });
-  it("mirrors when only the other holding returned the value, and counts asymmetric pairs", () => {
-    const g = assembleCorrelation([
-      { ticker: "A", correlations: [{ ticker: "B", correlation: null }] },
-      { ticker: "B", correlations: [{ ticker: "A", correlation: 0.5 }] },
-    ]);
-    expect(g.matrix[0][1]).toBe(0.5);
-    const asym = assembleCorrelation([
-      { ticker: "A", correlations: [{ ticker: "B", correlation: 0.5 }] },
-      { ticker: "B", correlations: [{ ticker: "A", correlation: 0.3 }] },
-    ]);
-    expect(asym.asymmetricPairs).toBe(1);
-    expect(asym.matrix[0][1]).toBe(0.5);
+  it("rejects a ragged body instead of padding it", () => {
+    expect(readCorrelation({ ...body, counts: [[1]] })).toBeNull();
+    expect(readCorrelation({ ...body, matrix: [[1, 0.8], [0.8, 1], [null, null]] })).toBeNull();
+  });
+  it("labels a last close by its quote basis", () => {
+    expect(describeLastClose(10, "GBX", "series")).toBe("10 GBX");
+    expect(describeLastClose(10, "USD", "instrument")).toBe("10 USD (instrument currency)");
+    expect(describeLastClose(10, null, null)).toBe("10 (unit not reported)");
   });
   it("orders correlated holdings together; a missing value counts as unrelated, not identical", () => {
     const m = [
@@ -363,20 +374,6 @@ describe("audit F3 regressions", () => {
   it("validates evidence ids as plain digits", () => {
     expect(parseEvidenceId("42")).toBe(42);
     for (const bad of ["1e3", "0x10", "-1", "0", "", "1.5", " "]) expect(parseEvidenceId(bad)).toBeNull();
-  });
-  it("mapLimit never runs more than the cap at once and keeps order", async () => {
-    let live = 0;
-    let peak = 0;
-    const out = await mapLimit([1, 2, 3, 4, 5, 6, 7, 8, 9], 3, async (n) => {
-      live += 1;
-      peak = Math.max(peak, live);
-      await new Promise((r) => setTimeout(r, 2));
-      live -= 1;
-      return n * 2;
-    });
-    expect(peak).toBeLessThanOrEqual(3);
-    expect(out).toEqual([2, 4, 6, 8, 10, 12, 14, 16, 18]);
-    expect(await mapLimit([], 4, async (x) => x)).toEqual([]);
   });
   it("the selector falls back to the first holding when the selected one is gone", () => {
     expect(resolveSelection("B", ["A", "B"])).toBe("B");

@@ -14,10 +14,9 @@ import { lastGood, ParsedGate, ResourceGate } from "@/components/markets/resourc
 import { ReturnsPanel } from "@/components/markets/returns-panel";
 import { SessionStrip } from "@/components/markets/session-strip";
 import { PageHeader } from "@/components/page-header";
-import { assembleCorrelation, addDays, buildSessionCells, chosenSeries, eventStudyGate, eventStudyWindow, resolveSelection, returnsWindow, todayIso } from "@/lib/markets/logic";
+import { addDays, buildSessionCells, chosenSeries, eventStudyGate, eventStudyWindow, readCorrelation, resolveSelection, returnsWindow, todayIso } from "@/lib/markets/logic";
 import {
   useCorporateActions,
-  useCorrelationRows,
   useExchangeCalendar,
   useExchangeSessions,
   useExpectedSessions,
@@ -25,6 +24,7 @@ import {
   useHoldingPrices,
   useHoldingReturns,
   usePortfolioHoldings,
+  usePortfolioCorrelation,
   usePortfolioHoldingsPrices,
   usePortfolioRisk,
   usePriceDiagnostics,
@@ -74,7 +74,7 @@ export function MarketsView() {
             <>
               <HoldingSection key={current.ticker} ticker={current.ticker} name={current.name} />
               <CorrelationSection holdings={list.map((h) => ({ ticker: h.ticker, name: h.name }))} />
-              <CoverageSection onSelect={setSelected} quotes={Object.fromEntries(list.map((h) => [h.ticker, h.instrument_currency]))} />
+              <CoverageSection onSelect={setSelected} />
             </>
           );
         }}
@@ -253,20 +253,33 @@ function SessionSection({ ticker, mic, barDates, firstBar, asOf }: { ticker: str
   );
 }
 
+const CORRELATION_WINDOWS = [
+  { id: "91", label: "3M" },
+  { id: "182", label: "6M" },
+  { id: "365", label: "1Y" },
+] as const;
+/** Fewest shared daily returns for a pair to get a value (the backend's default). */
+const CORRELATION_MIN_SHARED = 20;
+
 function CorrelationSection({ holdings }: { holdings: { ticker: string; name: string | null }[] }) {
-  const tickers = useMemo(() => holdings.map((h) => h.ticker), [holdings]);
-  const rows = useCorrelationRows(tickers);
-  const risk = usePortfolioRisk(365);
+  const [windowId, setWindowId] = useState<(typeof CORRELATION_WINDOWS)[number]["id"]>("365");
+  const days = Number(windowId);
+  const correlation = usePortfolioCorrelation(days, CORRELATION_MIN_SHARED);
+  const risk = usePortfolioRisk(days);
   const names = useMemo(() => Object.fromEntries(holdings.map((h) => [h.ticker, h.name ?? h.ticker])), [holdings]);
   const riskData = lastGood(risk.state);
   return (
-    <ResourceGate state={rows.state} label="correlations">
-      {(load) => <CorrelationPanel grid={assembleCorrelation(load.rows)} names={names} asOf={load.asOf} source={load.source} failed={load.failed} risk={riskData} />}
+    <ResourceGate state={correlation.state} label="correlations">
+      {(data) => {
+        const grid = readCorrelation(data);
+        if (!grid) return <StatePlaceholder state="unavailable" reason="The correlation response did not match its ticker list, so no matrix is shown." />;
+        return <CorrelationPanel data={data} grid={grid} names={names} risk={riskData} windowControl={<Segmented label="Correlation window" value={windowId} onChange={setWindowId} options={CORRELATION_WINDOWS} />} />;
+      }}
     </ResourceGate>
   );
 }
 
-function CoverageSection({ onSelect, quotes }: { onSelect: (ticker: string) => void; quotes: Record<string, string> }) {
+function CoverageSection({ onSelect }: { onSelect: (ticker: string) => void }) {
   const prices = usePortfolioHoldingsPrices(30);
-  return <ResourceGate state={prices.state} label="portfolio prices">{(data) => <PortfolioCoveragePanel data={data} onSelect={onSelect} quotes={quotes} />}</ResourceGate>;
+  return <ResourceGate state={prices.state} label="portfolio prices">{(data) => <PortfolioCoveragePanel data={data} onSelect={onSelect} />}</ResourceGate>;
 }

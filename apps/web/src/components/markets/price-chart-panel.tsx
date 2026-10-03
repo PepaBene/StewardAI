@@ -21,9 +21,11 @@ const RANGES = [
 
 /**
  * Candles and volume for one holding with the corporate-action ledger as a lettered marker lane
- * on the candles' x geometry. The basis is stated outright: GET /holdings/{ticker}/prices serves
- * the provider-adjusted series only, so the raw option is disabled with the reason and the two
- * bases are never spliced into one line. Raw and adjusted window returns sit in the returns panel.
+ * on the candles' x geometry. The basis is stated outright and switchable: Adjusted is the
+ * provider-adjusted series; Raw is the unadjusted bars of the same source (`raw_bars`) and is
+ * enabled only when the backend says they are available (its reason and source are shown
+ * otherwise). The two bases are never spliced into one line. Raw and adjusted window returns sit
+ * in the returns panel.
  */
 export function PriceChartPanel({
   ticker,
@@ -43,10 +45,16 @@ export function PriceChartPanel({
   actionsReason?: string | null;
 }) {
   const [range, setRange] = useState<(typeof RANGES)[number]["id"]>("126");
+  const [basisChoice, setBasisChoice] = useState<"adjusted" | "raw">("adjusted");
+  const rawBars = prices.raw_bars ?? null;
+  const rawAvailable = rawBars !== null && rawBars.available && rawBars.bars.length > 0;
+  const basis: "adjusted" | "raw" = basisChoice === "raw" && rawAvailable ? "raw" : "adjusted";
   const chosen = diagnostics ? chosenSeries(diagnostics) : null;
   const raw = diagnostics ? rawSeries(diagnostics, chosen) : null;
-  const quote = quoteOf(chosen);
-  const all: OhlcBar[] = prices.bars.map((b) => ({ date: b.date, open: b.open, high: b.high, low: b.low, close: b.close, volume: b.volume }));
+  // The unit of the bars drawn: the backend's quote currency of the series (raw: the raw series' own unit), else the diagnostics' unit.
+  const quote = basis === "raw" ? (rawBars?.quote_unit ?? prices.quote_currency ?? null) : (prices.quote_currency ?? quoteOf(chosen));
+  const shown = basis === "raw" && rawBars ? rawBars.bars : prices.bars;
+  const all: OhlcBar[] = shown.map((b) => ({ date: b.date, open: b.open, high: b.high, low: b.low, close: b.close, volume: b.volume }));
   const bars = all.slice(-Number(range));
   const placed = placeActions(bars, (actions ?? []).filter((a) => a.status !== "rejected"));
   const visible = placed.filter((p) => p.index !== null);
@@ -65,36 +73,43 @@ export function PriceChartPanel({
       title={`${name ?? ticker} (${ticker})`}
       takeaway={
         last && last.close !== null && change !== null
-          ? `Last close ${quote ? describeQuote(last.close, quote) : formatNumber(last.close, 2)} on ${formatDay(last.date)}, ${formatPct(change, 1, true)} over ${bars.length} sessions on the adjusted basis.`
+          ? `Last close ${quote ? describeQuote(last.close, quote) : formatNumber(last.close, 2)} on ${formatDay(last.date)}, ${formatPct(change, 1, true)} over ${bars.length} sessions on the ${basis} basis.`
           : "No priced bars are available."
       }
-      units={`${quote ?? "quote unit not reported"} per share · adjusted basis (provider-adjusted closes as stored) · last ${bars.length} of ${all.length} stored sessions`}
+      units={`${quote ?? "quote unit not reported"} per share · ${basis === "raw" ? `raw basis (unadjusted bars of ${rawBars?.source ?? prices.source}, not adjusted for splits or dividends)` : "adjusted basis (provider-adjusted closes as stored)"} · last ${bars.length} of ${all.length} stored sessions`}
       hasValue={all.length > 0}
       controls={
         <>
           <Segmented label="Window" value={range} onChange={setRange} options={RANGES} />
           <Segmented
             label="Price basis"
-            value="adjusted"
-            onChange={() => undefined}
+            value={basis}
+            onChange={setBasisChoice}
             options={[
-              { id: "raw", label: "Raw", disabled: true, hint: "Raw bars are stored but no endpoint serves them yet; the raw price return is shown in the returns panel." },
+              {
+                id: "raw",
+                label: "Raw",
+                disabled: !rawAvailable,
+                hint: rawAvailable
+                  ? `Unadjusted bars of ${rawBars?.source ?? prices.source}${rawBars?.quote_unit ? `, quoted in ${rawBars.quote_unit}` : ""}.`
+                  : `Raw bars unavailable${rawBars?.source ? ` from ${rawBars.source}` : ""}: ${rawBars?.reason ?? "the backend sent no raw-bar information"}.`,
+              },
               { id: "adjusted", label: "Adjusted" },
             ]}
           />
         </>
       }
       provenance={{
-        source: `${prices.source}${prices.symbol ? ` · ${prices.symbol}` : ""}`,
+        source: basis === "raw" && rawBars ? `${rawBars.source ?? prices.source}${rawBars.symbol ? ` · ${rawBars.symbol}` : ""} (raw bars)` : `${prices.source}${prices.symbol ? ` · ${prices.symbol}` : ""}`,
         asOf: prices.as_of,
         knownAt: prices.fetched_at,
-        method: "Daily bars of the series every reader serves (bar type adjusted). Raw and adjusted are never spliced; a fallback source is named below when used.",
+        method: `Daily bars, bar type ${basis}${basis === "raw" ? " (unadjusted, same source as the adjusted series)" : ""}. Raw and adjusted are never spliced; a fallback source is named below when used.`,
         state: st.state,
         reason: st.reason ?? prices.fallback_reason,
         coverage: chosen && chosen.expected_sessions > 0 ? { covered: chosen.expected_sessions - chosen.missing_days, total: chosen.expected_sessions, unit: "expected sessions" } : null,
       }}
       table={{
-        caption: `${ticker} daily bars, adjusted basis, last ${bars.length} sessions`,
+        caption: `${ticker} daily bars, ${basis} basis${quote ? `, ${quote}` : ""}, last ${bars.length} sessions`,
         columns: ["Date", "Open", "High", "Low", "Close", "Volume"],
         rows: [...bars].reverse().map((b) => [
           formatDay(b.date),
@@ -107,7 +122,7 @@ export function PriceChartPanel({
       }}
     >
       <div className="flex min-w-0 flex-col gap-1">
-        <CandleChart bars={bars} label={`${ticker} (adjusted)`} width={WIDTH} maWindow={20} formatPrice={(v) => formatNumber(v, 2)} />
+        <CandleChart bars={bars} label={`${ticker} (${basis}${quote ? `, ${quote}` : ""})`} width={WIDTH} maWindow={20} formatPrice={(v) => formatNumber(v, 2)} />
         {actions === null ? (
           <p role="status" className="text-xs text-text-muted">
             Corporate-action lane unavailable: {actionsReason ?? "the ledger could not be read"}.
@@ -148,16 +163,27 @@ export function PriceChartPanel({
         )}
       </div>
 
-      {raw ? (
+      {rawBars ? (
+        rawBars.available ? (
+          <p className="text-xs text-text-muted">
+            Raw (unadjusted) bars of {rawBars.source ?? prices.source}
+            {rawBars.symbol ? ` · ${rawBars.symbol}` : ""} are available, quoted in {rawBars.quote_unit ?? "an unreported unit"}. Switch the price basis to Raw to draw them; they are never mixed into the adjusted series.
+          </p>
+        ) : (
+          <p className="text-xs text-text-muted">
+            Raw bars are not available{rawBars.source ? ` from ${rawBars.source}` : ""}: {rawBars.reason ?? "no reason given by the backend"}. Raw-basis figures and total return are shown in the returns panel only where the backend can derive them.
+          </p>
+        )
+      ) : raw ? (
         <p className="text-xs text-text-muted">
-          A raw-bar series is also stored for this listing ({raw.observed_sessions} sessions, last {raw.last_session ? formatDay(raw.last_session) : "n/a"}); it is not drawn because the price endpoint does not serve it.
+          A raw-bar series is also stored for this listing ({raw.observed_sessions} sessions, last {raw.last_session ? formatDay(raw.last_session) : "n/a"}), but this response carried no raw bars to draw.
         </p>
       ) : (
         <p className="text-xs text-text-muted">No raw-bar series is stored for this listing, so raw-basis figures and total return cannot be derived.</p>
       )}
       {hasSplit ? (
         <p role="note" className="border-l-[3px] border-l-info-signal bg-info-signal-subtle px-3 py-1.5 text-sm">
-          A confirmed split is in the ledger. The drawn series is the adjusted basis, so the split does not appear as a price step; compare with the raw price return in the returns panel.
+          A confirmed split is in the ledger. {basis === "raw" ? "The drawn series is the raw basis, so the split appears as a price step." : "The drawn series is the adjusted basis, so the split does not appear as a price step; switch to Raw or compare with the raw price return in the returns panel."}
         </p>
       ) : null}
       {jumps.length > 0 ? (

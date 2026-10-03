@@ -60,6 +60,8 @@ export type HeatmapRow = {
   cells: readonly (number | null)[];
   /** Optional row total shown in the last column (e.g. the year's return). */
   total?: number | null;
+  /** Optional note per column (hover text, and the screen-reader text of an empty cell). */
+  notes?: readonly (string | null)[];
 };
 
 export type HeatmapProps = {
@@ -141,6 +143,7 @@ export function Heatmap({
               {columns.map((_, i) => {
                 const v = r.cells[i] ?? null;
                 const level = heatLevel(v, cap);
+                const note = r.notes?.[i] ?? null;
                 return (
                   <td key={i} className="p-0">
                     {level && isFiniteNumber(v) ? (
@@ -151,13 +154,13 @@ export function Heatmap({
                           HEAT_TEXT[level],
                           level.endsWith("strong") && "font-semibold",
                         )}
-                        title={`${r.label} ${columnNames[i] ?? columns[i]}: ${formatCell(v)}`}
+                        title={`${r.label} ${columnNames[i] ?? columns[i]}: ${formatCell(v)}${note ? ` · ${note}` : ""}`}
                       >
                         {formatCell(v)}
                       </div>
                     ) : (
-                      <div className="h-10 border border-dashed border-border">
-                        <span className="sr-only">No data</span>
+                      <div className="h-10 border border-dashed border-border" title={note ? `${r.label} ${columnNames[i] ?? columns[i]}: no value · ${note}` : undefined}>
+                        <span className="sr-only">{note ? `No data: ${note}` : "No data"}</span>
                       </div>
                     )}
                   </td>

@@ -12,7 +12,6 @@ import {
   parseListing,
   parseReturns,
 } from "./parse";
-import { mapLimit, type CorrelationRow } from "./logic";
 import type { Parsed } from "./types";
 
 /*
@@ -94,49 +93,8 @@ export function usePortfolioRisk(days: number) {
   return useApiResource(fetcher);
 }
 
-const CORRELATION_CONCURRENCY = 4;
-
-export type CorrelationLoad = { rows: CorrelationRow[]; failed: string[]; asOf: string | null; source: string | null };
-
-/**
- * One GET /holdings/{ticker}/prices per holding: each answers with the backend's correlation of
- * that holding with every other (last 252 days). No endpoint returns the whole matrix, so the
- * matrix is assembled from these vectors; nothing is computed here.
- */
-export function useCorrelationRows(tickers: readonly string[]) {
-  const key = tickers.join("\u0000");
-  // eslint-disable-next-line react-hooks/exhaustive-deps -- `key` is the stable identity of `tickers`
-  const list = useCallback(() => tickers, [key]);
-  const fetcher = useCallback(async (): Promise<ApiResult<CorrelationLoad>> => {
-    const names = list();
-    // Each response makes the backend load every other holding's series, so the fan-out is capped.
-    const results = await mapLimit(names, CORRELATION_CONCURRENCY, async (ticker) => {
-      try {
-        return { ticker, r: await api().GET("/holdings/{ticker}/prices", { params: { path: { ticker }, query: { days: 365 } } }) };
-      } catch {
-        return { ticker, r: null };
-      }
-    });
-    const good = results.filter((x) => x.r && x.r.response.ok && x.r.data !== undefined);
-    if (good.length === 0) {
-      const first = results.find((x) => x.r)?.r;
-      if (first) return { error: first.error, response: first.response };
-      throw new Error("No holding price request reached the API.");
-    }
-    const rows: CorrelationRow[] = results.map(({ ticker, r }) => {
-      const body = r && r.response.ok ? r.data : undefined;
-      return { ticker, correlations: body && body.bars.length > 0 ? body.correlations.map((c) => ({ ticker: c.ticker, correlation: c.correlation })) : null };
-    });
-    const asOfs = good.map((x) => x.r!.data!.as_of).filter((d): d is string => d !== null);
-    return {
-      data: {
-        rows,
-        failed: results.filter((x) => !(x.r && x.r.response.ok)).map((x) => x.ticker),
-        asOf: asOfs.length ? asOfs.reduce((a, b) => (a > b ? a : b)) : null,
-        source: good[0].r!.data!.source,
-      },
-      response: good[0].r!.response,
-    };
-  }, [list]);
+/** One request for the whole matrix; the window and the minimum shared returns are part of the query identity. */
+export function usePortfolioCorrelation(days: number, minShared: number) {
+  const fetcher = useCallback(() => api().GET("/portfolio/correlation", { params: { query: { days, min_shared: minShared } } }), [days, minShared]);
   return useApiResource(fetcher);
 }

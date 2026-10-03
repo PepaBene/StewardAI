@@ -2,7 +2,7 @@ import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 
-import { assembleCorrelation, buildSessionCells } from "@/lib/markets/logic";
+import { buildSessionCells, readCorrelation } from "@/lib/markets/logic";
 import type { CorporateAction, HoldingsPrices, PriceDiagnostic, PriceHistory, ReturnsReport } from "@/lib/markets/types";
 
 import { ActionLedger } from "./action-ledger";
@@ -77,6 +77,19 @@ const action: CorporateAction = {
   amountBasis: null,
 };
 
+const corrData = { days: 365, min_shared: 20, max_returns: 252, start: "2025-10-02", end: "2026-10-02", method: "Pearson on daily returns" };
+const corrGrid = (matrix: (number | null)[][], notes?: (string | null)[][]) => {
+  const n = matrix.length;
+  const tickers = ["A", "B", "C"].slice(0, n);
+  return readCorrelation({
+    tickers,
+    holdings: tickers.map((ticker) => ({ ticker, source: "Stooq", observations: 100 })),
+    matrix,
+    counts: matrix.map((r) => r.map((v) => (v === null ? 7 : 120))),
+    notes: notes ?? matrix.map((r) => r.map(() => null)),
+  })!;
+};
+
 const html = (el: Parameters<typeof renderToStaticMarkup>[0]) => renderToStaticMarkup(el);
 
 describe("price chart panel", () => {
@@ -91,6 +104,30 @@ describe("price chart panel", () => {
     const partial = html(createElement(PriceChartPanel, { ticker: "ABC", name: null, prices: prices(), diagnostics: null, actions: null, actionsReason: "unreadable" }));
     expect(partial).toContain("Corporate-action lane unavailable");
     expect(partial).toContain("Partial coverage");
+  });
+});
+
+describe("price basis switch (raw_bars)", () => {
+  const rawBars = bars.map((b) => ({ ...b, open: b.open * 4, high: b.high * 4, low: b.low * 4, close: b.close * 4 }));
+  it("enables Raw only when raw_bars is available, labels basis and quote unit, and never splices", () => {
+    const withRaw = prices({ quote_currency: "GBX", raw_bars: { available: true, source: "EODHD", symbol: "abc.lse", quote_unit: "GBX", currency: "GBp", reason: null, bars: rawBars } });
+    const out = html(createElement(PriceChartPanel, { ticker: "ABC", name: null, prices: withRaw, diagnostics: null, actions: [] }));
+    expect(out).not.toMatch(/<button[^>]*disabled=""[^>]*>Raw</);
+    expect(out).toContain("GBX per share");
+    expect(out).toContain("adjusted basis");
+    expect(out).toContain("quoted in GBX");
+  });
+  it("disables Raw with the backend's reason and source when unavailable", () => {
+    const none = prices({ raw_bars: { available: false, source: "Stooq", symbol: "abc.us", quote_unit: "USD", currency: "USD", reason: "Stooq stores adjusted closes only", bars: [] } });
+    const out = html(createElement(PriceChartPanel, { ticker: "ABC", name: null, prices: none, diagnostics: null, actions: [] }));
+    expect(out).toMatch(/<button[^>]*disabled=""[^>]*>Raw</);
+    expect(out).toContain("Stooq stores adjusted closes only");
+    expect(out).not.toContain("no endpoint serves");
+    expect(out).not.toContain("does not serve it");
+  });
+  it("uses the price route's quote_currency, falling back to the diagnostics' unit", () => {
+    expect(html(createElement(PriceChartPanel, { ticker: "ABC", name: null, prices: prices({ quote_currency: "GBX" }), diagnostics: [diag], actions: [] }))).toContain("GBX per share");
+    expect(html(createElement(PriceChartPanel, { ticker: "ABC", name: null, prices: prices(), diagnostics: [diag], actions: [] }))).toContain("USD per share");
   });
 });
 
@@ -171,17 +208,26 @@ describe("diagnostics and sessions", () => {
 });
 
 describe("correlation and portfolio coverage", () => {
-  it("renders a matrix, names the missing counts endpoint, and handles fewer than two holdings", () => {
-    const grid = assembleCorrelation([
-      { ticker: "A", correlations: [{ ticker: "B", correlation: 0.7 }] },
-      { ticker: "B", correlations: [{ ticker: "A", correlation: 0.7 }] },
-    ]);
-    const out = html(createElement(CorrelationPanel, { grid, names: { A: "Alpha" }, asOf: "2026-10-02", source: "Stooq", failed: [], risk: null }));
+  it("renders the matrix from one response with footer window, counts and notes, blank for null, and handles fewer than two holdings", () => {
+    const grid = corrGrid([[1, 0.7, null], [0.7, 1, null], [null, null, 1]], [[null, null, "fewer than 20 shared returns (7)"], [null, null, "fewer than 20 shared returns (7)"], [null, null, null]]);
+    const out = html(createElement(CorrelationPanel, { data: corrData, grid, names: { A: "Alpha" }, risk: null }));
     expect(out).toContain("Alpha");
-    expect(out).toContain("shared observations");
     expect(out).toContain("0.70");
-    const one = html(createElement(CorrelationPanel, { grid: assembleCorrelation([{ ticker: "A", correlations: null }]), names: {}, asOf: null, source: null, failed: ["Z"], risk: null }));
+    expect(out).toContain("120 shared returns");
+    expect(out).toContain("fewer than 20 shared returns (7)");
+    expect(out).toContain("Pearson on daily returns");
+    expect(out).toContain("at least 20 shared returns");
+    expect(out).toContain("GET /portfolio/correlation");
+    expect(out).not.toContain("not returned");
+    expect(out).not.toContain("Missing endpoint");
+    expect(out).not.toContain("0.00");
+    const one = html(createElement(CorrelationPanel, { data: corrData, grid: corrGrid([[null]]), names: {}, risk: null }));
     expect(one).toContain("Fewer than two holdings");
+  });
+  it("shows a different-source caution in the table view", () => {
+    const caution = "series from different sources (Stooq, Yahoo); adjustments can differ";
+    const out = html(createElement(CorrelationPanel, { data: corrData, grid: corrGrid([[1, 0.5], [0.5, 1]], [[null, caution], [caution, null]]), names: {}, risk: null }));
+    expect(out).toContain(caution);
   });
   it("renders portfolio coverage with a holding that has no bars, and with no holdings", () => {
     const data: HoldingsPrices = {
@@ -198,20 +244,19 @@ describe("correlation and portfolio coverage", () => {
     expect(out).toContain("+11.10%");
     expect(out).not.toContain("+0.11%");
     // Last close carries its quote unit; unknown stays honest.
-    const withQuote = html(createElement(PortfolioCoveragePanel, { data, quotes: { A: "GBX" } }));
+    expect(out).toContain("10 (unit not reported)");
+    const withQuote = html(createElement(PortfolioCoveragePanel, { data: { ...data, holdings: [{ ...data.holdings[0], quote_currency: "GBX", quote_currency_basis: "series" }, { ...data.holdings[1] }] } }));
     expect(withQuote).toContain("10 GBX");
-    expect(out).toContain("(unit not reported)");
+    expect(withQuote).not.toContain("instrument currency");
+    const guessed = html(createElement(PortfolioCoveragePanel, { data: { ...data, holdings: [{ ...data.holdings[0], quote_currency: "USD", quote_currency_basis: "instrument" }, data.holdings[1]] } }));
+    expect(guessed).toContain("10 USD (instrument currency)");
     expect(html(createElement(PortfolioCoveragePanel, { data: { days: 30, holdings: [] } }))).toContain("Not covered");
   });
 });
 
 describe("audit F3 regressions", () => {
   it("labels the correlation scale -1..+1, not percent", () => {
-    const grid = assembleCorrelation([
-      { ticker: "A", correlations: [{ ticker: "B", correlation: 0.7 }] },
-      { ticker: "B", correlations: [{ ticker: "A", correlation: 0.7 }] },
-    ]);
-    const out = html(createElement(CorrelationPanel, { grid, names: {}, asOf: null, source: null, failed: [], risk: null }));
+    const out = html(createElement(CorrelationPanel, { data: corrData, grid: corrGrid([[1, 0.7], [0.7, 1]]), names: {}, risk: null }));
     expect(out).not.toContain("−100%");
     expect(out).not.toContain("+100%");
     expect(out).toContain('<span class="num">−1</span>');

@@ -55,20 +55,6 @@ export function resolveSelection(selected: string | null, tickers: readonly stri
   return selected !== null && tickers.includes(selected) ? selected : (tickers[0] ?? null);
 }
 
-/** Runs `fn` over `items` with at most `limit` calls in flight; results keep the input order. */
-export async function mapLimit<T, R>(items: readonly T[], limit: number, fn: (item: T) => Promise<R>): Promise<R[]> {
-  const out: R[] = new Array(items.length);
-  let next = 0;
-  const worker = async () => {
-    while (next < items.length) {
-      const i = next++;
-      out[i] = await fn(items[i]);
-    }
-  };
-  await Promise.all(Array.from({ length: Math.max(1, Math.min(limit, items.length)) }, worker));
-  return out;
-}
-
 /** A positive integer evidence id typed by the owner; "1e3", "0x10", "-1" and "" are not ids. */
 export function parseEvidenceId(text: string): number | null {
   const t = text.trim();
@@ -138,6 +124,16 @@ export function rawSeries(rows: readonly PriceDiagnostic[], chosen: PriceDiagnos
 /** The quote code the series is printed in: the unit when present ("GBX"), else the currency. */
 export function quoteOf(series: PriceDiagnostic | null): string | null {
   return series ? (series.quote_unit ?? series.currency ?? null) : null;
+}
+
+/**
+ * "10 GBX" for a close in the series' own unit; "10 USD (instrument currency)" when the backend
+ * could only fall back to the instrument's currency; "10 (unit not reported)" when it sent none.
+ */
+export function describeLastClose(value: number, quote: string | null | undefined, basis: string | null | undefined): string {
+  const fmt = value.toLocaleString("en-US", { maximumFractionDigits: 2 });
+  if (!quote) return `${fmt} (unit not reported)`;
+  return basis === "instrument" ? `${fmt} ${quote} (instrument currency)` : `${fmt} ${quote}`;
 }
 
 /** Held share of the sessions the exchange held, for one series; null without a denominator. */
@@ -274,44 +270,53 @@ export function eventStudyGate(input: { hasAdjustedBars: boolean; returns: Retur
 // Correlation (numbers computed by the backend; this only arranges them)
 // ---------------------------------------------------------------------------------------
 
-export type CorrelationRow = {
-  ticker: string;
-  /** Correlations with each other holding as returned by GET /holdings/{ticker}/prices; null when that call had no series. */
-  correlations: readonly { ticker: string; correlation: number | null }[] | null;
-};
-
 export type CorrelationGrid = {
   tickers: string[];
-  /** matrix[i][j]: backend correlation of tickers[i] with tickers[j]; null when the backend returned none. */
+  /** matrix[i][j]: the backend's correlation of tickers[i] with tickers[j]; null (never 0) when it returned none. */
   matrix: (number | null)[][];
-  /** Pairs where the two rows' backend values differ by more than 0.01 (should be symmetric). */
-  asymmetricPairs: number;
-  /** Holdings whose own call returned no series, so they have no row. */
+  /** counts[i][j]: shared daily returns behind the pair, as returned (0 when there is no series). */
+  counts: number[][];
+  /** notes[i][j]: the backend's reason for a null, or its different-source caution. */
+  notes: (string | null)[][];
+  /** Holdings with no stored series in the window (no row of values). */
   withoutSeries: string[];
+  /** Distinct sources of the series used. */
+  sources: string[];
 };
 
+/** True when `m` is n x n: a ragged body is rejected, not padded. */
+function isSquare<T>(m: readonly (readonly T[])[], n: number): boolean {
+  return m.length === n && m.every((r) => r.length === n);
+}
+
 /**
- * Arranges the per-holding correlation vectors into a matrix. A cell takes row i's value, else
- * the mirrored value from row j; nothing is computed or imputed. The diagonal is 1 only for a
- * holding that has a series (a series' correlation with itself).
+ * Reads GET /portfolio/correlation into a grid. The numbers are the backend's; nothing is
+ * computed or imputed here and a null stays null. Returns null when the matrices do not match the
+ * ticker list (shown as unavailable by the caller rather than guessed at).
  */
-export function assembleCorrelation(rows: readonly CorrelationRow[]): CorrelationGrid {
-  const withSeries = rows.filter((r) => r.correlations !== null);
-  const tickers = withSeries.map((r) => r.ticker);
-  const lookup = new Map(withSeries.map((r) => [r.ticker, new Map(r.correlations!.map((c) => [c.ticker, c.correlation]))]));
-  const matrix: (number | null)[][] = tickers.map((a) => tickers.map((b) => (a === b ? 1 : null)));
-  let asymmetricPairs = 0;
-  for (let i = 0; i < tickers.length; i++) {
-    for (let j = i + 1; j < tickers.length; j++) {
-      const ij = lookup.get(tickers[i])?.get(tickers[j]) ?? null;
-      const ji = lookup.get(tickers[j])?.get(tickers[i]) ?? null;
-      const v = ij ?? ji;
-      matrix[i][j] = v;
-      matrix[j][i] = v;
-      if (ij !== null && ji !== null && Math.abs(ij - ji) > 0.01) asymmetricPairs += 1;
-    }
-  }
-  return { tickers, matrix, asymmetricPairs, withoutSeries: rows.filter((r) => r.correlations === null).map((r) => r.ticker) };
+export function readCorrelation(data: {
+  tickers: readonly string[];
+  holdings: readonly { ticker: string; source: string | null; observations: number }[];
+  matrix: readonly (readonly (number | null)[])[];
+  counts: readonly (readonly number[])[];
+  notes: readonly (readonly (string | null)[])[];
+}): CorrelationGrid | null {
+  const n = data.tickers.length;
+  if (!isSquare(data.matrix, n) || !isSquare(data.counts, n) || !isSquare(data.notes, n)) return null;
+  const byTicker = new Map(data.holdings.map((h) => [h.ticker, h]));
+  const withoutSeries = data.tickers.filter((t) => {
+    const h = byTicker.get(t);
+    return !h || h.source === null || h.observations === 0;
+  });
+  const sources = [...new Set(data.holdings.map((h) => h.source).filter((x): x is string => x !== null))];
+  return {
+    tickers: [...data.tickers],
+    matrix: data.matrix.map((r) => r.map((v) => (isFiniteNumber(v) ? v : null))),
+    counts: data.counts.map((r) => [...r]),
+    notes: data.notes.map((r) => [...r]),
+    withoutSeries,
+    sources,
+  };
 }
 
 /**

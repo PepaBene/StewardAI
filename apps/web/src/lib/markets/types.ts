@@ -12,6 +12,7 @@ export type PriceBarOut = Schemas["PriceBarOut"];
 export type PriceDiagnostic = Schemas["PriceDiagnostic"];
 export type HoldingsPrices = Schemas["HoldingsPrices"];
 export type HoldingPrices = Schemas["HoldingPrices"];
+export type PortfolioCorrelation = Schemas["PortfolioCorrelation"];
 export type PortfolioRisk = Schemas["PortfolioRisk"];
 export type ExchangeCalendar = Schemas["ExchangeCalendar"];
 export type PortfolioHoldings = Schemas["HoldingsResponse"];

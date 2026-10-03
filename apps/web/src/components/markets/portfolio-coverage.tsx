@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { getBrowserApiClient } from "@/lib/api/client";
 import { formatPct } from "@/lib/charts/format";
 import { formatDay } from "@/lib/charts/time";
-import { portfolioPriceCoverage } from "@/lib/markets/logic";
+import { describeLastClose, portfolioPriceCoverage } from "@/lib/markets/logic";
 import type { HoldingsPrices } from "@/lib/markets/types";
 
 /**
@@ -19,12 +19,9 @@ import type { HoldingsPrices } from "@/lib/markets/types";
 export function PortfolioCoveragePanel({
   data,
   onSelect,
-  quotes,
 }: {
   data: HoldingsPrices;
   onSelect?: (ticker: string) => void;
-  /** Quote currency / unit per ticker (the instrument currency of the holding), when known. */
-  quotes?: Readonly<Record<string, string>>;
 }) {
   const cov = portfolioPriceCoverage(data.holdings);
   const [armed, setArmed] = useState(false);
@@ -100,7 +97,7 @@ export function PortfolioCoveragePanel({
           h.ticker,
           h.source ?? "none",
           h.bars.length,
-          h.last_close === null ? "none" : `${h.last_close.toLocaleString("en-US", { maximumFractionDigits: 2 })} ${quotes?.[h.ticker] ?? "(unit not reported)"}`,
+          h.last_close === null ? "none" : describeLastClose(h.last_close, h.quote_currency, h.quote_currency_basis),
           h.as_of ? formatDay(h.as_of) : "none",
           h.day_change_pct === null ? "n/a" : formatPct(h.day_change_pct, 2, true),
         ]),
