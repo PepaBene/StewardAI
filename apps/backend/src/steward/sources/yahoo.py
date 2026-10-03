@@ -202,12 +202,21 @@ def parse_chart(
 
 
 async def yahoo_chart(
-    http: httpx.AsyncClient, symbol: str, *, range_: str, interval: str, retry: bool = True
+    http: httpx.AsyncClient,
+    symbol: str,
+    *,
+    range_: str,
+    interval: str,
+    retry: bool = True,
+    events: bool = False,
 ) -> YahooChart:
     """One chart request, retried after a 429 or a server error (unless `retry` is off, for
-    a page waiting on the answer)."""
+    a page waiting on the answer). `events` also asks for the dividends and splits inside the
+    range (`events=div,splits`), read by `steward.sources.yahoo_events` from the stored body."""
     url = CHART_URL.format(symbol=symbol)
     params = {"range": range_, "interval": interval, "includePrePost": "false"}
+    if events:
+        params["events"] = "div,splits"
     response: httpx.Response | None = None
     waits = RETRY_WAITS if retry else ()
     for attempt in range(len(waits) + 1):
@@ -291,5 +300,5 @@ async def yahoo_daily(
     """Daily bars from `start` (the smallest Yahoo range covering it) up to the last
     completed session."""
     days = (now.date() - start).days + 1
-    chart = await yahoo_chart(http, symbol, range_=daily_range(days), interval="1d")
+    chart = await yahoo_chart(http, symbol, range_=daily_range(days), interval="1d", events=True)
     return chart, [b for b in daily_bars(chart, now) if b.date >= start]

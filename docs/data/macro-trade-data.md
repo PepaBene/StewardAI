@@ -37,9 +37,21 @@ Applies to `macro_observation`, `trade_observation`, `exposure_mapping` (code in
 - Flows: `export`, `import`, `re_export`, `re_import`. Quantity (`quantity`, `quantity_unit`) and
   net weight in kg (`net_weight`) are separate columns; a zero quantity with unit N/A is NULL.
 - HS revisions are stored canonically (`HS2022`, not `H6`). `exposure_mapping.hs_code` requires
-  `hs_revision`. `hs_concordance` is seeded at chapter level only (HS2017 <-> HS2022 chapters have
-  the same numbering); 4/6-digit mappings need the WCO correlation tables
-  (`steward.macro.hs.concordance_rows`) and are "unknown" until loaded.
+  `hs_revision`. `hs_concordance` holds, besides the 97 chapters, the **6-digit correspondence
+  tables of the UN Statistics Division** (free, official, no key; migration
+  `20261007160000_hs_concordance_subheadings`): HS2022 -> HS2017 (15,656 pairs) and HS2017 ->
+  HS2012 (6,140 pairs), each row with its `source_url` and `source_sha256`. Reproduce or extend it
+  with `python -m steward.reference.hs_concordance fetch HS2022 HS2017 --emit-sql seed.sql`
+  (`--load` writes to `DATABASE_URL`); the parser checks every relationship label against the
+  degree of the pairs before it writes anything. Revisions are not chained: a pair with no loaded
+  table is "unknown", never "same".
+- `reference.hs_concordance.equivalence(code, from, to)` answers for 2-, 4- and 6-digit codes:
+  `identical` (a 1:1 row), `aggregate_identical` (a chapter or heading whose 6-digit rows all stay
+  inside it, so its trade adds up the same although its subheadings were re-cut), `related` (split
+  or merged: the target codes are listed, never summed) or `unknown`. The holding data context
+  (`trade_exposure`) uses it: an exposure mapped in HS2022 reads HS2017 trade rows only through
+  `identical`/`aggregate_identical`, labels each row's `revision_basis`, prefers the mapping's own
+  revision for the same flow, and lists non-comparable revisions in `revision_notes`.
 - `trade_metrics` reports export and import growth and partner concentration separately, excludes
   the World aggregate from concentration, treats a missing value as missing, and compares only
   adjacent periods.

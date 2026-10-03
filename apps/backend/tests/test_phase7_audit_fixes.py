@@ -474,7 +474,7 @@ async def test_consensus_revisions_are_computed_per_provider(backend_pool: async
     assert by_provider["issuer_ir"].revision_since_previous == Decimal("0.10")
     # One vintage of its own: no revision, instead of 5.00 - 1.10 across providers.
     assert by_provider["other_ir"].revision_since_previous is None
-    ctx = await company_context(backend_pool, TICKER, at("2026-09-01"))
+    ctx = await company_context(backend_pool, TICKER, at("2026-09-01"), enforce_gates=False)
     forward_claims = [c for c in ctx.claims if c.domain == "forward"]
     assert {c.value for c in forward_claims} == {Decimal("1.10"), Decimal("5.00")}
 

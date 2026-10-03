@@ -33,6 +33,7 @@ from steward.free_source_reads import (
 )
 from steward.geo_codes import has_iso_columns, reporter_codes, reporter_match_sql, to_iso
 from steward.macro.read import MacroContext, context_for_holding
+from steward.reference.hs_concordance import equivalence
 
 ROW_LIMIT = 300
 
@@ -85,6 +86,13 @@ class TradeRow(BaseModel):
     quantity_unit: str | None
     known_at: dt.datetime
     source_url: str
+    revision_basis: str = Field(
+        default="same revision as the exposure mapping",
+        description="How this row's HS code relates to the exposure mapping's code: the same "
+        "revision, a 1:1 correspondence in the UN Statistics Division table, or an aggregate "
+        "(chapter or heading) whose subheadings stay inside it. Rows whose code is only "
+        "related (split or merged) are never listed here; see `revision_notes`.",
+    )
 
 
 class TradeExposure(BaseModel):
@@ -100,6 +108,12 @@ class TradeExposure(BaseModel):
         "suppliers, and rows for different partners are listed, never summed."
     )
     gap: str | None = None
+    revision_notes: list[str] = Field(
+        default_factory=list,
+        description="Trade rows that exist under another HS revision but are not comparable "
+        "with this mapping's code (the code was split or merged, or no correspondence table is "
+        "loaded for the pair). They are not shown and not summed.",
+    )
 
 
 class Disagreement(BaseModel):
@@ -195,6 +209,49 @@ def build_financial_history(rows: list[dict[str, Any]], limit: int = ROW_LIMIT) 
     )
 
 
+async def _revision_targets(
+    pool: asyncpg.Pool, code: str, revision: str | None
+) -> tuple[list[tuple[str, str, str]], list[str]]:
+    """(revision, code, basis) triples to read trade for, and notes on revisions that hold rows
+    but cannot be compared. Without a recorded revision the code alone is read, as before."""
+    if revision is None:
+        return [], []
+    known = [
+        r["hs_revision"]
+        for r in await pool.fetch(
+            "select distinct hs_revision from public.trade_observation",
+        )
+        if r["hs_revision"] != revision
+    ]
+    targets = [(revision, code, "same revision as the exposure mapping")]
+    notes: list[str] = []
+    for other in sorted(known):
+        eq = await equivalence(pool, code, revision, other)
+        if eq.comparable:
+            targets.extend((other, c, f"{other} {eq.basis}") for c in eq.codes)
+            continue
+        probe = [c + "%" for c in (eq.codes or (code,))]
+        held = await pool.fetchval(
+            "select exists(select 1 from public.trade_observation"
+            " where hs_revision=$1 and hs_code like any($2::text[]))",
+            other,
+            probe,
+        )
+        if not held:
+            continue  # nothing recorded under that revision for this product: nothing to say
+        if eq.status == "related":
+            notes.append(
+                f"HS {code} ({revision}) is {eq.relation} with {', '.join(eq.codes)} in {other}; "
+                f"{other} rows are not comparable and are not shown."
+            )
+        else:
+            notes.append(
+                f"{other} rows exist but no correspondence table links HS {code} ({revision}) "
+                f"to {other}; they are not shown."
+            )
+    return targets, notes
+
+
 async def trade_exposure(
     pool: asyncpg.Pool, effects: list[Any], as_of: dt.datetime
 ) -> list[TradeExposure]:
@@ -205,6 +262,19 @@ async def trade_exposure(
         if not effect.hs_code or (effect.geography, effect.hs_code) in seen:
             continue
         seen.add((effect.geography, effect.hs_code))
+        # The mapping's own HS revision decides which codes are the same product in another
+        # revision (UNSD correspondence tables); a code with no recorded revision is read as is.
+        revision = await pool.fetchval(
+            "select hs_revision from public.exposure_mapping where issuer_id=$1 and hs_code=$2"
+            " and weight>0 order by (created_at <= $3) desc, created_at desc, id desc limit 1",
+            getattr(effect, "issuer_id", None),
+            effect.hs_code,
+            as_of,
+        )
+        targets, notes = await _revision_targets(pool, effect.hs_code, revision)
+        pairs_rev = [t[0] for t in targets] or None
+        pairs_code = [t[1] for t in targets] or None
+        basis_of = {(t[0], t[1]): t[2] for t in targets}
         # The exposure geography is ISO alpha-2; Comtrade stores M49 numbers (US = 842).
         codes = reporter_codes(effect.geography) if effect.geography else None
         reporter_filter = reporter_match_sql(has_iso, 2) if codes else "$2::text[] is null"
@@ -214,19 +284,36 @@ async def trade_exposure(
                         reporter,partner,flow,hs_revision,hs_code,period,trade_value,quantity,
                         quantity_unit,known_at,source_url
                  from public.trade_observation
-                 where hs_code=$1 and ({reporter_filter}) and known_at <= $3
+                 where ((hs_code=$1 and $4::text[] is null)
+                        or (hs_revision,hs_code) in
+                           (select * from unnest($4::text[],$5::text[])))
+                   and ({reporter_filter}) and known_at <= $3
                  order by reporter,partner,flow,hs_revision,hs_code,period,known_at desc
+               ), one as (
+                 -- the same flow in two revisions is one fact: keep the mapping's own revision
+                 select distinct on (reporter,partner,flow,period) *
+                 from latest
+                 order by reporter,partner,flow,period,(hs_revision=$6) desc nulls last,
+                          known_at desc
                )
-               select * from latest
-               where period=(select max(period) from latest)
+               select * from one
+               where period=(select max(period) from one)
                order by trade_value desc nulls last,reporter,partner,flow limit 20""",  # noqa: S608 - the filter is built from constants
             effect.hs_code,
             codes,
             as_of,
+            pairs_rev,
+            pairs_code,
+            revision,
         )
         trade_rows = [
             TradeRow(
-                **dict(r), reporter_iso=to_iso(r["reporter"]), partner_iso=to_iso(r["partner"])
+                **dict(r),
+                reporter_iso=to_iso(r["reporter"]),
+                partner_iso=to_iso(r["partner"]),
+                revision_basis=basis_of.get(
+                    (r["hs_revision"], r["hs_code"]), "revision of the mapping not recorded"
+                ),
             )
             for r in rows
         ]
@@ -242,6 +329,7 @@ async def trade_exposure(
                 gap=None
                 if trade_rows
                 else "No trade observations were known for this product by the cutoff.",
+                revision_notes=notes,
             )
         )
     return out

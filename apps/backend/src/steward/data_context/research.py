@@ -26,6 +26,7 @@ from steward.free_source_reads import (
     patent_trend_rows,
 )
 from steward.geo_codes import has_iso_columns, reporter_codes, reporter_match_sql
+from steward.verify_sources.enforce import Enforcement, conclusion_gate, signal_gate
 
 Domain = Literal[
     "macro",
@@ -267,11 +268,73 @@ async def industry_context(
     return context
 
 
+# Derived company claims and the Phase 8 gate that must be open before they are offered to a
+# writer (audit B46; the same mapping the alert evaluator uses). Stored financial facts and
+# company-research datasets are source observations, not derived signals, and are not gated.
+EDGE_SIGNAL = {
+    "customer": "customer_concentration",
+    "supplier": "supplier_dependency",
+    "acquirer": "deal_state",
+    "acquired": "deal_state",
+}
+FORWARD_SIGNAL = "analyst_consensus_vintage"
+PATENT_CONCLUSION = "patent_alert"
+
+
+async def _enforce_gates(pool: asyncpg.Pool) -> bool:
+    """`free_source_alerts.enforce_verification_gates` of the active event rules (default on)."""
+    from steward.config.event_rules import EventRulesConfig
+    from steward.config.store import load_active
+
+    try:
+        stored = await load_active(pool, "event_rules", EventRulesConfig)
+    except (asyncpg.PostgresError, asyncpg.InterfaceError, OSError):
+        return True  # cannot tell: stay closed
+    rules = stored.body if stored else EventRulesConfig()
+    return rules.free_source_alerts.enforce_verification_gates
+
+
+def _withheld(domain: str, what: str, gate: Enforcement) -> ContextGap:
+    return ContextGap(
+        domain=domain,
+        reason=f"Withheld, not missing: {what} is not offered until its verification gate "
+        f"({gate.kind} {gate.subject}) is open: {'; '.join(gate.reasons) or 'closed'}.",
+    )
+
+
 async def company_context(
-    pool: asyncpg.Pool, ticker: str, as_of: dt.datetime | None = None, limit: int = 60
+    pool: asyncpg.Pool,
+    ticker: str,
+    as_of: dt.datetime | None = None,
+    limit: int = 60,
+    *,
+    enforce_gates: bool | None = None,
 ) -> ResearchContext:
+    """Claims about one company that a writer may cite.
+
+    Derived claims (confirmed customer, supplier and deal edges, consensus estimates, patent
+    trend counts) pass the Phase 8 gate of their signal first (audit B46): a closed gate, or
+    one that cannot be evaluated, withholds those claims and says so as a gap. `enforce_gates`
+    defaults to the active event rules' `enforce_verification_gates`."""
     when = cutoff(as_of)
     claims: list[Claim] = []
+    withheld: list[ContextGap] = []
+    enforce = await _enforce_gates(pool) if enforce_gates is None else enforce_gates
+    verdicts: dict[tuple[str, str], Enforcement] = {}
+
+    async def blocked(kind: str, name: str) -> Enforcement | None:
+        """The closed gate for this signal/conclusion, or None when it may be offered."""
+        if not enforce:
+            return None
+        key = (kind, name)
+        if key not in verdicts:
+            verdicts[key] = await (
+                signal_gate(pool, name, now=when)
+                if kind == "signal"
+                else conclusion_gate(pool, name, now=when)
+            )
+        return None if verdicts[key].allowed else verdicts[key]
+
     facts = await financial_history_rows(pool, ticker, when)
     seen: set[tuple[str, dt.date | None, dt.date, str, str | None]] = set()
     for f in facts:  # newest period first, latest revision first within a period
@@ -317,6 +380,10 @@ async def company_context(
         latest_forward.setdefault(
             (fr["kind"], fr["provider"] or "", fr["metric"], fr["fiscal_period"]), fr
         )
+    forward_block = await blocked("signal", FORWARD_SIGNAL) if latest_forward else None
+    if forward_block is not None:
+        withheld.append(_withheld("forward", "analyst consensus and estimates", forward_block))
+        latest_forward = {}
     for (kind, provider, metric, period), fr in sorted(latest_forward.items())[:10]:
         claims.append(
             _claim(
@@ -375,7 +442,17 @@ async def company_context(
         when,
         when.date(),
     )
+    shown_edges = []
     for e in edges:
+        signal = EDGE_SIGNAL.get(e["edge_type"])
+        edge_block = await blocked("signal", signal) if signal else None
+        if edge_block is not None:
+            withheld.append(
+                _withheld("business_network", f"{e['edge_type']} relationships", edge_block)
+            )
+            continue
+        shown_edges.append(e)
+    for e in shown_edges:
         claims.append(
             _claim(
                 claim_id=f"edge:{e['id']}",
@@ -393,6 +470,10 @@ async def company_context(
             )
         )
     patent_rows = await patent_trend_rows(pool, ticker, when)
+    patent_block = await blocked("conclusion", PATENT_CONCLUSION) if patent_rows else None
+    if patent_block is not None:
+        withheld.append(_withheld("patents", "patent family counts", patent_block))
+        patent_rows = []
     patent_known = await pool.fetchval(
         """select max(p.known_at) from public.patent_family p
            join public.patent_family_owner o on o.family_id=p.id
@@ -417,13 +498,28 @@ async def company_context(
                 note="Counts are a signal, not a valuation; direct owners only.",
             )
         )
-    present = {c.domain for c in claims}
+    present = {c.domain for c in claims} | {g.domain for g in withheld}
     gaps = [
         ContextGap(domain=d, reason=f"No {d.replace('_', ' ')} record was known by the cutoff.")
         for d in ("financial", "forward", "company_research", "business_network", "patents")
         if d not in present
     ]
-    return ResearchContext(scope="company", subject=ticker, as_of=when, claims=claims, gaps=gaps)
+    # One gap per withheld domain: several edge types can be blocked by different gates.
+    merged: dict[str, ContextGap] = {}
+    for gap in withheld:
+        prior = merged.get(gap.domain)
+        merged[gap.domain] = (
+            gap
+            if prior is None
+            else ContextGap(domain=gap.domain, reason=f"{prior.reason} {gap.reason}")
+        )
+    return ResearchContext(
+        scope="company",
+        subject=ticker,
+        as_of=when,
+        claims=claims,
+        gaps=gaps + list(merged.values()),
+    )
 
 
 def _shown(value: Decimal) -> str:

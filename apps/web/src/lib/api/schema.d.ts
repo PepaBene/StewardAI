@@ -11105,6 +11105,11 @@ export interface components {
             watch_topics?: string[];
             /** Exposures */
             exposures?: components["schemas"]["Exposure"][];
+            /**
+             * Dividend Withholding Rate
+             * @description Tax withheld at source on this holding's dividends, as a fraction (0.15 = 15%), entered by the owner. Total return reduces each reinvested dividend by it; empty means gross dividends and the return says so.
+             */
+            dividend_withholding_rate?: number | null;
             share_basis?: components["schemas"]["ShareBasis"];
             /**
              * Manual Segments
@@ -18091,6 +18096,11 @@ export interface components {
             notice: string;
             /** Gap */
             gap?: string | null;
+            /**
+             * Revision Notes
+             * @description Trade rows that exist under another HS revision but are not comparable with this mapping's code (the code was split or merged, or no correspondence table is loaded for the pair). They are not shown and not summed.
+             */
+            revision_notes?: string[];
         };
         /** TradeFlowPartners */
         TradeFlowPartners: {
@@ -18220,6 +18230,12 @@ export interface components {
             known_at: string;
             /** Source Url */
             source_url: string;
+            /**
+             * Revision Basis
+             * @description How this row's HS code relates to the exposure mapping's code: the same revision, a 1:1 correspondence in the UN Statistics Division table, or an aggregate (chapter or heading) whose subheadings stay inside it. Rows whose code is only related (split or merged) are never listed here; see `revision_notes`.
+             * @default same revision as the exposure mapping
+             */
+            revision_basis: string;
         };
         /** TrailOut */
         TrailOut: {
@@ -23836,7 +23852,7 @@ export interface operations {
             query: {
                 start: string;
                 end: string;
-                withholding_rate?: number | string;
+                withholding_rate?: number | string | null;
             };
             header?: never;
             path: {

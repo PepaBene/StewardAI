@@ -8902,9 +8902,11 @@
                 {
                   "type": "string",
                   "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+                },
+                {
+                  "type": "null"
                 }
               ],
-              "default": "0",
               "title": "Withholding Rate"
             }
           }
@@ -32066,6 +32068,20 @@
             "type": "array",
             "title": "Exposures"
           },
+          "dividend_withholding_rate": {
+            "anyOf": [
+              {
+                "type": "number",
+                "exclusiveMaximum": 1.0,
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Dividend Withholding Rate",
+            "description": "Tax withheld at source on this holding's dividends, as a fraction (0.15 = 15%), entered by the owner. Total return reduces each reinvested dividend by it; empty means gross dividends and the return says so."
+          },
           "share_basis": {
             "$ref": "#/components/schemas/ShareBasis"
           },
@@ -51775,6 +51791,14 @@
               }
             ],
             "title": "Gap"
+          },
+          "revision_notes": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Revision Notes",
+            "description": "Trade rows that exist under another HS revision but are not comparable with this mapping's code (the code was split or merged, or no correspondence table is loaded for the pair). They are not shown and not summed."
           }
         },
         "type": "object",
@@ -52104,6 +52128,12 @@
           "source_url": {
             "type": "string",
             "title": "Source Url"
+          },
+          "revision_basis": {
+            "type": "string",
+            "title": "Revision Basis",
+            "description": "How this row's HS code relates to the exposure mapping's code: the same revision, a 1:1 correspondence in the UN Statistics Division table, or an aggregate (chapter or heading) whose subheadings stay inside it. Rows whose code is only related (split or merged) are never listed here; see `revision_notes`.",
+            "default": "same revision as the exposure mapping"
           }
         },
         "type": "object",

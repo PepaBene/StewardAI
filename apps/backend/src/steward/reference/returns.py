@@ -49,6 +49,7 @@ class ReturnInputs:
     listing_id: int | None
     action_symbols: list[str]
     ads_ratio: Decimal | None
+    withholding_rate: Decimal = Decimal(0)
 
 
 async def series_currency(
@@ -100,6 +101,9 @@ async def return_inputs(
         listing_id=listing_id,
         action_symbols=sorted(set(names)),
         ads_ratio=Decimal(str(ads)) if ads is not None else None,
+        withholding_rate=Decimal(str(profile.dividend_withholding_rate))
+        if profile and profile.dividend_withholding_rate is not None
+        else Decimal(0),
     )
 
 
@@ -179,9 +183,11 @@ async def compute_for(
     end: dt.date,
     *,
     store: bool,
-    withholding_rate: Decimal = Decimal(0),
+    withholding_rate: Decimal | None = None,
 ) -> dict[str, object]:
-    """One window of one holding's chosen series; `store` is False on the read routes."""
+    """One window of one holding's chosen series; `store` is False on the read routes.
+    `withholding_rate` overrides the holding profile's `dividend_withholding_rate`."""
+    rate = inputs.withholding_rate if withholding_rate is None else withholding_rate
     dividend_currencies = await _foreign_dividends(pool, inputs, start, end)
     fx, fixings = await ecb_fx_to_quote(pool, dividend_currencies, inputs.currency)
     kwargs: dict[str, Any] = dict(
@@ -195,7 +201,7 @@ async def compute_for(
         listing_id=inputs.listing_id,
         action_symbols=inputs.action_symbols,
         ads_ratio=inputs.ads_ratio,
-        withholding_rate=withholding_rate,
+        withholding_rate=rate,
         fx_to_quote=fx or None,
     )
     if store:

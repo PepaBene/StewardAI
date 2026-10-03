@@ -18,6 +18,7 @@ from steward.forward_consensus import observation_key
 from steward.graph.edges import upsert_edge
 from steward.graph.patents import store_patent_family  # noqa: F401 - re-exported
 from steward.market_analysis import UNHANDLED_KINDS, Action, PricePoint, calculate_return
+from steward.reference.adjusted_total_return import split_adjusted_total_return
 from steward.reference.calendar import expected_sessions
 from steward.reference.price_series import series_mic
 from steward.sources.base import AccessResult, AccessState
@@ -488,7 +489,9 @@ async def store_company_edge(
     )
 
 
-RETURN_CALC_VERSION = 2  # 2: session-calendar coverage, deduplicated and split-adjusted actions
+# 3: total return on split-adjusted closes (Stooq/Yahoo); 2: session-calendar coverage,
+# deduplicated and split-adjusted actions
+RETURN_CALC_VERSION = 3
 
 
 @dataclass(frozen=True, slots=True)
@@ -692,21 +695,41 @@ async def compute_returns(
     )
     total_reason = total_result.reason
     total_value = total_result.value
+    total_cov, total_obs, total_bar_type = raw_cov, raw_in, "raw"
     if not raw_points:
         total_reason, total_value = "raw close history is unavailable", None
+        if adjusted_points:
+            # Stooq and Yahoo have no raw closes: their split-adjusted closes carry the return
+            # when the dividends and their completeness genuinely exist (and say which).
+            total_result = await split_adjusted_total_return(
+                pool,
+                source=source,
+                symbol=symbol,
+                points=adjusted_points,
+                confirmed=loaded.actions,
+                owner_verified=actions_complete,
+                action_symbols=action_symbols or [symbol],
+                listing_id=listing_id,
+                start=start,
+                end=end,
+                fx_to_quote=fx_to_quote,
+                withholding_rate=withholding_rate,
+            )
+            total_reason, total_value = total_result.reason, total_result.value
+            total_cov, total_obs, total_bar_type = adj_cov, adj_in, "adjusted"
     elif not actions_complete:
         total_reason, total_value = "corporate-action coverage is incomplete", None
     total_row = ReturnRow(
         "total_return",
         total_value,
-        raw_cov,
-        raw_in,
+        total_cov,
+        total_obs,
         ([total_reason] if total_reason else []) + list(total_result.incomplete),
         {
             **base,
             **total_result.details,
             "reason": total_reason,
-            "bar_type": "raw",
+            "bar_type": total_bar_type,
             "actions": len(loaded.actions),
         },
     )
@@ -716,6 +739,7 @@ async def compute_returns(
         [(a.kind, a.ex_date, a.ratio, a.cash, a.currency, a.source) for a in loaded.actions],
         withholding_rate,
         sorted((fx_to_quote or {}).items()),
+        total_result.details,
         RETURN_CALC_VERSION,
     )
     output: dict[str, object] = {

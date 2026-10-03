@@ -222,6 +222,15 @@ class HoldingProfile(ConfigModel):
     watch_topics: list[ShortText] = Field(default_factory=list)
     exposures: list[Exposure] = Field(default_factory=list)
 
+    dividend_withholding_rate: float | None = Field(
+        default=None,
+        ge=0,
+        lt=1,
+        description="Tax withheld at source on this holding's dividends, as a fraction (0.15 = "
+        "15%), entered by the owner. Total return reduces each reinvested dividend by it; "
+        "empty means gross dividends and the return says so.",
+    )
+
     # SEC XBRL fundamentals: the 13F share basis and revenue breakdowns entered by hand.
     share_basis: ShareBasis = Field(default_factory=ShareBasis)
     manual_segments: list[ManualSegmentRow] = Field(

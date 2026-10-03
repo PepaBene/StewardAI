@@ -974,7 +974,7 @@ async def holding_returns(
     _owner: Owner,
     start: Annotated[date, Query()],
     end: Annotated[date, Query()],
-    withholding_rate: Annotated[Decimal, Query(ge=0, lt=1)] = Decimal(0),
+    withholding_rate: Annotated[Decimal | None, Query(ge=0, lt=1)] = None,
 ) -> dict[str, Any]:
     """Raw price, adjusted price and total return of the holding's chosen series (the one every
     reader serves). Computed on request and never written: the scheduled `returns_refresh` job

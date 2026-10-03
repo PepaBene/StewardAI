@@ -871,7 +871,7 @@ async def test_a16_returns_use_the_chosen_series_without_writing_and_the_job_sto
         " from public.price_return_series where start_date = '2026-08-26'"
     )
     assert {r["adjustment_basis"] for r in rows} == {"price_raw", "price_adjusted", "total_return"}
-    assert {(r["symbol"], r["source"], r["calc_version"]) for r in rows} == {("CEZ.PR", "yahoo", 2)}
+    assert {(r["symbol"], r["source"], r["calc_version"]) for r in rows} == {("CEZ.PR", "yahoo", 3)}
     assert all(r["inputs_digest"] for r in rows)
     count = await backend_pool.fetchval("select count(*) from public.price_return_series")
     assert await run_job(backend_pool, "returns_refresh", handler, trigger="manual") == "succeeded"
@@ -907,7 +907,7 @@ async def test_price_return_series_is_versioned_not_overwritten(
         "select calc_version, value from public.price_return_series"
         " where symbol = 'A' and adjustment_basis = 'price_raw' order by calc_version"
     )
-    assert [(r["calc_version"], r["value"]) for r in versions] == [(1, D("0.1")), (2, D("0.1"))]
+    assert [(r["calc_version"], r["value"]) for r in versions] == [(1, D("0.1")), (3, D("0.1"))]
 
 
 # ------------------------------------------------------------------ A16 diagnostics

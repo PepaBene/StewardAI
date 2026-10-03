@@ -411,6 +411,17 @@ async def seed_company(p: asyncpg.Pool, ids: dict[str, int]) -> None:
     )
 
 
+async def gates_off(pool: asyncpg.Pool) -> None:
+    """Store event rules that do not consult the Phase 8 gates (see test_derived_claim_gates)."""
+    from steward.config.event_rules import EventRulesConfig
+    from steward.config.store import save_config
+
+    rules = EventRulesConfig()
+    rules.free_source_alerts.enforce_verification_gates = False
+    async with pool.acquire() as conn:
+        await save_config(conn, "event_rules", rules, created_by=None, note="test")
+
+
 @pytest.mark.db
 async def test_holding_data_context_composes_provenance_disagreements_and_gaps(
     backend_pool: asyncpg.Pool, api: httpx.AsyncClient
@@ -610,6 +621,7 @@ async def test_research_context_claims_carry_known_as_of_and_respect_cutoff(
 ) -> None:
     ids = await seed_world(backend_pool)
     await seed_company(backend_pool, ids)
+    await gates_off(backend_pool)  # derived-claim gating has its own tests
 
     country = (
         await api.get("/research-context/country/de", params={"as_of": "2026-09-10T00:00:00Z"})

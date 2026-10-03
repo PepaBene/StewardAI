@@ -211,19 +211,30 @@ route is owner-only and enqueues a `manual` job.
   domain) or `signal_gate` (signal audit) first; both fail closed, so a gate that cannot be
   evaluated refuses. Default is enforcing (`enforce_verification_gates`): a fresh deployment raises
   no credit, trade, patent or graph alert until reconciliation or signal-audit data exists.
+- **Derived claims offered to writers** (`data_context/research.company_context`, which feeds
+  research notes and chat): confirmed customer, supplier and deal edges pass `signal_gate`
+  (`customer_concentration`, `supplier_dependency`, `deal_state`), consensus estimates pass
+  `analyst_consensus_vintage`, and patent family counts pass the `patent_alert` reconciliation
+  gate. A closed gate, or one that cannot be evaluated, withholds those claims and the context says
+  so in a gap ("Withheld, not missing"); stored financial facts and company-research datasets are
+  observations, not derived signals, and are not gated. The same `enforce_verification_gates`
+  setting governs it; the gate is evaluated at the context's own cutoff, so an audit dated later
+  cannot open a historical report.
 - **Collectors' hard stop**: `record_provider_attempt` hard-blocks paid-only and rejected-key
   outcomes and records a server Retry-After, and `PostgresRequestGovernor.reserve` refuses those
-  endpoints for every caller. A 429 *without* a Retry-After is deliberately recorded as a
-  transient attempt that leaves the gate open (audit A6); the window that `enforce.record_outcome`
-  derives from the allowance period is not applied by the collectors, none of which call it.
+  endpoints for every caller (the `provider_gate_open` rule in SQL; `disable_policy` is proven to
+  agree with it). A 429 *without* a Retry-After is deliberately recorded as a transient attempt
+  that leaves the gate open (audit A6); `enforce.record_outcome` (which would close it until the
+  allowance resets) is therefore not wired into the collectors.
 
 It does **not** gate the read models: valuation ratios, the insider net-discretionary summary,
-segment, concentration and consensus panels are always served, as data with its sources, not as
-alerts or conclusions. There is no price, return, corporate-action or fund-overlap alert in the
-code, so the `price_alert`, `return_alert`, `corporate_action_alert` and `fund_overlap_alert`
-conclusion kinds have no caller yet; `valuation_conclusion` likewise (nothing publishes a
-valuation verdict). Collectors keep the budgets registered in `verify_sources/budgets.py` (checked
-by `test_every_budget_construction_in_the_code_is_registered`) and do not call
+segment, concentration and consensus panels are always served to the owner's UI, as data with its
+sources, not as alerts or conclusions (gating them would blank the owner's own screens; making
+their derived fields nullable would break the web contract). There is no price, return,
+corporate-action or fund-overlap alert and no valuation verdict in the code, so the `price_alert`,
+`return_alert`, `corporate_action_alert`, `fund_overlap_alert` and `valuation_conclusion` kinds have
+no caller yet. Collectors keep the budgets registered in `verify_sources/budgets.py` (checked by
+`test_every_budget_construction_in_the_code_is_registered`) and do not call
 `reserve_for_endpoint`. A new alert or published conclusion must call `conclusion_gate` /
 `signal_gate` (or `require_conclusion` / `pre_publish_check`) before it is raised.
 

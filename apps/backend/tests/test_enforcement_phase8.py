@@ -385,3 +385,17 @@ def test_enforce_has_production_callers() -> None:
         and "verify_sources.enforce" in path.read_text(encoding="utf-8")
     ]
     assert "steward/free_source_alerts.py" in callers, callers
+    # Derived claims offered to research notes and chat pass the same gates (audit B46).
+    assert "steward/data_context/research.py" in callers, callers
+
+
+def test_no_overage_providers_cite_the_page_they_were_read_from() -> None:
+    """Audit item: the list came from public pricing pages. Each entry now carries the official
+    URLs and the date it was re-read, and the two dictionaries cover the same providers."""
+    from steward.verify_sources.budgets import NO_OVERAGE_EVIDENCE, NO_OVERAGE_PROVIDERS
+
+    assert set(NO_OVERAGE_EVIDENCE) == set(NO_OVERAGE_PROVIDERS)
+    for provider, evidence in NO_OVERAGE_EVIDENCE.items():
+        assert evidence["checked"] >= "2026-10-03", provider
+        assert all(u.strip().startswith("https://") for u in evidence["urls"].split(";")), provider
+        assert evidence["note"], provider

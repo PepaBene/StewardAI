@@ -69,6 +69,7 @@ from steward.sources.nport import NportError, parse_nport
 from steward.sources.pdmr_uk import parse_pdmr_notification
 from steward.sources.schedule13 import Schedule13Error, parse_schedule13_xml
 from steward.sources.yahoo import YahooError, parse_chart, yahoo_intraday
+from steward.sources.yahoo_events import parse_events
 
 FIX = Path(__file__).parent / "fixtures"
 CON = FIX / "contracts"
@@ -337,6 +338,15 @@ PARSER_CASES: list[ParserCase] = [
         lambda b: parse_chart("MSFT", b),
         lambda: jfix("prices", "yahoo_msft_5m.json"),
         (YahooError,),
+    ),
+    ParserCase(
+        "yahoo_events",
+        "steward.sources.yahoo_events",
+        parse_events,
+        lambda: jfix("prices", "yahoo_events_vod_l.json"),
+        (ValueError,),
+        rows=lambda e: len(e.dividends) + len(e.splits),
+        min_rows=3,
     ),
     ParserCase(
         "pse_index_page",

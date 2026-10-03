@@ -77,7 +77,7 @@ success for your account.
 | EODHD | `EODHD_API_KEY` | eodhd.com free plan | 20 requests/day, one year of history | last-resort price-gap fallback in `price_history` only | end of day |
 | Finnhub | `FINNHUB_API_KEY` | finnhub.io dashboard | free-account limits | US earnings calendar, US company news, `/stock/metric` valuation cross-check, owner-triggered peer/EPS surprise refresh, optional fund/ownership probes | calendar daily; news minutes |
 | FMP | `FMP_API_KEY` | financialmodelingprep.com | Basic 250 requests/day | access probes only (`source_audit`, `fund_probes`); no data consumer reads FMP rows except the probed fund records | n/a |
-| Twelve Data | `TWELVE_DATA_API_KEY` | twelvedata.com | credit/minute/day limits | access probes only (`source_audit`); no consumer yet | n/a |
+| Twelve Data | `TWELVE_DATA_API_KEY` | twelvedata.com | Basic: 8 credits/minute, 800/day (see licence caveat below) | access probes only (`source_audit`); no consumer yet | n/a |
 | FRED / ALFRED | `FRED_API_KEY` | fredaccount.stlouisfed.org | generous; key required | US CPI, unemployment, Fed funds in `macro_collect` and vintage history (`alfred` rows) | release day; revisions kept as new vintages |
 | UN Comtrade | `UN_COMTRADE_API_KEY` | comtradedeveloper.un.org (free registered subscription key) | 500 calls/day, 100k rows/call | reporter/partner/HS trade slices in `public_data_collect` (needs provider enabled, key, and an open provider gate), mapped exposure trade alerts | annual slice (the collector requests `/C/A/HS`), published months after year end |
 | EPO OPS | `EPO_OPS_CLIENT_ID`, `EPO_OPS_CLIENT_SECRET` | developers.epo.org OAuth client | about 4 GB/week | owner-triggered patent family refresh, patent trends, legal-status alerts | publication about 18 months after filing; legal status as EPO updates it |
@@ -202,3 +202,27 @@ counted in the job step.
    `provider_access.state`. Preserve the last good observation in every case.
 4. Never retry a paid/authentication denial until configuration changes. Redact query keys and
    headers from logs and evidence.
+
+## No-overage providers: re-verified 2026-10-03
+
+`NO_OVERAGE_PROVIDERS` (`verify_sources/budgets.py`) lists the credentialed providers whose free key
+cannot bill per call, so their endpoints need no ledger quota to pass the zero-cost gate. The list
+used to come from public pricing pages; it was re-read from the providers' own pages on 2026-10-03
+(`NO_OVERAGE_EVIDENCE` holds the URLs and date; a test requires both):
+
+| Provider | Official page | What it says | Verdict |
+|---|---|---|---|
+| FRED | fred.stlouisfed.org/docs/api/terms_of_use.html, api_key.html | no fee or paid tier is mentioned; the Federal Reserve Bank of St. Louis "may impose or adjust the limit on ... bandwidth ... or the number of transactions" and may disable access | no overage; numeric limit not published there |
+| Finnhub | finnhub.io/docs/api/rate-limit, terms-of-service | "If your limit is exceeded, you will receive a response with status code 429"; 30 calls/second on every plan; subscription plans only | no overage (the pricing page is script-rendered and unreadable, so the free plan's 60/minute is not re-confirmed) |
+| Twelve Data | twelvedata.com/pricing, /docs (Errors) | Basic is free: 8 API credits/minute, 800/day; "No contracts, no hidden charges"; 429 "API request limit reached for your key. Wait briefly or upgrade your plan" | no overage; **licence caveat** |
+| EPO OPS | epo.org/en/searching-for-patents/data/web-services/ops | non-paying users: up to 4 GB/week, free; paying users: more than 4 GB/week, annual subscription EUR 2,800 | no automatic billing; exceeding the allowance means taking the subscription |
+
+**Twelve Data licence caveat (owner decision).** The Basic plan row on the pricing page says
+"Internal non-display usage: data may be used internally for testing, evaluation, or development
+purposes only; it cannot be displayed to users, shared externally, or used in production systems."
+The key is still free, so the zero-cost gate holds; whether Twelve Data figures may appear in this
+app's screens is a terms question the owner has to answer. Today the key is used for access probes
+and the per-exchange quote probe, not as a displayed price source of record.
+
+Correction made: the EPO entry said billing "needs a signed contract"; the page states a
+self-service annual subscription instead. The gate is unchanged (no entry could bill silently).

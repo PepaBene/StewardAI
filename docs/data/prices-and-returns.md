@@ -69,6 +69,25 @@ clock). `GET /exchange-sessions/{mic}/expected` shows the calendar in force.
   multiplied by the ADS ratio when recorded per ordinary share (`raw.per = "ordinary_share"`),
   and reduced by the stated withholding rate. The fixing dates and the withholding assumption are
   stored in `details`.
+* **Total return for Stooq and Yahoo series** (no raw closes exist for them): computed on the
+  split-adjusted closes, `last * prod(1 + D/close_ex) / first - 1`, with the basis in
+  `details.basis = split_adjusted_close_with_reinvested_dividends` (`reference/adjusted_total_return.py`,
+  `RETURN_CALC_VERSION` 3). Dividends are the owner-confirmed ones (amounts "as declared" are
+  brought onto the closes' basis by every later confirmed split; confirmed splits are never applied
+  to the closes) plus, for a **Yahoo** series only, the dividends Yahoo lists in the same chart
+  answer (`events=div,splits`; stored by `collect_yahoo` as `corporate_action` rows with
+  `status='suggested'`, `source='yahoo'`, amounts split-adjusted; a confirmed or rejected row is
+  never changed by Yahoo, a confirmed dividend wins its ex-date, a rejected one is a veto).
+  Completeness is stated, not assumed: either the owner verified corporate-action coverage, or Yahoo's
+  events were collected over the whole window (`coverage_status yahoo/dividend_events` records the
+  range; a series stored before this existed is refetched once over its full history). The Yahoo
+  basis is flagged as unofficial and unverified against the issuer in `details.warnings`. A confirmed
+  split still visible in the closes, a spin-off/merger/delisting, conflicting sources, a dividend
+  without an ex-date close, a missing FX fixing: unavailable with the reason. **Stooq publishes no
+  dividend history**, so a Stooq series is computable only from owner-confirmed dividends with
+  verified coverage and otherwise says so. `dividend_withholding_rate` in the holding profile (owner
+  entered) reduces reinvested dividends; the `withholding_rate` query parameter overrides it;
+  empty means gross.
 * `price_raw` is the raw closes with no action applied; `price_adjusted` uses the adjusted bars;
   `total_return` needs raw closes, confirmed actions and owner-verified action coverage. A
   confirmed spin-off, merger, delisting or symbol change inside the window makes total return

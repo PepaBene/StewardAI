@@ -59,6 +59,7 @@ from steward.reference.price_series import (
     index_symbols,
     series_mic,
 )
+from steward.reference.yahoo_actions import needs_history_refetch, store_events
 from steward.settings import get_settings
 from steward.sources import yahoo
 from steward.sources.base import AccessResult, AccessState
@@ -81,6 +82,7 @@ from steward.sources.market import (
     stooq_daily,
 )
 from steward.sources.store import CoverageUpdate, record_access, update_coverage
+from steward.sources.yahoo_events import parse_events
 
 GAPS_KEY = "price_gaps"
 CHECKS_KEY = "price_checks"
@@ -282,6 +284,10 @@ async def collect_yahoo(
     restatement rules as Stooq; the quote currency Yahoo reports is stored with the bars."""
     ref = SeriesRef(symbol, "yahoo")
     last, full_start, backfill, state_key = await _backfill_start(pool, deps, ref, years)
+    # Dividends and splits come with the bars: a series stored before they were collected is
+    # fetched over its whole history once, so the events cover the same range as the bars.
+    backfill = backfill or await needs_history_refetch(pool, symbol, full_start)
+    refetched = backfill
     start = last - dt.timedelta(days=RECENT_DAYS) if last and not backfill else full_start
     try:
         chart, bars = await _yahoo_daily(pool, deps, symbol, start)
@@ -298,9 +304,42 @@ async def collect_yahoo(
             chart, bars = await _yahoo_daily(pool, deps, symbol, full_start)
         except (yahoo.YahooError, httpx.HTTPError, ValueError) as exc:
             return 0, f"Yahoo restated history; refetch failed: {describe(exc)}"[:300]
+        refetched = True
         if notes is not None:
             notes[symbol] = f"history restated by Yahoo; refetched {len(bars)} bars"
-    return await store_bars(pool, bars, "yahoo", chart.meta.currency), None
+    stored = await store_bars(pool, bars, "yahoo", chart.meta.currency)
+    await _store_yahoo_events(pool, symbol, chart, full_history=refetched, notes=notes)
+    return stored, None
+
+
+async def _store_yahoo_events(
+    pool: asyncpg.Pool,
+    symbol: str,
+    chart: yahoo.YahooChart,
+    *,
+    full_history: bool,
+    notes: dict[str, str] | None,
+) -> None:
+    """Keep the dividends and splits of the answer as unconfirmed evidence (never raises: the
+    bars are already stored, and a bad events block must not lose them)."""
+    try:
+        events = parse_events(chart.body)
+    except ValueError as exc:
+        if notes is not None:
+            notes[f"{symbol}:events"] = f"Yahoo events unreadable: {exc}"[:200]
+        return
+    zone = chart.meta.zone()
+    days = [b.ts.astimezone(zone).date() for b in chart.bars]
+    listing_id, _ = await resolve_series_listing(pool, symbol, "yahoo")
+    await store_events(
+        pool,
+        symbol,
+        events,
+        listing_id=listing_id,
+        first_session=min(days, default=None),
+        last_session=max(days, default=None),
+        full_history=full_history,
+    )
 
 
 async def collect_series(

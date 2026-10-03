@@ -1,0 +1,34 @@
+{
+ "chart": {
+  "result": [
+   {
+    "meta": {
+     "currency": "GBp",
+     "symbol": "VOD.L",
+     "exchangeTimezoneName": "Europe/London"
+    },
+    "events": {
+     "dividends": {
+      "1763625600": {
+       "amount": 1.9512,
+       "date": 1763625600
+      },
+      "1780556400": {
+       "amount": 2.0074635,
+       "date": 1780556400
+      }
+     },
+     "splits": {
+      "1718026200": {
+       "date": 1718026200,
+       "numerator": 10.0,
+       "denominator": 1.0,
+       "splitRatio": "10:1"
+      }
+     }
+    }
+   }
+  ],
+  "error": null
+ }
+}
