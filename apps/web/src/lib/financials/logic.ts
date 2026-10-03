@@ -40,9 +40,61 @@ function toNumber(value: number | string | null | undefined): number | null {
   return Number.isFinite(n) ? n : null;
 }
 
+/** A date (YYYY-MM-DD) as the end-of-day instant `as_of` expects; null = the current view. The day is a UTC day. */
+export function asOfParam(date: string | null): string | undefined {
+  // The backend compares `known_at <= as_of`; .999999 keeps the whole last second of the day in.
+  return date ? `${date}T23:59:59.999999Z` : undefined;
+}
+
+/** Today's date in the viewer's own time zone (YYYY-MM-DD), for the date picker's upper bound. */
+export function localIsoDate(now: Date = new Date()): string {
+  const m = String(now.getMonth() + 1).padStart(2, "0");
+  const d = String(now.getDate()).padStart(2, "0");
+  return `${now.getFullYear()}-${m}-${d}`;
+}
+
+/** Everything that changes what the financial sections fetch: a change of any part remounts them. */
+export function sectionKey(ticker: string, asOf: string | null, reconciledOnly: boolean, refresh: number): string {
+  return `${ticker}:${asOf ?? "latest"}:${reconciledOnly ? "reconciled" : "all"}:${refresh}`;
+}
+
+const WEB_URL = /^https?:\/\//i;
+/** A link target only when it is an http(s) URL; anything else (javascript:, data:) is never an href. */
+export function safeHref(url: string | null | undefined): string | null {
+  return typeof url === "string" && WEB_URL.test(url.trim()) ? url.trim() : null;
+}
+
 // ---------------------------------------------------------------------------------------
 // Fact selection
 // ---------------------------------------------------------------------------------------
+
+/**
+ * Concepts the backend maps to one line item, best first. Rows of one filing share `known_at`
+ * and `revision`, so without a fixed preference the winner would be whichever row was inserted
+ * last. A concept not listed ranks after every listed one.
+ */
+const CONCEPT_PREFERENCE: Readonly<Record<string, readonly string[]>> = {
+  net_income: ["NetIncomeLoss", "ProfitLossAttributableToOwnersOfParent", "ProfitLoss", "NetIncomeLossAvailableToCommonStockholdersBasic"],
+  capex: ["PaymentsToAcquirePropertyPlantAndEquipment", "PaymentsToAcquireProductiveAssets"],
+  depreciation_amortization: ["DepreciationDepletionAndAmortization", "DepreciationAndAmortization"],
+  cash_from_operations: ["NetCashProvidedByUsedInOperatingActivities", "NetCashProvidedByUsedInOperatingActivitiesContinuingOperations"],
+};
+
+function localConcept(concept: string): string {
+  return concept.split(":").pop() as string;
+}
+
+export function conceptRank(lineItem: string, concept: string): number {
+  const i = (CONCEPT_PREFERENCE[lineItem] ?? []).indexOf(localConcept(concept));
+  return i === -1 ? 100 : i;
+}
+
+/** The newest fact of the single best-ranked concept: facts of different concepts are never compared by recency. */
+export function newestPreferred(lineItem: string, facts: readonly FactRow[]): FactRow | null {
+  if (facts.length === 0) return null;
+  const concepts = [...new Set(facts.map((f) => f.concept))].sort((a, b) => conceptRank(lineItem, a) - conceptRank(lineItem, b) || a.localeCompare(b));
+  return newest(facts.filter((f) => f.concept === concepts[0]));
+}
 
 /** A consolidated, numeric statement fact: not a breakdown, not a text block, has a value. */
 export function isStatementFact(f: FactRow): boolean {
@@ -149,7 +201,69 @@ function periodEndsOf(facts: readonly FactRow[], basis: PeriodBasis): Set<string
   const wanted: PeriodClass = basis === "annual" ? "annual" : "quarter";
   const ends = new Set<string>();
   for (const f of facts) if (isStatementFact(f) && periodClass(f) === wanted) ends.add(f.periodEnd);
+  // A fiscal year end is also the fourth quarter's balance date: a 10-K carries no 3-month flow,
+  // so without this the year-end balance sheet would have no column in the quarterly view.
+  if (basis === "quarter" && ends.size > 0) for (const f of facts) if (isStatementFact(f) && periodClass(f) === "annual") ends.add(f.periodEnd);
   return ends;
+}
+
+function addDays(date: string, n: number): string {
+  return new Date(Date.parse(date) + n * DAY_MS).toISOString().slice(0, 10);
+}
+
+function fiscalYearOf(fp: string | null): string | null {
+  const m = fp ? /^FY(\d{4})/.exec(fp) : null;
+  return m ? m[1] : null;
+}
+
+/**
+ * Discrete quarters computed from cumulative filings: 10-Q cash-flow facts are year to date
+ * (6 and 9 months) and a 10-K carries the 12 months, so Q2 = 6M - 3M, Q3 = 9M - 6M, Q4 = 12M - 9M.
+ * Only where both operands are filed with the same concept and unit, and never where the
+ * quarter itself is filed. Each result has form "derived", unreconciled, with the
+ * arithmetic in `checkNote`.
+ */
+export function deriveDiscreteQuarters(facts: readonly FactRow[]): FactRow[] {
+  const usableFlows = facts.filter((f) => isStatementFact(f) && usable(f) && f.periodStart !== null);
+  const groups = new Map<string, FactRow[]>();
+  for (const f of usableFlows) {
+    const key = [f.statement, f.lineItem, f.concept, f.unit ?? "", f.periodStart].join("|");
+    groups.set(key, [...(groups.get(key) ?? []), f]);
+  }
+  const filedQuarters = new Set(usableFlows.filter((f) => periodClass(f) === "quarter").map((f) => `${f.statement}|${f.lineItem}|${f.concept}|${f.unit ?? ""}|${f.periodEnd}`));
+  const out: FactRow[] = [];
+  for (const group of groups.values()) {
+    const cum = (lo: number, hi: number) => newest(group.filter((f) => { const d = days(f.periodStart as string, f.periodEnd); return d >= lo && d <= hi; }));
+    const steps: { n: number; cur: FactRow | null; prev: FactRow | null }[] = [
+      { n: 2, cur: cum(160, 200), prev: cum(80, 100) },
+      { n: 3, cur: cum(250, 290), prev: cum(160, 200) },
+      { n: 4, cur: cum(330, 380), prev: cum(250, 290) },
+    ];
+    for (const { n, cur, prev } of steps) {
+      if (!cur || !prev || cur.value === null || prev.value === null) continue;
+      if (Date.parse(prev.periodEnd) >= Date.parse(cur.periodEnd)) continue;
+      const key = `${cur.statement}|${cur.lineItem}|${cur.concept}|${cur.unit ?? ""}|${cur.periodEnd}`;
+      if (filedQuarters.has(key)) continue;
+      const year = fiscalYearOf(cur.fiscalPeriod);
+      out.push({
+        ...cur,
+        id: -(cur.id * 10 + n),
+        periodStart: addDays(prev.periodEnd, 1),
+        fiscalPeriod: year ? `FY${year}Q${n}` : null,
+        value: cur.value - prev.value,
+        knownAt: cur.knownAt > prev.knownAt ? cur.knownAt : prev.knownAt,
+        revision: 0,
+        amendsFactId: null,
+        amendsAccession: null,
+        isAmendment: false,
+        accession: null,
+        form: "derived",
+        reconciliation: cur.reconciliation === "reconciled" && prev.reconciliation === "reconciled" ? "reconciled" : "unchecked",
+        checkNote: `Derived: ${cur.periodStart} to ${cur.periodEnd} year-to-date minus ${prev.periodStart} to ${prev.periodEnd} year-to-date`,
+      });
+    }
+  }
+  return out;
 }
 
 /**
@@ -158,7 +272,9 @@ function periodEndsOf(facts: readonly FactRow[], basis: PeriodBasis): Set<string
  * Failed-reconciliation facts are counted, never drawn. A line takes the one concept with
  * the most periods, so two tags of one line item are never mixed within a series.
  */
-export function buildStatement(allFacts: readonly FactRow[], kind: StatementKind, basis: PeriodBasis, maxPeriods = 8): StatementView {
+export function buildStatement(rawFacts: readonly FactRow[], kind: StatementKind, basis: PeriodBasis, maxPeriods = 8): StatementView {
+  const derivedFacts = basis === "quarter" ? deriveDiscreteQuarters(rawFacts.filter((f) => f.statement === kind)) : [];
+  const allFacts = derivedFacts.length > 0 ? [...rawFacts, ...derivedFacts] : rawFacts;
   const ends = periodEndsOf(allFacts, basis);
   const wanted: PeriodClass = basis === "annual" ? "annual" : "quarter";
   const inKind = allFacts.filter((f) => isStatementFact(f) && f.statement === kind && !NOT_STATEMENT_LINES.test(f.lineItem as string));
@@ -166,6 +282,7 @@ export function buildStatement(allFacts: readonly FactRow[], kind: StatementKind
     const c = periodClass(f);
     return c === wanted || (c === "instant" && ends.has(f.periodEnd));
   });
+  const derivedUsed = inBasis.filter((f) => f.form === "derived" && usable(f)).length;
   const counts = { reconciled: 0, unchecked: 0, failed: 0, total: 0 };
   for (const f of inBasis) {
     counts.total += 1;
@@ -194,26 +311,48 @@ export function buildStatement(allFacts: readonly FactRow[], kind: StatementKind
     const unit = [...unitCount.entries()].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))[0][0];
     const sameUnit = facts.filter((f) => (f.unit ?? "") === unit && allEnds.includes(f.periodEnd));
     if (sameUnit.length === 0) continue;
+    // Each period takes the best-ranked concept filed for it (fixed preference, then the concept
+    // with the most periods), so a tag switch does not blank the periods filed under the other tag.
     const conceptEnds = new Map<string, Set<string>>();
     for (const f of sameUnit) conceptEnds.set(f.concept, (conceptEnds.get(f.concept) ?? new Set()).add(f.periodEnd));
-    const concept = [...conceptEnds.entries()].sort((a, b) => b[1].size - a[1].size || a[0].localeCompare(b[0]))[0][0];
-    const chosen = sameUnit.filter((f) => f.concept === concept);
-    const periods: StatementPeriod[] = allEnds.map((end) => ({
-      end,
-      label: labels.get(end) ?? end,
-      versions: toVersions(chosen.filter((f) => f.periodEnd === end)),
-    }));
+    const order = [...conceptEnds.entries()].sort((a, b) => conceptRank(lineItem, a[0]) - conceptRank(lineItem, b[0]) || b[1].size - a[1].size || a[0].localeCompare(b[0])).map(([c]) => c);
+    const chosenBy = new Map<string, string>();
+    for (const end of allEnds) {
+      const c = order.find((cc) => conceptEnds.get(cc)?.has(end));
+      if (c) chosenBy.set(end, c);
+    }
+    const periods: StatementPeriod[] = allEnds.map((end) => {
+      const c = chosenBy.get(end) ?? null;
+      return {
+        end,
+        label: labels.get(end) ?? end,
+        concept: c,
+        versions: c ? toVersions(sameUnit.filter((f) => f.periodEnd === end && f.concept === c)) : [],
+      };
+    });
+    const used_concepts = [...new Set([...chosenBy.values()])];
+    const tally = new Map<string, number>();
+    for (const c of chosenBy.values()) tally.set(c, (tally.get(c) ?? 0) + 1);
+    const concept = [...tally.entries()].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))[0][0];
+    const chosen = sameUnit.filter((f) => chosenBy.get(f.periodEnd) === f.concept);
     lines.push({
       id: lineItem,
       label: chosen.find((f) => f.label)?.label ?? humanize(lineItem),
       statement: kind,
       unit: unit || "units",
       concept,
+      concepts: used_concepts,
       periods,
     });
   }
   lines.sort((a, b) => a.id.localeCompare(b.id));
-  return { kind, basis, lines, periods: allEnds.map((end) => ({ end, label: labels.get(end) ?? end })), counts };
+  const notes: string[] = [];
+  if (derivedUsed > 0) notes.push(`${derivedUsed} quarterly figure${derivedUsed === 1 ? " is" : "s are"} derived, not filed as such: a year-to-date figure minus the previous year-to-date.`);
+  if (basis === "quarter" && kind === "cash_flow" && lines.length > 0) {
+    if (derivedFacts.length === 0) notes.push("Cash-flow statements in quarterly filings are cumulative from the start of the fiscal year; quarters that cannot be derived from filed year-to-date figures are shown as not filed, and the fourth quarter is only in the annual filing.");
+  }
+  if (basis === "quarter" && kind === "balance_sheet" && lines.length > 0) notes.push("A fiscal-year-end balance sheet is shown as the fourth quarter's balance (the annual filing carries it).");
+  return { kind, basis, lines, periods: allEnds.map((end) => ({ end, label: labels.get(end) ?? end })), counts, derivedCount: derivedUsed, notes };
 }
 
 /** The data state a statement view wears, from its reconciliation counts. */
@@ -248,7 +387,7 @@ function factsOf(facts: readonly FactRow[], lineItem: string): FactRow[] {
 }
 
 function pick(facts: readonly FactRow[], lineItem: string, start: string | null, end: string, unit: string | null): FactRow | null {
-  return newest(factsOf(facts, lineItem).filter((f) => f.periodStart === start && f.periodEnd === end && f.unit === unit));
+  return newestPreferred(lineItem, factsOf(facts, lineItem).filter((f) => f.periodStart === start && f.periodEnd === end && f.unit === unit));
 }
 
 export type CashWalkResult = { walk: CashWalk; reason?: undefined } | { walk: null; reason: string };
@@ -268,7 +407,7 @@ export function cashWalkFromFacts(facts: readonly FactRow[]): CashWalkResult {
   for (const c of candidates) {
     const ni = pick(facts, "net_income", c.periodStart, c.periodEnd, c.unit);
     if (!ni) continue;
-    const cfo = newest(cfoFacts.filter((f) => f.periodStart === c.periodStart && f.periodEnd === c.periodEnd && f.unit === c.unit)) as FactRow;
+    const cfo = newestPreferred("cash_from_operations", cfoFacts.filter((f) => f.periodStart === c.periodStart && f.periodEnd === c.periodEnd && f.unit === c.unit)) as FactRow;
     const adjustments: { id: string; label: string; value: number }[] = [];
     const used: FactRow[] = [ni, cfo];
     for (const a of ADJUSTMENT_ITEMS) {
@@ -396,13 +535,13 @@ export function debtFromFacts(facts: readonly FactRow[]): DebtSchedule | null {
   const tranches: { key: string; label: string; amount: number }[] = [];
   const used: FactRow[] = [];
   for (const m of MATURITY_ITEMS) {
-    const f = newest(atEnd.filter((x) => x.lineItem === m.id && (x.unit ?? "") === unit));
+    const f = newestPreferred(m.id, atEnd.filter((x) => x.lineItem === m.id && (x.unit ?? "") === unit));
     if (f) {
       tranches.push({ key: m.id, label: m.label, amount: f.value as number });
       used.push(f);
     }
   }
-  const at = (item: string) => newest(factsOf(facts, item).filter((f) => f.periodEnd === end && f.periodStart === null && (f.unit ?? "") === unit));
+  const at = (item: string) => newestPreferred(item, factsOf(facts, item).filter((f) => f.periodEnd === end && f.periodStart === null && (f.unit ?? "") === unit));
   let total = at("long_term_debt_total") ?? at("borrowings_total");
   let totalBasis: string | null = total ? total.concept : null;
   let reportedTotal = total ? (total.value as number) : null;
@@ -420,7 +559,7 @@ export function debtFromFacts(facts: readonly FactRow[]): DebtSchedule | null {
   for (const l of LEASE_ITEMS) {
     const cands = factsOf(facts, l.id).filter((x) => (x.unit ?? "") === unit && x.periodEnd <= end);
     const latestEnd = cands.map((x) => x.periodEnd).sort().pop();
-    const f = latestEnd ? newest(cands.filter((x) => x.periodEnd === latestEnd)) : null;
+    const f = latestEnd ? newestPreferred(l.id, cands.filter((x) => x.periodEnd === latestEnd)) : null;
     if (f) leases.push({ id: l.id, label: l.label, value: f.value as number, periodEnd: f.periodEnd });
   }
   const first = used[0];
@@ -484,18 +623,36 @@ function localName(member: string): string {
   return member.split(":").pop()!.toLowerCase();
 }
 
+const SEGMENT_AXIS = /(^|:)StatementBusinessSegmentsAxis$/i;
+const CONSOLIDATION_AXIS = /(^|:)ConsolidationItemsAxis$/i;
+
+/** The business-segment member of a fact, when its context is a business-segment breakdown (alone, or with the consolidation axis of ASU 2023-07). */
+function businessSegmentMember(f: FactRow): string | null {
+  const seg = f.members.filter((m) => SEGMENT_AXIS.test(m.axis));
+  if (seg.length !== 1) return null;
+  if (f.members.some((m) => !SEGMENT_AXIS.test(m.axis) && !CONSOLIDATION_AXIS.test(m.axis))) return null;
+  return seg[0].member;
+}
+
 /**
  * Segment operating profit facts (`statement=segment&line_item=operating_income`) matched to
  * the drawn rows by XBRL member, for the same period end and an annual duration.
  */
-function profitFor(rows: readonly { member: string | null }[], periodEnd: string, facts: readonly FactRow[] | null): Map<string, { value: number; concept: string }> {
+function profitFor(rows: readonly { member: string | null }[], periodEnd: string, facts: readonly FactRow[] | null, currency: string): Map<string, { value: number; concept: string }> {
   const out = new Map<string, { value: number; concept: string }>();
   if (!facts) return out;
-  const eligible = facts.filter((f) => f.statement === "segment" && f.lineItem === "operating_income" && f.value !== null && usable(f) && f.periodEnd === periodEnd && periodClass(f) === "annual" && f.members.length === 1);
+  // Only the business-segment axis carries segment profit comparable to the segment revenue rows
+  // (a product or geography member of the same name is a different breakdown); the profit must be
+  // in the revenue's currency.
+  const eligible = facts
+    .filter((f) => f.statement === "segment" && f.lineItem === "operating_income" && f.value !== null && usable(f) && f.periodEnd === periodEnd && periodClass(f) === "annual" && (f.currency ?? f.unit ?? currency) === currency)
+    .map((f) => ({ f, member: businessSegmentMember(f) }))
+    .filter((x): x is { f: FactRow; member: string } => x.member !== null);
   for (const r of rows) {
     if (!r.member) continue;
-    const key = localName(r.member);
-    const f = newest(eligible.filter((x) => localName(x.members[0].member) === key));
+    const exact = eligible.filter((x) => x.member === r.member);
+    const pool = exact.length > 0 ? exact : eligible.filter((x) => localName(x.member) === localName(r.member as string));
+    const f = newest(pool.map((x) => x.f));
     if (f) out.set(r.member, { value: f.value as number, concept: f.concept });
   }
   return out;
@@ -514,7 +671,7 @@ export function buildSegmentSet(data: HoldingSegments, axis: SegmentAxisKey, pro
   if (drawn.length === 0) return null;
   const history = data.history?.[axis] ?? [];
   const priorPoint = history.find((h) => h.period.months === period.months && h.period.basis === period.basis && Math.abs(days(h.period.end, period.end) - 365) <= 20);
-  const profit = axis === "segment" ? profitFor(drawn, period.end, profitFacts) : new Map();
+  const profit = axis === "segment" ? profitFor(drawn, period.end, profitFacts, data.currency) : new Map();
   const segments: SegmentRowView[] = drawn.map((r) => {
     const prior = priorPoint?.rows.find((p) => !p.subtotal && (r.member ? p.member === r.member : p.label === r.label));
     const p = r.member ? profit.get(r.member) : undefined;
@@ -599,8 +756,14 @@ export function seriesId(s: { provider: string | null; currency: string | null; 
   return `${s.provider ?? ""}|${s.currency ?? ""}|${s.basis ?? ""}`;
 }
 
-function vintageDate(o: ForwardObs): string {
-  return (o.vintage ?? o.knownAt).slice(0, 10);
+/** A vintage the provider stated as an ISO date; the backend allows free text (e.g. "Q1 2026 preview"). */
+export function isDateVintage(v: string | null | undefined): v is string {
+  return typeof v === "string" && /^\d{4}-\d{2}-\d{2}(?![\d])/.test(v) && Number.isFinite(Date.parse(v.slice(0, 10)));
+}
+
+/** The date a snapshot is placed at: its stated ISO vintage, else the day it became known. Free-text vintages are labels only. */
+export function vintageDate(o: Pick<ForwardObs, "vintage" | "knownAt">): string {
+  return (isDateVintage(o.vintage) ? o.vintage : o.knownAt).slice(0, 10);
 }
 
 /**
@@ -647,11 +810,36 @@ function pointValues(o: ForwardObs): number[] {
   return [o.value, o.low, o.high].filter((x): x is number => x !== null);
 }
 
-/** Actual values of a metric per fiscal period (annual and quarterly), newest filing per period. */
-export function actualsFor(metric: string, facts: readonly FactRow[]): { points: ActualPoint[]; currency: string | null } {
+/** Chronological order key of a fiscal-period label (FY2025, FY2025Q3, FY2025H1, FY2025M9); NaN when it does not parse. */
+export function fiscalPeriodKey(period: string): number {
+  const m = /^FY(\d{4})(?:Q([1-4])|H([12])|M(\d{1,2}))?$/.exec(period);
+  if (!m) return Number.NaN;
+  const year = Number(m[1]);
+  const within = m[2] ? Number(m[2]) * 25 : m[3] ? Number(m[3]) * 50 : m[4] ? (Number(m[4]) / 12) * 100 : 100;
+  return year * 1000 + within;
+}
+
+export function comparePeriods(a: string, b: string): number {
+  const ka = fiscalPeriodKey(a);
+  const kb = fiscalPeriodKey(b);
+  return Number.isFinite(ka) && Number.isFinite(kb) && ka !== kb ? ka - kb : a.localeCompare(b);
+}
+
+export type ActualGranularity = "annual" | "quarter" | "both";
+
+/**
+ * Actual values of a metric per fiscal period, newest filing per period, oldest period first
+ * (by period end, not by label). `granularity` keeps a chart to one period length: an annual
+ * figure and a quarterly figure are never points of one line.
+ */
+export function actualsFor(metric: string, facts: readonly FactRow[], granularity: ActualGranularity = "both"): { points: ActualPoint[]; currency: string | null } {
   const lineItem = ACTUAL_LINE_ITEM[metric];
   if (!lineItem) return { points: [], currency: null };
-  const f = facts.filter((x) => isStatementFact(x) && usable(x) && x.lineItem === lineItem && x.fiscalPeriod && periodClass(x) !== "other" && periodClass(x) !== "instant");
+  const f = facts.filter((x) => {
+    if (!isStatementFact(x) || !usable(x) || x.lineItem !== lineItem || !x.fiscalPeriod) return false;
+    const c = periodClass(x);
+    return granularity === "both" ? c === "annual" || c === "quarter" : c === granularity;
+  });
   const units = new Map<string, number>();
   for (const x of f) units.set(x.unit ?? "", (units.get(x.unit ?? "") ?? 0) + 1);
   const unit = [...units.entries()].sort((a, b) => b[1] - a[1])[0]?.[0];
@@ -661,11 +849,18 @@ export function actualsFor(metric: string, facts: readonly FactRow[]): { points:
   for (const x of same) byPeriod.set(x.fiscalPeriod as string, [...(byPeriod.get(x.fiscalPeriod as string) ?? []), x]);
   const points: ActualPoint[] = [];
   for (const [period, list] of byPeriod) {
-    const n = newest(list) as FactRow;
-    points.push({ period, value: n.value as number, knownAt: n.knownAt });
+    const n = newestPreferred(lineItem, list) as FactRow;
+    points.push({ period, value: n.value as number, knownAt: n.knownAt, end: n.periodEnd, granularity: periodClass(n) === "annual" ? "annual" : "quarter" });
   }
-  points.sort((a, b) => a.period.localeCompare(b.period));
+  points.sort((a, b) => (a.end === b.end ? comparePeriods(a.period, b.period) : a.end < b.end ? -1 : 1));
   return { points, currency: same[0].currency };
+}
+
+/** The period length a set of forward figures is stated in: the more common of annual (FY2026) and quarterly (FY2026Q1). */
+export function forwardGranularity(periods: readonly string[]): "annual" | "quarter" {
+  const quarters = periods.filter((p) => /Q[1-4]$/.test(p)).length;
+  const annual = periods.filter((p) => /^FY\d{4}$/.test(p)).length;
+  return quarters > annual ? "quarter" : "annual";
 }
 
 /**
@@ -713,10 +908,10 @@ export function buildEstimates(payload: { observations: readonly ForwardObs[]; s
     }
     candidates.push(o);
   }
-  const points = candidates.sort((a, b) => a.fiscalPeriod.localeCompare(b.fiscalPeriod) || a.kind.localeCompare(b.kind));
+  const points = candidates.sort((a, b) => comparePeriods(a.fiscalPeriod, b.fiscalPeriod) || a.kind.localeCompare(b.kind));
 
-  const forwardPeriods = [...new Set(points.map((p) => p.fiscalPeriod))].sort();
-  const act = actualsFor(metric, facts);
+  const forwardPeriods = [...new Set(points.map((p) => p.fiscalPeriod))].sort(comparePeriods);
+  const act = actualsFor(metric, facts, forwardGranularity(forwardPeriods));
   let actuals: ActualPoint[] = act.points;
   let actualsNote: string | null = null;
   if (actuals.length > 0 && currency && act.currency && act.currency !== currency) {
@@ -735,12 +930,12 @@ export function buildEstimates(payload: { observations: readonly ForwardObs[]; s
     }
   }
   const lastActualPeriods = actuals.slice(-4).map((a) => a.period);
-  const periods = [...new Set([...lastActualPeriods, ...forwardPeriods])].sort();
+  const periods = [...new Set([...lastActualPeriods, ...forwardPeriods])].sort(comparePeriods);
 
   const revisions = chosen
     ? consensus
         .filter((s) => seriesId(s) === chosen.id)
-        .sort((a, b) => a.fiscalPeriod.localeCompare(b.fiscalPeriod))
+        .sort((a, b) => comparePeriods(a.fiscalPeriod, b.fiscalPeriod))
         .map((s) => {
           const slope = revisionSlope(s);
           return { period: s.fiscalPeriod, slope, reason: slope ? null : s.vintages.length < 2 ? "One snapshot only: no revision to show." : "Snapshots carry no comparable consensus value." };
@@ -761,20 +956,37 @@ export type Surprise = {
 };
 
 /** Actual versus the consensus the API found before the report. No consensus yields null: nothing is invented. */
-export function surprise(a: Pick<ActualVsConsensus, "actual" | "consensus">): Surprise {
+export function surprise(a: Pick<ActualVsConsensus, "actual" | "consensus"> & { surprisePct?: number | null }): Surprise {
   const actual = a.actual?.value ?? null;
   const c = a.consensus;
   if (actual === null || !c) return { pct: null, position: "no_range" };
-  const pct = isFiniteNumber(c.value) && c.value !== 0 ? actual / c.value - 1 : null;
+  // (actual - expected) / |expected|, as the backend computes it: against a negative consensus a
+  // narrower loss is a beat (positive), not a miss. The API's own figure wins when present.
+  const computed = isFiniteNumber(c.value) && c.value !== 0 ? (actual - c.value) / Math.abs(c.value) : null;
+  const pct = isFiniteNumber(a.surprisePct) ? a.surprisePct : computed;
   if (!isFiniteNumber(c.low) || !isFiniteNumber(c.high)) return { pct, position: "no_range" };
   return { pct, position: actual > c.high ? "above_range" : actual < c.low ? "below_range" : "within_range" };
+}
+
+/** The actual and the consensus mean differ by more than 100x: a unit or scale mismatch, not a surprise. */
+export function avcScaleMismatch(a: Pick<ActualVsConsensus, "actual" | "consensus">): boolean {
+  const actual = a.actual?.value;
+  const mean = a.consensus?.value;
+  if (!isFiniteNumber(actual) || !isFiniteNumber(mean) || actual === 0 || mean === 0) return false;
+  const ratio = Math.abs(actual / mean);
+  return ratio > 100 || ratio < 0.01;
 }
 
 /** Data state of an actual-vs-consensus answer. */
 export function avcState(a: ActualVsConsensus): StateAndReason {
   switch (a.state) {
     case "available":
-      return { state: a.actual?.reconciled ? "verified" : "partial", reason: a.actual?.reconciled ? null : "The reported figure was not covered by a reconciliation check." };
+      if (avcScaleMismatch(a)) return { state: "disputed", reason: "The reported figure and the consensus differ by more than 100x: a unit or scale mismatch, so no surprise is computed." };
+      return {
+        state: a.actual?.reconciled ? "verified" : "partial",
+        // The API reports `reconciled` as false both when no check ran and when a check failed.
+        reason: a.actual?.reconciled ? null : "The reported figure is not confirmed by a reconciliation check (the API does not say whether none ran or one disagreed).",
+      };
     case "no_consensus_before_report":
       return { state: "not_covered", reason: a.reason ?? "No consensus was known before the report." };
     case "currency_mismatch":
@@ -826,8 +1038,10 @@ export function peerComparison(p: PeerMetricsPayload, metricId: string): PeerCom
   const row: PeerMetricRow | undefined = p.metrics.find((m) => m.id === metricId);
   if (!row) return null;
   const meta = PEER_METRIC_META[metricId];
-  const total = p.confirmedPeers.length;
-  const excludedAll = p.confirmedPeers.map((c) => c.peerTicker).filter((t) => !row.included.includes(t));
+  // One confirmed peer can be stored once per source (suggested by a provider and re-added by the owner).
+  const tickers = [...new Set(p.confirmedPeers.map((c) => c.peerTicker))];
+  const total = tickers.length;
+  const excludedAll = tickers.filter((t) => !row.included.includes(t));
   const wholly = new Map(p.excludedPeers.map((e) => [e.peer, e.reason]));
   return {
     id: metricId,

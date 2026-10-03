@@ -2,7 +2,7 @@ import { AXIS_TEXT, SVG_BASE } from "@/components/charts/shared";
 import { ChartFrame } from "@/components/data-state";
 import { formatCompact, formatNumber, formatPct, formatSigned } from "@/lib/charts/format";
 import { bandScale, extent, linearScale, niceTicks } from "@/lib/charts/scale";
-import { cashWalk, type CashWalkResult } from "@/lib/financials/logic";
+import { cashWalk, safeHref, type CashWalkResult } from "@/lib/financials/logic";
 import { formatDate } from "@/lib/format";
 import { cn } from "@/lib/utils";
 
@@ -41,7 +41,7 @@ export function CashWaterfall({ result }: { result: CashWalkResult }) {
   };
   const provenanceBase = {
     source: `${walk.source ?? "Filed statements"}${walk.accessions.length ? ` · ${walk.accessions.join(", ")}` : ""}`,
-    sourceUrl: walk.sourceUrl,
+    sourceUrl: safeHref(walk.sourceUrl),
     asOf: walk.periodEnd,
     knownAt: walk.knownAt,
     method: "Each step is a filed line; free cash flow = filed operating cash flow − filed capital expenditure (derived)",

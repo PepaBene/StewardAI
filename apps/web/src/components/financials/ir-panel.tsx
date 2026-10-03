@@ -3,11 +3,15 @@ import { ExternalLinkIcon } from "lucide-react";
 import { StatePlaceholder } from "@/components/data-state";
 import { Blueprint, PanelHeading } from "@/components/ui/blueprint";
 import type { IrRelease, IrSource } from "@/lib/financials/types";
+import { safeHref } from "@/lib/financials/logic";
 import { formatDate } from "@/lib/format";
 
 function Link({ href, children }: { href: string; children: React.ReactNode }) {
+  const safe = safeHref(href);
+  // A stored URL that is not http(s) (javascript:, data:) is shown as text, never as a link.
+  if (!safe) return <span className="min-w-0 truncate" title="Not an http(s) address, so not linked">{children}</span>;
   return (
-    <a href={href} target="_blank" rel="noreferrer noopener" className="inline-flex max-w-full items-center gap-0.5 text-accent-ink hover:underline">
+    <a href={safe} target="_blank" rel="noreferrer noopener" className="inline-flex max-w-full items-center gap-0.5 text-accent-ink hover:underline">
       <span className="min-w-0 truncate">{children}</span>
       <ExternalLinkIcon aria-hidden="true" className="size-3 shrink-0" />
       <span className="sr-only">(opens in a new tab)</span>

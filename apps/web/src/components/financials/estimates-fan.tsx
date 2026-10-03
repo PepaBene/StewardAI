@@ -8,7 +8,7 @@ import { ChartFrame, Segmented } from "@/components/data-state";
 import { formatNumber, formatPct } from "@/lib/charts/format";
 import { linePath } from "@/lib/charts/path";
 import { bandScale, extent, linearScale, niceTicks } from "@/lib/charts/scale";
-import { buildEstimates, forwardMetrics, forwardState } from "@/lib/financials/logic";
+import { buildEstimates, forwardMetrics, forwardState, isDateVintage, safeHref, vintageDate } from "@/lib/financials/logic";
 import { FORWARD_LABELS, type FactRow, type ForwardKind, type ForwardPayload } from "@/lib/financials/types";
 import { formatDate } from "@/lib/format";
 import { cn } from "@/lib/utils";
@@ -21,6 +21,11 @@ const OFFSET: Record<ForwardKind, number> = {
   owner_scenario: 26,
   event_calendar_estimate: 40,
 };
+
+/** A stated vintage as a date when it is one; free text ("Q1 2026 preview") is shown as the provider wrote it. */
+function vLabel(v: string | null): string {
+  return v === null ? "—" : isDateVintage(v) ? formatDate(v.slice(0, 10)) : v;
+}
 
 function n(v: number | null, digits = 2): string {
   return v === null ? "—" : formatNumber(v, Math.abs(v) >= 1000 ? 0 : digits);
@@ -68,7 +73,7 @@ export function EstimatesFan({ payload, facts, asOf }: { payload: ForwardPayload
   const firstConsensus = model.points.find((p) => p.kind === "published_analyst_consensus" && p.value !== null);
   const option = model.seriesOptions.find((s) => s.id === model.seriesId);
   const providers = [...new Set(model.points.map((p) => p.provider).filter((p): p is string => !!p))];
-  const vintages = model.points.map((p) => p.vintage ?? p.knownAt.slice(0, 10)).sort();
+  const vintages = model.points.map((p) => vintageDate(p)).sort();
   const cur = model.currency ?? "currency not stated";
 
   return (
@@ -101,7 +106,7 @@ export function EstimatesFan({ payload, facts, asOf }: { payload: ForwardPayload
       }
       provenance={{
         source: providers.length ? providers.join(" · ") : "Stored forward observations",
-        sourceUrl: model.points.find((p) => p.sourceUrl)?.sourceUrl ?? null,
+        sourceUrl: safeHref(model.points.find((p) => safeHref(p.sourceUrl))?.sourceUrl),
         asOf: vintages.length ? vintages[vintages.length - 1] : null,
         knownAt: model.points.map((p) => p.knownAt).sort().pop() ?? null,
         method: "Estimates exactly as published by their provider; the app never fills a missing estimate with a model figure",
@@ -114,8 +119,8 @@ export function EstimatesFan({ payload, facts, asOf }: { payload: ForwardPayload
         columns: ["Period", "Kind", "Low", "Mean / value", "High", "Analysts", "Basis", "Vintage", "Provider"],
         rows: [
           ...model.actuals.map((a) => [a.period, FORWARD_LABELS.actual, "—", n(a.value), "—", "—", "as filed", formatDate(a.knownAt.slice(0, 10)), "filing"]),
-          ...model.points.map((f) => [f.fiscalPeriod, FORWARD_LABELS[f.kind], n(f.low), n(f.value), n(f.high), f.analystCount === null ? "not stated" : f.analystCount, f.basis ?? "not stated", f.vintage ? formatDate(f.vintage) : "—", f.provider ?? "—"]),
-          ...model.unplotted.map(({ obs: f, reason }) => [f.fiscalPeriod, `${FORWARD_LABELS[f.kind]} (not plotted)`, n(f.low), n(f.value), n(f.high), f.analystCount === null ? "not stated" : f.analystCount, f.basis ?? "not stated", f.vintage ? formatDate(f.vintage) : "—", `${f.provider ?? "—"}: ${reason}`]),
+          ...model.points.map((f) => [f.fiscalPeriod, FORWARD_LABELS[f.kind], n(f.low), n(f.value), n(f.high), f.analystCount === null ? "not stated" : f.analystCount, f.basis ?? "not stated", vLabel(f.vintage), f.provider ?? "—"]),
+          ...model.unplotted.map(({ obs: f, reason }) => [f.fiscalPeriod, `${FORWARD_LABELS[f.kind]} (not plotted)`, n(f.low), n(f.value), n(f.high), f.analystCount === null ? "not stated" : f.analystCount, f.basis ?? "not stated", vLabel(f.vintage), `${f.provider ?? "—"}: ${reason}`]),
         ],
       }}
     >
@@ -140,7 +145,7 @@ export function EstimatesFan({ payload, facts, asOf }: { payload: ForwardPayload
               .filter((p) => periods.includes(p))
               .map((p) => (
                 <g key={p}>
-                  <text x={cx(p)} y={22} textAnchor="middle" fontSize={10} className="fill-text-faint">
+                  <text x={cx(p)} y={22} textAnchor="middle" fontSize={10} className="fill-text-muted">
                     no consensus
                   </text>
                 </g>

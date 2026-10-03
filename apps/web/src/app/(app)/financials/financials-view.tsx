@@ -7,6 +7,7 @@ import { HoldingSelector } from "@/components/financials/holding-selector";
 import { FundamentalsSections, PeerSections, ProbeSection, ValuationSection } from "@/components/financials/sections";
 import { PageHeader } from "@/components/page-header";
 import { useHoldingsList } from "@/lib/financials/hooks";
+import { localIsoDate, sectionKey } from "@/lib/financials/logic";
 import { displayTicker } from "@/lib/portfolio/holdings-view";
 
 /**
@@ -27,7 +28,7 @@ export function FinancialsView() {
   const [asOf, setAsOf] = useState<string | null>(null);
   const [reconciledOnly, setReconciledOnly] = useState(false);
   const [refresh, setRefresh] = useState(0);
-  const today = new Date().toISOString().slice(0, 10);
+  const today = localIsoDate();
 
   return (
     <div className="flex min-w-0 flex-col gap-5">
@@ -44,7 +45,7 @@ export function FinancialsView() {
           status={state.kind === "error" ? { kind: "error", title: state.title } : state.kind === "loading" ? { kind: "loading" } : { kind: "ok" }}
         />
         <label className="flex flex-col gap-0.5 text-xs text-text-muted">
-          <span>As known on (point in time)</span>
+          <span>As known on (point in time, UTC day)</span>
           <span className="flex items-center gap-1.5">
             <input
               type="date"
@@ -70,7 +71,7 @@ export function FinancialsView() {
       </div>
 
       {ticker ? (
-        <div key={`${ticker}:${refresh}`} className="flex min-w-0 flex-col gap-5">
+        <div key={sectionKey(ticker, asOf, reconciledOnly, refresh)} className="flex min-w-0 flex-col gap-5">
           <FundamentalsSections ticker={ticker} name={name} asOf={asOf} reconciledOnly={reconciledOnly} />
           <PeerSections ticker={ticker} name={name} asOf={asOf} reconciledOnly={reconciledOnly} />
           <ValuationSection ticker={ticker} />
@@ -80,7 +81,7 @@ export function FinancialsView() {
           {state.kind === "loading" ? "Loading holdings…" : "No holdings are available to choose from."}
         </p>
       )}
-      {ticker ? <ProbeSection ticker={ticker} onDone={() => setRefresh((k) => k + 1)} /> : null}
+      {ticker ? <ProbeSection key={ticker} ticker={ticker} onDone={() => setRefresh((k) => k + 1)} /> : null}
     </div>
   );
 }

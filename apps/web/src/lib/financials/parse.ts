@@ -360,7 +360,8 @@ export function parsePeerMetrics(body: unknown): PeerMetricsPayload | null {
   const confirmedPeers = (Array.isArray(body.confirmed_peers) ? body.confirmed_peers : [])
     .filter(isRec)
     .map((p) => ({ peerTicker: str(p.peer_ticker) ?? "", basis: str(p.basis), source: str(p.source) }))
-    .filter((p) => p.peerTicker !== "");
+    .filter((p) => p.peerTicker !== "")
+    .filter((p, i, all) => all.findIndex((q) => q.peerTicker === p.peerTicker) === i);
   const excludedPeers = (Array.isArray(body.excluded_peers) ? body.excluded_peers : [])
     .filter(isRec)
     .map((p) => ({ peer: str(p.peer) ?? "", reason: str(p.reason) ?? "No reason recorded" }))

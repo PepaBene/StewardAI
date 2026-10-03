@@ -9,6 +9,21 @@ import type { PeerMetricsPayload } from "@/lib/financials/types";
 import { formatDate } from "@/lib/format";
 import { cn } from "@/lib/utils";
 
+/**
+ * Bar extents on one shared scale around a zero baseline: a negative value extends left of zero
+ * (and is drawn in the loss colour), a positive one right, so -20% and +20% are never the same bar.
+ */
+export function barGeometry(values: readonly (number | null)[]): { bars: ({ left: number; width: number } | null)[]; zero: number } {
+  const finite = values.filter((v): v is number => v !== null && Number.isFinite(v));
+  const lo = Math.min(0, ...finite);
+  const hi = Math.max(0, ...finite);
+  const span = hi - lo || 1e-9;
+  const pos = (v: number) => ((v - lo) / span) * 100;
+  const zero = pos(0);
+  const out = values.map((v) => (v === null || !Number.isFinite(v) ? null : { left: Math.min(pos(v), zero), width: Math.abs(pos(v) - zero) }));
+  return { bars: out, zero };
+}
+
 function fmtValue(v: number | null, unit: PeerComparison["unit"]): string {
   if (v === null) return "n/m";
   return unit === "percent" ? formatPct(v, 1) : `${formatNumber(v, 2)}×`;
@@ -33,7 +48,7 @@ export function PeerTable({ data, ticker }: { data: PeerMetricsPayload; ticker: 
         { key: "mean", label: `Peer mean (${c.covered} of ${c.total})`, value: c.mean, subject: false },
       ]
     : [];
-  const max = Math.max(...bars.map((b) => Math.abs(b.value ?? 0)), 1e-9);
+  const geometry = barGeometry(bars.map((b) => b.value));
 
   return (
     <ChartFrame
@@ -68,11 +83,15 @@ export function PeerTable({ data, ticker }: { data: PeerMetricsPayload; ticker: 
       {c ? (
         <>
           <ol className="m-0 flex list-none flex-col gap-1.5 p-0">
-            {bars.map((b) => (
+            {bars.map((b, i) => (
+
               <li key={b.key} className={cn("grid grid-cols-[minmax(0,9rem)_minmax(0,1fr)_4.5rem] items-center gap-2 text-sm", b.subject && "font-semibold")}>
                 <span className="truncate">{b.label}</span>
-                <span className="flex h-2.5 bg-surface-muted" aria-hidden="true">
-                  {b.value !== null ? <span className={cn("block h-full", b.subject ? "bg-accent-ramp-1" : "bg-accent-300")} style={{ width: `${(Math.abs(b.value) / max) * 100}%` }} /> : null}
+                <span className="relative flex h-2.5 bg-surface-muted" aria-hidden="true">
+                  {geometry.bars[i] ? (
+                    <span className={cn("absolute top-0 block h-full", b.value !== null && b.value < 0 ? "bg-loss" : b.subject ? "bg-accent-ramp-1" : "bg-accent-300")} style={{ left: `${geometry.bars[i]!.left}%`, width: `${geometry.bars[i]!.width}%` }} />
+                  ) : null}
+                  <span className="absolute top-0 block h-full w-px bg-text-muted" style={{ left: `${geometry.zero}%` }} />
                 </span>
                 <span className="num text-right">{fmtValue(b.value, c.unit)}</span>
               </li>

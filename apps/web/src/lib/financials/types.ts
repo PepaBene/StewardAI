@@ -84,6 +84,8 @@ export type StatementPeriod = {
   label: string;
   /** Oldest first; empty when no value was filed for the period (never drawn as zero). */
   versions: readonly LineVersion[];
+  /** The concept the shown value was filed under (a line can switch tag between periods). */
+  concept?: string | null;
 };
 
 export type StatementLine = {
@@ -91,7 +93,10 @@ export type StatementLine = {
   label: string;
   statement: StatementKind;
   unit: string;
+  /** The concept most periods are filed under. */
   concept: string;
+  /** Every concept used across the periods; more than one means the filer switched tag. */
+  concepts?: readonly string[];
   periods: readonly StatementPeriod[];
 };
 
@@ -102,6 +107,10 @@ export type StatementView = {
   periods: readonly { end: string; label: string }[];
   /** Facts behind the drawn lines, by reconciliation state. */
   counts: { reconciled: number; unchecked: number; failed: number; total: number };
+  /** Discrete quarters computed as year-to-date minus the previous year-to-date (not filed as such). */
+  derivedCount?: number;
+  /** Plain-language caveats about this view (derived quarters, a missing fourth quarter). */
+  notes?: readonly string[];
 };
 
 /** Which version of each value a view shows. */
@@ -224,7 +233,7 @@ export type ForwardPayload = {
   dropped: number;
 };
 
-export type ActualPoint = { period: string; value: number; knownAt: string };
+export type ActualPoint = { period: string; value: number; knownAt: string; end: string; granularity: "annual" | "quarter" };
 
 export type RevisionSlope = {
   period: string;

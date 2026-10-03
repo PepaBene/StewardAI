@@ -61,7 +61,7 @@ export function FundamentalsSections({ ticker, name, asOf, reconciledOnly }: Com
 function SegmentsSection({ ticker, asOf }: { ticker: string; asOf: string | null }) {
   const [basis, setBasis] = useState<"annual" | "quarter" | null>(null);
   const segments = useHoldingSegments(ticker, basis);
-  const profit = useSegmentProfitFacts(ticker, asOf);
+  const profit = useSegmentProfitFacts(ticker);
   const profitRows: readonly FactRow[] | null = profit.kind === "ok" ? profit.data.rows : profit.kind === "error" && profit.previous ? profit.previous.rows : null;
   return (
     <div className="flex min-w-0 flex-col gap-2">
@@ -83,7 +83,7 @@ function SegmentsSection({ ticker, asOf }: { ticker: string; asOf: string | null
           />
         )}
       </ResourceBoundary>
-      {asOf ? <p className="text-xs text-text-muted">Segment revenue and valuation show the latest stored filing: the API has no as-known-on cut-off for them, so the date above does not apply here.</p> : null}
+      {asOf ? <p className="text-xs text-text-muted">Segment revenue, segment profit and valuation show the latest stored filing: the API has no as-known-on cut-off for them, so the date above does not apply here.</p> : null}
     </div>
   );
 }
@@ -96,7 +96,7 @@ function ForwardSections({ ticker, asOf, forward, facts }: { ticker: string; asO
   return (
     <>
       <EstimatesFan payload={forward} facts={facts} asOf={asOf} />
-      <ActualVsConsensusSection ticker={ticker} forward={forward} facts={facts} />
+      <ActualVsConsensusSection ticker={ticker} asOf={asOf} forward={forward} facts={facts} />
       <ResourceBoundary state={releases} label="IR releases">
         {(r) => (
           <ResourceBoundary state={sources} label="IR pages">
@@ -109,7 +109,7 @@ function ForwardSections({ ticker, asOf, forward, facts }: { ticker: string; asO
 }
 
 /** Actual versus the consensus known before the report, for a metric and a fiscal period. */
-function ActualVsConsensusSection({ ticker, forward, facts }: { ticker: string; forward: ForwardPayload; facts: readonly FactRow[] }) {
+function ActualVsConsensusSection({ ticker, asOf, forward, facts }: { ticker: string; asOf: string | null; forward: ForwardPayload; facts: readonly FactRow[] }) {
   const metrics = useMemo(() => forwardMetrics(forward).filter((m) => m in ACTUAL_LINE_ITEM), [forward]);
   const [metricChoice, setMetric] = useState<string | null>(null);
   const [periodChoice, setPeriod] = useState<string | null>(null);
@@ -150,6 +150,7 @@ function ActualVsConsensusSection({ ticker, forward, facts }: { ticker: string; 
       ) : (
         <ResourceBoundary state={avc} label="Actual vs consensus">{(a) => <EarningsCard avc={a} />}</ResourceBoundary>
       )}
+      {asOf ? <p className="text-xs text-text-muted">This comparison uses the latest stored reported figure and the last consensus known before that report: the API has no as-known-on cut-off for it, so the date above does not apply here.</p> : null}
     </Blueprint>
   );
 }
@@ -184,5 +185,6 @@ export function ValuationSection({ ticker }: { ticker: string }) {
 }
 
 export function ProbeSection({ ticker, onDone }: { ticker: string; onDone: () => void }) {
-  return <ProbePanel ticker={ticker} onDone={onDone} />;
+  // Keyed by ticker: an armed confirmation and earlier results never carry over to another holding.
+  return <ProbePanel key={ticker} ticker={ticker} onDone={onDone} />;
 }

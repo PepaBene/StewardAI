@@ -6,7 +6,7 @@ import { Treemap } from "@/components/charts";
 import { ChartFrame, Segmented } from "@/components/data-state";
 import type { HoldingSegments } from "@/lib/api/client";
 import { formatCompact, formatPct } from "@/lib/charts/format";
-import { buildSegmentSet, segmentAlignment, segmentTiles, type SegmentAxisKey, type SegmentColorBy } from "@/lib/financials/logic";
+import { buildSegmentSet, safeHref, segmentAlignment, segmentTiles, type SegmentAxisKey, type SegmentColorBy } from "@/lib/financials/logic";
 import type { FactRow } from "@/lib/financials/types";
 import { AS_REPORTED_NOTE, AXIS_LABELS, availableAxes } from "@/lib/reference/segments";
 
@@ -53,7 +53,7 @@ export function SegmentTreemapPanel({
         controls={basisControl}
         provenance={{
           source: sourceName,
-          sourceUrl: source?.filing_url ?? null,
+          sourceUrl: safeHref(source?.filing_url),
           asOf: data.as_of,
           state: "not_covered",
           reason: data.notes?.[0] ?? "No revenue breakdown is stored for this holding and period.",
@@ -83,7 +83,7 @@ export function SegmentTreemapPanel({
       }
       provenance={{
         source: sourceName,
-        sourceUrl: source?.filing_url ?? source?.instance_url ?? null,
+        sourceUrl: safeHref(source?.filing_url) ?? safeHref(source?.instance_url),
         asOf: set.periodEnd,
         knownAt: source?.filed ?? null,
         method: colorBy === "growth" ? "Revenue growth vs the same member one fiscal year earlier (same period length)" : "Segment operating profit ÷ segment revenue; one shared XBRL definition",

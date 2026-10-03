@@ -31,7 +31,7 @@ export function LineItemBars({ points, unit, label, format = (v) => formatNumber
           return (
             <g key={p.period}>
               <rect x={bx} y={top} width={band.bandwidth} height={H - bottom - top} className="fill-none stroke-border" strokeDasharray="2 2" />
-              <text x={cx} y={H - bottom - 4} textAnchor="middle" fontSize={9} className="fill-text-faint">
+              <text x={cx} y={H - bottom - 4} textAnchor="middle" fontSize={9} className="fill-text-muted">
                 —
               </text>
               <text x={cx} y={H - 4} textAnchor="middle" fontSize={9} className={AXIS_TEXT}>

@@ -2,7 +2,7 @@ import { AXIS_TEXT, SVG_BASE } from "@/components/charts/shared";
 import { ChartFrame } from "@/components/data-state";
 import { formatCompact, formatPct } from "@/lib/charts/format";
 import { bandScale, linearScale, niceTicks } from "@/lib/charts/scale";
-import { debtBreakdown } from "@/lib/financials/logic";
+import { debtBreakdown, safeHref } from "@/lib/financials/logic";
 import type { DebtSchedule } from "@/lib/financials/types";
 import { cn } from "@/lib/utils";
 
@@ -60,7 +60,7 @@ export function DebtMaturityChart({ schedule }: { schedule: DebtSchedule | null 
       units={`${cur}, as of ${schedule.periodEnd}; maturity table sums to ${formatCompact(b.classified)}${total !== null ? ` against ${formatCompact(total)} reported debt (${schedule.totalBasis})` : ""}`}
       provenance={{
         source: schedule.source ?? "Filed debt note",
-        sourceUrl: schedule.sourceUrl,
+        sourceUrl: safeHref(schedule.sourceUrl),
         asOf: schedule.periodEnd,
         knownAt: schedule.knownAt,
         method: "Principal maturities from the debt note, buckets as filed (relative to the balance date); remainder against balance-sheet debt shown as Unclassified",

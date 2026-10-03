@@ -6,6 +6,7 @@ import { getBrowserApiClient } from "@/lib/api/client";
 import { useApiResource, type ApiResult, type ResourceState } from "@/lib/hooks/use-api-resource";
 
 import { mergeFacts, parseActualVsConsensus, parseFacts, parseForwardPayload, parseIrReleases, parseIrSources, parsePeerMetrics, parsePeerSet } from "./parse";
+import { asOfParam } from "./logic";
 import type { ActualVsConsensus, ForwardPayload, IrRelease, IrSource, ParsedFacts, PeerEntry, PeerMetricsPayload, StatementKind } from "./types";
 
 /*
@@ -14,10 +15,7 @@ import type { ActualVsConsensus, ForwardPayload, IrRelease, IrSource, ParsedFact
  * error state ("unexpected response shape"), never an empty or zero result.
  */
 
-/** A date (YYYY-MM-DD) as the end-of-day instant `as_of` expects; null = the current view. */
-export function asOfParam(date: string | null): string | undefined {
-  return date ? `${date}T23:59:59Z` : undefined;
-}
+export { asOfParam };
 
 /** Narrow an untyped resource through a parser; keeps the last good parsed value on error. */
 export function parsedState<T>(state: ResourceState<unknown>, parse: (body: unknown) => T | null): ResourceState<T> {
@@ -57,14 +55,14 @@ export function useStatementFacts(ticker: string, asOf: string | null, reconcile
   return { state: useParsed(state, parse), reload };
 }
 
-/** Segment operating-profit facts, for the margin colour of the segment treemap. */
-export function useSegmentProfitFacts(ticker: string, asOf: string | null) {
+/** Segment operating-profit facts, for the margin colour of the segment treemap. Not as-of limited: the segment revenue it is joined to is not either. */
+export function useSegmentProfitFacts(ticker: string) {
   const fetcher = useCallback(
     () =>
       getBrowserApiClient().GET("/holdings/{ticker}/financial-history", {
-        params: { path: { ticker }, query: { statement: "segment", line_item: "operating_income", as_of: asOfParam(asOf) } },
+        params: { path: { ticker }, query: { statement: "segment", line_item: "operating_income" } },
       }),
-    [ticker, asOf],
+    [ticker],
   );
   const { state } = useApiResource(fetcher);
   return useParsed(state, parseFacts);

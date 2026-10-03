@@ -5,7 +5,7 @@ import { useMemo, useState } from "react";
 import { ChartFrame, Segmented } from "@/components/data-state";
 import { formatDate } from "@/lib/format";
 import { formatAmount } from "@/lib/financials/format";
-import { buildStatement, restatements, linePoints, statementState } from "@/lib/financials/logic";
+import { buildStatement, restatements, linePoints, safeHref, statementState } from "@/lib/financials/logic";
 import { STATEMENT_LABELS, type ParsedFacts, type PeriodBasis, type StatementKind, type VersionMode } from "@/lib/financials/types";
 
 import { LineItemBars } from "./line-item-bars";
@@ -32,9 +32,10 @@ export function StatementExplorer({ name, facts, asOf }: { name: string; facts: 
   const mode: VersionMode = { kind: modeId };
   const status = statementState(view, facts.dropped);
   const restated = view.lines.flatMap((l) => restatements(l).map((r) => ({ line: l, ...r })));
+  const switched = view.lines.filter((l) => (l.concepts?.length ?? 0) > 1);
   const knownAt = facts.rows.map((f) => f.knownAt).sort().pop() ?? null;
   const sources = [...new Set(facts.rows.map((f) => f.source).filter((s): s is string => !!s))];
-  const sourceUrl = facts.rows.find((f) => f.sourceUrl)?.sourceUrl ?? null;
+  const sourceUrl = safeHref(facts.rows.find((f) => safeHref(f.sourceUrl))?.sourceUrl);
   const lastEnd = view.periods[view.periods.length - 1]?.end ?? null;
   const bases = [...new Set(view.lines.map((l) => facts.rows.find((f) => f.lineItem === l.id && f.concept === l.concept)?.basis).filter((b): b is string => !!b))];
 
@@ -112,6 +113,18 @@ export function StatementExplorer({ name, facts, asOf }: { name: string; facts: 
           <i aria-hidden="true" className="inline-block h-2.5 w-2.5 border border-dashed border-border" /> Not filed
         </span>
       </p>
+      {view.notes && view.notes.length > 0 ? (
+        <ul className="m-0 flex list-none flex-col gap-1 p-0 text-xs text-text-muted">
+          {view.notes.map((note) => (
+            <li key={note}>{note}</li>
+          ))}
+        </ul>
+      ) : null}
+      {switched.length > 0 ? (
+        <p role="note" className="text-xs text-text-muted">
+          Filed under a different tag in different years (each period uses the preferred tag filed for it, so none is shown as missing): {switched.map((l) => `${l.label} (${(l.concepts ?? []).join(", ")})`).join("; ")}.
+        </p>
+      ) : null}
       {restated.length > 0 && modeId === "latest" ? (
         <section aria-labelledby="restatements-heading" className="flex flex-col gap-1.5">
           <h3 id="restatements-heading" className="font-heading text-lg font-semibold">
