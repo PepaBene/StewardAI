@@ -687,7 +687,7 @@ async def _public_macro(http: httpx.AsyncClient, which: str) -> Any:
         )
     if which == "sdmx":
         return await SdmxAdapter(http, "bis", "https://stats.bis.org/api/v2").fetch(
-            {"flow": "WS_CREDIT_GAP", "key": "Q.CZ", "series_id": "x"}
+            {"flow": "BIS,WS_TC,2.0", "key": "Q.CZ.P.A.M.770.A", "series_id": "x"}
         )
     return await ComtradeAdapter(http, api_key="k").fetch(
         {"reporter": 203, "period": "2024", "hs_code": "85"}
