@@ -651,7 +651,9 @@ class MacroSettings(ConfigModel):
 
 
 class ProviderJobSettings(ConfigModel):
-    """A free provider is opt-in until its account-specific endpoint audit passes."""
+    """A free provider with an account or key is opt-in until its account-specific endpoint audit
+    passes; the keyless public statistics providers (World Bank, OECD, BIS) default to on and
+    are still held shut by the access gate until their endpoint probe says available."""
 
     enabled: bool = False
     refresh_hours: int = Field(default=168, ge=1, le=8760)
@@ -894,6 +896,9 @@ class PublicDataSettings(ConfigModel):
     comtrade: list[ComtradeSlice] = Field(default_factory=list)
 
 
+KEYLESS_PUBLIC_PROVIDERS = frozenset({"world_bank", "oecd", "bis"})
+
+
 def _provider_defaults() -> dict[str, ProviderJobSettings]:
     quotas = {
         "alpha_vantage": (25, None),
@@ -911,7 +916,13 @@ def _provider_defaults() -> dict[str, ProviderJobSettings]:
         "epo_ops": (None, None),
     }
     return {
-        name: ProviderJobSettings(daily_quota=daily, monthly_quota=monthly)
+        name: ProviderJobSettings(
+            # Keyless public statistics have no account for an audit to qualify: the gate (a
+            # probed, available endpoint) is the control, so they are on unless switched off.
+            enabled=name in KEYLESS_PUBLIC_PROVIDERS,
+            daily_quota=daily,
+            monthly_quota=monthly,
+        )
         for name, (daily, monthly) in quotas.items()
     }
 

@@ -82,6 +82,19 @@ async def _gate(ctx: JobContext, provider: str, endpoint: str) -> AccessState | 
     return AccessState(value) if value else None
 
 
+async def _skip_reason(
+    ctx: JobContext, provider: str, endpoint: str, settings: ProviderJobSettings
+) -> str | None:
+    """None when the collector may call the endpoint; else which of the two switches is shut:
+    the provider's `enabled` flag in the jobs config, or the access gate (and why)."""
+    if not settings.enabled:
+        return f"provider disabled in the jobs config (providers.{provider}.enabled is false)"
+    decision = await provider_gate(ctx.pool, provider, endpoint)
+    if decision.open:
+        return None
+    return f"access gate closed for {provider}/{endpoint}: {decision.reason}"
+
+
 def _flat_dimensions(point: MacroPoint) -> dict[str, str]:
     nested = point.metadata.get("dimensions")
     source = nested if isinstance(nested, dict) else point.metadata
@@ -207,8 +220,9 @@ async def _world_bank_step(
     step: Any,
 ) -> None:
     settings = jobs.providers["world_bank"]
-    if not settings.enabled or await _gate(ctx, "world_bank", "indicators") != "available":
-        step.detail["skipped"] = "provider disabled or access gate not available"
+    reason = await _skip_reason(ctx, "world_bank", "indicators", settings)
+    if reason:
+        step.detail["skipped"] = reason
         return
     indicators = [item.key for item in jobs.public_data.world_bank]
     first_year, last_year = now.year - 10, now.year
@@ -334,8 +348,9 @@ async def _sdmx_step(
     step: Any,
 ) -> None:
     provider_settings = jobs.providers[series.provider]
-    if not provider_settings.enabled or await _gate(ctx, series.provider, "sdmx") != "available":
-        step.detail["skipped"] = "provider disabled or access gate not available"
+    reason = await _skip_reason(ctx, series.provider, "sdmx", provider_settings)
+    if reason:
+        step.detail["skipped"] = reason
         return
 
     async def fail(state: AccessState, reason: str) -> None:

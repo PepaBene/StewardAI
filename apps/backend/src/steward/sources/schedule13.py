@@ -9,7 +9,9 @@ unstructured by the collector, never parsed by guesswork.
 Field names are matched by their local XML name and tolerate the variants of the 13D and
 13G schemas (for instance `aggregateAmountOwned` and
 `reportingPersonBeneficiallyOwnedAggregateNumberOfShares`). The fixtures are modelled on the
-published schema description; this parser has not been run against a live filing.
+published schema description and checked against live filings of October 2026 (tests/fixtures/
+control_stakes/live_*.xml): the issuer CUSIP is `issuerCusips/issuerCusipNumber`, the reporting
+person block is `coverPageHeaderReportingPersonDetails`, and the percent is `classPercent`.
 
 Semantics worth keeping in mind (they drive the read model's limitations):
 
@@ -224,13 +226,25 @@ def _intent(root: ET.Element) -> str | None:
     return flat or None
 
 
+def _explained(xml: bytes) -> bytes:
+    """The document itself, after turning the commonest wrong input into a clear refusal: the
+    SEC's rendered HTML page of a filing (a DOCTYPE and `<html>`, not the submission XML)."""
+    head = xml[:4000].lower()
+    if b"<html" in head or b"<!doctype html" in head:
+        raise Schedule13Error(
+            "the document is the SEC's rendered HTML page, not the submission XML "
+            "(fetch primary_doc.xml without the xsl... folder)"
+        )
+    return xml
+
+
 def parse_schedule13_xml(xml: bytes, form: str | None = None) -> Schedule13Filing:
     """Parse the structured XML of a Schedule 13D/G or amendment.
 
     `form` is the submissions-API form type; it is used when the XML omits the submission
     type. Raises Schedule13Error for a document that is not a Schedule 13D/G.
     """
-    root = safe_fromstring(xml, Schedule13Error)
+    root = safe_fromstring(_explained(xml), Schedule13Error)
 
     namespace = root.tag.lower()
     submission_type = _text(root, "submissionType") or form
@@ -244,7 +258,10 @@ def parse_schedule13_xml(xml: bytes, form: str | None = None) -> Schedule13Filin
     elif _find(root, ("schedule13G",)) is not None:
         schedule = "13G"
     else:
-        raise Schedule13Error("document is not a Schedule 13D or 13G")
+        raise Schedule13Error(
+            f"document is not a Schedule 13D or 13G (root <{_local(root.tag)}>, "
+            f"submission type {submission_type!r})"
+        )
 
     header = _first_node(root, ("coverPageHeader",))
     issuer = _first_node(header, ("issuerInfo",))
@@ -270,7 +287,9 @@ def parse_schedule13_xml(xml: bytes, form: str | None = None) -> Schedule13Filin
         amendment_no=amendment_no,
         submission_type=submission_type,
         issuer_cik=ten_digit_cik(issuer_cik),
-        issuer_cusip=normalise_cusip(_text(issuer, "issuerCUSIP", "issuerCusip")),
+        issuer_cusip=normalise_cusip(
+            _text(issuer, "issuerCUSIP", "issuerCusip", "issuerCusipNumber")
+        ),
         issuer_name=_text(issuer, "issuerName", "nameOfIssuer"),
         class_title=_text(header, "securitiesClassTitle", "titleOfClassOfSecurities"),
         event_date=_date(

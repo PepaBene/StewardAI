@@ -1,0 +1,129 @@
+<?xml version="1.0" encoding="UTF-8"?><edgarSubmission xmlns="http://www.sec.gov/edgar/schedule13g" xmlns:com="http://www.sec.gov/edgar/common">
+  <schemaVersion>X0202</schemaVersion>
+<headerData>
+    <submissionType>SCHEDULE 13G</submissionType>
+    <filerInfo>
+      <filer>
+        <filerCredentials>
+          <cik>0000769317</cik>
+          <ccc>XXXXXXXX</ccc>
+        </filerCredentials>
+      </filer>
+      <liveTestFlag>LIVE</liveTestFlag>
+
+
+
+    </filerInfo>
+  </headerData>
+  <formData>
+    <coverPageHeader>
+      <securitiesClassTitle>Common Stock</securitiesClassTitle>
+      <eventDateRequiresFilingThisStatement>09/30/2026</eventDateRequiresFilingThisStatement>
+      <issuerInfo>
+        <issuerCik>0000810766</issuerCik>
+        <issuerName>UBS ASSET MANAGEMENT INCOME FUND, INC.</issuerName>
+        <issuerCusips>
+          <issuerCusipNumber>224916106</issuerCusipNumber>
+        </issuerCusips>
+        <issuerPrincipalExecutiveOfficeAddress>
+          <com:street1>1285 AVENUE OF THE AMERICAS</com:street1>
+          <com:city>NEW YORK</com:city>
+          <com:stateOrCountry>NY</com:stateOrCountry>
+          <com:zipCode>10019</com:zipCode>
+        </issuerPrincipalExecutiveOfficeAddress>
+      </issuerInfo>
+      <designateRulesPursuantThisScheduleFiled>
+        <designateRulePursuantThisScheduleFiled>Rule 13d-1(b)</designateRulePursuantThisScheduleFiled>
+      </designateRulesPursuantThisScheduleFiled>
+    </coverPageHeader>
+    <coverPageHeaderReportingPersonDetails>
+
+      <reportingPersonName>SIT INVESTMENT ASSOCIATES INC</reportingPersonName>
+      <memberGroup>b</memberGroup>
+      <citizenshipOrOrganization>MN</citizenshipOrOrganization>
+      <reportingPersonBeneficiallyOwnedNumberOfShares>
+        <soleVotingPower>0.00</soleVotingPower>
+        <sharedVotingPower>2785976.00</sharedVotingPower>
+        <soleDispositivePower>0.00</soleDispositivePower>
+        <sharedDispositivePower>2785976.00</sharedDispositivePower>
+      </reportingPersonBeneficiallyOwnedNumberOfShares>
+      <reportingPersonBeneficiallyOwnedAggregateNumberOfShares>2785976.00</reportingPersonBeneficiallyOwnedAggregateNumberOfShares>
+      <classPercent>5.1</classPercent>
+      <typeOfReportingPerson>IA</typeOfReportingPerson>
+    </coverPageHeaderReportingPersonDetails>
+    <coverPageHeaderReportingPersonDetails>
+
+      <reportingPersonName>SIT FIXED INCOME ADVISORS II LLC /ADV</reportingPersonName>
+      <memberGroup>b</memberGroup>
+      <citizenshipOrOrganization>DE</citizenshipOrOrganization>
+      <reportingPersonBeneficiallyOwnedNumberOfShares>
+        <soleVotingPower>0.00</soleVotingPower>
+        <sharedVotingPower>2785976.00</sharedVotingPower>
+        <soleDispositivePower>0.00</soleDispositivePower>
+        <sharedDispositivePower>2785976.00</sharedDispositivePower>
+      </reportingPersonBeneficiallyOwnedNumberOfShares>
+      <reportingPersonBeneficiallyOwnedAggregateNumberOfShares>2785976.00</reportingPersonBeneficiallyOwnedAggregateNumberOfShares>
+      <classPercent>5.1</classPercent>
+      <typeOfReportingPerson>IA</typeOfReportingPerson>
+    </coverPageHeaderReportingPersonDetails>
+    <items>
+      <item1>
+        <issuerName>UBS ASSET MANAGEMENT INCOME FUND, INC.</issuerName>
+        <issuerPrincipalExecutiveOfficeAddress>1285 AVENUE OF THE AMERICAS, NEW YORK, NEW YORK, 10019.</issuerPrincipalExecutiveOfficeAddress>
+      </item1>
+      <item2>
+        <filingPersonName>Sit Investment Associates, Inc.
+Sit Fixed Income Advisors II, LLC</filingPersonName>
+        <principalBusinessOfficeOrResidenceAddress>80 South 8th Street, Suite 3300
+Minneapolis, MN 55402</principalBusinessOfficeOrResidenceAddress>
+        <citizenship>Sit Investment Associates, Inc. Minnesota
+Sit Fixed Income Advisors II, LLC Delaware</citizenship>
+      </item2>
+      <item3>
+        <notApplicableFlag>N</notApplicableFlag>
+        <typeOfPersonFiling>IA</typeOfPersonFiling>
+      </item3>
+      <item4>
+        <amountBeneficiallyOwned>See response to item 9 on each cover page</amountBeneficiallyOwned>
+        <classPercent>See response to item 11 on each cover page</classPercent>
+        <numberOfSharesPersonHas>
+          <solePowerOrDirectToVote>See response to item 5 on each cover page</solePowerOrDirectToVote>
+          <sharedPowerOrDirectToVote>See response to item 6 on each cover page</sharedPowerOrDirectToVote>
+          <solePowerOrDirectToDispose>See response to item 7 on each cover page</solePowerOrDirectToDispose>
+          <sharedPowerOrDirectToDispose>See response to item 8 on each cover page.
+
+The ownership percentages reported are based on 54,859,559 shares of common stock outstanding as of 6/30/2026, as reported in the Issuer's Report on Form N-CSRS filed with the Securities Exchange Commission.
+
+Sit Investment Associates, Inc. ("SIA") is an investment adviser registered under section 203 of the Investment Advisers Act of 1940.  Sit Fixed Income Advisors II, LLC ("SFI") is an investment adviser registered under section 203 of the Investment Advisers Act of 1940 and a subsidiary of SIA.  SIA and SFI provide investment management services to client accounts ("Accounts").  In their roles as investment advisers SIA and SFI possess shared voting and investment power over securities of the Issuer described in this schedule 13G owned by the Accounts and may be deemed to be the beneficial owner of such shares of the Issuer owned by the Accounts.  All securities reported in this schedule 13G are owned by the Accounts.  Pursuant to Rule 13d-4 of the Securities Exchange Act of 1934, as amended (the "Exchange Act"), SIA and SFI disclaim beneficial ownership of such securities. </sharedPowerOrDirectToDispose>
+        </numberOfSharesPersonHas>
+      </item4>
+      <item5>
+        <notApplicableFlag>Y</notApplicableFlag>
+        <classOwnership5PercentOrLess>N</classOwnership5PercentOrLess>
+      </item5>
+      <item6>
+        <notApplicableFlag>N</notApplicableFlag>
+        <ownershipMoreThan5PercentOnBehalfOfAnotherPerson>Except as may be indicated if this is a joint filing with a registered investment company managed by SIA or SFI, not more than 5% of the class of such securities is owned by any one Account subject to the investment advice of SIA or SFI. </ownershipMoreThan5PercentOnBehalfOfAnotherPerson>
+      </item6>
+      <item7>
+        <notApplicableFlag>Y</notApplicableFlag>
+      </item7>
+      <item8>
+        <notApplicableFlag>Y</notApplicableFlag>
+      </item8>
+      <item9>
+        <notApplicableFlag>Y</notApplicableFlag>
+      </item9>
+      <item10>
+        <notApplicableFlag>N</notApplicableFlag>
+        <certifications>By signing below I certify that, to the best of my knowledge and belief, the securities referred to above were acquired and are held in the ordinary course of business and were not acquired and are not held for the purpose of or with the effect of changing or influencing the control of the issuer of the securities and were not acquired and are not held in connection with or as a participant in any transaction having that purpose or effect, other than activities solely in connection with a nomination under &amp;#167; 240.14a-11.
+
+</certifications>
+      </item10>
+    </items>
+    <exhibitInfo>Exhibit A Joint Filing Agreement</exhibitInfo>
+    <signatureInformation/>
+    <signatureInformation/>
+  </formData>
+
+</edgarSubmission>

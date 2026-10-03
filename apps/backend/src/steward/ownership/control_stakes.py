@@ -661,6 +661,32 @@ def _transient(exc: Exception) -> bool:
     return "HTTP 404" not in str(exc)
 
 
+def submission_xml_names(primary_document: str, names: Sequence[str]) -> list[str]:
+    """The raw submission XML names to try, best first.
+
+    The submissions API reports a 13D/G's primary document as the SEC's *rendered* page, e.g.
+    `xslSCHEDULE_13G_X02/primary_doc.xml`: the same file name, but under an `xsl...` folder that
+    the SEC serves as an HTML rendering with a DOCTYPE, not as the submission XML. The raw
+    document is the same name without that folder. Rendered paths are never candidates."""
+    first, sep, rest = primary_document.partition("/")
+    raw_primary = rest if sep and first.lower().startswith("xsl") else primary_document
+    ordered = [raw_primary, *names]
+    out: list[str] = []
+    for name in ordered:
+        if not name.lower().endswith(".xml") or name.lower().startswith("xsl") or name in out:
+            continue
+        out.append(name)
+    return out
+
+
+def _is_submission_xml(body: bytes) -> bool:
+    """A raw EDGAR submission (not an HTML page that merely names the schedule's namespace)."""
+    head = body[:4000].lower()
+    if b"<html" in head or b"<!doctype html" in head:
+        return False
+    return b"<edgarsubmission" in head or b"schedule13" in body[:4000].lower()
+
+
 async def _load_xml(edgar: EdgarClient, filing: Filing) -> tuple[bytes, str] | None:
     """The filing's structured XML, or None for a legacy text/HTML filing.
 
@@ -673,12 +699,7 @@ async def _load_xml(edgar: EdgarClient, filing: Filing) -> tuple[bytes, str] | N
         names = []
         if _transient(exc):
             failures.append(exc)
-    candidates = [filing.primary_document, *names]
-    seen: set[str] = set()
-    for name in candidates:
-        if name in seen or not name.lower().endswith(".xml"):
-            continue
-        seen.add(name)
+    for name in submission_xml_names(filing.primary_document, names):
         url = filing.url(name)
         try:
             body = await edgar.document(url, max_bytes=8 * 1024 * 1024)
@@ -686,8 +707,7 @@ async def _load_xml(edgar: EdgarClient, filing: Filing) -> tuple[bytes, str] | N
             if _transient(exc):
                 failures.append(exc)
             continue
-        lowered = body.lower()
-        if b"schedule13" in lowered or b"13d" in lowered[:4000] or b"13g" in lowered[:4000]:
+        if _is_submission_xml(body):
             return body, url
     if failures:
         raise EdgarError(f"{filing.accession}: download failed ({failures[0]})")
@@ -731,6 +751,7 @@ async def collect_control_stakes(
     async with ctx.step("store-filings") as step:
         skipped = await _skipped(ctx.pool, list(seen))
         failures: list[dict[str, str]] = []
+        parse_failures: list[dict[str, str]] = []
         for accession, filing in sorted(seen.items(), key=lambda kv: (kv[1].filing_date, kv[0])):
             if await ctx.pool.fetchval(
                 "select exists(select 1 from public.control_stake_filing where accession = $1)",
@@ -753,7 +774,10 @@ async def collect_control_stakes(
                     parsed = parse_schedule13_xml(body, filing.form)
                 except Schedule13Error as exc:
                     counts["parse_failed"] += 1
-                    await _record_skip(ctx.pool, filing, "parse_failed", None, detail=str(exc))
+                    reason = f"{exc} [{url}]"
+                    parse_failures.append({"accession": accession, "form": filing.form,
+                                           "reason": reason[:300]})  # fmt: skip
+                    await _record_skip(ctx.pool, filing, "parse_failed", None, detail=reason)
                     continue
                 tickers = await store_filing(ctx.pool, filing, parsed, url, body, held)
                 if tickers:
@@ -773,6 +797,8 @@ async def collect_control_stakes(
         step.detail.update(counts)
         if failures:
             step.detail["failures"] = failures[:50]
+        if parse_failures:  # why each one failed, not just how many
+            step.detail["parse_failures"] = parse_failures[:50]
     return counts
 
 
