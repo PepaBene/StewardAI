@@ -113,6 +113,15 @@
     text-underline-offset: 3px;
   }
 
+  /* Tailwind v4's `outline-hidden` also sets the outline STYLE to none, so a sibling
+     `focus-visible:outline-2` draws a 0px outline: the control had no focus ring at all (found
+     in a real browser on the Segmented and atlas-matrix buttons). Controls that ask for the
+     focus outline get a solid style back. Unlayered on purpose: it must beat the utility. */
+}
+[class*="focus-visible:outline-2"]:focus-visible {
+  outline-style: solid;
+}
+@layer base {
   /* Scroll regions made keyboard-reachable by ScrollRegionFocus: the ring sits inside the box. */
   [data-scroll-focus]:focus-visible {
     outline-offset: -2px;

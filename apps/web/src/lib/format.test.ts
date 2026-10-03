@@ -21,6 +21,12 @@ describe("formatMoney", () => {
     expect(n(formatMoney(1234.5, "CZK", { locale: L }))).toBe("CZK 1,234.50");
   });
 
+  it("never prints a negative zero for a float residual (live: unknown_value_base = -8.9e-14 read '-0 EUR')", () => {
+    expect(n(formatMoney(-8.859855666e-14, "EUR", { locale: L, decimals: 0 }))).toBe("EUR 0");
+    expect(n(formatMoney(-0.004, "EUR", { locale: L }))).toBe("EUR 0.00");
+    expect(n(formatMoney(-0.006, "EUR", { locale: L }))).toBe("-EUR 0.01");
+  });
+
   it("formats minor-unit codes Intl does not know", () => {
     expect(n(formatMoney(4312.5, "GBX", { locale: L }))).toBe("GBX 4,312.50");
   });

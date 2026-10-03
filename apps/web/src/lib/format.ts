@@ -20,6 +20,9 @@ export function formatMoney(
   { locale, decimals = 2, signed = false }: { locale?: Locale; decimals?: number; signed?: boolean } = {},
 ): string {
   if (!isFiniteNumber(value)) return EM_DASH;
+  // A float residual (-8.9e-14 from a subtraction that should be 0) rounds to zero at this
+  // precision and must read "0", not "-0".
+  const shown = Math.abs(value) < 0.5 * 10 ** -decimals ? 0 : value;
   return new Intl.NumberFormat(locale, {
     style: "currency",
     currency,
@@ -27,7 +30,7 @@ export function formatMoney(
     minimumFractionDigits: decimals,
     maximumFractionDigits: decimals,
     signDisplay: signed ? "exceptZero" : "auto",
-  }).format(value);
+  }).format(shown);
 }
 
 /** A price in its own currency, with up to 4 decimals (some quotes need them). */
