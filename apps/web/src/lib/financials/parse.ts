@@ -13,7 +13,9 @@ import {
   type PeerMetricRow,
   type PeerMetricsPayload,
   type PeerStatus,
+  type PeerValue,
   type Reconciliation,
+  type ReconciliationState,
 } from "./types";
 
 /*
@@ -42,11 +44,17 @@ export function str(v: unknown): string | null {
   return typeof v === "string" && v !== "" ? v : null;
 }
 
+/** An ISO calendar date (YYYY-MM-DD) or null. */
+function isoDate(v: unknown): string | null {
+  return typeof v === "string" && /^\d{4}-\d{2}-\d{2}$/.test(v) && Number.isFinite(Date.parse(v)) ? v : null;
+}
+
 function int(v: unknown): number | null {
   const n = num(v);
   return n !== null && Number.isInteger(n) ? n : null;
 }
 
+const RECONCILIATION_STATES: readonly ReconciliationState[] = ["unchecked", "failed", "passed"];
 const RECONCILIATION: readonly Reconciliation[] = ["reconciled", "failed", "unchecked"];
 
 function parseMembers(dimensions: unknown): { members: { axis: string; member: string }[]; typed: boolean } {
@@ -164,6 +172,7 @@ export function parseForwardObs(raw: unknown): ForwardObs | null {
     high: num(raw.high),
     analystCount: int(raw.analyst_count),
     vintage: str(raw.vintage),
+    vintageDate: isoDate(raw.vintage_date),
     publishedAt: str(raw.published_at),
     knownAt,
     sourceUrl: str(raw.source_url),
@@ -219,6 +228,7 @@ export function parseActualVsConsensus(body: unknown): ActualVsConsensus | null 
         knownAt: str(body.actual.known_at),
         accession: str(body.actual.accession),
         reconciled: body.actual.reconciled === true,
+        reconciliationState: RECONCILIATION_STATES.find((s) => s === (body.actual as Record<string, unknown>).reconciliation_state) ?? null,
       };
     }
   }
@@ -234,6 +244,7 @@ export function parseActualVsConsensus(body: unknown): ActualVsConsensus | null 
       currency: str(c.currency),
       basis: str(c.basis),
       vintage: str(c.vintage),
+      vintageDate: isoDate(c.vintage_date),
       knownAt: str(c.known_at),
     };
   }
@@ -337,6 +348,28 @@ function stringMap(v: unknown): Record<string, string> {
   return out;
 }
 
+/** Per-peer rows of one metric, one per ticker (defensive: the backend already returns distinct peers). */
+function parsePeerValues(v: unknown): PeerValue[] {
+  if (!Array.isArray(v)) return [];
+  const out: PeerValue[] = [];
+  for (const raw of v) {
+    if (!isRec(raw)) continue;
+    const ticker = str(raw.ticker);
+    if (!ticker || out.some((p) => p.ticker === ticker)) continue;
+    out.push({
+      ticker,
+      name: str(raw.name),
+      basis: str(raw.basis),
+      period: str(raw.period),
+      periodStart: str(raw.period_start),
+      value: num(raw.value),
+      definitionVersion: str(raw.definition_version),
+      reason: str(raw.reason),
+    });
+  }
+  return out;
+}
+
 /** `GET /holdings/{ticker}/peer-metrics`. */
 export function parsePeerMetrics(body: unknown): PeerMetricsPayload | null {
   if (!isRec(body) || !isRec(body.covered_peer_metrics)) return null;
@@ -346,6 +379,7 @@ export function parsePeerMetrics(body: unknown): PeerMetricsPayload | null {
     metrics.push({
       id,
       mean: num(raw.mean),
+      peers: parsePeerValues(raw.peers),
       coveredPeers: int(raw.covered_peers) ?? 0,
       included: stringList(raw.included),
       excluded: stringList(raw.excluded),
@@ -359,9 +393,9 @@ export function parsePeerMetrics(body: unknown): PeerMetricsPayload | null {
   }
   const confirmedPeers = (Array.isArray(body.confirmed_peers) ? body.confirmed_peers : [])
     .filter(isRec)
-    .map((p) => ({ peerTicker: str(p.peer_ticker) ?? "", basis: str(p.basis), source: str(p.source) }))
+    .map((p) => ({ peerTicker: str(p.peer_ticker) ?? "", basis: str(p.basis), source: str(p.source), sources: stringList(p.sources) }))
     .filter((p) => p.peerTicker !== "")
-    .filter((p, i, all) => all.findIndex((q) => q.peerTicker === p.peerTicker) === i);
+    .filter((p, i, all) => all.findIndex((q) => q.peerTicker === p.peerTicker) === i); // defensive: the backend already returns one row per peer
   const excludedPeers = (Array.isArray(body.excluded_peers) ? body.excluded_peers : [])
     .filter(isRec)
     .map((p) => ({ peer: str(p.peer) ?? "", reason: str(p.reason) ?? "No reason recorded" }))

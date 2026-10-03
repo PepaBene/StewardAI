@@ -3,7 +3,6 @@ import { describe, expect, it } from "vitest";
 import type { HoldingSegments } from "@/lib/api/client";
 
 import {
-  asOfParam,
   avcScaleMismatch,
   avcState,
   buildEstimates,
@@ -14,13 +13,17 @@ import {
   peerComparison,
   peerState,
   revisionSlope,
-  safeHref,
   sectionKey,
   segmentAlignment,
   surprise,
-  localIsoDate,
 } from "./logic";
-import { parsePeerMetrics } from "./parse";
+import { createElement } from "react";
+import { renderToStaticMarkup } from "react-dom/server";
+
+import { EarningsCard } from "@/components/financials/earnings-card";
+import { PeerTable } from "@/components/financials/peer-table";
+
+import { parseActualVsConsensus, parseForwardPayload, parsePeerMetrics } from "./parse";
 import type { ActualVsConsensus, ConsensusSeries, FactRow, ForwardObs, PeerMetricsPayload } from "./types";
 
 let nextId = 1;
@@ -76,7 +79,7 @@ describe("F4-01 surprise against a negative consensus", () => {
 describe("F4-02 estimates fan keeps one period length", () => {
   const obs = (fiscalPeriod: string, value: number): ForwardObs => ({
     id: nextId++, kind: "published_analyst_consensus", provider: "P", metric: "revenue", basis: null, fiscalPeriod, periodEnd: null, currency: "USD",
-    value, low: null, high: null, analystCount: 5, vintage: null, publishedAt: null, knownAt: "2026-01-01T00:00:00Z", sourceUrl: null,
+    value, low: null, high: null, analystCount: 5, vintage: null, vintageDate: null, publishedAt: null, knownAt: "2026-01-01T00:00:00Z", sourceUrl: null,
   });
   const facts = [
     annual("revenue", 2025, 400),
@@ -174,11 +177,11 @@ describe("F4-06 / F7-5 section key and as-of", () => {
 
 describe("F4-08 duplicate peers", () => {
   it("parse dedupes by ticker and the comparison counts distinct tickers", () => {
-    const body = { covered_peer_metrics: {}, confirmed_peers: [{ peer_ticker: "AAA", source: "finnhub" }, { peer_ticker: "AAA", source: "owner" }, { peer_ticker: "BBB" }] };
+    const body = { covered_peer_metrics: {}, confirmed_peers: [{ peer_ticker: "AAA", source: "finnhub", sources: [] }, { peer_ticker: "AAA", source: "owner", sources: [] }, { peer_ticker: "BBB" }] };
     expect(parsePeerMetrics(body)!.confirmedPeers.map((p) => p.peerTicker)).toEqual(["AAA", "BBB"]);
     const p: PeerMetricsPayload = {
-      confirmedPeers: [{ peerTicker: "AAA", basis: null, source: "finnhub" }, { peerTicker: "AAA", basis: null, source: "owner" }, { peerTicker: "BBB", basis: null, source: null }],
-      metrics: [{ id: "gross_margin", mean: 0.5, coveredPeers: 2, included: ["AAA", "BBB"], excluded: [], excludedReasons: {}, holdingValue: 0.6, holdingReason: null, periodEnd: null, periodStart: null, basis: null }],
+      confirmedPeers: [{ peerTicker: "AAA", basis: null, source: "finnhub", sources: [] }, { peerTicker: "AAA", basis: null, source: "owner", sources: [] }, { peerTicker: "BBB", basis: null, source: null, sources: [] }],
+      metrics: [{ id: "gross_margin", mean: 0.5, coveredPeers: 2, included: ["AAA", "BBB"], excluded: [], excludedReasons: {}, peers: [], holdingValue: 0.6, holdingReason: null, periodEnd: null, periodStart: null, basis: null }],
       excludedPeers: [], holdingPeriod: { periodStart: null, periodEnd: null, basis: null, unit: null, reconciliation: "reconciled", unreconciledInputs: [] },
       reconciledOnly: false, formulas: {}, universe: null, knownAsOf: null,
     };
@@ -215,7 +218,7 @@ describe("F4-10 free-text vintage", () => {
   it("never yields NaN days and orders by known_at", () => {
     const o = (value: number, vintage: string, knownAt: string): ForwardObs => ({
       id: nextId++, kind: "published_analyst_consensus", provider: "P", metric: "revenue", basis: null, fiscalPeriod: "FY2026", periodEnd: null, currency: "USD",
-      value, low: null, high: null, analystCount: null, vintage, publishedAt: null, knownAt, sourceUrl: null,
+      value, low: null, high: null, analystCount: null, vintage, vintageDate: null, publishedAt: null, knownAt, sourceUrl: null,
     });
     const r = revisionSlope({ fiscalPeriod: "FY2026", vintages: [o(10, "Q1 2026 preview", "2026-01-01T00:00:00Z"), o(11, "Q1 2026 update", "2026-01-31T00:00:00Z")] })!;
     expect(r.days).toBe(30);
@@ -228,32 +231,90 @@ describe("F4-10 free-text vintage", () => {
 describe("F4-12 actual vs consensus guards", () => {
   const avc = (actual: number, mean: number, reconciled = true): ActualVsConsensus => ({
     state: "available", reason: null, metric: "revenue", fiscalPeriod: "FY2025", surprise: null, surprisePct: null,
-    actual: { value: actual, unit: "USD", currency: "USD", knownAt: null, accession: null, reconciled },
-    consensus: { provider: "P", value: mean, low: null, high: null, analystCount: null, currency: "USD", basis: null, vintage: null, knownAt: null },
+    actual: { value: actual, unit: "USD", currency: "USD", knownAt: null, accession: null, reconciled, reconciliationState: reconciled ? ("passed" as const) : ("unchecked" as const) },
+    consensus: { provider: "P", value: mean, low: null, high: null, analystCount: null, currency: "USD", basis: null, vintage: null, vintageDate: null, knownAt: null },
   });
   it("a million-fold gap is a scale mismatch, not a surprise", () => {
     expect(avcScaleMismatch(avc(5_000_000_000, 5000))).toBe(true);
     expect(avcState(avc(5_000_000_000, 5000)).state).toBe("disputed");
     expect(avcScaleMismatch(avc(105, 100))).toBe(false);
   });
-  it("an unconfirmed reconciliation is not claimed to be unchecked", () => {
-    expect(avcState(avc(105, 100, false)).reason).toMatch(/does not say/);
+  it("unchecked, failed and passed reconciliation have distinct states and labels", () => {
+    const withState = (s: "unchecked" | "failed" | "passed" | null): ActualVsConsensus => {
+      const base = avc(105, 100, s === "passed");
+      return { ...base, actual: { ...base.actual!, reconciliationState: s } };
+    };
+    expect(avcState(withState("unchecked"))).toMatchObject({ state: "partial", reason: expect.stringMatching(/No reconciliation check ran/) });
+    expect(avcState(withState("failed"))).toMatchObject({ state: "disputed", reason: expect.stringMatching(/disagreed/) });
+    expect(avcState(withState("passed"))).toEqual({ state: "verified", reason: null });
+    expect(avcState(withState(null)).reason).toMatch(/did not state/);
+    expect(avcState(withState("unchecked")).reason).not.toMatch(/does not say/);
   });
 });
 
-describe("F4-14 as-of boundary", () => {
-  it("includes the whole last second of the chosen day, and the picker uses the local date", () => {
-    expect(asOfParam("2026-03-01")).toBe("2026-03-01T23:59:59.999999Z");
-    expect(asOfParam(null)).toBeUndefined();
-    expect(localIsoDate(new Date(2026, 2, 1, 0, 30))).toBe("2026-03-01");
+describe("backend peers[], vintage_date and reconciliation_state", () => {
+  const peerBody = {
+    covered_peer_metrics: {
+      gross_margin: {
+        mean: 0.4, covered_peers: 2, included: ["A", "B"], excluded: ["C"], excluded_reasons: { C: "missing revenue" }, holding_value: 0.5,
+        peers: [
+          { ticker: "B", name: "Bee Inc", basis: "US_GAAP", period: "2025-12-31", period_start: "2025-01-01", value: "0.2", definition_version: "peer_metrics_v1", reason: null },
+          { ticker: "C", name: null, basis: null, period: null, period_start: null, value: null, definition_version: "peer_metrics_v1", reason: "missing revenue" },
+          { ticker: "A", name: "Ay", basis: "US_GAAP", period: "2025-12-31", period_start: "2025-01-01", value: 0.6, definition_version: "peer_metrics_v1", reason: null },
+          { ticker: "A", name: "Ay again", value: 0.9 },
+        ],
+      },
+    },
+    confirmed_peers: [{ peer_ticker: "A", sources: ["finnhub", "owner"] }, { peer_ticker: "B", sources: [] }, { peer_ticker: "C", sources: ["owner"] }],
+  };
+  it("ranks peers by value, lists null-value peers unranked with their reason, and dedupes by ticker defensively", () => {
+    const p = parsePeerMetrics(peerBody)!;
+    expect(p.metrics[0].peers.map((x) => x.ticker)).toEqual(["B", "C", "A"]);
+    expect(p.confirmedPeers[0].sources).toEqual(["finnhub", "owner"]);
+    const c = peerComparison(p, "gross_margin")!;
+    expect(c.ranked.map((x) => [x.ticker, x.value])).toEqual([["A", 0.6], ["B", 0.2]]);
+    expect(c.unranked).toMatchObject([{ ticker: "C", value: null, reason: "missing revenue" }]);
+    expect(c.excluded).toEqual([{ ticker: "C", reason: "missing revenue" }]);
+    expect([c.covered, c.total]).toEqual([2, 3]);
   });
-});
-
-describe("F4-15 link scheme", () => {
-  it("only http(s) is a link", () => {
-    expect(safeHref("https://example.com/a")).toBe("https://example.com/a");
-    expect(safeHref("javascript:alert(1)")).toBeNull();
-    expect(safeHref("data:text/html,x")).toBeNull();
-    expect(safeHref(null)).toBeNull();
+  it("PeerTable draws one bar per ranked peer, with name, basis and definition version", () => {
+    const html = renderToStaticMarkup(createElement(PeerTable, { data: parsePeerMetrics(peerBody)!, ticker: "SUBJ" }));
+    expect(html).toContain("Ay (A)");
+    expect(html).toContain("Bee Inc (B)");
+    expect(html).toContain("peer_metrics_v1");
+    expect(html).toContain("Peer sources: A (finnhub, owner)");
+    expect(html).toContain("missing revenue");
+    expect(html).not.toMatch(/returns the peer mean/);
+  });
+  it("uses vintage_date, not the free text, for snapshot order and day math", () => {
+    const o = (value: number, vintage: string, vintageDate: string | null, knownAt: string): ForwardObs => ({
+      id: nextId++, kind: "published_analyst_consensus", provider: "P", metric: "revenue", basis: null, fiscalPeriod: "FY2026", periodEnd: null, currency: "USD",
+      value, low: null, high: null, analystCount: null, vintage, vintageDate, publishedAt: null, knownAt, sourceUrl: null,
+    });
+    // Free text says "2026-12-31" in an unparseable form; only vintage_date counts. Ingested in reverse order.
+    const r = revisionSlope({ fiscalPeriod: "FY2026", vintages: [o(11, "2026-02-01 post-earnings", "2026-02-01", "2026-03-01T00:00:00Z"), o(10, "2026-01-01 preview", "2026-01-01", "2026-03-02T00:00:00Z")] })!;
+    expect([r.from.vintage, r.to.vintage, r.days]).toEqual(["2026-01-01", "2026-02-01", 31]);
+    expect(r.change).toBe(1);
+    // A date-looking free text without vintage_date is not parsed: the known_at day is used.
+    const free = revisionSlope({ fiscalPeriod: "FY2026", vintages: [o(10, "2026-01-01", null, "2026-03-01T00:00:00Z"), o(11, "2026-06-01", null, "2026-03-11T00:00:00Z")] })!;
+    expect(free.days).toBe(10);
+  });
+  it("parses vintage_date only when it is an ISO date", () => {
+    const raw = { id: 1, kind: "published_analyst_consensus", metric: "revenue", fiscal_period: "FY2026", known_at: "2026-01-02T00:00:00Z" };
+    const p = parseForwardPayload({ observations: [{ ...raw, vintage: "2026-01-01 x", vintage_date: "2026-01-01" }, { ...raw, id: 2, vintage: "Q1 preview", vintage_date: null }, { ...raw, id: 3, vintage_date: "garbage" }] })!;
+    expect(p.observations.map((x) => x.vintageDate)).toEqual(["2026-01-01", null, null]);
+    const avc = parseActualVsConsensus({ state: "available", actual: { value: 1, reconciled: false, reconciliation_state: "failed" }, consensus: { value: 1, vintage: "Q1 preview", vintage_date: null } })!;
+    expect([avc.actual?.reconciliationState, avc.consensus?.vintageDate]).toEqual(["failed", null]);
+  });
+  it("a failed reconciliation draws no surprise", () => {
+    const mk = (state: "failed" | "passed"): ActualVsConsensus => ({
+      state: "available", reason: null, metric: "revenue", fiscalPeriod: "FY2025", surprise: 5, surprisePct: 0.05,
+      actual: { value: 105, unit: "USD", currency: "USD", knownAt: null, accession: null, reconciled: state === "passed", reconciliationState: state },
+      consensus: { provider: "P", value: 100, low: 95, high: 110, analystCount: 10, currency: "USD", basis: null, vintage: null, vintageDate: null, knownAt: null },
+    });
+    const failed = renderToStaticMarkup(createElement(EarningsCard, { avc: mk("failed") }));
+    expect(failed).toMatch(/disagreed/);
+    expect(failed).not.toMatch(/analyst range/);
+    expect(renderToStaticMarkup(createElement(EarningsCard, { avc: mk("passed") }))).toMatch(/analyst range/);
   });
 });

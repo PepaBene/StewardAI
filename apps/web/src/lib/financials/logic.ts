@@ -15,6 +15,8 @@ import type {
   LineVersion,
   PeerMetricRow,
   PeerMetricsPayload,
+  PeerValue,
+  ReconciliationState,
   PeriodBasis,
   RevisionSlope,
   SegmentRowView,
@@ -756,14 +758,13 @@ export function seriesId(s: { provider: string | null; currency: string | null; 
   return `${s.provider ?? ""}|${s.currency ?? ""}|${s.basis ?? ""}`;
 }
 
-/** A vintage the provider stated as an ISO date; the backend allows free text (e.g. "Q1 2026 preview"). */
-export function isDateVintage(v: string | null | undefined): v is string {
-  return typeof v === "string" && /^\d{4}-\d{2}-\d{2}(?![\d])/.test(v) && Number.isFinite(Date.parse(v.slice(0, 10)));
-}
-
-/** The date a snapshot is placed at: its stated ISO vintage, else the day it became known. Free-text vintages are labels only. */
-export function vintageDate(o: Pick<ForwardObs, "vintage" | "knownAt">): string {
-  return (isDateVintage(o.vintage) ? o.vintage : o.knownAt).slice(0, 10);
+/**
+ * The date a snapshot is placed at: the backend's `vintage_date` when the provider stated one,
+ * else the day it became known. The free-text `vintage` ("Q1 2026 preview") is a label only and
+ * is never parsed.
+ */
+export function vintageDate(o: Pick<ForwardObs, "vintageDate" | "knownAt">): string {
+  return (o.vintageDate ?? o.knownAt).slice(0, 10);
 }
 
 /**
@@ -773,7 +774,13 @@ export function vintageDate(o: Pick<ForwardObs, "vintage" | "knownAt">): string 
  */
 export function revisionSlope(series: Pick<ConsensusSeries, "fiscalPeriod" | "vintages">): RevisionSlope | null {
   const byDate = new Map<string, ForwardObs>();
-  for (const v of [...series.vintages].sort((a, b) => (a.knownAt < b.knownAt ? -1 : 1))) {
+  // Ordered by the snapshot date, then by when it became known (the later known one wins a same-day tie).
+  const order = (a: ForwardObs, b: ForwardObs) => {
+    const da = vintageDate(a);
+    const db = vintageDate(b);
+    return da !== db ? (da < db ? -1 : 1) : a.knownAt < b.knownAt ? -1 : a.knownAt > b.knownAt ? 1 : 0;
+  };
+  for (const v of [...series.vintages].sort(order)) {
     if (v.value === null) continue;
     byDate.set(vintageDate(v), v);
   }
@@ -977,16 +984,27 @@ export function avcScaleMismatch(a: Pick<ActualVsConsensus, "actual" | "consensu
   return ratio > 100 || ratio < 0.01;
 }
 
+/** The reconciliation state of the actual: the API's three-way state; `reconciled: true` from an older payload still means passed. */
+export function avcReconciliation(a: ActualVsConsensus): ReconciliationState | null {
+  if (!a.actual) return null;
+  return a.actual.reconciliationState ?? (a.actual.reconciled ? "passed" : null);
+}
+
 /** Data state of an actual-vs-consensus answer. */
 export function avcState(a: ActualVsConsensus): StateAndReason {
   switch (a.state) {
     case "available":
       if (avcScaleMismatch(a)) return { state: "disputed", reason: "The reported figure and the consensus differ by more than 100x: a unit or scale mismatch, so no surprise is computed." };
-      return {
-        state: a.actual?.reconciled ? "verified" : "partial",
-        // The API reports `reconciled` as false both when no check ran and when a check failed.
-        reason: a.actual?.reconciled ? null : "The reported figure is not confirmed by a reconciliation check (the API does not say whether none ran or one disagreed).",
-      };
+      switch (avcReconciliation(a)) {
+        case "passed":
+          return { state: "verified", reason: null };
+        case "failed":
+          return { state: "disputed", reason: "A reconciliation check ran on the reported figure and the figures disagreed, so no surprise is computed." };
+        case "unchecked":
+          return { state: "partial", reason: "No reconciliation check ran on the reported figure (kept, flagged)." };
+        default:
+          return { state: "partial", reason: "The API did not state whether the reported figure was reconciled." };
+      }
     case "no_consensus_before_report":
       return { state: "not_covered", reason: a.reason ?? "No consensus was known before the report." };
     case "currency_mismatch":
@@ -1026,6 +1044,10 @@ export type PeerComparison = {
   total: number;
   included: readonly string[];
   excluded: readonly { ticker: string; reason: string }[];
+  /** Peers with a comparable value, highest first. */
+  ranked: readonly PeerValue[];
+  /** Peers listed without a value (each with its reason); never ranked, never drawn as zero. */
+  unranked: readonly PeerValue[];
   periodEnd: string | null;
   basis: string | null;
 };
@@ -1038,8 +1060,11 @@ export function peerComparison(p: PeerMetricsPayload, metricId: string): PeerCom
   const row: PeerMetricRow | undefined = p.metrics.find((m) => m.id === metricId);
   if (!row) return null;
   const meta = PEER_METRIC_META[metricId];
-  // One confirmed peer can be stored once per source (suggested by a provider and re-added by the owner).
+  // The backend returns one row per distinct peer; the set keeps a malformed payload honest.
   const tickers = [...new Set(p.confirmedPeers.map((c) => c.peerTicker))];
+  const peerRows = new Map(row.peers.map((x) => [x.ticker, x]));
+  const ranked = row.peers.filter((x) => x.value !== null).sort((a, b) => (b.value as number) - (a.value as number) || a.ticker.localeCompare(b.ticker));
+  const unranked = row.peers.filter((x) => x.value === null);
   const total = tickers.length;
   const excludedAll = tickers.filter((t) => !row.included.includes(t));
   const wholly = new Map(p.excludedPeers.map((e) => [e.peer, e.reason]));
@@ -1054,7 +1079,9 @@ export function peerComparison(p: PeerMetricsPayload, metricId: string): PeerCom
     covered: row.included.length,
     total,
     included: row.included,
-    excluded: excludedAll.map((t) => ({ ticker: t, reason: row.excludedReasons[t] ?? wholly.get(t) ?? "No value for this metric." })),
+    excluded: excludedAll.map((t) => ({ ticker: t, reason: row.excludedReasons[t] ?? peerRows.get(t)?.reason ?? wholly.get(t) ?? "No value for this metric." })),
+    ranked,
+    unranked,
     periodEnd: row.periodEnd,
     basis: row.basis,
   };

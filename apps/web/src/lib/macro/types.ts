@@ -3,9 +3,9 @@ import type { DataState } from "@/lib/data-state/states";
 /*
  * Domain types of the macro, financial-cycle and trade views, built from what the backend
  * returns (apps/backend/src/api/macro_routes.py, research_context_routes.py,
- * data_context_routes.py). The API returns the latest point of each series with its
- * previous period and 5/10-year range, not a vintage history, so there is no first-release
- * series type: nothing is modelled that the API does not send. Decimals arrive as numbers or
+ * data_context_routes.py). Each series comes with its latest point, previous period and
+ * 5/10-year range and, when requested (`history`), the per-period vintage history (latest
+ * value, first release or null, revision markers). Decimals arrive as numbers or
  * strings and are parsed into `number | null`, where null is "missing", never zero.
  */
 
@@ -14,6 +14,19 @@ export type ExposureBasis = "reported" | "estimated" | "user_assigned";
 export type BasisLabel = ExposureBasis | "unclassified";
 
 export type Range = { low: number; high: number };
+
+/** One period of a series' vintage history: the latest value, and the first release when it was archived. */
+export type VintagePoint = {
+  period: string;
+  valueLatest: number | null;
+  /** Null when the first release was not archived: never substituted by the revised value. */
+  valueFirstRelease: number | null;
+  vintageUnavailable: boolean;
+  releasedAt: string | null;
+  /** Null when the period was never revised. */
+  revisedAt: string | null;
+  revisionCount: number;
+};
 
 /** One country series at its latest period known by the as-of time (GET /macro/context/{ticker}). */
 export type IndicatorPoint = {
@@ -35,6 +48,10 @@ export type IndicatorPoint = {
   state: DataState;
   /** Why the state is not simply verified, in the backend's words where it gave any. */
   stateReason: string | null;
+  /** Vintage history, oldest first; empty when not requested or not stored. */
+  history: readonly VintagePoint[];
+  /** Free text from the backend; there is no machine-readable next release. */
+  releaseCalendar: string | null;
 };
 
 export type CoverageRow = {
@@ -187,6 +204,45 @@ export type ExposureMapping = {
 // Trade and research context
 // ---------------------------------------------------------------------------------------
 
+export type TradePartner = {
+  /** Partner code as stored (M49 for Comtrade). */
+  partner: string;
+  /** ISO alpha-2 when a single country; null for areas nes. */
+  partnerIso: string | null;
+  value: number | null;
+  /** Fraction of the product's total for this flow and period; null when unknown. */
+  share: number | null;
+};
+
+export type TradePartnerPeriod = {
+  period: string;
+  total: number | null;
+  totalBasis: "world_row" | "partner_sum";
+  mappedValue: number | null;
+  /** Null when no World total was reported: not stated, never zero. */
+  unmappedValue: number | null;
+  unmappedShare: number | null;
+  partnerCount: number;
+  /** Fraction 0..1 over the mapped partners. */
+  hhi: number | null;
+  partnersExceedTotal: boolean;
+};
+
+export type TradeFlowPartners = {
+  flow: string;
+  period: string;
+  summary: TradePartnerPeriod;
+  partners: readonly TradePartner[];
+  history: readonly TradePartnerPeriod[];
+};
+
+export type ReporterWideTrade = {
+  periods: number;
+  hsRevision: string;
+  products: number;
+  metrics: Readonly<Record<string, number | null>>;
+};
+
 export type TradeContext = {
   reporter: string;
   hsCode: string;
@@ -201,6 +257,9 @@ export type TradeContext = {
   sourceUrl: string | null;
   knownAt: string | null;
   notice: string;
+  /** Reporter-wide context (all products stored for the reporter); `metrics` above is product-scoped. */
+  reporterWide: ReporterWideTrade | null;
+  partners: readonly TradeFlowPartners[];
 };
 
 export type ClaimDomain = "macro" | "trade" | "financial" | "forward" | "company_research" | "business_network" | "patents";
@@ -232,7 +291,7 @@ export type ResearchContext = {
   method: string;
 };
 
-/** A trade claim whose natural key (reporter, partner, flow, revision, HS code, period) was read from its claim id. */
+/** A trade claim (industry context) whose natural key (reporter, partner, flow, revision, HS code, period) was read from its claim id. */
 export type TradeRow = {
   claim: Claim;
   reporter: string;

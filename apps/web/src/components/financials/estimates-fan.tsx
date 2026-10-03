@@ -8,7 +8,7 @@ import { ChartFrame, Segmented } from "@/components/data-state";
 import { formatNumber, formatPct } from "@/lib/charts/format";
 import { linePath } from "@/lib/charts/path";
 import { bandScale, extent, linearScale, niceTicks } from "@/lib/charts/scale";
-import { buildEstimates, forwardMetrics, forwardState, isDateVintage, safeHref, vintageDate } from "@/lib/financials/logic";
+import { buildEstimates, forwardMetrics, forwardState, safeHref, vintageDate } from "@/lib/financials/logic";
 import { FORWARD_LABELS, type FactRow, type ForwardKind, type ForwardPayload } from "@/lib/financials/types";
 import { formatDate } from "@/lib/format";
 import { cn } from "@/lib/utils";
@@ -22,9 +22,9 @@ const OFFSET: Record<ForwardKind, number> = {
   event_calendar_estimate: 40,
 };
 
-/** A stated vintage as a date when it is one; free text ("Q1 2026 preview") is shown as the provider wrote it. */
-function vLabel(v: string | null): string {
-  return v === null ? "—" : isDateVintage(v) ? formatDate(v.slice(0, 10)) : v;
+/** The backend's `vintage_date` as a date when there is one; free text ("Q1 2026 preview") is shown as the provider wrote it. */
+function vLabel(f: { vintage: string | null; vintageDate: string | null }): string {
+  return f.vintageDate !== null ? formatDate(f.vintageDate) : (f.vintage ?? "—");
 }
 
 function n(v: number | null, digits = 2): string {
@@ -119,8 +119,8 @@ export function EstimatesFan({ payload, facts, asOf }: { payload: ForwardPayload
         columns: ["Period", "Kind", "Low", "Mean / value", "High", "Analysts", "Basis", "Vintage", "Provider"],
         rows: [
           ...model.actuals.map((a) => [a.period, FORWARD_LABELS.actual, "—", n(a.value), "—", "—", "as filed", formatDate(a.knownAt.slice(0, 10)), "filing"]),
-          ...model.points.map((f) => [f.fiscalPeriod, FORWARD_LABELS[f.kind], n(f.low), n(f.value), n(f.high), f.analystCount === null ? "not stated" : f.analystCount, f.basis ?? "not stated", vLabel(f.vintage), f.provider ?? "—"]),
-          ...model.unplotted.map(({ obs: f, reason }) => [f.fiscalPeriod, `${FORWARD_LABELS[f.kind]} (not plotted)`, n(f.low), n(f.value), n(f.high), f.analystCount === null ? "not stated" : f.analystCount, f.basis ?? "not stated", vLabel(f.vintage), `${f.provider ?? "—"}: ${reason}`]),
+          ...model.points.map((f) => [f.fiscalPeriod, FORWARD_LABELS[f.kind], n(f.low), n(f.value), n(f.high), f.analystCount === null ? "not stated" : f.analystCount, f.basis ?? "not stated", vLabel(f), f.provider ?? "—"]),
+          ...model.unplotted.map(({ obs: f, reason }) => [f.fiscalPeriod, `${FORWARD_LABELS[f.kind]} (not plotted)`, n(f.low), n(f.value), n(f.high), f.analystCount === null ? "not stated" : f.analystCount, f.basis ?? "not stated", vLabel(f), `${f.provider ?? "—"}: ${reason}`]),
         ],
       }}
     >

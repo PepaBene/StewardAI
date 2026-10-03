@@ -103,7 +103,7 @@ describe("financial components render without throwing", () => {
     expect(html).toContain("Nothing stored");
   });
 
-  const obs = (over: Partial<ForwardObs>): ForwardObs => ({ id: id++, kind: "published_analyst_consensus", provider: "P", metric: "eps_diluted", basis: "GAAP", fiscalPeriod: "FY2026", periodEnd: null, currency: "USD", value: 5, low: 4, high: 6, analystCount: null, vintage: "2026-01-10", publishedAt: null, knownAt: "2026-01-10T00:00:00Z", sourceUrl: null, ...over });
+  const obs = (over: Partial<ForwardObs>): ForwardObs => ({ id: id++, kind: "published_analyst_consensus", provider: "P", metric: "eps_diluted", basis: "GAAP", fiscalPeriod: "FY2026", periodEnd: null, currency: "USD", value: 5, low: 4, high: 6, analystCount: null, vintage: "2026-01-10", vintageDate: null, publishedAt: null, knownAt: "2026-01-10T00:00:00Z", sourceUrl: null, ...over });
 
   it("estimates fan: nothing stored, and every kind present", () => {
     const empty: ForwardPayload = { observations: [], series: [], knownAsOf: null, dropped: 0 };
@@ -122,7 +122,7 @@ describe("financial components render without throwing", () => {
   });
 
   it("earnings card: every answer state", () => {
-    const base: ActualVsConsensus = { state: "available", reason: null, metric: "revenue", fiscalPeriod: "FY2025", actual: { value: 105, unit: "USD", currency: "USD", knownAt: "2026-02-01T00:00:00Z", accession: "a", reconciled: true }, consensus: { provider: "P", value: 100, low: 95, high: 110, analystCount: 10, currency: "USD", basis: "GAAP", vintage: "2026-01-01", knownAt: "2026-01-02T00:00:00Z" }, surprise: 5, surprisePct: 0.05 };
+    const base: ActualVsConsensus = { state: "available", reason: null, metric: "revenue", fiscalPeriod: "FY2025", actual: { value: 105, unit: "USD", currency: "USD", knownAt: "2026-02-01T00:00:00Z", accession: "a", reconciled: true, reconciliationState: "passed" as const }, consensus: { provider: "P", value: 100, low: 95, high: 110, analystCount: 10, currency: "USD", basis: "GAAP", vintage: "2026-01-01", vintageDate: null, knownAt: "2026-01-02T00:00:00Z" }, surprise: 5, surprisePct: 0.05 };
     expect(renderToStaticMarkup(h(EarningsCard, { avc: base }))).toContain("Within the analyst range");
     expect(renderToStaticMarkup(h(EarningsCard, { avc: { ...base, state: "no_consensus_before_report", consensus: null, reason: "none known" } }))).toContain("No estimate is created");
     expect(renderToStaticMarkup(h(EarningsCard, { avc: { ...base, state: "currency_mismatch" } }))).toContain("Disputed");
@@ -134,8 +134,8 @@ describe("financial components render without throwing", () => {
     expect(renderToStaticMarkup(h(PeerTable, { data: none, ticker: "X" }))).toContain("No confirmed peer");
     const partial: PeerMetricsPayload = {
       ...none,
-      confirmedPeers: [{ peerTicker: "A", basis: null, source: null }, { peerTicker: "B", basis: null, source: null }],
-      metrics: [{ id: "gross_margin", mean: 0.4, coveredPeers: 1, included: ["A"], excluded: ["B"], excludedReasons: { B: "different basis" }, holdingValue: 0.5, holdingReason: null, periodEnd: "2025-12-31", periodStart: null, basis: "US_GAAP" }],
+      confirmedPeers: [{ peerTicker: "A", basis: null, source: null, sources: [] }, { peerTicker: "B", basis: null, source: null, sources: [] }],
+      metrics: [{ id: "gross_margin", mean: 0.4, coveredPeers: 1, included: ["A"], excluded: ["B"], excludedReasons: { B: "different basis" }, peers: [], holdingValue: 0.5, holdingReason: null, periodEnd: "2025-12-31", periodStart: null, basis: "US_GAAP" }],
     };
     const html = renderToStaticMarkup(h(PeerTable, { data: partial, ticker: "X" }));
     expect(html).toContain("1 of 2");

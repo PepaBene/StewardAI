@@ -1,11 +1,14 @@
-import { ChartFrame, StatePlaceholder, TableView } from "@/components/data-state";
+"use client";
+
+import { useState } from "react";
+
 import { AlertMessage } from "@/components/alert-message";
-import { DataStateBadge } from "@/components/data-state";
+import { ChartFrame, DataStateBadge, Segmented, StatePlaceholder, TableView } from "@/components/data-state";
 import { Blueprint, PanelHeading } from "@/components/ui/blueprint";
 import { formatPct } from "@/lib/charts/format";
 import { resolveGeography } from "@/lib/charts/geo";
 import { isFiniteNumber } from "@/lib/charts/scale";
-import { comparisonGroups, geographyName, groupByGeography, mappedTargets } from "@/lib/macro/logic";
+import { comparisonGroups, geographyName, groupByGeography, mappedTargets, sharedTimeDomain, type VintageMode } from "@/lib/macro/logic";
 import type { HoldingMacroContext } from "@/lib/macro/types";
 import { cn } from "@/lib/utils";
 
@@ -28,7 +31,9 @@ function sameGeography(a: string, b: string): boolean {
  * gets an explicit "exposure unknown" state, never a default country.
  */
 export function HoldingMacroPanel({ ctx, ticker, pastAsOf = false }: { ctx: HoldingMacroContext; ticker: string; /** The owner chose a past "known as of" date. */ pastAsOf?: boolean }) {
+  const [mode, setMode] = useState<VintageMode>("latest");
   const groups = groupByGeography(ctx.observations);
+  const domain = sharedTimeDomain(ctx.observations.map((o) => o.history));
   const targets = mappedTargets(ctx.effects);
   const mappedGeos = targets.filter((t) => t.kind === "geography").map((t) => t.key);
   const comps = comparisonGroups(ctx.comparisons);
@@ -85,8 +90,17 @@ export function HoldingMacroPanel({ ctx, ticker, pastAsOf = false }: { ctx: Hold
           <PanelHeading kicker="Country indicators" title={<span id="holding-indicators-heading">Latest values for the mapped countries</span>} />
           <p className="max-w-prose text-sm text-text-muted">
             Each card is one series at the latest period known by {day(ctx.asOf)}, in its own unit, with the previous period and where the value sits in its stored 5- and 10-year range.
-            The API returns the latest vintage only; first-release values and revision history are not part of this response, so none are shown. A period with no value is left empty, never zero.
+            The small charts share one time axis. Latest vintage shows each period as last revised; first release shows the value as first published, and a period whose first release was never archived is left blank (vintage unavailable), not filled with the revised value. Ringed points were revised. A period with no value is left empty, never zero.
           </p>
+          <Segmented
+            label="Vintage"
+            options={[
+              { id: "latest" as const, label: "Latest vintage" },
+              { id: "first_release" as const, label: "First release" },
+            ]}
+            value={mode}
+            onChange={setMode}
+          />
           {groups.length === 0 ? (
             <StatePlaceholder state="not_covered" reason={`No stored country series for ${mappedGeos.length ? mappedGeos.join(", ") : "the mapped geographies"} was known by ${day(ctx.asOf)}.`} />
           ) : (
@@ -97,7 +111,7 @@ export function HoldingMacroPanel({ ctx, ticker, pastAsOf = false }: { ctx: Hold
                 </h3>
                 <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">
                   {g.points.map((p, i) => (
-                    <IndicatorCard key={`${p.seriesId}|${p.source}|${p.geography}|${i}`} point={p} />
+                    <IndicatorCard key={`${p.seriesId}|${p.source}|${p.geography}|${i}`} point={p} mode={mode} domain={domain} />
                   ))}
                 </div>
               </section>

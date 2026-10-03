@@ -5,7 +5,7 @@ import { describe, expect, it } from "vitest";
 import { ChoroplethMap } from "@/components/charts/choropleth-map";
 import { worldShapes } from "@/lib/charts/geo-world";
 import type { ResourceState } from "@/lib/hooks/use-api-resource";
-import type { Claim, HoldingMacroContext, IndicatorPoint, PortfolioCountryContext, ResearchContext, TradeContext } from "@/lib/macro/types";
+import type { Claim, HoldingMacroContext, IndicatorPoint, PortfolioCountryContext, TradeContext, TradeFlowPartners } from "@/lib/macro/types";
 
 import { ClaimList } from "./context-cards";
 import { formatShare } from "./format";
@@ -15,7 +15,7 @@ import { HoldingMacroPanel } from "./holding-macro-panel";
 import { IndicatorCard } from "./indicator-card";
 import { PortfolioExposureMap } from "./portfolio-exposure-map";
 import { ResourceBoundary } from "./resource-boundary";
-import { PartnerSankey, TradeMetrics, TradeSummary } from "./trade-panel";
+import { ConcentrationTrend, PartnerSankey, ProductRows, TradeMetrics, TradeSummary } from "./trade-panel";
 
 /*
  * Render smoke tests: every state of the macro views renders without NaN/undefined leaking
@@ -28,7 +28,7 @@ const clean = (html: string) => {
 };
 
 function point(over: Partial<IndicatorPoint> = {}): IndicatorPoint {
-  return { seriesId: "cpi", source: "oecd", geography: "DE", unit: "percent", period: "2026-08-31", value: 2.1, releaseAt: "2026-09-12T08:00:00Z", knownAt: "2026-09-12T09:00:00Z", sourceUrl: "https://x.test", previousPeriod: "2026-07-31", previousValue: 2.4, fiveYear: { low: -0.5, high: 9 }, tenYear: { low: -1, high: 10 }, state: "verified", stateReason: null, ...over };
+  return { seriesId: "cpi", source: "oecd", geography: "DE", unit: "percent", period: "2026-08-31", value: 2.1, releaseAt: "2026-09-12T08:00:00Z", knownAt: "2026-09-12T09:00:00Z", sourceUrl: "https://x.test", previousPeriod: "2026-07-31", previousValue: 2.4, fiveYear: { low: -0.5, high: 9 }, tenYear: { low: -1, high: 10 }, state: "verified", stateReason: null, history: [], releaseCalendar: null, ...over };
 }
 
 function context(over: Partial<HoldingMacroContext> = {}): HoldingMacroContext {
@@ -101,7 +101,8 @@ describe("HoldingMacroPanel", () => {
     expect(html).toContain("The same indicators across countries");
     expect(html).toContain("Latest periods differ");
     expect(html).toContain("Collection state for the mapped countries");
-    expect(html).toContain("latest vintage only");
+    expect(html).toContain("Latest vintage");
+    expect(html).toContain("First release");
   });
   it("says exposure is unknown, and shows no indicator, when nothing is mapped", () => {
     const html = clean(renderToStaticMarkup(createElement(HoldingMacroPanel, { ctx: context({ exposureUnknown: true, effects: [], observations: [], seriesEffects: [], comparisons: [], coverage: [] }), ticker: "SAP" })));
@@ -180,25 +181,55 @@ describe("ExposureEditor", () => {
   });
 });
 
+const period = (over: Record<string, unknown> = {}) => ({ period: "2025-12-31", total: 10e9, totalBasis: "world_row" as const, mappedValue: 6e9, unmappedValue: 4e9, unmappedShare: 0.4, partnerCount: 2, hhi: 0.25, partnersExceedTotal: false, ...over });
+const flowOf = (over: Partial<TradeFlowPartners> = {}): TradeFlowPartners => ({
+  flow: "export",
+  period: "2025-12-31",
+  summary: period(),
+  partners: [
+    { partner: "276", partnerIso: "DE", value: 4e9, share: 0.4 },
+    { partner: "899", partnerIso: null, value: 2e9, share: 0.2 },
+  ],
+  history: [period({ period: "2024-12-31", hhi: 0.3 }), period()],
+  ...over,
+});
+const tradeOf = (over: Partial<TradeContext> = {}): TradeContext => ({ reporter: "US", hsCode: "8486", hsRevision: "HS2022", partner: null, periods: 3, latestPeriod: "2025-12-31", latestByFlow: { export: 10e9 }, currency: "USD", metrics: { export_growth: 0.12, import_growth: null, export_partner_concentration: 0.25, product_mix_change: null }, sourceUrl: null, knownAt: null, notice: "n", reporterWide: null, partners: [flowOf()], ...over });
+
 describe("trade views", () => {
-  const claim = (id: string, value: number | null): Claim => ({ claimId: id, domain: "trade", subject: "US", metric: "trade_export", label: "l", value, textValue: null, unit: "USD", currency: null, period: "2025-12-31", knownAsOf: "2026-02-01", source: "un_comtrade", provenance: "primary", sourceUrl: null, note: null });
-  const research = (claims: Claim[]): ResearchContext => ({ scope: "country", subject: "US", asOf: "2026-10-03T00:00:00Z", claims, gaps: [], method: "m" });
-  it("renders the partner Sankey from claim rows", () => {
-    const html = clean(renderToStaticMarkup(createElement(PartnerSankey, { context: research([claim("trade:842:276:export:HS2022:8486:2025-12-31", 5e9), claim("trade:842:156:export:HS2022:8486:2025-12-31", 2e9)]), selectedHs: "8486" })));
+  it("renders the partner Sankey from partner rows with the unmapped remainder as its own target", () => {
+    const html = clean(renderToStaticMarkup(createElement(PartnerSankey, { trade: tradeOf() })));
     expect(html).toContain("Germany");
-    expect(html).toContain("China");
-    expect(html).toContain("not zero");
+    expect(html).toContain("code 899");
+    expect(html).toContain("Unmapped remainder");
+    expect(html).toContain("40.0%");
   });
-  it("renders a not-covered placeholder with no rows", () => {
-    const html = clean(renderToStaticMarkup(createElement(PartnerSankey, { context: { ...research([]), gaps: [{ domain: "trade", reason: "No trade observation" }] }, selectedHs: "8486" })));
+  it("says the remainder is not stated (no World total), never zero, when it is null", () => {
+    const html = clean(renderToStaticMarkup(createElement(PartnerSankey, { trade: tradeOf({ partners: [flowOf({ summary: period({ unmappedValue: null, unmappedShare: null }) })] }) })));
+    expect(html).toContain("not stated");
+    expect(html).toContain("no World total");
+    expect(html).not.toContain("Unmapped remainder</text>");
+  });
+  it("renders a not-covered placeholder with no partner rows", () => {
+    const html = clean(renderToStaticMarkup(createElement(PartnerSankey, { trade: tradeOf({ partners: [] }) })));
     expect(html).toContain("Not covered");
   });
+  it("draws the concentration trend on the 10,000 axis and shows the partners-exceed-total flag", () => {
+    const f = flowOf({ history: [period({ period: "2024-12-31", hhi: 0.3, partnersExceedTotal: true }), period()] });
+    const html = clean(renderToStaticMarkup(createElement(ConcentrationTrend, { flow: f })));
+    expect(html).toContain("of 10,000");
+    expect(html).toContain("Partners exceed the total in Dec 31, 2024");
+    expect(clean(renderToStaticMarkup(createElement(ConcentrationTrend, { flow: flowOf() })))).not.toContain("Partners exceed the total");
+  });
   it("renders trade metrics with missing ones as not available", () => {
-    const trade: TradeContext = { reporter: "US", hsCode: "8486", hsRevision: "HS2022", partner: null, periods: 3, latestPeriod: "2025-12-31", latestByFlow: { export: 5e9 }, currency: "USD", metrics: { export_growth: 0.12, import_growth: null, export_partner_concentration: 0.25, revealed_trade_dependence: null }, sourceUrl: null, knownAt: null, notice: "n" };
-    const html = clean(renderToStaticMarkup(createElement(TradeMetrics, { trade })));
+    const html = clean(renderToStaticMarkup(createElement(TradeMetrics, { metrics: { export_growth: 0.12, import_growth: null, export_partner_concentration: 0.25, revealed_trade_dependence: null } })));
     expect(html).toContain("+12.0%");
     expect(html).toContain("2,500");
     expect(html).toContain("not available");
+  });
+  it("keeps the claim-based product rows list working for the industry context", () => {
+    const c: Claim = { claimId: "trade:842:276:export:HS2022:8486:2025-12-31", domain: "trade", subject: "8486", metric: "m", label: "l", value: 5e9, textValue: null, unit: "USD", currency: null, period: "2025-12-31", knownAsOf: "2026-02-01", source: "un_comtrade", provenance: "primary", sourceUrl: null, note: null };
+    const html = clean(renderToStaticMarkup(createElement(ProductRows, { context: { scope: "industry", subject: "8486", asOf: "2026-10-03T00:00:00Z", claims: [c], gaps: [], method: "m" }, hsCode: "8486" })));
+    expect(html).toContain("Germany");
   });
 });
 
@@ -275,14 +306,20 @@ describe("fix pass: macro panels", () => {
     expect(past).not.toContain("Add a mapping below");
     expect(clean(renderToStaticMarkup(createElement(HoldingMacroPanel, { ctx: empty, ticker: "SAP" })))).toContain("Add a mapping below");
   });
-  it("trade: reporter-wide figures are labelled apart from the product's own latest totals", () => {
-    const trade: TradeContext = { reporter: "US", hsCode: "8486", hsRevision: "mixed", partner: null, periods: 12, latestPeriod: "2025-12-31", latestByFlow: { export: 5e9 }, currency: "USD", metrics: { export_growth: 0.18 }, sourceUrl: null, knownAt: null, notice: "n" };
-    const html = clean(renderToStaticMarkup(createElement(TradeSummary, { trade })));
-    expect(html).toContain("Reporter-wide");
-    expect(html).toContain("12 periods stored across all of this reporter");
-    expect(html).toContain("not from HS 8486 alone");
+  it("trade: product-scoped figures, with the reporter-wide context in a collapsed block", () => {
+    const html = clean(renderToStaticMarkup(createElement(TradeSummary, { trade: tradeOf({ hsRevision: "mixed", periods: 12, reporterWide: { periods: 40, hsRevision: "mixed", products: 5, metrics: { product_mix_change: 0.2 } } }) })));
+    expect(html).toContain("12 periods stored for it");
+    expect(html).toContain("Reporter-wide context");
+    expect(html).toContain("These figures are not specific to HS 8486");
+    expect(html).toContain("Product mix change");
     expect(html).toContain("mixed (several revisions are stored)");
     expect(html).not.toContain("(mixed)");
+    expect(html).not.toContain("not from HS 8486 alone");
+    expect(html).not.toMatch(/<details[^>]*\sopen/);
+  });
+  it("trade: the product-scoped tiles omit the always-null product mix change", () => {
+    const html = clean(renderToStaticMarkup(createElement(TradeSummary, { trade: tradeOf() })));
+    expect(html).not.toContain("Product mix change");
   });
 });
 
@@ -313,5 +350,40 @@ describe("fix pass: source links are http(s) only", () => {
     expect(list).not.toContain("data:text/html");
     expect(card).toContain("<span>Source link not available</span>");
     expect(clean(renderToStaticMarkup(createElement(IndicatorCard, { point: point() })))).toContain('href="https://x.test"');
+  });
+});
+
+describe("adoption: vintage small multiples", () => {
+  const hist = [
+    { period: "2026-06-30", valueLatest: 2.0, valueFirstRelease: null, vintageUnavailable: true, releasedAt: null, revisedAt: null, revisionCount: 0 },
+    { period: "2026-07-31", valueLatest: 2.4, valueFirstRelease: 2.2, vintageUnavailable: false, releasedAt: "2026-08-12T08:00:00Z", revisedAt: "2026-09-12T08:00:00Z", revisionCount: 1 },
+  ];
+  const withHist = (over: Partial<IndicatorPoint> = {}) => point({ history: hist, releaseCalendar: "Monthly, mid-month", ...over });
+  const dom = [Date.UTC(2020, 0, 1), Date.UTC(2026, 8, 1)] as const;
+  it("draws the history with revision markers and the release-calendar text", () => {
+    const html = clean(renderToStaticMarkup(createElement(IndicatorCard, { point: withHist(), mode: "latest", domain: dom })));
+    expect(html).toContain('data-vintage-chart="latest"');
+    expect(html).toContain("data-revision-marker");
+    expect(html).toContain("Monthly, mid-month");
+  });
+  it("first release: an unarchived period is 'vintage unavailable', never the revised value", () => {
+    const only = withHist({ history: [hist[0]] });
+    const html = clean(renderToStaticMarkup(createElement(IndicatorCard, { point: only, mode: "first_release", domain: dom })));
+    expect(html).toContain("Vintage unavailable");
+    expect(html).toContain("not substituted");
+    expect(html).not.toContain("stroke-chart-line");
+  });
+  it("states a missing release calendar as not stated", () => {
+    expect(clean(renderToStaticMarkup(createElement(IndicatorCard, { point: point(), mode: "latest", domain: dom })))).toContain("not stated");
+  });
+  it("panel offers the Latest vintage / First release toggle and aligns charts on one axis", () => {
+    const ctx = context({ observations: [withHist(), withHist({ seriesId: "rate", history: [{ ...hist[1], period: "2019-01-31" }] })] });
+    const html = clean(renderToStaticMarkup(createElement(HoldingMacroPanel, { ctx, ticker: "SAP" })));
+    expect(html).toContain("Latest vintage");
+    expect(html).toContain("First release");
+    expect(html.match(/>2019</g)?.length).toBe(2);
+  });
+  it("renders access_unverified through the shared state vocabulary", () => {
+    expect(clean(renderToStaticMarkup(createElement(IndicatorCard, { point: point({ state: "access_unverified" }) })))).toContain("Access unverified");
   });
 });

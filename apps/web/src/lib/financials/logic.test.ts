@@ -330,6 +330,7 @@ describe("estimates", () => {
     high: 11,
     analystCount: 20,
     vintage: "2026-01-10",
+    vintageDate: "2026-01-10",
     publishedAt: null,
     knownAt: "2026-01-10T00:00:00Z",
     sourceUrl: null,
@@ -338,7 +339,7 @@ describe("estimates", () => {
   const series = (vintages: ForwardObs[], over: Partial<ConsensusSeries> = {}): ConsensusSeries => ({ metric: "eps_diluted", fiscalPeriod: "FY2026", provider: "Finnhub", currency: "USD", basis: "GAAP", vintages, revisionSincePrevious: null, ...over });
 
   it("computes a revision slope across snapshots of one series", () => {
-    const s = series([obs({ value: 10, vintage: "2026-01-01", knownAt: "2026-01-01T00:00:00Z" }), obs({ value: 11, vintage: "2026-01-31", knownAt: "2026-01-31T00:00:00Z" })]);
+    const s = series([obs({ value: 10, vintage: "2026-01-01", vintageDate: "2026-01-01", knownAt: "2026-01-01T00:00:00Z" }), obs({ value: 11, vintage: "2026-01-31", vintageDate: "2026-01-31", knownAt: "2026-01-31T00:00:00Z" })]);
     const r = revisionSlope(s)!;
     expect(r.change).toBe(1);
     expect(r.pct).toBeCloseTo(0.1);
@@ -397,8 +398,8 @@ describe("estimates", () => {
 });
 
 describe("actual vs consensus", () => {
-  const actual = { value: 105, unit: "USD", currency: "USD", knownAt: "x", accession: "a", reconciled: true };
-  const consensus = { provider: "P", value: 100, low: 95, high: 110, analystCount: 10, currency: "USD", basis: "GAAP", vintage: null, knownAt: null };
+  const actual = { value: 105, unit: "USD", currency: "USD", knownAt: "x", accession: "a", reconciled: true, reconciliationState: "passed" as const };
+  const consensus = { provider: "P", value: 100, low: 95, high: 110, analystCount: 10, currency: "USD", basis: "GAAP", vintage: null, vintageDate: null, knownAt: null };
 
   it("positions the actual against the range", () => {
     expect(surprise({ actual, consensus })).toMatchObject({ position: "within_range" });
@@ -415,7 +416,8 @@ describe("actual vs consensus", () => {
   it("maps the API's states", () => {
     const base = { reason: null, metric: "m", fiscalPeriod: "FY2025", actual: null, consensus: null, surprise: null, surprisePct: null };
     expect(avcState({ ...base, state: "available", actual }).state).toBe("verified");
-    expect(avcState({ ...base, state: "available", actual: { ...actual, reconciled: false } }).state).toBe("partial");
+    expect(avcState({ ...base, state: "available", actual: { ...actual, reconciled: false, reconciliationState: "unchecked" } }).state).toBe("partial");
+    expect(avcState({ ...base, state: "available", actual: { ...actual, reconciled: false, reconciliationState: "failed" } }).state).toBe("disputed");
     expect(avcState({ ...base, state: "no_consensus_before_report" }).state).toBe("not_covered");
     expect(avcState({ ...base, state: "currency_mismatch" }).state).toBe("disputed");
     expect(avcState({ ...base, state: "no_actual" }).state).toBe("not_covered");
@@ -426,12 +428,12 @@ describe("actual vs consensus", () => {
 describe("peers", () => {
   const payload = (over: Partial<PeerMetricsPayload> = {}): PeerMetricsPayload => ({
     confirmedPeers: [
-      { peerTicker: "A", basis: "US_GAAP", source: null },
-      { peerTicker: "B", basis: "IFRS", source: null },
-      { peerTicker: "C", basis: "US_GAAP", source: null },
+      { peerTicker: "A", basis: "US_GAAP", source: null, sources: [] },
+      { peerTicker: "B", basis: "IFRS", source: null, sources: [] },
+      { peerTicker: "C", basis: "US_GAAP", source: null, sources: [] },
     ],
     metrics: [
-      { id: "gross_margin", mean: 0.5, coveredPeers: 1, included: ["A"], excluded: ["B", "C"], excludedReasons: { B: "accounting basis IFRS differs from US_GAAP: not comparable" }, holdingValue: 0.6, holdingReason: null, periodEnd: "2025-12-31", periodStart: "2025-01-01", basis: "US_GAAP" },
+      { id: "gross_margin", mean: 0.5, coveredPeers: 1, included: ["A"], excluded: ["B", "C"], excludedReasons: { B: "accounting basis IFRS differs from US_GAAP: not comparable" }, peers: [], holdingValue: 0.6, holdingReason: null, periodEnd: "2025-12-31", periodStart: "2025-01-01", basis: "US_GAAP" },
     ],
     excludedPeers: [{ peer: "C", reason: "no filed statement facts" }],
     holdingPeriod: { periodStart: null, periodEnd: null, basis: null, unit: null, reconciliation: "reconciled", unreconciledInputs: [] },
@@ -461,7 +463,7 @@ describe("peers", () => {
   });
 
   it("is verified only when all confirmed peers are covered and inputs reconciled", () => {
-    const all = payload({ confirmedPeers: [{ peerTicker: "A", basis: null, source: null }] });
+    const all = payload({ confirmedPeers: [{ peerTicker: "A", basis: null, source: null, sources: [] }] });
     expect(peerState(all, peerComparison(all, "gross_margin")).state).toBe("verified");
   });
 });

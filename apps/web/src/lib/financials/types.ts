@@ -12,6 +12,8 @@ import type { DataState } from "@/lib/data-state/states";
 // ---------------------------------------------------------------------------------------
 
 export type Reconciliation = "reconciled" | "failed" | "unchecked";
+/** `actual.reconciliation_state` of actual-vs-consensus: no check ran / a check disagreed / a check agreed. */
+export type ReconciliationState = "unchecked" | "failed" | "passed";
 
 /** The statements the view draws; the API calls the cash flow `cash_flow` and balance sheet `balance_sheet`. */
 export type StatementKind = "income" | "balance_sheet" | "cash_flow";
@@ -209,7 +211,10 @@ export type ForwardObs = {
   high: number | null;
   /** Null when the provider does not say; never inferred. */
   analystCount: number | null;
+  /** Free text from the provider ("Q1 2026 preview"); a label only. */
   vintage: string | null;
+  /** ISO date the backend extracted from the vintage; null for free text. The only vintage date used for ordering and slopes. */
+  vintageDate: string | null;
   publishedAt: string | null;
   knownAt: string;
   sourceUrl: string | null;
@@ -274,7 +279,7 @@ export type ActualVsConsensus = {
   reason: string | null;
   metric: string | null;
   fiscalPeriod: string | null;
-  actual: { value: number; unit: string | null; currency: string | null; knownAt: string | null; accession: string | null; reconciled: boolean } | null;
+  actual: { value: number; unit: string | null; currency: string | null; knownAt: string | null; accession: string | null; reconciled: boolean; reconciliationState: ReconciliationState | null } | null;
   consensus: {
     provider: string | null;
     value: number | null;
@@ -284,6 +289,8 @@ export type ActualVsConsensus = {
     currency: string | null;
     basis: string | null;
     vintage: string | null;
+    /** ISO date of the vintage when it starts with one; null for free text. */
+    vintageDate: string | null;
     knownAt: string | null;
   } | null;
   surprise: number | null;
@@ -331,10 +338,24 @@ export type PeerEntry = {
   knownAt: string | null;
 };
 
+export type PeerValue = {
+  ticker: string;
+  name: string | null;
+  basis: string | null;
+  period: string | null;
+  periodStart: string | null;
+  /** Fraction (0.25 = 25%); null = no comparable value, see `reason`. */
+  value: number | null;
+  definitionVersion: string | null;
+  reason: string | null;
+};
+
 export type PeerMetricRow = {
   id: string;
-  /** Mean of the comparable peers (the API gives no per-peer values). */
+  /** Mean of the comparable peers; `peers` carries each peer's own value. */
   mean: number | null;
+  /** One row per distinct confirmed peer, with its value (a fraction) or the reason it has none. */
+  peers: readonly PeerValue[];
   coveredPeers: number;
   included: readonly string[];
   excluded: readonly string[];
@@ -347,7 +368,7 @@ export type PeerMetricRow = {
 };
 
 export type PeerMetricsPayload = {
-  confirmedPeers: readonly { peerTicker: string; basis: string | null; source: string | null }[];
+  confirmedPeers: readonly { peerTicker: string; basis: string | null; source: string | null; sources: readonly string[] }[];
   metrics: readonly PeerMetricRow[];
   excludedPeers: readonly { peer: string; reason: string }[];
   holdingPeriod: { periodStart: string | null; periodEnd: string | null; basis: string | null; unit: string | null; reconciliation: string | null; unreconciledInputs: readonly string[] } | null;

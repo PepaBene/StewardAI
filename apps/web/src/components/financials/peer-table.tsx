@@ -31,9 +31,10 @@ function fmtValue(v: number | null, unit: PeerComparison["unit"]): string {
 
 /**
  * The holding against the mean of its comparable CONFIRMED peers, per metric, on the one
- * formula the backend documents. The API returns the peer mean, not each peer's value, so no
- * per-peer ranking is drawn. Covered/total peers are always shown, and every confirmed peer
- * that is out lists why (different basis, period mismatch, non-meaningful value, no facts).
+ * formula the backend documents. Each comparable peer is drawn as its own bar, ranked highest
+ * first; a peer without a value is listed with its reason and never ranked. Covered/total peers
+ * are always shown, and every confirmed peer that is out lists why (different basis, period
+ * mismatch, non-meaningful value, no facts).
  */
 export function PeerTable({ data, ticker }: { data: PeerMetricsPayload; ticker: string }) {
   const ids = data.metrics.map((m) => m.id);
@@ -44,10 +45,21 @@ export function PeerTable({ data, ticker }: { data: PeerMetricsPayload; ticker: 
   const all = ids.map((id) => peerComparison(data, id)).filter((x): x is PeerComparison => x !== null);
   const bars = c
     ? [
-        { key: "holding", label: ticker, value: c.holdingValue, subject: true },
-        { key: "mean", label: `Peer mean (${c.covered} of ${c.total})`, value: c.mean, subject: false },
+        { key: "holding", label: ticker, detail: null, value: c.holdingValue, subject: true },
+        { key: "mean", label: `Peer mean (${c.covered} of ${c.total})`, detail: null, value: c.mean, subject: false },
+        ...c.ranked.map((x) => ({
+          key: `peer-${x.ticker}`,
+          label: x.name ? `${x.name} (${x.ticker})` : x.ticker,
+          detail: [x.basis?.replaceAll("_", " "), x.period ? `to ${formatDate(x.period)}` : null, x.definitionVersion].filter(Boolean).join(" · "),
+          value: x.value,
+          subject: false,
+        })),
       ]
     : [];
+  const sourcesLine = data.confirmedPeers
+    .filter((p) => p.sources.length > 0)
+    .map((p) => `${p.peerTicker} (${p.sources.join(", ")})`)
+    .join("; ");
   const geometry = barGeometry(bars.map((b) => b.value));
 
   return (
@@ -84,9 +96,11 @@ export function PeerTable({ data, ticker }: { data: PeerMetricsPayload; ticker: 
         <>
           <ol className="m-0 flex list-none flex-col gap-1.5 p-0">
             {bars.map((b, i) => (
-
-              <li key={b.key} className={cn("grid grid-cols-[minmax(0,9rem)_minmax(0,1fr)_4.5rem] items-center gap-2 text-sm", b.subject && "font-semibold")}>
-                <span className="truncate">{b.label}</span>
+              <li key={b.key} className={cn("grid grid-cols-[minmax(0,12rem)_minmax(0,1fr)_4.5rem] items-center gap-2 text-sm", b.subject && "font-semibold")}>
+                <span className="min-w-0">
+                  <span className="block truncate">{b.label}</span>
+                  {b.detail ? <span className="block truncate text-xs font-normal text-text-muted">{b.detail}</span> : null}
+                </span>
                 <span className="relative flex h-2.5 bg-surface-muted" aria-hidden="true">
                   {geometry.bars[i] ? (
                     <span className={cn("absolute top-0 block h-full", b.value !== null && b.value < 0 ? "bg-loss" : b.subject ? "bg-accent-ramp-1" : "bg-accent-300")} style={{ left: `${geometry.bars[i]!.left}%`, width: `${geometry.bars[i]!.width}%` }} />
@@ -98,7 +112,8 @@ export function PeerTable({ data, ticker }: { data: PeerMetricsPayload; ticker: 
             ))}
           </ol>
           {c.holdingValue === null && c.holdingReason ? <p className="text-xs text-text-muted">{ticker}: {c.holdingReason}</p> : null}
-          {c.included.length > 0 ? <p className="text-xs text-text-muted">Included: {c.included.join(", ")}</p> : null}
+          {c.ranked.length > 0 ? <p className="text-xs text-text-muted">Peers are ranked by their own value, highest first. A peer with no comparable value is listed below with its reason and is not ranked.</p> : null}
+          {sourcesLine ? <p className="text-xs text-text-muted">Peer sources: {sourcesLine}</p> : null}
           {c.excluded.length > 0 ? (
             <section aria-labelledby="peer-excluded-heading" className="flex min-w-0 flex-col gap-1">
               <h3 id="peer-excluded-heading" className="font-heading text-lg font-semibold">

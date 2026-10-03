@@ -2,7 +2,7 @@
 
 import { useCallback, useState, type FormEvent } from "react";
 
-import { HBar, Sankey } from "@/components/charts";
+import { HBar, LineChart, Sankey } from "@/components/charts";
 import { ChartFrame, ProvenanceFooter, Segmented, StatePlaceholder } from "@/components/data-state";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -11,9 +11,9 @@ import { Blueprint, PanelHeading } from "@/components/ui/blueprint";
 import { formatCompact, formatNumber, formatPct } from "@/lib/charts/format";
 import { isFiniteNumber } from "@/lib/charts/scale";
 import { useApiResource, type ApiResult } from "@/lib/hooks/use-api-resource";
-import { fetchCountryContext, fetchIndustryContext, fetchTradeContext } from "@/lib/macro/api";
-import { equalPartners, hhiPoints, normaliseReporter, productSankey, tradeFlows, tradePartyName, tradeRows, TRADE_METRIC_LABELS, TRADE_STALE_AFTER_MONTHS, tradePeriodStale } from "@/lib/macro/logic";
-import type { ResearchContext, TradeContext, TradeRow } from "@/lib/macro/types";
+import { fetchIndustryContext, fetchTradeContext } from "@/lib/macro/api";
+import { equalPartners, hhiPoints, hhiTrend, normaliseReporter, partnerLabel, partnerSankey, tradePartyName, tradeRows, TRADE_METRIC_LABELS, TRADE_STALE_AFTER_MONTHS, tradePeriodStale } from "@/lib/macro/logic";
+import type { ResearchContext, TradeContext, TradeFlowPartners } from "@/lib/macro/types";
 
 import { day } from "./format";
 import { ResourceBoundary } from "./resource-boundary";
@@ -23,98 +23,123 @@ const HS_RE = /^[0-9]{2,6}$/;
 
 export type TradeQuery = { reporter: string; hsCode: string };
 
-/** Metric tiles of GET /macro/trade: growth, partner concentration and export share, each with its flow and note. */
-export function TradeMetrics({ trade }: { trade: TradeContext }) {
-  const entries = Object.entries(trade.metrics);
+/** Metric tiles of GET /macro/trade (product-scoped) or of its reporter_wide block: growth, partner concentration, shares. */
+export function TradeMetrics({ metrics }: { metrics: Readonly<Record<string, number | null>> }) {
+  const entries = Object.entries(metrics);
   return (
-    <div className="flex flex-col gap-3">
-      <p className="max-w-prose text-xs text-text-muted">
-        Reporter-wide figures: the backend computes these from every product stored for {tradePartyName(trade.reporter)}, not from HS {trade.hsCode} alone, so they move when another product is collected. Only the latest-period totals above are for HS {trade.hsCode}.
+    <dl className="m-0 grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">
+      {entries.map(([key, value]) => {
+        const meta = TRADE_METRIC_LABELS[key] ?? { label: key.replace(/_/g, " "), kind: "index" as const, note: "" };
+        return (
+          <div key={key} className="flex min-w-0 flex-col gap-1 border border-border-soft p-3">
+            <dt className="text-xs text-text-muted">{meta.label}</dt>
+            <dd className="m-0">
+              {!isFiniteNumber(value) ? (
+                <span className="num font-heading text-[22px] font-semibold text-text-muted">not available</span>
+              ) : meta.kind === "growth" ? (
+                <span className="num font-heading text-[22px] font-semibold">{formatPct(value, 1, true)}</span>
+              ) : meta.kind === "share" ? (
+                <span className="num font-heading text-[22px] font-semibold">{formatPct(value, 1)}</span>
+              ) : meta.kind === "hhi" ? (
+                <span className="flex flex-col gap-1">
+                  <span className="num font-heading text-[22px] font-semibold">{formatNumber(hhiPoints(value) ?? 0, 0)} <span className="text-xs font-normal text-text-muted">of 10,000</span></span>
+                  <HBar value={value} label={meta.label} formatValue={(v) => `${formatNumber(Math.round(v * 10_000), 0)} of 10,000`} />
+                  <span className="text-[11px] text-text-muted">About {formatNumber(equalPartners(value) ?? 0, 1)} equal partners; 10,000 is a single partner.</span>
+                </span>
+              ) : (
+                <span className="num font-heading text-[22px] font-semibold">{formatNumber(value, 3)}</span>
+              )}
+            </dd>
+            {meta.note ? <p className="text-[11px] text-text-muted">{meta.note}</p> : null}
+          </div>
+        );
+      })}
+    </dl>
+  );
+}
+
+const flowLabel = (f: string) => (f === "export" ? "Exports" : f === "import" ? "Imports" : f);
+
+/** The partner-concentration trend of one flow on the 0..10,000 axis, with the partners-exceed-total flag. */
+export function ConcentrationTrend({ flow }: { flow: TradeFlowPartners }) {
+  const trend = hhiTrend(flow.history);
+  const exceeding = trend.filter((t) => t.exceedsTotal);
+  return (
+    <div className="flex flex-col gap-2">
+      <h4 className="text-sm font-semibold">{flowLabel(flow.flow)} partner concentration over time</h4>
+      <LineChart
+        data={trend.map((t) => ({ date: t.period, value: t.points }))}
+        label={`${flowLabel(flow.flow)} concentration`}
+        yTickCount={4}
+        height={180}
+        formatValue={(v) => `${formatNumber(v, 0)} of 10,000`}
+        legend={false}
+      />
+      <p className="text-[11px] text-text-muted">
+        Herfindahl index over the reported country partners, 10,000 = a single partner. Periods are spaced evenly; a period without an index is a gap, not zero.
       </p>
-      <dl className="m-0 grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">
-        {entries.map(([key, value]) => {
-          const meta = TRADE_METRIC_LABELS[key] ?? { label: key.replace(/_/g, " "), kind: "index" as const, note: "" };
-          return (
-            <div key={key} className="flex min-w-0 flex-col gap-1 border border-border-soft p-3">
-              <dt className="text-xs text-text-muted">{meta.label}</dt>
-              <dd className="m-0">
-                {!isFiniteNumber(value) ? (
-                  <span className="num font-heading text-[22px] font-semibold text-text-muted">not available</span>
-                ) : meta.kind === "growth" ? (
-                  <span className="num font-heading text-[22px] font-semibold">{formatPct(value, 1, true)}</span>
-                ) : meta.kind === "share" ? (
-                  <span className="num font-heading text-[22px] font-semibold">{formatPct(value, 1)}</span>
-                ) : meta.kind === "hhi" ? (
-                  <span className="flex flex-col gap-1">
-                    <span className="num font-heading text-[22px] font-semibold">{formatNumber(hhiPoints(value) ?? 0, 0)} <span className="text-xs font-normal text-text-muted">of 10,000</span></span>
-                    <HBar value={value} label={meta.label} formatValue={(v) => `${formatNumber(Math.round(v * 10_000), 0)} of 10,000`} />
-                    <span className="text-[11px] text-text-muted">About {formatNumber(equalPartners(value) ?? 0, 1)} equal partners; 10,000 is a single partner.</span>
-                  </span>
-                ) : (
-                  <span className="num font-heading text-[22px] font-semibold">{formatNumber(value, 3)}</span>
-                )}
-              </dd>
-              {meta.note ? <p className="text-[11px] text-text-muted">{meta.note}</p> : null}
-            </div>
-          );
-        })}
-      </dl>
+      {exceeding.length > 0 ? (
+        <p role="note" className="border border-border px-3 py-1.5 text-xs text-text">
+          Partners exceed the total in {exceeding.map((t) => day(t.period)).join(", ")}: the partner rows add up to more than the World row, so the index for {exceeding.length === 1 ? "that period" : "those periods"} rests on inconsistent source data.
+        </p>
+      ) : null}
     </div>
   );
 }
 
-/** Product -> partner flow for one trade flow, from the reporter's largest rows in its latest period. */
-export function PartnerSankey({ context, selectedHs }: { context: ResearchContext; selectedHs: string }) {
-  const { rows, unparsed } = tradeRows(context);
-  const flows = tradeFlows(rows);
+/** Product -> partner flow for one trade flow from the latest-period partner rows, with the unmapped remainder as its own target. */
+export function PartnerSankey({ trade }: { trade: TradeContext }) {
+  const flows = trade.partners.map((f) => f.flow).sort();
   const [flow, setFlow] = useState<string | null>(null);
   const active = flow && flows.includes(flow) ? flow : (flows.find((f) => f === "export") ?? flows[0] ?? null);
-  const s = active ? productSankey(rows, active) : null;
+  const data = active ? trade.partners.find((f) => f.flow === active) : undefined;
+  const s = data ? partnerSankey(data, trade.hsCode) : null;
   const hasValue = !!s && s.links.length > 0;
-  const reporterName = tradePartyName(context.subject);
-  const inRows = (s?.nodes ?? []).some((n) => n.id.startsWith(`hs:${selectedHs}:`));
-  const flowRows: TradeRow[] = active ? rows.filter((r) => r.flow === active) : [];
+  const reporterName = tradePartyName(trade.reporter);
+  const sum = data?.summary;
+  const stated = isFiniteNumber(sum?.unmappedValue);
+  const flagged = !!sum?.partnersExceedTotal;
 
   return (
     <ChartFrame
       id="trade-partners"
       kicker="UN Comtrade"
-      title={`${reporterName}: largest ${active ?? "trade"} rows by partner`}
+      title={`${reporterName}: HS ${trade.hsCode} ${active ?? "trade"} by partner`}
       takeaway={
-        hasValue && s
-          ? `${s.drawn} reporter-to-partner row${s.drawn === 1 ? "" : "s"} among ${reporterName}'s ten largest in ${s.period ? day(s.period) : "the latest period"}${inRows ? "" : `; HS ${selectedHs} is not among them`}. Rows outside the top ten are not shown: they are unknown here, not zero.`
-          : `No ${active ?? ""} partner rows are available for ${reporterName} in the latest period.`
+        hasValue && s && sum
+          ? `${s.drawn} partner${s.drawn === 1 ? "" : "s"} in ${day(s.period)}. ${
+              stated ? `${usd(sum.unmappedValue as number)}${isFiniteNumber(sum.unmappedShare) ? ` (${formatPct(sum.unmappedShare, 1)})` : ""} of the total is not attributed to any listed partner.` : "Unmapped remainder not stated: no World total was reported for this period, so it is unknown, not zero."
+            }${flagged ? " Partner rows add up to more than the World total (source data inconsistent)." : ""}`
+          : `No ${active ?? ""} partner rows are available for HS ${trade.hsCode} of ${reporterName}.`
       }
-      units={`US dollars, ${s?.revisions.join(" / ") || "HS revision n/a"}; one link per product and partner, partners are not summed to a total`}
+      units={`US dollars, ${trade.hsRevision}; partners from the latest period with a value; total is the ${sum?.totalBasis === "partner_sum" ? "sum of the partner rows (no World row)" : "World row"}`}
       hasValue={hasValue}
-      controls={flows.length > 1 ? <Segmented label="Trade flow" options={flows.map((f) => ({ id: f, label: f === "export" ? "Exports" : f === "import" ? "Imports" : f }))} value={active ?? flows[0]} onChange={setFlow} /> : undefined}
+      controls={flows.length > 1 ? <Segmented label="Trade flow" options={flows.map((f) => ({ id: f, label: flowLabel(f) }))} value={active ?? flows[0]} onChange={setFlow} /> : undefined}
       provenance={{
-        source: "UN Comtrade via research context",
-        sourceUrl: flowRows[0]?.claim.sourceUrl ?? null,
+        source: "UN Comtrade (national trade statistics)",
+        sourceUrl: trade.sourceUrl,
         asOf: s?.period ?? null,
-        knownAt: flowRows[0]?.claim.knownAsOf ?? null,
-        method: context.method,
-        state: rows.length === 0 ? "not_covered" : unparsed.length > 0 ? "partial" : "verified",
-        reason: rows.length === 0 ? (context.gaps.find((g) => g.domain === "trade")?.reason ?? "No trade rows were returned.") : "National trade rows do not identify any company's customers or suppliers.",
-        coverage: rows.length ? { covered: flowRows.length, total: rows.length, unit: "rows of this flow among the returned rows" } : null,
+        knownAt: trade.knownAt,
+        method: "Partner rows of one product and flow; World is a total, never a partner; the unmapped remainder is its own target and is never folded into a partner.",
+        state: trade.partners.length === 0 ? "not_covered" : !stated || flagged || (s?.skipped ?? 0) > 0 ? "partial" : "verified",
+        reason: trade.partners.length === 0 ? "The backend returned no partner rows for this product." : "National trade rows do not identify any company's customers or suppliers.",
       }}
       table={{
-        caption: `${reporterName} ${active ?? "trade"} rows by product and partner`,
-        columns: ["Product (revision)", "Partner", "Value (USD)", "Period"],
-        rows: flowRows.map((r) => [`HS ${r.hsCode} (${r.hsRevision})`, tradePartyName(r.partner), r.valueUsd === null ? "n/a" : usd(r.valueUsd), day(r.period)]),
+        caption: `${reporterName} HS ${trade.hsCode} ${active ?? "trade"} by partner`,
+        columns: ["Partner", "Value (USD)", "Share of total"],
+        rows: [
+          ...(data?.partners ?? []).map((p) => [partnerLabel(p), isFiniteNumber(p.value) ? usd(p.value) : "n/a", isFiniteNumber(p.share) ? formatPct(p.share, 1) : "n/a"]),
+          ["Unmapped remainder", stated ? usd(sum?.unmappedValue as number) : "not stated: no World total", isFiniteNumber(sum?.unmappedShare) ? formatPct(sum.unmappedShare, 1) : "not stated"],
+        ],
       }}
     >
       {s && s.links.length > 0 ? (
         <>
-          <Sankey nodes={s.nodes} links={s.links} label={`${reporterName} ${active} by product and partner`} formatValue={usd} labelWidth={120} height={Math.max(180, 40 + s.nodes.filter((n) => n.column === 1).length * 30)} />
-          {s.worldRows.length > 0 ? (
-            <p className="text-xs text-text-muted">
-              World-total rows ({s.worldRows.map((r) => `HS ${r.hsCode}: ${r.valueUsd === null ? "n/a" : usd(r.valueUsd)}`).join(", ")}) are totals, not a partner, and are left out of the flow.
-            </p>
-          ) : null}
+          <Sankey nodes={s.nodes} links={s.links} label={`${reporterName} HS ${trade.hsCode} ${active} by partner`} formatValue={usd} labelWidth={120} height={Math.max(180, 40 + s.nodes.filter((n) => n.column === 1).length * 30)} />
+          {!stated ? <p className="text-xs text-text">Unmapped remainder: not stated, because no World total was reported for this period. It is unknown, not zero.</p> : null}
         </>
       ) : null}
-      {unparsed.length > 0 ? <p className="text-xs text-text-muted">{unparsed.length} trade claim{unparsed.length === 1 ? "" : "s"} could not be placed (unexpected id) and {unparsed.length === 1 ? "is" : "are"} left out.</p> : null}
+      {data && data.history.length > 0 ? <ConcentrationTrend flow={data} /> : null}
     </ChartFrame>
   );
 }
@@ -164,35 +189,46 @@ export function ProductRows({ context, hsCode }: { context: ResearchContext; hsC
   );
 }
 
-/** The product's latest-period totals (HS-specific) and the reporter-wide figures, labelled apart. */
+/** The product's latest-period totals and product-scoped metrics, with the reporter-wide context collapsed apart. */
 export function TradeSummary({ trade: t }: { trade: TradeContext }) {
+  const productMetrics = Object.fromEntries(Object.entries(t.metrics).filter(([k]) => k !== "product_mix_change"));
+  const rw = t.reporterWide;
+  const stale = tradePeriodStale(t.latestPeriod, new Date());
   return (
     <section aria-label="Trade summary" className="flex flex-col gap-3">
       <p className="max-w-prose text-sm text-text">
-        {tradePartyName(t.reporter)}, HS {t.hsCode}: latest period for this product {t.latestPeriod ? day(t.latestPeriod) : "n/a"}.
+        {tradePartyName(t.reporter)}, HS {t.hsCode}: latest period for this product {t.latestPeriod ? day(t.latestPeriod) : "n/a"}; {t.periods} period{t.periods === 1 ? "" : "s"} stored for it; HS revision {t.hsRevision === "mixed" ? "mixed (several revisions are stored)" : t.hsRevision}.
         {Object.keys(t.latestByFlow).length === 0 ? " No flow total exists for the latest period." : ""}
-      </p>
-      <p className="max-w-prose text-xs text-text-muted">
-        Reporter-wide: {t.periods} period{t.periods === 1 ? "" : "s"} stored across all of this reporter&apos;s products; HS revision {t.hsRevision === "mixed" ? "mixed (several revisions are stored)" : t.hsRevision}.
       </p>
       <dl className="m-0 flex flex-wrap gap-3">
         {Object.entries(t.latestByFlow).map(([flow, v]) => (
           <div key={flow} className="flex min-w-36 flex-col border border-border-soft px-3 py-2">
-            <dt className="text-xs text-text-muted">{flow === "export" ? "Exports" : flow === "import" ? "Imports" : flow}, latest period</dt>
+            <dt className="text-xs text-text-muted">{flowLabel(flow)}, latest period</dt>
             <dd className="num m-0 font-heading text-[22px] font-semibold">{usd(v)} <span className="text-xs font-normal text-text-muted">{t.currency}</span></dd>
           </div>
         ))}
       </dl>
-      <TradeMetrics trade={t} />
+      <TradeMetrics metrics={productMetrics} />
+      {rw ? (
+        <details className="border border-border-soft text-sm">
+          <summary className="cursor-pointer px-3 py-1.5 text-xs font-medium text-accent-ink select-none hover:underline">Reporter-wide context</summary>
+          <div className="flex flex-col gap-3 border-t border-border-soft p-3">
+            <p className="max-w-prose text-xs text-text-muted">
+              All {rw.products} product{rw.products === 1 ? "" : "s"} stored for {tradePartyName(t.reporter)} together, {rw.periods} period{rw.periods === 1 ? "" : "s"}; HS revision {rw.hsRevision === "mixed" ? "mixed (several revisions are stored)" : rw.hsRevision}. These figures are not specific to HS {t.hsCode}.
+            </p>
+            <TradeMetrics metrics={rw.metrics} />
+          </div>
+        </details>
+      ) : null}
       <ProvenanceFooter
         provenance={{
           source: "UN Comtrade (national trade statistics)",
           sourceUrl: t.sourceUrl,
           asOf: t.latestPeriod,
           knownAt: t.knownAt,
-          method: `${t.hsRevision === "mixed" ? "several HS revisions stored for this reporter" : t.hsRevision}; latest revision of each observation; exports and imports never blended. Metrics are reporter-wide, the latest-period totals are for HS ${t.hsCode}`,
-          state: !t.latestPeriod ? "not_covered" : tradePeriodStale(t.latestPeriod, new Date()) ? "stale" : "verified",
-          reason: tradePeriodStale(t.latestPeriod, new Date()) ? `Latest stored period is ${t.latestPeriod}, more than ${TRADE_STALE_AFTER_MONTHS} months ago.${t.notice ? " " + t.notice : ""}` : t.notice,
+          method: `${t.hsRevision === "mixed" ? "several HS revisions stored for this product" : t.hsRevision}; latest revision of each observation; exports and imports never blended. Figures are for HS ${t.hsCode}; reporter-wide context is shown apart`,
+          state: !t.latestPeriod ? "not_covered" : stale ? "stale" : "verified",
+          reason: stale ? `Latest stored period is ${t.latestPeriod}, more than ${TRADE_STALE_AFTER_MONTHS} months ago.${t.notice ? " " + t.notice : ""}` : t.notice,
         }}
       />
     </section>
@@ -200,10 +236,10 @@ export function TradeSummary({ trade: t }: { trade: TradeContext }) {
 }
 
 /**
- * Trade context for one reporter and HS product: the backend's latest value per flow and
- * its reporter-wide metrics, the reporter's largest product-to-partner rows as a Sankey, and
- * the largest rows for the product across reporters. The backend gives only the latest partner
- * concentration, not a trend, and no unmapped-partner share, so neither is drawn.
+ * Trade context for one reporter and HS product, all product-scoped: the latest value per flow
+ * and metrics, the product -> partner Sankey with the unmapped remainder as its own target, the
+ * partner-concentration trend, and the largest rows for the product across reporters. The
+ * reporter-wide figures sit in a collapsed block.
  */
 /** Remount (key) with new `initial` values to reset the form, e.g. when the holding changes. */
 export function TradePanel({ initial }: { initial: TradeQuery }) {
@@ -227,10 +263,8 @@ export function TradePanel({ initial }: { initial: TradeQuery }) {
   const reporterCode = normaliseReporter(query.reporter).code;
   const valid = reporterCode !== null && HS_RE.test(query.hsCode);
   const tradeFetcher = useCallback((): Promise<ApiResult<TradeContext>> => (reporterCode !== null && HS_RE.test(query.hsCode) ? fetchTradeContext(reporterCode, query.hsCode) : Promise.resolve(NOT_REQUESTED)), [reporterCode, query.hsCode]);
-  const countryFetcher = useCallback((): Promise<ApiResult<ResearchContext>> => (reporterCode !== null ? fetchCountryContext(reporterCode) : Promise.resolve(NOT_REQUESTED_CTX)), [reporterCode]);
   const industryFetcher = useCallback((): Promise<ApiResult<ResearchContext>> => (HS_RE.test(query.hsCode) ? fetchIndustryContext(query.hsCode) : Promise.resolve(NOT_REQUESTED_CTX)), [query.hsCode]);
   const { state: trade } = useApiResource(tradeFetcher);
-  const { state: country } = useApiResource(countryFetcher);
   const { state: industry } = useApiResource(industryFetcher);
 
   function submit(e: FormEvent) {
@@ -265,10 +299,12 @@ export function TradePanel({ initial }: { initial: TradeQuery }) {
       ) : (
         <>
           <ResourceBoundary state={trade} what="trade context">
-            {(t) => <TradeSummary trade={t} />}
-          </ResourceBoundary>
-          <ResourceBoundary state={country} what="reporter trade rows">
-            {(c) => <PartnerSankey context={c} selectedHs={query.hsCode} />}
+            {(t) => (
+              <>
+                <TradeSummary trade={t} />
+                <PartnerSankey key={`${t.reporter}|${t.hsCode}`} trade={t} />
+              </>
+            )}
           </ResourceBoundary>
           <ResourceBoundary state={industry} what="product trade rows">
             {(c) => <ProductRows context={c} hsCode={query.hsCode} />}

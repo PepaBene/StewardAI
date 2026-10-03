@@ -48,12 +48,20 @@ export const fetchPortfolioMacroCoverage = (): Promise<ApiResult<PortfolioMacroC
 
 export const fetchExposureMappings = (): Promise<ApiResult<ExposureMapping[]>> => parsed(api().GET("/macro/exposures", {}), parseExposureMappings);
 
-/** `asOf`: an ISO date-time; omit for now. */
+/** History periods requested for the vintage small multiples (backend maximum). */
+export const VINTAGE_HISTORY_PERIODS = 60;
+
+/** `asOf`: an ISO date-time; omit for now. The vintage history is requested with every read. */
 export const fetchMacroContext = (ticker: string, asOf: string | null): Promise<ApiResult<HoldingMacroContext>> =>
-  parsed(api().GET("/macro/context/{ticker}", { params: { path: { ticker }, query: asOf ? { as_of: asOf } : {} } }), parseMacroContext);
+  parsed(
+    api().GET("/macro/context/{ticker}", { params: { path: { ticker }, query: { history: VINTAGE_HISTORY_PERIODS, ...(asOf ? { as_of: asOf } : {}) } } }),
+    parseMacroContext,
+  );
+
+const TRADE_HISTORY_PERIODS = 60;
 
 export const fetchTradeContext = (reporter: string, hsCode: string): Promise<ApiResult<TradeContext>> =>
-  parsed(api().GET("/macro/trade/{reporter}/{hs_code}", { params: { path: { reporter, hs_code: hsCode }, query: {} } }), parseTradeContext);
+  parsed(api().GET("/macro/trade/{reporter}/{hs_code}", { params: { path: { reporter, hs_code: hsCode }, query: { history_periods: TRADE_HISTORY_PERIODS } } }), parseTradeContext);
 
 export const fetchCountryContext = (geography: string): Promise<ApiResult<ResearchContext>> =>
   parsed(api().GET("/research-context/country/{geography}", { params: { path: { geography }, query: {} } }), parseResearchContext);

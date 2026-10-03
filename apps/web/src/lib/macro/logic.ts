@@ -13,7 +13,10 @@ import type {
   PortfolioCountryContext,
   Range,
   ResearchContext,
+  TradeFlowPartners,
+  TradePartnerPeriod,
   TradeRow,
+  VintagePoint,
 } from "./types";
 
 const EPS = 1e-9;
@@ -488,56 +491,101 @@ export function normaliseReporter(input: string): { code: string; error: null } 
   return { code: null, error: `Reporter: ${text.toUpperCase()} is not an ISO country code or M49 number this app knows.` };
 }
 
-export function isWorld(code: string): boolean {
-  return resolveGeography(code).kind === "world";
-}
-
-export type ProductSankey = {
+export type PartnerSankey = {
   nodes: { id: string; label: string; column: 0 | 1 }[];
   links: { source: string; target: string; value: number }[];
-  /** Rows drawn / rows of that flow in the response (World excluded from partners, listed apart). */
+  /** Partner rows drawn (rows without a positive value are not). */
   drawn: number;
-  worldRows: TradeRow[];
-  period: string | null;
-  revisions: string[];
+  skipped: number;
+  /** The remainder of the product's total that no partner row explains; null = not stated (no World total). */
+  unmappedValue: number | null;
+  unmappedShare: number | null;
+  period: string;
 };
 
-/**
- * Product -> partner links of one flow from the response's rows. World is a total, not a partner,
- * so it is left out of the links and reported in `worldRows`. Rows missing a USD value are not
- * drawn. Several rows for the same product and partner (different revisions) add up only within
- * the same revision: a product node is "HS code (revision)".
- */
-export function productSankey(rows: readonly TradeRow[], flow: string): ProductSankey {
-  const ofFlow = rows.filter((r) => r.flow === flow);
-  const nodes = new Map<string, { id: string; label: string; column: 0 | 1 }>();
-  const links = new Map<string, { source: string; target: string; value: number }>();
-  let drawn = 0;
-  for (const r of ofFlow) {
-    if (isWorld(r.partner) || !isFiniteNumber(r.valueUsd) || r.valueUsd <= 0) continue;
-    const product = `hs:${r.hsCode}:${r.hsRevision}`;
-    const partner = `partner:${r.partner}`;
-    nodes.set(product, { id: product, label: `HS ${r.hsCode} (${r.hsRevision})`, column: 0 });
-    nodes.set(partner, { id: partner, label: tradePartyName(r.partner), column: 1 });
-    const key = `${product}>${partner}`;
-    const l = links.get(key) ?? { source: product, target: partner, value: 0 };
-    l.value += r.valueUsd;
-    links.set(key, l);
-    drawn += 1;
-  }
-  const periods = [...new Set(ofFlow.map((r) => r.period))].sort();
-  return {
-    nodes: [...nodes.values()],
-    links: [...links.values()],
-    drawn,
-    worldRows: ofFlow.filter((r) => isWorld(r.partner)),
-    period: periods[periods.length - 1] ?? null,
-    revisions: [...new Set(ofFlow.map((r) => r.hsRevision))].sort(),
-  };
+/** A partner's name from its ISO code; an area nes (no ISO code) is labelled by its stored code. */
+export function partnerLabel(p: { partner: string; partnerIso: string | null }): string {
+  return p.partnerIso ? countryName(p.partnerIso) : `Area nes (code ${p.partner})`;
 }
 
-export function tradeFlows(rows: readonly TradeRow[]): string[] {
-  return [...new Set(rows.map((r) => r.flow))].sort();
+/**
+ * Product -> partner links of one flow from the latest-period partner rows, plus the explicit
+ * unmapped remainder as its own target. The remainder is drawn only when the backend states it
+ * (unmapped_value > 0); a null remainder (no World total) is reported as not stated, never zero.
+ */
+export function partnerSankey(flow: TradeFlowPartners, hsCode: string): PartnerSankey {
+  const product = `hs:${hsCode}`;
+  const nodes: PartnerSankey["nodes"] = [{ id: product, label: `HS ${hsCode}`, column: 0 }];
+  const links: PartnerSankey["links"] = [];
+  let skipped = 0;
+  for (const p of flow.partners) {
+    if (!isFiniteNumber(p.value) || p.value <= 0) {
+      skipped += 1;
+      continue;
+    }
+    const id = `partner:${p.partner}`;
+    nodes.push({ id, label: partnerLabel(p), column: 1 });
+    links.push({ source: product, target: id, value: p.value });
+  }
+  const { unmappedValue, unmappedShare } = flow.summary;
+  if (isFiniteNumber(unmappedValue) && unmappedValue > 0) {
+    nodes.push({ id: "unmapped", label: "Unmapped remainder", column: 1 });
+    links.push({ source: product, target: "unmapped", value: unmappedValue });
+  }
+  return { nodes, links, drawn: links.filter((l) => l.target !== "unmapped").length, skipped, unmappedValue, unmappedShare, period: flow.period };
+}
+
+export type HhiTrendPoint = { period: string; points: number | null; exceedsTotal: boolean };
+
+/** Partner-concentration trend, oldest first, on the classic 0..10,000 axis; a missing index stays null. */
+export function hhiTrend(history: readonly TradePartnerPeriod[]): HhiTrendPoint[] {
+  return [...history]
+    .sort((a, b) => a.period.localeCompare(b.period))
+    .map((h) => ({ period: h.period, points: hhiPoints(h.hhi), exceedsTotal: h.partnersExceedTotal }));
+}
+
+// ---------------------------------------------------------------------------------------
+// Vintage history (latest vs first release)
+// ---------------------------------------------------------------------------------------
+
+export type VintageMode = "latest" | "first_release";
+
+export type VintageChartPoint = {
+  period: string;
+  /** Null when the chosen vintage has no value for the period (first release not archived); never the other vintage. */
+  value: number | null;
+  /** The period was revised after its first release. */
+  revised: boolean;
+  revisedAt: string | null;
+  revisionCount: number;
+  vintageUnavailable: boolean;
+};
+
+export function vintageSeries(history: readonly VintagePoint[], mode: VintageMode): VintageChartPoint[] {
+  return [...history]
+    .sort((a, b) => a.period.localeCompare(b.period))
+    .map((h) => ({
+      period: h.period,
+      value: mode === "latest" ? h.valueLatest : h.vintageUnavailable ? null : h.valueFirstRelease,
+      revised: h.revisedAt !== null,
+      revisedAt: h.revisedAt,
+      revisionCount: h.revisionCount,
+      vintageUnavailable: h.vintageUnavailable,
+    }));
+}
+
+/** Calendar day of a period as epoch milliseconds (UTC), or null when unparseable. */
+export function periodTime(period: string): number | null {
+  const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(period);
+  if (!m) return null;
+  const t = Date.UTC(Number(m[1]), Number(m[2]) - 1, Number(m[3]));
+  return Number.isFinite(t) ? t : null;
+}
+
+/** The one time axis the small multiples share: earliest to latest period over all the given histories. */
+export function sharedTimeDomain(histories: readonly (readonly { period: string }[])[]): [number, number] | null {
+  const times = histories.flatMap((h) => h.map((p) => periodTime(p.period))).filter((t): t is number => t !== null);
+  return times.length ? [Math.min(...times), Math.max(...times)] : null;
 }
 
 /** Herfindahl (0..1) as the familiar 0..10,000 points. */
@@ -551,12 +599,12 @@ export function equalPartners(hhi: number | null): number | null {
 }
 
 export const TRADE_METRIC_LABELS: Record<string, { label: string; kind: "growth" | "hhi" | "share" | "index"; flow?: string; note: string }> = {
-  export_growth: { label: "Export growth", kind: "growth", flow: "export", note: "Latest period against the adjacent one only; all products stored for the reporter" },
-  import_growth: { label: "Import growth", kind: "growth", flow: "import", note: "Latest period against the adjacent one only; all products stored for the reporter" },
-  export_partner_concentration: { label: "Export partner concentration", kind: "hhi", flow: "export", note: "Herfindahl over country partners, World excluded; all products stored for the reporter" },
-  import_partner_concentration: { label: "Import partner concentration", kind: "hhi", flow: "import", note: "Herfindahl over country partners, World excluded; all products stored for the reporter" },
-  export_share_of_two_way_trade: { label: "Export share of two-way trade", kind: "share", note: "Exports over exports plus imports, latest common period; all products stored for the reporter" },
-  product_mix_change: { label: "Product mix change", kind: "index", note: "Shift in the export product mix against the adjacent period; all products stored for the reporter" },
+  export_growth: { label: "Export growth", kind: "growth", flow: "export", note: "Latest period against the adjacent one only" },
+  import_growth: { label: "Import growth", kind: "growth", flow: "import", note: "Latest period against the adjacent one only" },
+  export_partner_concentration: { label: "Export partner concentration", kind: "hhi", flow: "export", note: "Herfindahl over the reported country partners, World excluded" },
+  import_partner_concentration: { label: "Import partner concentration", kind: "hhi", flow: "import", note: "Herfindahl over the reported country partners, World excluded" },
+  export_share_of_two_way_trade: { label: "Export share of two-way trade", kind: "share", note: "Exports over exports plus imports, latest common period" },
+  product_mix_change: { label: "Product mix change", kind: "index", note: "Shift in the reporter's export product mix against the adjacent period (reporter-wide only)" },
   revealed_trade_dependence: { label: "Revealed trade dependence", kind: "index", note: "Needs world totals and GDP; the backend does not compute it" },
 };
 

@@ -3,9 +3,11 @@ import { ExternalLinkIcon } from "lucide-react";
 
 import { geographyName, outsideRange, pointChange, rangePosition } from "@/lib/macro/logic";
 import { isExternalUrl } from "@/lib/sources/sources";
+import type { VintageMode } from "@/lib/macro/logic";
 import type { IndicatorPoint } from "@/lib/macro/types";
 
 import { day, formatChange, formatFigure } from "./format";
+import { VintageChart } from "./vintage-chart";
 
 /** A marker on the range strip: a pointer-free tick at `pos` (0..1). */
 function Tick({ pos, className, label }: { pos: number; className: string; label: string }) {
@@ -14,10 +16,11 @@ function Tick({ pos, className, label }: { pos: number; className: string; label
 
 /**
  * One country series at its latest known period, with the previous period and where the value
- * sits inside its 5- and 10-year range. The API returns this one point, not a history, so the
- * card draws exactly that and says so; there is no first-release value to switch to.
+ * sits inside its 5- and 10-year range. When the response carries the vintage history, a small
+ * multiple on the panel's shared time axis shows the latest vintage or the first release, with
+ * revision markers; the backend's release-calendar text is shown as sent.
  */
-export function IndicatorCard({ point }: { point: IndicatorPoint }) {
+export function IndicatorCard({ point, mode = "latest", domain = null }: { point: IndicatorPoint; mode?: VintageMode; /** Shared time axis (epoch ms) of the whole panel. */ domain?: readonly [number, number] | null }) {
   const outer = point.tenYear ?? point.fiveYear;
   const outerLabel = point.tenYear ? "10-year" : "5-year";
   const pos = rangePosition(point.value, outer);
@@ -70,6 +73,12 @@ export function IndicatorCard({ point }: { point: IndicatorPoint }) {
         )}
       </div>
 
+      {domain && point.history.length > 0 ? (
+        <VintageChart history={point.history} mode={mode} domain={domain} label={`${point.seriesId}, ${geographyName(point.geography)}`} unit={point.unit} />
+      ) : (
+        <p className="text-xs text-text-muted">No vintage history was returned for this series.</p>
+      )}
+
       <dl className="num m-0 grid grid-cols-[auto_1fr] gap-x-3 gap-y-0.5 text-[11px] text-text-muted">
         <dt>Previous</dt>
         <dd className="m-0 text-text">
@@ -89,6 +98,8 @@ export function IndicatorCard({ point }: { point: IndicatorPoint }) {
         <dd className="m-0 text-text">{point.releaseAt ? day(point.releaseAt) : "release date not recorded"}</dd>
         <dt>Known since</dt>
         <dd className="m-0 text-text">{day(point.knownAt)}</dd>
+        <dt>Release calendar</dt>
+        <dd className="m-0 text-text">{point.releaseCalendar ?? "not stated"}</dd>
       </dl>
       {odd ? <p className="text-[11px] text-text">The value lies outside the stored range; treat the range as incomplete.</p> : null}
 

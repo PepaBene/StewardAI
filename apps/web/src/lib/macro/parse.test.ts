@@ -181,3 +181,62 @@ describe("parseResearchContext", () => {
     expect(r.ok && r.value.claims).toEqual([]);
   });
 });
+
+describe("adoption: vintage history and trade partners", () => {
+  const obsBody = (o: Record<string, unknown>) => ({ as_of: "2026-10-03T10:00:00Z", observations: [{ ...obs, ...o }], coverage: [], effects: [], comparisons: [], exposure_unknown: false, series_effects: [] });
+  it("parses history with a null first release as vintage unavailable and keeps revised_at null when never revised", () => {
+    const r = parseMacroContext(
+      obsBody({
+        release_calendar: "Monthly, mid-month",
+        history: [
+          { period: "2026-06-30", value_latest: "2.0", value_first_release: null, vintage_unavailable: true, released_at: null, revised_at: null, revision_count: 0 },
+          { period: "2026-07-31", value_latest: "2.4", value_first_release: "2.2", vintage_unavailable: false, released_at: "2026-08-12T08:00:00Z", revised_at: "2026-09-12T08:00:00Z", revision_count: 1 },
+        ],
+      }),
+    );
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    const o = r.value.observations[0];
+    expect(o.releaseCalendar).toBe("Monthly, mid-month");
+    expect(o.history[0]).toMatchObject({ valueLatest: 2, valueFirstRelease: null, vintageUnavailable: true, revisedAt: null });
+    expect(o.history[1]).toMatchObject({ valueFirstRelease: 2.2, vintageUnavailable: false, revisedAt: "2026-09-12T08:00:00Z", revisionCount: 1 });
+  });
+  it("defaults to empty history and no calendar when the backend sends none", () => {
+    const r = parseMacroContext(obsBody({}));
+    expect(r.ok && r.value.observations[0]).toMatchObject({ history: [], releaseCalendar: null });
+  });
+  it("renders access_unverified through the shared vocabulary", () => {
+    const r = parseMacroContext(obsBody({ access_state: "access_unverified" }));
+    expect(r.ok && r.value.observations[0].state).toBe("access_unverified");
+    expect(r.ok && r.value.observations[0].stateReason).toBeNull();
+  });
+  const period = { period: "2025-12-31", total: "10", total_basis: "world_row", mapped_value: "6", unmapped_value: "4", unmapped_share: "0.4", partner_count: 2, hhi: "0.5", partners_exceed_total: false };
+  const tradeBody = {
+    reporter: "US", hs_code: "8486", hs_revision: "HS2022", partner: null, periods: 4, latest_period: "2025-12-31", latest_value: "10", latest_value_by_flow: { export: "10" }, latest_value_currency: "USD", metrics: { export_growth: "0.1" }, source_url: null, known_at: null, notice: "n",
+    reporter_wide: { periods: 12, hs_revision: "mixed", products: 5, metrics: { product_mix_change: "0.2", export_growth: null } },
+    partners: [{ flow: "export", period: "2025-12-31", summary: period, partners: [{ partner: "276", partner_iso: "DE", value: "4", share: "0.4" }, { partner: "899", partner_iso: null, value: "2", share: null }], history: [period] }],
+  };
+  it("parses partners, the unmapped remainder, hhi history and the reporter-wide block", () => {
+    const r = parseTradeContext(tradeBody);
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    expect(r.value.partners[0].partners).toEqual([
+      { partner: "276", partnerIso: "DE", value: 4, share: 0.4 },
+      { partner: "899", partnerIso: null, value: 2, share: null },
+    ]);
+    expect(r.value.partners[0].summary).toMatchObject({ unmappedValue: 4, unmappedShare: 0.4, hhi: 0.5, partnersExceedTotal: false });
+    expect(r.value.reporterWide).toEqual({ periods: 12, hsRevision: "mixed", products: 5, metrics: { product_mix_change: 0.2, export_growth: null } });
+  });
+  it("keeps a null unmapped remainder null (no World total), never zero", () => {
+    const r = parseTradeContext({ ...tradeBody, partners: [{ ...tradeBody.partners[0], summary: { ...period, unmapped_value: null, unmapped_share: null } }] });
+    expect(r.ok && r.value.partners[0].summary.unmappedValue).toBeNull();
+    expect(r.ok && r.value.partners[0].summary.unmappedShare).toBeNull();
+  });
+  it("accepts a body without partners or reporter_wide", () => {
+    const { partners: _p, reporter_wide: _r, ...rest } = tradeBody;
+    void _p; void _r;
+    const r = parseTradeContext(rest);
+    expect(r.ok && r.value.partners).toEqual([]);
+    expect(r.ok && r.value.reporterWide).toBeNull();
+  });
+});

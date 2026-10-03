@@ -21,6 +21,9 @@ import type {
   SeriesEffect,
   Share,
   TradeContext,
+  TradeFlowPartners,
+  TradePartnerPeriod,
+  VintagePoint,
 } from "./types";
 
 /*
@@ -83,6 +86,20 @@ function range(low: unknown, high: unknown): Range | null {
 // GET /macro/context/{ticker}
 // ---------------------------------------------------------------------------------------
 
+function parseVintage(v: Schemas["SeriesVintage"]): VintagePoint {
+  const first = num(v.value_first_release);
+  return {
+    period: v.period,
+    valueLatest: num(v.value_latest),
+    valueFirstRelease: first,
+    // Unavailable exactly when the first release is missing; the flag is trusted too.
+    vintageUnavailable: v.vintage_unavailable === true || first === null,
+    releasedAt: v.released_at ?? null,
+    revisedAt: v.revised_at ?? null,
+    revisionCount: v.revision_count,
+  };
+}
+
 export function parseMacroContext(body: Schemas["MacroContext"] | unknown): Parsed<HoldingMacroContext> {
   if (!isRecord(body)) return fail("The macro context response was not an object.");
   const { observations, coverage, effects, comparisons } = body;
@@ -110,6 +127,8 @@ export function parseMacroContext(body: Schemas["MacroContext"] | unknown): Pars
         tenYear: range(o.ten_year_low, o.ten_year_high),
         state: s.state,
         stateReason: s.reason,
+        history: (o.history ?? []).map(parseVintage),
+        releaseCalendar: o.release_calendar ?? null,
       };
     }),
     coverage: b.coverage.map((c): CoverageRow => {
@@ -285,6 +304,36 @@ export function parseExposureMappings(body: Schemas["ExposureResult"][] | unknow
 // GET /macro/trade/{reporter}/{hs_code}
 // ---------------------------------------------------------------------------------------
 
+function parsePartnerPeriod(p: Schemas["TradePartnerPeriod"]): TradePartnerPeriod {
+  return {
+    period: p.period,
+    total: num(p.total),
+    totalBasis: p.total_basis,
+    mappedValue: num(p.mapped_value),
+    unmappedValue: num(p.unmapped_value),
+    unmappedShare: num(p.unmapped_share),
+    partnerCount: p.partner_count,
+    hhi: num(p.hhi),
+    partnersExceedTotal: p.partners_exceed_total === true,
+  };
+}
+
+function parseFlowPartners(f: Schemas["TradeFlowPartners"]): TradeFlowPartners {
+  return {
+    flow: f.flow,
+    period: f.period,
+    summary: parsePartnerPeriod(f.summary),
+    partners: f.partners.map((p) => ({ partner: p.partner, partnerIso: p.partner_iso ?? null, value: num(p.value), share: num(p.share) })),
+    history: f.history.map(parsePartnerPeriod),
+  };
+}
+
+function numRecord(r: Record<string, unknown>): Record<string, number | null> {
+  const out: Record<string, number | null> = {};
+  for (const [k, v] of Object.entries(r)) out[k] = num(v);
+  return out;
+}
+
 export function parseTradeContext(body: Schemas["TradeContext"] | unknown): Parsed<TradeContext> {
   if (!isRecord(body) || !isRecord(body.metrics)) return fail("The trade context was not in the expected shape.");
   const b = body as Schemas["TradeContext"];
@@ -293,8 +342,11 @@ export function parseTradeContext(body: Schemas["TradeContext"] | unknown): Pars
     const n = num(v);
     if (n !== null) latestByFlow[flow] = n;
   }
-  const metrics: Record<string, number | null> = {};
-  for (const [k, v] of Object.entries(b.metrics)) metrics[k] = num(v);
+  const metrics = numRecord(b.metrics);
+  const rw = b.reporter_wide;
+  if (rw && !isRecord(rw.metrics)) return fail("The reporter-wide trade block was malformed.");
+  const flows = b.partners ?? [];
+  if (!Array.isArray(flows) || flows.some((f) => !isRecord(f) || !isRecord(f.summary) || !Array.isArray(f.partners) || !Array.isArray(f.history))) return fail("The trade partner block was malformed.");
   return ok({
     reporter: b.reporter,
     hsCode: b.hs_code,
@@ -308,6 +360,8 @@ export function parseTradeContext(body: Schemas["TradeContext"] | unknown): Pars
     sourceUrl: b.source_url,
     knownAt: b.known_at,
     notice: b.notice,
+    reporterWide: rw ? { periods: rw.periods, hsRevision: rw.hs_revision, products: rw.products, metrics: numRecord(rw.metrics) } : null,
+    partners: flows.map(parseFlowPartners),
   });
 }
 

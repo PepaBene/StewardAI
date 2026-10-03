@@ -8,6 +8,12 @@ import {
   equalPartners,
   groupByGeography,
   hhiPoints,
+  hhiTrend,
+  partnerLabel,
+  partnerSankey,
+  periodTime,
+  sharedTimeDomain,
+  vintageSeries,
   isActiveMapping,
   checkGeography,
   canonicalGeography,
@@ -16,7 +22,6 @@ import {
   outsideRange,
   parseTradeClaim,
   pointChange,
-  productSankey,
   rangePosition,
   summariseMappings,
   tradePartyName,
@@ -24,7 +29,7 @@ import {
   validateExposureForm,
   type ExposureForm,
 } from "./logic";
-import type { Claim, ComparisonPoint, CountryExposureRow, EffectRow, ExposureMapping, IndicatorPoint, PortfolioCountryContext, ResearchContext, Share } from "./types";
+import type { TradeFlowPartners, VintagePoint, Claim, ComparisonPoint, CountryExposureRow, EffectRow, ExposureMapping, IndicatorPoint, PortfolioCountryContext, ResearchContext, Share } from "./types";
 
 // ---- builders (inline: no shared fixtures) -------------------------------------------
 
@@ -72,6 +77,8 @@ function point(over: Partial<IndicatorPoint> = {}): IndicatorPoint {
     tenYear: { low: -5, high: 6 },
     state: "verified",
     stateReason: null,
+    history: [],
+    releaseCalendar: null,
     ...over,
   };
 }
@@ -323,44 +330,16 @@ function research(claims: Claim[]): ResearchContext {
   return { scope: "country", subject: "US", asOf: "2026-10-03T00:00:00Z", claims, gaps: [], method: "m" };
 }
 
-describe("tradeRows / productSankey", () => {
+describe("tradeRows", () => {
   const claims = [
     claim({}),
     claim({ claimId: "trade:842:156:export:HS2022:8486:2025-12-31", value: 3e9 }),
-    claim({ claimId: "trade:842:0:export:HS2022:8486:2025-12-31", value: 9e9 }),
-    claim({ claimId: "trade:842:276:import:HS2022:8542:2025-12-31", value: 1e9 }),
     claim({ claimId: "broken" }),
-    claim({ claimId: "trade:842:699:export:HS2022:8486:2025-12-31", value: null }),
   ];
-  it("separates placeable rows from unplaceable trade claims", () => {
+  it("separates placeable rows from unplaceable trade claims (industry context)", () => {
     const { rows, unparsed } = tradeRows(research(claims));
-    expect(rows).toHaveLength(5);
+    expect(rows).toHaveLength(2);
     expect(unparsed).toHaveLength(1);
-  });
-  it("draws product-to-partner links of one flow, leaving World out and listing it apart", () => {
-    const s = productSankey(tradeRows(research(claims)).rows, "export");
-    expect(s.links.map((l) => l.value).sort()).toEqual([3e9, 5e9]);
-    expect(s.drawn).toBe(2);
-    expect(s.worldRows).toHaveLength(1);
-    expect(s.nodes.filter((n) => n.column === 0)).toHaveLength(1);
-    expect(s.nodes.map((n) => n.label)).toEqual(expect.arrayContaining(["HS 8486 (HS2022)", "Germany", "China"]));
-    expect(s.period).toBe("2025-12-31");
-  });
-  it("does not draw a row without a USD value (India here) and keeps imports apart", () => {
-    const s = productSankey(tradeRows(research(claims)).rows, "export");
-    expect(s.nodes.some((n) => n.label === "India")).toBe(false);
-    expect(productSankey(tradeRows(research(claims)).rows, "import").links).toHaveLength(1);
-  });
-  it("adds rows of the same product and partner within one revision only", () => {
-    const rows = tradeRows(research([claim({ value: 1e9 }), claim({ claimId: "trade:840:276:export:HS2022:8486:2025-09-30", value: 2e9 }), claim({ claimId: "trade:842:276:export:HS2017:8486:2025-12-31", value: 4e9 })])).rows;
-    const s = productSankey(rows, "export");
-    expect(s.links).toHaveLength(2);
-    expect(s.links.find((l) => l.source === "hs:8486:HS2022")!.value).toBe(3e9);
-  });
-  it("is empty for a flow with no rows", () => {
-    const s = productSankey([], "export");
-    expect(s.links).toEqual([]);
-    expect(s.period).toBeNull();
   });
 });
 
@@ -465,5 +444,74 @@ describe("F8-7 trade period staleness", () => {
   it("does not judge a missing or unparseable period", () => {
     expect(tradePeriodStale(null, now)).toBeNull();
     expect(tradePeriodStale("recent", now)).toBeNull();
+  });
+});
+
+describe("adoption: partner Sankey", () => {
+  const flow = (over: Partial<TradeFlowPartners["summary"]> = {}): TradeFlowPartners => ({
+    flow: "export",
+    period: "2025-12-31",
+    summary: { period: "2025-12-31", total: 10, totalBasis: "world_row", mappedValue: 6, unmappedValue: 4, unmappedShare: 0.4, partnerCount: 2, hhi: 0.5, partnersExceedTotal: false, ...over },
+    partners: [
+      { partner: "276", partnerIso: "DE", value: 4, share: 0.4 },
+      { partner: "899", partnerIso: null, value: 2, share: 0.2 },
+      { partner: "156", partnerIso: "CN", value: null, share: null },
+    ],
+    history: [],
+  });
+  it("draws product to partners and the unmapped remainder as its own target", () => {
+    const s = partnerSankey(flow(), "8486");
+    expect(s.links).toEqual([
+      { source: "hs:8486", target: "partner:276", value: 4 },
+      { source: "hs:8486", target: "partner:899", value: 2 },
+      { source: "hs:8486", target: "unmapped", value: 4 },
+    ]);
+    expect(s.drawn).toBe(2);
+    expect(s.skipped).toBe(1);
+    expect(s.nodes.find((n) => n.id === "unmapped")?.label).toBe("Unmapped remainder");
+  });
+  it("labels partners by ISO name and an area nes by its stored code", () => {
+    expect(partnerLabel({ partner: "276", partnerIso: "DE" })).toBe("Germany");
+    expect(partnerLabel({ partner: "899", partnerIso: null })).toContain("code 899");
+  });
+  it("draws no unmapped target when the remainder is not stated (null), and reports it as null not zero", () => {
+    const s = partnerSankey(flow({ unmappedValue: null, unmappedShare: null }), "8486");
+    expect(s.nodes.some((n) => n.id === "unmapped")).toBe(false);
+    expect(s.unmappedValue).toBeNull();
+  });
+});
+
+describe("adoption: concentration trend", () => {
+  it("is on the 10,000 axis, oldest first, with the exceed flag and a missing index kept null", () => {
+    const base = { total: 10, totalBasis: "world_row" as const, mappedValue: 6, unmappedValue: 4, unmappedShare: 0.4, partnerCount: 2 };
+    const t = hhiTrend([
+      { ...base, period: "2025-12-31", hhi: 0.25, partnersExceedTotal: true },
+      { ...base, period: "2024-12-31", hhi: null, partnersExceedTotal: false },
+    ]);
+    expect(t).toEqual([
+      { period: "2024-12-31", points: null, exceedsTotal: false },
+      { period: "2025-12-31", points: 2500, exceedsTotal: true },
+    ]);
+  });
+});
+
+describe("adoption: vintage series", () => {
+  const h = (period: string, latest: number, first: number | null, revisedAt: string | null): VintagePoint => ({ period, valueLatest: latest, valueFirstRelease: first, vintageUnavailable: first === null, releasedAt: null, revisedAt, revisionCount: revisedAt ? 1 : 0 });
+  const history = [h("2026-07-31", 2.4, 2.2, "2026-09-01T00:00:00Z"), h("2026-06-30", 2.0, null, null)];
+  it("latest vintage uses the latest value, oldest first, and flags revisions", () => {
+    const s = vintageSeries(history, "latest");
+    expect(s.map((p) => p.value)).toEqual([2.0, 2.4]);
+    expect(s.map((p) => p.revised)).toEqual([false, true]);
+  });
+  it("first release is null (vintage unavailable) where unarchived, never the revised value", () => {
+    const s = vintageSeries(history, "first_release");
+    expect(s[0].value).toBeNull();
+    expect(s[0].vintageUnavailable).toBe(true);
+    expect(s[1].value).toBe(2.2);
+  });
+  it("shares one time axis over all histories", () => {
+    const d = sharedTimeDomain([history, [h("2020-01-31", 1, 1, null)], []]);
+    expect(d).toEqual([periodTime("2020-01-31"), periodTime("2026-07-31")]);
+    expect(sharedTimeDomain([[]])).toBeNull();
   });
 });

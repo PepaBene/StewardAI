@@ -1,7 +1,7 @@
 import { ProvenanceFooter } from "@/components/data-state";
 import { formatNumber, formatPct } from "@/lib/charts/format";
 import { linearScale } from "@/lib/charts/scale";
-import { avcScaleMismatch, avcState, isDateVintage, surprise } from "@/lib/financials/logic";
+import { avcScaleMismatch, avcReconciliation, avcState, surprise } from "@/lib/financials/logic";
 import type { ActualVsConsensus } from "@/lib/financials/types";
 import { formatDate } from "@/lib/format";
 
@@ -28,7 +28,7 @@ export function EarningsCard({ avc }: { avc: ActualVsConsensus }) {
   const c = avc.consensus;
   const actual = avc.actual;
   const hasRange = !!c && c.low !== null && c.high !== null && c.value !== null && !!actual;
-  const surpriseOk = avc.state === "available" && !scaleMismatch;
+  const surpriseOk = avc.state === "available" && !scaleMismatch && avcReconciliation(avc) !== "failed";
   const title = `${avc.metric ?? "Metric"} ${avc.fiscalPeriod ?? ""}: actual vs the consensus known before the report`;
 
   let lo = 0;
@@ -93,7 +93,7 @@ export function EarningsCard({ avc }: { avc: ActualVsConsensus }) {
           source: c?.provider ? `${c.provider} (consensus) · filed actual${actual?.accession ? ` ${actual.accession}` : ""}` : `Filed actual${actual?.accession ? ` ${actual.accession}` : ""}`,
           asOf: actual?.knownAt ? actual.knownAt.slice(0, 10) : null,
           knownAt: c?.knownAt ?? null,
-          method: `Surprise = (actual − consensus mean) ÷ |consensus mean|, on the provider's stated basis${c?.basis ? ` (${c.basis})` : ""}; consensus vintage ${c?.vintage ? (isDateVintage(c.vintage) ? formatDate(c.vintage.slice(0, 10)) : c.vintage) : "n/a"}`,
+          method: `Surprise = (actual − consensus mean) ÷ |consensus mean|, on the provider's stated basis${c?.basis ? ` (${c.basis})` : ""}; consensus vintage ${c?.vintage ? (c.vintageDate ? formatDate(c.vintageDate) : c.vintage) : "n/a"}`,
           state: status.state,
           reason: status.reason,
         }}
