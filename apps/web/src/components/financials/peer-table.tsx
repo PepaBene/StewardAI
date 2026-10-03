@@ -86,11 +86,23 @@ export function PeerTable({ data, ticker }: { data: PeerMetricsPayload; ticker: 
         reason: status.reason,
         coverage: c ? { covered: c.covered, total: c.total, unit: "confirmed peers" } : null,
       }}
-      table={{
-        caption: "Peer metrics: the holding and the mean of comparable confirmed peers",
-        columns: ["Metric", ticker, "Peer mean", "Peers covered", "Period end"],
-        rows: all.map((x) => [x.label, fmtValue(x.holdingValue, x.unit), fmtValue(x.mean, x.unit), `${x.covered} of ${x.total}`, x.periodEnd ?? "—"]),
-      }}
+      table={
+        c
+          ? {
+              caption: `${c.label}: the holding and each confirmed peer, ranked; peers with no comparable value are listed unranked`,
+              columns: ["Company", "Value", "Basis, period, definition"],
+              rows: [
+                ...bars.map((b) => [b.label, fmtValue(b.value, c.unit), b.detail ?? "—"]),
+                ...c.excluded.map((e) => [e.ticker, "not ranked", e.reason]),
+                ["Peer mean", fmtValue(c.mean, c.unit), `${c.covered} of ${c.total} confirmed peers comparable`],
+              ],
+            }
+          : {
+              caption: "Peer metrics: the holding and the mean of comparable confirmed peers",
+              columns: ["Metric", ticker, "Peer mean", "Peers covered", "Period end"],
+              rows: all.map((x) => [x.label, fmtValue(x.holdingValue, x.unit), fmtValue(x.mean, x.unit), `${x.covered} of ${x.total}`, x.periodEnd ?? "—"]),
+            }
+      }
     >
       {c ? (
         <>

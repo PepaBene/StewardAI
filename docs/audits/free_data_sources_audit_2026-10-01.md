@@ -310,6 +310,8 @@ Each was re-verified before changing code; every fix has a regression test that 
 
 ### Plan gaps found by the frontend build-out (D, added 2026-10-03)
 
+> **Update (2026-10-03, second backend pass).** The gaps below were closed in commit `401c1fb` except where noted: portfolio correlation matrix (`GET /portfolio/correlation`), raw bars and quote currency, per-peer values, product-scoped trade metrics with partner rows, macro vintage history, research `known_at`, and the coverage `stale`/`entity_kind` items. Still open: a machine-readable next-release date for macro series, `known_at` for sources with no stored ingestion time, value-weighted price coverage / exchange-level reach / provenance-completeness endpoints, and the untyped responses. Full table: `docs/audits/frontend_audit_2026-10-03.md`. The suite after the second pass: 1,937 passed, 16 skipped (pgmq), and the one failure (rollback documentation for the two new migrations) was fixed; `test_lifecycle_phase8.py` passes 10/10 including the up/down round trip.
+
 Each claim was checked in the current backend; "true" means the gap exists at `bd5f1fd`.
 
 - **Portfolio correlation matrix: true.** No route returns one. `GET /holdings/{ticker}/prices` returns that holding's `correlations` with each other holding over the last 252 days (`reference/read.py:399`); a matrix therefore costs one call per holding and each call recomputes every pair.
