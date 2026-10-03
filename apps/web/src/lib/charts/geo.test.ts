@@ -9,6 +9,7 @@ import {
   projectGeometry,
   rampIndex,
   resolveGeography,
+  splitRingAtAntimeridian,
 } from "./geo";
 import { MAP_HEIGHT, MAP_WIDTH, worldShapes } from "./geo-world";
 
@@ -188,5 +189,32 @@ describe("choropleth classes", () => {
   it("caps values above the last edge in the strongest class", () => {
     const b = choroplethBreaks([0.6])!;
     expect(rampIndex(5, b)).toBe(0);
+  });
+});
+
+describe("antimeridian", () => {
+  const proj = fitWorld(960, 480);
+  const crossing = { type: "Polygon", coordinates: [[[170, 60], [-170, 60], [-170, 70], [170, 70], [170, 60]]] };
+  it("splits a ring crossing +/-180 into rings that stay inside the world strip", () => {
+    const parts = splitRingAtAntimeridian(crossing.coordinates[0]);
+    expect(parts).toHaveLength(2);
+    for (const r of parts) for (const [lon] of r) expect(Math.abs(lon)).toBeLessThanOrEqual(180 + 1e-9);
+  });
+  it("leaves a ring that does not cross unchanged", () => {
+    const ring = [[0, 0], [10, 0], [10, 10], [0, 0]];
+    expect(splitRingAtAntimeridian(ring)).toEqual([ring]);
+  });
+  it("draws no edge longer than half the map width for a crossing polygon", () => {
+    const shape = projectGeometry(crossing, proj.project);
+    expect(shape.d.split("M").length - 1).toBe(2);
+    expect(shape.maxJump).toBeLessThan(480);
+  });
+  it("draws no edge longer than half the map width for any country", () => {
+    for (const s of worldShapes()) {
+      for (const sub of s.d.split("M").filter(Boolean)) {
+        const xs = [...sub.matchAll(/(-?\d+(?:\.\d+)?),/g)].map((m) => Number(m[1]));
+        for (let i = 1; i < xs.length; i++) expect(Math.abs(xs[i] - xs[i - 1])).toBeLessThan(MAP_WIDTH / 2);
+      }
+    }
   });
 });
