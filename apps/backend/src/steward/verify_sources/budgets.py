@@ -55,6 +55,7 @@ NO_OVERAGE_PROVIDERS: dict[str, str] = {
 BUDGET_SITES: dict[str, int] = {
     "steward/free_sources.py": 2,
     "steward/macro/public_collect.py": 1,
+    "steward/macro/release_calendar.py": 4,
     "steward/news/feeds.py": 1,
     "steward/reference/exchange_probes.py": 2,
     "steward/reference/prices.py": 3,
@@ -95,6 +96,7 @@ def capped_settings_budget(settings: Any, cap: int) -> Budget:
 
 
 def literal_budgets() -> list[CollectorBudget]:
+    from steward.macro.release_calendar import CALENDAR_BUDGETS, ENDPOINT
     from steward.reference.exchange_probes import FINNHUB_BUDGET, TWELVE_BUDGET
     from steward.valuation.collect import ALPHA_VANTAGE_DAILY_LIMIT
 
@@ -124,6 +126,11 @@ def literal_budgets() -> list[CollectorBudget]:
         # the module's own constants, so the registry cannot drift from them
         ("finnhub", ANY_ENDPOINT, FINNHUB_BUDGET, "steward/reference/exchange_probes.py"),
         ("twelve_data", ANY_ENDPOINT, TWELVE_BUDGET, "steward/reference/exchange_probes.py"),
+        # the release-calendar collector's own constants (one per provider calendar)
+        *(
+            (provider, ENDPOINT, budget, "steward/macro/release_calendar.py")
+            for provider, budget in CALENDAR_BUDGETS.items()
+        ),
     ]
     return [CollectorBudget(p, e, b, w, "literal") for p, e, b, w in rows]
 

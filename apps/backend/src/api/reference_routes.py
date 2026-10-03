@@ -12,6 +12,7 @@ from pydantic import BaseModel, Field
 from api.auth import Owner
 from api.db import IdPath, Pool
 from api.routes import _enqueue
+from api.typed_responses import IdentityDecisions
 from steward.config.common import Ticker
 from steward.config.jobs import ExchangeClosure
 from steward.db_json import decode_row
@@ -124,7 +125,7 @@ async def legal_entity_history(
     ]
 
 
-@router.get("/reference/identity-decisions", tags=["reference"])
+@router.get("/reference/identity-decisions", tags=["reference"], response_model=IdentityDecisions)
 async def identity_decisions(pool: Pool, _owner: Owner) -> list[dict[str, object]]:
     rows = await pool.fetch(
         """select id,instrument_ticker,candidate_issuer_id,candidate_security_id,

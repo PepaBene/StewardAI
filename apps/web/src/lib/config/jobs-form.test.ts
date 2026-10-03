@@ -57,6 +57,7 @@ const FULL: JobsConfig = {
   sec_fsds_backfill: { enabled: false, cron: "45 10 * * mon", timezone: "UTC" },
   pdmr_uk: { enabled: true, cron: "52 11 * * mon", timezone: "UTC" },
   graph_review: { enabled: false, cron: "59 12 * * mon", timezone: "UTC" },
+  macro_release_calendar: { enabled: false, cron: "21 7 * * *", timezone: "UTC" },
   earnings_check: {
     extraction_model: "claude-opus-5-5",
     locate_model: "claude-sonnet-5",

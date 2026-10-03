@@ -1,14 +1,20 @@
 """Point-in-time macro context and mapped holding effects."""
 
 import datetime as dt
+import itertools
+import statistics
 from decimal import Decimal
+from typing import Literal
 
 import asyncpg
 from pydantic import BaseModel, Field
 
 from steward.macro.exposure import Exposure, exposure_summary, weighted_effect
+from steward.macro.release_calendar import NextRelease, next_releases
 
 HISTORY_MAX = 60
+# Fewer stored first-release timestamps than this and no cadence is claimed.
+MIN_RELEASES_FOR_CADENCE = 4
 
 
 class SeriesVintage(BaseModel):
@@ -25,6 +31,16 @@ class SeriesVintage(BaseModel):
     released_at: dt.datetime | None  # when the first release was published
     revised_at: dt.datetime | None  # when the latest value became known; null if never revised
     revision_count: int  # stored revisions after the first row (0: never revised)
+
+
+class NextReleaseSource(BaseModel):
+    """Where a `next_release` date comes from: the provider's own published calendar."""
+
+    provider: str = Field(
+        description="Provider whose calendar names the date (fred, eurostat, ecb, bis)."
+    )
+    url: str = Field(description="The provider's calendar page the date was read from.")
+    title: str | None = Field(default=None, description="The calendar entry's own label.")
 
 
 class ContextPoint(BaseModel):
@@ -50,6 +66,42 @@ class ContextPoint(BaseModel):
     # machine-readable next-release date is stored.
     history: list[SeriesVintage] = Field(default_factory=list)
     release_calendar: str | None = None
+    next_release: dt.date | None = Field(
+        default=None,
+        description="Date of the next release of this series as announced in the provider's own "
+        "published release calendar: the earliest stored calendar date on or after the UTC date "
+        "of `as_of`, from calendar rows known by `as_of` and not superseded (rescheduled) by "
+        "then. A date, not a promise: the provider may still reschedule it. Null when no "
+        "calendar entry is stored for the series (then see `next_release_estimate`). "
+        "`next_release_basis` is `provider_calendar` whenever this is set.",
+    )
+    next_release_time: dt.time | None = Field(
+        default=None,
+        description="Time of day of `next_release` exactly as the provider publishes it (the "
+        "publisher's local time; the ECB calendar does not state a zone). Null when the calendar "
+        "gives only a date (FRED, Eurostat, BIS) or `next_release` is null.",
+    )
+    next_release_source: NextReleaseSource | None = Field(
+        default=None,
+        description="Provider and calendar URL of `next_release`; null when it is null.",
+    )
+    next_release_estimate: dt.date | None = Field(
+        default=None,
+        description="FALLBACK, set only when `next_release` is null (no calendar entry stored "
+        "for the series). Estimated date (UTC) of the next release of this series: the latest "
+        "stored first-release timestamp plus the median gap between the stored first-release "
+        "timestamps of its observations (all periods known by `as_of`, independent of "
+        "`history`). Null with fewer than 4 stored first-release timestamps, with a "
+        "non-positive median gap, or when the estimate is already before `as_of` (the series "
+        "is overdue or no longer published). An estimate, not a provider announcement.",
+    )
+    next_release_basis: Literal["provider_calendar", "observed_cadence"] | None = Field(
+        default=None,
+        description="Where the returned next-release date comes from: `provider_calendar` "
+        "(`next_release`, the provider's published schedule) or `observed_cadence` "
+        "(`next_release_estimate`, the median gap of stored first releases; a fallback only "
+        "when no calendar entry exists). Null when both are null.",
+    )
 
 
 class HoldingEffect(BaseModel):
@@ -183,6 +235,8 @@ async def context_for_holding(
         else []
     )
     histories = await _vintage_history(pool, rows, as_of, history) if history > 0 else {}
+    cadences = await _release_cadence(pool, rows, as_of)
+    calendar = await next_releases(pool, [(r["source"], r["series_id"]) for r in rows], as_of)
     observed_geographies = {row["geography"] for row in rows}
     decorated_mapping = []
     for row in mapping:
@@ -268,6 +322,10 @@ async def context_for_holding(
             ContextPoint(
                 **dict(row),
                 **histories.get((row["series_id"], row["source"], row["geography"]), {}),
+                **_with_calendar(
+                    cadences.get((row["series_id"], row["source"], row["geography"]), {}),
+                    calendar.get((row["source"], row["series_id"])),
+                ),
             )
             for row in rows
         ],
@@ -278,6 +336,77 @@ async def context_for_holding(
         exposure=summary,
         series_effects=series_effects,
     )
+
+
+def observed_next_release(
+    releases: list[dt.datetime], as_of: dt.datetime
+) -> tuple[dt.date | None, Literal["observed_cadence"] | None]:
+    """(estimate, basis) from stored first-release timestamps only: the latest one plus the
+    median gap between consecutive distinct ones. (None, None) when fewer than
+    MIN_RELEASES_FOR_CADENCE are stored, the median gap is not positive, or the estimate lies
+    before `as_of`."""
+    stamps = sorted({r if r.tzinfo else r.replace(tzinfo=dt.UTC) for r in releases})
+    if len(stamps) < MIN_RELEASES_FOR_CADENCE:
+        return None, None
+    gap = statistics.median((b - a).total_seconds() for a, b in itertools.pairwise(stamps))
+    if gap <= 0:
+        return None, None
+    estimate = (stamps[-1] + dt.timedelta(seconds=gap)).astimezone(dt.UTC)
+    if estimate < as_of:
+        return None, None
+    return estimate.date(), "observed_cadence"
+
+
+def _with_calendar(cadence: dict[str, object], entry: NextRelease | None) -> dict[str, object]:
+    """The provider's calendar date when one is stored; the observed-cadence estimate only as
+    the fallback (never both: the basis names the one returned)."""
+    if entry is None:
+        return cadence
+    return {
+        "next_release": entry.release_date,
+        "next_release_time": entry.release_time,
+        "next_release_source": NextReleaseSource(
+            provider=entry.provider, url=entry.source_url, title=entry.title
+        ),
+        "next_release_estimate": None,
+        "next_release_basis": "provider_calendar",
+    }
+
+
+async def _release_cadence(
+    pool: asyncpg.Pool, rows: list[asyncpg.Record], as_of: dt.datetime
+) -> dict[tuple[str, str, str], dict[str, object]]:
+    """Per series, `next_release_estimate` / `next_release_basis` from the first-release
+    timestamps (release_at of each period's first stored row) known by `as_of`."""
+    if not rows:
+        return {}
+    keys = {(r["series_id"], r["source"], r["geography"]) for r in rows}
+    stored = await pool.fetch(
+        """with known as (
+             select m.series_id,m.source,m.geography,m.period,m.release_at,
+               row_number() over (partition by m.series_id,m.source,m.geography,m.period
+                 order by m.revision,m.known_at,m.id) first_rn
+             from public.macro_observation m
+             where m.known_at <= $2 and m.series_id = any($1::text[])
+               and m.geography = any($3::text[]) and m.source = any($4::text[])
+               and m.value is not null
+           )
+           select series_id,source,geography,array_agg(release_at order by release_at) releases
+           from known where first_rn=1 and release_at is not null
+           group by 1,2,3""",
+        sorted({k[0] for k in keys}),
+        as_of,
+        sorted({k[2] for k in keys}),
+        sorted({k[1] for k in keys}),
+    )
+    out: dict[tuple[str, str, str], dict[str, object]] = {}
+    for row in stored:
+        key = (row["series_id"], row["source"], row["geography"])
+        if key not in keys:
+            continue
+        estimate, basis = observed_next_release(list(row["releases"]), as_of)
+        out[key] = {"next_release_estimate": estimate, "next_release_basis": basis}
+    return out
 
 
 async def _vintage_history(

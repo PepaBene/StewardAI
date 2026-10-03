@@ -1,0 +1,322 @@
+[
+{
+"category_id": "CBPOL",
+"category_name": "Central bank policy rates",
+"release_type": "Daily and monthly data",
+"time_period": "2026-07",
+"release_date": "2026/08/06",
+"commentary": ""
+},
+{
+"category_id": "CBPOL",
+"category_name": "Central bank policy rates",
+"release_type": "Daily and monthly data",
+"time_period": "2026-07",
+"release_date": "2026/08/13",
+"commentary": ""
+},
+{
+"category_id": "CBPOL",
+"category_name": "Central bank policy rates",
+"release_type": "Daily and monthly data",
+"time_period": "2026-07",
+"release_date": "2026/08/20",
+"commentary": ""
+},
+{
+"category_id": "CBPOL",
+"category_name": "Central bank policy rates",
+"release_type": "Daily and monthly data",
+"time_period": "2026-07",
+"release_date": "2026/08/27",
+"commentary": ""
+},
+{
+"category_id": "CBPOL",
+"category_name": "Central bank policy rates",
+"release_type": "Daily and monthly data",
+"time_period": "2026-08",
+"release_date": "2026/09/03",
+"commentary": ""
+},
+{
+"category_id": "CBPOL",
+"category_name": "Central bank policy rates",
+"release_type": "Daily and monthly data",
+"time_period": "2026-08",
+"release_date": "2026/09/10",
+"commentary": ""
+},
+{
+"category_id": "CBPOL",
+"category_name": "Central bank policy rates",
+"release_type": "Daily and monthly data",
+"time_period": "2026-08",
+"release_date": "2026/09/17",
+"commentary": ""
+},
+{
+"category_id": "CBPOL",
+"category_name": "Central bank policy rates",
+"release_type": "Daily and monthly data",
+"time_period": "2026-08",
+"release_date": "2026/09/24",
+"commentary": ""
+},
+{
+"category_id": "CBPOL",
+"category_name": "Central bank policy rates",
+"release_type": "Daily and monthly data",
+"time_period": "2026-09",
+"release_date": "2026/10/01",
+"commentary": ""
+},
+{
+"category_id": "CBPOL",
+"category_name": "Central bank policy rates",
+"release_type": "Daily and monthly data",
+"time_period": "2026-09",
+"release_date": "2026/10/08",
+"commentary": ""
+},
+{
+"category_id": "CBPOL",
+"category_name": "Central bank policy rates",
+"release_type": "Daily and monthly data",
+"time_period": "2026-09",
+"release_date": "2026/10/15",
+"commentary": ""
+},
+{
+"category_id": "CBPOL",
+"category_name": "Central bank policy rates",
+"release_type": "Daily and monthly data",
+"time_period": "2026-09",
+"release_date": "2026/10/22",
+"commentary": ""
+},
+{
+"category_id": "CBPOL",
+"category_name": "Central bank policy rates",
+"release_type": "Daily and monthly data",
+"time_period": "2026-09",
+"release_date": "2026/10/29",
+"commentary": ""
+},
+{
+"category_id": "CBPOL",
+"category_name": "Central bank policy rates",
+"release_type": "Daily and monthly data",
+"time_period": "2026-10",
+"release_date": "2026/11/05",
+"commentary": ""
+},
+{
+"category_id": "CBPOL",
+"category_name": "Central bank policy rates",
+"release_type": "Daily and monthly data",
+"time_period": "2026-10",
+"release_date": "2026/11/12",
+"commentary": ""
+},
+{
+"category_id": "CBPOL",
+"category_name": "Central bank policy rates",
+"release_type": "Daily and monthly data",
+"time_period": "2026-10",
+"release_date": "2026/11/19",
+"commentary": ""
+},
+{
+"category_id": "CBPOL",
+"category_name": "Central bank policy rates",
+"release_type": "Daily and monthly data",
+"time_period": "2026-10",
+"release_date": "2026/11/26",
+"commentary": ""
+},
+{
+"category_id": "CBPOL",
+"category_name": "Central bank policy rates",
+"release_type": "Daily and monthly data",
+"time_period": "2026-11",
+"release_date": "2026/12/03",
+"commentary": ""
+},
+{
+"category_id": "CBPOL",
+"category_name": "Central bank policy rates",
+"release_type": "Daily and monthly data",
+"time_period": "2026-11",
+"release_date": "2026/12/10",
+"commentary": ""
+},
+{
+"category_id": "CBPOL",
+"category_name": "Central bank policy rates",
+"release_type": "Daily and monthly data",
+"time_period": "2026-11",
+"release_date": "2026/12/17",
+"commentary": ""
+},
+{
+"category_id": "CBPOL",
+"category_name": "Central bank policy rates",
+"release_type": "Daily and monthly data",
+"time_period": "2026-11",
+"release_date": "2026/12/23",
+"commentary": ""
+},
+{
+"category_id": "CPI",
+"category_name": "Consumer prices",
+"release_type": "Release",
+"time_period": "2026-07",
+"release_date": "2026/08/27",
+"commentary": ""
+},
+{
+"category_id": "CPI",
+"category_name": "Consumer prices",
+"release_type": "Release",
+"time_period": "2026-08",
+"release_date": "2026/09/24",
+"commentary": ""
+},
+{
+"category_id": "CPI",
+"category_name": "Consumer prices",
+"release_type": "Release",
+"time_period": "2026-09",
+"release_date": "2026/10/29",
+"commentary": ""
+},
+{
+"category_id": "CPI",
+"category_name": "Consumer prices",
+"release_type": "Release",
+"time_period": "2026-10",
+"release_date": "2026/11/26",
+"commentary": ""
+},
+{
+"category_id": "CPI",
+"category_name": "Consumer prices",
+"release_type": "Release",
+"time_period": "2026-11",
+"release_date": "2026/12/23",
+"commentary": ""
+},
+{
+"category_id": "TOTAL_CREDIT",
+"category_name": "Credit to the non-financial sector",
+"release_type": "Release",
+"time_period": "2026-Q1",
+"release_date": "2026/09/14",
+"commentary": ""
+},
+{
+"category_id": "TOTAL_CREDIT",
+"category_name": "Credit to the non-financial sector",
+"release_type": "Release",
+"time_period": "2026-Q2",
+"release_date": "2026/12/07",
+"commentary": ""
+},
+{
+"category_id": "DSS",
+"category_name": "Debt securities statistics",
+"release_type": "Release",
+"time_period": "2026-Q1",
+"release_date": "2026/09/14",
+"commentary": ""
+},
+{
+"category_id": "DSS",
+"category_name": "Debt securities statistics",
+"release_type": "Release",
+"time_period": "2026-Q2",
+"release_date": "2026/12/07",
+"commentary": ""
+},
+{
+"category_id": "DSR",
+"category_name": "Debt service ratios",
+"release_type": "Release",
+"time_period": "2026-Q1",
+"release_date": "2026/09/14",
+"commentary": ""
+},
+{
+"category_id": "DSR",
+"category_name": "Debt service ratios",
+"release_type": "Release",
+"time_period": "2026-Q2",
+"release_date": "2026/12/07",
+"commentary": ""
+},
+{
+"category_id": "GLI",
+"category_name": "Global liquidity",
+"release_type": "Release",
+"time_period": "2026-Q2",
+"release_date": "2026/10/30",
+"commentary": ""
+},
+{
+"category_id": "GLI",
+"category_name": "Global liquidity",
+"release_type": "Release",
+"time_period": "2026-Q3",
+"release_date": "2027/01/29",
+"commentary": ""
+},
+{
+"category_id": "GLI",
+"category_name": "Global liquidity",
+"release_type": "Revision",
+"time_period": "2026-Q1",
+"release_date": "2026/09/14",
+"commentary": ""
+},
+{
+"category_id": "GLI",
+"category_name": "Global liquidity",
+"release_type": "Revision",
+"time_period": "2026-Q2",
+"release_date": "2026/12/07",
+"commentary": ""
+},
+{
+"category_id": "LBS",
+"category_name": "Locational banking statistics",
+"release_type": "Release",
+"time_period": "2026-Q2",
+"release_date": "2026/10/30",
+"commentary": ""
+},
+{
+"category_id": "LBS",
+"category_name": "Locational banking statistics",
+"release_type": "Release",
+"time_period": "2026-Q3",
+"release_date": "2027/01/29",
+"commentary": ""
+},
+{
+"category_id": "LBS",
+"category_name": "Locational banking statistics",
+"release_type": "Revision",
+"time_period": "2026-Q1",
+"release_date": "2026/09/14",
+"commentary": ""
+},
+{
+"category_id": "LBS",
+"category_name": "Locational banking statistics",
+"release_type": "Revision",
+"time_period": "2026-Q2",
+"release_date": "2026/12/07",
+"commentary": ""
+}
+]

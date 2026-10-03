@@ -50,8 +50,10 @@ class Source(BaseModel):
     known_at: str | None = Field(
         default=None,
         description="ISO 8601 time the stored record became known to the app (ingestion time). "
-        "Null when the source has no such time (13F data, web search, thesis, strategy) or the "
-        "report predates the field; never inferred.",
+        "For 13F sources it is the filing date (day precision, the only 13F time stored); web "
+        "search results carry the retrieval time captured when they were gathered; thesis and "
+        "strategy carry the cited config version's created_at. Null for sources without such a "
+        "time and for reports that predate the field; never inferred.",
     )
 
 

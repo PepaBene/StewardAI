@@ -31,7 +31,13 @@ from steward.config.verification import VerificationConfig
 from steward.jobs.runner import JobContext, JobFailed
 from steward.news.normalize import host_of
 from steward.research.gather import Gathered, Valuation, gather
-from steward.research.sources import CitedSentence, Registry, Source, known_at_range
+from steward.research.sources import (
+    CitedSentence,
+    Registry,
+    Source,
+    iso_known_at,
+    known_at_range,
+)
 from steward.research.writer import (
     SECTION_TITLES,
     ClaudeResearchWriter,
@@ -177,6 +183,7 @@ async def run_research(ctx: JobContext, deps: ResearchDeps) -> int:
                 strategy,
                 strategy_v.id if strategy_v else None,
                 ctx.params.get("name"),
+                thesis_version=theses_v.id if theses_v else None,
             )
             step.detail.update(sources=len(g.sources), code_sections=sorted(g.sections))
             return g.model_dump(mode="json")
@@ -234,6 +241,9 @@ async def run_research(ctx: JobContext, deps: ResearchDeps) -> int:
                     )
                 )
                 step.usage = result.usage.step_usage()
+                # The search results were retrieved inside write(); this is the moment the app
+                # received them (stored in the Source, so a resumed run keeps it).
+                retrieved_at = iso_known_at(dt.datetime.now(dt.UTC))
                 out["steps"] = 1 + result.usage.searches
                 out["searches"] = result.usage.searches
                 if result.draft is None:
@@ -252,7 +262,8 @@ async def run_research(ctx: JobContext, deps: ResearchDeps) -> int:
                         ):
                             before = len(reg.sources)
                             sid = reg.add("search", url, result.titles[url], url=url, tier=tier,
-                                          snippet=result.titles[url])  # fmt: skip
+                                          snippet=result.titles[url],
+                                          known_at=retrieved_at)  # fmt: skip
                             if len(reg.sources) > before:
                                 out["new_sources"].append(reg.sources[-1].model_dump())
                             ids.append(sid)

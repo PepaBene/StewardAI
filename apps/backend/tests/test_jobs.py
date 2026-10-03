@@ -229,6 +229,7 @@ async def test_schedule_follows_the_jobs_config() -> None:
         "intraday_prices",
         "ir_releases",
         "macro_collect",
+        "macro_release_calendar",
         "monitor",
         "monthly_review",
         "news_ingest",

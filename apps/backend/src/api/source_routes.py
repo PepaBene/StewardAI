@@ -14,7 +14,13 @@ from pydantic import BaseModel, Field
 
 from api.auth import Owner
 from api.db import Pool
-from steward.config.jobs import COVERAGE_PROVIDER_JOB, JobsConfig, coverage_stale_after_hours
+from steward.config.jobs import (
+    COVERAGE_DEFAULT_REFRESH_HOURS,
+    COVERAGE_PROVIDER_JOB,
+    CoverageStaleBasis,
+    JobsConfig,
+    coverage_stale_policy,
+)
 from steward.config.store import load_active
 from steward.geo_codes import has_iso_columns
 from steward.redact import redact
@@ -102,8 +108,15 @@ class DataCoverage(BaseModel):
         default=None,
         description="Hours after `checked_at` at which the row counts as stale: twice the "
         "longest gap between scheduled runs of the job that refreshes this provider "
-        "(config/jobs.py, see COVERAGE_PROVIDER_JOB). Null when no enabled job is known to "
-        "refresh the provider.",
+        "(config/jobs.py, see COVERAGE_PROVIDER_JOB) or, for providers collected on demand or "
+        "by other jobs, twice the documented default interval (COVERAGE_DEFAULT_REFRESH_HOURS). "
+        "Null when no enabled job and no documented default applies (owner/manual rows).",
+    )
+    stale_basis: Literal["job_schedule", "documented_default"] | None = Field(
+        default=None,
+        description="Where `stale_after_hours` comes from: `job_schedule` (the refreshing "
+        "job's cron), `documented_default` (the explicit table in config/jobs.py, each value "
+        "with its plan/schedule basis) or null when it is null.",
     )
     stale: bool | None = Field(
         default=None,
@@ -316,11 +329,14 @@ async def get_data_coverage(
     now = datetime.now(UTC)
     stored = await load_active(pool, "jobs", JobsConfig)
     jobs = stored.body if stored else JobsConfig()
-    after_by_provider = {p: coverage_stale_after_hours(jobs, p) for p in COVERAGE_PROVIDER_JOB}
+    policy_by_provider: dict[str, tuple[int | None, CoverageStaleBasis | None]] = {
+        p: coverage_stale_policy(jobs, p)
+        for p in {*COVERAGE_PROVIDER_JOB, *COVERAGE_DEFAULT_REFRESH_HOURS}
+    }
     out: list[DataCoverage] = []
     for row in rows:
         item = dict(row)
-        stale_after = after_by_provider.get(item["provider"])
+        stale_after, stale_basis = policy_by_provider.get(item["provider"], (None, None))
         checked: datetime = item["checked_at"]
         expected, available = item["expected_periods"], item["available_periods"]
         latest: date | None = item["latest_period"]
@@ -336,6 +352,7 @@ async def get_data_coverage(
                 ),
                 age_days=(today - latest).days if latest else None,
                 stale_after_hours=stale_after,
+                stale_basis=stale_basis,
                 stale=(
                     (now - checked).total_seconds() > stale_after * 3600
                     if stale_after is not None

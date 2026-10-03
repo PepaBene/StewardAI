@@ -11,6 +11,7 @@ from fastapi import APIRouter, HTTPException, Path, Query
 
 from api.auth import Owner
 from api.db import Pool
+from api.typed_responses import EvidenceDomainBody, typed
 from steward.data_context import evidence
 from steward.data_context.evidence import EvidenceSummary
 from steward.data_context.holding import HoldingDataContext, holding_data_context
@@ -76,7 +77,12 @@ async def get_evidence_summary(
     return await evidence.evidence_summary(pool, ticker, as_of)
 
 
-@router.get("/holdings/{ticker}/evidence/{domain}", tags=["holdings"], response_model=None)
+@router.get(
+    "/holdings/{ticker}/evidence/{domain}",
+    tags=["holdings"],
+    response_model=None,
+    responses=typed(EvidenceDomainBody),
+)
 async def get_evidence_domain(
     ticker: TickerPath, domain: EvidenceDomain, pool: Pool, _owner: Owner, as_of: AsOfTime = None
 ) -> object:

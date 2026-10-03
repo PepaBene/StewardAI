@@ -229,6 +229,11 @@ export const SCHEDULES: Record<ScheduleKey, { label: string; description: string
       "Parse UK PDMR notifications from the RNS stream. Off by default (retrieval unverified).",
     cron: "10 8 * * 1-5",
   },
+  macro_release_calendar: {
+    label: "Macro release calendar",
+    description: "Refresh upcoming release dates from the FRED, Eurostat, ECB and BIS calendars.",
+    cron: "20 7 * * *",
+  },
   graph_review: {
     label: "Relationship and deal review",
     description:

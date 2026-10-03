@@ -25,6 +25,7 @@ NEW_JOBS = {
     "sec_fsds_backfill": "/jobs/sec-fsds-backfill",
     "pdmr_uk": "/jobs/pdmr-uk",
     "graph_review": "/jobs/graph-review",
+    "macro_release_calendar": "/jobs/macro-release-calendar",
 }
 
 

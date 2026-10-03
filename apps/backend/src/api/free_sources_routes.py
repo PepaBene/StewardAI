@@ -14,6 +14,43 @@ from pydantic import BaseModel, ConfigDict, Field, model_validator
 from api.auth import Owner
 from api.db import Pool
 from api.routes import _enqueue
+from api.typed_responses import (
+    ActualVsConsensus,
+    AlphaExposureRefreshed,
+    AlphaStatementRefreshed,
+    BusinessNetwork,
+    CompanyEdgeRecorded,
+    CompanyResearchObservations,
+    CorporateActionCoverageConfirmed,
+    CorporateActionDecided,
+    CorporateActionRecorded,
+    CorporateActions,
+    CustomerSupplierConcentration,
+    DiffbotRefreshed,
+    EpoPatentsRefreshed,
+    ExchangeSessionRecorded,
+    ExchangeSessions,
+    ExpectedExchangeSessions,
+    ExposureContext,
+    FinancialHistoryRows,
+    FinnhubResearchRefreshed,
+    ForwardConsensus,
+    ForwardObservations,
+    HoldingListing,
+    HoldingReturns,
+    IssuerIrReleases,
+    IssuerIrSources,
+    ListingConfirmed,
+    ListingDerived,
+    PatentFamilyRecorded,
+    PatentTrends,
+    PdlRefreshed,
+    PeerMetrics,
+    PeerSet,
+    PeerStatusChanged,
+    RecordedId,
+    typed,
+)
 from steward.config.common import Ticker
 from steward.config.holding_profiles import HoldingProfile, HoldingProfilesConfig
 from steward.config.jobs import JobsConfig
@@ -408,7 +445,10 @@ def _profile_domain(profile: HoldingProfile) -> str | None:
 
 
 @router.get(
-    "/holdings/{ticker}/company-research-observations", tags=["holdings"], response_model=None
+    "/holdings/{ticker}/company-research-observations",
+    tags=["holdings"],
+    response_model=None,
+    responses=typed(CompanyResearchObservations),
 )
 async def company_research_observations(
     ticker: TickerPath,
@@ -421,7 +461,10 @@ async def company_research_observations(
 
 
 @router.post(
-    "/holdings/{ticker}/exposure-context/alpha-vantage", tags=["holdings"], response_model=None
+    "/holdings/{ticker}/exposure-context/alpha-vantage",
+    tags=["holdings"],
+    response_model=None,
+    responses=typed(AlphaExposureRefreshed),
 )
 async def refresh_alpha_exposure(
     ticker: TickerPath, body: AlphaExposureRequest, pool: Pool, _owner: Owner
@@ -480,7 +523,12 @@ async def refresh_alpha_exposure(
     return {"ticker": ticker, "series": body.series_name, "observations_stored": count}
 
 
-@router.get("/holdings/{ticker}/exposure-context", tags=["holdings"], response_model=None)
+@router.get(
+    "/holdings/{ticker}/exposure-context",
+    tags=["holdings"],
+    response_model=None,
+    responses=typed(ExposureContext),
+)
 async def exposure_context(ticker: TickerPath, pool: Pool, _owner: Owner) -> dict[str, Any]:
     stored = await load_active(pool, "holding_profiles", HoldingProfilesConfig)
     profile = _holding_research_profile(stored, ticker)
@@ -504,7 +552,12 @@ async def exposure_context(ticker: TickerPath, pool: Pool, _owner: Owner) -> dic
     }
 
 
-@router.post("/holdings/{ticker}/company-research/diffbot", tags=["holdings"], response_model=None)
+@router.post(
+    "/holdings/{ticker}/company-research/diffbot",
+    tags=["holdings"],
+    response_model=None,
+    responses=typed(DiffbotRefreshed),
+)
 async def refresh_diffbot_company_research(
     ticker: TickerPath, pool: Pool, _owner: Owner
 ) -> dict[str, Any]:
@@ -536,7 +589,12 @@ async def refresh_diffbot_company_research(
     return {"ticker": ticker, "suggested_edges": count}
 
 
-@router.post("/holdings/{ticker}/company-research/pdl", tags=["holdings"], response_model=None)
+@router.post(
+    "/holdings/{ticker}/company-research/pdl",
+    tags=["holdings"],
+    response_model=None,
+    responses=typed(PdlRefreshed),
+)
 async def refresh_pdl_company_research(
     ticker: TickerPath, pool: Pool, _owner: Owner
 ) -> dict[str, Any]:
@@ -574,7 +632,10 @@ async def refresh_pdl_company_research(
 
 
 @router.post(
-    "/holdings/{ticker}/patent-families/epo-ops/refresh", tags=["holdings"], response_model=None
+    "/holdings/{ticker}/patent-families/epo-ops/refresh",
+    tags=["holdings"],
+    response_model=None,
+    responses=typed(EpoPatentsRefreshed),
 )
 async def refresh_epo_patents(ticker: TickerPath, pool: Pool, _owner: Owner) -> dict[str, Any]:
     settings = get_settings()
@@ -617,7 +678,12 @@ async def refresh_epo_patents(ticker: TickerPath, pool: Pool, _owner: Owner) -> 
     return {"ticker": ticker, "patent_candidates": count}
 
 
-@router.get("/exchange-sessions/{mic}", tags=["reference"], response_model=None)
+@router.get(
+    "/exchange-sessions/{mic}",
+    tags=["reference"],
+    response_model=None,
+    responses=typed(ExchangeSessions),
+)
 async def exchange_sessions(
     mic: Annotated[str, Path(pattern=r"^[A-Z0-9]{4}$")],
     pool: Pool,
@@ -639,7 +705,12 @@ async def exchange_sessions(
     return [dict(row) for row in rows]
 
 
-@router.get("/exchange-sessions/{mic}/expected", tags=["reference"], response_model=None)
+@router.get(
+    "/exchange-sessions/{mic}/expected",
+    tags=["reference"],
+    response_model=None,
+    responses=typed(ExpectedExchangeSessions),
+)
 async def expected_exchange_sessions(
     mic: Annotated[str, Path(pattern=r"^[A-Z0-9]{4}$")],
     pool: Pool,
@@ -667,7 +738,12 @@ async def expected_exchange_sessions(
     }
 
 
-@router.post("/exchange-sessions", tags=["reference"], response_model=None)
+@router.post(
+    "/exchange-sessions",
+    tags=["reference"],
+    response_model=None,
+    responses=typed(ExchangeSessionRecorded),
+)
 async def record_exchange_session(
     body: ExchangeSessionInput, pool: Pool, _owner: Owner
 ) -> dict[str, Any]:
@@ -691,7 +767,9 @@ async def record_exchange_session(
     return {"session_date": row_id}
 
 
-@router.get("/holdings/{ticker}/peer-set", tags=["holdings"], response_model=None)
+@router.get(
+    "/holdings/{ticker}/peer-set", tags=["holdings"], response_model=None, responses=typed(PeerSet)
+)
 async def peer_set(
     ticker: TickerPath, pool: Pool, _owner: Owner, as_of: Annotated[datetime | None, Query()] = None
 ) -> dict[str, Any]:
@@ -712,7 +790,12 @@ async def peer_set(
     }
 
 
-@router.post("/holdings/{ticker}/peer-set", tags=["holdings"], response_model=None)
+@router.post(
+    "/holdings/{ticker}/peer-set",
+    tags=["holdings"],
+    response_model=None,
+    responses=typed(RecordedId),
+)
 async def record_peer(
     ticker: TickerPath, body: PeerInput, pool: Pool, _owner: Owner
 ) -> dict[str, Any]:
@@ -741,7 +824,12 @@ class PeerStatusInput(BaseModel):
     evidence_id: int | None = None
 
 
-@router.put("/holdings/{ticker}/peer-set/{peer_id}/status", tags=["holdings"], response_model=None)
+@router.put(
+    "/holdings/{ticker}/peer-set/{peer_id}/status",
+    tags=["holdings"],
+    response_model=None,
+    responses=typed(PeerStatusChanged),
+)
 async def change_peer_status(
     ticker: TickerPath, peer_id: int, body: PeerStatusInput, pool: Pool, _owner: Owner
 ) -> dict[str, Any]:
@@ -766,7 +854,12 @@ async def change_peer_status(
     return {"peer": changed}
 
 
-@router.get("/holdings/{ticker}/peer-metrics", tags=["holdings"], response_model=None)
+@router.get(
+    "/holdings/{ticker}/peer-metrics",
+    tags=["holdings"],
+    response_model=None,
+    responses=typed(PeerMetrics),
+)
 async def peer_metrics(
     ticker: TickerPath,
     pool: Pool,
@@ -869,7 +962,12 @@ async def price_diagnostics(ticker: TickerPath, pool: Pool, _owner: Owner) -> li
     return [PriceDiagnostic(**row) for row in await holding_price_diagnostics(pool, ticker)]
 
 
-@router.get("/holdings/{ticker}/returns", tags=["holdings"], response_model=None)
+@router.get(
+    "/holdings/{ticker}/returns",
+    tags=["holdings"],
+    response_model=None,
+    responses=typed(HoldingReturns),
+)
 async def holding_returns(
     ticker: TickerPath,
     pool: Pool,
@@ -923,7 +1021,12 @@ async def holding_returns(
     return {"ticker": ticker, "known_as_of": end, "results": [result]}
 
 
-@router.get("/holdings/{ticker}/corporate-actions", tags=["holdings"], response_model=None)
+@router.get(
+    "/holdings/{ticker}/corporate-actions",
+    tags=["holdings"],
+    response_model=None,
+    responses=typed(CorporateActions),
+)
 async def list_corporate_actions(
     ticker: TickerPath, pool: Pool, _owner: Owner
 ) -> list[dict[str, Any]]:
@@ -948,7 +1051,12 @@ async def _holding_symbol_names(pool: Pool, ticker: str) -> set[str]:
     return await holding_symbol_names(pool, ticker, body)
 
 
-@router.post("/holdings/{ticker}/corporate-actions", tags=["holdings"])
+@router.post(
+    "/holdings/{ticker}/corporate-actions",
+    tags=["holdings"],
+    response_model=None,
+    responses=typed(CorporateActionRecorded),
+)
 async def record_corporate_action(
     ticker: TickerPath, body: CorporateActionInput, pool: Pool, _owner: Owner
 ) -> dict[str, Any]:
@@ -1013,6 +1121,7 @@ async def record_corporate_action(
     "/holdings/{ticker}/corporate-actions/{action_id}/decision",
     tags=["holdings"],
     response_model=None,
+    responses=typed(CorporateActionDecided),
 )
 async def decide_corporate_action(
     ticker: TickerPath,
@@ -1056,7 +1165,10 @@ async def decide_corporate_action(
 
 
 @router.post(
-    "/holdings/{ticker}/corporate-actions/coverage", tags=["holdings"], response_model=None
+    "/holdings/{ticker}/corporate-actions/coverage",
+    tags=["holdings"],
+    response_model=None,
+    responses=typed(CorporateActionCoverageConfirmed),
 )
 async def confirm_action_coverage(
     ticker: TickerPath,
@@ -1084,7 +1196,12 @@ async def confirm_action_coverage(
     return {"symbol": symbol, "covered_through": body.through, "state": "available"}
 
 
-@router.get("/holdings/{ticker}/listing", tags=["holdings"], response_model=None)
+@router.get(
+    "/holdings/{ticker}/listing",
+    tags=["holdings"],
+    response_model=None,
+    responses=typed(HoldingListing),
+)
 async def holding_listing(ticker: TickerPath, pool: Pool, _owner: Owner) -> dict[str, Any]:
     """The holding's derived canonical listing, the evidence it was matched on and the provider
     symbols mapped to it."""
@@ -1094,7 +1211,12 @@ async def holding_listing(ticker: TickerPath, pool: Pool, _owner: Owner) -> dict
     return overview
 
 
-@router.post("/holdings/{ticker}/listing/derive", tags=["holdings"], response_model=None)
+@router.post(
+    "/holdings/{ticker}/listing/derive",
+    tags=["holdings"],
+    response_model=None,
+    responses=typed(ListingDerived),
+)
 async def derive_holding_listing(ticker: TickerPath, pool: Pool, _owner: Owner) -> dict[str, Any]:
     """(Re)derive the holding's listing from the instrument, ESMA FIRDS and OpenFIGI. A link is
     `confirmed` automatically only when all three agree; otherwise it is `suggested` and waits
@@ -1113,7 +1235,12 @@ async def derive_holding_listing(ticker: TickerPath, pool: Pool, _owner: Owner) 
     }
 
 
-@router.post("/holdings/{ticker}/listing/confirm", tags=["holdings"], response_model=None)
+@router.post(
+    "/holdings/{ticker}/listing/confirm",
+    tags=["holdings"],
+    response_model=None,
+    responses=typed(ListingConfirmed),
+)
 async def confirm_holding_listing(
     ticker: TickerPath, body: ListingDecision, pool: Pool, owner: Owner
 ) -> dict[str, Any]:
@@ -1127,7 +1254,12 @@ async def confirm_holding_listing(
         raise HTTPException(404 if exc.not_found else 422, str(exc)) from exc
 
 
-@router.get("/holdings/{ticker}/financial-history", tags=["holdings"], response_model=None)
+@router.get(
+    "/holdings/{ticker}/financial-history",
+    tags=["holdings"],
+    response_model=None,
+    responses=typed(FinancialHistoryRows),
+)
 async def financial_history(
     ticker: TickerPath,
     pool: Pool,
@@ -1150,6 +1282,7 @@ async def financial_history(
     "/holdings/{ticker}/financial-history/alpha-vantage/{statement}",
     tags=["holdings"],
     response_model=None,
+    responses=typed(AlphaStatementRefreshed),
 )
 async def refresh_alpha_vantage_statement(
     ticker: TickerPath,
@@ -1196,7 +1329,10 @@ async def refresh_alpha_vantage_statement(
 
 
 @router.post(
-    "/holdings/{ticker}/financial-history/finnhub-research", tags=["holdings"], response_model=None
+    "/holdings/{ticker}/financial-history/finnhub-research",
+    tags=["holdings"],
+    response_model=None,
+    responses=typed(FinnhubResearchRefreshed),
 )
 async def refresh_finnhub_research(ticker: TickerPath, pool: Pool, _owner: Owner) -> dict[str, Any]:
     """Refresh free-gated peer candidates and reported quarterly EPS surprises."""
@@ -1231,14 +1367,24 @@ async def refresh_finnhub_research(ticker: TickerPath, pool: Pool, _owner: Owner
     return {"ticker": ticker, "symbol": symbol, **result}
 
 
-@router.get("/holdings/{ticker}/forward-data", tags=["holdings"], response_model=None)
+@router.get(
+    "/holdings/{ticker}/forward-data",
+    tags=["holdings"],
+    response_model=None,
+    responses=typed(ForwardObservations),
+)
 async def forward_data(
     ticker: TickerPath, pool: Pool, _owner: Owner, as_of: Annotated[datetime | None, Query()] = None
 ) -> list[dict[str, Any]]:
     return await forward_rows(pool, ticker, as_of)
 
 
-@router.get("/holdings/{ticker}/forward-data/consensus", tags=["holdings"], response_model=None)
+@router.get(
+    "/holdings/{ticker}/forward-data/consensus",
+    tags=["holdings"],
+    response_model=None,
+    responses=typed(ForwardConsensus),
+)
 async def forward_consensus(
     ticker: TickerPath, pool: Pool, _owner: Owner, as_of: Annotated[datetime | None, Query()] = None
 ) -> dict[str, Any]:
@@ -1246,7 +1392,12 @@ async def forward_consensus(
     return await forward_payload(pool, ticker, as_of)
 
 
-@router.post("/holdings/{ticker}/forward-data", tags=["holdings"], response_model=None)
+@router.post(
+    "/holdings/{ticker}/forward-data",
+    tags=["holdings"],
+    response_model=None,
+    responses=typed(RecordedId),
+)
 async def record_forward_data(
     ticker: TickerPath,
     body: ForwardObservationInput,
@@ -1278,7 +1429,12 @@ async def record_forward_data(
     return {"id": observation_id}
 
 
-@router.get("/holdings/{ticker}/issuer-ir-releases", tags=["holdings"], response_model=None)
+@router.get(
+    "/holdings/{ticker}/issuer-ir-releases",
+    tags=["holdings"],
+    response_model=None,
+    responses=typed(IssuerIrReleases),
+)
 async def issuer_ir_releases(
     ticker: TickerPath,
     pool: Pool,
@@ -1310,7 +1466,12 @@ class IssuerIRSourceInput(BaseModel):
     active: bool = True
 
 
-@router.get("/holdings/{ticker}/issuer-ir-sources", tags=["holdings"], response_model=None)
+@router.get(
+    "/holdings/{ticker}/issuer-ir-sources",
+    tags=["holdings"],
+    response_model=None,
+    responses=typed(IssuerIrSources),
+)
 async def issuer_ir_sources(ticker: TickerPath, pool: Pool, _owner: Owner) -> dict[str, Any]:
     """The IR pages the `ir_releases` job polls for this holding, with their last outcome."""
     rows = await pool.fetch(
@@ -1322,7 +1483,12 @@ async def issuer_ir_sources(ticker: TickerPath, pool: Pool, _owner: Owner) -> di
     return {"ticker": ticker, "sources": [dict(row) for row in rows]}
 
 
-@router.post("/holdings/{ticker}/issuer-ir-sources", tags=["holdings"], response_model=None)
+@router.post(
+    "/holdings/{ticker}/issuer-ir-sources",
+    tags=["holdings"],
+    response_model=None,
+    responses=typed(RecordedId),
+)
 async def register_issuer_ir_source(
     ticker: TickerPath, body: IssuerIRSourceInput, pool: Pool, _owner: Owner
 ) -> dict[str, Any]:
@@ -1347,7 +1513,12 @@ async def register_issuer_ir_source(
     return {"id": source_id}
 
 
-@router.get("/holdings/{ticker}/actual-vs-consensus", tags=["holdings"], response_model=None)
+@router.get(
+    "/holdings/{ticker}/actual-vs-consensus",
+    tags=["holdings"],
+    response_model=None,
+    responses=typed(ActualVsConsensus),
+)
 async def actual_vs_consensus_route(
     ticker: TickerPath,
     pool: Pool,
@@ -1359,7 +1530,12 @@ async def actual_vs_consensus_route(
     return await actual_vs_consensus(pool, ticker, metric, fiscal_period)
 
 
-@router.post("/holdings/{ticker}/issuer-ir-releases", tags=["holdings"], response_model=None)
+@router.post(
+    "/holdings/{ticker}/issuer-ir-releases",
+    tags=["holdings"],
+    response_model=None,
+    responses=typed(RecordedId),
+)
 async def record_issuer_ir_release(
     ticker: TickerPath,
     body: IssuerIRReleaseInput,
@@ -1395,7 +1571,12 @@ async def record_issuer_ir_release(
     return {"id": release_id}
 
 
-@router.post("/company-graph/edges", tags=["research"], response_model=None)
+@router.post(
+    "/company-graph/edges",
+    tags=["research"],
+    response_model=None,
+    responses=typed(CompanyEdgeRecorded),
+)
 async def record_company_edge(body: CompanyEdgeInput, pool: Pool, _owner: Owner) -> dict[str, Any]:
     """Suggest (or, with primary evidence and a passage, confirm) an edge. A re-sync never
     changes a decided edge; move one with POST /company-graph/edges/{id}/decision."""
@@ -1424,7 +1605,12 @@ async def record_company_edge(body: CompanyEdgeInput, pool: Pool, _owner: Owner)
     return {"id": edge_id, "status": status}
 
 
-@router.post("/holdings/{ticker}/company-events", tags=["holdings"], response_model=None)
+@router.post(
+    "/holdings/{ticker}/company-events",
+    tags=["holdings"],
+    response_model=None,
+    responses=typed(RecordedId),
+)
 async def record_company_event(
     ticker: TickerPath,
     body: CompanyEventInput,
@@ -1486,7 +1672,12 @@ async def record_company_event(
     return {"id": event_id}
 
 
-@router.post("/holdings/{ticker}/patent-families", tags=["holdings"], response_model=None)
+@router.post(
+    "/holdings/{ticker}/patent-families",
+    tags=["holdings"],
+    response_model=None,
+    responses=typed(PatentFamilyRecorded),
+)
 async def record_patent_family(
     ticker: TickerPath,
     body: PatentFamilyInput,
@@ -1519,7 +1710,12 @@ async def record_patent_family(
     return {"family_id": family_id}
 
 
-@router.get("/holdings/{ticker}/business-network", tags=["holdings"], response_model=None)
+@router.get(
+    "/holdings/{ticker}/business-network",
+    tags=["holdings"],
+    response_model=None,
+    responses=typed(BusinessNetwork),
+)
 async def business_network(
     ticker: TickerPath, pool: Pool, _owner: Owner, as_of: Annotated[datetime | None, Query()] = None
 ) -> dict[str, Any]:
@@ -1580,7 +1776,10 @@ async def record_relationship_review(
 
 
 @router.get(
-    "/holdings/{ticker}/customer-supplier-concentration", tags=["holdings"], response_model=None
+    "/holdings/{ticker}/customer-supplier-concentration",
+    tags=["holdings"],
+    response_model=None,
+    responses=typed(CustomerSupplierConcentration),
 )
 async def relationship_concentration(
     ticker: TickerPath,
@@ -1608,7 +1807,12 @@ async def relationship_concentration(
     }
 
 
-@router.get("/holdings/{ticker}/patent-trends", tags=["holdings"], response_model=None)
+@router.get(
+    "/holdings/{ticker}/patent-trends",
+    tags=["holdings"],
+    response_model=None,
+    responses=typed(PatentTrends),
+)
 async def patent_trends(ticker: TickerPath, pool: Pool, _owner: Owner) -> list[dict[str, Any]]:
     return await patent_trend_rows(pool, ticker)
 

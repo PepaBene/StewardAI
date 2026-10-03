@@ -24,6 +24,7 @@ from steward.jobs.runner import JobHandler
 from steward.lookthrough.collect import etf_look_through_handler
 from steward.macro.collect import macro_collect_handler
 from steward.macro.public_collect import public_data_collect_handler
+from steward.macro.release_calendar import macro_release_calendar_handler
 from steward.monitor import monitor_handler
 from steward.news.digest import daily_digest_handler, weekly_digest_handler
 from steward.news.escalation import event_escalation_handler
@@ -64,6 +65,7 @@ JobType = Literal[
     "intraday_prices",
     "holiday_refresh",
     "macro_collect",
+    "macro_release_calendar",
     "public_data_collect",
     "source_audit",
     "event_escalation",
@@ -109,6 +111,7 @@ JOB_HANDLERS: dict[str, JobHandler] = {
     "intraday_prices": intraday_prices_handler,
     "holiday_refresh": holiday_refresh_handler,
     "macro_collect": macro_collect_handler,
+    "macro_release_calendar": macro_release_calendar_handler,
     "public_data_collect": public_data_collect_handler,
     "source_audit": source_audit_handler,
     "event_escalation": event_escalation_handler,

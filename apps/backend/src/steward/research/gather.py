@@ -330,6 +330,7 @@ async def ownership(pool: asyncpg.Pool, reg: Registry, ticker: str, top: int = 3
             snippet=f"{p.holders} holders, {_num(p.shares, 0)} shares, value "
             f"${_num(p.value_usd, 0)}, latest filing {p.latest_filed}",
             as_of=str(p.period),
+            known_at=iso_known_at(p.latest_filed),
         )
         text = (
             f"In 13F filings for the period ending {p.period}, {p.holders:,} institutional "
@@ -347,6 +348,7 @@ async def ownership(pool: asyncpg.Pool, reg: Registry, ticker: str, top: int = 3
                 tier=1,
                 snippet=f"{h.manager_name}: {_num(h.shares, 0)} shares",
                 as_of=str(p.period),
+                known_at=iso_known_at(h.filed),
             )
             section.sentences.append(
                 CitedSentence(
@@ -605,6 +607,16 @@ async def data_context_section(
     return section
 
 
+async def _config_created_at(pool: asyncpg.Pool, version: int | None) -> str | None:
+    """When the cited config version was saved (config_version.created_at); None when the
+    version is unknown. Config versions are immutable, so this is when the text became known."""
+    if version is None:
+        return None
+    return iso_known_at(
+        await pool.fetchval("select created_at from public.config_version where id = $1", version)
+    )
+
+
 async def gather(
     pool: asyncpg.Pool,
     ticker: str,
@@ -613,6 +625,7 @@ async def gather(
     strategy: StrategyConfig | None,
     strategy_version: int | None,
     name_hint: str | None = None,
+    thesis_version: int | None = None,
 ) -> Gathered:
     reg = Registry()
     inst = await pool.fetchrow(
@@ -672,6 +685,7 @@ async def gather(
             f"Thesis for {ticker}",
             app_path=f"/holdings/{ticker}",
             tier=1,
+            known_at=await _config_created_at(pool, thesis_version),
             snippet=f"Why owned: {thesis.why_owned} KPIs: {kpis or 'none'}. Exit conditions: "
             f"{'; '.join(thesis.exit_conditions) or 'none'}.",
         )
@@ -702,6 +716,7 @@ async def gather(
             "Investment strategy",
             app_path="/config/strategy",
             tier=1,
+            known_at=await _config_created_at(pool, strategy_version),
             snippet=f"Goals: {strategy.goals or 'none'}. Horizon: "
             f"{strategy.horizon_years or 'n/a'} years. Notes: {strategy.notes or 'none'}. "
             f"Rules: {rules or 'none'}.",

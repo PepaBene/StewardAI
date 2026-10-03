@@ -6,6 +6,14 @@ from fastapi import APIRouter, HTTPException, Path
 
 from api.auth import Owner
 from api.db import Pool
+from api.typed_responses import (
+    DomainGates,
+    MeasuredCoverage,
+    ShadowReport,
+    SignalGate,
+    SignalGates,
+    ZeroCostGate,
+)
 from steward.verify_sources.signal_audit import (
     SIGNAL_REQUIREMENTS,
     coverage_by_jurisdiction_and_metric,
@@ -21,13 +29,13 @@ from steward.verify_sources.zero_cost import audit_zero_cost
 router = APIRouter(prefix="/verification", tags=["verification"])
 
 
-@router.get("/zero-cost-gate")
+@router.get("/zero-cost-gate", response_model=ZeroCostGate)
 async def get_zero_cost_gate(pool: Pool, _owner: Owner) -> dict[str, Any]:
     """Read-only audit of the endpoint manifest: nothing paid is reachable."""
     return (await audit_zero_cost(pool)).to_json()
 
 
-@router.get("/domain-gates")
+@router.get("/domain-gates", response_model=DomainGates)
 async def get_domain_gates(pool: Pool, _owner: Owner) -> dict[str, Any]:
     """Per-domain reconciliation gate and which conclusions each domain unlocks."""
     decisions = {d: await domain_gate(pool, d) for d in DOMAINS}
@@ -53,7 +61,7 @@ async def get_domain_gates(pool: Pool, _owner: Owner) -> dict[str, Any]:
     }
 
 
-@router.get("/signals")
+@router.get("/signals", response_model=SignalGates)
 async def get_signal_gates(pool: Pool, _owner: Owner) -> dict[str, Any]:
     out: dict[str, Any] = {}
     for name in SIGNAL_REQUIREMENTS:
@@ -71,7 +79,7 @@ async def get_signal_gates(pool: Pool, _owner: Owner) -> dict[str, Any]:
     return out
 
 
-@router.get("/signals/{signal_name}")
+@router.get("/signals/{signal_name}", response_model=SignalGate)
 async def get_signal_gate(
     pool: Pool,
     _owner: Owner,
@@ -84,13 +92,13 @@ async def get_signal_gate(
     return result
 
 
-@router.get("/coverage")
+@router.get("/coverage", response_model=MeasuredCoverage)
 async def get_measured_coverage(pool: Pool, _owner: Owner) -> list[dict[str, Any]]:
     """Measured coverage by jurisdiction and metric (absent = no coverage, never zero)."""
     return await coverage_by_jurisdiction_and_metric(pool)
 
 
-@router.get("/shadow-report")
+@router.get("/shadow-report", response_model=ShadowReport)
 async def get_latest_shadow_report(pool: Pool, _owner: Owner) -> dict[str, Any]:
     row = await pool.fetchrow(
         "select report, markdown, generated_at from public.source_shadow_report"

@@ -293,6 +293,12 @@ async def run_public_data(pool: Pool, owner: Owner) -> JobSummary:
     return await _enqueue(pool, "public_data_collect", owner.user_id)
 
 
+@router.post("/jobs/macro-release-calendar", tags=["jobs"], status_code=status.HTTP_202_ACCEPTED)
+async def run_macro_release_calendar(pool: Pool, owner: Owner) -> JobSummary:
+    """Re-read the providers' published release calendars (FRED, Eurostat, ECB, BIS) now."""
+    return await _enqueue(pool, "macro_release_calendar", owner.user_id)
+
+
 @router.get("/sources/status", tags=["sources"])
 async def source_status(pool: Pool, _owner: Owner) -> list[ProviderStatus]:
     rows = await pool.fetch("select * from public.provider_quota_status order by provider,endpoint")

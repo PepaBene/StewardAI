@@ -1359,6 +1359,12 @@ class JobsConfig(ConfigModel):
         description="FRED, ECB and Eurostat macro series; macro surprises on release days. "
         "Default: daily 11:30 (after Eurostat's 11:00 releases).",
     )
+    macro_release_calendar: JobSchedule = Field(
+        default_factory=lambda: JobSchedule(cron="20 7 * * *"),
+        description="The providers' own published release calendars (FRED, Eurostat, ECB, BIS) "
+        "into macro_release_calendar: the next-release dates of the macro context. Free and "
+        "verified sources only; one request per calendar per run. Default: daily 07:20.",
+    )
     public_data_collect: JobSchedule = Field(
         default_factory=lambda: JobSchedule(enabled=False, cron="0 4 * * 0"),
         description="Curated World Bank, OECD, BIS and UN Comtrade releases. Disabled until "
@@ -1533,6 +1539,7 @@ class JobsConfig(ConfigModel):
             "price_history": self.price_history,
             "holiday_refresh": self.holiday_refresh,
             "macro_collect": self.macro_collect,
+            "macro_release_calendar": self.macro_release_calendar,
             "public_data_collect": self.public_data_collect,
             "source_audit": self.source_audit,
             "monitor": self.monitor,
@@ -1639,11 +1646,81 @@ def longest_gap_hours(schedule: JobSchedule, *, samples: int = 64) -> int | None
     return -(-int(longest.total_seconds()) // 3600)
 
 
+# Providers that no scheduled job refreshes row by row (collected on demand, by the owner's
+# trigger, or by a job that does not own the coverage row). For these the table below gives an
+# EXPLICIT, documented expected refresh interval in hours; the stale threshold is that interval
+# times COVERAGE_STALE_GRACE, as for scheduled jobs. `None` means "deliberately not judged"
+# and the reason is written next to it. Every value states its basis; none is a guess. A
+# provider that HAS a job in COVERAGE_PROVIDER_JOB always uses the job's schedule (null while
+# that job is disabled), never this table.
+COVERAGE_DEFAULT_REFRESH_HOURS: dict[str, tuple[int | None, str]] = {
+    "macro_release_calendar": (
+        24,
+        "The macro_release_calendar job re-reads every provider calendar daily (cron "
+        "`20 7 * * *`) and the providers change their calendars at most daily "
+        "(docs/data/macro-release-calendar.md).",
+    ),
+    "finnhub": (
+        168,
+        "Calendar and surprise data are re-read about weekly: the weekly earnings_calendar job "
+        "(cron `0 6 * * 0`) and docs/plans/free_data_sources_implementation_plan.md D4.3 "
+        "('earnings calendar as an event source', 'calendar near events').",
+    ),
+    "diffbot": (
+        720,
+        "Plan, Diffbot row: 'Monthly credit allocation weighted to held names' and D5.1 "
+        "'one monthly credit pool' (30 days).",
+    ),
+    "people_data_labs": (
+        720,
+        "Plan, People Data Labs row: 'Small monthly exception queue' (30 days).",
+    ),
+    "pdl": (
+        720,
+        "Alias of people_data_labs: plan 'Small monthly exception queue' (30 days).",
+    ),
+    "epo_ops": (
+        720,
+        "Plan, EPO OPS row: 'Incremental weekly/monthly for selected issuers'; the longer, "
+        "monthly (30 day) figure is used so a weekly run is never mis-flagged.",
+    ),
+    "twelve_data": (
+        None,
+        "Plan, Twelve Data row: 'Exception-first within the free credit budget' - no cadence "
+        "is documented, so age is not judged.",
+    ),
+    "fmp": (
+        None,
+        "Plan, FMP row: 'Probe once in Phase 0, then refresh endpoints actually accessible' - "
+        "no cadence is documented, so age is not judged.",
+    ),
+    "owner_review": (None, "Owner-confirmed rows change only when the owner decides."),
+    "manual": (None, "Manually entered rows have no refresh cadence."),
+}
+
+CoverageStaleBasis = Literal["job_schedule", "documented_default"]
+
+
+def coverage_stale_policy(
+    jobs: JobsConfig, provider: str
+) -> tuple[int | None, CoverageStaleBasis | None]:
+    """(stale_after_hours, basis) for the coverage rows of `provider`.
+
+    `job_schedule`: twice the longest gap between runs of the enabled job that refreshes the
+    provider (COVERAGE_PROVIDER_JOB). `documented_default`: twice the interval of
+    COVERAGE_DEFAULT_REFRESH_HOURS (the basis is written there). (None, None) when neither
+    applies: stale is unknown, never guessed."""
+    if provider in COVERAGE_PROVIDER_JOB:
+        schedule = jobs.worker_schedules().get(COVERAGE_PROVIDER_JOB[provider])
+        gap = longest_gap_hours(schedule) if schedule else None
+        return (gap * COVERAGE_STALE_GRACE, "job_schedule") if gap else (None, None)
+    default = COVERAGE_DEFAULT_REFRESH_HOURS.get(provider)
+    if default is not None and default[0]:
+        return default[0] * COVERAGE_STALE_GRACE, "documented_default"
+    return None, None
+
+
 def coverage_stale_after_hours(jobs: JobsConfig, provider: str) -> int | None:
-    """Age in hours after which a coverage row of `provider` counts as stale: the refreshing
-    job's longest gap between runs times COVERAGE_STALE_GRACE. None when no enabled job is
-    known to refresh the provider (stale is then unknown)."""
-    job = COVERAGE_PROVIDER_JOB.get(provider)
-    schedule = jobs.worker_schedules().get(job) if job else None
-    gap = longest_gap_hours(schedule) if schedule else None
-    return gap * COVERAGE_STALE_GRACE if gap else None
+    """Age in hours after which a coverage row of `provider` counts as stale (see
+    coverage_stale_policy); None when stale is unknown."""
+    return coverage_stale_policy(jobs, provider)[0]

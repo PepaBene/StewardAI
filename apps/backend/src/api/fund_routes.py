@@ -14,6 +14,14 @@ from pydantic import BaseModel, Field
 
 from api.auth import Owner
 from api.db import Pool
+from api.typed_responses import (
+    CharacteristicsAudit,
+    FactsheetStored,
+    FundFactsheets,
+    FundLookThroughAsOf,
+    SnapshotsPinned,
+    typed,
+)
 from steward.config.jobs import JobsConfig
 from steward.config.store import load_active
 from steward.funds.aggregate import (
@@ -61,7 +69,12 @@ async def get_fund_overlap(pool: Pool, _owner: Owner, as_of: AsOf = None) -> Fun
     return await fund_overlap(pool, as_of=as_of)
 
 
-@router.get("/funds/look-through", tags=["funds"], response_model=None)
+@router.get(
+    "/funds/look-through",
+    tags=["funds"],
+    response_model=None,
+    responses=typed(FundLookThroughAsOf),
+)
 async def get_look_through_as_of(
     pool: Pool,
     _owner: Owner,
@@ -158,7 +171,12 @@ async def delete_coverage_entry(
     return await read_ledger(pool)
 
 
-@router.get("/funds/{isin}/factsheet", tags=["funds"], response_model=None)
+@router.get(
+    "/funds/{isin}/factsheet",
+    tags=["funds"],
+    response_model=None,
+    responses=typed(FundFactsheets),
+)
 async def get_factsheet(
     pool: Pool, _owner: Owner, isin: IsinPath, limit: Annotated[int, Query(ge=1, le=120)] = 24
 ) -> list[dict[str, Any]]:
@@ -195,7 +213,12 @@ class ManualFactsheetInput(BaseModel):
     note: str | None = Field(default=None, max_length=1000)
 
 
-@router.put("/funds/{isin}/factsheet", tags=["funds"], response_model=None)
+@router.put(
+    "/funds/{isin}/factsheet",
+    tags=["funds"],
+    response_model=None,
+    responses=typed(FactsheetStored),
+)
 async def put_factsheet(
     pool: Pool, _owner: Owner, isin: IsinPath, body: ManualFactsheetInput
 ) -> dict[str, int]:
@@ -216,7 +239,12 @@ class PinInput(BaseModel):
     )
 
 
-@router.post("/funds/snapshots/pin", tags=["funds"], response_model=None)
+@router.post(
+    "/funds/snapshots/pin",
+    tags=["funds"],
+    response_model=None,
+    responses=typed(SnapshotsPinned),
+)
 async def pin_snapshots(pool: Pool, _owner: Owner, body: PinInput) -> dict[str, list[int]]:
     """Protect the holdings snapshots a saved report/decision rests on from retention pruning."""
     if (body.snapshot_id is None) == (body.as_of is None):
@@ -239,7 +267,12 @@ async def pin_snapshots(pool: Pool, _owner: Owner, body: PinInput) -> dict[str, 
     return {"pinned": pinned}
 
 
-@router.get("/funds/characteristics-audit", tags=["funds"], response_model=None)
+@router.get(
+    "/funds/characteristics-audit",
+    tags=["funds"],
+    response_model=None,
+    responses=typed(CharacteristicsAudit),
+)
 async def get_characteristics_audit(
     pool: Pool,
     _owner: Owner,

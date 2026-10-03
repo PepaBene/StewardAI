@@ -16,6 +16,20 @@ from pydantic import BaseModel, Field
 from api.auth import Owner
 from api.db import Pool
 from api.routes import _enqueue
+from api.typed_responses import (
+    ContradictionResolved,
+    DisclosureDecisionResult,
+    FilingHitReviewed,
+    GraphDecisionResult,
+    GraphReconciliations,
+    HoldingDeals,
+    PatentCompetitorOverlap,
+    ProviderBlockReset,
+    RelationshipKnockOn,
+    RelationshipReviewQueue,
+    ThesisKpiLinks,
+    typed,
+)
 from steward.graph import provider_gate
 from steward.graph.deals import deal_timeline
 from steward.graph.decisions import (
@@ -52,7 +66,12 @@ def _decision_error(exc: GraphDecisionError) -> HTTPException:
     return HTTPException(404 if isinstance(exc, NotFound) else 409, str(exc))
 
 
-@router.post("/company-graph/edges/{edge_id}/decision", tags=["research"], response_model=None)
+@router.post(
+    "/company-graph/edges/{edge_id}/decision",
+    tags=["research"],
+    response_model=None,
+    responses=typed(GraphDecisionResult),
+)
 async def decide_company_edge(
     edge_id: int, body: DecisionBody, pool: Pool, owner: Owner
 ) -> dict[str, Any]:
@@ -66,7 +85,10 @@ async def decide_company_edge(
 
 
 @router.post(
-    "/holdings/{ticker}/company-events/{event_id}/decision", tags=["holdings"], response_model=None
+    "/holdings/{ticker}/company-events/{event_id}/decision",
+    tags=["holdings"],
+    response_model=None,
+    responses=typed(GraphDecisionResult),
 )
 async def decide_company_event(
     ticker: TickerPath, event_id: int, body: DecisionBody, pool: Pool, _owner: Owner
@@ -85,6 +107,7 @@ async def decide_company_event(
     "/holdings/{ticker}/relationship-disclosures/{disclosure_id}/decision",
     tags=["holdings"],
     response_model=None,
+    responses=typed(DisclosureDecisionResult),
 )
 async def decide_relationship_disclosure(
     ticker: TickerPath, disclosure_id: int, body: DecisionBody, pool: Pool, _owner: Owner
@@ -101,7 +124,12 @@ async def decide_relationship_disclosure(
     return {"id": disclosure_id, "status": row["status"]}
 
 
-@router.get("/relationship-review/queue", tags=["research"], response_model=None)
+@router.get(
+    "/relationship-review/queue",
+    tags=["research"],
+    response_model=None,
+    responses=typed(RelationshipReviewQueue),
+)
 async def relationship_review_queue(
     pool: Pool,
     _owner: Owner,
@@ -113,7 +141,12 @@ async def relationship_review_queue(
     return dict(await review_queue(pool, ticker, limit))
 
 
-@router.post("/relationship-review/hits/{hit_id}/review", tags=["research"], response_model=None)
+@router.post(
+    "/relationship-review/hits/{hit_id}/review",
+    tags=["research"],
+    response_model=None,
+    responses=typed(FilingHitReviewed),
+)
 async def review_filing_hit(hit_id: int, pool: Pool, _owner: Owner) -> dict[str, Any]:
     """Fetch the cited filing now, read the passages naming the holding and store them as
     suggested disclosures."""
@@ -151,6 +184,7 @@ class ContradictionResolution(BaseModel):
     "/relationship-review/contradictions/{contradiction_id}/resolve",
     tags=["research"],
     response_model=None,
+    responses=typed(ContradictionResolved),
 )
 async def resolve_contradiction(
     contradiction_id: int, body: ContradictionResolution, pool: Pool, _owner: Owner
@@ -167,7 +201,12 @@ async def resolve_contradiction(
     return dict(row)
 
 
-@router.get("/holdings/{ticker}/deals", tags=["holdings"], response_model=None)
+@router.get(
+    "/holdings/{ticker}/deals",
+    tags=["holdings"],
+    response_model=None,
+    responses=typed(HoldingDeals),
+)
 async def holding_deals(
     ticker: TickerPath,
     pool: Pool,
@@ -187,7 +226,12 @@ async def holding_deals(
     }
 
 
-@router.get("/holdings/{ticker}/thesis-kpi-links", tags=["holdings"], response_model=None)
+@router.get(
+    "/holdings/{ticker}/thesis-kpi-links",
+    tags=["holdings"],
+    response_model=None,
+    responses=typed(ThesisKpiLinks),
+)
 async def thesis_kpi_links(
     ticker: TickerPath,
     pool: Pool,
@@ -197,7 +241,12 @@ async def thesis_kpi_links(
     return {"ticker": ticker, "links": await kpi_event_links(pool, ticker, as_of)}
 
 
-@router.get("/holdings/{ticker}/patent-competitor-overlap", tags=["holdings"], response_model=None)
+@router.get(
+    "/holdings/{ticker}/patent-competitor-overlap",
+    tags=["holdings"],
+    response_model=None,
+    responses=typed(PatentCompetitorOverlap),
+)
 async def patent_overlap(
     ticker: TickerPath,
     pool: Pool,
@@ -207,7 +256,12 @@ async def patent_overlap(
     return {"ticker": ticker, "peers": await competitor_overlap_rows(pool, ticker, as_of)}
 
 
-@router.get("/company-graph/reconciliations", tags=["research"], response_model=None)
+@router.get(
+    "/company-graph/reconciliations",
+    tags=["research"],
+    response_model=None,
+    responses=typed(GraphReconciliations),
+)
 async def graph_reconciliations(
     pool: Pool,
     _owner: Owner,
@@ -218,7 +272,10 @@ async def graph_reconciliations(
 
 
 @router.post(
-    "/provider-access/{provider}/{endpoint}/reset-block", tags=["sources"], response_model=None
+    "/provider-access/{provider}/{endpoint}/reset-block",
+    tags=["sources"],
+    response_model=None,
+    responses=typed(ProviderBlockReset),
 )
 async def reset_provider_block(
     provider: ProviderPath, endpoint: ProviderPath, pool: Pool, _owner: Owner
@@ -230,7 +287,12 @@ async def reset_provider_block(
         raise HTTPException(404, str(exc)) from exc
 
 
-@router.get("/portfolio/relationship-knock-on", tags=["portfolio"], response_model=None)
+@router.get(
+    "/portfolio/relationship-knock-on",
+    tags=["portfolio"],
+    response_model=None,
+    responses=typed(RelationshipKnockOn),
+)
 async def relationship_knock_on(
     pool: Pool, _owner: Owner, as_of: Annotated[datetime | None, Query()] = None
 ) -> dict[str, Any]:
