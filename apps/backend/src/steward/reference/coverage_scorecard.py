@@ -121,8 +121,10 @@ async def price_coverage(
     latest = await _latest_bars(pool, refs)
     denominator = sum((Decimal(p["value_base"]) for p in positions), Decimal(0))
     rows: list[HoldingPriceCoverage] = []
+    exact_values: list[Decimal] = []  # exact per-row values: the buckets are summed in Decimal
     for p in positions:
         value = Decimal(p["value_base"])
+        exact_values.append(value)
         best: tuple[SeriesRef, asyncpg.Record] | None = None
         for ref in symbols[p["ticker"]].refs():
             bar = latest.get((ref.symbol, ref.source))
@@ -176,7 +178,14 @@ async def price_coverage(
                     f"{bar['bar_type']} close in {bar['currency']}, {after.count} sessions old"
                 )
         rows.append(row)
-    usable = sum((Decimal(str(r.value_base)) for r in rows if r.state == "usable"), Decimal(0))
+    # Exact Decimal buckets: the unknown value is the sum of the non-usable rows, so it can never
+    # be float residue (-8.9e-14) when everything is usable.
+    usable = sum(
+        (v for v, r in zip(exact_values, rows, strict=True) if r.state == "usable"), Decimal(0)
+    )
+    unknown = sum(
+        (v for v, r in zip(exact_values, rows, strict=True) if r.state != "usable"), Decimal(0)
+    )
     share = float(usable / denominator) if denominator else None
     counts = Counter(r.state for r in rows)
     return PriceCoverage(
@@ -185,9 +194,9 @@ async def price_coverage(
         base_currency=positions[0]["base_currency"] if positions else None,
         denominator_base=float(denominator),
         usable_value_base=float(usable),
-        unknown_value_base=float(denominator - usable),
+        unknown_value_base=float(unknown),
         usable_share=share,
-        unknown_share=(1 - share) if share is not None else None,
+        unknown_share=float(unknown / denominator) if denominator else None,
         target=PRICE_TARGET,
         meets_target=share is not None and share >= PRICE_TARGET,
         max_stale_sessions=max_stale_sessions,

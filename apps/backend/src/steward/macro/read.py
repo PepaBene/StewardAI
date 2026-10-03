@@ -13,6 +13,10 @@ from steward.macro.exposure import Exposure, exposure_summary, weighted_effect
 from steward.macro.release_calendar import NextRelease, next_releases
 
 HISTORY_MAX = 60
+# A vintage source archives the real-time revisions of a series another provider publishes
+# (ALFRED holds the vintages of FRED series). It is history for that series, never a second card,
+# and it has no calendar of its own: the series' release calendar is the primary provider's.
+VINTAGE_PRIMARY_SOURCE = {"alfred": "fred"}
 # Fewer stored first-release timestamps than this and no cadence is claimed.
 MIN_RELEASES_FOR_CADENCE = 4
 
@@ -189,6 +193,17 @@ class MacroContext(BaseModel):
     series_effects: list[SeriesEffect] = Field(default_factory=list)
 
 
+def _as_of_date(as_of: dt.datetime) -> dt.date:
+    """The calendar day (UTC) of an as-of instant.
+
+    A query that compares a timestamp column with the instant and a date column with its day must
+    bind them as two separately typed parameters: with one shared parameter Postgres infers `date`
+    and a row created at 10:00 on the as-of day is compared against midnight and hidden."""
+    if as_of.tzinfo is not None:
+        as_of = as_of.astimezone(dt.UTC)
+    return as_of.date()
+
+
 async def context_for_holding(
     pool: asyncpg.Pool, ticker: str, as_of: dt.datetime, history: int = 0
 ) -> MacroContext:
@@ -201,8 +216,8 @@ async def context_for_holding(
                     sum(em.weight) over(partition by em.issuer_id,
                       public.exposure_dimension(em.geography,em.hs_code)) mapped_weight
              from public.exposure_mapping em
-             where em.weight > 0 and em.valid_from <= $2::date and em.created_at <= $2
-               and (em.valid_to is null or em.valid_to >= $2::date)
+             where em.weight > 0 and em.valid_from <= $3::date and em.created_at <= $2::timestamptz
+               and (em.valid_to is null or em.valid_to >= $3::date)
            )
            select isl.ticker,em.issuer_id,em.segment,em.basis,em.weight,em.geography,em.hs_code,
                   em.dimension,greatest(0,1-em.mapped_weight) unknown_weight
@@ -214,6 +229,7 @@ async def context_for_holding(
            order by em.segment""",
         ticker,
         as_of,
+        _as_of_date(as_of),
     )
     geographies = sorted({row["geography"] for row in mapping if row["geography"]})
     rows = (
@@ -222,17 +238,18 @@ async def context_for_holding(
                  select m.*, row_number() over (partition by m.series_id,m.source,m.geography,
                    m.period order by m.revision desc,m.known_at desc,m.id desc) vrn
                  from public.macro_observation m
-                 where m.known_at <= $2 and m.geography = any($1::text[]) and m.value is not null
+                 where m.known_at <= $2::timestamptz and m.geography = any($1::text[])
+                   and m.value is not null
                ), latest as (
                  select *, lag(value) over w previous_value, lag(period) over w previous_period
                  from eligible where vrn=1
                  window w as (partition by series_id,source,geography order by period)
                ), ranges as (
                  select series_id,source,geography,
-                   min(value) filter(where period >= ($2::date-interval '5 years')) low5,
-                   max(value) filter(where period >= ($2::date-interval '5 years')) high5,
-                   min(value) filter(where period >= ($2::date-interval '10 years')) low10,
-                   max(value) filter(where period >= ($2::date-interval '10 years')) high10
+                   min(value) filter(where period >= ($3::date-interval '5 years')) low5,
+                   max(value) filter(where period >= ($3::date-interval '5 years')) high5,
+                   min(value) filter(where period >= ($3::date-interval '10 years')) low10,
+                   max(value) filter(where period >= ($3::date-interval '10 years')) high10
                  from latest group by 1,2,3
                ), newest as (
                  select distinct on (series_id,source,geography) *
@@ -254,13 +271,19 @@ async def context_for_holding(
                order by e.series_id,e.geography""",
             geographies,
             as_of,
+            _as_of_date(as_of),
         )
         if geographies
         else []
     )
-    histories = await _vintage_history(pool, rows, as_of, history) if history > 0 else {}
+    all_rows = rows
+    rows = one_card_per_series(all_rows)
+    histories = await _vintage_history(pool, all_rows, as_of, history) if history > 0 else {}
+    histories = _vintages_as_history(histories, all_rows, rows)
     cadences = await _release_cadence(pool, rows, as_of)
-    calendar = await next_releases(pool, [(r["source"], r["series_id"]) for r in rows], as_of)
+    calendar = await next_releases(
+        pool, [(_calendar_source(r["source"]), r["series_id"]) for r in rows], as_of
+    )
     observed_geographies = {row["geography"] for row in rows}
     decorated_mapping = []
     for row in mapping:
@@ -340,6 +363,7 @@ async def context_for_holding(
         if series_ids
         else []
     )
+    comparisons = one_card_per_series(comparisons)
     return MacroContext(
         as_of=as_of,
         observations=[
@@ -348,7 +372,7 @@ async def context_for_holding(
                 **histories.get((row["series_id"], row["source"], row["geography"]), {}),
                 **_with_calendar(
                     cadences.get((row["series_id"], row["source"], row["geography"]), {}),
-                    calendar.get((row["source"], row["series_id"])),
+                    calendar.get((_calendar_source(row["source"]), row["series_id"])),
                 ),
             )
             for row in rows
@@ -360,6 +384,42 @@ async def context_for_holding(
         exposure=summary,
         series_effects=series_effects,
     )
+
+
+def _calendar_source(source: str) -> str:
+    return VINTAGE_PRIMARY_SOURCE.get(source, source)
+
+
+def one_card_per_series(rows: list[asyncpg.Record]) -> list[asyncpg.Record]:
+    """One row per (series, geography): a vintage source's row is dropped when its primary
+    provider has the series (the vintages become the primary card's history instead). A vintage
+    row with no primary sibling stays, so the series is never silently absent."""
+    primary = {(r["series_id"], r["geography"], r["source"]) for r in rows}
+    return [
+        r
+        for r in rows
+        if VINTAGE_PRIMARY_SOURCE.get(r["source"]) is None
+        or (r["series_id"], r["geography"], VINTAGE_PRIMARY_SOURCE[r["source"]]) not in primary
+    ]
+
+
+def _vintages_as_history(
+    histories: dict[tuple[str, str, str], dict[str, object]],
+    all_rows: list[asyncpg.Record],
+    cards: list[asyncpg.Record],
+) -> dict[tuple[str, str, str], dict[str, object]]:
+    """Give a primary card the real-time vintages its vintage source archived: ALFRED's windows
+    carry the true first-release values that the provider's current-vintage fetch cannot."""
+    out = dict(histories)
+    kept = {(r["series_id"], r["geography"], r["source"]) for r in cards}
+    for row in all_rows:
+        primary = VINTAGE_PRIMARY_SOURCE.get(row["source"])
+        if primary is None or (row["series_id"], row["geography"], primary) not in kept:
+            continue
+        vintage = histories.get((row["series_id"], row["source"], row["geography"]))
+        if vintage:
+            out[(row["series_id"], primary, row["geography"])] = vintage
+    return out
 
 
 def observed_next_release(

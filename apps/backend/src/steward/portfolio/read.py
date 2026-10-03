@@ -555,7 +555,18 @@ async def contribution_to_return(pool: asyncpg.Pool, days: int) -> ContributionR
             gap="no position snapshots in this window",
         )  # fmt: skip
 
-    period_start = min(r["snapshot_date"] for r in rows)
+    distinct_dates = sorted({r["snapshot_date"] for r in rows})
+    if len(distinct_dates) < 2:
+        # One snapshot has no change to measure: report that, never a column of zeros.
+        return ContributionReport(
+            as_of=latest_date, period_start=distinct_dates[0], base_currency=None, holdings=[],
+            gap=(
+                f"only one position snapshot ({distinct_dates[0].isoformat()}) in this window; "
+                "a contribution needs at least two snapshots to measure a change"
+            ),
+        )  # fmt: skip
+
+    period_start = distinct_dates[0]
     start_total = await pool.fetchval(
         "select total_base from public.account_snapshot where snapshot_date = $1", period_start
     )
@@ -577,6 +588,8 @@ async def contribution_to_return(pool: asyncpg.Pool, days: int) -> ContributionR
 
     holdings = []
     for ticker, values in by_ticker.items():
+        if len(values) < 2:
+            continue  # a holding seen once has no measurable change; omitted, not zero
         gain = position_organic_gain(values)
         holdings.append(
             HoldingContribution(
@@ -587,6 +600,12 @@ async def contribution_to_return(pool: asyncpg.Pool, days: int) -> ContributionR
             )
         )
     holdings.sort(key=lambda h: h.contribution_base, reverse=True)
+    if not holdings:
+        return ContributionReport(
+            as_of=latest_date, period_start=period_start, base_currency=base_currency,
+            holdings=[],
+            gap="no holding appears in two or more snapshots in this window",
+        )  # fmt: skip
 
     return ContributionReport(
         as_of=latest_date,

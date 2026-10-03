@@ -54,8 +54,20 @@ class IdentityOverride(BaseModel):
 
 
 class ListingLifecyclePoint(BaseModel):
-    mic: str
+    mic: str = Field(description="Trading venue (market identifier code) the record is for.")
     publication_date: dt.date | None
+    published_at: dt.datetime | None = Field(
+        default=None, description="The register's publication timestamp of this record."
+    )
+    valid_from: dt.date | None = Field(
+        default=None, description="Start of the window the record was in force (FIRDS)."
+    )
+    valid_to: dt.date | None = Field(
+        default=None, description="End of that window; null while open or unreported."
+    )
+    first_trade_at: dt.datetime | None = Field(
+        default=None, description="The venue's reported trading start for the instrument."
+    )
     status: str | None
     terminated_at: dt.datetime | None
     issuer_lei: str | None
@@ -84,12 +96,27 @@ async def listing_history(
     _owner: Owner,
     as_of: Annotated[dt.datetime | None, Query()] = None,
 ) -> list[ListingLifecyclePoint]:
+    # FIRDS re-publishes a venue's record with new validity windows: rows that differ only in
+    # register-internal ids are one row here (the latest read of it), and the fields that do
+    # distinguish two states of the same venue are returned instead of being hidden.
     rows = await pool.fetch(
-        """select distinct on (mic,publication_date,content_hash) mic,publication_date,
-                  status,terminated_at,issuer_lei,currency,source_url,known_at
-           from public.listing_lifecycle_snapshot
-           where isin=$1 and ($2::timestamptz is null or known_at <= $2)
-           order by mic,publication_date,content_hash,known_at desc""",
+        """with s as (
+             select mic,publication_date,status,terminated_at,issuer_lei,currency,source_url,
+                    known_at,
+                    (raw->>'publication_date')::timestamptz published_at,
+                    (raw->>'valid_from_date')::timestamptz::date valid_from,
+                    (raw->>'valid_to_date')::timestamptz::date valid_to,
+                    (raw->>'mrkt_trdng_start_date')::timestamptz first_trade_at
+             from public.listing_lifecycle_snapshot
+             where isin=$1 and ($2::timestamptz is null or known_at <= $2)
+           )
+           select distinct on (mic,publication_date,published_at,status,terminated_at,issuer_lei,
+                    currency,valid_from,valid_to,first_trade_at)
+                  mic,publication_date,published_at,valid_from,valid_to,first_trade_at,status,
+                  terminated_at,issuer_lei,currency,source_url,known_at
+           from s
+           order by mic,publication_date,published_at,status,terminated_at,issuer_lei,currency,
+                    valid_from,valid_to,first_trade_at,known_at desc""",
         isin,
         as_of,
     )
