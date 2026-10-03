@@ -15,6 +15,7 @@ import { DriftPanel, DriftTable } from "@/components/portfolio/drift-panel";
 import { ExposurePanel } from "@/components/portfolio/exposure-panel";
 import { useLookThrough } from "@/components/portfolio/look-through-exposure";
 import { FreshnessLabel } from "@/components/portfolio/freshness-label";
+import { PortfolioDataContextSection } from "@/components/overview-data/portfolio-data-context";
 import { OverviewHero, type HistoryLoad } from "@/components/portfolio/overview-hero";
 import { ReturnsHeatmap } from "@/components/portfolio/returns-heatmap";
 import { RiskPanel } from "@/components/portfolio/risk-panel";
@@ -273,6 +274,8 @@ function Overview({ data }: { data: PortfolioOverview }) {
       </div>
 
       <ValuationBenchmarkPanel state={valuation} />
+
+      <PortfolioDataContextSection />
 
       <FxFootnote data={data} />
     </div>

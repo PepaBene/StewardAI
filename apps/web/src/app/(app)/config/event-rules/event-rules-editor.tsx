@@ -5,7 +5,7 @@ import { useMemo, useState } from "react";
 
 import { AlertMessage } from "@/components/alert-message";
 import { ConfigHeader } from "@/components/config/config-header";
-import { CheckboxGroup, SelectField, TextAreaField, TextField } from "@/components/config/fields";
+import { CheckboxField, CheckboxGroup, SelectField, TextAreaField, TextField } from "@/components/config/fields";
 import { ReplayPreviewDialog, useReplayGate } from "@/components/config/replay-preview";
 import { SaveBar } from "@/components/config/save-bar";
 import { Button } from "@/components/ui/button";
@@ -22,6 +22,7 @@ import {
   type AnnouncementRuleForm,
   type AnnouncementTarget,
   type EventRulesForm,
+  type FreeSourceForm,
   type OverrideForm,
 } from "@/lib/config/news-forms";
 import { configSaveQuery, useConfigEditor } from "@/lib/hooks/use-config-editor";
@@ -183,6 +184,14 @@ export function EventRulesEditor() {
             onChange={(announcement_types) => set({ announcement_types })}
           />
 
+          {form.free_source_alerts ? (
+            <FreeSourceRules
+              rules={form.free_source_alerts}
+              errors={editor.errors}
+              onChange={(free_source_alerts) => set({ free_source_alerts })}
+            />
+          ) : null}
+
           <SaveBar
             dirty={dirty}
             savedVersionId={editor.version?.id ?? null}
@@ -278,6 +287,88 @@ function AnnouncementRules({
           Reset to the defaults
         </Button>
       </div>
+    </section>
+  );
+}
+
+function FreeSourceRules({
+  rules,
+  errors,
+  onChange,
+}: {
+  rules: FreeSourceForm;
+  errors: FieldErrors;
+  onChange: (rules: FreeSourceForm) => void;
+}) {
+  const set = (change: Partial<FreeSourceForm>) => onChange({ ...rules, ...change });
+  const field = (label: string, key: keyof FreeSourceForm & string, hint: string) => (
+    <TextField
+      label={label}
+      inputMode="decimal"
+      path={`free_source_alerts.${key}`}
+      errors={errors}
+      value={rules[key] as string}
+      onChange={(v) => set({ [key]: v } as Partial<FreeSourceForm>)}
+      hint={hint}
+    />
+  );
+  return (
+    <section aria-labelledby="free-source-heading" className="space-y-3 blueprint p-5">
+      <BlueprintCorners />
+      <h2 id="free-source-heading" className="text-[22px] leading-tight font-semibold">
+        Free-source alerts
+      </h2>
+      <p className="max-w-prose text-sm text-text-muted">
+        Credit stress, trade exposure, patent or legal status and confirmed company-graph events. Every decision, raised or
+        not, is listed in the Decision trail on the Activity page.
+      </p>
+      <div className="flex flex-wrap gap-x-6 gap-y-2">
+        <CheckboxField label="Evaluate these rules" checked={rules.enabled} onChange={(enabled) => set({ enabled })} />
+        <CheckboxField
+          label="Enforce verification gates"
+          checked={rules.enforce_verification_gates}
+          onChange={(enforce_verification_gates) => set({ enforce_verification_gates })}
+          hint="Without recorded audit data a gate denies; the decision is then recorded as blocked by gate."
+        />
+      </div>
+      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        {field("Lookback (days)", "lookback_days", "Observations first known within this window are evaluated.")}
+        {field("Max catch-up (days)", "max_catchup_days", "How far a run reaches back after missed runs.")}
+        {field("Throttle (hours)", "throttle_hours", "Repeat alerts for one rule and scope inside this window are recorded as throttled. 0: off.")}
+        {field("Max alerts per run", "max_alerts_per_run", "")}
+        {field("Trade: min exposure weight", "trade_min_exposure_weight", "Share of the issuer, 0 to 1. Unmapped weight is never counted.")}
+        {field("Trade: min change (%)", "trade_min_change_pct", "Year-on-year change in the trade value that alerts.")}
+        {field("Patent: min ownership confidence", "patent_min_ownership_confidence", "0 to 1.")}
+      </div>
+      {rules.credit_stress.length > 0 ? (
+        <fieldset className="space-y-2">
+          <legend className="text-sm font-medium">Credit stress rules</legend>
+          <ul className="space-y-2">
+            {rules.credit_stress.map((r, i) => (
+              <li key={r.key} className="grid items-start gap-2 border border-border p-3 sm:grid-cols-[minmax(0,1fr)_10rem_auto]">
+                <div className="min-w-0 text-sm">
+                  <p className="font-medium">{r.label}</p>
+                  <p className="text-xs text-text-muted">{r.series}, alerts when {r.direction} the threshold</p>
+                </div>
+                <TextField
+                  label={`Threshold for ${r.label}`}
+                  hideLabel
+                  inputMode="decimal"
+                  path={`free_source_alerts.credit_stress.${i}.threshold`}
+                  errors={errors}
+                  value={r.threshold}
+                  onChange={(threshold) => set({ credit_stress: rules.credit_stress.map((x) => (x.key === r.key ? { ...x, threshold } : x)) })}
+                />
+                <CheckboxField
+                  label="Enabled"
+                  checked={r.enabled}
+                  onChange={(enabled) => set({ credit_stress: rules.credit_stress.map((x) => (x.key === r.key ? { ...x, enabled } : x)) })}
+                />
+              </li>
+            ))}
+          </ul>
+        </fieldset>
+      ) : null}
     </section>
   );
 }

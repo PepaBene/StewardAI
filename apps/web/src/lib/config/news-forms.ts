@@ -433,7 +433,77 @@ export type EventRulesForm = {
   /** "series_key band" per line, e.g. "hicp 0.3". */
   macro_surprise_bands: string;
   announcement_types: AnnouncementRuleForm[];
+  /** The free-source alert rules; null when the stored body carries none (the backend then applies its defaults, and none is sent). */
+  free_source_alerts: FreeSourceForm | null;
 };
+
+type FreeSourceBody = NonNullable<EventRulesConfig["free_source_alerts"]>;
+type CreditRuleBody = NonNullable<FreeSourceBody["credit_stress"]>[number];
+
+export type CreditRuleForm = { key: string; label: string; series: string; direction: "above" | "below"; threshold: string; enabled: boolean };
+
+/**
+ * Editable part of `free_source_alerts`. `raw` keeps the stored body so fields this form does
+ * not show (graph event and edge types, rule series and sources) survive a save unchanged.
+ */
+export type FreeSourceForm = {
+  raw: FreeSourceBody;
+  enabled: boolean;
+  lookback_days: string;
+  max_catchup_days: string;
+  throttle_hours: string;
+  max_alerts_per_run: string;
+  enforce_verification_gates: boolean;
+  trade_min_exposure_weight: string;
+  trade_min_change_pct: string;
+  patent_min_ownership_confidence: string;
+  credit_stress: CreditRuleForm[];
+};
+
+export function freeSourceFromBody(body: FreeSourceBody | null | undefined): FreeSourceForm | null {
+  if (!body) return null;
+  return {
+    raw: body,
+    enabled: body.enabled,
+    lookback_days: String(body.lookback_days),
+    max_catchup_days: String(body.max_catchup_days),
+    throttle_hours: String(body.throttle_hours),
+    max_alerts_per_run: String(body.max_alerts_per_run),
+    enforce_verification_gates: body.enforce_verification_gates,
+    trade_min_exposure_weight: String(body.trade_min_exposure_weight),
+    trade_min_change_pct: String(body.trade_min_change_pct),
+    patent_min_ownership_confidence: String(body.patent_min_ownership_confidence),
+    credit_stress: (body.credit_stress ?? []).map((r) => ({
+      key: r.key,
+      label: r.label,
+      series: `${r.series_id}${r.geography ? ` · ${r.geography}` : ""} (${r.source})`,
+      direction: r.direction,
+      threshold: String(r.threshold),
+      enabled: r.enabled,
+    })),
+  };
+}
+
+export function freeSourceToBody(form: FreeSourceForm): FreeSourceBody {
+  const num = (t: string) => numberOrText(t.replace(",", ".")) as number;
+  const edited = new Map(form.credit_stress.map((r) => [r.key, r]));
+  return {
+    ...form.raw,
+    enabled: form.enabled,
+    lookback_days: num(form.lookback_days),
+    max_catchup_days: num(form.max_catchup_days),
+    throttle_hours: num(form.throttle_hours),
+    max_alerts_per_run: num(form.max_alerts_per_run),
+    enforce_verification_gates: form.enforce_verification_gates,
+    trade_min_exposure_weight: num(form.trade_min_exposure_weight),
+    trade_min_change_pct: num(form.trade_min_change_pct),
+    patent_min_ownership_confidence: num(form.patent_min_ownership_confidence),
+    credit_stress: (form.raw.credit_stress ?? []).map((r: CreditRuleBody) => {
+      const e = edited.get(r.key);
+      return e ? { ...r, enabled: e.enabled, threshold: num(e.threshold) } : r;
+    }),
+  };
+}
 
 export function newOverride(): OverrideForm {
   return { key: nextKey(), ticker: "", event_type: "product_business", severity: 2 };
@@ -478,6 +548,7 @@ export function eventRulesFromBody(body: EventRulesConfig | null): EventRulesFor
       pattern: r.pattern,
       event_type: r.event_type,
     })),
+    free_source_alerts: freeSourceFromBody(body?.free_source_alerts),
   };
 }
 
@@ -502,5 +573,7 @@ export function eventRulesToBody(form: EventRulesForm): EventRulesConfig {
       pattern: r.pattern.trimEnd(),
       event_type: r.event_type,
     })),
+    // No form (stored body without the rules): nothing is sent and the backend keeps its defaults.
+    ...(form.free_source_alerts ? { free_source_alerts: freeSourceToBody(form.free_source_alerts) } : {}),
   };
 }

@@ -177,3 +177,30 @@ describe("news forms: Google News edition and earnings check cooldown", () => {
     expect(eventRulesToBody(form).earnings_check_cooldown_days).toBe(5);
   });
 });
+
+describe("free-source alert rules in the event-rules form", () => {
+  const stored = {
+    enabled: true, lookback_days: 3, max_catchup_days: 30, enforce_verification_gates: true, throttle_hours: 24,
+    max_alerts_per_run: 10, trade_min_exposure_weight: 0.05, trade_min_change_pct: 20, patent_min_ownership_confidence: 0.8,
+    credit_stress: [{ key: "hy", label: "HY spread", series_id: "BAMLH0A0HYM2", source: "fred", direction: "above", threshold: 6, enabled: true }],
+    graph_event_types: ["deal"], graph_edge_types: ["supplier"],
+  };
+  it("is not sent when the stored body has none", () => {
+    expect("free_source_alerts" in eventRulesToBody(eventRulesFromBody(null))).toBe(false);
+  });
+  it("round-trips untouched fields and applies edits", () => {
+    const form = eventRulesFromBody({ schema_version: 1, free_source_alerts: stored } as never);
+    expect(eventRulesToBody(form).free_source_alerts).toEqual(stored);
+    form.free_source_alerts!.throttle_hours = "12";
+    form.free_source_alerts!.credit_stress[0].threshold = "7,5";
+    const out = eventRulesToBody(form).free_source_alerts!;
+    expect(out.throttle_hours).toBe(12);
+    expect(out.credit_stress![0]).toMatchObject({ threshold: 7.5, series_id: "BAMLH0A0HYM2", source: "fred" });
+    expect(out.graph_event_types).toEqual(["deal"]);
+  });
+  it("keeps half-typed numbers as text for the backend to reject", () => {
+    const form = eventRulesFromBody({ schema_version: 1, free_source_alerts: stored } as never);
+    form.free_source_alerts!.lookback_days = "3x";
+    expect(eventRulesToBody(form).free_source_alerts!.lookback_days).toBe("3x");
+  });
+});
