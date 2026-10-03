@@ -2,7 +2,7 @@
 
 import { LoaderCircleIcon } from "lucide-react";
 import Link from "next/link";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 import { AlertMessage } from "@/components/alert-message";
 import { SelectField, TextField } from "@/components/config/fields";
@@ -11,18 +11,21 @@ import { BlueprintCorners } from "@/components/ui/blueprint";
 import { Button } from "@/components/ui/button";
 import { getBrowserApiClient } from "@/lib/api/client";
 import {
-  appendPage,
+  atEndOfTrail,
+  canLoadOlder,
   EMPTY_TRAIL_FILTER,
   evidenceFields,
   OUTCOME_META,
   outcomeMeta,
   ruleLabel,
+  settleOlderPage,
   summarize,
   TRAIL_OUTCOMES,
   TRAIL_RULE_LABELS,
   TRAIL_RULES,
   validTicker,
   type TrailFilter,
+  type TrailLoad,
   type TrailOutcome,
   type TrailRow,
   type TrailRule,
@@ -40,11 +43,6 @@ const OUTCOME_OPTIONS: { value: TrailOutcome | ""; label: string }[] = [
   ...TRAIL_OUTCOMES.map((o) => ({ value: o, label: OUTCOME_META[o].label })),
 ];
 
-type Load =
-  | { kind: "loading" }
-  | { kind: "error"; message: string; rows: TrailRow[]; next: number | null }
-  | { kind: "ok"; rows: TrailRow[]; next: number | null; paging: boolean };
-
 const KIND_CLASS = {
   alerted: "border-accent text-text",
   suppressed: "border-border text-text-muted",
@@ -60,7 +58,9 @@ const KIND_CLASS = {
  */
 export function DecisionTrailPanel() {
   const [filter, setFilter] = useState<TrailFilter>(EMPTY_TRAIL_FILTER);
-  const [load, setLoad] = useState<Load>({ kind: "loading" });
+  const [load, setLoad] = useState<TrailLoad>({ kind: "loading" });
+  // Advances whenever the filter changes; a late "older decisions" response of an earlier filter is dropped.
+  const epoch = useRef(0);
   const ticker = validTicker(filter.ticker);
   const tickerInvalid = filter.ticker.trim() !== "" && ticker === null;
 
@@ -84,6 +84,7 @@ export function DecisionTrailPanel() {
   );
 
   useEffect(() => {
+    epoch.current += 1;
     if (tickerInvalid) return;
     let cancelled = false;
     fetchPage(null)
@@ -95,21 +96,25 @@ export function DecisionTrailPanel() {
   }, [fetchPage, tickerInvalid]);
 
   function change(next: TrailFilter) {
+    epoch.current += 1;
     setFilter(next);
     // Show the spinner right away, unless the ticker is invalid (then no request is made).
     if (next.ticker.trim() === "" || validTicker(next.ticker) !== null) setLoad({ kind: "loading" });
   }
 
   async function more() {
-    if (load.kind !== "ok" || load.next === null) return;
+    if (!canLoadOlder(load) || load.kind === "loading" || load.next === null) return;
     const { rows, next } = load;
+    const mine = epoch.current;
     setLoad({ kind: "ok", rows, next, paging: true });
+    let result: Parameters<typeof settleOlderPage>[3];
     try {
       const d = await fetchPage(next);
-      setLoad({ kind: "ok", rows: appendPage(rows, d.rows), next: d.next_before_id, paging: false });
+      result = { page: { rows: d.rows, next: d.next_before_id } };
     } catch (e) {
-      setLoad({ kind: "error", message: e instanceof Error ? e.message : String(e), rows, next });
+      result = { error: e instanceof Error ? e.message : String(e) };
     }
+    setLoad((cur) => settleOlderPage(cur, mine, epoch.current, result));
   }
 
   const rows = load.kind === "loading" ? [] : load.rows;
@@ -165,13 +170,12 @@ export function DecisionTrailPanel() {
               <TrailItem key={r.id} row={r} />
             ))}
           </ol>
-          {load.kind === "ok" && load.next !== null ? (
-            <Button variant="outline" size="sm" disabled={load.paging} onClick={() => void more()}>
-              {load.paging ? "Loading…" : "Older decisions"}
+          {canLoadOlder(load) || (load.kind === "ok" && load.paging) ? (
+            <Button variant="outline" size="sm" disabled={load.kind === "ok" && load.paging} onClick={() => void more()}>
+              {load.kind === "ok" && load.paging ? "Loading…" : load.kind === "error" ? "Retry older decisions" : "Older decisions"}
             </Button>
-          ) : (
-            <p className="text-xs text-text-muted">End of the trail.</p>
-          )}
+          ) : null}
+          {atEndOfTrail(load) ? <p className="text-xs text-text-muted">End of the trail.</p> : null}
         </>
       ) : null}
     </section>

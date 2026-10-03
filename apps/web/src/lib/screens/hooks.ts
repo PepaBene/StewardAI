@@ -31,9 +31,18 @@ export function useScreenSources() {
 /** Gap-state ledger entries per security (paid_only / not_covered), for the unknown-reason split. */
 export function useLedgerGaps(): { gaps: ReadonlyMap<string, readonly LedgerGap[]>; failed: boolean } {
   const { state } = useDataCoverage({ entityKind: "security" });
+  // A ledger entry may be keyed by the price symbol instead of the ticker; /activity/coverage maps one to the other.
+  const { state: held } = useApiResource(fetchHeldCoverage);
   const entries = state.kind === "ok" ? state.data : state.kind === "error" ? state.previous : null;
-  return useMemo(() => ({ gaps: entries ? ledgerGaps(entries) : new Map<string, LedgerGap[]>(), failed: entries === null && state.kind === "error" }), [entries, state.kind]);
+  const heldData = held.kind === "ok" ? held.data : held.kind === "error" ? held.previous : null;
+  return useMemo(() => {
+    const aliases = new Map<string, string>();
+    for (const h of heldData?.holdings ?? []) if (h.price_symbol) aliases.set(h.price_symbol.toUpperCase(), h.ticker.toUpperCase());
+    return { gaps: entries ? ledgerGaps(entries, aliases) : new Map<string, LedgerGap[]>(), failed: entries === null && state.kind === "error" };
+  }, [entries, heldData, state.kind]);
 }
+
+const fetchHeldCoverage = () => getBrowserApiClient().GET("/activity/coverage");
 
 const CONCURRENCY = 4;
 
@@ -44,6 +53,8 @@ const CONCURRENCY = 4;
  */
 export function useValuations(entities: readonly Entity[], enabled: boolean) {
   const [map, setMap] = useState<ReadonlyMap<string, ValuationInput>>(new Map());
+  // Upper-cased tickers whose latest refresh failed while older figures are kept on screen.
+  const [refreshFailed, setRefreshFailed] = useState<ReadonlySet<string>>(new Set());
   const [tick, setTick] = useState(0);
   const key = entities.map((e) => e.ticker).join("|");
   const run = useRef(0);
@@ -66,11 +77,20 @@ export function useValuations(entities: readonly Entity[], enabled: boolean) {
           next = { kind: "error", message: err instanceof Error ? err.message : String(err) };
         }
         if (mine !== run.current) return;
+        const upperKey = ticker.toUpperCase();
         setMap((prev) => {
-          const old = prev.get(ticker.toUpperCase());
-          // Keep the last good figures when a refetch fails.
+          const old = prev.get(upperKey);
+          // Keep the last good figures when a refetch fails (and say so via `refreshFailed`).
           if (next.kind === "error" && old?.kind === "ok") return prev;
-          return new Map(prev).set(ticker.toUpperCase(), next);
+          return new Map(prev).set(upperKey, next);
+        });
+        setRefreshFailed((prev) => {
+          const keep = next.kind === "error";
+          if (keep === prev.has(upperKey)) return prev;
+          const copy = new Set(prev);
+          if (keep) copy.add(upperKey);
+          else copy.delete(upperKey);
+          return copy;
         });
       }
     };
@@ -81,5 +101,5 @@ export function useValuations(entities: readonly Entity[], enabled: boolean) {
   }, [key, enabled, tick]);
 
   const reload = useCallback(() => setTick((t) => t + 1), []);
-  return { valuations: map, reload };
+  return { valuations: map, reload, refreshFailed };
 }

@@ -50,7 +50,7 @@ export function SummaryTiles({ s, treatment, hasCriteria }: { s: ScreenSummary; 
     <div className="flex min-w-0 flex-col gap-0.5 border border-border-soft p-3">
       <dt className="text-xs text-text-muted">{label}</dt>
       <dd className="num m-0 text-2xl font-semibold">{value}</dd>
-      <dd className="m-0 text-[11px] text-text-faint">{hint}</dd>
+      <dd className="m-0 text-[11px] text-text-muted">{hint}</dd>
     </div>
   );
   const unknownCount = s.excluded + s.unknown;

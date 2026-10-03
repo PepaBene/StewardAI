@@ -8,11 +8,13 @@ import {
   cellState,
   drillThroughHref,
   filterGroups,
+  gateVerdict,
   matchFailedJob,
   overAllowance,
   scopeOf,
   stateCounts,
   tickerSet,
+  usageSince,
   usedFraction,
 } from "./logic";
 import type { components } from "@/lib/api/schema";
@@ -374,5 +376,34 @@ describe("zero-cost gate parser", () => {
     const bad = { ...ok, findings: [{ provider: "a", endpoint: "b", severity: "violation", code: "c", message: "m" }], violation_count: 1 };
     expect(parseZeroCostGate(bad)).toBeNull();
     expect(parseZeroCostGate({ ...bad, passed: false })?.violationCount).toBe(1);
+  });
+});
+
+describe("fix pass: zero-cost gate verdict and consistency", () => {
+  const body = { passed: true, checked: 0, free_available: 0, disabled_ok: 0, gated_unverified: 0, violation_count: 0, warning_count: 0, warnings_by_code: {}, findings: [] };
+  it("F1-01: a gate that checked zero endpoints is not verified, never passed", () => {
+    const g = parseZeroCostGate(body)!;
+    expect(g.passed).toBe(true);
+    expect(gateVerdict(g)).toBe("not_verified");
+    expect(gateVerdict({ ...g, checked: 4 })).toBe("passed");
+    expect(gateVerdict({ ...g, checked: 4, passed: false, violationCount: 1 })).toBe("failed");
+  });
+  it("F1-02: passed with a violation count, or failed with none, is rejected", () => {
+    expect(parseZeroCostGate({ ...body, checked: 3, violation_count: 3 })).toBeNull();
+    expect(parseZeroCostGate({ ...body, checked: 3, passed: false, violation_count: 0 })).toBeNull();
+    expect(parseZeroCostGate({ ...body, checked: 3, passed: false, violation_count: 1, findings: [] })?.violationCount).toBe(1);
+  });
+  it("F1-03: the usage fetch reaches back to the start of the month so a monthly window is not dropped", () => {
+    const since = new Date(usageSince(new Date("2026-10-20T12:00:00Z")));
+    expect(since.getTime()).toBeLessThanOrEqual(Date.UTC(2026, 9, 1));
+    // early in the month the 15-day lookback is the earlier bound
+    expect(new Date(usageSince(new Date("2026-10-03T12:00:00Z"))).toISOString().slice(0, 10)).toBe("2026-09-18");
+  });
+  it("F1-15: filterGroups says how many dataset rows the scope hid", () => {
+    const entries = [entry({ provider: "fmp", dataset: "profile", entityKey: "OTHER1" })];
+    const groups = buildMatrix(entries, { held: new Set(["AAA"]), watchlist: new Set() }, []);
+    const [g] = filterGroups(groups, { scope: "held" });
+    expect(g.rows).toHaveLength(0);
+    expect(g.hiddenRows).toBe(1);
   });
 });

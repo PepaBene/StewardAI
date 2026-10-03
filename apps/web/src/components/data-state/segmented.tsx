@@ -25,7 +25,7 @@ export function Segmented<T extends string>({
           title={o.hint}
           onClick={() => onChange(o.id)}
           className={cn(
-            "px-2.5 py-1 outline-hidden focus-visible:outline-2 focus-visible:outline-focus disabled:opacity-40",
+            "px-2.5 py-1 outline-hidden focus-visible:-outline-offset-2 focus-visible:outline-2 focus-visible:outline-focus disabled:opacity-40",
             i > 0 && "border-l border-border",
             value === o.id ? "bg-accent text-accent-foreground" : "text-text-muted hover:bg-border-soft",
           )}

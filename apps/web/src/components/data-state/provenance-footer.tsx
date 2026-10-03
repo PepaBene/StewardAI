@@ -2,6 +2,7 @@ import { ExternalLinkIcon } from "lucide-react";
 
 import { coverageShare, describeCoverage, type DataProvenance } from "@/lib/data-state/provenance";
 import { formatDate } from "@/lib/format";
+import { isExternalUrl } from "@/lib/sources/sources";
 import { cn } from "@/lib/utils";
 
 import { DataStateBadge } from "./data-state-badge";
@@ -20,7 +21,7 @@ export function ProvenanceFooter({ provenance, className }: { provenance: DataPr
         <DataStateBadge state={state} reason={reason} />
         <span>
           Source:{" "}
-          {sourceUrl ? (
+          {isExternalUrl(sourceUrl) ? (
             <a
               href={sourceUrl}
               target="_blank"

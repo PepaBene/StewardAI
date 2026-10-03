@@ -29,6 +29,9 @@ export function adaptValuation(v: Schemas["HoldingValuation"]): ValuationInput {
     ratios,
     priceStale: v.price ? v.price.stale : null,
     epsStale: v.eps_ttm ? v.eps_ttm.stale : null,
+    fundStale: v.fund ? v.fund.stale : null,
+    bvpsStale: v.book_value_per_share ? v.book_value_per_share.stale : null,
+    dpsStale: v.dividend_per_share ? v.dividend_per_share.stale : null,
     priceDate: v.price?.date ?? null,
     checkedAt: v.checked_at ?? null,
     sourceLabel: v.fundamentals?.source_label ?? null,
@@ -37,12 +40,17 @@ export function adaptValuation(v: Schemas["HoldingValuation"]): ValuationInput {
   };
 }
 
-/** Coverage-ledger entries in a gap state, per upper-cased security entity key. */
-export function ledgerGaps(entries: readonly CoverageEntry[]): Map<string, LedgerGap[]> {
+/**
+ * Coverage-ledger entries in a gap state, per upper-cased security entity key. A security's
+ * ledger key is its Trading212 ticker or its price symbol, so `aliases` (price symbol -> ticker,
+ * both upper-cased) files an entry stored under the price symbol beside the ticker's.
+ */
+export function ledgerGaps(entries: readonly CoverageEntry[], aliases: ReadonlyMap<string, string> = new Map()): Map<string, LedgerGap[]> {
   const map = new Map<string, LedgerGap[]>();
   for (const e of entries) {
     if (e.entityKind !== "security" || (e.rawState !== "paid_only" && e.rawState !== "not_covered")) continue;
-    const key = e.entityKey.toUpperCase();
+    const raw = e.entityKey.toUpperCase();
+    const key = aliases.get(raw) ?? raw;
     map.set(key, [...(map.get(key) ?? []), { provider: e.provider, dataset: e.dataset, rawState: e.rawState, reason: e.reason }]);
   }
   return map;

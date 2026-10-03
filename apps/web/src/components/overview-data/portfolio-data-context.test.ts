@@ -2,7 +2,7 @@ import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 
-import type { PortfolioDataContext } from "@/lib/overview-data/context";
+import { overlapSummary, PANEL_GAP_DOMAINS, panelState, type PortfolioDataContext } from "@/lib/overview-data/context";
 
 import { PortfolioDataContextView } from "./portfolio-data-context";
 
@@ -44,5 +44,30 @@ describe("PortfolioDataContextView", () => {
     expect(html).toContain("total portfolio value");
     expect(html).toContain("Could not refresh");
     expect(html).toContain("No fund holdings snapshot was known.");
+  });
+});
+
+describe("fix pass: per-panel state and overlap labels", () => {
+  it("F1-17: a panel with its own data is not labelled partial by another domain's gap; an empty panel never reads Verified", () => {
+    const withOverlap = ctx({
+      fund_overlap: { funds: [{ isin: "IE1", label: "Fund", stale: false }], pairs: [], notes: [] } as never,
+      gaps: [{ domain: "exposure_mapping", state: "missing", reason: "No active exposure mapping." }],
+    });
+    expect(panelState(withOverlap, PANEL_GAP_DOMAINS.overlap, true).state).toBe("verified");
+    expect(panelState(withOverlap, PANEL_GAP_DOMAINS.concentration, false)).toMatchObject({ state: "not_covered", reason: "No active exposure mapping." });
+    const clean = ctx({ identity_coverage: share(1000, 1000) });
+    expect(panelState(clean, PANEL_GAP_DOMAINS.overlap, false).state).toBe("not_covered");
+    const html = render({ kind: "ok", data: clean });
+    expect(html).not.toContain("Verified");
+  });
+  it("F1-18: one fund with holdings says there is no pair to compare", () => {
+    const data = ctx({ fund_overlap: { funds: [{ isin: "IE1", label: "Fund", stale: false }], pairs: [], notes: [] } as never });
+    expect(render({ kind: "ok", data })).toContain("no pair to compare");
+  });
+  it("F1-18: pairs of equally labelled funds get distinct keys (by ISIN)", () => {
+    const funds = [{ isin: "IE1", label: "Same", stale: false }, { isin: "IE2", label: "Same", stale: false }, { isin: "IE3", label: "Same", stale: false }];
+    const pairs = [{ fund_a: "IE1", fund_b: "IE2", overlap: 0.3, shared_issuers: 2, same_date: true }, { fund_a: "IE1", fund_b: "IE3", overlap: 0.2, shared_issuers: 1, same_date: true }];
+    const s = overlapSummary({ funds, pairs, notes: [] } as never, null)!;
+    expect(new Set(s.pairs.map((p) => `${p.isinA}|${p.isinB}`)).size).toBe(2);
   });
 });

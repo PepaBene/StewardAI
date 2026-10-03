@@ -180,7 +180,13 @@ export function parseZeroCostGate(body: unknown): ZeroCostGate | null {
     }
   }
   // A gate that says "passed" while listing violations is internally inconsistent: reject it.
-  if (body.passed && findings.some((f) => f.severity === "violation")) return null;
+  const violationFindings = findings.filter((f) => f.severity === "violation").length;
+  if (body.passed && violationFindings > 0) return null;
+  // The headline counts must agree with the verdict and the listed findings, or the Activity
+  // panel and the Coverage scorecard could read the same body two ways.
+  if (body.passed && violationCount! > 0) return null;
+  if (!body.passed && violationCount! === 0) return null;
+  if (violationFindings > violationCount!) return null;
   return {
     passed: body.passed,
     checked: checked!,

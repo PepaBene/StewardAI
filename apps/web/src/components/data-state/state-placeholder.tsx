@@ -1,4 +1,4 @@
-import { DATA_STATE_META, type DataState } from "@/lib/data-state/states";
+import { DATA_STATE_META, placeholderState, type DataState } from "@/lib/data-state/states";
 import { cn } from "@/lib/utils";
 
 import { DataStateBadge } from "./data-state-badge";
@@ -18,7 +18,8 @@ export function StatePlaceholder({
   minHeight?: number;
   className?: string;
 }) {
-  const meta = DATA_STATE_META[state];
+  const shown = placeholderState(state);
+  const meta = DATA_STATE_META[shown];
   return (
     <div
       data-slot="state-placeholder"
@@ -29,9 +30,9 @@ export function StatePlaceholder({
       )}
       style={{ minHeight }}
     >
-      <DataStateBadge state={state} />
+      <DataStateBadge state={shown} />
       <p className="max-w-prose text-xs text-text-muted">{reason ?? meta.description}</p>
-      {meta.nextStep ? <p className="text-xs text-text-faint">{meta.nextStep}</p> : null}
+      {meta.nextStep ? <p className="text-xs text-text-muted">{meta.nextStep}</p> : null}
     </div>
   );
 }

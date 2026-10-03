@@ -45,7 +45,7 @@ export function Scorecard({ items }: { items: readonly ScoreItem[] }) {
                 </div>
               ) : null}
               <p className="text-xs text-text-muted">{i.detail}</p>
-              <p className="num text-[11px] text-text-faint">
+              <p className="num text-[11px] text-text-muted">
                 Source: {i.source}
                 {i.asOf ? ` · as of ${formatDate(i.asOf.slice(0, 10))}` : ""}
               </p>

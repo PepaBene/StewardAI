@@ -14,6 +14,7 @@ import {
   type ProviderGroup,
   type SourceStatusRow,
   type UsageWindow,
+  type ZeroCostGate,
 } from "./types";
 
 export type ScopeFilter = EntityScope | "all";
@@ -161,14 +162,14 @@ export function filterGroups(
 ): ProviderGroup[] {
   return groups
     .filter((g) => provider === "all" || g.provider === provider)
-    .map((g) => ({
-      ...g,
-      rows: g.rows.filter((r) => {
+    .map((g) => {
+      const rows = g.rows.filter((r) => {
         const cells = cellsFor(r, scope);
         if (state === "all") return cells.some((c) => c.entries > 0) || scope === "all";
         return cells.some((c) => c.state === state);
-      }),
-    }))
+      });
+      return { ...g, rows, hiddenRows: g.rows.length - rows.length };
+    })
     .filter((g) => state === "all" || g.rows.length > 0);
 }
 
@@ -189,6 +190,35 @@ export function accessCounts(access: readonly AccessRow[]): Record<DataState, nu
 /** "3 of 5 entries available" — the denominator is ledger entries, not the universe. */
 export function describeCell(cell: MatrixCell): string {
   return cell.entries === 0 ? "No ledger entries" : `${cell.available} of ${cell.entries} ledger ${cell.entries === 1 ? "entry" : "entries"} available`;
+}
+
+/**
+ * Where the usage fetch starts: the last `days` days, but never later than the start of the
+ * current calendar month (less two days for reset time zones). The backend filters
+ * `window_start >= since`, and a monthly window starts on the first of the month, so a fixed
+ * 15-day lookback drops the current monthly window from day 16 on and loses its reset time.
+ */
+export function usageSince(now: Date, days = 15): string {
+  const byDays = now.getTime() - days * 86_400_000;
+  const monthStart = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1) - 2 * 86_400_000;
+  return new Date(Math.min(byDays, monthStart)).toISOString();
+}
+
+// ---------------------------------------------------------------------------------------
+// Zero-cost gate verdict
+// ---------------------------------------------------------------------------------------
+
+export type GateVerdict = "passed" | "failed" | "not_verified";
+
+/**
+ * The gate's verdict as the UI states it. The backend reports `passed` as "no violations", so an
+ * audit that checked zero manifest endpoints (empty or unseeded manifest) is vacuously "passed":
+ * that is "not verified", never a pass.
+ */
+export function gateVerdict(gate: Pick<ZeroCostGate, "passed" | "checked" | "violationCount">): GateVerdict {
+  if (!gate.passed || gate.violationCount > 0) return "failed";
+  if (gate.checked === 0) return "not_verified";
+  return "passed";
 }
 
 // ---------------------------------------------------------------------------------------

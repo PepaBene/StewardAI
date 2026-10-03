@@ -2,7 +2,7 @@
 
 import { ArrowRightIcon, RotateCcwIcon } from "lucide-react";
 import Link from "next/link";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import { DataStateBadge } from "@/components/data-state";
 import { Button } from "@/components/ui/button";
@@ -30,7 +30,7 @@ function Cell({ cell, now }: { cell: MatrixCell; now: Date }) {
   if (cell.state === null) {
     return (
       <div className="flex flex-col gap-0.5 text-xs text-text-muted">
-        <span className="font-medium text-text-faint">No ledger entry</span>
+        <span className="font-medium text-text-muted">No ledger entry</span>
         <span>Unknown, not covered and not zero.</span>
       </div>
     );
@@ -81,7 +81,7 @@ function Cell({ cell, now }: { cell: MatrixCell; now: Date }) {
         </span>
       ))}
       {gaps.length > 0 ? (
-        <span className="num text-xs break-words text-text-faint">
+        <span className="num text-xs break-words text-text-muted">
           Not available: {gaps.slice(0, 4).join(", ")}
           {gaps.length > 4 ? ` and ${gaps.length - 4} more` : ""}
         </span>
@@ -94,6 +94,18 @@ function Cell({ cell, now }: { cell: MatrixCell; now: Date }) {
 function ResetBlock({ row, onReset }: { row: AccessRow; onReset: (provider: string, endpoint: string) => Promise<string | null> }) {
   const [step, setStep] = useState<"idle" | "confirm" | "busy" | "done">("idle");
   const [error, setError] = useState<string | null>(null);
+  // Arming replaces the trigger with the confirm group: move focus to the safe choice (Cancel)
+  // and, when it closes again, back to the trigger, so keyboard focus is never dropped on the body.
+  const triggerRef = useRef<HTMLButtonElement>(null);
+  const cancelRef = useRef<HTMLButtonElement>(null);
+  const previous = useRef(step);
+  useEffect(() => {
+    if (previous.current !== step) {
+      if (step === "confirm") cancelRef.current?.focus();
+      else if (step === "idle") triggerRef.current?.focus();
+      previous.current = step;
+    }
+  }, [step]);
   if (!row.hardBlocked || !PATH_SEGMENT.test(row.provider) || !PATH_SEGMENT.test(row.endpoint)) return null;
   const paid = row.rawState === "paid_only";
   async function run() {
@@ -115,13 +127,13 @@ function ResetBlock({ row, onReset }: { row: AccessRow; onReset: (provider: stri
             <Button size="sm" variant="outline" disabled={step === "busy"} onClick={run}>
               {step === "busy" ? "Lifting…" : "Lift block"}
             </Button>
-            <Button size="sm" variant="ghost" disabled={step === "busy"} onClick={() => setStep("idle")}>
+            <Button ref={cancelRef} size="sm" variant="ghost" disabled={step === "busy"} onClick={() => setStep("idle")}>
               Cancel
             </Button>
           </span>
         </span>
       ) : (
-        <Button size="sm" variant="ghost" onClick={() => setStep("confirm")}>
+        <Button ref={triggerRef} size="sm" variant="ghost" onClick={() => setStep("confirm")}>
           Reset block…
         </Button>
       )}
@@ -150,7 +162,7 @@ function AccessTable({ rows, now, onReset }: { rows: readonly AccessRow[]; now: 
               <th scope="row" className="px-2 py-1.5 text-left font-mono font-normal break-all">{a.endpoint}</th>
               <td className="px-2 py-1.5">
                 <DataStateBadge state={a.state} reason={a.detail} />
-                <span className="mt-0.5 block text-text-faint">
+                <span className="mt-0.5 block text-text-muted">
                   ledger: {a.rawState}
                   {a.hardBlocked ? " · hard-blocked" : ""} · {a.accountTier} tier
                 </span>
@@ -159,7 +171,7 @@ function AccessTable({ rows, now, onReset }: { rows: readonly AccessRow[]; now: 
                 {a.lastSuccessAt ? (
                   <>
                     <time dateTime={a.lastSuccessAt} title={formatDateTime(a.lastSuccessAt)}>{formatRelative(new Date(a.lastSuccessAt), now)}</time>
-                    <span className="block text-text-faint">stale after {a.staleAfterHours} h</span>
+                    <span className="block text-text-muted">stale after {a.staleAfterHours} h</span>
                   </>
                 ) : (
                   "Never succeeded"
@@ -171,7 +183,7 @@ function AccessTable({ rows, now, onReset }: { rows: readonly AccessRow[]; now: 
                 ) : (
                   <>
                     {a.quotaUsed === null ? "?" : a.quotaUsed} of {a.quota} per {a.quotaPeriod ?? "window"}
-                    {a.requestWeight !== null ? <span className="block text-text-faint">weight {a.requestWeight}</span> : null}
+                    {a.requestWeight !== null ? <span className="block text-text-muted">weight {a.requestWeight}</span> : null}
                   </>
                 )}
               </td>
@@ -189,7 +201,7 @@ function AccessTable({ rows, now, onReset }: { rows: readonly AccessRow[]; now: 
                       {a.lastDenialDetail ? `: ${a.lastDenialDetail}` : ""}
                     </span>
                   ) : null}
-                  {a.testedAt ? <span className="num text-text-faint">Tested {formatDate(a.testedAt.slice(0, 10))}</span> : null}
+                  {a.testedAt ? <span className="num text-text-muted">Tested {formatDate(a.testedAt.slice(0, 10))}</span> : null}
                   <ResetBlock row={a} onReset={onReset} />
                 </div>
               </td>
@@ -287,7 +299,9 @@ export function CoverageMatrix({
               {g.rows.length === 0 ? (
                 <tr className="border-t border-border-soft">
                   <td colSpan={4} className="px-3 py-2 text-xs text-text-muted">
-                    No coverage-ledger entries for this provider yet: its datasets are unknown, not covered and not zero.
+                    {g.hiddenRows && g.hiddenRows > 0
+                      ? `No datasets of this provider have entries in the selected universe; ${g.hiddenRows} dataset${g.hiddenRows === 1 ? " has" : "s have"} entries elsewhere (change the universe to see them).`
+                      : "No coverage-ledger entries for this provider yet: its datasets are unknown, not covered and not zero."}
                   </td>
                 </tr>
               ) : null}

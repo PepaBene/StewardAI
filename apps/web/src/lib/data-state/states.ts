@@ -181,3 +181,12 @@ export function displayDecision(state: DataState, hasValue: boolean): DisplayDec
   if (state === "unavailable" || state === "quota_exhausted") return hasValue ? "last_good_with_notice" : "placeholder";
   return "placeholder";
 }
+
+/**
+ * The state a placeholder (or the footer under one) names. A state that carries a value
+ * (verified, stale, partial, disputed) must not label an empty frame: "Verified" over nothing
+ * reads as a verified absence. Such a state is shown as "not_covered" (no value to show).
+ */
+export function placeholderState(state: DataState): DataState {
+  return DATA_STATE_META[state].showsValue ? "not_covered" : state;
+}

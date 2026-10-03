@@ -15,7 +15,7 @@ import { ChartFrame } from "@/components/data-state";
 import { PageHeader } from "@/components/page-header";
 import { Blueprint, PanelHeading } from "@/components/ui/blueprint";
 import { useDataContext, useHeldPriceCount, useIdentityGaps, useMeasuredCoverage, useCoverageSummary } from "@/lib/coverage/hooks";
-import { buildAtlas, gapsFirst, costScore, drillEntries, globalReachScore, identityScore, priceScore, provenanceScore, returnWindowScore } from "@/lib/coverage/logic";
+import { LEDGER_ROW_CAP, atlasFooterState, buildAtlas, gapsFirst, costScore, drillEntries, globalReachScore, identityScore, priceScore, provenanceScore, returnWindowScore } from "@/lib/coverage/logic";
 import { atlasQuery, parseAtlasParams } from "@/lib/coverage/url";
 import type { AtlasDrill, AtlasFilters } from "@/lib/coverage/types";
 import { useQueryState } from "@/lib/coverage/use-query-state";
@@ -105,7 +105,8 @@ export function CoverageAtlas() {
           source: "Coverage ledger via GET /data/coverage and GET /data/coverage/summary",
           asOf: newest ? newest.slice(0, 10) : null,
           method: "Backend filters by provider, dataset, entity key, state, period and entity kind; the matrix counts the returned rows. A partial state means the ledger records fewer periods than expected.",
-          state: ledger.state.kind === "error" ? "unavailable" : total === 0 ? "not_covered" : "verified",
+          // The badge describes the data, not the fetch: a ledger of only gaps is not "verified".
+          state: ledger.state.kind === "error" ? "unavailable" : atlasFooterState(entries ?? []),
           reason: total === 0 ? "No ledger entry matches. The ledger holds only entities a collector has checked." : null,
           coverage: null,
         }}
@@ -139,14 +140,27 @@ export function CoverageAtlas() {
             ) : null
           }
         />
-        <p className="text-xs text-text-muted">Select a matrix cell to see its rows; otherwise every row matching the filters is listed, gaps first.</p>
+        <p className="text-xs text-text-muted">
+          Select a matrix cell to see its rows; otherwise the rows matching the filters are listed, gaps first (up to {LEDGER_ROW_CAP}; a longer list says how many are left out).
+        </p>
         <ResourceGate state={ledger.state} label="ledger rows">
-          {(rows) => <LedgerTable entries={drilled ?? gapsFirst(rows)} caption="Coverage ledger rows with state, reason and last check" />}
+          {(rows) => (
+            <LedgerTable
+              entries={drilled ?? gapsFirst(rows)}
+              totalMatching={drilled ? drilled.length : rows.length}
+              caption="Coverage ledger rows with state, reason and last check"
+            />
+          )}
         </ResourceGate>
       </Blueprint>
 
       <Blueprint as="section" aria-labelledby="summary-heading" id="summary" className="flex scroll-mt-24 flex-col gap-3 px-5 py-5">
         <PanelHeading kicker="Summary" title={<span id="summary-heading">Entries grouped by {filters.group}</span>} />
+        {filters.kind !== "any" ? (
+          <p role="note" className="text-xs text-text-muted">
+            The entity-kind filter is not applied here: the summary endpoint has no entity-kind parameter, so these counts cover every entity kind while the matrix and rows above show only {filters.kind}.
+          </p>
+        ) : null}
         <ResourceGate state={summary.state} label="coverage summary">
           {(d) => (d.totalEntries === 0 ? <p className="text-sm text-text-muted">The ledger has no entry for these filters.</p> : <SummaryStrip data={d} />)}
         </ResourceGate>

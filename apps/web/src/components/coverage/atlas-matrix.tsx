@@ -5,7 +5,7 @@ import { providerLabel } from "@/lib/source-coverage/providers";
 import type { EntityKind } from "@/lib/source-coverage/types";
 import { cn } from "@/lib/utils";
 
-import { PatternDefs, PatternFill, STATE_ICONS } from "./state-glyph";
+import { PatternFill, STATE_ICONS } from "./state-glyph";
 
 export const KIND_LABEL: Record<EntityKind, string> = {
   security: "Securities",
@@ -23,7 +23,7 @@ function Cell({ cell, selected, onSelect }: { cell: AtlasCell; selected: boolean
   if (cell.entries === 0 || cell.state === null) {
     return (
       <td className="border-l border-border-soft p-1 align-top">
-        <div className="flex h-14 items-center justify-center border border-dashed border-border-soft px-2 text-center text-[11px] text-text-faint">No ledger entry (unknown)</div>
+        <div className="flex h-14 items-center justify-center border border-dashed border-border-soft px-2 text-center text-[11px] text-text-muted">No ledger entry (unknown)</div>
       </td>
     );
   }
@@ -44,7 +44,7 @@ function Cell({ cell, selected, onSelect }: { cell: AtlasCell; selected: boolean
         )}
       >
         <PatternFill state={cell.state} />
-        <span className="relative flex items-center gap-1 text-xs font-semibold">
+        <span className="relative flex items-center gap-1 bg-surface-raised/80 px-0.5 text-xs font-semibold">
           <Icon aria-hidden="true" className="size-3.5" />
           {meta.label}
         </span>
@@ -65,7 +65,6 @@ function Cell({ cell, selected, onSelect }: { cell: AtlasCell; selected: boolean
 export function AtlasMatrix({ rows, drill, onDrill }: { rows: readonly AtlasRow[]; drill: AtlasDrill; onDrill: (d: AtlasDrill) => void }) {
   return (
     <div className="relative overflow-x-auto">
-      <PatternDefs />
       <table className="w-full min-w-[34rem] border-collapse text-sm">
         <caption className="sr-only">Coverage ledger entries by dataset and entity kind</caption>
         <thead>

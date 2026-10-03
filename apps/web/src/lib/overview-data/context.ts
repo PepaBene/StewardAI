@@ -69,6 +69,37 @@ export function contextState(ctx: PortfolioDataContext): { state: DataState; rea
   return { state: "verified", reason: null };
 }
 
+/** Gap domains (backend `Gap.domain`) that bear on each overview panel. */
+export const PANEL_GAP_DOMAINS = {
+  concentration: ["exposure_mapping", "identity"],
+  sensitivities: ["macro_sensitivities", "exposure_mapping", "identity"],
+  returns: ["identity"],
+  overlap: ["fund_overlap"],
+} as const satisfies Record<string, readonly string[]>;
+
+/**
+ * One panel's own state. The section-wide `contextState` is partial when any gap exists, which
+ * would label e.g. the fund-overlap panel "partial" because the exposure mapping is missing; and
+ * a panel with nothing to draw must never read "verified". A panel is judged by the gaps of its
+ * own domains, and by whether it has a value at all.
+ */
+export function panelState(
+  ctx: PortfolioDataContext,
+  domains: readonly string[],
+  hasValue: boolean,
+): { state: DataState; reason: string | null } {
+  const overall = contextState(ctx);
+  if (overall.state === "not_covered") return overall;
+  const gaps = ctx.gaps.filter((g) => domains.includes(g.domain));
+  if (gaps.length > 0) return { state: hasValue ? "partial" : "not_covered", reason: gaps.map((g) => g.reason).join(" ") };
+  if (!hasValue) return { state: "not_covered", reason: "The API returned no figures for this panel." };
+  if (domains.includes("identity")) {
+    const identity = shareView(ctx.identity_coverage)?.ratio;
+    if (identity !== null && identity !== undefined && identity < 1) return { state: "partial", reason: "Not every holding has a confirmed issuer link." };
+  }
+  return { state: "verified", reason: null };
+}
+
 export type ConcentrationRowView = {
   key: string;
   hsRevision: string | null;
@@ -175,7 +206,7 @@ export function returnCoverageRows(cov: AdjustedReturnCoverage | null | undefine
 export type OverlapSummary = {
   funds: number;
   staleFunds: number;
-  pairs: { a: string; b: string; overlap: number; shared: number; sameDate: boolean }[];
+  pairs: { a: string; b: string; isinA: string; isinB: string; overlap: number; shared: number; sameDate: boolean }[];
   unknownWeight: number | null;
 };
 
@@ -188,6 +219,8 @@ export function overlapSummary(report: FundOverlapReport | null | undefined, unk
     .slice(0, limit)
     .map((p) => ({
       a: labels.get(p.fund_a) ?? p.fund_a,
+      isinA: p.fund_a,
+      isinB: p.fund_b,
       b: labels.get(p.fund_b) ?? p.fund_b,
       overlap: p.overlap,
       shared: p.shared_issuers,

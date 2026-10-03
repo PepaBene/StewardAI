@@ -1,5 +1,5 @@
 import { DATA_STATES, type DataState } from "@/lib/data-state/states";
-import { cellState } from "@/lib/source-coverage/logic";
+import { cellState, gateVerdict } from "@/lib/source-coverage/logic";
 import type { CoverageEntry, EntityKind, ZeroCostGate } from "@/lib/source-coverage/types";
 
 import type { DataContextFigures, ShareFigure } from "./parse";
@@ -45,8 +45,19 @@ export function drillEntries(entries: readonly CoverageEntry[], dataset: string,
     .sort((a, b) => rank(a.state) - rank(b.state) || a.provider.localeCompare(b.provider) || a.entityKey.localeCompare(b.entityKey));
 }
 
+/** Most rows the ledger table draws; the table says when more match. */
+export const LEDGER_ROW_CAP = 500;
+
+/**
+ * The state the atlas footer shows for a set of entries: judged from the entries themselves
+ * (never "verified" merely because rows exist), "not_covered" for none.
+ */
+export function atlasFooterState(entries: readonly CoverageEntry[]): DataState {
+  return cellState(entries.map((e) => e.state)) ?? "not_covered";
+}
+
 /** Every row, gaps first (verified rows last), capped so the table stays light. */
-export function gapsFirst(entries: readonly CoverageEntry[], cap = 500): CoverageEntry[] {
+export function gapsFirst(entries: readonly CoverageEntry[], cap = LEDGER_ROW_CAP): CoverageEntry[] {
   const rank = (e: CoverageEntry) => (e.state === "verified" ? 1 : 0);
   return [...entries].sort((a, b) => rank(a) - rank(b) || a.dataset.localeCompare(b.dataset) || a.entityKey.localeCompare(b.entityKey)).slice(0, cap);
 }
@@ -100,10 +111,11 @@ export function identityScore(ctx: DataContextFigures | null, unresolvedHoldings
   const unresolved = unresolvedHoldings === null ? "the unresolved-holding list could not be loaded" : `${unresolvedHoldings} holding${unresolvedHoldings === 1 ? "" : "s"} listed as an unresolved exception`;
   return {
     ...base,
-    status: ratio >= 1 && unresolvedHoldings === 0 ? "met" : "not_met",
+    // Without the unresolved list (loading or failed) a full share cannot be called met or not met.
+    status: unresolvedHoldings === null ? "unavailable" : ratio >= 1 && unresolvedHoldings === 0 ? "met" : "not_met",
     measured: shareText(share),
     share: Math.min(1, Math.max(0, ratio)),
-    detail: `Counts positions with a confirmed issuer link; the API does not report a separate "reviewed" flag. ${unresolved}.`,
+    detail: `Share of portfolio value in positions with a confirmed issuer link; the API does not report a separate "reviewed" flag. ${unresolved}.`,
   };
 }
 
@@ -164,9 +176,19 @@ export function costScore(gate: ZeroCostGate | null): ScoreItem {
     asOf: null,
   };
   if (!gate) return { ...base, status: "unavailable", measured: null, share: null, detail: "The zero-cost gate could not be loaded, so no pass or fail is shown." };
+  const verdict = gateVerdict(gate);
+  if (verdict === "not_verified") {
+    return {
+      ...base,
+      status: "unavailable",
+      measured: "0 endpoints audited: the endpoint manifest is empty, so the gate verified nothing",
+      share: null,
+      detail: "Not verified. An audit of zero manifest endpoints cannot show that no paid endpoint was used; seed the endpoint manifest and reload.",
+    };
+  }
   return {
     ...base,
-    status: gate.passed && gate.violationCount === 0 ? "met" : "not_met",
+    status: verdict === "passed" ? "met" : "not_met",
     measured: `${gate.checked} endpoints audited: ${gate.freeAvailable} free and available, ${gate.disabledOk} disabled, ${gate.gatedUnverified} gated and unverified; ${gate.violationCount} violations, ${gate.warningCount} warnings`,
     share: null,
     detail: "The gate audits the endpoint manifest and reports credits and findings. It does not report dollars.",

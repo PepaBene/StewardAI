@@ -1,7 +1,7 @@
 import type { ReactNode } from "react";
 
 import { Blueprint, PanelHeading } from "@/components/ui/blueprint";
-import { displayDecision, type DataState } from "@/lib/data-state/states";
+import { displayDecision, placeholderState, type DataState } from "@/lib/data-state/states";
 import type { DataProvenance } from "@/lib/data-state/provenance";
 import { cn } from "@/lib/utils";
 
@@ -90,6 +90,8 @@ export function ChartFrame({
   className?: string;
 }) {
   const decision = displayDecision(provenance.state as DataState, hasValue);
+  // With nothing drawn the footer and placeholder never say "Verified" (or another value state).
+  const shown: DataProvenance = decision === "placeholder" ? { ...provenance, state: placeholderState(provenance.state as DataState) } : provenance;
   const headingId = id ? `${id}-heading` : undefined;
   return (
     <Blueprint
@@ -107,12 +109,12 @@ export function ChartFrame({
         {controls ? <div className="flex min-w-0 max-w-full flex-wrap items-center gap-2">{controls}</div> : null}
       </div>
       {decision === "placeholder" ? (
-        <StatePlaceholder state={provenance.state} reason={provenance.reason} />
+        <StatePlaceholder state={shown.state} reason={provenance.reason} />
       ) : (
         children
       )}
       {table && decision !== "placeholder" ? <TableView table={table} /> : null}
-      <ProvenanceFooter provenance={provenance} />
+      <ProvenanceFooter provenance={shown} />
     </Blueprint>
   );
 }

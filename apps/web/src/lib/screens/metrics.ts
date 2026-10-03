@@ -4,11 +4,11 @@ const V = "GET /holdings/{ticker}/valuation";
 
 /** The metrics available to a screen. Each maps to a figure an API endpoint already returns. */
 export const METRICS: readonly MetricDef[] = [
-  { id: "pe", label: "P/E", unit: "x", source: "valuation", endpoint: V, staleWhen: ["price", "eps"], heldOnly: false },
-  { id: "pb", label: "P/B", unit: "x", source: "valuation", endpoint: V, staleWhen: ["price"], heldOnly: false },
+  { id: "pe", label: "P/E", unit: "x", source: "valuation", endpoint: V, staleWhen: ["price", "eps", "fund"], heldOnly: false },
+  { id: "pb", label: "P/B", unit: "x", source: "valuation", endpoint: V, staleWhen: ["price", "bvps", "fund"], heldOnly: false },
   { id: "ps", label: "P/S", unit: "x", source: "valuation", endpoint: V, staleWhen: ["price", "eps"], heldOnly: false },
   { id: "peg", label: "PEG", unit: "x", source: "valuation", endpoint: V, staleWhen: ["price", "eps"], heldOnly: false },
-  { id: "dividend_yield", label: "Dividend yield", unit: "pct", source: "valuation", endpoint: V, staleWhen: ["price"], heldOnly: false },
+  { id: "dividend_yield", label: "Dividend yield", unit: "pct", source: "valuation", endpoint: V, staleWhen: ["price", "dps", "fund"], heldOnly: false },
   { id: "gross_margin", label: "Gross margin", unit: "pct", source: "valuation", endpoint: V, staleWhen: ["eps"], heldOnly: false },
   { id: "operating_margin", label: "Operating margin", unit: "pct", source: "valuation", endpoint: V, staleWhen: ["eps"], heldOnly: false },
   { id: "net_margin", label: "Net margin", unit: "pct", source: "valuation", endpoint: V, staleWhen: ["eps"], heldOnly: false },

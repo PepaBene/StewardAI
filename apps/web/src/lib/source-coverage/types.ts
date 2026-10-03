@@ -187,6 +187,8 @@ export type ProviderGroup = {
   provider: string;
   label: string;
   rows: MatrixRow[];
+  /** Dataset rows the active filters hid (0 unfiltered); lets a view tell "filtered out" from "no ledger rows". */
+  hiddenRows?: number;
   /** Access rows of the provider (from /sources/access). */
   access: readonly AccessRow[];
 };

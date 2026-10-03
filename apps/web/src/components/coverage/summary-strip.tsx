@@ -12,21 +12,27 @@ export function groupStates(g: SummaryGroup): [DataState, number][] {
   return [...m.entries()].sort((a, b) => b[1] - a[1]);
 }
 
+/** Below this share of a bar a segment shows its pattern only. */
+export const SLIVER = 0.08;
+
 function Bar({ group }: { group: SummaryGroup }) {
   const states = groupStates(group);
   return (
     <div className="flex h-6 w-full min-w-[8rem] border border-border-soft" role="img" aria-label={states.map(([s, n]) => `${n} ${DATA_STATE_META[s].label}`).join(", ")}>
       {states.map(([s, n]) => {
         const Icon = STATE_ICONS[s];
+        // A sliver is too narrow for its icon (it would be clipped half-drawn): the pattern and
+        // the text list under the bar still name the state.
+        const roomForIcon = n / group.entries >= SLIVER;
         return (
           <span
             key={s}
             title={`${DATA_STATE_META[s].label}: ${n} of ${group.entries}`}
-            style={{ width: `${(n / group.entries) * 100}%` }}
+            style={{ width: `${(n / group.entries) * 100}%`, minWidth: 4 }}
             className={cn("relative flex min-w-0 items-center justify-center overflow-hidden border-r border-surface-raised last:border-r-0", STATE_TONE_CLASSES[DATA_STATE_META[s].tone].chip)}
           >
             <PatternFill state={s} />
-            <Icon aria-hidden="true" className="relative size-3 shrink-0" />
+            {roomForIcon ? <Icon aria-hidden="true" className="relative size-3 shrink-0" /> : null}
           </span>
         );
       })}

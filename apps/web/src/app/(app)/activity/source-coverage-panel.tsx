@@ -28,6 +28,7 @@ import {
   buildBudgets,
   buildMatrix,
   filterGroups,
+  gateVerdict,
   overAllowance,
   stateCounts,
   type ScopeFilter,
@@ -59,14 +60,20 @@ function LoadError({ what, state }: { what: string; state: ResourceState<unknown
   );
 }
 
-function GateSummary({ gate }: { gate: ZeroCostGate }) {
+export function GateSummary({ gate }: { gate: ZeroCostGate }) {
   const violations = gate.findings.filter((f) => f.severity === "violation");
   const warnings = gate.findings.filter((f) => f.severity === "warning");
+  const verdict = gateVerdict(gate);
   return (
     <div className="flex flex-col gap-1 border border-border-soft px-3 py-2 text-sm">
       <p className="flex flex-wrap items-center gap-x-3 gap-y-1">
         <span className="font-medium text-text">
-          Zero-cost gate: {gate.passed ? "passed" : `failed (${gate.violationCount} violation${gate.violationCount === 1 ? "" : "s"})`}
+          Zero-cost gate:{" "}
+          {verdict === "passed"
+            ? "passed"
+            : verdict === "not_verified"
+              ? "not verified (no manifest endpoints were checked)"
+              : `failed (${gate.violationCount} violation${gate.violationCount === 1 ? "" : "s"})`}
         </span>
         <span className="num text-xs text-text-muted">
           {gate.checked} manifest endpoints checked · {gate.freeAvailable} free and available · {gate.disabledOk} disabled for a permitted reason ·{" "}

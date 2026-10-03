@@ -16,6 +16,9 @@ export type MetricId =
   | "ppl_pct"
   | "day_change_pct";
 
+/** Staleness flags of the valuation response: price, EPS TTM, the fund's published figures, book value / dividend per share. */
+export type StaleFlag = "price" | "eps" | "fund" | "bvps" | "dps";
+
 export type MetricSource = "valuation" | "holdings" | "prices";
 
 export type MetricDef = {
@@ -27,7 +30,7 @@ export type MetricDef = {
   /** Where the figure comes from, for the table header and the provenance line. */
   endpoint: string;
   /** Staleness flags of the valuation response that make this figure stale. */
-  staleWhen: readonly ("price" | "eps")[];
+  staleWhen: readonly StaleFlag[];
   heldOnly: boolean;
 };
 
@@ -66,6 +69,10 @@ export type ValuationInput =
       ratios: Partial<Record<MetricId, RatioFigure>>;
       priceStale: boolean | null;
       epsStale: boolean | null;
+      /** `fund.stale` (an ETF's provider figures older than 45 days); null when there is no fund block. */
+      fundStale: boolean | null;
+      bvpsStale: boolean | null;
+      dpsStale: boolean | null;
       priceDate: string | null;
       checkedAt: string | null;
       sourceLabel: string | null;

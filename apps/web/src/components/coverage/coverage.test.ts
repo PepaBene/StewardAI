@@ -8,7 +8,7 @@ import { PlanGaps } from "@/components/coverage/plan-gaps";
 import { Scorecard } from "@/components/coverage/scorecard";
 import { SummaryStrip } from "@/components/coverage/summary-strip";
 import { LedgerTable } from "@/components/coverage/ledger-table";
-import { buildAtlas, provenanceScore } from "@/lib/coverage/logic";
+import { buildAtlas, costScore, provenanceScore } from "@/lib/coverage/logic";
 import type { CoverageEntry } from "@/lib/source-coverage/types";
 
 const entry = (over: Partial<CoverageEntry>): CoverageEntry => ({
@@ -53,5 +53,35 @@ describe("coverage components render", () => {
     expect(renderToStaticMarkup(createElement(GlobalReach, { rows: [] }))).toContain("No observation rows");
     const gaps = renderToStaticMarkup(createElement(PlanGaps));
     expect(gaps).toContain("Plan scope, not data");
+  });
+});
+
+describe("fix pass: coverage components", () => {
+  it("F1-01: the scorecard never says Target met for a gate that audited nothing", () => {
+    const gate = { passed: true, checked: 0, freeAvailable: 0, disabledOk: 0, gatedUnverified: 0, violationCount: 0, warningCount: 0, warningsByCode: {}, findings: [] };
+    const html = renderToStaticMarkup(createElement(Scorecard, { items: [costScore(gate)] }));
+    expect(html).not.toContain("Target met");
+    expect(html).toContain("Unavailable");
+    expect(html).toContain("manifest is empty");
+  });
+  it("F1-06: the ledger table says when rows are left out", () => {
+    const html = renderToStaticMarkup(createElement(LedgerTable, { entries: [entry({})], totalMatching: 1200, caption: "c" }));
+    expect(html).toContain("Showing 1 of 1200");
+    expect(renderToStaticMarkup(createElement(LedgerTable, { entries: [entry({})], totalMatching: 1, caption: "c" }))).not.toContain("left out");
+  });
+  it("F7-9: a summary strip carries its own pattern definitions (no atlas matrix needed)", () => {
+    const data = { groupBy: "source" as const, totalEntries: 2, note: "n", groups: [{ key: "fred", entries: 2, byState: { paid_only: 1, available: 1 }, expectedPeriods: null, availablePeriods: null, entriesWithExpected: 0, availableEntries: 1, coverageRatio: null }] };
+    const html = renderToStaticMarkup(createElement(SummaryStrip, { data }));
+    const ref = /fill="url\(#([^)]+)\)"/.exec(html);
+    expect(ref).not.toBeNull();
+    expect(html).toContain(`<pattern id="${ref![1]}"`);
+    // the hatch colour is set on the svg that defines the pattern, in a token that exists in both themes
+    expect(html).toContain("text-text-muted");
+  });
+  it("F7-9: a sliver segment drops its icon instead of clipping it", () => {
+    const data = { groupBy: "source" as const, totalEntries: 60, note: "n", groups: [{ key: "x", entries: 60, byState: { available: 59, paid_only: 1 }, expectedPeriods: null, availablePeriods: null, entriesWithExpected: 0, availableEntries: 59, coverageRatio: null }] };
+    const html = renderToStaticMarkup(createElement(SummaryStrip, { data }));
+    const sliver = html.split('title="Paid only')[1]?.split("</span>")[0] ?? "";
+    expect(sliver).not.toContain("<svg class=\"lucide");
   });
 });

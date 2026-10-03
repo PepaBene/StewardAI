@@ -4,7 +4,9 @@ import type { components } from "@/lib/api/schema";
 import { adaptCoverage } from "@/lib/source-coverage/parse";
 import type { CoverageEntry, ZeroCostGate } from "@/lib/source-coverage/types";
 
-import { buildAtlas, costScore, drillEntries, filterMeasured, gapsFirst, globalReachScore, identityScore, priceScore, provenanceScore, returnWindowScore, summaryKeyLabel } from "./logic";
+import type { DataState } from "@/lib/data-state/states";
+
+import { LEDGER_ROW_CAP, atlasFooterState, buildAtlas, costScore, drillEntries, filterMeasured, gapsFirst, globalReachScore, identityScore, priceScore, provenanceScore, returnWindowScore, summaryKeyLabel } from "./logic";
 import { adaptSummary, parseMeasuredCoverage } from "./parse";
 import { atlasQuery, DEFAULT_ATLAS_FILTERS, parseAtlasParams } from "./url";
 
@@ -133,5 +135,29 @@ describe("atlas url state", () => {
     const p = parseAtlasParams(new URLSearchParams("kind=fund&period=yesterday&group=zzz&drill=nope"));
     expect(p.filters).toEqual(DEFAULT_ATLAS_FILTERS);
     expect(p.drill).toBeNull();
+  });
+});
+
+describe("fix pass: scorecard honesty", () => {
+  const empty: ZeroCostGate = { passed: true, checked: 0, freeAvailable: 0, disabledOk: 0, gatedUnverified: 0, violationCount: 0, warningCount: 0, warningsByCode: {}, findings: [] };
+  it("F1-01: an empty manifest reads as unavailable (not verified), never Target met", () => {
+    const c = costScore(empty);
+    expect(c.status).toBe("unavailable");
+    expect(c.detail).toMatch(/not verified/i);
+  });
+  it("F1-13: a full identity share with the unresolved list unknown is unavailable, not Target not met", () => {
+    const ctx = { snapshotDate: "2026-10-01", knownAsOf: "2026-10-02", baseCurrency: "EUR", positionCount: 1, identity: { numerator: 1, denominator: 1, ratio: 1, basis: "total portfolio value" }, returnBases: [], gaps: [] };
+    const s = identityScore(ctx, null);
+    expect(s.status).toBe("unavailable");
+    expect(s.detail).toMatch(/value/);
+  });
+  it("F1-06: the atlas footer state follows the entries, and rows beyond the cap are counted", () => {
+    const e = (state: DataState, i: number) => ({ id: String(i), state, entityKey: `K${i}`, dataset: "d", provider: "p" }) as never;
+    expect(atlasFooterState([])).toBe("not_covered");
+    expect(atlasFooterState([e("paid_only", 1), e("paid_only", 2)])).toBe("paid_only");
+    expect(atlasFooterState([e("verified", 1), e("verified", 2)])).toBe("verified");
+    expect(atlasFooterState([e("verified", 1), e("paid_only", 2)])).toBe("partial");
+    const many = Array.from({ length: LEDGER_ROW_CAP + 5 }, (_, i) => e("verified", i));
+    expect(gapsFirst(many)).toHaveLength(LEDGER_ROW_CAP);
   });
 });

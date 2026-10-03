@@ -3,10 +3,11 @@ import { describe, expect, it } from "vitest";
 import { buildUniverse, evaluateEntity, readMetric, runScreen, summarize, thresholdValue } from "./logic";
 import { metricDef } from "./metrics";
 import type { Criterion, Entity, ScreenInputs, ValuationInput } from "./types";
+import { ledgerGaps } from "./parse";
 import { parseCriteria, parseScreenParams, screenQuery } from "./url";
 
 function ok(over: Partial<Extract<ValuationInput, { kind: "ok" }>> = {}): ValuationInput {
-  return { kind: "ok", ratios: {}, priceStale: false, epsStale: false, priceDate: "2026-10-01", checkedAt: null, sourceLabel: null, errors: [], hasAnyData: true, ...over };
+  return { kind: "ok", ratios: {}, priceStale: false, epsStale: false, fundStale: null, bvpsStale: null, dpsStale: null, priceDate: "2026-10-01", checkedAt: null, sourceLabel: null, errors: [], hasAnyData: true, ...over };
 }
 
 function inputs(valuations: Record<string, ValuationInput>, extra: Partial<ScreenInputs> = {}): ScreenInputs {
@@ -131,5 +132,40 @@ describe("url state", () => {
     expect(parseCriteria("pe:lte:20,bogus:gte:1,pe:eq:3,roe")).toEqual([peLte20]);
     expect(parseScreenParams(new URLSearchParams("missing=zero&scope=x"))).toMatchObject({ missing: "exclude", scope: "all", show: "all" });
     expect(screenQuery({ criteria: [], missing: "exclude", scope: "all", show: "all" })).toBe("");
+  });
+});
+
+describe("fix pass: stale inputs, reasons, boundary, ledger aliases", () => {
+  it("F1-08: a stale fund figure (ETF P/E, P/B, yield) never passes a criterion", () => {
+    const stale = ok({ fundStale: true, ratios: { pe: { value: 14, reason: null }, pb: { value: 2, reason: null }, dividend_yield: { value: 0.02, reason: null } } });
+    for (const id of ["pe", "pb", "dividend_yield"] as const) {
+      expect(readMetric(ent("F"), metricDef(id)!, inputs({ F: stale }))).toMatchObject({ status: "unknown", reason: "stale" });
+    }
+    expect(evaluateEntity(ent("F"), [{ metric: "pe", op: "lte", value: "15" }], inputs({ F: stale }), "exclude").kind).toBe("excluded");
+  });
+  it("F1-08: stale book value per share stales P/B, stale dividend per share stales the yield", () => {
+    const v = ok({ bvpsStale: true, dpsStale: true, ratios: { pb: { value: 3, reason: null }, dividend_yield: { value: 0.03, reason: null }, pe: { value: 9, reason: null } } });
+    expect(readMetric(ent("A"), metricDef("pb")!, inputs({ A: v }))).toMatchObject({ reason: "stale", detail: expect.stringContaining("book value per share") });
+    expect(readMetric(ent("A"), metricDef("dividend_yield")!, inputs({ A: v }))).toMatchObject({ reason: "stale" });
+    expect(readMetric(ent("A"), metricDef("pe")!, inputs({ A: v }))).toEqual({ status: "value", value: 9 });
+  });
+  it("F1-10: the ratio's own reason beats an unrelated source's premium error", () => {
+    const r = readMetric(ent("A"), metricDef("pe")!, inputs({ A: ok({ ratios: { pe: { value: null, reason: "n/m: no EPS in the figures" } }, errors: ["finnhub: 403 premium endpoint"] }) }));
+    expect(r).toMatchObject({ reason: "missing", detail: "n/m: no EPS in the figures" });
+  });
+  it("F1-11: an exact boundary value passes at-most / at-least in percent space", () => {
+    const yieldLte = { metric: "dividend_yield" as const, op: "lte" as const, value: "0.7" };
+    const i = inputs({ A: ok({ ratios: { dividend_yield: { value: 0.007, reason: null } } }) });
+    expect(evaluateEntity(ent("A"), [yieldLte], i, "exclude").kind).toBe("matched");
+    const gte = { metric: "dividend_yield" as const, op: "gte" as const, value: "1.1" };
+    expect(evaluateEntity(ent("A"), [gte], inputs({ A: ok({ ratios: { dividend_yield: { value: 0.011, reason: null } } }) }), "exclude").kind).toBe("matched");
+  });
+  it("F1-09: ledger gaps keyed by the price symbol are filed under the ticker", () => {
+    const entries = [{ id: "x", provider: "stooq", dataset: "prices", entityKey: "aapl.us", entityKind: "security", state: "paid_only", rawState: "paid_only", reason: null }] as never;
+    expect(ledgerGaps(entries).get("AAPL_US_EQ")).toBeUndefined();
+    const filed = ledgerGaps(entries, new Map([["AAPL.US", "AAPL_US_EQ"]]));
+    expect(filed.get("AAPL_US_EQ")).toHaveLength(1);
+    const r = readMetric(ent("AAPL_US_EQ"), metricDef("pe")!, inputs({ AAPL_US_EQ: { kind: "not_found" } }, { ledger: filed }));
+    expect(r).toMatchObject({ reason: "paid_only" });
   });
 });

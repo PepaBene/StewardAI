@@ -111,3 +111,35 @@ export function summarize(rows: readonly TrailRow[]): Record<OutcomeKind, number
   for (const r of rows) counts[outcomeMeta(r.outcome).kind] += 1;
   return counts;
 }
+
+/** The trail panel's load state; an `error` keeps the rows and cursor loaded so far so paging can be retried. */
+export type TrailLoad =
+  | { kind: "loading" }
+  | { kind: "error"; message: string; rows: TrailRow[]; next: number | null }
+  | { kind: "ok"; rows: TrailRow[]; next: number | null; paging: boolean };
+
+/**
+ * The state after an "older decisions" request settles. A response from an earlier filter
+ * (`requestEpoch` differs from `currentEpoch`, which advances on every filter change) is dropped
+ * so it can never replace the new filter's rows; a failure keeps the rows and the cursor.
+ */
+export function settleOlderPage(
+  current: TrailLoad,
+  requestEpoch: number,
+  currentEpoch: number,
+  result: { page: { rows: readonly TrailRow[]; next: number | null } } | { error: string },
+): TrailLoad {
+  if (requestEpoch !== currentEpoch || current.kind === "loading") return current;
+  if ("error" in result) return { kind: "error", message: result.error, rows: current.rows, next: current.next };
+  return { kind: "ok", rows: appendPage(current.rows, result.page.rows), next: result.page.next, paging: false };
+}
+
+/** Whether older decisions can be requested (also after a failed page, to retry). */
+export function canLoadOlder(load: TrailLoad): boolean {
+  return (load.kind === "ok" || load.kind === "error") && load.next !== null && !(load.kind === "ok" && load.paging);
+}
+
+/** "End of the trail" is true only when a successful load reached the last page. */
+export function atEndOfTrail(load: TrailLoad): boolean {
+  return load.kind === "ok" && load.next === null;
+}

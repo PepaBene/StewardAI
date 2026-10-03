@@ -12,7 +12,9 @@ import type {
   ScopeFilter,
   ScreenInputs,
   ScreenSummary,
+  StaleFlag,
   UnknownReason,
+  ValuationInput,
 } from "./types";
 
 export const UNKNOWN_REASONS: readonly UnknownReason[] = ["missing", "stale", "not_covered", "paid_only", "unavailable"];
@@ -52,6 +54,20 @@ export function inScope(e: Entity, scope: ScopeFilter): boolean {
   return scope === "all" || (scope === "held" ? e.held : e.watchlist);
 }
 
+const STALE_LABEL: Record<StaleFlag, string> = {
+  price: "price",
+  eps: "fundamentals",
+  fund: "fund figures",
+  bvps: "book value per share",
+  dps: "dividend per share",
+};
+
+/** Which of the figure's inputs the valuation response flags as stale (only the flags this metric depends on). */
+function staleFlags(def: MetricDef, v: Extract<ValuationInput, { kind: "ok" }>): string[] {
+  const flagged: Record<StaleFlag, boolean | null> = { price: v.priceStale, eps: v.epsStale, fund: v.fundStale, bvps: v.bvpsStale, dps: v.dpsStale };
+  return def.staleWhen.filter((f) => flagged[f] === true).map((f) => STALE_LABEL[f]);
+}
+
 const PAID = /paid|premium|upgrade|subscription|plan does not/i;
 
 function ledgerReason(gaps: readonly LedgerGap[] | undefined): { reason: "paid_only" | "not_covered"; detail: string } | null {
@@ -77,19 +93,25 @@ export function readMetric(entity: Entity, def: MetricDef, inputs: ScreenInputs)
     if (v.kind === "not_found") return { status: "unknown", reason: gap?.reason ?? "not_covered", detail: gap?.detail ?? "The valuation endpoint has no record of this ticker." };
     const fig = v.ratios[def.id];
     if (fig && fig.value !== null && Number.isFinite(fig.value)) {
-      const stale = (def.staleWhen.includes("price") && v.priceStale === true) || (def.staleWhen.includes("eps") && v.epsStale === true);
-      if (stale) {
-        const which = [def.staleWhen.includes("price") && v.priceStale === true ? "price" : null, def.staleWhen.includes("eps") && v.epsStale === true ? "fundamentals" : null].filter(Boolean).join(" and ");
-        return { status: "unknown", reason: "stale", detail: `The API flags the ${which} behind this figure as stale.`, staleValue: fig.value };
+      const staleParts = staleFlags(def, v);
+      if (staleParts.length > 0) {
+        return { status: "unknown", reason: "stale", detail: `The API flags the ${staleParts.join(" and ")} behind this figure as stale.`, staleValue: fig.value };
       }
       return { status: "value", value: fig.value };
     }
     const apiReason = fig?.reason ?? null;
     if (!v.hasAnyData) return { status: "unknown", reason: gap?.reason ?? "not_covered", detail: gap?.detail ?? "The valuation endpoint returned neither a price nor fundamentals for this entity." };
+    // The ratio's own reason explains this metric; a source's refresh error is only a fallback, because
+    // an unrelated source's "premium endpoint" error says nothing about why this figure is missing.
+    if (apiReason) {
+      if (PAID.test(apiReason)) return { status: "unknown", reason: "paid_only", detail: apiReason };
+      if (gap?.reason === "paid_only") return { status: "unknown", reason: "paid_only", detail: gap.detail };
+      return { status: "unknown", reason: "missing", detail: apiReason };
+    }
     const errorText = v.errors.find((e) => PAID.test(e));
     if (errorText) return { status: "unknown", reason: "paid_only", detail: `Source error reported by the API: ${errorText}` };
     if (gap?.reason === "paid_only") return { status: "unknown", reason: "paid_only", detail: gap.detail };
-    return { status: "unknown", reason: "missing", detail: apiReason ?? "The API returned no value and gave no reason." };
+    return { status: "unknown", reason: "missing", detail: "The API returned no value and gave no reason." };
   }
 
   // Held-position metrics: only a held entity has them.
@@ -113,7 +135,9 @@ export function thresholdValue(c: Criterion): number | null {
   if (!def || text === "") return null;
   const n = Number(text);
   if (!Number.isFinite(n)) return null;
-  return def.unit === "pct" ? n / 100 : n;
+  // Compare in the API's unit, rounded to 12 significant digits: 0.7 / 100 is 0.006999999999999999 and
+  // would fail an exact 0.007 at "at most 0.7%".
+  return def.unit === "pct" ? Number((n / 100).toPrecision(12)) : n;
 }
 
 export function isComplete(c: Criterion): boolean {

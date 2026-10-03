@@ -3,10 +3,11 @@
 import { useCallback, useMemo } from "react";
 
 import { getBrowserApiClient } from "@/lib/api/client";
+import { errorMessage } from "@/lib/api/error-message";
 import { useApiResource, type ResourceState } from "@/lib/hooks/use-api-resource";
 
 import { adaptAccess, adaptCoverage, adaptStatus, adaptUsage, parseZeroCostGate } from "./parse";
-import { tickerSet } from "./logic";
+import { tickerSet, usageSince } from "./logic";
 import type {
   AccessRow,
   CoverageEntry,
@@ -53,10 +54,10 @@ export function useSourceAccess() {
   return { state: result, reload };
 }
 
-/** Usage windows of the last `days` days (`GET /sources/usage?since=`). */
+/** Usage windows of the last `days` days and the current month (`GET /sources/usage?since=`). */
 export function useSourceUsage(days = 15) {
   const fetcher = useCallback(
-    () => getBrowserApiClient().GET("/sources/usage", { params: { query: { since: new Date(Date.now() - days * 86_400_000).toISOString() } } }),
+    () => getBrowserApiClient().GET("/sources/usage", { params: { query: { since: usageSince(new Date(), days) } } }),
     [days],
   );
   const { state: raw, reload } = useApiResource(fetcher);
@@ -141,7 +142,7 @@ export async function resetProviderBlock(provider: string, endpoint: string): Pr
       params: { path: { provider, endpoint } },
     });
     if (r.response.ok) return null;
-    const detail = r.error && typeof r.error === "object" && "detail" in r.error ? String((r.error as { detail: unknown }).detail) : "";
+    const detail = errorMessage(r.error);
     return `HTTP ${r.response.status}${detail ? `: ${detail}` : ""}`;
   } catch (err) {
     return err instanceof Error ? err.message : String(err);

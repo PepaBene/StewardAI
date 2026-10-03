@@ -1,3 +1,5 @@
+import { useId } from "react";
+
 import {
   BanIcon,
   CircleCheckIcon,
@@ -39,6 +41,8 @@ export const STATE_PATTERN_NAME: Record<DataState, string> = {
   unavailable: "reverse diagonal lines",
 };
 
+const FILLED_STATES: ReadonlySet<DataState> = new Set(["not_covered", "access_unverified", "disputed"]);
+
 const PATTERNS: Record<DataState, React.ReactNode> = {
   verified: null,
   stale: <path d="M-1,1 l2,-2 M0,8 l8,-8 M7,9 l2,-2" />,
@@ -51,29 +55,26 @@ const PATTERNS: Record<DataState, React.ReactNode> = {
   unavailable: <path d="M-1,7 l2,2 M0,0 l8,8 M7,-1 l2,2" />,
 };
 
-/** Hidden SVG holding the nine fill patterns; render once per page, cells reference `#atlas-pat-<state>`. */
-export function PatternDefs() {
-  return (
-    <svg aria-hidden="true" focusable="false" width="0" height="0" className="absolute">
-      <defs>
-        {DATA_STATES.map((s) => (
-          <pattern key={s} id={`atlas-pat-${s}`} width="8" height="8" patternUnits="userSpaceOnUse">
-            <g stroke="currentColor" fill={s === "not_covered" || s === "access_unverified" || s === "disputed" ? "currentColor" : "none"} strokeWidth="1">
-              {PATTERNS[s]}
-            </g>
-          </pattern>
-        ))}
-      </defs>
-    </svg>
-  );
-}
-
-/** A state's pattern as an absolutely-filling layer (needs `PatternDefs` on the page). */
+/**
+ * A state's pattern as an absolutely-filling layer. The `<pattern>` is defined inside the same
+ * svg, so the fill never depends on another component having rendered the definitions, and
+ * `currentColor` resolves from this svg (a pattern takes its colour from where it is defined,
+ * not from the element that references it). The hatch is muted ink at reduced opacity: it
+ * is a second, redundant encoding behind the icon and label, never the only cue.
+ */
 export function PatternFill({ state }: { state: DataState }) {
+  const id = `atlas-pat-${state}-${useId().replace(/[^a-zA-Z0-9_-]/g, "")}`;
   if (state === "verified") return null;
   return (
-    <svg aria-hidden="true" focusable="false" className="pointer-events-none absolute inset-0 size-full text-text-faint opacity-60">
-      <rect width="100%" height="100%" fill={`url(#atlas-pat-${state})`} />
+    <svg aria-hidden="true" focusable="false" className="pointer-events-none absolute inset-0 size-full text-text-muted opacity-40">
+      <defs>
+        <pattern id={id} width="8" height="8" patternUnits="userSpaceOnUse">
+          <g stroke="currentColor" fill={FILLED_STATES.has(state) ? "currentColor" : "none"} strokeWidth="1">
+            {PATTERNS[state]}
+          </g>
+        </pattern>
+      </defs>
+      <rect width="100%" height="100%" fill={`url(#${id})`} />
     </svg>
   );
 }

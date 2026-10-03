@@ -39,7 +39,7 @@ export function ScreenBuilder() {
   const scoped = useMemo(() => universe.filter((e) => inScope(e, state.scope)), [universe, state.scope]);
   const complete = useMemo(() => state.criteria.filter(isComplete), [state.criteria]);
   const useVal = needsValuations(complete);
-  const { valuations, reload: reloadValuations } = useValuations(scoped, useVal);
+  const { valuations, reload: reloadValuations, refreshFailed } = useValuations(scoped, useVal);
 
   const inputs: ScreenInputs = useMemo(
     () => ({ held: held ?? EMPTY, watchlist: watch ?? [], prices: prices ?? [], valuations, ledger: gaps }),
@@ -51,10 +51,13 @@ export function ScreenBuilder() {
     state.show === "all" ? true : state.show === "matched" ? o.kind === "matched" : state.show === "failed" ? o.kind === "failed" : o.kind === "excluded" || o.kind === "unknown",
   );
 
+  // Figures kept on screen after their latest refresh failed: still shown, but not silently.
+  const staleRefreshes = [...refreshFailed].filter((k) => valuations.get(k)?.kind === "ok").length;
   const failedSources = [
     sources.held.kind === "error" ? `holdings (${sources.held.title})` : null,
     sources.watch.kind === "error" ? `watchlist (${sources.watch.title})` : null,
     sources.price.kind === "error" ? `prices (${sources.price.title})` : null,
+    staleRefreshes > 0 ? `${staleRefreshes} valuation${staleRefreshes === 1 ? "" : "s"} could not be refreshed (the previous figures are shown)` : null,
   ].filter(Boolean);
   const loadingUniverse = sources.held.kind === "loading" || sources.watch.kind === "loading";
   const metricsUsed = [...new Set(complete.map((c) => metricDef(c.metric)!))];
