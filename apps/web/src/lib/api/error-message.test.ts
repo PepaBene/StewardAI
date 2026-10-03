@@ -9,7 +9,7 @@ describe("errorMessage", () => {
 
   it("flattens a 422 detail array instead of printing [object Object]", () => {
     const body = { detail: [{ loc: ["body", "weight"], msg: "Input should be less than or equal to 1" }, { loc: ["query", "as_of"], msg: "Value error, in the future" }] };
-    expect(errorMessage(body)).toBe("weight: Input should be less than or equal to 1; as_of: in the future");
+    expect(errorMessage(body)).toBe("weight: Input should be less than or equal to 1; query.as_of: in the future");
   });
 
   it("falls back when there is nothing readable", () => {
