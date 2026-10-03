@@ -79,6 +79,8 @@ export type HeatmapProps = {
   scale?: boolean;
   /** Table caption (visually hidden), e.g. "Monthly returns, time-weighted". */
   caption?: string;
+  /** Width class of the row-header column (default w-12, fits a year); widen it for long labels such as tickers. */
+  rowHeaderClassName?: string;
   className?: string;
 };
 
@@ -102,6 +104,7 @@ export function Heatmap({
   formatTotal = (v) => formatPct(v, 1, true),
   scale = true,
   caption = "Heatmap",
+  rowHeaderClassName = "w-12",
   className,
 }: HeatmapProps) {
   const any = rows.some((r) => r.cells.some(isFiniteNumber));
@@ -115,7 +118,7 @@ export function Heatmap({
         <caption className="sr-only">{caption}</caption>
         <thead>
           <tr>
-            <td className="w-12" />
+            <td className={rowHeaderClassName} />
             {columns.map((c, i) => (
               <th key={i} scope="col" className="pb-1 text-center text-[11px] font-normal text-text-muted">
                 <span aria-hidden="true">{c}</span>
@@ -132,7 +135,7 @@ export function Heatmap({
         <tbody>
           {rows.map((r) => (
             <tr key={r.label}>
-              <th scope="row" className="pr-2 text-left font-semibold text-text">
+              <th scope="row" className="truncate pr-2 text-left font-semibold text-text" title={r.label}>
                 {r.label}
               </th>
               {columns.map((_, i) => {

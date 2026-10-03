@@ -85,7 +85,7 @@ export function CorrelationPanel({
     >
       {/* The default scale key prints percent ("-100% to +100%"); a correlation runs -1 to +1. */}
       <HeatScale cap={1} format={(v) => formatSigned(v, 0)} className="self-end" />
-      <Heatmap rows={tickers.map((t, i) => ({ label: t, cells: matrix[i] }))} columns={tickers} columnNames={tickers.map(label)} cap={1} formatCell={(v) => formatNumber(v, 2)} scale={false} caption="Correlation matrix, clustered" />
+      <Heatmap rows={tickers.map((t, i) => ({ label: t, cells: matrix[i] }))} columns={tickers} columnNames={tickers.map(label)} cap={1} formatCell={(v) => formatNumber(v, 2)} scale={false} caption="Correlation matrix, clustered" rowHeaderClassName="w-28" />
       {risk ? (
         <p className="m-0 text-xs text-text-muted">
           Portfolio context (GET /portfolio/risk, {risk.days} days
