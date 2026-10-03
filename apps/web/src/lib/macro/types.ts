@@ -1,111 +1,245 @@
 import type { DataState } from "@/lib/data-state/states";
 
 /*
- * Typed contracts for the Phase 2 macro, financial-cycle and trade views. The observation
- * shape follows the plan's versioned observation table: period, value, release time and
- * first-release versus latest-vintage values, so a revision never overwrites history.
+ * Domain types of the macro, financial-cycle and trade views, built from what the backend
+ * returns (apps/backend/src/api/macro_routes.py, research_context_routes.py,
+ * data_context_routes.py). The API returns the latest point of each series with its
+ * previous period and 5/10-year range, not a vintage history, so there is no first-release
+ * series type: nothing is modelled that the API does not send. Decimals arrive as numbers or
+ * strings and are parsed into `number | null`, where null is "missing", never zero.
  */
 
-export type Vintage = "latest" | "first_release";
+export type ExposureBasis = "reported" | "estimated" | "user_assigned";
+/** A basis string the backend sent that this client does not know: shown as such, never relabelled. */
+export type BasisLabel = ExposureBasis | "unclassified";
 
-export type Frequency = "monthly" | "quarterly" | "annual";
+export type Range = { low: number; high: number };
 
-export type MacroObservation = {
-  /** Last day of the period the value describes, "2025-12-31". */
+/** One country series at its latest period known by the as-of time (GET /macro/context/{ticker}). */
+export type IndicatorPoint = {
+  seriesId: string;
+  source: string;
+  /** Geography as stored (ISO alpha-2 by convention). */
+  geography: string;
+  unit: string;
+  /** Last day of the period the value describes. */
   period: string;
-  /** The current (latest-vintage) value. */
-  latest: number;
-  /**
-   * The value as first published. Null means the first release was not archived: the view
-   * shows `vintage_unavailable` for that point rather than substituting the latest value.
-   */
-  firstRelease: number | null;
-  /** When the first release was published. */
-  releasedAt: string;
-  /** When the value was last revised, if it was. */
-  revisedAt: string | null;
-};
-
-export type MacroSeries = {
-  id: string;
-  title: string;
-  provider: "World Bank" | "OECD" | "BIS" | "ECB" | "Eurostat" | "FRED" | "ČNB";
-  /** ISO 3166-1 alpha-3. */
-  country: string;
-  countryName: string;
-  unit: string;
-  frequency: Frequency;
-  seasonalAdjustment: "seasonally adjusted" | "not seasonally adjusted" | "not applicable";
-  sourceUrl: string | null;
-  /** Observations oldest first. */
-  observations: readonly MacroObservation[];
-  nextRelease: string | null;
+  value: number | null;
+  releaseAt: string | null;
+  knownAt: string;
+  sourceUrl: string;
+  previousPeriod: string | null;
+  previousValue: number | null;
+  fiveYear: Range | null;
+  tenYear: Range | null;
   state: DataState;
+  /** Why the state is not simply verified, in the backend's words where it gave any. */
+  stateReason: string | null;
+};
+
+export type CoverageRow = {
+  provider: string;
+  dataset: string;
+  geography: string;
+  state: DataState;
+  rawState: string;
   reason: string | null;
+  checkedAt: string;
 };
 
-/** A comparable value per country for one indicator and two periods (the slopegraph input). */
-export type CountryComparisonRow = {
-  country: string;
-  countryName: string;
-  from: number | null;
-  to: number | null;
+export type EffectRow = {
+  ticker: string;
+  issuerId: number;
+  segment: string;
+  basis: BasisLabel;
+  weight: number | null;
+  geography: string | null;
+  hsCode: string | null;
+  /** 1 minus the mapped weight of this dimension: the share nothing explains. */
+  unknownWeight: number | null;
+  explanation: string;
+  dimension: string;
+  relatedSeries: readonly string[];
 };
 
-export type CountryComparison = {
-  title: string;
+export type SeriesEffect = {
+  seriesId: string;
+  source: string;
   unit: string;
-  fromLabel: string;
-  toLabel: string;
-  /** Higher is listed first. */
-  higherIsRanked: "first";
-  rows: readonly CountryComparisonRow[];
-  provenance: { source: string; sourceUrl: string | null; asOf: string; state: DataState; reason: string | null };
+  weightedChange: number | null;
+  /** Share of the issuer the contributing geographies represent; the rest is unknown. */
+  coveredWeight: number | null;
+  geographies: readonly string[];
 };
 
-export type TradeFlow = {
-  year: number;
+/** Latest value of a series for any geography the store holds (the cross-country comparison input). */
+export type ComparisonPoint = {
+  seriesId: string;
+  source: string;
+  geography: string;
+  unit: string;
+  period: string;
+  value: number | null;
+  releaseAt: string | null;
+  knownAt: string;
+  sourceUrl: string;
+};
+
+export type HoldingMacroContext = {
+  asOf: string;
+  observations: readonly IndicatorPoint[];
+  coverage: readonly CoverageRow[];
+  effects: readonly EffectRow[];
+  comparisons: readonly ComparisonPoint[];
+  /** No exposure mapping was known by the as-of time, so no country can be attributed. */
+  exposureUnknown: boolean;
+  seriesEffects: readonly SeriesEffect[];
+};
+
+// ---------------------------------------------------------------------------------------
+// Portfolio country exposure
+// ---------------------------------------------------------------------------------------
+
+export type Share = {
+  numerator: number | null;
+  denominator: number | null;
+  ratio: number | null;
+  denominatorBasis: string;
+};
+
+export type CountryExposureRow = {
+  /** The geography key as stored: alpha-2, "EU" or something unrecognised. */
+  key: string;
+  exposedValue: number | null;
+  shareOfPortfolio: Share;
+  shareOfMapped: Share | null;
+  /** Exposed value by stored basis (reported / estimated / user_assigned). */
+  byBasis: Readonly<Record<string, number>>;
+  holdings: number;
+};
+
+export type PortfolioConcentration = {
+  mapped: Share;
+  unmappedValue: number | null;
+  unmappedTickers: readonly string[];
+  rows: readonly CountryExposureRow[];
+  hhi: number | null;
+  hhiDenominator: number | null;
+  note: string;
+};
+
+export type PortfolioGap = { domain: string; state: string; reason: string };
+
+export type PortfolioCountryContext = {
+  snapshotDate: string | null;
+  knownAsOf: string;
+  baseCurrency: string | null;
+  totalValue: number | null;
+  positionCount: number;
+  country: PortfolioConcentration | null;
+  product: PortfolioConcentration | null;
+  gaps: readonly PortfolioGap[];
+};
+
+/** One line of GET /macro/coverage/portfolio `by_exposure` (an untyped object in the OpenAPI). */
+export type CoverageExposure = {
+  exposureType: "geography" | "hs_product";
+  exposureKey: string;
+  hsRevision: string | null;
+  basis: BasisLabel;
+  mappedValue: number | null;
+  holdingCount: number | null;
+  latestPeriod: string | null;
+  availableSeries: number | null;
+};
+
+export type PortfolioMacroCoverage = {
+  asOf: string;
+  baseCurrency: string;
+  totalValue: number | null;
+  mappedValue: number | null;
+  unknownValue: number | null;
+  mappedWeight: number | null;
+  unknownWeight: number | null;
+  byExposure: readonly CoverageExposure[];
+  gaps: readonly string[];
+};
+
+// ---------------------------------------------------------------------------------------
+// Exposure mappings
+// ---------------------------------------------------------------------------------------
+
+export type ExposureMapping = {
+  id: number;
+  issuerId: number;
+  segment: string;
+  geography: string | null;
+  hsRevision: string | null;
+  hsCode: string | null;
+  basis: BasisLabel;
+  /** Fraction 0..1. */
+  weight: number | null;
+  validFrom: string;
+  validTo: string | null;
+};
+
+// ---------------------------------------------------------------------------------------
+// Trade and research context
+// ---------------------------------------------------------------------------------------
+
+export type TradeContext = {
+  reporter: string;
+  hsCode: string;
+  hsRevision: string;
+  partner: string | null;
+  periods: number;
+  latestPeriod: string | null;
+  /** Latest-period value by flow ("export" / "import"), in `currency`. */
+  latestByFlow: Readonly<Record<string, number>>;
+  currency: string;
+  metrics: Readonly<Record<string, number | null>>;
+  sourceUrl: string | null;
+  knownAt: string | null;
+  notice: string;
+};
+
+export type ClaimDomain = "macro" | "trade" | "financial" | "forward" | "company_research" | "business_network" | "patents";
+
+export type Claim = {
+  claimId: string;
+  domain: ClaimDomain;
+  subject: string;
+  metric: string;
+  label: string;
+  value: number | null;
+  textValue: string | null;
+  unit: string | null;
+  currency: string | null;
+  period: string | null;
+  knownAsOf: string;
+  source: string;
+  provenance: string;
+  sourceUrl: string | null;
+  note: string | null;
+};
+
+export type ResearchContext = {
+  scope: "country" | "industry" | "company";
+  subject: string;
+  asOf: string;
+  claims: readonly Claim[];
+  gaps: readonly { domain: string; reason: string }[];
+  method: string;
+};
+
+/** A trade claim whose natural key (reporter, partner, flow, revision, HS code, period) was read from its claim id. */
+export type TradeRow = {
+  claim: Claim;
   reporter: string;
   partner: string;
-  /** Trade value in US dollars. */
-  valueUsd: number;
-};
-
-export type TradeSlice = {
-  reporterName: string;
-  flow: "exports" | "imports";
-  /** HS code and revision, e.g. "HS 8486" and "HS 2022". */
-  product: string;
-  productName: string;
+  flow: string;
   hsRevision: string;
-  /** Flows by year and partner (mapped partners only). */
-  flows: readonly TradeFlow[];
-  /** Value reported by the reporter that no partner account explains, by year (USD). */
-  unmappedUsd: Readonly<Record<number, number>>;
-  valueUnit: "USD";
-  sourceUrl: string | null;
-};
-
-export type ExposureKind = "reported" | "estimated" | "user_assigned";
-
-export type ExposureWeight = {
-  /** Company segment or product line the weight belongs to. */
-  segment: string;
-  /** Country (or "HS 8486" style product key) the segment's revenue/cost is tied to. */
-  target: string;
-  targetName: string;
-  /** Fraction of the holding's total (0..1). */
-  weight: number;
-  kind: ExposureKind;
-  /** Where the weight comes from: a filing note, an estimate method, an owner decision. */
-  evidence: string;
-  evidenceUrl: string | null;
-};
-
-export type HoldingExposureMap = {
-  ticker: string;
-  name: string;
-  weights: readonly ExposureWeight[];
-  /** The fiscal period the reported weights describe. */
+  hsCode: string;
   period: string;
+  valueUsd: number | null;
 };

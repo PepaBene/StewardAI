@@ -25,6 +25,12 @@ export {
   type HeatmapRow,
 } from "./heat";
 export { Treemap, type TreemapItem, type TreemapProps } from "./treemap";
+export {
+  Choropleth,
+  type ChoroplethDatum,
+  type ChoroplethExtraRow,
+  type ChoroplethProps,
+} from "./choropleth";
 export { Sankey, type SankeyProps, type SankeyLinkInput, type SankeyNodeInput } from "./sankey";
 export { BarChart, Histogram, type BarChartProps, type BarDatum, type HistogramProps } from "./bar-chart";
 export {
