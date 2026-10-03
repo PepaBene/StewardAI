@@ -59,7 +59,11 @@ export type IndicatorGroup = { geography: string; name: string; points: Indicato
 /** Indicators grouped by geography (largest group first, then code), each ordered by series id. */
 export function groupByGeography(points: readonly IndicatorPoint[]): IndicatorGroup[] {
   const map = new Map<string, IndicatorPoint[]>();
-  for (const p of points) map.set(p.geography, [...(map.get(p.geography) ?? []), p]);
+  // DE, DEU and 276 are one country: one group, not three headings called "Germany".
+  for (const p of points) {
+    const key = canonicalGeography(p.geography);
+    map.set(key, [...(map.get(key) ?? []), p]);
+  }
   return [...map.entries()]
     .map(([geography, list]) => ({
       geography,
@@ -67,6 +71,12 @@ export function groupByGeography(points: readonly IndicatorPoint[]): IndicatorGr
       points: [...list].sort((a, b) => a.seriesId.localeCompare(b.seriesId) || a.source.localeCompare(b.source)),
     }))
     .sort((a, b) => b.points.length - a.points.length || a.geography.localeCompare(b.geography));
+}
+
+/** The alpha-2 (or "EU") code a spelling resolves to; an unrecognised spelling stays as given (upper-cased). */
+export function canonicalGeography(code: string): string {
+  const g = resolveGeography(code);
+  return g.code ?? code.trim().toUpperCase();
 }
 
 /** "DE" -> "Germany"; an unrecognised code stays as given. */
@@ -160,6 +170,8 @@ export type CountryExposureDatum = {
   exposedValue: number | null;
   byBasis: Readonly<Record<string, number>>;
   holdings: number;
+  /** True when several spellings (DE, DEU) were merged: the backend gives counts only, so `holdings` is a lower bound. */
+  holdingsAtLeast: boolean;
 };
 
 export type CountryExposureView = {
@@ -174,7 +186,19 @@ export type CountryExposureView = {
   unmappedValue: number | null;
   mappedShare: number | null;
   totalValue: number | null;
+  /** Under a basis filter: share of portfolio value mapped on the chosen basis (all rows, drawn or not). Null under "all". */
+  basisShare: number | null;
+  /** Under a basis filter: share mapped on the other bases, which the countries shown do not include. Null under "all". */
+  otherBasisShare: number | null;
 };
+
+/** The share an unrecognised-code row has on `basis` (its ratio under "all"), null without a denominator. */
+export function rowShare(row: CountryExposureRow, basis: BasisFilter, total: number | null): number | null {
+  if (basis === "all") return row.shareOfPortfolio.ratio;
+  const den = row.shareOfPortfolio.denominator ?? total;
+  if (!isFiniteNumber(den) || !(den > 0)) return null;
+  return (row.byBasis[basis] ?? 0) / den;
+}
 
 function shareFor(row: Pick<CountryExposureDatum, "exposedValue" | "byBasis">, ratioAll: number | null, denominator: number | null, basis: BasisFilter): number | null {
   if (basis === "all") return ratioAll;
@@ -188,12 +212,18 @@ function shareFor(row: Pick<CountryExposureDatum, "exposedValue" | "byBasis">, r
  * this basis), not a missing value. Rows whose codes collapse to one country (DE and DEU) add up.
  */
 export function countryExposureView(ctx: PortfolioCountryContext, basis: BasisFilter): CountryExposureView {
-  const empty: CountryExposureView = { countries: [], aggregates: [], unrecognised: [], unmappedShare: null, unmappedValue: null, mappedShare: null, totalValue: ctx.totalValue };
+  const empty: CountryExposureView = { countries: [], aggregates: [], unrecognised: [], unmappedShare: null, unmappedValue: null, mappedShare: null, totalValue: ctx.totalValue, basisShare: null, otherBasisShare: null };
   const c = ctx.country;
   if (!c) return empty;
   const merged = new Map<string, CountryExposureDatum & { ratioAll: number | null; denominator: number | null }>();
+  let allBases = 0;
+  let chosen = 0;
   const unrecognised: CountryExposureRow[] = [];
   for (const row of c.rows) {
+    for (const [k, v] of Object.entries(row.byBasis)) {
+      allBases += v;
+      if (k === basis) chosen += v;
+    }
     const g = resolveGeography(row.key);
     if (g.kind !== "country" && g.kind !== "aggregate") {
       unrecognised.push(row);
@@ -210,14 +240,23 @@ export function countryExposureView(ctx: PortfolioCountryContext, basis: BasisFi
       exposedValue: sumOrNull(prev?.exposedValue, row.exposedValue),
       byBasis,
       holdings: Math.max(prev?.holdings ?? 0, row.holdings),
+      holdingsAtLeast: prev !== undefined,
       ratioAll: sumOrNull(prev?.ratioAll, ratio),
       denominator: row.shareOfPortfolio.denominator ?? prev?.denominator ?? null,
     });
   }
-  const list = [...merged.values()].map(({ ratioAll, denominator, ...d }) => ({ ...d, value: shareFor(d, ratioAll, denominator, basis) }));
+  const list = [...merged.values()].map(({ ratioAll, denominator, ...d }) => ({
+    ...d,
+    // Under a basis filter the exposed value is that basis's value too, so value and share agree.
+    exposedValue: basis === "all" ? d.exposedValue : (d.byBasis[basis] ?? 0),
+    value: shareFor(d, ratioAll, denominator, basis),
+  }));
   list.sort((a, b) => (b.value ?? -1) - (a.value ?? -1) || a.code.localeCompare(b.code));
   const total = ctx.totalValue;
+  const den = isFiniteNumber(total) && total > 0 ? total : null;
   return {
+    basisShare: basis === "all" || den === null ? null : chosen / den,
+    otherBasisShare: basis === "all" || den === null ? null : Math.max(0, allBases - chosen) / den,
     countries: list.filter((d) => d.code !== "EU"),
     aggregates: list.filter((d) => d.code === "EU"),
     unrecognised,
@@ -311,6 +350,21 @@ export type ExposureBody = {
 
 export type FormErrors = Partial<Record<keyof ExposureForm | "form", string>>;
 
+/**
+ * A geography typed into the editor, checked against the codes the app knows: the backend
+ * accepts any 2 to 5 letters/digits, so a wrong code (UK, XK) would be stored as a mapping no
+ * series ever matches. Alpha-3 and M49 spellings are accepted and stored as the alpha-2 code
+ * (DEU and 276 become DE) so one country is never two keys.
+ */
+export function checkGeography(input: string): { code: string; error: null } | { code: null; error: string } {
+  const text = input.trim().toUpperCase();
+  if (text === "UK") return { code: null, error: "UK is not an ISO country code: the United Kingdom is GB." };
+  const g = resolveGeography(text);
+  if (g.kind === "country" || g.kind === "aggregate") return { code: g.code as string, error: null };
+  if (g.kind === "world") return { code: null, error: "World is not a country; map an issuer to a country or to EU." };
+  return { code: null, error: `${text} is not a country code this app knows (ISO alpha-2 such as DE, or EU). Kosovo (XK) has no code in the macro sources.` };
+}
+
 /** Client-side mirror of the backend's ExposureInput rules, so the obvious mistakes never leave the form. */
 export function validateExposureForm(f: ExposureForm): { errors: FormErrors; body: ExposureBody | null } {
   const errors: FormErrors = {};
@@ -322,14 +376,23 @@ export function validateExposureForm(f: ExposureForm): { errors: FormErrors; bod
   const hsCode = f.hsCode.trim();
   const hsRevision = f.hsRevision.trim();
   if (!geography && !hsCode) errors.form = "Give a geography or an HS product code (a mapping needs one of them).";
+  let geographyCode = geography;
   if (geography && !/^[A-Z0-9]{2,5}$/.test(geography)) errors.geography = "Use 2 to 5 letters or digits, e.g. DE or US.";
+  else if (geography) {
+    const resolved = checkGeography(geography);
+    if (resolved.error !== null) errors.geography = resolved.error;
+    else geographyCode = resolved.code;
+  }
   if (geography && hsCode) errors.form = "Map one dimension per row: either a geography or an HS product, not both.";
   if (hsCode && !/^[0-9]{2,6}$/.test(hsCode)) errors.hsCode = "An HS code is 2 to 6 digits.";
   if (hsCode && !hsRevision) errors.hsRevision = "A product mapping needs its HS revision, e.g. HS2022.";
   if (!hsCode && hsRevision) errors.hsRevision = "A revision only goes with an HS code.";
   if (!f.basis) errors.basis = "Choose reported, estimated or owner-assigned.";
-  const pct = Number(f.weightPercent);
-  if (f.weightPercent.trim() === "" || !Number.isFinite(pct) || pct < 0 || pct > 100) errors.weightPercent = "Enter a percentage from 0 to 100.";
+  const weightText = f.weightPercent.trim();
+  // Plain decimals only: Number() would also accept "0x10" (16) and "1e1" (10).
+  const pct = /^\d+(\.\d+)?$/.test(weightText) ? Number(weightText) : Number.NaN;
+  if (!Number.isFinite(pct) || pct < 0 || pct > 100) errors.weightPercent = "Enter a percentage from 0 to 100, as plain digits (e.g. 12.5).";
+  else if (pct > 0 && Math.round(pct * 1e4) === 0) errors.weightPercent = "That weight is below 0.0001% and would be stored as zero. Enter 0 or a larger weight.";
   if (!/^\d{4}-\d{2}-\d{2}$/.test(f.validFrom)) errors.validFrom = "Choose the date the mapping starts.";
   if (f.validTo && !/^\d{4}-\d{2}-\d{2}$/.test(f.validTo)) errors.validTo = "Use a calendar date.";
   if (f.validTo && f.validFrom && f.validTo < f.validFrom) errors.validTo = "The end date is before the start date.";
@@ -339,7 +402,7 @@ export function validateExposureForm(f: ExposureForm): { errors: FormErrors; bod
     body: {
       issuer_id: issuer,
       segment,
-      geography: geography || null,
+      geography: geographyCode || null,
       hs_code: hsCode || null,
       hs_revision: hsCode ? hsRevision : null,
       basis: f.basis as ExposureBasis,
@@ -410,6 +473,21 @@ export function tradePartyName(code: string): string {
   return `Code ${code}`;
 }
 
+/**
+ * The reporter of a trade query as the backend matches it: `/macro/trade` compares the text
+ * exactly (case-sensitive, no alpha-3 or alias expansion) against the stored alpha-2 or Comtrade
+ * M49 code, so "de", "DEU" and "276" would all read as "no data". Everything the code tables
+ * know goes out as the alpha-2 code ("EU" for 97); anything else is refused with a reason.
+ */
+export function normaliseReporter(input: string): { code: string; error: null } | { code: null; error: string } {
+  const text = input.trim();
+  if (!/^[A-Za-z0-9]{2,5}$/.test(text)) return { code: null, error: "Reporter: 2 to 5 letters or digits, e.g. DE, US or 276." };
+  const g = resolveGeography(text);
+  if (g.kind === "country" || g.kind === "aggregate") return { code: g.code as string, error: null };
+  if (g.kind === "world") return { code: null, error: "Reporter: World is not a reporter; enter a country." };
+  return { code: null, error: `Reporter: ${text.toUpperCase()} is not an ISO country code or M49 number this app knows.` };
+}
+
 export function isWorld(code: string): boolean {
   return resolveGeography(code).kind === "world";
 }
@@ -473,11 +551,11 @@ export function equalPartners(hhi: number | null): number | null {
 }
 
 export const TRADE_METRIC_LABELS: Record<string, { label: string; kind: "growth" | "hhi" | "share" | "index"; flow?: string; note: string }> = {
-  export_growth: { label: "Export growth", kind: "growth", flow: "export", note: "Latest period against the adjacent one only" },
-  import_growth: { label: "Import growth", kind: "growth", flow: "import", note: "Latest period against the adjacent one only" },
-  export_partner_concentration: { label: "Export partner concentration", kind: "hhi", flow: "export", note: "Herfindahl over country partners, World excluded" },
-  import_partner_concentration: { label: "Import partner concentration", kind: "hhi", flow: "import", note: "Herfindahl over country partners, World excluded" },
-  export_share_of_two_way_trade: { label: "Export share of two-way trade", kind: "share", note: "Exports over exports plus imports, latest common period" },
-  product_mix_change: { label: "Product mix change", kind: "index", note: "Shift in the export product mix against the adjacent period" },
+  export_growth: { label: "Export growth", kind: "growth", flow: "export", note: "Latest period against the adjacent one only; all products stored for the reporter" },
+  import_growth: { label: "Import growth", kind: "growth", flow: "import", note: "Latest period against the adjacent one only; all products stored for the reporter" },
+  export_partner_concentration: { label: "Export partner concentration", kind: "hhi", flow: "export", note: "Herfindahl over country partners, World excluded; all products stored for the reporter" },
+  import_partner_concentration: { label: "Import partner concentration", kind: "hhi", flow: "import", note: "Herfindahl over country partners, World excluded; all products stored for the reporter" },
+  export_share_of_two_way_trade: { label: "Export share of two-way trade", kind: "share", note: "Exports over exports plus imports, latest common period; all products stored for the reporter" },
+  product_mix_change: { label: "Product mix change", kind: "index", note: "Shift in the export product mix against the adjacent period; all products stored for the reporter" },
   revealed_trade_dependence: { label: "Revealed trade dependence", kind: "index", note: "Needs world totals and GDP; the backend does not compute it" },
 };

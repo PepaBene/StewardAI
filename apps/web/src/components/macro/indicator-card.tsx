@@ -2,6 +2,7 @@ import { DataStateBadge } from "@/components/data-state";
 import { ExternalLinkIcon } from "lucide-react";
 
 import { geographyName, outsideRange, pointChange, rangePosition } from "@/lib/macro/logic";
+import { isExternalUrl } from "@/lib/sources/sources";
 import type { IndicatorPoint } from "@/lib/macro/types";
 
 import { day, formatChange, formatFigure } from "./format";
@@ -93,11 +94,15 @@ export function IndicatorCard({ point }: { point: IndicatorPoint }) {
 
       <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-text-muted">
         <DataStateBadge state={point.state} reason={point.stateReason} />
-        <a href={point.sourceUrl} target="_blank" rel="noreferrer noopener" className="inline-flex items-center gap-0.5 text-accent-ink hover:underline">
-          Source
-          <ExternalLinkIcon aria-hidden="true" className="size-3" />
-          <span className="sr-only">(opens in a new tab)</span>
-        </a>
+        {isExternalUrl(point.sourceUrl) ? (
+          <a href={point.sourceUrl} target="_blank" rel="noreferrer noopener" className="inline-flex items-center gap-0.5 text-accent-ink hover:underline">
+            Source
+            <ExternalLinkIcon aria-hidden="true" className="size-3" />
+            <span className="sr-only">(opens in a new tab)</span>
+          </a>
+        ) : (
+          <span>Source link not available</span>
+        )}
       </div>
     </figure>
   );

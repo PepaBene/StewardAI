@@ -9,6 +9,7 @@ import { useApiResource, type ApiResult } from "@/lib/hooks/use-api-resource";
 import { fetchCountryContext, fetchIndustryContext } from "@/lib/macro/api";
 import { geographyName, type MappedTarget } from "@/lib/macro/logic";
 import type { Claim, ResearchContext } from "@/lib/macro/types";
+import { isExternalUrl } from "@/lib/sources/sources";
 
 import { ExposureTag } from "./exposure-tag";
 import { day, formatFigure } from "./format";
@@ -47,7 +48,7 @@ export function ClaimList({ claims }: { claims: readonly Claim[] }) {
               <td className="num px-3 py-1.5">{c.period ? day(c.period) : "n/a"}</td>
               <td className="num px-3 py-1.5">{day(c.knownAsOf)}</td>
               <td className="px-3 py-1.5">
-                {c.sourceUrl ? (
+                {isExternalUrl(c.sourceUrl) ? (
                   <a href={c.sourceUrl} target="_blank" rel="noreferrer noopener" className="inline-flex items-center gap-0.5 text-accent-ink hover:underline">
                     {c.source}
                     <ExternalLinkIcon aria-hidden="true" className="size-3" />

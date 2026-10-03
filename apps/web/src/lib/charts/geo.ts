@@ -659,3 +659,16 @@ export function rampIndex(
   const cls = k === -1 ? breaks.edges.length - 1 : k; // 0 = lowest class
   return breaks.edges.length - 1 - cls;
 }
+
+/**
+ * Where a map tooltip sits relative to its anchor so it stays inside the map's box: centred
+ * over the anchor in the middle, flush right of it near the left edge and flush left of it
+ * near the right edge. `fraction` is the anchor's x as a share of the map width. The 0.3 / 0.7
+ * limits keep a 12rem tooltip inside a 320px box; the map wrapper also clips as a last resort.
+ */
+export function tooltipPlacement(fraction: number): "start" | "center" | "end" {
+  if (!Number.isFinite(fraction)) return "center";
+  if (fraction < 0.3) return "start";
+  if (fraction > 0.7) return "end";
+  return "center";
+}

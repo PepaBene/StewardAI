@@ -10,6 +10,7 @@ import {
   rampIndex,
   resolveGeography,
   splitRingAtAntimeridian,
+  tooltipPlacement,
 } from "./geo";
 import { MAP_HEIGHT, MAP_WIDTH, worldShapes } from "./geo-world";
 
@@ -215,6 +216,26 @@ describe("antimeridian", () => {
         const xs = [...sub.matchAll(/(-?\d+(?:\.\d+)?),/g)].map((m) => Number(m[1]));
         for (let i = 1; i < xs.length; i++) expect(Math.abs(xs[i] - xs[i - 1])).toBeLessThan(MAP_WIDTH / 2);
       }
+    }
+  });
+});
+
+describe("tooltipPlacement", () => {
+  it("keeps a map tooltip inside the map: flush right of the anchor near the left edge, flush left of it near the right edge", () => {
+    expect(tooltipPlacement(0.05)).toBe("start");
+    expect(tooltipPlacement(0.5)).toBe("center");
+    expect(tooltipPlacement(0.95)).toBe("end");
+  });
+  it("places every drawn country so a 192px tooltip fits a 358px map (Fiji, New Zealand, Alaska included)", () => {
+    const W = 358;
+    const T = 192;
+    for (const s of worldShapes()) {
+      if (!s.anchor) continue;
+      const x = (s.anchor[0] / MAP_WIDTH) * W;
+      const mode = tooltipPlacement(s.anchor[0] / MAP_WIDTH);
+      const left = mode === "center" ? x - T / 2 : mode === "start" ? x : x - T;
+      expect(left, s.name).toBeGreaterThanOrEqual(-0.5);
+      expect(left + T, s.name).toBeLessThanOrEqual(W + 0.5);
     }
   });
 });

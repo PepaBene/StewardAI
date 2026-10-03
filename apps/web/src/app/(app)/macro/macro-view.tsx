@@ -1,6 +1,6 @@
 "use client";
 
-import { RefreshCwIcon } from "lucide-react";
+import Link from "next/link";
 import { useCallback, useMemo, useState } from "react";
 
 import { AlertMessage } from "@/components/alert-message";
@@ -13,10 +13,12 @@ import { TradePanel } from "@/components/macro/trade-panel";
 import { PageHeader } from "@/components/page-header";
 import { StatePlaceholder } from "@/components/data-state";
 import { Blueprint } from "@/components/ui/blueprint";
+import { ConfirmAction } from "@/components/xray/confirm-action";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useApiResource, type ApiResult } from "@/lib/hooks/use-api-resource";
+import { jobHref } from "@/lib/jobs/job-detail";
 import {
   fetchExposureMappings,
   fetchHoldings,
@@ -53,9 +55,6 @@ export function MacroView() {
   const contextFetcher = useCallback((): Promise<ApiResult<HoldingMacroContext>> => (ticker ? fetchMacroContext(ticker, asOfIso) : Promise.resolve(NO_TICKER)), [ticker, asOfIso]);
   const context = useApiResource(contextFetcher);
 
-  const [job, setJob] = useState<{ tone: "info" | "warning"; text: string } | null>(null);
-  const [starting, setStarting] = useState(false);
-
   const contextData = context.state.kind === "ok" ? context.state.data : context.state.kind === "error" ? context.state.previous : null;
   const targets = useMemo(() => (contextData ? mappedTargets(contextData.effects) : []), [contextData]);
   const issuers = useMemo(() => new Map((contextData?.effects ?? []).map((e) => [e.issuerId, e.ticker] as const)), [contextData]);
@@ -72,18 +71,15 @@ export function MacroView() {
     context.reload();
   };
 
+  /** Runs after the owner confirmed: queues the macro job and says which one. */
   async function collect() {
-    setStarting(true);
-    setJob(null);
-    try {
-      const { data, response } = await runMacroCollect();
-      if (response.ok && data) setJob({ tone: "info", text: `Macro collection queued as job ${data.id} (${data.status}). New series appear here after a sync or reload.` });
-      else setJob({ tone: "warning", text: `The API did not queue the collection (HTTP ${response.status}).` });
-    } catch (err) {
-      setJob({ tone: "warning", text: `Could not reach the API: ${err instanceof Error ? err.message : String(err)}` });
-    } finally {
-      setStarting(false);
-    }
+    const { data, response } = await runMacroCollect();
+    if (!response.ok || !data) throw new Error(`The API did not queue the collection (HTTP ${response.status}).`);
+    return (
+      <Link href={jobHref(data.id)} className="text-accent-ink hover:underline">
+        Queued as job #{data.id} ({data.status}). New series appear here after a sync or reload.
+      </Link>
+    );
   }
 
   return (
@@ -93,13 +89,15 @@ export function MacroView() {
         title="Macro and trade"
         description="Country and sector context with release dates and known-since dates, tied to a holding only through a mapped, evidence-labelled exposure. Every figure is read live; missing data is shown as missing."
         aside={
-          <Button type="button" variant="outline" size="sm" onClick={() => void collect()} disabled={starting}>
-            <RefreshCwIcon aria-hidden="true" className={starting ? "animate-spin" : undefined} />
-            {starting ? "Queuing…" : "Collect macro data"}
-          </Button>
+          <ConfirmAction
+            label="Collect macro data"
+            confirmTitle="Collect macro data now?"
+            confirmBody="Queues one macro collection job. It calls the free macro and trade providers (World Bank, OECD, ECB, BIS, FRED, UN Comtrade and others, each within its free quota) and can raise macro-surprise alerts. Nothing is bought; the job also runs on its own schedule."
+            confirmLabel="Queue job"
+            run={collect}
+          />
         }
       />
-      {job ? <AlertMessage tone={job.tone} title={job.tone === "info" ? "Collection queued" : "Collection not started"}>{job.text}</AlertMessage> : null}
 
       <ResourceBoundary
         state={portfolio.state}
@@ -159,16 +157,17 @@ export function MacroView() {
 
       {ticker ? (
         <ResourceBoundary state={context.state} what={`macro context for ${ticker}`}>
-          {(ctx) => <HoldingMacroPanel ctx={ctx} ticker={ticker} />}
+          {(ctx) => <HoldingMacroPanel key={`${ticker}|${asOfIso ?? "now"}`} ctx={ctx} ticker={ticker} pastAsOf={asOfDate !== ""} />}
         </ResourceBoundary>
       ) : null}
 
-      {ticker ? <ContextCards targets={targets} ticker={ticker} /> : null}
+      {/* Only once this holding's context has arrived: while it loads there are no targets yet, which must not read as "nothing mapped". */}
+      {ticker && contextData ? <ContextCards key={ticker} targets={targets} ticker={ticker} /> : null}
 
-      <TradePanel key={`${initialTrade.reporter}|${initialTrade.hsCode}`} initial={initialTrade} />
+      <TradePanel key={ticker ?? "none"} initial={initialTrade} />
 
       <ResourceBoundary state={exposures.state} what="exposure mappings">
-        {(list) => <ExposureEditor key={`${ticker}-${defaultIssuerId}`} mappings={list} issuers={issuers} defaultIssuerId={defaultIssuerId} onChanged={reloadAll} />}
+        {(list) => <ExposureEditor key={ticker ?? "none"} mappings={list} issuers={issuers} defaultIssuerId={defaultIssuerId} ticker={ticker} onChanged={reloadAll} />}
       </ResourceBoundary>
     </div>
   );

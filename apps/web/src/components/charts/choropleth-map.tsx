@@ -2,7 +2,7 @@
 
 import { useId, useMemo, useState, type ReactNode } from "react";
 
-import { choroplethBreaks, countryName, RAMP_BG, RAMP_FILL, rampIndex } from "@/lib/charts/geo";
+import { choroplethBreaks, countryName, RAMP_BG, RAMP_FILL, rampIndex, tooltipPlacement } from "@/lib/charts/geo";
 import { MAP_HEIGHT, MAP_WIDTH, worldShapes } from "@/lib/charts/geo-world";
 import { isFiniteNumber } from "@/lib/charts/scale";
 import { cn } from "@/lib/utils";
@@ -74,20 +74,24 @@ export function ChoroplethMap({
 
   const drawn = new Set(shapes.map((s) => s.code).filter((c): c is string => c !== null));
   const offMap = data.filter((d) => !drawn.has(d.code));
+  // The ranked list holds the countries on the map; those with no polygon are listed once, below,
+  // as "not drawn on the map" (with their value), so nothing is counted twice.
   const ranked = [...data]
-    .filter((d): d is ChoroplethDatum & { value: number } => isFiniteNumber(d.value))
+    .filter((d): d is ChoroplethDatum & { value: number } => isFiniteNumber(d.value) && drawn.has(d.code))
     .sort((a, b) => b.value - a.value || a.code.localeCompare(b.code));
-  const top = ranked.length ? ranked[0].value : 0;
+  const top = Math.max(0, ...data.filter((d) => isFiniteNumber(d.value)).map((d) => d.value as number));
 
   if (data.length === 0 && extraRows.length === 0) return <ChartEmpty label="No country values to map" minHeight={160} />;
 
   const activeDatum = active?.code ? byCode.get(active.code) : undefined;
   const tooltip = active && active.anchor ? active : null;
+  const anchorX = tooltip?.anchor ? tooltip.anchor[0] / MAP_WIDTH : 0;
+  const placement = tooltipPlacement(anchorX);
 
   return (
     <div className={cn("grid min-w-0 grid-cols-1 gap-5 lg:grid-cols-[minmax(0,1.7fr)_minmax(0,1fr)]", className)}>
       <div className="min-w-0">
-        <div className="relative">
+        <div className="relative overflow-x-clip">
           <svg
             viewBox={`0 0 ${MAP_WIDTH} ${MAP_HEIGHT}`}
             className={SVG_BASE}
@@ -100,7 +104,7 @@ export function ChoroplethMap({
             <defs>
               <pattern id={hatchId} width="6" height="6" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
                 <rect width="6" height="6" className="fill-surface-muted" />
-                <line x1="0" y1="0" x2="0" y2="6" className="stroke-text-faint" strokeWidth="1.5" />
+                <line x1="0" y1="0" x2="0" y2="6" className="stroke-text-muted" strokeWidth="1.5" />
               </pattern>
             </defs>
             {shapes.map((s) => {
@@ -110,7 +114,10 @@ export function ChoroplethMap({
               const hasValue = d !== undefined && isFiniteNumber(d.value);
               const isZero = hasValue && d.value === 0;
               const fillClass = idx !== null ? RAMP_FILL[idx] : isZero ? "fill-surface-raised" : null;
-              const label = hasValue ? `${s.name}: ${isZero ? zeroLabel : formatValue(d.value as number)}` : `${s.name}: ${noDataLabel}`;
+              // A negative value has no ramp class and is not zero: it is drawn like "no data" but
+              // named for what it is, never a bare number under a hatched fill.
+              const isNegative = hasValue && (d.value as number) < 0;
+              const label = hasValue ? `${s.name}: ${isZero ? zeroLabel : formatValue(d.value as number)}${isNegative ? " (negative, not on the colour scale)" : ""}` : `${s.name}: ${noDataLabel}`;
               const isActive = active?.key === key;
               const focusable = hasValue;
               return (
@@ -143,15 +150,22 @@ export function ChoroplethMap({
           {tooltip && tooltip.anchor ? (
             <div
               role="status"
-              className="pointer-events-none absolute z-10 max-w-48 -translate-x-1/2 -translate-y-full border border-border bg-surface-raised px-2 py-1 text-xs shadow-sm"
-              style={{ left: `${(tooltip.anchor[0] / MAP_WIDTH) * 100}%`, top: `${(tooltip.anchor[1] / MAP_HEIGHT) * 100}%` }}
+              className={cn(
+                "pointer-events-none absolute z-10 max-w-48 -translate-y-full border border-border bg-surface-raised px-2 py-1 text-xs shadow-sm",
+                placement === "center" && "-translate-x-1/2",
+              )}
+              data-placement={placement}
+              style={{
+                ...(placement === "end" ? { right: `${(1 - anchorX) * 100}%` } : { left: `${anchorX * 100}%` }),
+                top: `${(tooltip.anchor[1] / MAP_HEIGHT) * 100}%`,
+              }}
             >
               <span className="block font-medium text-text">{tooltip.name}</span>
               <span className="num block text-text-muted">
                 {activeDatum && isFiniteNumber(activeDatum.value)
                   ? activeDatum.value === 0
                     ? `${zeroLabel} (mapped, none)`
-                    : formatValue(activeDatum.value)
+                    : `${formatValue(activeDatum.value)}${activeDatum.value < 0 ? " (negative, not on the colour scale)" : ""}`
                   : noDataLabel}
               </span>
               {activeDatum?.detail ? <span className="block text-text-muted">{activeDatum.detail}</span> : null}
@@ -168,7 +182,7 @@ export function ChoroplethMap({
                   return (
                     <li key={i} className="num inline-flex items-center gap-1.5">
                       <span aria-hidden="true" className={cn("inline-block size-3 border border-border-soft", RAMP_BG[RAMP_BG.length - 1 - i])} />
-                      {i === 0 ? `up to ${formatValue(breaks.edges[0])}` : `${formatValue(lo)} to ${formatValue(breaks.edges[i])}`}
+                      {i === 0 ? `up to ${formatValue(breaks.edges[0])}` : `over ${formatValue(lo)} up to ${formatValue(breaks.edges[i])}`}
                     </li>
                   );
                 })
@@ -205,7 +219,7 @@ export function ChoroplethMap({
                 {countryName(r.code)}
               </span>
               <span className="flex h-2 bg-surface-muted" aria-hidden="true">
-                <span className="block h-full bg-accent" style={{ width: `${top > 0 ? Math.min(100, (r.value / top) * 100) : 0}%` }} />
+                <span className="block h-full bg-accent" style={{ width: `${top > 0 ? Math.max(0, Math.min(100, (r.value / top) * 100)) : 0}%` }} />
               </span>
               <span className="num text-right">{formatValue(r.value)}</span>
             </li>

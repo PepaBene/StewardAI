@@ -3,17 +3,19 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 
 import { ChoroplethMap } from "@/components/charts/choropleth-map";
+import { worldShapes } from "@/lib/charts/geo-world";
 import type { ResourceState } from "@/lib/hooks/use-api-resource";
 import type { Claim, HoldingMacroContext, IndicatorPoint, PortfolioCountryContext, ResearchContext, TradeContext } from "@/lib/macro/types";
 
 import { ClaimList } from "./context-cards";
+import { formatShare } from "./format";
 import { ExposureEditor } from "./exposure-editor";
 import { ExposureTag } from "./exposure-tag";
 import { HoldingMacroPanel } from "./holding-macro-panel";
 import { IndicatorCard } from "./indicator-card";
 import { PortfolioExposureMap } from "./portfolio-exposure-map";
 import { ResourceBoundary } from "./resource-boundary";
-import { PartnerSankey, TradeMetrics } from "./trade-panel";
+import { PartnerSankey, TradeMetrics, TradeSummary } from "./trade-panel";
 
 /*
  * Render smoke tests: every state of the macro views renders without NaN/undefined leaking
@@ -228,5 +230,88 @@ describe("ResourceBoundary", () => {
     const html = render({ kind: "error", title: "Backend unreachable", detail: "down", previous: "old" });
     expect(html).toContain("data:old");
     expect(html).toContain("last data received is still shown");
+  });
+});
+
+describe("fix pass: choropleth list, negatives, tooltip box", () => {
+  const base = { formatValue: (v: number) => `${(v * 100).toFixed(1)}%`, unitLabel: "% of portfolio", ariaLabel: "Map" };
+  it("lists a country with a value but no polygon once (as 'not drawn'), not twice", () => {
+    expect(worldShapes().some((s) => s.code === "SG")).toBe(false);
+    const html = clean(renderToStaticMarkup(createElement(ChoroplethMap, { ...base, data: [{ code: "US", value: 0.4 }, { code: "SG", value: 0.04 }] })));
+    expect(html.match(/Singapore/g)).toHaveLength(1);
+    expect(html.match(/not drawn on the map/g)).toHaveLength(1);
+    expect(html.match(/4\.0%/g)).toHaveLength(1);
+  });
+  it("names a negative value as outside the colour scale instead of a bare number under a hatched fill", () => {
+    const html = clean(renderToStaticMarkup(createElement(ChoroplethMap, { ...base, data: [{ code: "US", value: 0.4 }, { code: "FR", value: -0.02 }] })));
+    expect(html).toContain("negative, not on the colour scale");
+  });
+  it("labels legend classes by what they contain (over lo, up to hi) and clips the map box", () => {
+    const html = clean(renderToStaticMarkup(createElement(ChoroplethMap, { ...base, data: [{ code: "US", value: 0.4 }] })));
+    expect(html).toMatch(/over \d+\.\d% up to \d+\.\d%/);
+    expect(html).toContain("overflow-x-clip");
+  });
+});
+
+describe("fix pass: share formatting at tiny values", () => {
+  it("does not print a real share as 0.00% and keeps small legend edges distinct", () => {
+    expect(formatShare(0.00004)).toBe("0.0040%");
+    expect(formatShare(0.00025)).toBe("0.025%");
+    expect(formatShare(0.05)).toBe("5.0%");
+    expect(formatShare(0)).toBe("0.0%");
+    expect(formatShare(1e-9)).toBe("<0.0001%");
+  });
+});
+
+describe("fix pass: macro panels", () => {
+  it("shows one Germany heading when indicators arrive as DE and DEU", () => {
+    const html = clean(renderToStaticMarkup(createElement(HoldingMacroPanel, { ctx: context({ observations: [point({ geography: "DE" }), point({ geography: "DEU", seriesId: "rate" })] }), ticker: "SAP" })));
+    expect(html.match(/aria-label="Germany indicators"/g)).toHaveLength(1);
+  });
+  it("says a mapping added now cannot appear at a past as-of date", () => {
+    const empty = context({ exposureUnknown: true, effects: [], observations: [], seriesEffects: [], comparisons: [], coverage: [] });
+    const past = clean(renderToStaticMarkup(createElement(HoldingMacroPanel, { ctx: empty, ticker: "SAP", pastAsOf: true })));
+    expect(past).toContain("cannot appear at this past date");
+    expect(past).not.toContain("Add a mapping below");
+    expect(clean(renderToStaticMarkup(createElement(HoldingMacroPanel, { ctx: empty, ticker: "SAP" })))).toContain("Add a mapping below");
+  });
+  it("trade: reporter-wide figures are labelled apart from the product's own latest totals", () => {
+    const trade: TradeContext = { reporter: "US", hsCode: "8486", hsRevision: "mixed", partner: null, periods: 12, latestPeriod: "2025-12-31", latestByFlow: { export: 5e9 }, currency: "USD", metrics: { export_growth: 0.18 }, sourceUrl: null, knownAt: null, notice: "n" };
+    const html = clean(renderToStaticMarkup(createElement(TradeSummary, { trade })));
+    expect(html).toContain("Reporter-wide");
+    expect(html).toContain("12 periods stored across all of this reporter");
+    expect(html).toContain("not from HS 8486 alone");
+    expect(html).toContain("mixed (several revisions are stored)");
+    expect(html).not.toContain("(mixed)");
+  });
+});
+
+describe("fix pass: exposure editor issuer id", () => {
+  const editor = (over: Record<string, unknown>) =>
+    clean(renderToStaticMarkup(createElement(ExposureEditor, { mappings: [], issuers: new Map(), defaultIssuerId: null, onChanged: () => {}, ...over })));
+  it("tells the owner when the holding's issuer id is unknown, instead of a bare number box", () => {
+    const html = editor({ ticker: "SAP" });
+    expect(html).toContain("SAP has no mapping yet");
+    expect(html).toContain("the company name is shown before you save");
+  });
+  it("shows the prefilled id's holding, offers known issuers, and states the geography rule", () => {
+    const html = editor({ ticker: "SAP", issuers: new Map([[3, "SAP"]]), defaultIssuerId: 3, mappings: [{ id: 1, issuerId: 3, segment: "Cloud", geography: "DE", hsRevision: null, hsCode: null, basis: "reported", weight: 0.4, validFrom: "2020-01-01", validTo: null }] });
+    expect(html).toContain("Prefilled with SAP");
+    expect(html).toContain("Issuer 3: SAP");
+    expect(html).toContain("SAP (issuer 3)</option>");
+    expect(html).toContain("GB (not UK)");
+  });
+});
+
+describe("fix pass: source links are http(s) only", () => {
+  it("renders no link for a javascript: or data: source URL on an indicator card or a claim", () => {
+    const card = clean(renderToStaticMarkup(createElement(IndicatorCard, { point: point({ sourceUrl: "javascript:alert(1)" }) })));
+    expect(card).not.toContain("javascript:");
+    expect(card).toContain("Source link not available");
+    const claim: Claim = { claimId: "c1", domain: "macro", subject: "DE", metric: "m", label: "l", value: 1, textValue: null, unit: "percent", currency: null, period: "2026-01-01", knownAsOf: "2026-02-01", source: "oecd", provenance: "primary", sourceUrl: "data:text/html,x", note: null };
+    const list = clean(renderToStaticMarkup(createElement(ClaimList, { claims: [claim] })));
+    expect(list).not.toContain("data:text/html");
+    expect(card).toContain("<span>Source link not available</span>");
+    expect(clean(renderToStaticMarkup(createElement(IndicatorCard, { point: point() })))).toContain('href="https://x.test"');
   });
 });

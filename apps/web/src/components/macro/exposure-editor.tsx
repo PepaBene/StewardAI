@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState, type FormEvent, type ReactNode } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent, type ReactNode } from "react";
 
 import { AlertMessage } from "@/components/alert-message";
 import { Blueprint, PanelHeading } from "@/components/ui/blueprint";
@@ -8,7 +8,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { formatPct } from "@/lib/charts/format";
-import { createExposure, deleteExposure } from "@/lib/macro/api";
+import { useApiResource, type ApiResult } from "@/lib/hooks/use-api-resource";
+import { createExposure, deleteExposure, fetchIssuerName } from "@/lib/macro/api";
 import {
   apiErrorMessages,
   BASIS_LABELS,
@@ -30,6 +31,21 @@ const today = () => new Date().toISOString().slice(0, 10);
 
 function blankForm(issuerId: number | null): ExposureForm {
   return { issuerId: issuerId === null ? "" : String(issuerId), segment: "", geography: "", hsCode: "", hsRevision: "", basis: "", weightPercent: "", validFrom: today(), validTo: "" };
+}
+
+/** Which company an issuer id belongs to: the ticker the page knows, else the name the backend holds for it. */
+function IssuerCheck({ issuerId, known, ticker }: { issuerId: number; known: string | undefined; ticker: string | null }) {
+  const fetcher = useCallback((): Promise<ApiResult<{ issuerId: number; names: string[] }>> => fetchIssuerName(issuerId), [issuerId]);
+  const { state } = useApiResource(fetcher);
+  if (state.kind === "loading") return <p role="status" className="text-xs text-text-muted">Looking up issuer {issuerId}…</p>;
+  const names = state.kind === "ok" ? state.data.names : [];
+  const name = names.length > 0 ? names.slice(0, 2).join(" / ") : null;
+  return (
+    <p role="status" className="text-xs text-text">
+      Issuer {issuerId}: {known ? `${known}${name ? ` (${name})` : ""}` : name ?? (state.kind === "ok" ? "no name on record" : "name could not be looked up")}.
+      {ticker && known && known !== ticker ? ` This is not ${ticker}.` : ticker && !known ? ` Check that this is ${ticker} before saving.` : ""}
+    </p>
+  );
 }
 
 function Field({ id, label, error, hint, children }: { id: string; label: string; error?: string; hint?: string; children: ReactNode }) {
@@ -67,15 +83,22 @@ export function ExposureEditor({
   mappings,
   issuers,
   defaultIssuerId,
+  ticker = null,
   onChanged,
 }: {
   mappings: readonly ExposureMapping[];
   /** issuer id -> ticker, for the issuers the page knows about. */
   issuers: ReadonlyMap<number, string>;
   defaultIssuerId: number | null;
+  /** The holding picked on the page: the issuer id typed below is checked against it. */
+  ticker?: string | null;
   onChanged: () => void;
 }) {
-  const [form, setForm] = useState<ExposureForm>(() => blankForm(defaultIssuerId));
+  const [formState, setForm] = useState<ExposureForm>(() => blankForm(null));
+  // The issuer id follows the picked holding's own issuer until the owner types one.
+  const [issuerTyped, setIssuerTyped] = useState<string | null>(null);
+  const form: ExposureForm = { ...formState, issuerId: issuerTyped ?? (defaultIssuerId === null ? "" : String(defaultIssuerId)) };
+  const [checkedId, setCheckedId] = useState<number | null>(null);
   const [errors, setErrors] = useState<FormErrors>({});
   const [serverErrors, setServerErrors] = useState<string[]>([]);
   const [saving, setSaving] = useState(false);
@@ -84,10 +107,21 @@ export function ExposureEditor({
   const [deleting, setDeleting] = useState<number | null>(null);
   const [deleteError, setDeleteError] = useState<{ id: number; messages: string[] } | null>(null);
 
+  // Focus follows the control that replaces the one just pressed (Delete -> Confirm, Cancel -> Delete).
+  const refocus = useRef<number | null>(null);
+  useEffect(() => {
+    if (refocus.current !== null) {
+      document.getElementById(`ex-del-${refocus.current}`)?.focus();
+      refocus.current = null;
+    }
+  });
   const t = today();
   const summaries = useMemo(() => summariseMappings(mappings, t), [mappings, t]);
   const issuerLabel = (id: number) => (issuers.has(id) ? `${issuers.get(id)} (issuer ${id})` : `Issuer ${id}`);
-  const set = <K extends keyof ExposureForm>(k: K, v: ExposureForm[K]) => setForm((f) => ({ ...f, [k]: v }));
+  const set = <K extends keyof ExposureForm>(k: K, v: ExposureForm[K]) => (k === "issuerId" ? setIssuerTyped(v as string) : setForm((f) => ({ ...f, [k]: v })));
+  const issuerNumber = /^\d+$/.test(form.issuerId.trim()) && Number(form.issuerId) >= 1 && Number.isSafeInteger(Number(form.issuerId)) ? Number(form.issuerId) : null;
+  // Known issuers (id -> ticker): the page's own plus those that already carry mappings.
+  const knownIssuers = useMemo(() => [...new Set([...issuers.keys(), ...mappings.map((m) => m.issuerId)])].sort((a, b) => a - b), [issuers, mappings]);
 
   async function submit(e: FormEvent) {
     e.preventDefault();
@@ -104,8 +138,9 @@ export function ExposureEditor({
         setServerErrors(messages.length ? messages : [`The API rejected the mapping (HTTP ${response.status}).`]);
         return;
       }
-      setNotice(`Mapping saved: ${body.segment} → ${body.geography ?? `HS ${body.hs_code}`} at ${formatPct(body.weight, 1)}.`);
-      setForm((f) => ({ ...blankForm(Number(f.issuerId) || null), basis: f.basis }));
+      setNotice(`Mapping saved for ${issuerLabel(body.issuer_id)}: ${body.segment} → ${body.geography ?? `HS ${body.hs_code}`} at ${formatPct(body.weight, 1)}.`);
+      setIssuerTyped(String(body.issuer_id));
+      setForm((f) => ({ ...blankForm(null), basis: f.basis }));
       onChanged();
     } catch (err) {
       setServerErrors([`Could not reach the API: ${err instanceof Error ? err.message : String(err)}`]);
@@ -192,13 +227,13 @@ export function ExposureEditor({
                     <td className="px-3 py-1.5 text-right">
                       {confirming === m.id ? (
                         <span className="inline-flex gap-1.5">
-                          <Button type="button" size="sm" variant="outline" disabled={deleting === m.id} onClick={() => void remove(m.id)}>
+                          <Button type="button" size="sm" variant="outline" autoFocus disabled={deleting === m.id} onClick={() => void remove(m.id)}>
                             {deleting === m.id ? "Deleting…" : "Confirm delete"}
                           </Button>
-                          <Button type="button" size="sm" variant="ghost" onClick={() => setConfirming(null)}>Cancel</Button>
+                          <Button type="button" size="sm" variant="ghost" onClick={() => { refocus.current = m.id; setConfirming(null); }}>Cancel</Button>
                         </span>
                       ) : (
-                        <Button type="button" size="sm" variant="ghost" onClick={() => { setConfirming(m.id); setDeleteError(null); }} aria-label={`Delete mapping ${m.segment} for ${issuerLabel(m.issuerId)}`}>
+                        <Button id={`ex-del-${m.id}`} type="button" size="sm" variant="ghost" onClick={() => { setConfirming(m.id); setDeleteError(null); }} aria-label={`Delete mapping ${m.segment} for ${issuerLabel(m.issuerId)}`}>
                           Delete
                         </Button>
                       )}
@@ -217,13 +252,35 @@ export function ExposureEditor({
       <form onSubmit={submit} noValidate className="flex flex-col gap-3 border-t border-border-soft pt-4" aria-labelledby="exposure-form-heading">
         <h3 id="exposure-form-heading" className="font-heading text-lg font-semibold">Add a mapping</h3>
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
-          <Field id="ex-issuer" label="Issuer id" error={fieldErr("issuerId")} hint={defaultIssuerId === null ? "The id of the issuer this segment belongs to." : undefined}>
-            <Input id="ex-issuer" value={form.issuerId} onChange={(e) => set("issuerId", e.target.value)} inputMode="numeric" aria-invalid={inv("issuerId")} aria-describedby={errors.issuerId ? "ex-issuer-error" : undefined} />
+          <Field
+            id="ex-issuer"
+            label="Issuer id"
+            error={fieldErr("issuerId")}
+            hint={
+              ticker && defaultIssuerId !== null && issuerTyped === null
+                ? `Prefilled with ${ticker}'s issuer id.`
+                : ticker && defaultIssuerId === null
+                  ? `${ticker} has no mapping yet, so its issuer id is not known here. Pick one below or type it; the company name is shown before you save.`
+                  : "The id of the issuer this segment belongs to."
+            }
+          >
+            <Input id="ex-issuer" value={form.issuerId} onChange={(e) => set("issuerId", e.target.value)} onBlur={() => setCheckedId(issuerNumber)} inputMode="numeric" aria-invalid={inv("issuerId")} aria-describedby={errors.issuerId ? "ex-issuer-error" : undefined} />
+            {knownIssuers.length > 0 ? (
+              <select aria-label="Pick a known issuer" value="" onChange={(e) => { if (e.target.value) { set("issuerId", e.target.value); setCheckedId(Number(e.target.value)); } }} className="h-8 w-full min-w-0 border border-border bg-surface-raised px-2 text-xs text-text outline-none focus-visible:border-focus focus-visible:ring-2 focus-visible:ring-focus/30">
+                <option value="">Known issuers…</option>
+                {knownIssuers.map((id) => (
+                  <option key={id} value={id}>{issuerLabel(id)}</option>
+                ))}
+              </select>
+            ) : null}
+            {issuerNumber !== null && checkedId === issuerNumber ? <IssuerCheck key={issuerNumber} issuerId={issuerNumber} known={issuers.get(issuerNumber)} ticker={ticker} /> : issuerNumber !== null && issuers.has(issuerNumber) ? (
+              <p role="status" className="text-xs text-text">Issuer {issuerNumber}: {issuers.get(issuerNumber)}.{ticker && issuers.get(issuerNumber) !== ticker ? ` This is not ${ticker}.` : ""}</p>
+            ) : null}
           </Field>
           <Field id="ex-segment" label="Segment" error={fieldErr("segment")}>
             <Input id="ex-segment" value={form.segment} onChange={(e) => set("segment", e.target.value)} maxLength={160} aria-invalid={inv("segment")} aria-describedby={errors.segment ? "ex-segment-error" : undefined} />
           </Field>
-          <Field id="ex-geo" label="Country code" error={fieldErr("geography")} hint="ISO alpha-2, e.g. DE (or EU)">
+          <Field id="ex-geo" label="Country code" error={fieldErr("geography")} hint="ISO alpha-2, e.g. DE or GB (not UK), or EU">
             <Input id="ex-geo" value={form.geography} onChange={(e) => set("geography", e.target.value.toUpperCase())} maxLength={5} aria-invalid={inv("geography")} aria-describedby={errors.geography ? "ex-geo-error" : undefined} />
           </Field>
           <Field id="ex-basis" label="Basis" error={fieldErr("basis")}>

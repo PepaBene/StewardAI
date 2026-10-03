@@ -8,6 +8,9 @@ import {
   groupByGeography,
   hhiPoints,
   isActiveMapping,
+  checkGeography,
+  canonicalGeography,
+  normaliseReporter,
   mappedTargets,
   outsideRange,
   parseTradeClaim,
@@ -371,5 +374,81 @@ describe("trade helpers", () => {
     expect(equalPartners(0.25)).toBe(4);
     expect(hhiPoints(null)).toBeNull();
     expect(equalPartners(0)).toBeNull();
+  });
+});
+
+describe("fix pass: trade reporter normalisation", () => {
+  it("sends every spelling of a country as the alpha-2 code the backend matches (it compares case-sensitively and has no alias expansion)", () => {
+    expect(normaliseReporter("de")).toEqual({ code: "DE", error: null });
+    expect(normaliseReporter("DEU")).toEqual({ code: "DE", error: null });
+    expect(normaliseReporter("276")).toEqual({ code: "DE", error: null });
+    expect(normaliseReporter(" 840 ")).toEqual({ code: "US", error: null });
+    expect(normaliseReporter("842")).toEqual({ code: "US", error: null });
+    expect(normaliseReporter("97")).toEqual({ code: "EU", error: null });
+  });
+  it("refuses codes it cannot place instead of asking the backend and reading 'no data'", () => {
+    expect(normaliseReporter("XYZ").error).toMatch(/not an ISO country code/);
+    expect(normaliseReporter("00").error).toMatch(/World/);
+    expect(normaliseReporter("Germany").error).toMatch(/2 to 5/);
+    expect(normaliseReporter("").code).toBeNull();
+  });
+});
+
+describe("fix pass: geography codes in the exposure editor", () => {
+  const f = (over: Partial<ExposureForm>): ExposureForm => ({ issuerId: "7", segment: "Cloud", geography: "DE", hsCode: "", hsRevision: "", basis: "reported", weightPercent: "10", validFrom: "2026-01-01", validTo: "", ...over });
+  it("rejects UK (it is GB), XK and unknown codes that the backend pattern would accept", () => {
+    expect(validateExposureForm(f({ geography: "uk" })).errors.geography).toMatch(/GB/);
+    expect(validateExposureForm(f({ geography: "XK" })).errors.geography).toMatch(/Kosovo/);
+    expect(validateExposureForm(f({ geography: "ZZZ" })).errors.geography).toMatch(/not a country code/);
+    expect(validateExposureForm(f({ geography: "UK" })).body).toBeNull();
+  });
+  it("stores one key per country: DEU and 276 are sent as DE, EU stays EU", () => {
+    expect(validateExposureForm(f({ geography: "deu" })).body?.geography).toBe("DE");
+    expect(validateExposureForm(f({ geography: "276" })).body?.geography).toBe("DE");
+    expect(validateExposureForm(f({ geography: "EU" })).body?.geography).toBe("EU");
+    expect(checkGeography("GB")).toEqual({ code: "GB", error: null });
+  });
+  it("accepts only plain decimal weights and refuses one that would round to zero", () => {
+    expect(validateExposureForm(f({ weightPercent: "0x10" })).errors.weightPercent).toBeDefined();
+    expect(validateExposureForm(f({ weightPercent: "1e1" })).errors.weightPercent).toBeDefined();
+    expect(validateExposureForm(f({ weightPercent: "0.00001" })).errors.weightPercent).toMatch(/stored as zero/);
+    expect(validateExposureForm(f({ weightPercent: "0" })).body?.weight).toBe(0);
+    expect(validateExposureForm(f({ weightPercent: "12.5" })).body?.weight).toBe(0.125);
+  });
+});
+
+describe("fix pass: alias consistency (DE / DEU)", () => {
+  it("groups indicators of one country spelled DE and DEU under one heading", () => {
+    const groups = groupByGeography([point({ geography: "DE" }), point({ geography: "DEU", seriesId: "cpi" })]);
+    expect(groups).toHaveLength(1);
+    expect(groups[0]).toMatchObject({ geography: "DE", name: "Germany" });
+    expect(canonicalGeography("deu")).toBe("DE");
+    expect(canonicalGeography("zz9")).toBe("ZZ9");
+  });
+  it("marks the holdings count of merged rows as a lower bound (the backend only gives counts)", () => {
+    const v = countryExposureView(ctx([row("DE", { reported: 100 }, 1000, 2), row("DEU", { reported: 50 }, 1000, 1), row("US", { reported: 10 })]), "all");
+    const de = v.countries.find((d) => d.code === "DE");
+    expect(de).toMatchObject({ holdings: 2, holdingsAtLeast: true });
+    expect(v.countries.find((d) => d.code === "US")?.holdingsAtLeast).toBe(false);
+  });
+});
+
+describe("fix pass: basis filter keeps the remainder honest", () => {
+  const c = ctx([row("DE", { reported: 200, estimated: 100 }), row("US", { estimated: 300 }), row("ZZ", { reported: 50 })], {}, 350);
+  it("reports the share mapped on the chosen basis and the share mapped on other bases, so countries + other + unknown add to 100%", () => {
+    const v = countryExposureView(c, "reported");
+    expect(v.basisShare).toBeCloseTo(0.25, 9); // DE 200 + unrecognised ZZ 50
+    expect(v.otherBasisShare).toBeCloseTo(0.4, 9); // DE estimated 100 + US estimated 300
+    expect(v.countries.find((d) => d.code === "US")?.value).toBe(0);
+    expect(v.countries.find((d) => d.code === "DE")?.value).toBeCloseTo(0.2, 9);
+    expect(v.unmappedShare).toBeCloseTo(0.35, 9);
+    expect((v.basisShare ?? 0) + (v.otherBasisShare ?? 0) + (v.unmappedShare ?? 0)).toBeCloseTo(1, 9);
+  });
+  it("uses the chosen basis for the exposed value too, and has no remainder under 'all'", () => {
+    const v = countryExposureView(c, "reported");
+    expect(v.countries.find((d) => d.code === "DE")?.exposedValue).toBe(200);
+    const all = countryExposureView(c, "all");
+    expect(all.otherBasisShare).toBeNull();
+    expect(all.countries.find((d) => d.code === "DE")?.exposedValue).toBe(300);
   });
 });

@@ -27,7 +27,7 @@ function sameGeography(a: string, b: string): boolean {
  * indicator, and a ranked cross-country view of the same indicators. A holding with no mapping
  * gets an explicit "exposure unknown" state, never a default country.
  */
-export function HoldingMacroPanel({ ctx, ticker }: { ctx: HoldingMacroContext; ticker: string }) {
+export function HoldingMacroPanel({ ctx, ticker, pastAsOf = false }: { ctx: HoldingMacroContext; ticker: string; /** The owner chose a past "known as of" date. */ pastAsOf?: boolean }) {
   const groups = groupByGeography(ctx.observations);
   const targets = mappedTargets(ctx.effects);
   const mappedGeos = targets.filter((t) => t.kind === "geography").map((t) => t.key);
@@ -41,7 +41,7 @@ export function HoldingMacroPanel({ ctx, ticker }: { ctx: HoldingMacroContext; t
         <PanelHeading kicker={`${ticker} · as of ${day(ctx.asOf)}`} title={<span id="holding-exposure-heading">Mapped exposure of {ticker}</span>} />
         {ctx.exposureUnknown ? (
           <AlertMessage tone="info" title="Exposure unknown">
-            No exposure mapping for {ticker} was known by {day(ctx.asOf)}, so no country or product is attributed to it and no indicator is shown as its context. Add a mapping below to link it to a country.
+            No exposure mapping for {ticker} was known by {day(ctx.asOf)}, so no country or product is attributed to it and no indicator is shown as its context. {pastAsOf ? "A mapping added now is dated from today, so it cannot appear at this past date; switch back to today to see it." : "Add a mapping below to link it to a country."}
           </AlertMessage>
         ) : (
           <>
@@ -96,8 +96,8 @@ export function HoldingMacroPanel({ ctx, ticker }: { ctx: HoldingMacroContext; t
                   {g.name} <span className="num text-xs font-normal text-text-muted">{g.points.length} series</span>
                 </h3>
                 <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">
-                  {g.points.map((p) => (
-                    <IndicatorCard key={`${p.seriesId}|${p.source}|${p.geography}`} point={p} />
+                  {g.points.map((p, i) => (
+                    <IndicatorCard key={`${p.seriesId}|${p.source}|${p.geography}|${i}`} point={p} />
                   ))}
                 </div>
               </section>

@@ -12,14 +12,13 @@ import { formatCompact, formatNumber, formatPct } from "@/lib/charts/format";
 import { isFiniteNumber } from "@/lib/charts/scale";
 import { useApiResource, type ApiResult } from "@/lib/hooks/use-api-resource";
 import { fetchCountryContext, fetchIndustryContext, fetchTradeContext } from "@/lib/macro/api";
-import { equalPartners, hhiPoints, productSankey, tradeFlows, tradePartyName, tradeRows, TRADE_METRIC_LABELS } from "@/lib/macro/logic";
+import { equalPartners, hhiPoints, normaliseReporter, productSankey, tradeFlows, tradePartyName, tradeRows, TRADE_METRIC_LABELS } from "@/lib/macro/logic";
 import type { ResearchContext, TradeContext, TradeRow } from "@/lib/macro/types";
 
 import { day } from "./format";
 import { ResourceBoundary } from "./resource-boundary";
 
 const usd = (v: number) => `$${formatCompact(v)}`;
-const REPORTER_RE = /^[A-Za-z0-9]{2,5}$/;
 const HS_RE = /^[0-9]{2,6}$/;
 
 export type TradeQuery = { reporter: string; hsCode: string };
@@ -29,6 +28,9 @@ export function TradeMetrics({ trade }: { trade: TradeContext }) {
   const entries = Object.entries(trade.metrics);
   return (
     <div className="flex flex-col gap-3">
+      <p className="max-w-prose text-xs text-text-muted">
+        Reporter-wide figures: the backend computes these from every product stored for {tradePartyName(trade.reporter)}, not from HS {trade.hsCode} alone, so they move when another product is collected. Only the latest-period totals above are for HS {trade.hsCode}.
+      </p>
       <dl className="m-0 grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">
         {entries.map(([key, value]) => {
           const meta = TRADE_METRIC_LABELS[key] ?? { label: key.replace(/_/g, " "), kind: "index" as const, note: "" };
@@ -162,6 +164,41 @@ export function ProductRows({ context, hsCode }: { context: ResearchContext; hsC
   );
 }
 
+/** The product's latest-period totals (HS-specific) and the reporter-wide figures, labelled apart. */
+export function TradeSummary({ trade: t }: { trade: TradeContext }) {
+  return (
+    <section aria-label="Trade summary" className="flex flex-col gap-3">
+      <p className="max-w-prose text-sm text-text">
+        {tradePartyName(t.reporter)}, HS {t.hsCode}: latest period for this product {t.latestPeriod ? day(t.latestPeriod) : "n/a"}.
+        {Object.keys(t.latestByFlow).length === 0 ? " No flow total exists for the latest period." : ""}
+      </p>
+      <p className="max-w-prose text-xs text-text-muted">
+        Reporter-wide: {t.periods} period{t.periods === 1 ? "" : "s"} stored across all of this reporter&apos;s products; HS revision {t.hsRevision === "mixed" ? "mixed (several revisions are stored)" : t.hsRevision}.
+      </p>
+      <dl className="m-0 flex flex-wrap gap-3">
+        {Object.entries(t.latestByFlow).map(([flow, v]) => (
+          <div key={flow} className="flex min-w-36 flex-col border border-border-soft px-3 py-2">
+            <dt className="text-xs text-text-muted">{flow === "export" ? "Exports" : flow === "import" ? "Imports" : flow}, latest period</dt>
+            <dd className="num m-0 font-heading text-[22px] font-semibold">{usd(v)} <span className="text-xs font-normal text-text-muted">{t.currency}</span></dd>
+          </div>
+        ))}
+      </dl>
+      <TradeMetrics trade={t} />
+      <ProvenanceFooter
+        provenance={{
+          source: "UN Comtrade (national trade statistics)",
+          sourceUrl: t.sourceUrl,
+          asOf: t.latestPeriod,
+          knownAt: t.knownAt,
+          method: `${t.hsRevision === "mixed" ? "several HS revisions stored for this reporter" : t.hsRevision}; latest revision of each observation; exports and imports never blended. Metrics are reporter-wide, the latest-period totals are for HS ${t.hsCode}`,
+          state: t.latestPeriod ? "verified" : "not_covered",
+          reason: t.notice,
+        }}
+      />
+    </section>
+  );
+}
+
 /**
  * Trade context for one reporter and HS product: the backend's latest value per flow and
  * its reporter-wide metrics, the reporter's largest product-to-partner rows as a Sankey, and
@@ -174,21 +211,37 @@ export function TradePanel({ initial }: { initial: TradeQuery }) {
   const [reporter, setReporter] = useState(initial.reporter);
   const [hs, setHs] = useState(initial.hsCode);
   const [error, setError] = useState<string | null>(null);
+  // A late-arriving default (the holding's mapped country and product load after the panel
+  // mounts) fills the form until the owner has typed something of their own.
+  const [touched, setTouched] = useState(false);
+  const [seen, setSeen] = useState(initial);
+  if (!touched && (seen.reporter !== initial.reporter || seen.hsCode !== initial.hsCode)) {
+    setSeen(initial);
+    setQuery(initial);
+    setReporter(initial.reporter);
+    setHs(initial.hsCode);
+  }
 
-  const valid = REPORTER_RE.test(query.reporter) && HS_RE.test(query.hsCode);
-  const tradeFetcher = useCallback((): Promise<ApiResult<TradeContext>> => (valid ? fetchTradeContext(query.reporter, query.hsCode) : Promise.resolve(NOT_REQUESTED)), [query, valid]);
-  const countryFetcher = useCallback((): Promise<ApiResult<ResearchContext>> => (REPORTER_RE.test(query.reporter) ? fetchCountryContext(query.reporter.toUpperCase()) : Promise.resolve(NOT_REQUESTED_CTX)), [query]);
-  const industryFetcher = useCallback((): Promise<ApiResult<ResearchContext>> => (HS_RE.test(query.hsCode) ? fetchIndustryContext(query.hsCode) : Promise.resolve(NOT_REQUESTED_CTX)), [query]);
+  // The backend matches the reporter exactly (alpha-2 or the stored M49), so every spelling is
+  // normalised to the alpha-2 code first; the country call below uses the same code.
+  const reporterCode = normaliseReporter(query.reporter).code;
+  const valid = reporterCode !== null && HS_RE.test(query.hsCode);
+  const tradeFetcher = useCallback((): Promise<ApiResult<TradeContext>> => (reporterCode !== null && HS_RE.test(query.hsCode) ? fetchTradeContext(reporterCode, query.hsCode) : Promise.resolve(NOT_REQUESTED)), [reporterCode, query.hsCode]);
+  const countryFetcher = useCallback((): Promise<ApiResult<ResearchContext>> => (reporterCode !== null ? fetchCountryContext(reporterCode) : Promise.resolve(NOT_REQUESTED_CTX)), [reporterCode]);
+  const industryFetcher = useCallback((): Promise<ApiResult<ResearchContext>> => (HS_RE.test(query.hsCode) ? fetchIndustryContext(query.hsCode) : Promise.resolve(NOT_REQUESTED_CTX)), [query.hsCode]);
   const { state: trade } = useApiResource(tradeFetcher);
   const { state: country } = useApiResource(countryFetcher);
   const { state: industry } = useApiResource(industryFetcher);
 
   function submit(e: FormEvent) {
     e.preventDefault();
-    if (!REPORTER_RE.test(reporter.trim())) return setError("Reporter: 2 to 5 letters or digits, e.g. DE, US or 276.");
+    setTouched(true);
+    const r = normaliseReporter(reporter);
+    if (r.error !== null) return setError(r.error);
     if (!HS_RE.test(hs.trim())) return setError("HS code: 2 to 6 digits, e.g. 8486.");
     setError(null);
-    setQuery({ reporter: reporter.trim(), hsCode: hs.trim() });
+    setReporter(r.code);
+    setQuery({ reporter: r.code, hsCode: hs.trim() });
   }
 
   return (
@@ -197,11 +250,11 @@ export function TradePanel({ initial }: { initial: TradeQuery }) {
       <form onSubmit={submit} className="flex flex-wrap items-end gap-3" noValidate>
         <div className="flex min-w-0 flex-col gap-1">
           <Label htmlFor="trade-reporter">Reporter (ISO code or M49)</Label>
-          <Input id="trade-reporter" value={reporter} onChange={(e) => setReporter(e.target.value)} className="w-36" inputMode="text" autoComplete="off" aria-invalid={error?.startsWith("Reporter") || undefined} />
+          <Input id="trade-reporter" value={reporter} onChange={(e) => { setTouched(true); setReporter(e.target.value); }} className="w-36" inputMode="text" autoComplete="off" aria-invalid={error?.startsWith("Reporter") || undefined} />
         </div>
         <div className="flex min-w-0 flex-col gap-1">
           <Label htmlFor="trade-hs">HS code</Label>
-          <Input id="trade-hs" value={hs} onChange={(e) => setHs(e.target.value)} className="w-32" inputMode="numeric" autoComplete="off" aria-invalid={error?.startsWith("HS") || undefined} />
+          <Input id="trade-hs" value={hs} onChange={(e) => { setTouched(true); setHs(e.target.value); }} className="w-32" inputMode="numeric" autoComplete="off" aria-invalid={error?.startsWith("HS") || undefined} />
         </div>
         <Button type="submit" size="sm">Show trade</Button>
         {error ? <p role="alert" className="text-sm text-text">{error}</p> : null}
@@ -212,34 +265,7 @@ export function TradePanel({ initial }: { initial: TradeQuery }) {
       ) : (
         <>
           <ResourceBoundary state={trade} what="trade context">
-            {(t) => (
-              <section aria-label="Trade summary" className="flex flex-col gap-3">
-                <p className="max-w-prose text-sm text-text">
-                  {tradePartyName(t.reporter)}, HS {t.hsCode} ({t.hsRevision}): {t.periods} period{t.periods === 1 ? "" : "s"} stored; latest {t.latestPeriod ? day(t.latestPeriod) : "n/a"}.
-                  {Object.keys(t.latestByFlow).length === 0 ? " No flow total exists for the latest period." : ""}
-                </p>
-                <dl className="m-0 flex flex-wrap gap-3">
-                  {Object.entries(t.latestByFlow).map(([flow, v]) => (
-                    <div key={flow} className="flex min-w-36 flex-col border border-border-soft px-3 py-2">
-                      <dt className="text-xs text-text-muted">{flow === "export" ? "Exports" : flow === "import" ? "Imports" : flow}, latest period</dt>
-                      <dd className="num m-0 font-heading text-[22px] font-semibold">{usd(v)} <span className="text-xs font-normal text-text-muted">{t.currency}</span></dd>
-                    </div>
-                  ))}
-                </dl>
-                <TradeMetrics trade={t} />
-                <ProvenanceFooter
-                  provenance={{
-                    source: "UN Comtrade (national trade statistics)",
-                    sourceUrl: t.sourceUrl,
-                    asOf: t.latestPeriod,
-                    knownAt: t.knownAt,
-                    method: `${t.hsRevision}; latest revision of each observation; exports and imports never blended`,
-                    state: t.latestPeriod ? "verified" : "not_covered",
-                    reason: t.notice,
-                  }}
-                />
-              </section>
-            )}
+            {(t) => <TradeSummary trade={t} />}
           </ResourceBoundary>
           <ResourceBoundary state={country} what="reporter trade rows">
             {(c) => <PartnerSankey context={c} selectedHs={query.hsCode} />}

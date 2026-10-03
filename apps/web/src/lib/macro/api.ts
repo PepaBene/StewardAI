@@ -72,3 +72,11 @@ export function deleteExposure(id: number) {
 export function runMacroCollect() {
   return api().POST("/jobs/macro-collect", {});
 }
+
+/** The names an issuer id carries today (legal name and aliases), to show which company an id belongs to. */
+export async function fetchIssuerName(issuerId: number): Promise<ApiResult<{ issuerId: number; names: string[] }>> {
+  const result = await api().GET("/reference/issuers/{issuer_id}/as-of", { params: { path: { issuer_id: issuerId }, query: { date: new Date().toISOString().slice(0, 10) } } });
+  if (!result.response.ok || result.data === undefined) return { error: result.error, response: result.response };
+  const names = [result.data.legal_name, ...result.data.aliases.map((a) => a.name)].filter((n): n is string => !!n);
+  return { data: { issuerId, names: [...new Set(names)] }, response: result.response };
+}

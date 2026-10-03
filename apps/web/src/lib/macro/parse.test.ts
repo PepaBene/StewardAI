@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
 
+import { BACKEND_STATE_MAP, toDataState as sharedToDataState } from "@/lib/data-state/states";
+
 import { num, parseExposureMappings, parseMacroContext, parsePortfolioCountryContext, parsePortfolioMacroCoverage, parseResearchContext, parseTradeContext, toBasis, toDataState } from "./parse";
 
 describe("num", () => {
@@ -21,10 +23,15 @@ describe("toDataState", () => {
     expect(toDataState("paid_only").state).toBe("paid_only");
     expect(toDataState("not_covered").state).toBe("not_covered");
   });
-  it("maps the Eurostat history gap to partial coverage with a reason", () => {
+  it("maps the Eurostat history gap like the shared adapter (not covered) and keeps the reason", () => {
     const s = toDataState("vintage_unavailable");
-    expect(s.state).toBe("partial");
+    expect(s.state).toBe(sharedToDataState("vintage_unavailable"));
+    expect(s.state).toBe("not_covered");
     expect(s.reason).toMatch(/not archived/);
+  });
+  it("agrees with the shared adapter on every backend state, and a failed provider is unavailable without an 'unrecognised' reason", () => {
+    for (const key of Object.keys(BACKEND_STATE_MAP)) expect(toDataState(key).state).toBe(sharedToDataState(key));
+    expect(toDataState("temporarily_failed")).toEqual({ state: "unavailable", reason: null });
   });
   it("never shows an unknown state as healthy", () => {
     const s = toDataState("weird");
@@ -69,7 +76,7 @@ describe("parseMacroContext", () => {
     expect(b.value).toBeNull();
     expect(b.state).toBe("quota_exhausted");
     expect(b.fiveYear).toBeNull(); // inverted range is not trusted
-    expect(r.value.coverage[0].state).toBe("partial");
+    expect(r.value.coverage[0].state).toBe("not_covered");
     expect(r.value.effects[0]).toMatchObject({ basis: "estimated", weight: 0.4, unknownWeight: 0.6 });
     expect(r.value.seriesEffects[0].weightedChange).toBe(-0.12);
     expect(r.value.comparisons[0].value).toBe(3);

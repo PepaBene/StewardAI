@@ -1,5 +1,5 @@
 import type { components } from "@/lib/api/schema";
-import { isDataState, type DataState } from "@/lib/data-state/states";
+import { parseDataState, type DataState } from "@/lib/data-state/states";
 
 import type {
   BasisLabel,
@@ -60,16 +60,17 @@ export function toBasis(raw: unknown): BasisLabel {
 }
 
 /**
- * Backend availability strings -> the shared vocabulary. "available" is "verified"; the
- * Eurostat history gap `vintage_unavailable` is partial coverage with the backend's reason; an
- * unrecognised value is `unavailable` and says so, rather than being shown as healthy.
+ * Backend availability strings -> the shared vocabulary, through the one adapter in
+ * lib/data-state (so macro and coverage views agree on the same ledger row). Only the reason
+ * is added here: the Eurostat history gap `vintage_unavailable` keeps the backend's wording,
+ * and an unrecognised value is `unavailable` and says so, rather than being shown as healthy.
  */
 export function toDataState(raw: string): { state: DataState; reason: string | null } {
   const key = raw.trim().toLowerCase();
-  if (key === "available" || key === "ok" || key === "verified") return { state: "verified", reason: null };
-  if (key === "vintage_unavailable") return { state: "partial", reason: "Release history before collection began was not archived (vintage unavailable)." };
-  if (isDataState(key)) return { state: key, reason: null };
-  return { state: "unavailable", reason: `Unrecognised source state "${raw}".` };
+  const state = parseDataState(key);
+  if (state === null) return { state: "unavailable", reason: `Unrecognised source state "${raw}".` };
+  if (key === "vintage_unavailable") return { state, reason: "Release history before collection began was not archived (vintage unavailable)." };
+  return { state, reason: null };
 }
 
 function range(low: unknown, high: unknown): Range | null {

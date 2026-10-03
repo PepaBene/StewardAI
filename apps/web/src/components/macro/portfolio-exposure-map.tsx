@@ -4,14 +4,14 @@ import { useMemo, useState } from "react";
 
 import { Choropleth, type ChoroplethDatum, type ChoroplethExtraRow } from "@/components/charts";
 import { ChartFrame, Segmented } from "@/components/data-state";
-import { formatNumber, formatPct } from "@/lib/charts/format";
+import { formatNumber } from "@/lib/charts/format";
 import { countryName } from "@/lib/charts/geo";
 import { isFiniteNumber } from "@/lib/charts/scale";
 import { describeCoverage } from "@/lib/data-state/provenance";
-import { BASIS_LABELS, countryExposureView, type BasisFilter } from "@/lib/macro/logic";
+import { BASIS_LABELS, canonicalGeography, countryExposureView, rowShare, type BasisFilter } from "@/lib/macro/logic";
 import type { PortfolioCountryContext, PortfolioMacroCoverage } from "@/lib/macro/types";
 
-import { day } from "./format";
+import { day, formatShare } from "./format";
 
 const BASIS_OPTIONS = [
   { id: "all", label: "All bases" },
@@ -20,7 +20,7 @@ const BASIS_OPTIONS = [
   { id: "user_assigned", label: "Owner-assigned" },
 ] as const satisfies readonly { id: BasisFilter; label: string }[];
 
-const pct = (v: number) => formatPct(v, v > 0 && v < 0.001 ? 2 : 1);
+const pct = formatShare;
 
 /**
  * Country exposure of the whole portfolio as a choropleth overview with a ranked list beside it
@@ -40,8 +40,10 @@ export function PortfolioExposureMap({ ctx, coverage }: { ctx: PortfolioCountryC
     const m = new Map<string, { series: number; latest: string | null }>();
     for (const e of coverage?.byExposure ?? []) {
       if (e.exposureType !== "geography") continue;
-      const prev = m.get(e.exposureKey);
-      m.set(e.exposureKey, {
+      // DE, DEU and 276 are one country: keyed by the resolved code, like the exposure rows.
+      const key = canonicalGeography(e.exposureKey);
+      const prev = m.get(key);
+      m.set(key, {
         series: Math.max(prev?.series ?? 0, e.availableSeries ?? 0),
         latest: [prev?.latest, e.latestPeriod].filter((x): x is string => !!x).sort().pop() ?? null,
       });
@@ -62,7 +64,7 @@ export function PortfolioExposureMap({ ctx, coverage }: { ctx: PortfolioCountryC
     value: d.value,
     detail:
       isFiniteNumber(total) && total > 0
-        ? `Reported ${pct((d.byBasis.reported ?? 0) / total)} · estimated ${pct((d.byBasis.estimated ?? 0) / total)} · owner-assigned ${pct((d.byBasis.user_assigned ?? 0) / total)}; ${d.holdings} holding${d.holdings === 1 ? "" : "s"}`
+        ? `Reported ${pct((d.byBasis.reported ?? 0) / total)} · estimated ${pct((d.byBasis.estimated ?? 0) / total)} · owner-assigned ${pct((d.byBasis.user_assigned ?? 0) / total)}; ${d.holdingsAtLeast ? "at least " : ""}${d.holdings} holding${d.holdings === 1 && !d.holdingsAtLeast ? "" : "s"}`
         : undefined,
   }));
   const extraRows: ChoroplethExtraRow[] = [
@@ -70,10 +72,13 @@ export function PortfolioExposureMap({ ctx, coverage }: { ctx: PortfolioCountryC
     ...view.unrecognised.map((r) => ({
       key: `unk-${r.key}`,
       label: `Unrecognised code ${r.key}`,
-      value: basis === "all" ? r.shareOfPortfolio.ratio : null,
+      value: rowShare(r, basis, total),
       kind: "aggregate" as const,
       note: "The geography code is not an ISO country this map knows.",
     })),
+    ...(basis !== "all" && view.otherBasisShare !== null
+      ? [{ key: "other-bases", label: "Mapped on other bases", value: view.otherBasisShare, kind: "aggregate" as const, note: `Value mapped to a country, but not on the ${BASIS_LABELS[basis].toLowerCase()} basis shown here.` }]
+      : []),
     {
       key: "unknown",
       label: "Unknown (unmapped)",
@@ -98,7 +103,7 @@ export function PortfolioExposureMap({ ctx, coverage }: { ctx: PortfolioCountryC
       title="Where the portfolio is exposed"
       takeaway={
         hasValue && top && mapped !== null
-          ? `${pct(mapped)} of portfolio value is mapped to a country${reported !== null ? ` (${pct(reported)} reported, ${pct(estimated ?? 0)} estimated, ${pct(assigned ?? 0)} owner-assigned)` : ""}; ${pct(view.unmappedShare ?? 1 - mapped)} is unknown. The largest mapped country is ${countryName(top.code)} at ${pct(top.value ?? 0)}.`
+          ? `${pct(mapped)} of portfolio value is mapped to a country${reported !== null ? ` (${pct(reported)} reported, ${pct(estimated ?? 0)} estimated, ${pct(assigned ?? 0)} owner-assigned)` : ""}; ${pct(view.unmappedShare ?? 1 - mapped)} is unknown. The largest mapped country is ${countryName(top.code)} at ${pct(top.value ?? 0)} (all bases).${basis !== "all" && view.basisShare !== null ? ` Shown on the ${BASIS_LABELS[basis].toLowerCase()} basis only: ${pct(view.basisShare)} of portfolio value; ${pct(view.otherBasisShare ?? 0)} is mapped on other bases and left out of the countries.` : ""}`
           : "No portfolio value has an active country mapping yet, so no country is attributed."
       }
       units={`% of total portfolio value${isFiniteNumber(total) ? `, ${formatNumber(total, 0)} ${currency}` : ""} across ${positions} position${positions === 1 ? "" : "s"}; basis: ${basis === "all" ? "all mappings" : BASIS_LABELS[basis]}`}
@@ -115,7 +120,7 @@ export function PortfolioExposureMap({ ctx, coverage }: { ctx: PortfolioCountryC
       }}
       table={{
         caption: "Portfolio exposure by country and evidence basis",
-        columns: ["Country", "Share of portfolio", `Exposed value (${currency})`, "Reported", "Estimated", "Owner-assigned", "Holdings", "Series stored", "Latest period"],
+        columns: ["Country", basis === "all" ? "Share of portfolio" : `Share of portfolio (${BASIS_LABELS[basis].toLowerCase()} only)`, basis === "all" ? `Exposed value (${currency})` : `Exposed value, ${BASIS_LABELS[basis].toLowerCase()} only (${currency})`, "Reported", "Estimated", "Owner-assigned", "Holdings (all bases)", "Series stored", "Latest period"],
         rows: [
           ...[...view.countries, ...view.aggregates].map((d) => {
             const s = seriesByGeo.get(d.code);
@@ -126,15 +131,15 @@ export function PortfolioExposureMap({ ctx, coverage }: { ctx: PortfolioCountryC
               formatNumber(d.byBasis.reported ?? 0, 0),
               formatNumber(d.byBasis.estimated ?? 0, 0),
               formatNumber(d.byBasis.user_assigned ?? 0, 0),
-              String(d.holdings),
+              `${d.holdingsAtLeast ? "at least " : ""}${d.holdings}`,
               s ? String(s.series) : "not reported",
               s?.latest ? day(s.latest) : "n/a",
             ];
           }),
           ...view.unrecognised.map((r) => [
             `Unrecognised code ${r.key}`,
-            r.shareOfPortfolio.ratio === null ? "n/a" : pct(r.shareOfPortfolio.ratio),
-            isFiniteNumber(r.exposedValue) ? formatNumber(r.exposedValue, 0) : "n/a",
+            rowShare(r, basis, total) === null ? "n/a" : pct(rowShare(r, basis, total) as number),
+            basis === "all" ? (isFiniteNumber(r.exposedValue) ? formatNumber(r.exposedValue, 0) : "n/a") : formatNumber(r.byBasis[basis] ?? 0, 0),
             formatNumber(r.byBasis.reported ?? 0, 0),
             formatNumber(r.byBasis.estimated ?? 0, 0),
             formatNumber(r.byBasis.user_assigned ?? 0, 0),
@@ -142,6 +147,9 @@ export function PortfolioExposureMap({ ctx, coverage }: { ctx: PortfolioCountryC
             "n/a",
             "n/a",
           ]),
+          ...(basis !== "all" && view.otherBasisShare !== null
+            ? [["Mapped on other bases", pct(view.otherBasisShare), isFiniteNumber(total) ? formatNumber(view.otherBasisShare * total, 0) : "n/a", "—", "—", "—", "—", "—", "—"]]
+            : []),
           [
             "Unknown (unmapped)",
             view.unmappedShare === null ? "n/a" : pct(view.unmappedShare),
@@ -163,7 +171,7 @@ export function PortfolioExposureMap({ ctx, coverage }: { ctx: PortfolioCountryC
         unitLabel={`% of portfolio value, ${basis === "all" ? "all mappings" : BASIS_LABELS[basis].toLowerCase()}`}
         denominator={
           isFiniteNumber(total)
-            ? `Denominator: total portfolio value ${formatNumber(total, 0)} ${currency}. Mapped ${mapped === null ? "n/a" : pct(mapped)}, unknown ${view.unmappedShare === null ? "n/a" : pct(view.unmappedShare)}. ${describeCoverage({ covered: Math.max(0, positions - unmappedCount), total: positions, unit: "positions" })} mapped.`
+            ? `Denominator: total portfolio value ${formatNumber(total, 0)} ${currency}. Mapped ${mapped === null ? "n/a" : pct(mapped)}${basis !== "all" && view.basisShare !== null ? ` (${pct(view.basisShare)} on the ${BASIS_LABELS[basis].toLowerCase()} basis shown, ${pct(view.otherBasisShare ?? 0)} on other bases)` : ""}, unknown ${view.unmappedShare === null ? "n/a" : pct(view.unmappedShare)}. ${describeCoverage({ covered: Math.max(0, positions - unmappedCount), total: positions, unit: "positions" })} mapped.`
             : "Denominator unavailable."
         }
         ariaLabel={`World map of portfolio exposure by country, ${basis === "all" ? "all evidence bases" : BASIS_LABELS[basis]}`}
