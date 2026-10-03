@@ -2267,6 +2267,46 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/jobs/returns-refresh": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Run Returns Refresh
+         * @description Compute and store price and total returns for the held securities now.
+         */
+        post: operations["run_returns_refresh"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/jobs/exchange-probes": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Run Exchange Probes
+         * @description Probe the free price endpoints, one held symbol per exchange, now.
+         */
+        post: operations["run_exchange_probes"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/holdings/{ticker}/ownership": {
         parameters: {
             query?: never;
@@ -2612,6 +2652,26 @@ export interface paths {
          * @description Read shares outstanding and revenue breakdowns from the SEC XBRL filings now.
          */
         post: operations["run_sec_xbrl"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/jobs/sec-fsds-backfill": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Run Sec Fsds Backfill
+         * @description Backfill statement facts from an SEC Financial Statement and Notes data set now.
+         */
+        post: operations["run_sec_fsds_backfill"];
         delete?: never;
         options?: never;
         head?: never;
@@ -3301,6 +3361,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/jobs/ir-releases": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Run Ir Releases
+         * @description Fetch, version and parse the registered issuer IR pages now.
+         */
+        post: operations["run_ir_releases"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/watchlist": {
         parameters: {
             query?: never;
@@ -3714,6 +3794,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/jobs/pdmr-uk": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Run Pdmr Uk
+         * @description Parse UK PDMR announcements from the RNS stream now.
+         */
+        post: operations["run_pdmr_uk"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/company-graph/edges/{edge_id}/decision": {
         parameters: {
             query?: never;
@@ -3933,6 +4033,27 @@ export interface paths {
         get: operations["relationship_knock_on"];
         put?: never;
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/jobs/graph-review": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Run Graph Review
+         * @description Review queued relationship candidates, extract deal events and reconcile parent changes
+         *     now.
+         */
+        post: operations["run_graph_review"];
         delete?: never;
         options?: never;
         head?: never;
@@ -8132,6 +8253,19 @@ export interface components {
             /** Job Id */
             job_id: number;
         };
+        /** FsdsRunRequest */
+        FsdsRunRequest: {
+            /**
+             * Quarter
+             * @description Data set quarter such as 2025q3; the latest published one when null.
+             */
+            quarter?: string | null;
+            /**
+             * Ticker
+             * @description One holding, or all when null.
+             */
+            ticker?: string | null;
+        };
         /** FundAsOf */
         FundAsOf: {
             /** Isin */
@@ -9924,6 +10058,14 @@ export interface components {
             status: string;
             /** Source Url */
             source_url: string;
+        };
+        /** IrRunRequest */
+        IrRunRequest: {
+            /**
+             * Ticker
+             * @description One holding, or all when null.
+             */
+            ticker?: string | null;
         };
         /** IssuerAliasOut */
         IssuerAliasOut: {
@@ -19509,6 +19651,46 @@ export interface operations {
             };
         };
     };
+    run_returns_refresh: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["JobSummary"];
+                };
+            };
+        };
+    };
+    run_exchange_probes: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["JobSummary"];
+                };
+            };
+        };
+    };
     get_holding_ownership: {
         parameters: {
             query?: never;
@@ -20075,6 +20257,39 @@ export interface operations {
         requestBody: {
             content: {
                 "application/json": components["schemas"]["XbrlRunRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["JobSummary"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    run_sec_fsds_backfill: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": components["schemas"]["FsdsRunRequest"] | null;
             };
         };
         responses: {
@@ -21438,6 +21653,39 @@ export interface operations {
             };
         };
     };
+    run_ir_releases: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": components["schemas"]["IrRunRequest"] | null;
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["JobSummary"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     list_watchlist: {
         parameters: {
             query?: never;
@@ -22140,6 +22388,26 @@ export interface operations {
             };
         };
     };
+    run_pdmr_uk: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["JobSummary"];
+                };
+            };
+        };
+    };
     decide_company_edge: {
         parameters: {
             query?: never;
@@ -22534,6 +22802,26 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    run_graph_review: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["JobSummary"];
                 };
             };
         };

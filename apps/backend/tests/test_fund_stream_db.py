@@ -1056,6 +1056,41 @@ def test_fsds_reader_applies_the_documented_layout() -> None:
     assert fsds.period_start(dt.date(2025, 6, 30), 1) == dt.date(2025, 4, 1)
 
 
+def test_recent_quarters_are_the_completed_ones_newest_first() -> None:
+    assert fsds.recent_quarters(dt.date(2026, 10, 3)) == ["2026q3", "2026q2", "2026q1"]
+    assert fsds.recent_quarters(dt.date(2026, 1, 15), 2) == ["2025q4", "2025q3"]
+
+
+async def test_scheduled_fsds_backfill_without_params_uses_the_latest_published_quarter(
+    backend_pool: asyncpg.Pool, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """N8: with no quarter or url (the scheduled run) the job used to fail with "params need a
+    quarter"; it now takes the newest completed quarter whose data set exists."""
+    await seed_instrument(backend_pool)
+    monkeypatch.setenv("SEC_USER_AGENT", "Steward Test owner@example.test")
+    from steward.settings import get_settings
+
+    get_settings.cache_clear()
+    asked: list[str] = []
+    newest = fsds.recent_quarters(dt.datetime.now(dt.UTC).date())[0]
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        asked.append(request.url.path)
+        if newest in request.url.path:  # not published yet
+            return httpx.Response(404)
+        return httpx.Response(200, content=fsds_zip())
+
+    async def job(ctx: JobContext) -> None:
+        async with httpx.AsyncClient(transport=httpx.MockTransport(handler)) as http:
+            await fsds.run_fsds_backfill(ctx, http)
+
+    assert await run_job(backend_pool, "sec_fsds_backfill", job, trigger="schedule") == "succeeded"
+    assert len(asked) == 2 and newest in asked[0] and newest not in asked[1]
+    assert await backend_pool.fetchval(
+        "select count(*) from public.financial_statement_fact where source='sec_fsds'"
+    )
+
+
 async def test_fsds_backfill_job_stores_reconciled_facts_with_lineage_and_is_idempotent(
     backend_pool: asyncpg.Pool,
 ) -> None:

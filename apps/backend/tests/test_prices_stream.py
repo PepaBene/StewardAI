@@ -1025,6 +1025,36 @@ async def test_b22_exchange_session_rows_drive_the_expected_calendar(
     assert again.count == 4
 
 
+@pytest.mark.db
+async def test_n11_weekend_rows_do_not_make_the_calendar_confirmed(
+    backend_pool: asyncpg.Pool,
+) -> None:
+    """Audit N11: 6 of 10 weekdays confirmed plus 4 weekend rows was labelled
+    confirmed_calendar because the weekend rows were counted as confirmed weekdays."""
+    settings = CalendarSettings()
+    monday = dt.date(2026, 9, 28)
+    end = monday + dt.timedelta(days=13)  # two weeks: 10 weekdays, 4 weekend days
+    days = [monday + dt.timedelta(days=i) for i in range(14)]
+    weekdays = [d for d in days if d.weekday() < 5]
+    weekend = [d for d in days if d.weekday() >= 5]
+    for d in [*weekdays[:6], *weekend]:
+        await backend_pool.execute(
+            "insert into public.exchange_session (mic, session_date, state, source, confirmed)"
+            " values ('XETR', $1, 'open', 'owner', true)",
+            d,
+        )
+    partial = await expected_sessions(backend_pool, settings, "XETR", monday, end)
+    assert partial.basis == "partial_confirmed_calendar"
+    for d in weekdays[6:]:
+        await backend_pool.execute(
+            "insert into public.exchange_session (mic, session_date, state, source, confirmed)"
+            " values ('XETR', $1, 'open', 'owner', true)",
+            d,
+        )
+    full = await expected_sessions(backend_pool, settings, "XETR", monday, end)
+    assert full.basis == "confirmed_calendar"
+
+
 # ------------------------------------------------------------------ A17
 @pytest.mark.db
 async def test_a17_the_listing_writer_derives_evidence_and_waits_for_the_owner_when_unsure(

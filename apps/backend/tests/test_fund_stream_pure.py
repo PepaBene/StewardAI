@@ -837,3 +837,59 @@ def test_ir_fetch_guard_refuses_private_hosts_and_plain_http() -> None:
         with pytest.raises(ir.IrError):
             ir.assert_fetchable(url)
     ir.assert_fetchable("https://ir.example.test/x")
+
+
+@pytest.mark.parametrize(
+    "url",
+    [
+        "https://2130706433/",  # decimal 127.0.0.1
+        "https://0x7f.1/",  # hex / short
+        "https://0177.0.0.1/",  # octal
+        "https://127.1/",
+        "https://[::ffff:127.0.0.1]/",  # IPv4-mapped IPv6
+        "https://[::ffff:a9fe:a9fe]/",  # mapped 169.254.169.254
+        "https://[::1]/",
+        "https://169.254.169.254/latest/meta-data",
+        "https://100.64.0.1/",  # carrier-grade NAT
+        "https://[fe80::1]/",
+        "https://localhost./",
+    ],
+)
+def test_ir_fetch_guard_refuses_every_spelling_of_an_internal_address(url: str) -> None:
+    """N6: decimal, hex, octal and IPv4-mapped forms got past the literal-address check."""
+    with pytest.raises(ir.IrError):
+        ir.assert_fetchable(url)
+
+
+async def test_ir_fetch_validates_each_redirect_hop_before_connecting() -> None:
+    """N6: the redirect target used to be requested first and judged afterwards."""
+    import httpx
+
+    seen: list[str] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        seen.append(str(request.url))
+        if request.url.host == "ir.example.test":
+            target = {
+                "/a": "http://169.254.169.254/latest",
+                "/b": "https://2130706433/x",
+                "/c": "https://rebind.example.test/y",
+                "/ok": "https://cdn.example.test/d",
+            }
+            return httpx.Response(302, headers={"location": target[request.url.path]})
+        return httpx.Response(200, text="hello", headers={"content-type": "text/plain"})
+
+    async def resolve(host: str) -> list[str]:
+        return {"ir.example.test": ["93.184.216.34"], "cdn.example.test": ["93.184.216.35"],
+                "rebind.example.test": ["10.0.0.7"]}[host]  # fmt: skip
+
+    async with httpx.AsyncClient(transport=httpx.MockTransport(handler)) as http:
+        for path in ("/a", "/b", "/c"):
+            seen.clear()
+            with pytest.raises(ir.IrError):
+                await ir.fetch_document(http, f"https://ir.example.test{path}", resolve=resolve)
+            assert seen == [f"https://ir.example.test{path}"], seen  # the hop was never sent
+        doc = await ir.fetch_document(http, "https://ir.example.test/ok", resolve=resolve)
+        assert doc.body == b"hello"
+        with pytest.raises(ir.IrError):  # a hostname that resolves to a private address
+            await ir.fetch_document(http, "https://rebind.example.test/", resolve=resolve)

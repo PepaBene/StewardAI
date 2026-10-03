@@ -13,6 +13,8 @@ from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from api.auth import Owner
 from api.db import Pool
+from api.routes import _enqueue
+from steward.config.common import Ticker
 from steward.config.holding_profiles import HoldingProfile, HoldingProfilesConfig
 from steward.config.jobs import JobsConfig
 from steward.config.store import StoredConfig, load_active
@@ -44,6 +46,7 @@ from steward.graph.patents import store_patent_family as _store_patent
 from steward.graph.relationships import concentration, detect_contradictions, upsert_disclosure
 from steward.market_analysis import financial_peer_metrics
 from steward.peer_metrics import FORMULA_DETAIL, FORMULAS, peer_comparison
+from steward.portfolio.read import JobSummary
 from steward.reference.calendar import expected_sessions
 from steward.reference.listings import (
     ListingDecisionError,
@@ -1573,3 +1576,14 @@ async def relationship_concentration(
 @router.get("/holdings/{ticker}/patent-trends", tags=["holdings"], response_model=None)
 async def patent_trends(ticker: TickerPath, pool: Pool, _owner: Owner) -> list[dict[str, Any]]:
     return await patent_trend_rows(pool, ticker)
+
+
+class IrRunRequest(BaseModel):
+    ticker: Ticker | None = Field(default=None, description="One holding, or all when null.")
+
+
+@router.post("/jobs/ir-releases", tags=["jobs"], status_code=202)
+async def run_ir_releases(pool: Pool, owner: Owner, body: IrRunRequest | None = None) -> JobSummary:
+    """Fetch, version and parse the registered issuer IR pages now."""
+    params = body.model_dump(mode="json", exclude_none=True) if body else {}
+    return await _enqueue(pool, "ir_releases", owner.user_id, params)

@@ -349,3 +349,39 @@ def test_next_window_start() -> None:
     assert next_window_start("month", mid) == dt.datetime(2026, 4, 1, tzinfo=dt.UTC)
     assert next_window_start("week", mid) == mid + dt.timedelta(hours=1)
     assert next_window_start(None, mid) == mid + dt.timedelta(hours=1)
+
+
+# ---------------------------------------------------------------------------------------
+# N7: production callers
+# ---------------------------------------------------------------------------------------
+async def test_alert_gates_go_through_enforce_and_fail_closed() -> None:
+    """N7: the alert evaluator is a production caller of `enforce`; a gate that cannot be
+    evaluated refuses (it used to raise out of the run)."""
+    from steward.free_source_alerts import _Gates
+
+    class BrokenPool:
+        def __getattr__(self, name: str) -> object:
+            async def fail(*_a: object, **_k: object) -> None:
+                raise OSError("database unreachable")
+
+            return fail
+
+    gates = _Gates(BrokenPool(), True, dt.datetime(2026, 10, 3, tzinfo=dt.UTC))  # type: ignore[arg-type]
+    for gate in ("domain:credit_stress_alert", "signal:deal_state"):
+        verdict = await gates.check(gate)
+        assert not verdict.allowed and "gate unavailable" in verdict.reason, verdict
+
+
+def test_enforce_has_production_callers() -> None:
+    """N7: `verify_sources/enforce.py` is imported by code outside tests and outside the
+    `verify_sources` package itself (the alert evaluator)."""
+    from pathlib import Path
+
+    src = Path(__file__).resolve().parents[1] / "src"
+    callers = [
+        str(path.relative_to(src))
+        for path in src.rglob("*.py")
+        if "verify_sources" not in path.parts
+        and "verify_sources.enforce" in path.read_text(encoding="utf-8")
+    ]
+    assert "steward/free_source_alerts.py" in callers, callers

@@ -553,3 +553,38 @@ async def test_resolvers_read_prices_actions_statements_macro_patents_and_fund_w
     for r in resolved[:7]:
         assert compare_sample(r, DEFAULT_THRESHOLDS[r.domain]).matched or r.metric == "exists"
     assert not compare_sample(resolved[7], DEFAULT_THRESHOLDS["prices"]).matched
+
+
+@pytest.mark.db
+async def test_statements_resolver_reads_the_consolidated_fact_not_a_segment_one(
+    backend_pool: asyncpg.Pool,
+) -> None:
+    """Audit N5: a later segment fact of the same filing (120) resolved as the stored value, so
+    a correct reviewer sample of 1000 failed. Two durations ending the same day stay
+    unresolved rather than passing against one of them."""
+    pool = backend_pool
+    day = dt.date(2026, 6, 30)
+    cols = (
+        "insert into public.financial_statement_fact(ticker,concept,statement,period_start,"
+        "period_end,basis,value,unit,dimensions,source,source_url,known_at,revision) values"
+    )
+    await pool.execute(
+        cols
+        + "('BBB','us-gaap:Revenues','income','2026-01-01',$1,'reported',1000,'USD','{}','sec',"
+        "'https://x',now() - interval '1 day',0),"
+        "('BBB','us-gaap:Revenues','segment','2026-01-01',$1,'reported',120,'USD',"
+        '\'{"members":[{"axis":"Seg","member":"A"}]}\','
+        "'sec','https://x',now(),0)",
+        day,
+    )
+    sample = PrimarySample("statements", "BBB", "us-gaap:Revenues", D(1000), "filing", None, day)
+    (resolved,) = await resolve_stored_values(pool, [sample])
+    assert resolved.stored_value == D(1000)
+    assert compare_sample(resolved, DEFAULT_THRESHOLDS["statements"]).matched
+    await pool.execute(
+        cols + "('BBB','us-gaap:Revenues','income','2026-04-01',$1,'reported',520,'USD','{}','sec',"
+        "'https://x',now(),0)",
+        day,
+    )
+    (ambiguous,) = await resolve_stored_values(pool, [sample])
+    assert ambiguous.stored_value is None

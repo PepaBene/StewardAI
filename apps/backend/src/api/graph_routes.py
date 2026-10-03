@@ -10,11 +10,12 @@ from datetime import datetime
 from typing import Annotated, Any, Literal
 
 import httpx
-from fastapi import APIRouter, HTTPException, Path, Query
+from fastapi import APIRouter, HTTPException, Path, Query, status
 from pydantic import BaseModel, Field
 
 from api.auth import Owner
 from api.db import Pool
+from api.routes import _enqueue
 from steward.graph import provider_gate
 from steward.graph.deals import deal_timeline
 from steward.graph.decisions import (
@@ -29,6 +30,7 @@ from steward.graph.passages import review_hit
 from steward.graph.patents import competitor_overlap_rows
 from steward.graph.relationships import portfolio_knock_on, review_queue
 from steward.graph.successors import open_reconciliations
+from steward.portfolio.read import JobSummary
 from steward.settings import get_settings
 from steward.sources.edgar import EdgarClient
 
@@ -241,3 +243,10 @@ async def relationship_knock_on(
             "Shares are as reported by the filer and are not summed or imputed.",
         ],
     }
+
+
+@router.post("/jobs/graph-review", tags=["jobs"], status_code=status.HTTP_202_ACCEPTED)
+async def run_graph_review(pool: Pool, owner: Owner) -> JobSummary:
+    """Review queued relationship candidates, extract deal events and reconcile parent changes
+    now."""
+    return await _enqueue(pool, "graph_review", owner.user_id)

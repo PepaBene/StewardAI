@@ -25,6 +25,8 @@ from steward.graph.deals import (
     DealTransitionError,
     deal_key,
     deal_timeline,
+    pro_forma,
+    read_base_capital,
     record_deal_event,
 )
 from steward.graph.decisions import GraphDecisionError, decide_disclosure, decide_edge, decide_event
@@ -754,9 +756,11 @@ async def test_dilution_and_leverage_use_confirmed_terms_only(backend_pool: asyn
         ("us-gaap:DepreciationDepletionAndAmortization", "cash_flow", 300_000_000),
     ):
         await pool.execute(
-            "insert into financial_statement_fact (ticker, concept, statement, period_end, basis, value,"
-            " unit, dimensions, source, source_url, known_at) values ($1,$2,$3,'2025-12-31','reported',$4,"
-            "'USD','{\"members\": []}'::jsonb,'sec','https://sec.example/f',$5)",
+            "insert into financial_statement_fact (ticker, concept, statement, period_start,"
+            " period_end, basis, value, unit, dimensions, source, source_url, known_at)"
+            " values ($1,$2,$3,case when $3 in ('income','cash_flow') then '2025-01-01'::date end,"
+            "'2025-12-31','reported',$4,'USD','{\"members\": []}'::jsonb,'sec',"
+            "'https://sec.example/f',$5)",
             TICKER, concept, stmt, Decimal(value), dt.datetime(2026, 2, 1, tzinfo=dt.UTC),
         )  # fmt: skip
     key = deal_key(TICKER, "deal", "Target Software Inc")
@@ -787,6 +791,47 @@ async def test_dilution_and_leverage_use_confirmed_terms_only(backend_pool: asyn
     again = (await deal_timeline(pool, TICKER))[0]
     assert again["pro_forma"]["share_count_increase"] == Decimal("0.1050")
     assert again["state"] == "amended" and again["confirmed_state"] == "announced"
+
+
+async def test_pro_forma_ebitda_is_a_full_year_not_the_latest_quarter(
+    backend_pool: asyncpg.Pool,
+) -> None:
+    """Audit N4: FY operating income 4000 and a later Q1 of 900 gave EBITDA 900, so 10bn of debt
+    read about 11x levered instead of 2.5x. A fact that failed reconciliation never counts."""
+    pool = backend_pool
+    await seed_holding(pool)
+    known = dt.datetime(2026, 5, 1, tzinfo=dt.UTC)
+
+    async def fact(
+        concept: str, stmt: str, start: str | None, end: str, value: int, validation: str = "{}"
+    ) -> None:
+        await pool.execute(
+            "insert into financial_statement_fact (ticker, concept, statement, period_start,"
+            " period_end, basis, value, unit, dimensions, source, source_url, known_at, validation)"
+            " values ($1,$2,$3,$4::date,$5::date,'reported',$6,'USD','{}'::jsonb,'sec',"
+            "'https://sec.example/f',$7,$8::jsonb)",
+            TICKER, concept, stmt, start and dt.date.fromisoformat(start),
+            dt.date.fromisoformat(end), Decimal(value), known, validation,
+        )  # fmt: skip
+
+    op = "us-gaap:OperatingIncomeLoss"
+    await fact("us-gaap:LongTermDebt", "balance_sheet", None, "2026-03-31", 10_000)
+    await fact(op, "income", "2025-01-01", "2025-12-31", 4_000)
+    await fact(op, "income", "2026-01-01", "2026-03-31", 900)  # Q1: newer, three months
+    base = await read_base_capital(pool, TICKER)
+    assert base.ebitda == Decimal(4_000)
+    assert base.total_debt == Decimal(10_000)
+    out = pro_forma({"debt_raised": "0"}, base)
+    assert out["gross_leverage_before"] == Decimal("2.5000")
+    # A failed-reconciliation annual fact is ignored; with no other annual figure there is no
+    # EBITDA and the pro-forma says so instead of falling back to the quarter.
+    await pool.execute(
+        "update financial_statement_fact set validation='{\"reconciled\": false}'::jsonb"
+        " where period_start='2025-01-01'"
+    )
+    refused = await read_base_capital(pool, TICKER)
+    assert refused.ebitda is None
+    assert any("EBITDA" in m for m in pro_forma({}, refused)["inputs_missing"])
 
 
 # ---------------------------------------------------------------- G14 / G12 / A20: collectors
@@ -1070,7 +1115,8 @@ async def test_epo_oauth_failure_is_recorded_with_its_type(backend_pool: asyncpg
                 client_id="id", client_secret="bad",
             )  # fmt: skip
     row = await pool.fetchrow(
-        "select last_attempt_state, status_code from provider_access where provider='epo_ops'"
+        "select last_attempt_state, status_code from provider_access"
+        " where provider='epo_ops' and endpoint='patent_search'"
     )
     # The first rejection is a cooldown, not a permanent block.
     assert row["last_attempt_state"] == "temporarily_failed" and row["status_code"] == 400
@@ -1208,6 +1254,34 @@ async def api(backend_pool: asyncpg.Pool) -> AsyncIterator[httpx.AsyncClient]:
         transport=httpx.ASGITransport(app=app), base_url="http://test"
     ) as client:
         yield client
+
+
+async def test_graph_review_routes_return_jsonb_as_objects(
+    backend_pool: asyncpg.Pool, api: httpx.AsyncClient
+) -> None:
+    """N2: `detail` of reconciliations and contradictions is jsonb; with no codec on the pool it
+    was sent as a JSON string, which the web parsers reject."""
+    pool = backend_pool
+    await reconcile_parent_change(
+        pool, ticker=TICKER, change_kind="parent_changed", from_key="name:oldco",
+        to_key="Other Holdings", observed_source="gleif", detail={"why": ["a", "b"]},
+    )  # fmt: skip
+    first = await upsert_disclosure(
+        pool, ticker=TICKER, relationship="customer", direction="issuer_sells_to",
+        passage="Northwind Traders accounted for 11% of revenue.", source_url="https://s.example/1",
+        source="sec", counterparty_name="Northwind Traders", reported_share=Decimal("0.11"),
+        share_basis="issuer_revenue", fiscal_period="FY2025", valid_from=dt.date(2025, 1, 1),
+    )  # fmt: skip
+    await pool.execute(
+        "insert into public.relationship_contradiction (ticker, relationship, kind, disclosure_id,"
+        " detail) values ($1,'customer','share_conflict',$2,'{\"shares\": [0.1, 0.2]}'::jsonb)",
+        TICKER,
+        first,
+    )
+    recon = (await api.get("/company-graph/reconciliations", params={"ticker": TICKER})).json()
+    assert recon["open"][0]["detail"]["why"] == ["a", "b"]
+    queue = (await api.get("/relationship-review/queue", params={"ticker": TICKER})).json()
+    assert queue["contradictions"][0]["detail"] == {"shares": [0.1, 0.2]}
 
 
 async def test_decision_and_queue_routes(

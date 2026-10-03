@@ -53,6 +53,9 @@ ALLOWED: dict[str | None, frozenset[str]] = {
 TERMINAL = frozenset({"terminated", "reversed"})
 
 
+ANNUAL_DAYS = (330, 380)  # a fiscal year's length in days, as in peer_metrics
+
+
 class DealTransitionError(ValueError):
     pass
 
@@ -243,7 +246,7 @@ def pro_forma(terms: Mapping[str, object], base: BaseCapital) -> dict[str, Any]:
     if base.total_debt is None:
         missing.append("total debt")
     if base.ebitda is None:
-        missing.append("EBITDA")
+        missing.append("annual EBITDA (no reconciled twelve-month operating income)")
     out: dict[str, Any] = {
         "currency": terms.get("currency") or base.currency,
         "shares_issued": shares_issued,
@@ -391,23 +394,46 @@ async def read_base_capital(
 ) -> BaseCapital:
     """Latest reported capital from the statement fact store (whole-company facts only)."""
 
-    async def latest(
-        concepts: Sequence[str], statement_in: Sequence[str]
-    ) -> tuple[Decimal | None, str | None]:
+    async def latest_fact(
+        concepts: Sequence[str],
+        statement_in: Sequence[str],
+        *,
+        annual: bool = False,
+        period_end: dt.date | None = None,
+    ) -> tuple[Decimal | None, str | None, dt.date | None]:
+        # `annual` keeps only whole-year flow facts (330-380 days): a 10-Q's three-month figure
+        # against a full debt balance overstates leverage about fourfold. A fact whose
+        # reconciliation failed never feeds a pro-forma (see fundamentals.statements).
         row = await pool.fetchrow(
-            """select value,currency from public.financial_statement_fact
+            """select value,currency,period_end from public.financial_statement_fact
                where ticker=$1 and concept=any($2::text[]) and value is not null
                  and (dimensions='{}'::jsonb or dimensions->'members'='[]'::jsonb)
                  and statement=any($3::text[])
                  and ($4::timestamptz is null or known_at<=$4)
+                 and coalesce(validation->>'reconciled','') <> 'false'
+                 and (not $5::boolean or (period_start is not null
+                      and period_end-period_start between $6 and $7))
+                 and ($8::date is null or period_end=$8)
                order by period_end desc, array_position($2::text[], concept), known_at desc
                limit 1""",
             ticker,
             list(concepts),
             list(statement_in),
             as_of,
+            annual,
+            ANNUAL_DAYS[0],
+            ANNUAL_DAYS[1],
+            period_end,
         )
-        return (Decimal(row["value"]), row["currency"]) if row else (None, None)
+        if not row:
+            return None, None, None
+        return Decimal(row["value"]), row["currency"], row["period_end"]
+
+    async def latest(
+        concepts: Sequence[str], statement_in: Sequence[str]
+    ) -> tuple[Decimal | None, str | None]:
+        value, currency, _ = await latest_fact(concepts, statement_in)
+        return value, currency
 
     shares, _ = await latest(
         ["dei:EntityCommonStockSharesOutstanding", "us-gaap:CommonStockSharesOutstanding"],
@@ -421,17 +447,23 @@ async def read_base_capital(
         ["us-gaap:CashAndCashEquivalentsAtCarryingValue", "ifrs-full:CashAndCashEquivalents"],
         ["balance_sheet"],
     )
-    operating, _ = await latest(
-        ["us-gaap:OperatingIncomeLoss", "ifrs-full:ProfitLossFromOperatingActivities"], ["income"]
+    operating, _, flow_end = await latest_fact(
+        ["us-gaap:OperatingIncomeLoss", "ifrs-full:ProfitLossFromOperatingActivities"],
+        ["income"],
+        annual=True,
     )
-    dna, _ = await latest(
-        [
-            "us-gaap:DepreciationDepletionAndAmortization",
-            "us-gaap:DepreciationAndAmortization",
-            "ifrs-full:DepreciationAndAmortisationExpense",
-        ],
-        ["cash_flow", "income"],
-    )
+    dna: Decimal | None = None
+    if flow_end is not None:  # D&A of the same fiscal year as the operating income
+        dna, _, _ = await latest_fact(
+            [
+                "us-gaap:DepreciationDepletionAndAmortization",
+                "us-gaap:DepreciationAndAmortization",
+                "ifrs-full:DepreciationAndAmortisationExpense",
+            ],
+            ["cash_flow", "income"],
+            annual=True,
+            period_end=flow_end,
+        )
     ebitda = operating + (dna or Decimal(0)) if operating is not None else None
     price_row = await pool.fetchrow(
         "select close from public.price_bar where symbol=$1 order by coalesce(session_date,date)"

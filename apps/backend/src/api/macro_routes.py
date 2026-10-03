@@ -111,6 +111,7 @@ async def get_portfolio_macro_coverage(pool: Pool, _owner: Owner) -> PortfolioMa
              select p.ticker,p.value_base,p.base_currency,s.issuer_id
              from public.position_snapshot p
              left join public.instrument_security_link i on i.ticker=p.ticker
+               and i.status='confirmed'
              left join public.security s on s.id=i.security_id
              where p.snapshot_date=$1
            ), by_dimension as (
@@ -148,6 +149,7 @@ async def get_portfolio_macro_coverage(pool: Pool, _owner: Owner) -> PortfolioMa
              select p.ticker,p.value_base,s.issuer_id
              from public.position_snapshot p
              left join public.instrument_security_link i on i.ticker=p.ticker
+               and i.status='confirmed'
              left join public.security s on s.id=i.security_id where p.snapshot_date=$1
            ), weights as (
              select p.ticker,p.value_base,'geography'::text exposure_type,

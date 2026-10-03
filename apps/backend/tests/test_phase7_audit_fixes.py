@@ -565,3 +565,26 @@ async def test_coverage_summary_ratio_uses_only_entries_with_an_expected_count(
     assert group["expected_periods"] == 10 and group["available_periods"] == 5
     assert Decimal(str(group["coverage_ratio"])) == Decimal("0.5")
     assert group["entries"] == 2 and group["entries_with_expected"] == 1
+
+
+@pytest.mark.parametrize(
+    ("text", "secret"),
+    [
+        ("sec%2Dtoken%3Dabc123def456", "abc123def456"),
+        ("GET /x?my%5Fapi%5Fkey%3Dabc123def456&a=1", "abc123def456"),
+        ("Cookie: session=abc123", "abc123"),
+        ("Set-Cookie: sid=abc123def; Path=/; HttpOnly", "abc123def"),
+        ("Cookie: a=one1; b=two2", "two2"),
+        ("req headers\r\ncookie: auth=zz99\r\nAccept: */*", "zz99"),
+    ],
+)
+def test_redact_masks_encoded_prefixed_names_and_cookie_headers(text: str, secret: str) -> None:
+    """N12: the prefix group took only `_`/`-`, and Cookie headers were not credential names."""
+    out = redact(text) or ""
+    assert secret not in out, out
+    assert "[redacted]" in out
+
+
+def test_redact_keeps_the_rest_of_a_request_around_a_cookie_header() -> None:
+    out = redact("GET /x\nCookie: s=1\nAccept: */*") or ""
+    assert "Accept: */*" in out and "GET /x" in out

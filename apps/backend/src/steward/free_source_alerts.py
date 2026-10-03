@@ -54,8 +54,7 @@ from steward.geo_codes import (
 )
 from steward.jobs.runner import JobContext
 from steward.news.synthetic import SyntheticEvent, SyntheticSource, raise_events
-from steward.verify_sources.signal_audit import publish_gate
-from steward.verify_sources.thresholds import GateBlocked, require_domain_gate
+from steward.verify_sources.enforce import conclusion_gate, signal_gate
 
 MACRO_ALERT_SOURCE = SyntheticSource(
     "free-source-macro", "Free-source macro and trade monitoring", "macro"
@@ -147,8 +146,8 @@ class GateVerdict:
 
 class _Gates:
     """Thin adapter over the Phase 8 gates, cached per run. `domain:<conclusion>` calls
-    `require_domain_gate`; `signal:<name>` calls the signal publication gate (the decision
-    `require_publishable` raises on, evaluated at the run's clock)."""
+    `enforce.conclusion_gate`; `signal:<name>` calls `enforce.signal_gate` (the decision
+    `require_publishable` raises on, evaluated at the run's clock); both fail closed."""
 
     def __init__(self, pool: asyncpg.Pool, enabled: bool, now: dt.datetime) -> None:
         self.pool = pool
@@ -163,17 +162,15 @@ class _Gates:
         if cached is not None:
             return cached
         kind, _, name = gate.partition(":")
+        # The production entry points of verify_sources.enforce: both fail closed (a gate that
+        # cannot be evaluated refuses) and report every reason.
         if kind == "domain":
-            try:
-                await require_domain_gate(self.pool, name, now=self.now)
-                verdict = GateVerdict(True, gate, "open")
-            except GateBlocked as exc:
-                verdict = GateVerdict(False, gate, str(exc))
+            decision = await conclusion_gate(self.pool, name, now=self.now)
         else:
-            decision = await publish_gate(self.pool, name, now=self.now)
-            verdict = GateVerdict(
-                decision.allowed, gate, "open" if decision.allowed else "; ".join(decision.reasons)
-            )
+            decision = await signal_gate(self.pool, name, now=self.now)
+        verdict = GateVerdict(
+            decision.allowed, gate, "open" if decision.allowed else "; ".join(decision.reasons)
+        )
         self._cache[gate] = verdict
         return verdict
 

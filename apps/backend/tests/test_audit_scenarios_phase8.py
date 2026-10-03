@@ -179,6 +179,70 @@ async def test_a_reversal_known_later_wins_even_when_its_effective_date_is_earli
     assert reviewer_state(result.deals[0].current_state) == "reversed"
 
 
+async def _seed_confirmed_deal_event(
+    pool: asyncpg.Pool,
+    n: int,
+    state: str,
+    *,
+    announced: str | None,
+    effective: str | None,
+    known: str,
+    counterparty: str = "target-1",
+) -> None:
+    await pool.execute(
+        "insert into public.company_event (ticker,event_type,event_state,announced_at,effective_at,"
+        " known_at,source,source_url,counterparty_key,status,evidence_id)"
+        " values ($1,'deal',$2,$3,$4,$5,'sec_xbrl',$6,$7,'confirmed',$8)",
+        TICKER,
+        state,
+        dt.date.fromisoformat(announced) if announced else None,
+        dt.date.fromisoformat(effective) if effective else None,
+        ts(known),
+        f"https://example.test/deal/rebid/{n}/{state}",
+        counterparty,
+        await evidence_id(pool, f"rebid-{n}"),
+    )
+
+
+@pytest.mark.db
+async def test_a_rebid_after_a_late_recorded_termination_is_not_shown_as_terminated(
+    backend_pool: asyncpg.Pool,
+) -> None:
+    """Audit N1: the counterparty bids again after a terminated deal and the old termination is
+    only recorded late. The termination took effect before the new bid existed, so the new bid
+    is the current state; the rule that lets a later-known unwind win must not reach it."""
+    await _seed_confirmed_deal_event(
+        backend_pool, 1, "announced", announced="2025-03-01", effective=None, known="2025-03-02Z"
+    )
+    await _seed_confirmed_deal_event(
+        backend_pool, 2, "terminated", announced=None, effective="2025-06-01", known="2026-09-30Z"
+    )
+    await _seed_confirmed_deal_event(
+        backend_pool, 3, "announced", announced="2026-08-01", effective=None, known="2026-08-02Z"
+    )
+    result = await deals(backend_pool, TICKER, ts("2026-10-03T00:00:00Z"))
+    assert result.deals[0].current_state == "announced"
+    # ... and the state known before the termination was recorded is unchanged
+    before = await deals(backend_pool, TICKER, ts("2026-09-01T00:00:00Z"))
+    assert before.deals[0].current_state == "announced"
+
+
+@pytest.mark.db
+async def test_a_late_termination_effective_before_the_rebid_but_after_the_first_bid(
+    backend_pool: asyncpg.Pool,
+) -> None:
+    """Both rules at once, with a termination: an unwind dated before every event it could
+    apply to, learned later, still wins (retroactive), as the reversal test above."""
+    await _seed_confirmed_deal_event(
+        backend_pool, 1, "announced", announced="2026-03-01", effective=None, known="2026-03-02Z"
+    )
+    await _seed_confirmed_deal_event(
+        backend_pool, 2, "terminated", announced=None, effective="2026-02-01", known="2026-09-30Z"
+    )
+    result = await deals(backend_pool, TICKER, ts("2026-10-03T00:00:00Z"))
+    assert result.deals[0].current_state == "terminated"
+
+
 # ---------------------------------------------------------------------------------------
 # Consensus: the real vintage reader, then the staleness verdict on its output
 # ---------------------------------------------------------------------------------------

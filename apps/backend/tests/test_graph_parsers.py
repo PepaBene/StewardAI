@@ -744,3 +744,12 @@ def test_commodity_cents_are_converted_not_labelled_dollars() -> None:
         Decimal(1),
     )
     assert normalize_commodity_unit("index") == ("index", None, Decimal(1))
+
+
+@pytest.mark.parametrize("xml", ['<!DOCTYPE r [<!ENTITY x "boom">]><r>&x;</r>', "<!doctype r><r/>"])
+def test_ops_parser_refuses_dtd_through_the_shared_xml_guard(xml: str) -> None:
+    """N10: graph/ops used a bare ET.fromstring; a DTD must be refused like every outside XML."""
+    with pytest.raises(FreeSourceError, match="refused"):
+        ops.parse_ops_page(xml, ALIASES)
+    with pytest.raises(FreeSourceError, match="not valid XML"):
+        ops.parse_ops_page("<a><b></a>", ALIASES)

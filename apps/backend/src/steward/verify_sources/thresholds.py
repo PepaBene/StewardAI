@@ -618,16 +618,23 @@ async def _resolve_one(pool: asyncpg.Pool, s: PrimarySample) -> Decimal | None:
             )
         )
     if s.domain == "statements" and s.period_end:
-        return _num(
-            await pool.fetchval(
-                "select value from public.financial_statement_fact where ticker=$1"
-                " and concept=$2 and period_end=$3 and value is not null"
-                " order by known_at desc, revision desc limit 1",
-                s.subject_key,
-                s.metric,
-                s.period_end,
-            )
+        # Only the consolidated, dimension-free fact: a segment fact of the same filing is a
+        # different number. Two durations ending the same day (a quarter and a year) are
+        # ambiguous, so the sample stays unresolved instead of passing against one of them.
+        rows = await pool.fetch(
+            "select period_start,value from public.financial_statement_fact where ticker=$1"
+            " and concept=$2 and period_end=$3 and value is not null"
+            " and statement <> 'segment'"
+            " and (dimensions='{}'::jsonb or dimensions->'members'='[]'::jsonb)"
+            " order by known_at desc, revision desc, id desc",
+            s.subject_key,
+            s.metric,
+            s.period_end,
         )
+        latest: dict[object, object] = {}
+        for row in rows:
+            latest.setdefault(row["period_start"], row["value"])  # newest revision per duration
+        return _num(next(iter(latest.values()))) if len(latest) == 1 else None
     if s.domain == "fund_weights" and ":" in s.subject_key:
         snapshot, isin = s.subject_key.split(":", 1)
         if not snapshot.isdigit():

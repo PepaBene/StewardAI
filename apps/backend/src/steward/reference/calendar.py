@@ -184,7 +184,8 @@ async def exchange_open_on(
 @dataclass(frozen=True)
 class ExpectedSessions:
     days: list[dt.date]
-    # confirmed_calendar: every weekday of the window has a confirmed row;
+    # confirmed_calendar: every weekday of the window has a confirmed row (weekend rows
+    # do not count towards that);
     # partial_confirmed_calendar: some do; weekdays_minus_configured_closures: none does.
     basis: str
     confirmed_days: int
@@ -208,11 +209,15 @@ async def expected_sessions(
         return ExpectedSessions([], "weekdays_minus_configured_closures", 0)
     index = await load_sessions(pool, [mic], start, end)
     days = [d for d in _days(start, end) if exchange_open(settings, mic, d, index)]
-    confirmed = sum(1 for (m, d) in index if m == mic and start <= d <= end)
+    rows = [d for (m, d) in index if m == mic and start <= d <= end]
+    confirmed = len(rows)
+    # Weekend rows (a Saturday session, a confirmed weekend closure) do not make a weekday
+    # confirmed: the label compares the weekdays that have a row with the weekdays there are.
+    confirmed_weekdays = sum(1 for d in rows if d.weekday() < 5)
     weekdays = sum(1 for d in _days(start, end) if d.weekday() < 5)
     if confirmed == 0:
         basis = "weekdays_minus_configured_closures"
-    elif confirmed >= weekdays:
+    elif confirmed_weekdays >= weekdays:
         basis = "confirmed_calendar"
     else:
         basis = "partial_confirmed_calendar"

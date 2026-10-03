@@ -43,3 +43,20 @@ async def run_sec_xbrl(body: XbrlRunRequest, pool: Pool, owner: Owner) -> JobSum
     return await _enqueue(
         pool, "sec_xbrl", owner.user_id, body.model_dump(mode="json", exclude_none=True)
     )
+
+
+class FsdsRunRequest(BaseModel):
+    quarter: Annotated[str | None, Field(pattern=r"^20\d{2}q[1-4]$")] = Field(
+        default=None,
+        description="Data set quarter such as 2025q3; the latest published one when null.",
+    )
+    ticker: Ticker | None = Field(default=None, description="One holding, or all when null.")
+
+
+@router.post("/jobs/sec-fsds-backfill", tags=["jobs"], status_code=status.HTTP_202_ACCEPTED)
+async def run_sec_fsds_backfill(
+    pool: Pool, owner: Owner, body: FsdsRunRequest | None = None
+) -> JobSummary:
+    """Backfill statement facts from an SEC Financial Statement and Notes data set now."""
+    params = body.model_dump(mode="json", exclude_none=True) if body else {}
+    return await _enqueue(pool, "sec_fsds_backfill", owner.user_id, params)

@@ -1129,6 +1129,46 @@ async def test_portfolio_coverage_does_not_add_geography_and_product_cuts(
 
 
 @pytest.mark.db
+@pytest.mark.parametrize("status", ["suggested", "rejected"])
+async def test_unconfirmed_identity_links_attribute_no_exposure(
+    backend_pool: asyncpg.Pool, macro_api: httpx.AsyncClient, status: str
+) -> None:
+    """Audit N3: a suggested (or owner-rejected) ticker-to-security link that still carries a
+    security_id must not hand that issuer's exposure mapping to the holding."""
+    issuer = await _issuer(backend_pool)
+    await _holding(backend_pool, "HOLD", issuer)
+    await _map(backend_pool, issuer, "0.6", geography="DE")
+    await backend_pool.execute("update exposure_mapping set created_at='2026-01-02'")
+    job = await backend_pool.fetchval(
+        "insert into job (job_type, trigger, status) values ('portfolio_sync', 'manual',"
+        " 'succeeded') returning id"
+    )
+    await backend_pool.execute(
+        "insert into position_snapshot (snapshot_date, ticker, job_id, captured_at, quantity,"
+        " avg_price, current_price, instrument_currency, value, account_currency,"
+        " value_account, cost_account, ppl, base_currency, fx_source, fx_rate, value_base)"
+        " values ('2026-09-25', 'HOLD', $1, now(), 1, 1, 1, 'USD', 100, 'USD', 100, 100, 0,"
+        " 'USD', 'ecb', 1, 100)",
+        job,
+    )
+    as_of = dt.datetime(2026, 9, 1, tzinfo=dt.UTC)
+    confirmed = await context_for_holding(backend_pool, "HOLD", as_of)
+    assert not confirmed.exposure_unknown
+    body = (await macro_api.get("/macro/coverage/portfolio")).json()
+    assert Decimal(body["mapped_weight"]) == Decimal("0.6")
+
+    await backend_pool.execute(
+        "update instrument_security_link set status=$1 where ticker='HOLD'", status
+    )
+    context = await context_for_holding(backend_pool, "HOLD", as_of)
+    assert context.exposure_unknown and context.observations == []
+    body = (await macro_api.get("/macro/coverage/portfolio")).json()
+    assert Decimal(body["mapped_weight"]) == 0
+    assert Decimal(body["unknown_weight"]) == 1
+    assert body["by_exposure"] == []
+
+
+@pytest.mark.db
 async def test_sdmx_attributes_reach_the_observation_columns(backend_pool: asyncpg.Pool) -> None:
     text = "KEY,TIME_PERIOD,OBS_VALUE,UNIT_MULT,ADJUSTMENT,TRANSFORMATION\nA,2026-07,3.2,6,Y,GY\n"
     obs = parse_ecb_series(text, ECB_SERIES, None)

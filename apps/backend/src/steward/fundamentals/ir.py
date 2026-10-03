@@ -31,17 +31,26 @@ import io
 import ipaddress
 import json
 import re
+import socket
 import zipfile
 from dataclasses import dataclass, field
 from decimal import Decimal, InvalidOperation
 from typing import Any
-from urllib.parse import urlsplit
+from urllib.parse import urljoin, urlsplit
 from xml.etree import ElementTree as ET
 
 import asyncpg
 import httpx
 
 from steward import __version__
+from steward.documents.fetch import (
+    MAX_REDIRECTS,
+    FetchError,
+    Resolver,
+    check_public_url,
+    is_public_address,
+    resolve_host,
+)
 from steward.documents.text import html_to_text
 from steward.free_sources import ForwardValue, store_forward_value
 from steward.jobs.runner import JobContext
@@ -61,23 +70,39 @@ class IrError(Exception):
     pass
 
 
+_REDIRECT_CODES = (301, 302, 303, 307, 308)
+
+
 # --------------------------------------------------------------------------------- fetching
 
 
+def _numeric_ipv4(host: str) -> ipaddress.IPv4Address | None:
+    """The address a resolver would read from a decimal (`2130706433`), octal (`0177.0.0.1`),
+    hex (`0x7f.1`) or short (`127.1`) IPv4 spelling; None when `host` is not such a number."""
+    try:
+        return ipaddress.IPv4Address(socket.inet_aton(host))
+    except (OSError, ValueError):
+        return None
+
+
 def assert_fetchable(url: str) -> None:
-    """HTTPS only, and never a literal private / loopback address or an internal hostname: the
-    URL is owner-entered but the job runs inside the deployment."""
+    """HTTPS only, and never a private, loopback, link-local, metadata, multicast or otherwise
+    non-global address in any spelling (IPv4-mapped IPv6, decimal / octal / hex IPv4) or an
+    internal hostname. The URL is owner-entered but the job runs inside the deployment. A
+    hostname is judged by `fetch_document`, which resolves it and checks every address."""
     parts = urlsplit(url)
-    host = (parts.hostname or "").lower()
+    host = (parts.hostname or "").lower().rstrip(".")
     if parts.scheme != "https" or not host:
         raise IrError("IR sources must be https URLs")
     if host in {"localhost"} or host.endswith((".local", ".internal", ".localhost")):
         raise IrError("IR source host is not a public address")
     try:
-        address = ipaddress.ip_address(host)
+        ipaddress.ip_address(host.split("%")[0])
+        literal: str | None = host
     except ValueError:
-        return
-    if not address.is_global:
+        numeric = _numeric_ipv4(host)
+        literal = str(numeric) if numeric is not None else None
+    if literal is not None and not is_public_address(literal):
         raise IrError("IR source host is not a public address")
 
 
@@ -91,37 +116,66 @@ class FetchedDocument:
 
 
 async def fetch_document(
-    http: httpx.AsyncClient, url: str, max_bytes: int = MAX_BYTES
+    http: httpx.AsyncClient,
+    url: str,
+    max_bytes: int = MAX_BYTES,
+    *,
+    resolve: Resolver | None = None,
 ) -> FetchedDocument:
-    assert_fetchable(url)
-    async with http.stream("GET", url, follow_redirects=True) as response:
-        if response.status_code != 200:
-            raise IrError(f"{url} returned HTTP {response.status_code}")
-        assert_fetchable(str(response.url))
-        chunks: list[bytes] = []
-        size = 0
-        async for chunk in response.aiter_bytes():
-            size += len(chunk)
-            if size > max_bytes:
-                raise IrError(f"{url} is larger than {max_bytes} bytes")
-            chunks.append(chunk)
-        modified = None
-        header = response.headers.get("last-modified")
-        if header:
-            try:
-                from email.utils import parsedate_to_datetime
+    """GET `url`, following at most MAX_REDIRECTS redirects by hand: every hop (the first URL
+    included) is checked BEFORE any request is made to it, so a redirect to an internal address
+    is never sent. `resolve` overrides DNS; with a mocked transport and no resolver the DNS check
+    is skipped (nothing leaves the process)."""
+    mocked = isinstance(getattr(http, "_transport", None), httpx.MockTransport)
+    guard = resolve or (None if mocked else resolve_host)
+    current = url
+    for _ in range(MAX_REDIRECTS + 1):
+        await _check_hop(current, guard)
+        async with http.stream("GET", current, follow_redirects=False) as response:
+            if response.status_code in _REDIRECT_CODES and response.headers.get("location"):
+                current = urljoin(current, response.headers["location"])
+                continue
+            return await _read_response(response, url, max_bytes)
+    raise IrError(f"{url} redirects more than {MAX_REDIRECTS} times")
 
-                modified = parsedate_to_datetime(header)
-            except (TypeError, ValueError):
-                modified = None
-        body = b"".join(chunks)
-        return FetchedDocument(
-            url=url,
-            body=body,
-            content_type=response.headers.get("content-type", "").split(";")[0].strip().lower(),
-            last_modified=modified,
-            sha256=hashlib.sha256(body).hexdigest(),
-        )
+
+async def _check_hop(url: str, guard: Resolver | None) -> None:
+    assert_fetchable(url)
+    if guard is None:
+        return
+    try:
+        await check_public_url(url, guard)
+    except FetchError as exc:
+        raise IrError(str(exc)) from exc
+
+
+async def _read_response(response: httpx.Response, url: str, max_bytes: int) -> FetchedDocument:
+    if response.status_code != 200:
+        raise IrError(f"{url} returned HTTP {response.status_code}")
+    chunks: list[bytes] = []
+    size = 0
+    async for chunk in response.aiter_bytes():
+        size += len(chunk)
+        if size > max_bytes:
+            raise IrError(f"{url} is larger than {max_bytes} bytes")
+        chunks.append(chunk)
+    modified = None
+    header = response.headers.get("last-modified")
+    if header:
+        try:
+            from email.utils import parsedate_to_datetime
+
+            modified = parsedate_to_datetime(header)
+        except (TypeError, ValueError):
+            modified = None
+    body = b"".join(chunks)
+    return FetchedDocument(
+        url=url,
+        body=body,
+        content_type=response.headers.get("content-type", "").split(";")[0].strip().lower(),
+        last_modified=modified,
+        sha256=hashlib.sha256(body).hexdigest(),
+    )
 
 
 def detect_format(content_type: str, body: bytes) -> str:

@@ -20,6 +20,7 @@ from pydantic import BaseModel, Field
 from steward.data_context.common import Gap, as_json, cutoff, to_date
 from steward.free_source_reads import business_network_payload, has_table, status_as_of_sql
 from steward.geo_codes import has_column
+from steward.graph.deals import ALLOWED
 from steward.ownership.control_stakes_read import (
     ControlStakeOut,
     holding_control_stakes,
@@ -518,6 +519,30 @@ def _deal_order(e: DealEvent) -> tuple[dt.date, dt.datetime, int]:
     return (e.effective_at or e.announced_at or e.known_at.date(), e.known_at, e.event_id)
 
 
+def _retroactive_unwinds(confirmed: list[DealEvent], current: DealEvent) -> list[DealEvent]:
+    """Unwinds learned after `current` that must still decide the state.
+
+    An unwind (terminated/reversed) known later but dated before `current` wins only when it is
+    *retroactive*: no confirmed event dated on or before it is a state it could validly follow
+    (a reversal needs a closing, a termination needs a live deal), while an event known before
+    it is. Then its date is wrong or back-dated and what was known last decides. When an
+    earlier event it applies is dated before it, it ended that episode, and a later event (a
+    re-bid by the same counterparty) is a new episode that the old unwind says nothing about."""
+    found: list[DealEvent] = []
+    for unwind in confirmed:
+        if unwind.event_state not in ("reversed", "terminated"):
+            continue
+        if (unwind.known_at, unwind.event_id) <= (current.known_at, current.event_id):
+            continue
+        predecessors = {s for s, nxt in ALLOWED.items() if s and unwind.event_state in nxt}
+        applicable = [e for e in confirmed if e is not unwind and e.event_state in predecessors]
+        if any(_deal_order(e)[0] <= _deal_order(unwind)[0] for e in applicable):
+            continue
+        if any((e.known_at, e.event_id) < (unwind.known_at, unwind.event_id) for e in applicable):
+            found.append(unwind)
+    return found
+
+
 async def deals(pool: asyncpg.Pool, ticker: str, as_of: dt.datetime | None = None) -> Deals:
     when = cutoff(as_of)
     log = await has_table(pool, "graph_status_log")
@@ -567,16 +592,9 @@ async def deals(pool: asyncpg.Pool, ticker: str, as_of: dt.datetime | None = Non
         confirmed = [e for e in events if e.status == "confirmed"]
         current = max(confirmed, key=_deal_order) if confirmed else None
         if current is not None:
-            # An unwind or termination learned after the current state wins even when its
-            # event date is earlier (a retroactive reversal): what was known last decides.
-            later_unwinds = [
-                e
-                for e in confirmed
-                if e.event_state in ("reversed", "terminated")
-                and (e.known_at, e.event_id) > (current.known_at, current.event_id)
-            ]
-            if later_unwinds:
-                current = max(later_unwinds, key=lambda e: (e.known_at, e.event_id))
+            retro = _retroactive_unwinds(confirmed, current)
+            if retro:
+                current = max(retro, key=lambda e: (e.known_at, e.event_id))
         states.append(
             DealState(
                 deal_key=key,

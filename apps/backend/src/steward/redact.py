@@ -4,6 +4,7 @@ job and job-step errors, the source read models).
 
 Rules, in order:
 - `Bearer x` / `Basic x` authorization values;
+- `Cookie:` / `Set-Cookie:` header lines (the whole value);
 - credentials in a URL's userinfo (`https://user:pass@host`, `https://token@host`);
 - JSON/dict members whose quoted key names a credential, whatever the value's length
   (`"key": "x"`, `'api_token': 'x'`);
@@ -32,7 +33,8 @@ _NAME_CORE = (
 # Env-style: any UPPER_SNAKE name ending in a credential word (FRED_API_KEY, GH_TOKEN).
 _ENV_NAME = r"[A-Z][A-Z0-9]*(?:_[A-Z0-9]+)*_(?:KEY|TOKEN|SECRET|PASSWORD|PASSWD)"
 _NAME = rf"(?:{_ENV_NAME}|(?i:{_NAME_CORE}))"
-_NAME_PREFIXED = rf"(?:[A-Za-z0-9]+[_-])?{_NAME}"  # e.g. fred_api_key, my-service-token
+# e.g. fred_api_key, my-service-token, and the URL-encoded separator (sec%2Dtoken%3Dx).
+_NAME_PREFIXED = rf"(?:[A-Za-z0-9]+(?:[_-]|%5[Ff]|%2[Dd]))?{_NAME}"
 
 _AUTH = re.compile(r"(?i)\b(bearer|basic)\s+[^\s,;\"'&]+")
 _USERINFO = re.compile(r"(?i)\b([a-z][a-z0-9+.\-]*://)[^\s/@?#\"']+@")
@@ -45,6 +47,8 @@ _ASSIGN = re.compile(
     rf"(?<![A-Za-z0-9_])(?P<k>{_NAME_PREFIXED}(?:\"|')?(?:\s*[=:]\s*|%3[Dd]|%3[Aa]))"
     r"""(?:"[^"]*"|'[^']*'|(?:%(?!26)|[^\s,;&"'}\]%])+)"""
 )
+# `Cookie:` / `Set-Cookie:` header lines: every pair (and attribute) on the line is masked.
+_COOKIE = re.compile(r"(?i)(?<![A-Za-z0-9_\-])(?P<k>(?:set-)?cookie\s*:[ \t]*)[^\r\n]+")
 _QUERY = re.compile(r"(?i)(?P<k>[?&](?:key|token|apikey)(?:=|%3D))[^&\s\"']+")
 _LONG = re.compile(r"(?<![A-Za-z0-9_\-])[A-Za-z0-9_\-]{32,}(?![A-Za-z0-9_\-])")
 _WORDS = re.compile(r"^[A-Za-z]+(?:[_-][A-Za-z]+)+$")
@@ -57,6 +61,7 @@ def _long(m: re.Match[str]) -> str:
 def redact_text(text: str) -> str:
     out = _AUTH.sub(lambda m: f"{m.group(1)} {REDACTED}", text)
     out = _USERINFO.sub(lambda m: f"{m.group(1)}{REDACTED}@", out)
+    out = _COOKIE.sub(lambda m: f"{m.group('k')}{REDACTED}", out)
     out = _QUOTED_MEMBER.sub(lambda m: f"{m.group('k')}{m.group('q')}{REDACTED}{m.group('q')}", out)
     out = _ASSIGN.sub(lambda m: f"{m.group('k')}{REDACTED}", out)
     out = _QUERY.sub(lambda m: f"{m.group('k')}{REDACTED}", out)

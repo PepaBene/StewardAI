@@ -1135,3 +1135,20 @@ async def test_identity_override_validates_ids_and_never_confirms_nothing(
     assert versions.status_code == 200 and versions.json()[0]["id"] == version
     evidence = await api.get("/reference/records/fact/5/evidence")
     assert evidence.status_code == 200 and evidence.json()[0]["quote"] == "q"
+
+
+@pytest.mark.db
+async def test_identity_decisions_route_returns_reasons_as_json_not_a_string(
+    backend_pool: asyncpg.Pool, api: httpx.AsyncClient
+) -> None:
+    """N2: no jsonb codec is registered, so `reasons` used to go out as the string '["isin"]'."""
+    await backend_pool.execute(
+        "insert into public.instrument (t212_ticker, isin, name, currency)"
+        " values ('N2_EQ', 'DE000N2C0001', 'N2 Co', 'EUR')"
+    )
+    await backend_pool.execute(
+        "insert into public.identity_match_decision (instrument_ticker, decision, score, reasons)"
+        " values ('N2_EQ', 'suggested', 0.5, '[\"isin\", {\"lei\": \"x\"}]'::jsonb)"
+    )
+    body = (await api.get("/reference/identity-decisions")).json()
+    assert body[0]["reasons"] == ["isin", {"lei": "x"}]

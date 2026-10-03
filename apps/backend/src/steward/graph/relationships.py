@@ -21,6 +21,8 @@ from typing import Any, Literal
 
 import asyncpg
 
+from steward.db_json import decode_row
+
 Relationship = Literal["customer", "supplier", "procurement_award"]
 Direction = Literal["issuer_sells_to", "issuer_buys_from", "award_to_issuer", "unknown"]
 ShareBasis = Literal[
@@ -313,7 +315,7 @@ async def review_queue(
     return {
         "filing_hits": [dict(r) for r in hits],
         "suggested_disclosures": [dict(r) for r in suggested],
-        "contradictions": [dict(r) for r in contradictions],
+        "contradictions": [decode_row(r, ("detail",), default={}) for r in contradictions],
     }
 
 

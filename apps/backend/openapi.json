@@ -6705,6 +6705,60 @@
         ]
       }
     },
+    "/jobs/returns-refresh": {
+      "post": {
+        "tags": [
+          "jobs"
+        ],
+        "summary": "Run Returns Refresh",
+        "description": "Compute and store price and total returns for the held securities now.",
+        "operationId": "run_returns_refresh",
+        "responses": {
+          "202": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/JobSummary"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/jobs/exchange-probes": {
+      "post": {
+        "tags": [
+          "jobs"
+        ],
+        "summary": "Run Exchange Probes",
+        "description": "Probe the free price endpoints, one held symbol per exchange, now.",
+        "operationId": "run_exchange_probes",
+        "responses": {
+          "202": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/JobSummary"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
     "/holdings/{ticker}/ownership": {
       "get": {
         "tags": [
@@ -7743,6 +7797,60 @@
             }
           },
           "required": true
+        },
+        "responses": {
+          "202": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/JobSummary"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/jobs/sec-fsds-backfill": {
+      "post": {
+        "tags": [
+          "jobs"
+        ],
+        "summary": "Run Sec Fsds Backfill",
+        "description": "Backfill statement facts from an SEC Financial Statement and Notes data set now.",
+        "operationId": "run_sec_fsds_backfill",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "anyOf": [
+                  {
+                    "$ref": "#/components/schemas/FsdsRunRequest"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Body"
+              }
+            }
+          }
         },
         "responses": {
           "202": {
@@ -10117,6 +10225,60 @@
         }
       }
     },
+    "/jobs/ir-releases": {
+      "post": {
+        "tags": [
+          "jobs"
+        ],
+        "summary": "Run Ir Releases",
+        "description": "Fetch, version and parse the registered issuer IR pages now.",
+        "operationId": "run_ir_releases",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "anyOf": [
+                  {
+                    "$ref": "#/components/schemas/IrRunRequest"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Body"
+              }
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/JobSummary"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
     "/watchlist": {
       "get": {
         "tags": [
@@ -11343,6 +11505,33 @@
         }
       }
     },
+    "/jobs/pdmr-uk": {
+      "post": {
+        "tags": [
+          "jobs"
+        ],
+        "summary": "Run Pdmr Uk",
+        "description": "Parse UK PDMR announcements from the RNS stream now.",
+        "operationId": "run_pdmr_uk",
+        "responses": {
+          "202": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/JobSummary"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
     "/company-graph/edges/{edge_id}/decision": {
       "post": {
         "tags": [
@@ -12048,6 +12237,33 @@
             }
           }
         }
+      }
+    },
+    "/jobs/graph-review": {
+      "post": {
+        "tags": [
+          "jobs"
+        ],
+        "summary": "Run Graph Review",
+        "description": "Review queued relationship candidates, extract deal events and reconcile parent changes\nnow.",
+        "operationId": "run_graph_review",
+        "responses": {
+          "202": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/JobSummary"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
       }
     },
     "/holdings/{ticker}/data-context": {
@@ -23182,6 +23398,41 @@
         ],
         "title": "Freshness"
       },
+      "FsdsRunRequest": {
+        "properties": {
+          "quarter": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^20\\d{2}q[1-4]$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Quarter",
+            "description": "Data set quarter such as 2025q3; the latest published one when null."
+          },
+          "ticker": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^[A-Za-z0-9._-]{1,32}$",
+                "examples": [
+                  "AAPL_US_EQ"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ticker",
+            "description": "One holding, or all when null."
+          }
+        },
+        "type": "object",
+        "title": "FsdsRunRequest"
+      },
       "FundAsOf": {
         "properties": {
           "isin": {
@@ -28766,6 +29017,28 @@
           "source_url"
         ],
         "title": "IrConsensusRelease"
+      },
+      "IrRunRequest": {
+        "properties": {
+          "ticker": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^[A-Za-z0-9._-]{1,32}$",
+                "examples": [
+                  "AAPL_US_EQ"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ticker",
+            "description": "One holding, or all when null."
+          }
+        },
+        "type": "object",
+        "title": "IrRunRequest"
       },
       "IssuerAliasOut": {
         "properties": {

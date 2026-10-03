@@ -14,6 +14,7 @@ from api.db import IdPath, Pool
 from api.routes import _enqueue
 from steward.config.common import Ticker
 from steward.config.jobs import ExchangeClosure
+from steward.db_json import decode_row
 from steward.ownership.read import HoldingOwnership, holding_ownership
 from steward.portfolio.read import JobSummary
 from steward.reference.lifecycle import (
@@ -130,7 +131,7 @@ async def identity_decisions(pool: Pool, _owner: Owner) -> list[dict[str, object
                   candidate_listing_id,decision,score,reasons,decided_at,decided_by
            from public.identity_match_decision order by decided_at desc limit 500"""
     )
-    return [dict(row) for row in rows]
+    return [decode_row(row, ("reasons",)) for row in rows]
 
 
 async def _validated_override_ids(
@@ -331,6 +332,18 @@ async def run_price_history(pool: Pool, owner: Owner) -> JobSummary:
 async def run_holiday_refresh(pool: Pool, owner: Owner) -> JobSummary:
     """Load public holidays for this and next year now."""
     return await _enqueue(pool, "holiday_refresh", owner.user_id)
+
+
+@router.post("/jobs/returns-refresh", tags=["jobs"], status_code=status.HTTP_202_ACCEPTED)
+async def run_returns_refresh(pool: Pool, owner: Owner) -> JobSummary:
+    """Compute and store price and total returns for the held securities now."""
+    return await _enqueue(pool, "returns_refresh", owner.user_id)
+
+
+@router.post("/jobs/exchange-probes", tags=["jobs"], status_code=status.HTTP_202_ACCEPTED)
+async def run_exchange_probes(pool: Pool, owner: Owner) -> JobSummary:
+    """Probe the free price endpoints, one held symbol per exchange, now."""
+    return await _enqueue(pool, "exchange_probes", owner.user_id)
 
 
 @router.get("/holdings/{ticker}/ownership", tags=["reference"])

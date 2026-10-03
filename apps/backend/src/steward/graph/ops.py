@@ -28,6 +28,7 @@ import httpx
 from steward.graph.keys import normalize_object_key
 from steward.sources.base import AccessState
 from steward.sources.free_market import FreeSourceError
+from steward.sources.xml_guard import safe_fromstring
 
 OPS_BASE = "https://ops.epo.org/3.2"
 MAX_XML_CHARS = 5_000_000
@@ -184,13 +185,21 @@ class OpsPage:
     documents: int
 
 
+class UnsafeOpsXml(ValueError):
+    """The guard refused the document (DTD / entity declaration) or it did not parse."""
+
+
 def _parse_root(xml_text: str) -> ET.Element:
     if len(xml_text) > MAX_XML_CHARS:
         raise FreeSourceError("EPO OPS response exceeds the 5 MB parse limit")
     try:
-        return ET.fromstring(xml_text)  # noqa: S314 - Expat disables external entity expansion.
-    except ET.ParseError as exc:
-        raise FreeSourceError("EPO OPS response was not valid XML") from exc
+        return safe_fromstring(xml_text, UnsafeOpsXml)
+    except UnsafeOpsXml as exc:
+        raise FreeSourceError(
+            "EPO OPS response was not valid XML"
+            if str(exc).startswith("malformed")
+            else f"EPO OPS response refused: {exc}"
+        ) from exc
 
 
 def parse_ops_page(xml_text: str, applicant_aliases: tuple[str, ...]) -> OpsPage:

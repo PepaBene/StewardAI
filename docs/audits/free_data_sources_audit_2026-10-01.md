@@ -288,6 +288,26 @@ Same format as above. Everything here was reproduced or read as stated; nothing 
 | N11 | Low | CBE | `reference/calendar.py:215` (`expected_sessions`) | `basis` is `confirmed_calendar` when `confirmed >= weekdays`, but `confirmed` counts weekend and closed rows. Reproduced: a two-week window with 6 of 10 weekdays confirmed plus 4 weekend rows is labelled `confirmed_calendar` (also shown as `calendar_basis` on `/returns`). Only the label is wrong; the days themselves are right. | Count only rows on weekdays (or compare the two day sets). |
 | N12 | Low | CBE | `redact.py:35` | Two forms still pass: a credential name with a URL-encoded prefix separator (`sec%2Dtoken%3Dabc123def456`, the prefix group takes only `_`/`-`) and `Cookie:`/`Set-Cookie:` values (`Cookie: session=abc123` is not masked). | Allow `%2D`/`%5F` in `_NAME_PREFIXED`; add `cookie` to the header names. |
 
+### Resolution of the new findings (fix pass, 2026-10-03)
+
+Each was re-verified before changing code; every fix has a regression test that fails on the old behaviour (N9 excepted: it is a flaky-test fix, made deterministic).
+
+| ID | Status | Fix and test |
+|---|---|---|
+| N1 | fixed | The suggested fix (group by `deal_key`) does not work because a re-bid by the same counterparty shares the key. `_retroactive_unwinds` (`data_context/evidence.py`) lets a later-known unwind override the date-ordered state only when it is retroactive (no confirmed event dated on or before it is a state it could validly follow). Tests: `test_audit_scenarios_phase8.py::test_a_rebid_after_a_late_recorded_termination_is_not_shown_as_terminated`, `::test_a_late_termination_effective_before_the_rebid_but_after_the_first_bid`; the earlier reversal test still passes. |
+| N2 | fixed | Root cause: no jsonb codec on the shared pool and per-site decoding (`db_json.py`); `reasons`/`detail` were not decoded in three readers. Tests: `test_graph_db.py::test_graph_review_routes_return_jsonb_as_objects`, `test_core_integrity.py::test_identity_decisions_route_returns_reasons_as_json_not_a_string`. |
+| N3 | fixed | `status='confirmed'` on the three `instrument_security_link` joins (`api/macro_routes.py`, `macro/read.py`). Test: `test_macro_fixes.py::test_unconfirmed_identity_links_attribute_no_exposure`. |
+| N4 | fixed | `read_base_capital` takes EBITDA only from annual facts (330-380 days, D&A from the same year) and excludes failed reconciliations; with no qualifying annual operating income it lists the input as missing. Debt still comes from one element (not switched to the peer-metrics component sum). Test: `test_graph_db.py::test_pro_forma_ebitda_is_a_full_year_not_the_latest_quarter`. |
+| N5 | fixed | The statements resolver reads only the consolidated, dimension-free fact and returns None when two durations end the same day. Test: `test_thresholds_phase8.py::test_statements_resolver_reads_the_consolidated_fact_not_a_segment_one`. |
+| N6 | fixed | `fetch_document` checks every hop (first URL included) before any request; `assert_fetchable` rejects decimal/hex/octal/short IPv4, IPv4-mapped IPv6, CGNAT, link-local and `localhost.`, and resolves hostnames and checks every address. Not covered: DNS rebinding between check and connect. Tests in `test_fund_stream_pure.py`. |
+| N7 / B46 | partly fixed | The alert evaluator now goes through `enforce.conclusion_gate`/`signal_gate`, failing closed (a database error in a gate no longer raises out of the run). Still ungated, on purpose: valuation conclusions and price/return/corporate-action/fund-overlap alerts (the code has no such alerts or verdicts to gate), read models (gating them would blank the owner's UI), and the collectors' `reserve_for_endpoint`/`record_outcome`. A change making a 429 with no Retry-After close the gate was reverted because audit item A6 requires that case to leave the gate open. README section "Verification gates: what is enforced where" states this. Tests: `test_enforcement_phase8.py::test_alert_gates_go_through_enforce_and_fail_closed`, `::test_enforce_has_production_callers`. |
+| N8 | fixed | `sec_fsds_backfill` without parameters tries the last three completed quarters newest first; six owner-only run-now routes added (`/jobs/returns-refresh`, `exchange-probes`, `ir-releases`, `sec-fsds-backfill`, `pdmr-uk`, `graph-review`); README updated; `openapi.json` and the web `schema.d.ts` regenerated. Tests: `test_fund_stream_db.py`, new `test_job_run_now_routes.py`. |
+| N9 | fixed | The query filters `endpoint='patent_search'`. |
+| N10 | fixed | `graph/ops.py` uses `safe_fromstring`; a DOCTYPE/ENTITY is refused. Test: `test_graph_parsers.py::test_ops_parser_refuses_dtd_through_the_shared_xml_guard`. |
+| N11 | fixed | Only weekday rows count toward `confirmed_calendar`. Test: `test_prices_stream.py::test_n11_weekend_rows_do_not_make_the_calendar_confirmed`. |
+| N12 | fixed | `_NAME_PREFIXED` accepts `%2D`/`%5F` separators and `Cookie`/`Set-Cookie` lines are masked. Tests in `test_phase7_audit_fixes.py`. |
+| B20 | not changed, on purpose | The context text in `macro/read.py` is a deterministic template; free-text generation there would invent claims. |
+
 ### Plan gaps found by the frontend build-out (D, added 2026-10-03)
 
 Each claim was checked in the current backend; "true" means the gap exists at `bd5f1fd`.

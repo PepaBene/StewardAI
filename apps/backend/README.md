@@ -186,12 +186,44 @@ Jobs (cron defaults in `config/jobs.py`; run now with `POST /jobs/...`):
 | `fund_characteristics_audit` | daily 07:30 | fingerprints the iShares/Vanguard fund P/E and P/B payloads and rules: `parser_drift` and `methodology_change` are reviewed, not read as market moves |
 | `etf_look_through` | Sat 06:40 | issuer fund holdings; aggregated by canonical issuer in `/funds/*`; unknown fund weight stays its own bucket |
 | `free_source_alerts` | daily, after `macro_collect` | D7.5 alert evaluator described below |
+| `returns_refresh` | weekdays 23:45 | price and total returns of the held securities (`/returns`); run now: `POST /jobs/returns-refresh` |
+| `exchange_probes` | disabled (monthly when on) | one held symbol per exchange against Finnhub `/quote` and Twelve Data Basic; run now: `POST /jobs/exchange-probes` |
+| `ir_releases` | daily 07:20 | fetches the registered issuer IR pages (HTTPS only; every redirect hop is checked against private, loopback, link-local, metadata and mapped/numeric address forms before it is requested), versions and parses guidance and consensus; run now: `POST /jobs/ir-releases` (optional `ticker`) |
+| `sec_fsds_backfill` | disabled (15th, 04:00 when on) | SEC Financial Statement and Notes data sets into the statement fact store; with no `quarter` it takes the newest completed quarter that is published (falling back up to two quarters on a 404); run now: `POST /jobs/sec-fsds-backfill` (optional `quarter` like `2025q3`, `ticker`) |
+| `pdmr_uk` | disabled | UK PDMR (MAR Art.19) notifications from the RNS stream, retrieval unverified; run now: `POST /jobs/pdmr-uk` |
+| `graph_review` | daily 07:40 | relationship candidates, 8-K/6-K deal extraction, TED awards, parent-change reconciliation; run now: `POST /jobs/graph-review` |
 
 Read endpoints and run-now routes added in these phases are listed by tag in `openapi.json`
 (`GET /data/coverage`, `/sources/{access,usage,status}`, `/macro/*`, `/funds/*`,
 `/holdings/{ticker}/{control-stakes,insider-activity,fund-positions,valuation,segments,
 business-network,patent-trends,...}`, `/alerts/free-source-trail`, `POST /jobs/{public-data,
-source-audit,sec-xbrl,valuation-refresh,control-stakes,nport-holdings,free-source-alerts}`).
+source-audit,sec-xbrl,valuation-refresh,control-stakes,nport-holdings,free-source-alerts,
+returns-refresh,exchange-probes,ir-releases,sec-fsds-backfill,pdmr-uk,graph-review}`). Every run-now
+route is owner-only and enqueues a `manual` job.
+
+### Verification gates: what is enforced where (D8.3, D8.5, D8.6)
+
+`steward/verify_sources/enforce.py` is the entry point other code calls. Today it stops:
+
+- **Alerts** (`free_source_alerts`): every rule asks `conclusion_gate` (reconciliation gate per
+  domain) or `signal_gate` (signal audit) first; both fail closed, so a gate that cannot be
+  evaluated refuses. Default is enforcing (`enforce_verification_gates`): a fresh deployment raises
+  no credit, trade, patent or graph alert until reconciliation or signal-audit data exists.
+- **Collectors' hard stop**: `record_provider_attempt` hard-blocks paid-only and rejected-key
+  outcomes and records a server Retry-After, and `PostgresRequestGovernor.reserve` refuses those
+  endpoints for every caller. A 429 *without* a Retry-After is deliberately recorded as a
+  transient attempt that leaves the gate open (audit A6); the window that `enforce.record_outcome`
+  derives from the allowance period is not applied by the collectors, none of which call it.
+
+It does **not** gate the read models: valuation ratios, the insider net-discretionary summary,
+segment, concentration and consensus panels are always served, as data with its sources, not as
+alerts or conclusions. There is no price, return, corporate-action or fund-overlap alert in the
+code, so the `price_alert`, `return_alert`, `corporate_action_alert` and `fund_overlap_alert`
+conclusion kinds have no caller yet; `valuation_conclusion` likewise (nothing publishes a
+valuation verdict). Collectors keep the budgets registered in `verify_sources/budgets.py` (checked
+by `test_every_budget_construction_in_the_code_is_registered`) and do not call
+`reserve_for_endpoint`. A new alert or published conclusion must call `conclusion_gate` /
+`signal_gate` (or `require_conclusion` / `pre_publish_check`) before it is raised.
 
 ### Free-source alerts (D7.5)
 

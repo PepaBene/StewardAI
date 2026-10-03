@@ -110,10 +110,24 @@ async def resolve_host(host: str) -> list[str]:
     return [str(info[4][0]) for info in infos]
 
 
+def is_public_address(address: str) -> bool:
+    """True for a globally routable address; an IPv4-mapped IPv6 address is judged by the IPv4
+    address inside it, and multicast is refused."""
+    return _public(address)
+
+
 def _public(address: str) -> bool:
     ip = ipaddress.ip_address(address.split("%")[0])
-    if isinstance(ip, ipaddress.IPv6Address) and ip.ipv4_mapped is not None:
-        ip = ip.ipv4_mapped
+    if isinstance(ip, ipaddress.IPv6Address):
+        # IPv4-mapped (::ffff:a.b.c.d), IPv4-compatible (::a.b.c.d) and 6to4 / NAT64 forms carry
+        # an IPv4 address that must be judged on its own.
+        embedded = ip.ipv4_mapped or ip.sixtofour
+        if embedded is None and int(ip) >> 32 == 0 and int(ip) > 1:
+            embedded = ipaddress.IPv4Address(int(ip) & 0xFFFFFFFF)
+        if embedded is None and int(ip) >> 32 == 0x64FF9B0000000000000000:
+            embedded = ipaddress.IPv4Address(int(ip) & 0xFFFFFFFF)
+        if embedded is not None:
+            ip = embedded
     return ip.is_global and not ip.is_multicast
 
 

@@ -108,6 +108,7 @@ async def context_for_holding(pool: asyncpg.Pool, ticker: str, as_of: dt.datetim
            from active em
            join public.security s on s.issuer_id=em.issuer_id
            join public.instrument_security_link isl on isl.security_id=s.id
+             and isl.status='confirmed'
            where isl.ticker=$1
            order by em.segment""",
         ticker,

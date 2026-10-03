@@ -16,6 +16,7 @@ from typing import Any, Literal
 
 import asyncpg
 
+from steward.db_json import decode_row
 from steward.graph.deals import derive_state, load_deal_events
 from steward.graph.keys import normalize_object_key
 
@@ -103,4 +104,4 @@ async def open_reconciliations(
            order by observed_at desc,id desc""",
         ticker,
     )
-    return [dict(r) for r in rows]
+    return [decode_row(r, ("detail",), default={}) for r in rows]

@@ -5,7 +5,8 @@ tab-separated files (https://www.sec.gov/dera/data/financial-statement-and-notes
 This module reads the documented layout and writes `financial_statement_fact` rows with
 `source='sec_fsds'`, so filings older than the live XBRL job's reach (or its gaps) have the
 same statement history. It is an optional job (`sec_fsds_backfill`, params
-`{"quarter": "2025q3"}` or `{"url": ...}`, optionally `{"ticker": ...}`): nothing schedules it.
+`{"quarter": "2025q3"}` or `{"url": ...}`, optionally `{"ticker": ...}`). Without a quarter or url
+(the scheduled run) it takes the latest completed quarter whose data set is published.
 
 Layout read (names are the SEC's; a column that is absent is treated as empty):
 
@@ -85,6 +86,10 @@ csv.field_size_limit(50_000_000)
 
 class FsdsError(Exception):
     pass
+
+
+class FsdsNotPublished(FsdsError):
+    """The data set for a quarter is not on the SEC site (HTTP 404)."""
 
 
 def _date(text: str) -> dt.date | None:
@@ -447,12 +452,27 @@ def _remove(name: str | Path) -> None:
         os.remove(name)
 
 
+def recent_quarters(today: dt.date, count: int = 3) -> list[str]:
+    """The last `count` COMPLETED calendar quarters as `2025q3`, newest first. The SEC posts a
+    quarter's data set some weeks after it closes, so the newest one may not exist yet."""
+    year, quarter = today.year, (today.month - 1) // 3 + 1
+    out: list[str] = []
+    for _ in range(count):
+        quarter -= 1
+        if quarter == 0:
+            year, quarter = year - 1, 4
+        out.append(f"{year}q{quarter}")
+    return out
+
+
 async def download(http: httpx.AsyncClient, url: str, headers: dict[str, str]) -> Path:
     handle, name = tempfile.mkstemp(suffix=".zip", prefix="fsds-")
     size = 0
     try:
         with os.fdopen(handle, "wb") as out:
             async with http.stream("GET", url, headers=headers, follow_redirects=True) as response:
+                if response.status_code == 404:
+                    raise FsdsNotPublished(f"{url} returned HTTP 404")
                 if response.status_code != 200:
                     raise FsdsError(f"{url} returned HTTP {response.status_code}")
                 async for chunk in response.aiter_bytes():
@@ -471,6 +491,7 @@ async def run_fsds_backfill(
 ) -> None:
     """Backfill from one data set. `archive` (tests) replaces the download."""
     quarter = str(ctx.params.get("quarter") or "")
+    explicit = bool(quarter or ctx.params.get("url"))
     url = str(ctx.params.get("url") or (URL.format(quarter=quarter) if quarter else ""))
     only = ctx.params.get("ticker")
     async with ctx.step("select_holdings") as step:
@@ -480,21 +501,37 @@ async def run_fsds_backfill(
             only if isinstance(only, str) and only else None,
         )
         by_cik = {pad_cik(r["cik"]): r["t212_ticker"] for r in rows}
-        step.detail.update(holdings=len(by_cik), source=url or "supplied archive")
+        step.detail.update(
+            holdings=len(by_cik),
+            source=url or ("latest published quarter" if archive is None else "supplied archive"),
+        )
     if not by_cik:
         return
     temp: Path | None = None
     try:
         if archive is None:
-            if not url:
-                raise JobFailed("params need a quarter ('2025q3') or a url")
             if http is None:
                 raise JobFailed("no HTTP client")
             agent = get_settings().sec_user_agent
             if not agent or "@" not in agent:
                 raise JobFailed("SEC_USER_AGENT must include a contact email address")
             async with ctx.step("download") as step:
-                temp = await download(http, url, {"User-Agent": agent})
+                headers = {"User-Agent": agent}
+                if explicit:
+                    temp = await download(http, url, headers)
+                else:
+                    # No quarter given (the scheduled run): the latest quarter whose data set is
+                    # already published.
+                    for candidate in recent_quarters(dt.datetime.now(dt.UTC).date()):
+                        url = URL.format(quarter=candidate)
+                        try:
+                            temp = await download(http, url, headers)
+                        except FsdsNotPublished:
+                            continue
+                        step.detail["quarter"] = candidate
+                        break
+                    else:
+                        raise JobFailed("no recent quarter's data set is published")
                 step.detail["bytes"] = temp.stat().st_size
             archive = temp
         async with ctx.step("parse") as step:
@@ -536,8 +573,10 @@ async def sec_fsds_backfill_handler(ctx: JobContext) -> None:
 __all__ = [
     "FsdsError",
     "FsdsFiling",
+    "FsdsNotPublished",
     "amends_map",
     "read_filings",
+    "recent_quarters",
     "run_fsds_backfill",
     "sec_fsds_backfill_handler",
 ]
