@@ -17,10 +17,12 @@ from pathlib import Path
 from types import SimpleNamespace
 from typing import Any
 
+import asyncpg
 import httpx
 import pytest
 
 from steward.fundamentals import fsds
+from steward.graph import ops
 from steward.graph.diffbot import parse_diffbot_relations
 from steward.graph.ted import parse_ted_response
 from steward.jobs.runner import JobFailed
@@ -30,6 +32,7 @@ from steward.lookthrough.factsheet import (
 )
 from steward.news.regulatory import INVESTEGATE_COMPANY
 from steward.ownership import insider_collect
+from steward.reference import exchange_probes
 from steward.reference.exchange_probes import classify_finnhub
 from steward.sources import etf_issuers, finnhub, nport, openfigi
 from steward.sources.alphavantage import AlphaVantageError, company_overview
@@ -545,3 +548,107 @@ def test_the_recorded_live_fixtures_hold_no_secrets() -> None:
             text = path.read_text(encoding="utf-8")
         for needle in ("apikey=", "api_token=", "X-Finnhub-Token", "@gmail", "OPENFIGI_API_KEY"):
             assert needle not in text, (path.name, needle)
+
+
+# ------------------------------------------------------------------------ D3.4 live replay
+
+
+@pytest.mark.db
+async def test_d34_exchange_probes_replay_the_live_finnhub_answers(
+    backend_pool: asyncpg.Pool,
+) -> None:
+    """The probe run against the live Finnhub free plan (2026-10-03), replayed: US and PRAGUE
+    answer (the earlier mock test assumed Prague had no coverage), Frankfurt and London are
+    403 -> `paid_only` per exchange (the endpoint stays open), an unknown symbol is the
+    all-zero 200 -> `not_covered`. The probe sends the key in a header, never the URL."""
+    await backend_pool.execute(
+        "update public.provider_access set state = 'available', hard_blocked = false"
+        " where provider = 'finnhub' and endpoint = 'quote'"
+    )
+    targets = [
+        exchange_probes.ProbeTarget("XNAS", "AAPL_US_EQ", "AAPL", None),
+        exchange_probes.ProbeTarget("XETR", "SAPd_EQ", "SAP.DE", None),
+        exchange_probes.ProbeTarget("XLON", "VODl_EQ", "VOD.L", None),
+        exchange_probes.ProbeTarget("XPRA", "CEZ_EQ", "CEZ.PR", None),
+        exchange_probes.ProbeTarget("XXXX", "NONE_EQ", "ZZZZZ.XX", None),
+    ]
+    seen_keys: list[bool] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        seen_keys.append("X-Finnhub-Token" in request.headers and "token" not in str(request.url))
+        return _finnhub_response(request.url.params["symbol"])
+
+    detail: dict[str, Any] = {}
+    async with client(handler) as http:
+        outcomes = await exchange_probes.run_exchange_probes(
+            backend_pool, http, targets, finnhub_key="k", twelve_key=None, detail=detail
+        )
+    states = {o.mic: o.state for o in outcomes}
+    assert states == {
+        "XNAS": AccessState.AVAILABLE,
+        "XETR": AccessState.PAID_ONLY,
+        "XLON": AccessState.PAID_ONLY,
+        "XPRA": AccessState.AVAILABLE,
+        "XXXX": AccessState.NOT_COVERED,
+    }
+    assert all(seen_keys) and detail["twelve_data"] == "skipped: no key configured"
+    gate = await backend_pool.fetchrow(
+        "select state, hard_blocked from public.provider_access"
+        " where provider = 'finnhub' and endpoint = 'quote'"
+    )
+    assert gate["state"] == "available" and gate["hard_blocked"] is False
+
+
+def test_sec_mutual_fund_ticker_file_shape() -> None:
+    """VERIFIED live: `company_tickers_mf.json` is `{"fields": [cik, seriesId, classId,
+    symbol], "data": [[2110, "S000009184", "C000024954", "LACAX"], ...]}` (28,579 rows)."""
+    from steward.ownership.nport_collect import parse_mf_tickers
+
+    mapping = parse_mf_tickers((LIVE / "sec_company_tickers_mf_live.json").read_bytes())
+    assert mapping["LACAX"] == ("0000002110", "S000009184", "C000024954")
+
+
+# ------------------------------------------------------------------------------- EPO OPS
+
+
+def test_ops_reference_guide_biblio_example_gives_a_filing_date() -> None:
+    """IMPOSSIBLE-WITHOUT-KEY live (anonymous OPS is HTTP 403 "Fair Use policy"); checked
+    against the EPO's published Reference Guide v1.3.20 example and ops.epo.org's XSDs.
+    REGRESSION: the guide's biblio-search example gives `application-reference` an epodoc and an
+    original document-id and no docdb one; only docdb was read, so no filing date was found."""
+    xml = (LIVE / "ops_biblio_search_reference_guide.xml").read_text(encoding="utf-8")
+    page = ops.parse_ops_page(xml, ("International Business Machines Corporation",))
+    assert page.total == 10000 and page.documents == 1
+    (family,) = page.families
+    assert family.family_id == "37717388"
+    assert family.applicants == ["INTERNATIONAL BUSINESS MACHINES CORPORATION"]
+    assert family.title == "INJECTION MOLDED MICROLENSES FOR OPTICAL INTERCONNECTS"
+    assert family.application_date == dt.date(2006, 7, 20)
+    assert family.priority_date == dt.date(2006, 7, 20)  # no claim in the sample: the filing
+    assert [(p.country, p.doc_number, p.kind) for p in family.publications] == [
+        ("KR", "20100130646", "A")
+    ]
+
+
+def test_ops_legal_events_take_their_date_from_the_gazette_element() -> None:
+    """REGRESSION (OPS Reference Guide v1.3.20 section 3.5 and ops_legal.xsd): `ops:legal`
+    carries `code`, `desc`, `infl` and `dateMigr` ("00010101"), never `date`; the event dates
+    are the child elements `L007EP` (Gazette DATE) and `L018EP`/`L019EP`. `date` was read, so
+    every event was dateless and a lapse produced an expired family with no expiry date. `code`
+    is space padded and `desc` wrapped over lines."""
+    xml = (LIVE / "ops_legal_reference_guide.xml").read_text(encoding="utf-8")
+    events = ops.parse_ops_legal(xml)["19768124"]
+    assert [e.code for e in events] == ["AK", "AX", "RER"]
+    assert [e.date for e in events] == [
+        dt.date(2000, 5, 17),
+        dt.date(2000, 5, 17),
+        dt.date(2003, 8, 15),
+    ]
+    assert events[2].description == (
+        "CEASED AS TO PARAGRAPH 5 LIT. 3 LAW INTRODUCING PATENT TREATIES"
+    )
+    assert events[2].influence == "-"
+    family = ops.OpsFamily("19768124")
+    family.publications.append(ops.OpsPublication("EP", "1000000", "B1", dt.date(2002, 1, 2)))
+    status, expiry = ops.derive_legal_status(family, events, today=dt.date(2026, 10, 3))
+    assert status == "expired" and expiry == dt.date(2003, 8, 15)

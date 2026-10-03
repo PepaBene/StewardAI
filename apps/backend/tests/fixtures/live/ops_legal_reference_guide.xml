@@ -1,0 +1,60 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Legal-service response example of the OPS Reference Guide v1.3.20 (section 3.5, EP.1000000.A1),
+     with the RER event of the guide's family example appended. The DOCUMENTED shape, not a
+     recorded response (OPS needs a registered client). Whitespace padding of `code` and the
+     wrapped `desc` are as printed in the guide. -->
+<ops:world-patent-data xmlns:ops="http://ops.epo.org" xmlns="http://www.epo.org/exchange">
+  <ops:patent-family legal="true">
+    <ops:publication-reference>
+      <document-id document-id-type="docdb">
+        <country>EP</country>
+        <doc-number>1000000</doc-number>
+        <kind>A1</kind>
+      </document-id>
+    </ops:publication-reference>
+    <ops:family-member family-id="19768124">
+      <publication-reference>
+        <document-id document-id-type="docdb">
+          <country>EP</country>
+          <doc-number>1000000</doc-number>
+          <kind>A1</kind>
+          <date>20000517</date>
+        </document-id>
+      </publication-reference>
+      <application-reference doc-id="17397285" is-representative="YES">
+        <document-id document-id-type="docdb">
+          <country>EP</country>
+          <doc-number>99203729</doc-number>
+          <kind>A</kind>
+          <date>19991108</date>
+        </document-id>
+      </application-reference>
+      <ops:legal code="AK     " desc="DESIGNATED CONTRACTING STATES:" infl="+"
+ dateMigr="00010101">
+        <ops:pre line="00001">EP     99203729A 2000-05-17AK          +DESIGNATED CONTRACTING STATES</ops:pre>
+        <ops:L001EP desc="Country Code">EP</ops:L001EP>
+        <ops:L007EP desc="Gazette DATE">2000-05-17</ops:L007EP>
+        <ops:L008EP desc="Legal Event Code 1">AK</ops:L008EP>
+        <ops:L018EP desc="DATE last exchanged">2003-01-01</ops:L018EP>
+        <ops:L019EP desc="DATE first created">2003-05-28</ops:L019EP>
+        <ops:L500EP/>
+      </ops:legal>
+      <ops:legal code="AX    " desc="EXTENSION OF THE EUROPEAN PATENT TO"
+infl="+" dateMigr="00010101">
+        <ops:pre line="00001">EP    99203729A 2000-05-17AX    +EXTENSION OF THE EUROPEAN PATENT TO</ops:pre>
+        <ops:L007EP desc="Gazette DATE">2000-05-17</ops:L007EP>
+        <ops:L018EP desc="DATE last exchanged">2003-01-01</ops:L018EP>
+        <ops:L019EP desc="DATE first created">2003-05-28</ops:L019EP>
+      </ops:legal>
+      <ops:legal code="RER    " desc="CEASED AS TO PARAGRAPH 5 LIT. 3 LAW
+                        INTRODUCING PATENT TREATIES"
+                 infl="-"
+                 dateMigr="00010101">
+        <ops:pre line="00001">AT     99203729T 2003-08-15RER   -CEASED AS TO PARAGRAPH 5 LIT. 3 LAW INTRODUCING PATENT TREATIES</ops:pre>
+        <ops:L007EP desc="Gazette DATE">2003-08-15</ops:L007EP>
+        <ops:L018EP desc="DATE last exchanged">2003-08-28</ops:L018EP>
+        <ops:L019EP desc="DATE first created">2003-08-26</ops:L019EP>
+      </ops:legal>
+    </ops:family-member>
+  </ops:patent-family>
+</ops:world-patent-data>

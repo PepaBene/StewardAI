@@ -1,0 +1,55 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Response example (with biblio) of the OPS Reference Guide v1.3.20 (June 2024), published by the
+     EPO at link.epo.org; real OPS needs a registered client, so this is the DOCUMENTED shape
+     (comments for removed parts kept out), not a recorded response. -->
+<ops:world-patent-data xmlns:ops="http://ops.epo.org" xmlns="http://www.epo.org/exchange">
+  <ops:biblio-search total-result-count="10000">
+    <ops:query syntax="CQL">applicant=IBM</ops:query>
+    <ops:range begin="1" end="25"/>
+    <ops:search-result>
+      <exchange-documents>
+        <exchange-document system="ops.epo.org" family-id="37717388" country="KR" doc-number="20100130646" kind="A">
+          <bibliographic-data>
+            <publication-reference>
+              <document-id document-id-type="docdb">
+                <country>KR</country>
+                <doc-number>20100130646</doc-number>
+                <kind>A</kind>
+                <date>20101213</date>
+              </document-id>
+              <document-id document-id-type="epodoc">
+                <doc-number>KR20100130646</doc-number>
+                <date>20101213</date>
+              </document-id>
+            </publication-reference>
+            <application-reference doc-id="331447793">
+              <document-id document-id-type="epodoc">
+                <doc-number>KR20107026618</doc-number>
+                <date>20060720</date>
+              </document-id>
+              <document-id document-id-type="original">
+                <doc-number>1020107026618</doc-number>
+              </document-id>
+            </application-reference>
+            <parties>
+              <applicants>
+                <applicant sequence="1" data-format="epodoc">
+                  <applicant-name>
+                    <name>IBM [US]</name>
+                  </applicant-name>
+                </applicant>
+                <applicant sequence="1" data-format="original">
+                  <applicant-name>
+                    <name>INTERNATIONAL BUSINESS MACHINES CORPORATION</name>
+                  </applicant-name>
+                </applicant>
+              </applicants>
+            </parties>
+            <invention-title lang="en">INJECTION MOLDED MICROLENSES FOR
+ OPTICAL INTERCONNECTS</invention-title>
+          </bibliographic-data>
+        </exchange-document>
+      </exchange-documents>
+    </ops:search-result>
+  </ops:biblio-search>
+</ops:world-patent-data>

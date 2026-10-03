@@ -11,7 +11,12 @@ and `kind`. The family key is the OPS family-id, so the A1 in one office and the
 merge into one family.
 
 Recorded fixtures under tests/fixtures/graph follow the OPS reference documentation; they have
-not been compared with a live payload (that needs a registered OPS client). Forward citations
+not been compared with a live payload (that needs a registered OPS client: an anonymous request
+is HTTP 403 "Fair Use policy"). They were checked against the public schemas
+(ops.epo.org/schema/exchange-documents.xsd v2.5.7 and ops_legal.xsd) and the OPS reference guide
+v1.3.20: the element and attribute names read here exist; the one mismatch found, the date of a
+legal event, is described at `_legal_date`. The schema also warns that `family-id` is "unique -
+not stable": a family may be re-keyed when DOCDB merges simple families. Forward citations
 are not part of the OPS bibliographic response and are therefore reported as unknown, never 0.
 """
 
@@ -108,6 +113,19 @@ def _docdb(node: ET.Element) -> ET.Element | None:
     return None
 
 
+def _dated(node: ET.Element) -> dt.date | None:
+    """The date under a reference: its docdb document-id, else its epodoc one. The reference
+    guide's own biblio-search example gives `application-reference` an epodoc and an original
+    document-id and no docdb one, so reading docdb alone left every filing date empty."""
+    for kind in ("docdb", "epodoc"):
+        for doc in _find_all(node, "document-id"):
+            if doc.attrib.get("document-id-type") == kind:
+                parsed = _date(_text(_child(doc, "date")))
+                if parsed:
+                    return parsed
+    return None
+
+
 def _publication(doc: ET.Element) -> OpsPublication | None:
     pub_ref = next(iter(_find_all(doc, "publication-reference")), None)
     if pub_ref is None:
@@ -171,8 +189,7 @@ def _cited_keys(doc: ET.Element) -> set[str]:
 def _priority_dates(doc: ET.Element) -> list[dt.date]:
     out: list[dt.date] = []
     for claim in _find_all(doc, "priority-claim"):
-        docdb = _docdb(claim)
-        parsed = _date(_text(_child(docdb, "date")) if docdb is not None else None)
+        parsed = _dated(claim)
         if parsed:
             out.append(parsed)
     return out
@@ -255,8 +272,7 @@ def parse_ops_page(xml_text: str, applicant_aliases: tuple[str, ...]) -> OpsPage
             )
         app = next(iter(_find_all(doc, "application-reference")), None)
         if app is not None:
-            docdb = _docdb(app)
-            filed = _date(_text(_child(docdb, "date")) if docdb is not None else None)
+            filed = _dated(app)
             if filed:
                 family.application_date = (
                     filed
@@ -284,9 +300,29 @@ class LegalEvent:
     influence: str | None
 
 
+def _legal_date(legal: ET.Element) -> dt.date | None:
+    """The date of one `ops:legal` event. The OPS reference guide (v1.3.20, section 3.5; the
+    public ops_legal.xsd) gives the element only the attributes `code`, `desc`, `infl` and
+    `dateMigr` (a migration stamp that is the placeholder "00010101" in every documented
+    example); the event's own dates are child elements: `L007EP` "Gazette DATE" (2003-08-15),
+    `L018EP` "DATE last exchanged" and `L019EP` "DATE first created". The gazette date is
+    used (the day the event was published, not necessarily the day it took effect); a `date`
+    attribute is still honoured for payloads that carry one."""
+    for name in ("L007EP", "L019EP", "L018EP"):
+        found = _date(_text(_child(legal, name)).replace("-", ""))
+        if found is not None and found.year >= 1900:
+            return found
+    for attribute in ("date", "dateMigr"):
+        found = _date(legal.attrib.get(attribute))
+        if found is not None and found.year >= 1900:
+            return found
+    return None
+
+
 def parse_ops_legal(xml_text: str) -> dict[str, list[LegalEvent]]:
     """Legal events by family-id from an OPS legal-service response (`ops:legal` elements
-    carrying `code`, `desc`, `date` and `infl`)."""
+    carrying `code`, `desc`, `infl`; the date is read by `_legal_date`). `code` is padded with
+    spaces by OPS ("RER    ") and `desc` is wrapped over lines: both are normalised."""
     root = _parse_root(xml_text)
     out: dict[str, list[LegalEvent]] = {}
     for member in _find_all(root, "family-member"):
@@ -296,9 +332,9 @@ def parse_ops_legal(xml_text: str) -> dict[str, list[LegalEvent]]:
         for legal in _children(member, "legal"):
             out.setdefault(family_id, []).append(
                 LegalEvent(
-                    legal.attrib.get("code", ""),
-                    legal.attrib.get("desc", ""),
-                    _date(legal.attrib.get("date")),
+                    " ".join(legal.attrib.get("code", "").split()),
+                    " ".join(legal.attrib.get("desc", "").split()),
+                    _legal_date(legal),
                     legal.attrib.get("infl"),
                 )
             )
