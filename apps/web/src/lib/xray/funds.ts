@@ -195,10 +195,15 @@ export function subjectKeyProblem(kind: "fund" | "index", key: string): string |
 }
 
 /** What a manual save does to an existing row; null when the key is new. */
+/** Confirmation text for removing a manual row. */
+export function removeOverrideNote(row: Pick<LedgerRow, "subject_key">): string {
+  return `Removes your owner-verified row for ${row.subject_key} and restores the derived row. Its holdings as-of date is recomputed from the stored snapshots. Derived rows are never removed by this action.`;
+}
+
 export function overrideNote(existing: Pick<LedgerRow, "origin" | "tier" | "latest_holdings_as_of" | "subject_key"> | undefined): string | null {
   if (!existing) return null;
   if (existing.origin === "derived") {
-    return `This overrides the derived row for ${existing.subject_key} (${LEDGER_TIER_META[existing.tier].label}${existing.latest_holdings_as_of ? `, holdings as of ${existing.latest_holdings_as_of}` : ""}). Its holdings as-of date is cleared (the form cannot set one) and refreshes no longer update it. There is no way to revert it from here.`;
+    return `This overrides the derived row for ${existing.subject_key} (${LEDGER_TIER_META[existing.tier].label}${existing.latest_holdings_as_of ? `, holdings as of ${existing.latest_holdings_as_of}` : ""}). Its holdings as-of date is cleared (the form cannot set one) and refreshes no longer update it. You can remove the manual row later to restore the derived row.`;
   }
   return `This replaces your earlier manual row for ${existing.subject_key}.`;
 }

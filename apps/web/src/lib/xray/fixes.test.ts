@@ -1,14 +1,14 @@
 import { describe, expect, it } from "vitest";
 
 import { aggregateProvenance, buildExposureTreemap, buildLookThroughSankey, treemapNotes, usableOverlap } from "./exposure";
-import { auditExplanation, normaliseSubjectKey, overrideNote, subjectKeyProblem } from "./funds";
+import { auditExplanation, normaliseSubjectKey, overrideNote, removeOverrideNote, subjectKeyProblem } from "./funds";
+import * as insiderModule from "./insider";
 import {
   classTotals,
   countsTowardNetText,
   insiderProvenance,
   netValueText,
   pdmrHoldingState,
-  tickerCaseCaveat,
 } from "./insider";
 import { breadthRows, stakePercentNote } from "./ownership";
 import { parseAudit } from "./parse";
@@ -38,16 +38,26 @@ describe("F6-09 aggregate provenance", () => {
 });
 
 describe("F6-02 treemap issuer split across buckets", () => {
-  it("caps a leaf at its bucket and flags the scaling", () => {
+  it("draws the issuer in each bucket with its own weight and a remainder", () => {
     const t = buildExposureTreemap(
-      report({ issuers: [issuer("I", 0.3)], exposures: [{ dimension: "sector", reconciles: true, buckets: [bucket("Technology", "classified", 0.1, 0.1), bucket("Information Technology", "classified", 0.2)] }] }),
+      report({
+        issuers: [issuer("I", 0.3)],
+        exposures: [{ dimension: "sector", reconciles: true, issuer_buckets: { I: { Technology: 0.1, "Information Technology": 0.2 } }, buckets: [bucket("Technology", "classified", 0.15, 0.15), bucket("Information Technology", "classified", 0.2)] }],
+      }),
       "sector",
     )!;
     const tech = t.groups.find((g) => g.key === "Technology")!;
-    expect(tech.children[0].weight).toBeCloseTo(0.1);
-    expect(tech.scaled).toBe(true);
+    const it = t.groups.find((g) => g.key === "Information Technology")!;
+    expect(tech.children.map((c) => [c.kind, c.weight])).toEqual([["issuer", 0.1], ["remainder", expect.closeTo(0.05)]]);
+    expect(it.children.map((c) => c.kind)).toEqual(["issuer"]);
+    expect(it.children[0].weight).toBeCloseTo(0.2);
     expect(tech.children.reduce((s, c) => s + c.weight, 0)).toBeCloseTo(tech.weight);
+    expect(tech.overflow).toBe(false);
     expect(tech.children[0].detail).toContain("issuer total 30.00%");
+  });
+  it("has no issuer leaves when the backend lists none for a bucket", () => {
+    const t = buildExposureTreemap(report({ issuers: [issuer("I", 0.3)], exposures: [{ dimension: "sector", reconciles: true, issuer_buckets: {}, buckets: [bucket("Technology", "classified", 0.3)] }] }), "sector")!;
+    expect(t.groups[0].children.map((c) => c.kind)).toEqual(["remainder"]);
   });
 });
 
@@ -139,9 +149,16 @@ describe("F6-05 PDMR state is per holding", () => {
     expect(pdmrHoldingState(out([{ status: "parsed" }, { status: "no_template" }])).state).toBe("partial");
     expect(pdmrHoldingState(out([{ status: "parsed" }])).state).toBe("verified");
   });
-  it("flags lower-case suffix tickers that the API upper-cases", () => {
-    expect(tickerCaseCaveat("VODl_EQ")).toBe(true);
-    expect(tickerCaseCaveat("AAPL_US_EQ")).toBe(false);
+  it("uses ticker_status counts for the holding, not the channel-wide status", () => {
+    const withTs = (ts: unknown, n: unknown[] = []) => ({ ...out(n), ticker_status: ts }) as unknown as HoldingPdmrOut;
+    const h = pdmrHoldingState(withTs({ state: "available", detail: null, parsed: 3, attempted: 4, by_status: { parsed: 3, no_template: 1 } }, [{ status: "parsed" }]));
+    expect(h).toMatchObject({ state: "partial", parsed: 3, total: 4 });
+    expect(pdmrHoldingState(withTs({ state: "available", detail: null, parsed: 2, attempted: 2, by_status: {} })).state).toBe("verified");
+    const none = pdmrHoldingState(withTs({ state: "access_unverified", detail: null, parsed: 0, attempted: 0, by_status: {} }));
+    expect(none).toMatchObject({ state: "not_covered", total: 0 });
+  });
+  it("has no lowercase-ticker caveat any more", () => {
+    expect(insiderModule).not.toHaveProperty("tickerCaseCaveat");
   });
 });
 
@@ -156,11 +173,13 @@ describe("F6-07 13D/G percent wording", () => {
 });
 
 describe("F6-14 13F change span", () => {
-  it("flags an oldest row whose comparison quarter is not returned", () => {
-    const p = (period: string, holders_change: number | null) => ({ period, holders: 3, shares: "10", value_usd: "1", latest_filed: null, holders_change, shares_change: null }) as unknown as OwnershipPeriod;
-    const rows = breadthRows([p("2026-06-30", 1), p("2026-03-31", 2)]);
-    expect(rows[0].changeSpanUnknown).toBe(true);
-    expect(rows[1].changeSpanUnknown).toBe(false);
+  it("labels the comparison quarter from the API previous_period, the oldest row has none", () => {
+    const p = (period: string, previous_period: string | null, holders_change: number | null) => ({ period, holders: 3, shares: "10", value_usd: "1", latest_filed: null, holders_change, shares_change: null, previous_period }) as unknown as OwnershipPeriod;
+    const rows = breadthRows([p("2026-06-30", "2025-12-31", 1), p("2025-12-31", null, null)]);
+    expect(rows[0].previousPeriod).toBeNull();
+    expect(rows[0]).not.toHaveProperty("changeSpanUnknown");
+    expect(rows[1].previousPeriod).toBe("2025-12-31");
+    expect(rows[1].quartersSincePrevious).toBe(2);
   });
 });
 
@@ -187,7 +206,17 @@ describe("F6-10 manual ledger honesty", () => {
     const note = overrideNote({ subject_key: "IE00B5BMR087", origin: "derived", tier: "issuer_downloadable", latest_holdings_as_of: "2026-09-01" })!;
     expect(note).toContain("overrides the derived row");
     expect(note).toContain("holdings as-of date is cleared");
+    expect(note).not.toContain("no way to revert");
+    expect(note).toContain("restore the derived row");
     expect(overrideNote(undefined)).toBeNull();
+  });
+});
+
+describe("coverage ledger manual override removal", () => {
+  it("says the derived row is restored and its as-of recomputed", () => {
+    const t = removeOverrideNote({ subject_key: "IE00B5BMR087" });
+    expect(t).toContain("restores the derived row");
+    expect(t).toContain("recomputed");
   });
 });
 

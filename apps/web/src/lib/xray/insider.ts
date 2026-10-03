@@ -158,23 +158,20 @@ export function netValueNote(nd: InsiderActivityOut["net_discretionary"]): strin
 }
 
 /**
- * The PDMR state of THIS holding. The API's `status` counts every notification of every issuer
- * (a channel-wide figure), so it can only say whether the channel is accessible; what this
- * holding has stored comes from its own notifications.
+ * The PDMR state of THIS holding, from the API's `ticker_status` (counted for this ticker only,
+ * case-insensitively). `status` is channel-wide (all issuers) and only says whether the channel
+ * is accessible. An old response without `ticker_status` falls back to this holding's own rows.
  */
 export function pdmrHoldingState(data: HoldingPdmrOut): { state: DataState; reason: string | null; parsed: number; total: number } {
-  const total = data.notifications.length;
-  const parsed = data.notifications.filter((n) => n.status === "parsed").length;
-  const channel = pdmrState(data.status);
-  if (data.status.state !== "available") return { state: channel, reason: data.status.detail, parsed, total };
+  const ts = data.ticker_status;
+  const total = ts ? ts.attempted : data.notifications.length;
+  const parsed = ts ? ts.parsed : data.notifications.filter((n) => n.status === "parsed").length;
+  const own = ts ?? data.status;
+  if (!ts && data.status.state !== "available") return { state: pdmrState(data.status), reason: data.status.detail, parsed, total };
   if (total === 0) return { state: "not_covered", reason: "No PDMR announcement is stored for this holding (the status counts below are for all issuers).", parsed, total };
+  if (own.state !== "available") return { state: pdmrState(own), reason: own.detail, parsed, total };
   if (parsed < total) return { state: "partial", reason: `${total - parsed} of this holding's ${total} announcements could not be read.`, parsed, total };
   return { state: "verified", reason: null, parsed, total };
-}
-
-/** Lower-case exchange suffix tickers (T212 style) are upper-cased by the API before the lookup. */
-export function tickerCaseCaveat(ticker: string): boolean {
-  return ticker !== ticker.toUpperCase();
 }
 
 export function pdmrState(s: HoldingPdmrOut["status"]): DataState {

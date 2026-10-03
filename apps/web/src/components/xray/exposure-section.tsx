@@ -199,13 +199,6 @@ function AggregateBody({
                 {n}
               </p>
             ))}
-            {treemap.groups.some((g) => g.overflow) ? (
-              <p role="status" className="text-xs text-text">
-                <span aria-hidden="true" className="text-warning-signal">▲ </span>
-                An issuer whose rows are classified into more than one {dimension} bucket is drawn whole in one of them, so for some groups the named issuers
-                were scaled down to fit the bucket (the tile says so); the table lists the exact bucket weights.
-              </p>
-            ) : null}
             <Legend
               items={[
                 { label: "Classified group, issuers nested inside", swatch: "square", className: "bg-categorical-3" },

@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
-import { breadthRows, buildRankFlow, filingLagDays, nportState, ownershipProvenance, quarterLabel, stakeViews } from "./ownership";
-import type { ControlStake, HoldingOwnership, OwnershipPeriod, TopHolder } from "./types";
+import { breadthRows, buildRankFlow, nportState, positionsNote, ownershipProvenance, quarterLabel, stakeViews } from "./ownership";
+import type { ControlStake, HoldingFundPositions, HoldingOwnership, OwnershipPeriod, TopHolder } from "./types";
 
 function period(p: string, over: Partial<OwnershipPeriod> = {}): OwnershipPeriod {
   return { period: p, holders: 10, shares: 1000, value_usd: 5000, latest_filed: null, holders_change: null, shares_change: null, new_holders: null, exited_holders: null, ...over };
@@ -13,23 +13,18 @@ function own(over: Partial<HoldingOwnership> = {}): HoldingOwnership {
   return { ticker: "AAPL_US_EQ", cusips: [], periods: [], top_holders: [], source: "SEC Form 13F data sets", applicable: true, ...over };
 }
 
-describe("quarterLabel / filingLagDays", () => {
+describe("quarterLabel", () => {
   it("labels calendar quarters", () => {
     expect(quarterLabel("2026-06-30")).toBe("Q2 2026");
     expect(quarterLabel("2025-12-31")).toBe("Q4 2025");
     expect(quarterLabel("nonsense")).toBe("nonsense");
-  });
-  it("computes the lag and rejects missing or inverted dates", () => {
-    expect(filingLagDays("2026-06-30", "2026-08-14")).toBe(45);
-    expect(filingLagDays("2026-06-30", null)).toBeNull();
-    expect(filingLagDays("2026-06-30", "2026-06-01")).toBeNull();
   });
 });
 
 describe("breadthRows", () => {
   it("orders chronologically, keeps the oldest change as null and flags a missing quarter", () => {
     const rows = breadthRows([
-      period("2026-06-30", { holders_change: 5, shares_change: "200", latest_filed: "2026-08-10" }),
+      period("2026-06-30", { holders_change: 5, shares_change: "200", latest_filed: "2026-08-10", latest_filing_lag_days: 41, earliest_filed: "2026-07-20", earliest_filing_lag_days: 20, previous_period: "2025-12-31" }),
       period("2025-12-31", { holders_change: null }),
     ]);
     expect(rows.map((r) => r.quarter)).toEqual(["Q4 2025", "Q2 2026"]);
@@ -38,6 +33,13 @@ describe("breadthRows", () => {
     expect(rows[1].sharesChange).toBe(200);
     expect(rows[1].quartersSincePrevious).toBe(2);
     expect(rows[1].lagDays).toBe(41);
+    expect(rows[1].earliestLagDays).toBe(20);
+    expect(rows[1].previousPeriod).toBe("2025-12-31");
+    expect(rows[0].previousPeriod).toBeNull();
+  });
+  it("takes the lag from the API only, never derives it from the dates", () => {
+    const rows = breadthRows([period("2026-06-30", { latest_filed: "2026-08-10" })]);
+    expect(rows[0].lagDays).toBeNull();
   });
 });
 
@@ -45,9 +47,9 @@ describe("buildRankFlow", () => {
   it("ranks by shares now and before, with ties broken by CIK and new holders unranked before", () => {
     const flow = buildRankFlow(
       own({
-        periods: [period("2026-06-30", { latest_filed: "2026-08-14" }), period("2026-03-31", { latest_filed: "2026-05-15" })],
+        periods: [period("2026-06-30", { latest_filed: "2026-08-14", latest_filing_lag_days: 45 }), period("2026-03-31", { latest_filed: "2026-05-15", latest_filing_lag_days: 45 })],
         top_holders_previous_period: "2026-03-31",
-        top_holders: [holder("1", 500, 300), holder("2", 400, 450), holder("3", 400, null), holder("4", 100, 100)],
+        top_holders: [holder("1", 500, 300, { filed: "2026-08-01", filing_lag_days: 32 }), holder("2", 400, 450), holder("3", 400, null), holder("4", 100, 100)],
       }),
     )!;
     expect(flow.rows.map((r) => [r.cik, r.rankNow, r.rankBefore])).toEqual([
@@ -60,6 +62,8 @@ describe("buildRankFlow", () => {
     expect(flow.rows[2].move).toBeNull();
     expect(flow.latestLagDays).toBe(45);
     expect(flow.previousLagDays).toBe(45);
+    expect(flow.rows[0].filingLagDays).toBe(32);
+    expect(flow.rows[1].filingLagDays).toBeNull();
     expect(flow.droppedNotShown).toBe(true);
   });
   it("ignores holders without a positive share count and is null when none are left", () => {
@@ -106,5 +110,13 @@ describe("stakeViews", () => {
     expect(views[0].isGroup).toBe(true);
     expect(views[1].percent).toBe(7.5);
     expect(views[1].checkLabel).toContain("not checkable");
+  });
+});
+
+describe("positionsNote", () => {
+  it("uses matching_positions and truncated from the API", () => {
+    const positions = new Array(50).fill({}) as HoldingFundPositions["positions"];
+    expect(positionsNote({ positions, matching_positions: 130, truncated: true })).toBe("Showing 50 of 130 fund positions that match this holding across the loaded funds.");
+    expect(positionsNote({ positions, matching_positions: 50, truncated: false })).toBeNull();
   });
 });

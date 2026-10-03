@@ -31,7 +31,7 @@ const report = {
   ],
   overlap: [],
   exposures: [
-    { dimension: "sector", reconciles: true, buckets: [
+    { dimension: "sector", reconciles: true, issuer_buckets: { i1: { Tech: 0.2 } }, buckets: [
       { key: "Tech", label: "Tech", kind: "classified", weight: 0.3, value_base: 300, direct_weight: 0.05, fund_weight: 0.25 },
       { key: "__cash__", label: "Cash", kind: "cash", weight: 0.1, value_base: 100, direct_weight: 0.1, fund_weight: 0 },
       { key: "__not_looked_through__", label: "Fund not looked through (unknown)", kind: "not_looked_through", weight: 0.2, value_base: 200, direct_weight: 0, fund_weight: 0.2 },
@@ -63,10 +63,10 @@ describe("xray charts render", () => {
   it("rank flow renders new holders without a line and the table moves", () => {
     const own = {
       ticker: "X", cusips: [], source: "s", applicable: true,
-      periods: [{ period: "2026-06-30", holders: 2, shares: 3, value_usd: 3, latest_filed: "2026-08-10" }],
+      periods: [{ period: "2026-06-30", holders: 2, shares: 3, value_usd: 3, latest_filed: "2026-08-10", latest_filing_lag_days: 41 }],
       top_holders_previous_period: "2026-03-31",
       top_holders: [
-        { cik: "1", manager_name: "Alpha", shares: 10, value_usd: 1, accession: "a", prev_shares: 5 },
+        { cik: "1", manager_name: "Alpha", shares: 10, value_usd: 1, accession: "a", prev_shares: 5, filed: "2026-08-01", filing_lag_days: 32 },
         { cik: "2", manager_name: "Beta", shares: 8, value_usd: 1, accession: "b", prev_shares: null },
       ],
     } as unknown as HoldingOwnership;
@@ -75,6 +75,7 @@ describe("xray charts render", () => {
     expect(html).toContain("quarter end");
     expect(html).toContain("filed 41 d after quarter end");
     expect(html).toContain("no earlier position");
+    expect(html).toContain("(+32 d)");
   });
 });
 

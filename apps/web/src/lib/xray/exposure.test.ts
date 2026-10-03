@@ -106,6 +106,7 @@ describe("buildExposureTreemap", () => {
       {
         dimension: "sector",
         reconciles: true,
+        issuer_buckets: { a: { Tech: 0.2 }, b: { Health: 0.1 }, c: { __unclassified__: 0.05 } },
         buckets: [
           bucket("Tech", "classified", 0.3),
           bucket("Health", "classified", 0.1),
@@ -136,7 +137,7 @@ describe("buildExposureTreemap", () => {
   });
   it("flags named issuers that exceed their bucket", () => {
     const t = buildExposureTreemap(
-      report({ issuers: [issuer("a", 0.5)], exposures: [{ dimension: "sector", reconciles: false, buckets: [bucket("Tech", "classified", 0.2)] }] }),
+      report({ issuers: [issuer("a", 0.5)], exposures: [{ dimension: "sector", reconciles: false, issuer_buckets: { a: { Tech: 0.5 } }, buckets: [bucket("Tech", "classified", 0.2)] }] }),
       "sector",
     )!;
     expect(t.groups[0].overflow).toBe(true);

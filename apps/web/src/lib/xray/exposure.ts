@@ -13,7 +13,6 @@ import type {
   ExposureBucket,
   FundAsOf,
   FundOverlapReport,
-  IssuerExposure,
 } from "./types";
 
 export type Dimension = "sector" | "region" | "country" | "currency";
@@ -104,14 +103,8 @@ export type TreemapGroup = {
   directWeight: number;
   fundWeight: number;
   children: TreemapLeaf[];
-  /** Named issuers add up to more than the bucket (rounding or an inconsistent report). */
+  /** Named issuers add up to more than the bucket (rounding or an inconsistent report); leaves are drawn as reported. */
   overflow: boolean;
-  /**
-   * The leaves were scaled down to the bucket weight: the backend adds each fund row to the
-   * row's own bucket, but an issuer carries only its first-seen sector/country/currency, so an
-   * issuer whose rows are classified differently is drawn whole in one bucket.
-   */
-  scaled: boolean;
 };
 export type ExposureTreemap = {
   dimension: Dimension;
@@ -126,11 +119,6 @@ export type ExposureTreemap = {
   droppedBuckets: { label: string; weight: number }[];
 };
 
-function issuerKey(issuer: IssuerExposure, dim: Dimension): string {
-  const v = dim === "sector" ? issuer.sector : dim === "region" ? issuer.region : dim === "country" ? issuer.country : issuer.currency;
-  return v && v !== "" ? v : KEY_UNCLASSIFIED;
-}
-
 function finitePositive(n: number): boolean {
   return Number.isFinite(n) && n > EPS;
 }
@@ -139,11 +127,9 @@ export function buildExposureTreemap(report: AggregateReport, dim: Dimension): E
   const view = report.exposures.find((e) => e.dimension === dim);
   if (!view) return null;
   const issuers = report.issuers.filter((i) => finitePositive(i.weight));
-  const byKey = new Map<string, IssuerExposure[]>();
-  for (const i of issuers) {
-    const k = issuerKey(i, dim);
-    byKey.set(k, [...(byKey.get(k) ?? []), i]);
-  }
+  // Per-bucket issuer weights come from the backend (an issuer split across buckets appears in
+  // each with its own weight); nothing is re-attributed or scaled here.
+  const perBucket = view.issuer_buckets ?? {};
   let dropped = 0;
   const droppedBuckets: { label: string; weight: number }[] = [];
   const groups: TreemapGroup[] = [];
@@ -153,28 +139,29 @@ export function buildExposureTreemap(report: AggregateReport, dim: Dimension): E
       if (Number.isFinite(b.weight) && Math.abs(b.weight) > EPS) droppedBuckets.push({ label: b.label, weight: b.weight });
       continue;
     }
-    const named = (byKey.get(b.key) ?? []).sort((a, c) => c.weight - a.weight);
     const isSpecial = b.kind !== "classified" && b.kind !== "unclassified";
-    const namedTotal = named.reduce((s, i) => s + i.weight, 0);
-    // An issuer is placed by its first-seen key, so its whole weight can exceed this bucket
-    // while the rest of it sits in another bucket of the backend: cap the leaves at the bucket.
-    const scale = !isSpecial && namedTotal > b.weight * (1 + 0.0005) + EPS ? b.weight / namedTotal : 1;
-    const children: TreemapLeaf[] = named.map((i) => ({
+    const named = isSpecial
+      ? []
+      : issuers
+          .map((i) => ({ i, w: perBucket[i.key]?.[b.key] ?? 0 }))
+          .filter((x) => finitePositive(x.w))
+          .sort((x, y) => y.w - x.w);
+    const namedTotal = named.reduce((sum, x) => sum + x.w, 0);
+    const children: TreemapLeaf[] = named.map(({ i, w }) => ({
       id: `${b.key}/${i.key}`,
       label: i.label,
-      weight: i.weight * scale,
+      weight: w,
       kind: "issuer",
-      detail: `${scale < 1 ? `issuer total ${(i.weight * 100).toFixed(2)}%, scaled to fit this bucket (part of it is classified in another bucket) · ` : ""}${i.merged_securities > 1 ? `${i.merged_securities} securities merged · ` : ""}direct ${(i.direct_weight * 100).toFixed(2)}% · via funds ${(i.fund_weight * 100).toFixed(2)}%`,
+      detail: `${w < i.weight - EPS ? `issuer total ${(i.weight * 100).toFixed(2)}%, the rest is in other buckets · ` : ""}${i.merged_securities > 1 ? `${i.merged_securities} securities merged · ` : ""}direct ${(i.direct_weight * 100).toFixed(2)}% · via funds ${(i.fund_weight * 100).toFixed(2)}%`,
     }));
-    const shown = namedTotal * scale;
-    const rest = b.weight - shown;
+    const rest = b.weight - namedTotal;
     if (!isSpecial && rest > EPS) {
       children.push({
         id: `${b.key}/__rest__`,
         label: "Other issuers (outside the named top list)",
         weight: rest,
         kind: "remainder",
-        detail: "Part of this bucket not attributed to a named issuer by this report.",
+        detail: "Part of this bucket not attributed to a listed issuer by this report.",
       });
     }
     groups.push({
@@ -185,8 +172,7 @@ export function buildExposureTreemap(report: AggregateReport, dim: Dimension): E
       directWeight: b.direct_weight,
       fundWeight: b.fund_weight,
       children,
-      overflow: !isSpecial && scale < 1,
-      scaled: scale < 1,
+      overflow: !isSpecial && namedTotal > b.weight * (1 + 0.0005) + EPS,
     });
   }
   groups.sort((a, c) => specialRank(a.kind) - specialRank(c.kind) || c.weight - a.weight);
@@ -214,6 +200,9 @@ export function treemapNotes(map: ExposureTreemap): string[] {
   }
   if (Math.abs(map.drawn - 1) > 0.005) {
     notes.push(`The drawn tiles add up to ${(map.drawn * 100).toFixed(1)}% of portfolio value, not 100%; tile area is a share of that drawn total.`);
+  }
+  for (const g of map.groups) {
+    if (g.overflow) notes.push(`${g.label}: the listed issuers add up to more than the bucket weight (rounding or an inconsistent report).`);
   }
   if (!map.reconciles) notes.push("The buckets do not add up to the total within tolerance; the difference is not drawn.");
   return notes;

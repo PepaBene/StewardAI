@@ -6,7 +6,7 @@ import { ChartFrame, DataStateBadge } from "@/components/data-state";
 import { getBrowserApiClient } from "@/lib/api/client";
 import { errorMessage } from "@/lib/api/error-message";
 import { useApiResource } from "@/lib/hooks/use-api-resource";
-import { backtestBlocked, LEDGER_TIER_META, LEDGER_TIERS, ledgerCounts, ledgerProvenance, normaliseSubjectKey, overrideNote, subjectKeyProblem } from "@/lib/xray/funds";
+import { backtestBlocked, LEDGER_TIER_META, LEDGER_TIERS, ledgerCounts, ledgerProvenance, normaliseSubjectKey, overrideNote, removeOverrideNote, subjectKeyProblem } from "@/lib/xray/funds";
 import { date } from "@/lib/xray/format";
 import type { CoverageLedger, LedgerRow } from "@/lib/xray/types";
 
@@ -94,6 +94,7 @@ function LedgerBody({ ledger, lastGood, reload }: { ledger: CoverageLedger; last
             { label: "Historical constituents" },
             { label: "Why" },
             { label: "Backtest" },
+            { label: "Manual row" },
           ]}
           rows={ledger.entries.map((e) => [
             <span key="s">
@@ -131,6 +132,27 @@ function LedgerBody({ ledger, lastGood, reload }: { ledger: CoverageLedger; last
                 flagged: {e.backtest_flags.join("; ") || "review before use"}
               </span>
             ),
+            e.origin === "manual" ? (
+              <ConfirmAction
+                key={`rm-${e.subject_kind}-${e.subject_key}`}
+                label="Remove manual override"
+                confirmTitle={`Remove the manual row for ${e.label}?`}
+                confirmBody={removeOverrideNote(e)}
+                confirmLabel="Remove override"
+                run={async () => {
+                  const r = await getBrowserApiClient().DELETE("/funds/coverage-ledger", {
+                    params: { query: { subject_kind: e.subject_kind, subject_key: e.subject_key } },
+                  });
+                  if (!r.data) throw new Error(`The override could not be removed (HTTP ${r.response.status}${errorMessage(r.error) ? `: ${errorMessage(r.error)}` : ""}).`);
+                  reload();
+                  return "Override removed; the derived row is restored.";
+                }}
+              />
+            ) : (
+              <span key="m" className="text-[11px] text-text-muted">
+                derived
+              </span>
+            ),
           ])}
         />
       </ChartFrame>
@@ -163,7 +185,7 @@ function ManualEntry({ reload, entries }: { reload: () => void; entries: readonl
       id="coverage-manual"
       kicker="Owner-verified row"
       title="Record a ledger row"
-      description="Use this when you have checked a fund's or index's source yourself. A later refresh never overwrites it. Saving over an existing derived row replaces it for good: there is no revert from this screen (the API has no delete)."
+      description="Use this when you have checked a fund's or index's source yourself. A later refresh never overwrites it. Saving over an existing derived row replaces it until you remove the manual row, which restores the derived row."
     >
       <details className="border border-border-soft">
         <summary className="cursor-pointer px-3 py-1.5 text-xs font-medium text-accent-ink select-none hover:underline">Open the form</summary>

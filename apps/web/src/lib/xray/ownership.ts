@@ -30,13 +30,6 @@ export function quarterLabel(period: string): string {
   return `Q${Math.ceil(m / 3)} ${y}`;
 }
 
-/** Filing lag: days from quarter end to the filing date; null when either is missing or inverted. */
-export function filingLagDays(period: string, filed: string | null | undefined): number | null {
-  if (!filed) return null;
-  const d = daysBetween(period, filed);
-  return d !== null && d >= 0 ? d : null;
-}
-
 // ---------------------------------------------------------------------------------------------
 // 13F breadth by quarter
 // ---------------------------------------------------------------------------------------------
@@ -47,8 +40,13 @@ export type BreadthRow = {
   holders: number;
   shares: number | null;
   valueUsd: number | null;
+  /** Latest / earliest effective filing of the quarter and their lags, as the API states them. */
   filed: string | null;
   lagDays: number | null;
+  earliestFiled: string | null;
+  earliestLagDays: number | null;
+  /** The period the changes are measured against (API `previous_period`); null for the oldest loaded period. */
+  previousPeriod: string | null;
   /** Changes are against the previous LOADED period; null for the oldest (missing, not zero). */
   holdersChange: number | null;
   sharesChange: number | null;
@@ -57,8 +55,6 @@ export type BreadthRow = {
   pctOfOutstanding: number | null;
   /** Quarters between this period and the one it is compared with (>1 = a quarter is not loaded). */
   quartersSincePrevious: number | null;
-  /** The change was computed against an earlier quarter that is not in the returned list: its span is unknown. */
-  changeSpanUnknown: boolean;
 };
 
 function monthsBetween(a: string, b: string): number {
@@ -68,21 +64,23 @@ function monthsBetween(a: string, b: string): number {
 /** Chronological (oldest first) rows from the newest-first `periods`. */
 export function breadthRows(periods: readonly OwnershipPeriod[]): BreadthRow[] {
   const sorted = [...periods].sort((a, b) => a.period.localeCompare(b.period));
-  return sorted.map((p, i) => ({
+  return sorted.map((p) => ({
     period: p.period,
     quarter: quarterLabel(p.period),
     holders: p.holders,
     shares: toNum(p.shares),
     valueUsd: toNum(p.value_usd),
     filed: p.latest_filed,
-    lagDays: filingLagDays(p.period, p.latest_filed),
+    lagDays: p.latest_filing_lag_days ?? null,
+    earliestFiled: p.earliest_filed ?? null,
+    earliestLagDays: p.earliest_filing_lag_days ?? null,
+    previousPeriod: p.previous_period ?? null,
     holdersChange: p.holders_change,
     sharesChange: toNum(p.shares_change),
     newHolders: p.new_holders,
     exitedHolders: p.exited_holders,
     pctOfOutstanding: p.pct_of_shares_outstanding ?? null,
-    quartersSincePrevious: i > 0 ? Math.round(monthsBetween(sorted[i - 1].period, p.period) / 3) : null,
-    changeSpanUnknown: i === 0 && (p.holders_change !== null || toNum(p.shares_change) !== null),
+    quartersSincePrevious: p.previous_period ? Math.round(monthsBetween(p.previous_period, p.period) / 3) : null,
   }));
 }
 
@@ -124,6 +122,9 @@ export type RankFlowRow = {
   changePct: number | null;
   pctOfOutstanding: number | null;
   accession: string;
+  /** Filing date and lag of this manager's filing, from the API. */
+  filed: string | null;
+  filingLagDays: number | null;
   /** rankBefore - rankNow: positive = moved up. */
   move: number | null;
 };
@@ -150,7 +151,7 @@ export function buildRankFlow(own: HoldingOwnership): RankFlow | null {
   const beforeRank = new Map(before.map((x, i) => [x.h.cik, i + 1]));
   const periods = [...own.periods].sort((a, b) => b.period.localeCompare(a.period));
   const latest = periods[0];
-  const prevPeriodKey = own.top_holders_previous_period ?? null;
+  const prevPeriodKey = own.top_holders_previous_period ?? own.top_holders.find((h) => h.previous_period_end)?.previous_period_end ?? null;
   const prevPeriod = prevPeriodKey ? periods.find((p) => p.period === prevPeriodKey) : undefined;
   return {
     rows: now.map((x, i) => {
@@ -165,13 +166,15 @@ export function buildRankFlow(own: HoldingOwnership): RankFlow | null {
         changePct: x.h.shares_change_pct ?? null,
         pctOfOutstanding: x.h.pct_of_shares_outstanding ?? null,
         accession: x.h.accession,
+        filed: x.h.filed ?? null,
+        filingLagDays: x.h.filing_lag_days ?? null,
         move: rankBefore === null ? null : rankBefore - (i + 1),
       };
     }),
     latestPeriod: latest?.period ?? null,
     previousPeriod: prevPeriodKey,
-    latestLagDays: latest ? filingLagDays(latest.period, latest.latest_filed) : null,
-    previousLagDays: prevPeriod ? filingLagDays(prevPeriod.period, prevPeriod.latest_filed) : null,
+    latestLagDays: latest?.latest_filing_lag_days ?? null,
+    previousLagDays: prevPeriod?.latest_filing_lag_days ?? null,
     droppedNotShown: true,
   };
 }
@@ -191,6 +194,12 @@ export function nportState(c: HoldingFundPositions["coverage"]): { state: DataSt
     case "no_funds_loaded":
       return { state: "unavailable", reason: "No N-PORT fund filings are loaded yet; run the N-PORT job." };
   }
+}
+
+/** "Showing N of M" note from the API's own count; null when every matching position is shown. */
+export function positionsNote(data: Pick<HoldingFundPositions, "positions" | "matching_positions" | "truncated">): string | null {
+  if (!data.truncated) return null;
+  return `Showing ${data.positions.length} of ${data.matching_positions} fund positions that match this holding across the loaded funds.`;
 }
 
 // ---------------------------------------------------------------------------------------------

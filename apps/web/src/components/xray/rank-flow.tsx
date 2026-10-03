@@ -88,7 +88,7 @@ export function RankFlowChart({ flow, label, className }: { flow: RankFlow; labe
       </svg>
       <SrTable
         caption={label}
-        columns={["Manager", `Rank ${nowQ}`, `Rank ${prevQ}`, "Move", "Shares now", "Shares before"]}
+        columns={["Manager", `Rank ${nowQ}`, `Rank ${prevQ}`, "Move", "Shares now", "Shares before", "Filed (lag)"]}
         rows={flow.rows.map((r) => [
           r.name,
           String(r.rankNow),
@@ -96,6 +96,7 @@ export function RankFlowChart({ flow, label, className }: { flow: RankFlow; labe
           r.move === null ? "—" : r.move > 0 ? `up ${r.move}` : r.move < 0 ? `down ${-r.move}` : "unchanged",
           compact(r.shares),
           compact(r.prevShares),
+          r.filed ? `${date(r.filed)}${r.filingLagDays === null ? "" : ` (+${r.filingLagDays} d)`}` : "—",
         ])}
       />
     </figure>

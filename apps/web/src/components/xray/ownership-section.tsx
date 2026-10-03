@@ -14,6 +14,7 @@ import {
   buildRankFlow,
   CHANNEL_NOTE,
   nportState,
+  positionsNote,
   ownershipProvenance,
   quarterLabel,
   stakePercentNote,
@@ -81,7 +82,7 @@ function InstitutionalBody({ own, lastGood }: { own: HoldingOwnership; lastGood:
   const breadthTakeaway = latest
     ? `${latest.holders} managers held ${compact(latest.shares)} shares at the ${latest.quarter} quarter end${
         latest.holdersChange === null ? "" : `, ${signedInt(latest.holdersChange)} managers against the previous loaded quarter`
-      }. The latest filing of the quarter was filed ${latest.lagDays === null ? "at an unknown lag" : `${latest.lagDays} days`} after quarter end (late amendments included).`
+      }. The latest filing of the quarter was filed ${latest.lagDays === null ? "at an unknown lag" : `${latest.lagDays} days`} after quarter end (late amendments included)${latest.earliestLagDays === null ? "" : `; the earliest was ${latest.earliestLagDays} days after`}.`
     : undefined;
 
   return (
@@ -98,13 +99,15 @@ function InstitutionalBody({ own, lastGood }: { own: HoldingOwnership; lastGood:
         hasValue={hasPeriods && own.applicable}
         table={{
           caption: "13F holders by quarter",
-          columns: ["Quarter end", "Latest filing (lag)", "Holders", "Holders change", "New / exited", "Shares", "Shares change", "% of outstanding"],
+          columns: ["Quarter end", "Latest filing (lag)", "Earliest filing (lag)", "Changes against", "Holders", "Holders change", "New / exited", "Shares", "Shares change", "% of outstanding"],
           rows: rows
             .slice()
             .reverse()
             .map((r) => [
               `${r.quarter} · ${date(r.period)}`,
               `${date(r.filed)}${r.lagDays === null ? "" : ` (+${r.lagDays} d)`}`,
+              `${date(r.earliestFiled)}${r.earliestLagDays === null ? "" : ` (+${r.earliestLagDays} d)`}`,
+              r.previousPeriod ? `${quarterLabel(r.previousPeriod)} · ${date(r.previousPeriod)}` : "none loaded",
               String(r.holders),
               signedInt(r.holdersChange),
               `${r.newHolders ?? "—"} / ${r.exitedHolders ?? "—"}`,
@@ -138,18 +141,12 @@ function InstitutionalBody({ own, lastGood }: { own: HoldingOwnership; lastGood:
         ) : null}
         {rows.some((r) => r.holdersChange === null) ? (
           <p className="text-xs text-text-muted">
-            A row marked “—” has no earlier loaded quarter to compare with: the change is unknown, not zero.
+            A row marked “—” has no earlier loaded quarter to compare with (the oldest loaded quarter): the change is unknown, not zero.
           </p>
         ) : null}
         {rows.some((r) => (r.quartersSincePrevious ?? 1) > 1) ? (
           <p role="status" className="text-xs text-text font-medium">
-            A quarter is missing between some loaded quarters, so those changes span more than one quarter.
-          </p>
-        ) : null}
-        {rows.some((r) => r.changeSpanUnknown) ? (
-          <p role="status" className="text-xs text-text">
-            <span aria-hidden="true" className="text-warning-signal">▲ </span>
-            The oldest row&apos;s change was computed against an earlier quarter that is not in this list, so how many quarters it spans is unknown.
+            A quarter is not loaded between some periods, so those changes are measured against an earlier quarter than the adjacent one (see “Changes against” in the table).
           </p>
         ) : null}
         <Legend
@@ -232,9 +229,7 @@ function FundPositionsBody({ data, lastGood }: { data: HoldingFundPositions; las
             <p className="text-sm text-text-muted">No tracked fund reports a position. This is not evidence that no fund holds it.</p>
           ) : (
             <>
-            {data.positions.length >= POSITION_LIMIT ? (
-              <p className="text-xs text-text-muted">Showing the {POSITION_LIMIT} requested rows; more funds may report a position (the API does not say).</p>
-            ) : null}
+            {positionsNote(data) ? <p className="text-xs text-text-muted">{positionsNote(data)}</p> : null}
             <DataTable
               caption="N-PORT fund positions with report date and filing lag. Not additive."
               minWidth="60rem"

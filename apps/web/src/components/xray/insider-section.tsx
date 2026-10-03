@@ -19,7 +19,6 @@ import {
   netValueText,
   PDMR_STATUS_LABEL,
   pdmrHoldingState,
-  tickerCaseCaveat,
   type InsiderGroup,
 } from "@/lib/xray/insider";
 import { toNum } from "@/lib/xray/parse";
@@ -243,12 +242,12 @@ function PdmrBlock({ ticker }: { ticker: string }) {
   const resource = useApiResource(fetcher);
   return (
     <ResourceShell state={resource.state} label="UK PDMR notifications">
-      {(data, lastGood) => <PdmrBody data={data} lastGood={lastGood} ticker={ticker} />}
+      {(data, lastGood) => <PdmrBody data={data} lastGood={lastGood} />}
     </ResourceShell>
   );
 }
 
-function PdmrBody({ data, lastGood, ticker }: { data: HoldingPdmrOut; lastGood: boolean; ticker: string }) {
+function PdmrBody({ data, lastGood }: { data: HoldingPdmrOut; lastGood: boolean }) {
   const holding = pdmrHoldingState(data);
   const state = holding.state;
   const dates = data.notifications.map((n) => n.announced_at).filter((d): d is string => !!d).sort();
@@ -270,7 +269,6 @@ function PdmrBody({ data, lastGood, ticker }: { data: HoldingPdmrOut; lastGood: 
       {data.notifications.length === 0 ? (
         <p className="text-sm text-text-muted">
           {data.status.state === "available" ? "No PDMR announcement is stored for this holding." : "No notification is available: see the channel status below."}
-          {tickerCaseCaveat(ticker) ? ` The API looks tickers up in upper case (${ticker.toUpperCase()}), so a holding whose stored ticker has a lower-case exchange suffix may be missed here even though announcements exist.` : ""}
         </p>
       ) : (
         <DataTable
@@ -313,7 +311,7 @@ function PdmrBody({ data, lastGood, ticker }: { data: HoldingPdmrOut; lastGood: 
       <div className="flex flex-wrap items-center gap-2 text-xs text-text-muted">
         <DataStateBadge state={state} reason={holding.reason ?? undefined} />
         <span className="num">
-          This holding: {holding.parsed} parsed of {holding.total} announcements. Channel status, all issuers: {data.status.parsed} parsed of {data.status.attempted} attempted
+          This holding: {holding.parsed} parsed of {holding.total} announcements{data.ticker_status && Object.keys(data.ticker_status.by_status).length > 0 ? ` (${Object.entries(data.ticker_status.by_status).map(([k, v]) => `${PDMR_STATUS_LABEL[k] ?? k} ${v}`).join(", ")})` : ""}. Channel-wide status, all issuers: {data.status.parsed} parsed of {data.status.attempted} attempted
           {Object.keys(data.status.by_status).length > 0 ? ` (${Object.entries(data.status.by_status).map(([k, v]) => `${PDMR_STATUS_LABEL[k] ?? k} ${v}`).join(", ")})` : ""}
         </span>
       </div>
