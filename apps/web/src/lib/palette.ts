@@ -58,6 +58,7 @@ const PRIMARY_PAGES = [
   { href: "/research", label: "Research", keywords: "reports research this ticker" },
   { href: "/financials", label: "Financials", keywords: "statements as filed restatement cash conversion debt maturity segments estimates consensus guidance peers earnings surprise" },
   { href: "/macro", label: "Macro and trade", keywords: "country gdp inflation credit gap oecd world bank bis ecb comtrade hs exports partners exposure vintage revision" },
+  { href: "/xray", label: "Funds and ownership", keywords: "x-ray look-through etf fund overlap holdings coverage ledger 13f n-port 13d 13g insider pdmr ownership treemap sankey" },
   { href: "/markets", label: "Price coverage", keywords: "prices candles corporate actions splits dividends adjusted raw total return correlation sessions holidays diagnostics gbx" },
   { href: "/reports", label: "Reports", keywords: "digest archive monthly reviews impact notes full text" },
   { href: "/activity", label: "Activity", keywords: "job log coverage gaps cost budget" },

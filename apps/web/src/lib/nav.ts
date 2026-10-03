@@ -30,6 +30,7 @@ export const CLUSTERS: readonly Cluster[] = [
       { href: "/transactions", label: "Transactions" },
       { href: "/watchlist", label: "Watchlist" },
       { href: "/markets", label: "Price coverage" },
+      { href: "/xray", label: "Funds and ownership" },
     ],
   },
   {
