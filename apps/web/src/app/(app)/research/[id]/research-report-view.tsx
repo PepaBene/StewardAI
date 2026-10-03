@@ -641,7 +641,7 @@ function ResearchSentence({
       {by !== sectionWriter ? <WriterTag by={by} className="mr-1 align-middle" /> : <span className="sr-only">{WRITTEN_BY[by].label}: </span>}
       <span className={checkedTextClass(sentence)}>{sentence.text}</span>
       <SourceChips ids={sentence.source_ids} index={index} className="font-sans" />
-      <ClaimKnownAsOf ids={sentence.source_ids} sources={index.byId} />
+      <ClaimKnownAsOf ids={sentence.source_ids} sources={index.byId} knownAtMin={sentence.known_at_min} knownAtMax={sentence.known_at_max} />
       {(sentence.source_ids ?? []).length === 0 ? <span className="ml-1 font-sans text-xs text-text-muted">(no source)</span> : null}
       <span className="font-sans">
         <SentenceCheckMark sentence={sentence} />
@@ -671,7 +671,7 @@ function InlineSentence({
     <span>
       <span className={checkedTextClass(sentence)}>{sentence.text}</span>
       <SourceChips ids={sentence.source_ids} index={index} className="font-sans" />
-      <ClaimKnownAsOf ids={sentence.source_ids} sources={index.byId} />
+      <ClaimKnownAsOf ids={sentence.source_ids} sources={index.byId} knownAtMin={sentence.known_at_min} knownAtMax={sentence.known_at_max} />
       <span className="font-sans">
         <SentenceCheckMark sentence={sentence} />
         <FeedbackControl

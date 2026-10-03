@@ -75,7 +75,7 @@ export function PatentMatrix({
       kicker="Innovation"
       title="Patent landscape"
       takeaway={takeaway}
-      units={`Rows: CPC subclass. Columns: priority year. Bubble area: distinct families (largest cell ${m.maxFamilies}). Colour: ${mode === "citations" ? "forward citations summed over the cell's families" : "legal status"}. ${m.attributedFamilies} attributed families; ${m.placedFamilies} placed${m.missingPriorityDate ? `, ${m.missingPriorityDate} without a priority date` : ""}${m.missingCpc ? `, ${m.missingCpc} without a CPC class` : ""}${m.unattributedFamilies ? `; ${m.unattributedFamilies} listed families have no dated ownership path and are excluded` : ""}. Families from a source that supplies no citation counts (EPO OPS) show citations as unknown, never as zero.`}
+      units={`Rows: CPC subclass. Columns: priority year. Bubble area: distinct families (largest cell ${m.maxFamilies}). Colour: ${mode === "citations" ? "forward citations summed over the cell's families" : "legal status"}. ${m.attributedFamilies} attributed families; ${m.placedFamilies} placed${m.missingPriorityDate ? `, ${m.missingPriorityDate} without a priority date` : ""}${m.missingCpc ? `, ${m.missingCpc} without a CPC class` : ""}${m.unattributedFamilies ? `; ${m.unattributedFamilies} listed families have no dated ownership path and are excluded` : ""}. Citation data for ${m.placedWithCitationData} of ${m.placedFamilies} placed families; the others (for example from EPO OPS, which supplies no citation counts) show citations as unknown, never as zero.`}
       provenance={{
         source: `Patent families (${sources}), reconciled to the issuer`,
         asOf: asOfDate,
@@ -99,7 +99,7 @@ export function PatentMatrix({
       }
       table={{
         caption: "Patent families by CPC subclass and priority year",
-        columns: ["Subclass", "Year", "Families", "Forward citations", "Citation counts unknown", "Legal status"],
+        columns: ["Subclass", "Year", "Families", "Forward citations", "Citation data", "Legal status"],
         rows: [...m.cells.values()]
           .sort((a, b) => a.subclass.localeCompare(b.subclass) || a.year - b.year)
           .map((c) => [
@@ -107,7 +107,7 @@ export function PatentMatrix({
             c.year,
             c.families,
             c.citationsUnknown === c.families ? "unknown" : formatNumber(c.citations),
-            c.citationsUnknown,
+            `${c.families - c.citationsUnknown} of ${c.families} families`,
             Object.entries(c.statusCounts)
               .map(([k, v]) => `${k} ${v}`)
               .join(", "),
@@ -171,7 +171,7 @@ export function PatentMatrix({
             ? CITATION_BG.map((cls, i) => (
                 <span key={i} className="inline-flex items-center gap-1.5">
                   <span className={cn("inline-block size-3 rounded-full", cls)} aria-hidden="true" />
-                  {i === 0 ? "No citations, or counts not provided by the source" : i === 1 ? "Few" : i === 2 ? "Some" : "Many (relative to the most-cited cell)"}
+                  {i === 0 ? `No citations, or counts not provided by the source (citation data for ${m.placedWithCitationData} of ${m.placedFamilies} families)` : i === 1 ? "Few" : i === 2 ? "Some" : "Many (relative to the most-cited cell)"}
                 </span>
               ))
             : [...new Set([...statusKinds, "mixed"])].map((k) => (

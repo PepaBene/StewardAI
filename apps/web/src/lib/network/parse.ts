@@ -208,8 +208,8 @@ function parseDisclosure(raw: unknown, i: number): NetworkDisclosure {
 }
 
 /**
- * EPO OPS bibliographic data carries no forward citations: the backend stores 0 for them. A 0 from
- * that source is "not provided", not "uncited".
+ * The backend now sends null for "the source cannot supply it" and trusts a number otherwise. Only a
+ * LEGACY 0 on a family whose source is EPO OPS (which never carries citations) is still read as unknown.
  */
 export function forwardCitations(value: number | null, source: string | null): number | null {
   return value === 0 && source !== null && source.toLowerCase().startsWith("epo_ops") ? null : value;
@@ -336,6 +336,14 @@ function parsePeriod(raw: unknown, i: number): ConcentrationPeriod {
     anonymousShareSum: num(r.anonymous_share_sum),
     reportedShareSum: num(r.reported_share_sum),
     missingShareCount: reqInt(r.missing_share_count, `${p}.missing_share_count`),
+    namedMissingShareCount: num(r.named_missing_share_count),
+    anonymousMissingShareCount: num(r.anonymous_missing_share_count),
+    namedReportedShareSum: num(r.named_reported_share_sum),
+    anonymousReportedShareSum: num(r.anonymous_reported_share_sum),
+    totalReportedShareSum: num(r.total_reported_share_sum),
+    namedAtLeast: typeof r.named_at_least === "boolean" ? r.named_at_least : null,
+    anonymousAtLeast: typeof r.anonymous_at_least === "boolean" ? r.anonymous_at_least : null,
+    totalAtLeast: typeof r.total_at_least === "boolean" ? r.total_at_least : null,
     largestShare: num(r.largest_share),
     shareExceedsTotal: r.share_exceeds_total === true,
     openContradictions: num(r.open_contradictions) ?? 0,
@@ -367,7 +375,8 @@ export function parsePatentTrends(raw: unknown): Parsed<PatentTrendRow[]> {
         cpc: reqStr(r.cpc, `${p}.cpc`),
         year: reqInt(r.year, `${p}.year`),
         families: reqInt(r.families, `${p}.families`),
-        forwardCitations: num(r.forward_citations) ?? 0,
+        forwardCitations: num(r.forward_citations),
+        familiesWithCitationData: num(r.families_with_citation_data),
         legalStatusCounts: counts,
         medianYearsToGrant: num(r.median_years_to_grant),
         expiringWithin5y: num(r.expiring_within_5y) ?? 0,

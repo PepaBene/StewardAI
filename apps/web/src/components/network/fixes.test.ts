@@ -23,7 +23,7 @@ const decide = () => Promise.resolve({ ok: true as const, message: "ok" });
 describe("F5-04 concentration panel text", () => {
   const data = (p: Partial<ConcentrationPayload["periods"][number]>): ConcentrationPayload => ({
     ticker: "T", limitations: [],
-    periods: [{ fiscalPeriod: "FY2025", relationship: "customer", shareBasis: "issuer_revenue", namedCount: 2, anonymousCount: 1, namedShareSum: 0.5, anonymousShareSum: 0, reportedShareSum: 0.5, missingShareCount: 1, largestShare: 0.3, shareExceedsTotal: false, openContradictions: 0, ...p }],
+    periods: [{ fiscalPeriod: "FY2025", relationship: "customer", shareBasis: "issuer_revenue", namedCount: 2, anonymousCount: 1, namedShareSum: 0.5, anonymousShareSum: 0, reportedShareSum: 0.5, missingShareCount: 1, namedMissingShareCount: null, anonymousMissingShareCount: null, namedReportedShareSum: null, anonymousReportedShareSum: null, totalReportedShareSum: null, namedAtLeast: null, anonymousAtLeast: null, totalAtLeast: null, largestShare: 0.3, shareExceedsTotal: false, openContradictions: 0, ...p }],
   });
   it("never prints an unknown anonymous share as 0.0%", () => {
     const out = html(createElement(ConcentrationPanel, { data: data({}), asOfDate: null }));
@@ -35,6 +35,18 @@ describe("F5-04 concentration panel text", () => {
     const out = html(createElement(ConcentrationPanel, { data: data({ largestShare: null, namedShareSum: 0, namedCount: 1, anonymousCount: 0, missingShareCount: 1 }), asOfDate: null }));
     expect(out).toContain("no counterparty reported a share");
     expect(out).not.toMatch(/(?<![\d.])0\.0%/);
+  });
+});
+
+describe("per-side concentration panel", () => {
+  it("shows exact named share and a floor only for the anonymous side", () => {
+    const out = html(createElement(ConcentrationPanel, {
+      asOfDate: null,
+      data: { ticker: "T", limitations: [], periods: [{ fiscalPeriod: "FY2025", relationship: "customer", shareBasis: "issuer_revenue", namedCount: 2, anonymousCount: 1, namedShareSum: 0.5, anonymousShareSum: 0.1, reportedShareSum: 0.6, missingShareCount: 1, namedMissingShareCount: 0, anonymousMissingShareCount: 1, namedReportedShareSum: 0.5, anonymousReportedShareSum: 0.1, totalReportedShareSum: 0.6, namedAtLeast: false, anonymousAtLeast: true, totalAtLeast: true, largestShare: 0.3, shareExceedsTotal: false, openContradictions: 0 }] },
+    }));
+    expect(out).toContain("Named 50.0%");
+    expect(out).toContain("anonymous at least 10.0%");
+    expect(out).not.toContain("at least 50.0%");
   });
 });
 

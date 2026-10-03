@@ -144,7 +144,7 @@ describe("concentration", () => {
     const out = html(
       createElement(ConcentrationPanel, {
         asOfDate: null,
-        data: data([{ fiscalPeriod: "FY2025", relationship: "customer", shareBasis: "issuer_revenue", namedCount: 2, anonymousCount: 1, namedShareSum: 0.2, anonymousShareSum: 0.1, reportedShareSum: 0.3, missingShareCount: 1, largestShare: 0.15, shareExceedsTotal: false, openContradictions: 0 }]),
+        data: data([{ fiscalPeriod: "FY2025", relationship: "customer", shareBasis: "issuer_revenue", namedCount: 2, anonymousCount: 1, namedShareSum: 0.2, anonymousShareSum: 0.1, reportedShareSum: 0.3, missingShareCount: 1, namedMissingShareCount: null, anonymousMissingShareCount: null, namedReportedShareSum: null, anonymousReportedShareSum: null, totalReportedShareSum: null, namedAtLeast: null, anonymousAtLeast: null, totalAtLeast: null, largestShare: 0.15, shareExceedsTotal: false, openContradictions: 0 }]),
       }),
     );
     expect(out).toContain("at least");

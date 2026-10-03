@@ -135,8 +135,8 @@ export type ClaimKnownAsOf = {
 };
 
 /**
- * The report payload has no per-claim known-at, only each source's `as_of`. The honest
- * per-claim date is the latest dated cited source, with undated citations counted, not hidden.
+ * The period/snapshot dates (`as_of`) of a claim's cited sources: what the data is about, NOT when the app
+ * learned of it (that is the API's `known_at_min`/`known_at_max`). Latest dated source, undated ones counted.
  */
 export function claimKnownAsOf(sourceIds: readonly string[], sources: ReadonlyMap<string, { as_of?: string | null }>): ClaimKnownAsOf {
   let date: string | null = null;

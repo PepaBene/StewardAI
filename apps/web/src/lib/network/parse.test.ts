@@ -75,6 +75,23 @@ describe("other payloads", () => {
     expect(r.ok && r.value.periods[0]!.largestShare).toBe(0.31);
     expect(parseConcentration({ ticker: "T", periods: [{ fiscal_period: "FY" }] }).ok).toBe(false);
   });
+  it("parses the per-side concentration fields, keeping a null sum null", () => {
+    const r = parseConcentration({
+      ticker: "T",
+      periods: [{ fiscal_period: "FY2024", relationship: "customer", named_count: 1, anonymous_count: 1, missing_share_count: 1, named_missing_share_count: 0, anonymous_missing_share_count: 1, named_reported_share_sum: "0.2", anonymous_reported_share_sum: null, total_reported_share_sum: "0.2", named_at_least: false, anonymous_at_least: true, total_at_least: true }],
+    });
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    const p = r.value.periods[0]!;
+    expect([p.namedReportedShareSum, p.anonymousReportedShareSum, p.totalReportedShareSum]).toEqual([0.2, null, 0.2]);
+    expect([p.namedAtLeast, p.anonymousAtLeast, p.totalAtLeast]).toEqual([false, true, true]);
+    expect(p.anonymousMissingShareCount).toBe(1);
+  });
+  it("keeps null forward citations as unknown and parses families_with_citation_data", () => {
+    const t = parsePatentTrends([{ cpc: "H01L", year: 2020, families: 3, forward_citations: null, families_with_citation_data: 0, legal_status_counts: {} }]);
+    expect(t.ok && t.value[0]!.forwardCitations).toBeNull();
+    expect(t.ok && t.value[0]!.familiesWithCitationData).toBe(0);
+  });
   it("parses trends and overlap, keeping null overlap as null", () => {
     const t = parsePatentTrends([{ cpc: "H01L21/02", year: 2020, families: 2, forward_citations: 5, legal_status_counts: { granted: 2 }, median_years_to_grant: null }]);
     expect(t.ok && t.value[0]!.medianYearsToGrant).toBeNull();

@@ -11,10 +11,21 @@ function pct(v: number | null): string {
 
 const side = (s: Parameters<typeof sideShareLabel>[0]) => sideShareLabel(s, (v) => formatPct(v, 1));
 
+function missingText(r: ReturnType<typeof concentrationRows>[number]): string {
+  if (r.namedMissingShareCount !== null && r.anonymousMissingShareCount !== null) {
+    const parts = [
+      r.namedMissingShareCount ? `${r.namedMissingShareCount} named` : "",
+      r.anonymousMissingShareCount ? `${r.anonymousMissingShareCount} anonymous` : "",
+    ].filter(Boolean);
+    return parts.length ? ` · disclosed without a share: ${parts.join(", ")} (not imputed)` : "";
+  }
+  return r.missingShareCount ? ` · ${r.missingShareCount} disclosed without a share (not imputed)` : "";
+}
+
 /**
  * Customer and supplier concentration from confirmed, dated, directed, issuer-basis
- * disclosures only. Named and anonymous counterparties stay separate; a sum over rows where
- * some counterparties reported no share is a floor ("at least"), never a total.
+ * disclosures only. Named and anonymous counterparties stay separate; each side is labelled exactly: a side's sum is a floor
+ * ("at least") only when a counterparty on that side reported no share ("at least"), never a total.
  */
 export function ConcentrationPanel({ data, asOfDate }: { data: ConcentrationPayload; asOfDate: string | null }) {
   const rows = concentrationRows(data.periods);
@@ -78,7 +89,7 @@ export function ConcentrationPanel({ data, asOfDate }: { data: ConcentrationPayl
               </div>
               <p className="num text-xs text-text-muted">
                 Named {side(r.named)} · anonymous {side(r.anonymous)} · largest {pct(r.largestShare)}
-                {r.missingShareCount ? ` · ${r.missingShareCount} disclosed without a share (not imputed)` : ""}
+                {missingText(r)}
               </p>
               {r.shareExceedsTotal ? <p className="text-xs text-text">The reported shares add up to more than 100%: a contradiction to review, not a figure to trust.</p> : null}
               {r.openContradictions ? <p className="text-xs text-text">{r.openContradictions} open contradiction(s) for this period.</p> : null}

@@ -99,12 +99,24 @@ describe("ClaimKnownAsOf", () => {
     ["S1", { source: { as_of: "2025-03-01" } }],
     ["S2", { source: { as_of: null } }],
   ]);
-  const r = (ids: string[] | undefined) => render(h(ClaimKnownAsOf, { ids, sources }));
+  const r = (ids: string[] | undefined, extra: { knownAtMin?: string | null; knownAtMax?: string | null } = {}) => render(h(ClaimKnownAsOf, { ids, sources, ...extra }));
   it("shows the latest cited date, counts undated citations, and is empty without citations", () => {
     expect(r(["S1"])).toContain("Source data dated 2025-03-01");
     expect(r(["S1", "S2"])).toContain("+1 undated");
     expect(r(["S2"])).toContain("Cited sources undated");
     expect(r([])).toBe("");
     expect(r(undefined)).toBe("");
+  });
+  it("shows the API's known-at bounds separately from the source dates and drops the derived disclaimer", () => {
+    const out = r(["S1"], { knownAtMin: "2026-03-01T10:00:00Z", knownAtMax: "2026-03-04T09:00:00Z" });
+    expect(out).toContain("Known to the app: 2026-03-01 to 2026-03-04");
+    expect(out).toContain("Source data dated 2025-03-01");
+    expect(out).not.toContain("derived");
+    expect(out).not.toContain("stores no known-at");
+  });
+  it("says known-at is not recorded, with the count, when the bounds are null", () => {
+    expect(r(["S1", "S2"], { knownAtMin: null, knownAtMax: null })).toContain("Known-at not recorded for 2 cited sources");
+    expect(r(["S1"])).toContain("Known-at not recorded for 1 cited source");
+    expect(r(["S1"])).not.toContain("Known to the app:");
   });
 });

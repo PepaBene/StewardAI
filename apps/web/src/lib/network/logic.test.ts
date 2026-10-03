@@ -243,7 +243,7 @@ describe("deals", () => {
 describe("concentration", () => {
   const p = (over: Partial<ConcentrationPeriod>): ConcentrationPeriod => ({
     fiscalPeriod: "FY2024", relationship: "customer", shareBasis: "issuer_revenue", namedCount: 1, anonymousCount: 0, namedShareSum: 0.2,
-    anonymousShareSum: 0, reportedShareSum: 0.2, missingShareCount: 0, largestShare: 0.2, shareExceedsTotal: false, openContradictions: 0, ...over,
+    anonymousShareSum: 0, reportedShareSum: 0.2, missingShareCount: 0, namedMissingShareCount: null, anonymousMissingShareCount: null, namedReportedShareSum: null, anonymousReportedShareSum: null, totalReportedShareSum: null, namedAtLeast: null, anonymousAtLeast: null, totalAtLeast: null, largestShare: 0.2, shareExceedsTotal: false, openContradictions: 0, ...over,
   });
   it("orders newest period first and flags sums with missing shares as a floor", () => {
     const rows = concentrationRows([p({}), p({ fiscalPeriod: "FY2025", missingShareCount: 1, namedCount: 2 })]);

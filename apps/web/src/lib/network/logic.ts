@@ -347,6 +347,8 @@ export type PatentMatrix = {
   cells: Map<string, MatrixCell>;
   /** Distinct families attributed to the holding through a dated ownership path. */
   attributedFamilies: number;
+  /** Placed families whose forward-citation count is known (null = unknown, not 0). */
+  placedWithCitationData: number;
   /** Of those, families placed in the matrix (priority date and a CPC subclass known). */
   placedFamilies: number;
   /** Listed by the API but with no dated ownership path: not counted for the holding. */
@@ -393,6 +395,7 @@ export function buildPatentMatrix(patents: readonly PatentFamily[], maxRows = 12
   let missingPriority = 0;
   let missingCpc = 0;
   const placed = new Set<string>();
+  const withCitationData = new Set<string>();
   const cells = new Map<string, MatrixCell>();
   const perSubclass = new Map<string, Set<string>>();
   for (const p of attributed) {
@@ -407,6 +410,7 @@ export function buildPatentMatrix(patents: readonly PatentFamily[], maxRows = 12
       continue;
     }
     placed.add(p.familyKey);
+    if (p.citationsForward !== null) withCitationData.add(p.familyKey);
     for (const s of subs) {
       const key = cellKey(s, year);
       const cell =
@@ -438,6 +442,7 @@ export function buildPatentMatrix(patents: readonly PatentFamily[], maxRows = 12
     years: yearList,
     cells: new Map(visible.map((c) => [cellKey(c.subclass, c.year), c])),
     attributedFamilies: attributed.length,
+    placedWithCitationData: withCitationData.size,
     placedFamilies: placed.size,
     unattributedFamilies: all.length - attributed.length,
     missingPriorityDate: missingPriority,
@@ -632,14 +637,34 @@ export type ConcentrationRow = ConcentrationPeriod & {
   anonymous: SideShare;
 };
 
-function sideShare(count: number, sum: number | null, missing: number, otherCount: number): SideShare {
+/** Exact per-side labelling from the API's per-side fields. */
+function sideShareExact(count: number, reportedSum: number | null, atLeast: boolean): SideShare {
   if (count <= 0) return { kind: "none", value: null };
-  // The API sends one missing count for both sides: with counterparties on the other side too, we
-  // cannot tell which side is missing, so any missing share makes both sides lower bounds.
+  // null sum = nothing reported on this side; never 0.
+  if (reportedSum === null) return { kind: "unknown", value: null };
+  return { kind: atLeast ? "floor" : "exact", value: reportedSum };
+}
+
+/** Legacy path (older backend without per-side fields): one missing count for both sides, so conservative. */
+function sideShareLegacy(count: number, sum: number | null, missing: number, otherCount: number): SideShare {
+  if (count <= 0) return { kind: "none", value: null };
   const missingHere = otherCount <= 0 ? missing : missing > 0 ? 1 : 0;
   const allMissing = otherCount <= 0 && missing >= count;
   if (sum === null || allMissing || (sum === 0 && missing > 0)) return { kind: "unknown", value: null };
   return { kind: missingHere > 0 ? "floor" : "exact", value: sum };
+}
+
+function periodSides(p: ConcentrationPeriod): { named: SideShare; anonymous: SideShare } {
+  if (p.namedAtLeast !== null && p.anonymousAtLeast !== null) {
+    return {
+      named: sideShareExact(p.namedCount, p.namedReportedShareSum, p.namedAtLeast),
+      anonymous: sideShareExact(p.anonymousCount, p.anonymousReportedShareSum, p.anonymousAtLeast),
+    };
+  }
+  return {
+    named: sideShareLegacy(p.namedCount, p.namedShareSum, p.missingShareCount, p.anonymousCount),
+    anonymous: sideShareLegacy(p.anonymousCount, p.anonymousShareSum, p.missingShareCount, p.namedCount),
+  };
 }
 
 export function sideShareLabel(side: SideShare, fmt: (v: number) => string): string {
@@ -653,8 +678,7 @@ export function concentrationRows(periods: readonly ConcentrationPeriod[]): Conc
   return [...periods]
     .sort((a, b) => b.fiscalPeriod.localeCompare(a.fiscalPeriod) || a.relationship.localeCompare(b.relationship))
     .map((p) => {
-      const named = sideShare(p.namedCount, p.namedShareSum, p.missingShareCount, p.anonymousCount);
-      const anonymous = sideShare(p.anonymousCount, p.anonymousShareSum, p.missingShareCount, p.namedCount);
+      const { named, anonymous } = periodSides(p);
       return {
         ...p,
         named,

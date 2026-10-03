@@ -23,7 +23,7 @@ import type { ConcentrationPeriod, NetworkEvent, PatentFamily, PatentOverlapRow 
 
 const period = (over: Partial<ConcentrationPeriod> = {}): ConcentrationPeriod => ({
   fiscalPeriod: "FY2025", relationship: "customer", shareBasis: "issuer_revenue", namedCount: 0, anonymousCount: 0, namedShareSum: 0, anonymousShareSum: 0,
-  reportedShareSum: null, missingShareCount: 0, largestShare: null, shareExceedsTotal: false, openContradictions: 0, ...over,
+  reportedShareSum: null, missingShareCount: 0, namedMissingShareCount: null, anonymousMissingShareCount: null, namedReportedShareSum: null, anonymousReportedShareSum: null, totalReportedShareSum: null, namedAtLeast: null, anonymousAtLeast: null, totalAtLeast: null, largestShare: null, shareExceedsTotal: false, openContradictions: 0, ...over,
 });
 const fam = (over: Partial<PatentFamily> = {}): PatentFamily => ({
   familyKey: "F1", priorityDate: "2020-03-01", firstPublicationDate: null, title: "t", cpcCodes: ["H01L21/02"], jurisdictions: [], citationsForward: 1, citationsBackward: null,
@@ -47,12 +47,12 @@ describe("F5-02 as-of is never a future instant", () => {
 
 describe("F5-04 concentration floors and unknowns", () => {
   it("anonymous disclosures missing a share are unknown, not 0.0%", () => {
-    const [r] = concentrationRows([period({ namedCount: 2, anonymousCount: 1, namedShareSum: 0.5, anonymousShareSum: 0, missingShareCount: 1, largestShare: 0.3 })]);
+    const [r] = concentrationRows([period({ namedCount: 2, anonymousCount: 1, namedShareSum: 0.5, anonymousShareSum: 0, missingShareCount: 1, namedMissingShareCount: null, anonymousMissingShareCount: null, namedReportedShareSum: null, anonymousReportedShareSum: null, totalReportedShareSum: null, namedAtLeast: null, anonymousAtLeast: null, totalAtLeast: null, largestShare: 0.3 })]);
     expect(sideShareLabel(r!.anonymous, fmt)).toBe("not reported");
     expect(sideShareLabel(r!.named, fmt)).toBe("at least 50.0%");
   });
   it("a side with no counterparty is 'none disclosed', never 0.0%", () => {
-    const [r] = concentrationRows([period({ namedCount: 2, anonymousCount: 0, namedShareSum: 0.3, anonymousShareSum: 0, missingShareCount: 1, largestShare: 0.3 })]);
+    const [r] = concentrationRows([period({ namedCount: 2, anonymousCount: 0, namedShareSum: 0.3, anonymousShareSum: 0, missingShareCount: 1, namedMissingShareCount: null, anonymousMissingShareCount: null, namedReportedShareSum: null, anonymousReportedShareSum: null, totalReportedShareSum: null, namedAtLeast: null, anonymousAtLeast: null, totalAtLeast: null, largestShare: 0.3 })]);
     expect(sideShareLabel(r!.anonymous, fmt)).toBe("none disclosed");
     expect(r!.named.kind).toBe("floor");
   });
@@ -65,6 +65,28 @@ describe("F5-04 concentration floors and unknowns", () => {
   it("the takeaway maximum ignores periods without a share", () => {
     expect(largestReportedShare([{ largestShare: null }, { largestShare: null }])).toBeNull();
     expect(largestReportedShare([{ largestShare: null }, { largestShare: 0.2 }])).toBe(0.2);
+  });
+});
+
+describe("per-side concentration labels (exact)", () => {
+  const side = (over: Partial<ConcentrationPeriod>) => concentrationRows([period({ namedCount: 2, anonymousCount: 1, ...over })])[0]!;
+  it("labels a floor only on the side whose disclosure lacks a share", () => {
+    const r = side({
+      namedReportedShareSum: 0.5, namedMissingShareCount: 0, namedAtLeast: false,
+      anonymousReportedShareSum: 0.1, anonymousMissingShareCount: 1, anonymousAtLeast: true,
+      totalReportedShareSum: 0.6, totalAtLeast: true, missingShareCount: 1,
+    });
+    expect(sideShareLabel(r.named, fmt)).toBe("50.0%");
+    expect(sideShareLabel(r.anonymous, fmt)).toBe("at least 10.0%");
+  });
+  it("a null side sum is not reported, never 0; the other side stays separate", () => {
+    const r = side({
+      namedReportedShareSum: 0.4, namedMissingShareCount: 0, namedAtLeast: false,
+      anonymousReportedShareSum: null, anonymousMissingShareCount: 1, anonymousAtLeast: true,
+      missingShareCount: 1,
+    });
+    expect(sideShareLabel(r.anonymous, fmt)).toBe("not reported");
+    expect(sideShareLabel(r.named, fmt)).toBe("40.0%");
   });
 });
 

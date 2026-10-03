@@ -160,6 +160,17 @@ export type ConcentrationPeriod = {
   anonymousShareSum: number | null;
   reportedShareSum: number | null;
   missingShareCount: number;
+  /** Per-side counts of disclosures with no reported share; null when the API did not send them (older backend). */
+  namedMissingShareCount: number | null;
+  anonymousMissingShareCount: number | null;
+  /** Sums over reported shares only; null = nothing reported on that side (never 0). */
+  namedReportedShareSum: number | null;
+  anonymousReportedShareSum: number | null;
+  totalReportedShareSum: number | null;
+  /** True when the side's sum is a lower bound (some disclosure on that side has no share); null when not sent. */
+  namedAtLeast: boolean | null;
+  anonymousAtLeast: boolean | null;
+  totalAtLeast: boolean | null;
   largestShare: number | null;
   shareExceedsTotal: boolean;
   openContradictions: number;
@@ -171,7 +182,9 @@ export type PatentTrendRow = {
   cpc: string;
   year: number;
   families: number;
-  forwardCitations: number;
+  /** null = no family in the bucket has citation data (unknown), never 0. */
+  forwardCitations: number | null;
+  familiesWithCitationData: number | null;
   legalStatusCounts: Record<string, number>;
   medianYearsToGrant: number | null;
   expiringWithin5y: number;
