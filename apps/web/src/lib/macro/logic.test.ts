@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  tradePeriodStale,
   apiErrorMessages,
   comparisonGroups,
   countryExposureView,
@@ -450,5 +451,19 @@ describe("fix pass: basis filter keeps the remainder honest", () => {
     const all = countryExposureView(c, "all");
     expect(all.otherBasisShare).toBeNull();
     expect(all.countries.find((d) => d.code === "DE")?.exposedValue).toBe(300);
+  });
+});
+
+describe("F8-7 trade period staleness", () => {
+  const now = new Date("2026-10-03T00:00:00Z");
+  it("calls a period older than 24 months stale and a recent one fresh", () => {
+    expect(tradePeriodStale("2025-01", now)).toBe(false);
+    expect(tradePeriodStale("2024-09", now)).toBe(true);
+    expect(tradePeriodStale("2023", now)).toBe(true);
+    expect(tradePeriodStale("2025", now)).toBe(false);
+  });
+  it("does not judge a missing or unparseable period", () => {
+    expect(tradePeriodStale(null, now)).toBeNull();
+    expect(tradePeriodStale("recent", now)).toBeNull();
   });
 });

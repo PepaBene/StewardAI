@@ -12,7 +12,7 @@ import { formatCompact, formatNumber, formatPct } from "@/lib/charts/format";
 import { isFiniteNumber } from "@/lib/charts/scale";
 import { useApiResource, type ApiResult } from "@/lib/hooks/use-api-resource";
 import { fetchCountryContext, fetchIndustryContext, fetchTradeContext } from "@/lib/macro/api";
-import { equalPartners, hhiPoints, normaliseReporter, productSankey, tradeFlows, tradePartyName, tradeRows, TRADE_METRIC_LABELS } from "@/lib/macro/logic";
+import { equalPartners, hhiPoints, normaliseReporter, productSankey, tradeFlows, tradePartyName, tradeRows, TRADE_METRIC_LABELS, TRADE_STALE_AFTER_MONTHS, tradePeriodStale } from "@/lib/macro/logic";
 import type { ResearchContext, TradeContext, TradeRow } from "@/lib/macro/types";
 
 import { day } from "./format";
@@ -191,8 +191,8 @@ export function TradeSummary({ trade: t }: { trade: TradeContext }) {
           asOf: t.latestPeriod,
           knownAt: t.knownAt,
           method: `${t.hsRevision === "mixed" ? "several HS revisions stored for this reporter" : t.hsRevision}; latest revision of each observation; exports and imports never blended. Metrics are reporter-wide, the latest-period totals are for HS ${t.hsCode}`,
-          state: t.latestPeriod ? "verified" : "not_covered",
-          reason: t.notice,
+          state: !t.latestPeriod ? "not_covered" : tradePeriodStale(t.latestPeriod, new Date()) ? "stale" : "verified",
+          reason: tradePeriodStale(t.latestPeriod, new Date()) ? `Latest stored period is ${t.latestPeriod}, more than ${TRADE_STALE_AFTER_MONTHS} months ago.${t.notice ? " " + t.notice : ""}` : t.notice,
         }}
       />
     </section>

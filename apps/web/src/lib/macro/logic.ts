@@ -559,3 +559,21 @@ export const TRADE_METRIC_LABELS: Record<string, { label: string; kind: "growth"
   product_mix_change: { label: "Product mix change", kind: "index", note: "Shift in the export product mix against the adjacent period; all products stored for the reporter" },
   revealed_trade_dependence: { label: "Revealed trade dependence", kind: "index", note: "Needs world totals and GDP; the backend does not compute it" },
 };
+
+/** A trade period older than this many months (UTC) is shown as stale rather than verified. */
+export const TRADE_STALE_AFTER_MONTHS = 24;
+
+/**
+ * Whether the latest stored trade period is stale at `now`. National trade statistics lag by
+ * months, so the threshold is deliberately generous: a period more than two years old reads
+ * as stale, a recent one as verified. Null/unparseable periods are not judged (null).
+ */
+export function tradePeriodStale(period: string | null | undefined, now: Date): boolean | null {
+  const m = period ? /^(\d{4})(?:-(\d{2}))?/.exec(period) : null;
+  if (!m) return null;
+  const year = Number(m[1]);
+  const month = m[2] ? Number(m[2]) : 12;
+  if (!Number.isFinite(year) || month < 1 || month > 12) return null;
+  const months = (now.getUTCFullYear() - year) * 12 + (now.getUTCMonth() + 1 - month);
+  return months > TRADE_STALE_AFTER_MONTHS;
+}
