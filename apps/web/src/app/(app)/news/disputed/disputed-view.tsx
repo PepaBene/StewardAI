@@ -223,8 +223,9 @@ function StoryCard({ story, onResolved }: { story: DisputedStory; onResolved: (u
       ) : null}
 
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-        <SourceColumn title="The claim" description="The story's own sources." sources={story.claim} empty="No source is stored for the claim." />
+        <SourceColumn scope={`story ${story.id}`} title="The claim" description="The story's own sources." sources={story.claim} empty="No source is stored for the claim." />
         <SourceColumn
+          scope={`story ${story.id}`}
           title="Contradicted by"
           description="Verified sources that dispute it."
           sources={story.contradicting}
@@ -233,7 +234,7 @@ function StoryCard({ story, onResolved }: { story: DisputedStory; onResolved: (u
         />
       </div>
       {story.supporting.length > 0 ? (
-        <SourceColumn title="Supported by" description="Verified sources found to support it." sources={story.supporting} empty="" />
+        <SourceColumn scope={`story ${story.id}`} title="Supported by" description="Verified sources found to support it." sources={story.supporting} empty="" />
       ) : null}
 
       {state.kind === "open" ? (
@@ -273,17 +274,20 @@ function SourceColumn({
   sources,
   empty,
   disputed = false,
+  scope,
 }: {
   title: string;
   description: string;
   sources: ClaimSource[];
   empty: string;
   disputed?: boolean;
+  /** Which story the column belongs to: every story repeats the same three titles. */
+  scope?: string;
 }) {
   const sorted = sortSources(sources);
   return (
     <section
-      aria-label={title}
+      aria-label={scope ? `${title}: ${scope}` : title}
       className={cn("space-y-2 border p-3", disputed ? "border-disputed/40 bg-disputed-subtle/40" : "border-border")}
     >
       <div>

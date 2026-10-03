@@ -25,7 +25,7 @@ Several findings overlap across auditors (the 100x day-change, surprise sign and
 
 ## Resolution
 
-Every finding was re-verified by its fixer before changing code. Fixes carry regression tests (frontend now 121 test files, 1,267 tests; typecheck, lint, colour check and production build pass).
+Every finding was re-verified by its fixer before changing code. Fixes carry regression tests (frontend now 133 test files, 1,357 tests after the live pass; typecheck, lint, colour check and production build pass).
 
 Fixed: all verified findings in F1, F2 (except F2-4 mitigation only), F3, F4 (F4-12 partly), F5 (F5-04/06 mitigated), F6 (F6-02/10/14 mitigated), F7 and F8 (F8-7 resolved with a 24-month staleness rule). Also fixed in the final pass: correlation heatmap row headers cut long tickers.
 
@@ -68,11 +68,53 @@ The items below were backend gaps that the frontend could only label honestly. A
 - `stale_after_hours` is null (age not judged) for providers with no refresh job and no documented default, and it is twice a refresh gap, not the cadence itself.
 - `next_release` is a date, not a promise: the provider may reschedule. The ECB calendar states no time zone; none is shown.
 - The release-calendar collector needs the `macro_release_calendar` job to have run; until then every series reads "unknown" or an estimate, and the `macro_release_calendar` rows in the coverage ledger show the per-provider state.
-- Provider-payload assumptions remain unverified against live providers (see the backend audit).
+- Provider-payload assumptions are verified by the backend audit and, for the views, by the live pass below (the frontend parsers read real JSON from about 40 endpoints without a failure).
+
+### Live-backend browser pass (2026-10-03, branch `claude/sharp-davinci-m2n5z8`)
+
+The views were run for the first time against a real backend with real data, in a real browser, with axe and with DOM tests. Setup: a throwaway UTF-8 Postgres 16 with every repo migration applied; the backend (`uvicorn api.main:app`) with an HS256 owner token; the real jobs run through the proxy against free providers (`reference_data`, `price_history` via Yahoo because there is no Stooq key, `returns_refresh`, `macro_collect`, `macro_release_calendar`, `holiday_refresh`, `sec_xbrl`, `etf_look_through`, `exchange_probes`, `source_audit`, `fund_probes`, `zero_cost_gate`, `ownership_13f`, `control_stakes`, `nport_holdings`, `pdmr_uk`, `ir_releases`, `public_data_collect`); five synthetic positions (AAPL, MSFT, SPY, ASML, CEZ, real tickers and ISINs, quantities invented, priced at the real closes), owner-confirmed listings and owner-assigned country mappings. Next dev server with a local, uncommitted auth bypass; Chromium driven by Playwright; axe-core 4.13 (WCAG 2.0/2.1 A and AA plus best-practice) in light and dark, at 1280 px and 390 px. Real figures read: 3,515 price bars, 15,709 macro observations, 259 release-calendar rows, 1,560 statement facts, 57,785 13F rows, 224 graph edges.
+
+Pages: `/`, `/macro` (every holding), `/markets`, `/financials` (SPY and AAPL), `/xray` (all tabs), `/coverage`, `/screens` (with criteria), `/holdings/[ticker]`, `/holdings/[ticker]/network`, `/activity`, `/holdings`, `/status`, the command palette, the chat panel, every arm-then-confirm control reachable on those pages. Values were compared with the API JSON (AAPL revenue, EPS and tax rate, prices, weights, price coverage, next-release dates and basis, P/E in the screen) and with what the company filed.
+
+**Defects found in the frontend, all fixed, each with a regression test that fails on the old behaviour**
+
+| # | Defect (seen live) | Fix |
+| --- | --- | --- |
+| L1 | `/macro` logged "two children with the same key (SPY_US_EQ)": `ContextCards` and `TradePanel` were siblings keyed by the bare ticker | Prefixed keys (`macro-view.test.tsx`) |
+| L2 | `/holdings/[t]/network` logged duplicate keys: ESMA publishes several records for one venue and date (OCXE has four, two identical), the list keyed on mic/date/known-at | Position in the key, and a comment saying why (`identity-panel.test.tsx`) |
+| L3 | Holding page was 917 px wide at 390 px: a long unbroken source label in the evidence ledger | `wrap-anywhere` on the row (`evidence-ledger.test.tsx`) |
+| L4 | Overview drew a contribution chart of zeros ("CZK 1 ... CZK 0") when only one snapshot exists: the API returns 0.0 for every holding with `gap: null` | "Only one snapshot exists, so there is no period to attribute yet" (`contribution-card.test.tsx`) |
+| L5 | "-0 EUR" for the price-coverage unknown bucket: the API sends -8.9e-14 | `formatMoney` rounds a residual to zero (`format.test.ts`) |
+| L6 | AAPL effective tax rate 0.156 / 0.241 / 0.147 shown as 0.2 / 0.2 / 0.1: compact notation for unit `pure` | Three decimals for `pure` (`financials/format.test.ts`) |
+| L7 | Keyboard focus was dropped to `<body>` after "Reset block" succeeded | The result line takes focus (`focus-management.test.tsx`) |
+| L8 | Controls with `outline-hidden focus-visible:outline-2` (Segmented tabs, atlas matrix cells, table sort buttons) drew **no focus ring**: Tailwind v4's `outline-hidden` sets the outline style to none, so the 2 px outline had style none. This also means the earlier "Segmented focus ring" fix did not work in a real browser | Unlayered rule restoring `outline-style: solid` for those controls (`globals.test.ts`); 33 of 90 tab stops on `/coverage` had no ring, 0 after |
+| L9 | Scrollable table wrappers were not keyboard-reachable (axe `scrollable-region-focusable`, 44 nodes) | `ScrollRegionFocus` gives `tabindex="0"` to exactly the wrappers that overflow now, after hydration has settled (`scroll-region-focus.test.tsx`) |
+| L10 | `role="meter"` without `aria-valuenow` when there is no value (axe critical, `HBar`, `Ring`, `Gauge`) | A labelled `img` with no value attributes when the value is unknown (`meter-a11y.test.tsx`) |
+| L11 | `dl > div > p` in the fund-view facts (axe serious); empty `th` in the screen-reader tables of charts; Activity coverage rings started at `h3` (heading order) | Note inside a `dd`; "Item"/"Value" for a blank header; `h2` |
+
+**Axe, before and after (48 page x theme x viewport combinations)**
+
+| | Combinations with a violation | Violating nodes | Serious or critical nodes |
+| --- | --- | --- | --- |
+| First run, unchanged code | 48 of 48 | 787 | 778 (679 colour contrast, 48 link-in-text-block, 44 scrollable-region-focusable, 4 definition-list, 3 aria-required-attr critical) |
+| After the fixes (final run, same 48 combinations, plus the holding page re-run after the last landmark fix) | 0 of 48 | 0 | 0 |
+
+Contrast fixes are tokens only (`src/app/tokens.css`; `npm run lint:colors` passes): light `--accent` #2f6bff to #2c66f5 (white on accent was 4.49:1) and dark #3d78ff to #2f66e8 (3.94:1), `--gain` light #0f8a63 to #0a7653 (3.94:1 on the page), `--text-faint` both themes, `--accent-strong` dark (hover state, 3.16:1), `--heat-up-strong`, and light `--loss`, `--warning-signal`, `--unconfirmed`, `--corroborated`, `--neutral-signal` which computed under 4.5:1 on the muted surface. A new `--warning-signal-foreground` for text on the amber badge (white on the dark amber was 2.16:1). Text links use `text-accent-ink` instead of the raw accent, are underlined in running text, and on-accent text no longer uses opacity.
+
+**Focus management**: verified with the keyboard in the browser (Enter on the trigger moves focus to Confirm, Tab reaches Cancel, Cancel returns to the trigger, Confirm returns to the trigger and the result is announced) through to the result for the macro collect job and the price-history refresh (both free, queued in the throwaway queue), armed and cancelled only (no quota is spent) for the network provider refreshes (Diffbot, PDL, EPO) and the financials probes; the xray job triggers are the same `ConfirmAction` component as the macro one. Also for the command palette (focus to the input, Escape returns to the opener) and the chat panel (focus to Close, Escape returns). Covered by DOM tests (jsdom, `@testing-library/react`, `user-event`) in `focus-management.test.tsx` and `confirm-action.test.tsx`: `ConfirmAction`, the price-history refresh, `RefreshActions`, `ProbePanel`, `HitRow`, `ResetBlock`. Suite: 133 files, 1,357 tests.
+
+**Data states**: six of the nine states appeared on live data (verified, partial coverage, not covered, paid only, access unverified, temporarily unavailable). Stale, quota exhausted and disputed were produced by changing rows in the throwaway database (an old check time, a provider's access state, three graph edges); they render with their label, icon and reason and pass axe in both themes. Disputed rows also showed that the claim and contradiction landmarks of several disputed relationships (and, by the same code pattern, disputed stories) shared one label (axe landmark-unique); each is now named after its relationship or story. Next release rows: `provider_calendar` rows read "as published in fred release calendar; the provider may still reschedule it" with the date, the observed-cadence row reads "an estimate based on observed cadence, not a published date", and the values equal the API's `next_release` and `next_release_estimate`.
+
+**Backend findings from the live run** (not fixed here; see the report of this pass): `/macro/context/{ticker}` returned no effects for a mapping entered today because the query's `$2` parameter is inferred as `date` (`created_at <= $2` compares with midnight); `valuation_refresh` fails with `'float' object has no attribute 'get'` for AAPL; `/portfolio/contribution` returns zero rows for a single snapshot with `gap: null`; `unknown_value_base` is a float residual (-8.9e-14); the vintage source `alfred` appears as a second card for the same series with a conflicting next-release date; ESMA listing history has exact duplicate rows; `control_stakes` could not parse 6 of 6 13D/G candidates; `public_data_collect` skips World Bank, OECD and BIS although the probe says `available`.
 
 ### Not verified
 
-No audit step ran the new views against a live backend with real data, in a screen reader, or with axe. Responsive findings in F7 came from code and geometry; the browser pass (`docs/data/frontend-acceptance.md`) covered error and empty states only. Focus-management fixes (focus moving to Confirm and back) are not covered by tests because the test setup has no DOM.
+- No screen reader (NVDA, VoiceOver, JAWS) was run: none is available in the sandbox. Roles, names and the semantics axe checks were verified; the spoken output was not.
+- Axe checks the page states listed above; hover and focus-only states, and tooltips, are not scanned. Colour pairings in states that need data that does not exist for the free providers (research reports with per-claim known-at, 13D/G stakes, PDMR notices, N-PORT funds, a hard-blocked provider) were not rendered from real data. Source cards with `known_at` were not reached because research reports need an Anthropic key (unit and render tests only).
+- The choropleth tooltip and the map's focus indication (a stroke change) were checked by eye and by axe, not with a screen reader.
+- Behaviour with each provider key removed was not run.
+- Hydration was clean in repeated runs of every page; the dev server was used, not a production build in a browser.
+- `/holdings/[ticker]` and the network page print one console line each for expected 404s ("no listing derived yet", "no research profiles config saved yet"): the pages handle both; the browser logs the failed request itself.
 
 ## Method
 

@@ -722,7 +722,7 @@ function DisputedRelationships({ identity, reload }: { identity: HoldingIdentity
   );
 }
 
-function DisputedItem({ r, onDecided, onStale }: { r: RelationshipOut; onDecided: (d: Decision) => void; onStale: () => void }) {
+export function DisputedItem({ r, onDecided, onStale }: { r: RelationshipOut; onDecided: (d: Decision) => void; onStale: () => void }) {
   const { busy, error, decide } = useRelationshipDecision(r, onDecided, onStale);
   const [confirmReject, setConfirmReject] = useState(false);
   const conflict = parseConflict(r.conflict);
@@ -738,13 +738,13 @@ function DisputedItem({ r, onDecided, onStale }: { r: RelationshipOut; onDecided
         </span>
       </p>
       <div className="grid gap-3 sm:grid-cols-2">
-        <section aria-label="The claim" className="space-y-1 rounded-md border border-border p-3">
+        <section aria-label={`The claim: ${name}`} className="space-y-1 rounded-md border border-border p-3">
           <h4 className="text-xs font-medium text-text-muted">The claim</h4>
           <p className="font-medium">{r.object_name}</p>
           {r.object_lei ? <LeiLink lei={r.object_lei} /> : null}
           <RelationshipMeta r={r} />
         </section>
-        <section aria-label="Contradicted by" className="space-y-1 rounded-md border border-disputed/40 p-3">
+        <section aria-label={`Contradicted by: ${name}`} className="space-y-1 rounded-md border border-disputed/40 p-3">
           <h4 className="text-xs font-medium text-text-muted">
             Contradicted by {conflict ? sourceLabel(conflict.source) : "another source"}
           </h4>
