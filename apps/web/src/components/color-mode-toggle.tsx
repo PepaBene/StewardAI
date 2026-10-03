@@ -26,7 +26,7 @@ export function ColorModeToggle() {
       suppressHydrationWarning
       onClick={() => setEnabled(!enabled)}
     >
-      <ContrastIcon aria-hidden="true" className="cvd:text-accent" />
+      <ContrastIcon aria-hidden="true" className="cvd:text-accent-ink" />
     </Button>
   );
 }

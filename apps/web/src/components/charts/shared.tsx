@@ -160,7 +160,7 @@ export function SrTable({
         <tr>
           {columns.map((c, i) => (
             <th key={i} scope="col">
-              {c}
+              {c.trim() === "" ? (i === 0 ? "Item" : "Value") : c}
             </th>
           ))}
         </tr>

@@ -38,15 +38,15 @@ export function InvestorsView() {
           {pending ? <LoaderCircleIcon aria-hidden="true" className="animate-spin" /> : <RefreshCwIcon aria-hidden="true" />}
           Load SEC 13F data
         </Button>
-        {jobId !== null ? <Link href={jobHref(jobId)} className="text-xs text-accent hover:underline" role="status">Queued as job #{jobId}</Link> : null}
+        {jobId !== null ? <Link href={jobHref(jobId)} className="text-xs text-accent-ink hover:underline" role="status">Queued as job #{jobId}</Link> : null}
         {jobError ? <span className="text-xs text-danger" role="alert">{jobError}</span> : null}
       </div>
       {state.kind === "error" ? <p className="text-sm text-danger">Could not load tracked investors: {state.detail}</p> : null}
       {state.kind === "loading" ? <p className="text-sm text-text-muted">Loading managers…</p> : null}
-      {data?.length === 0 ? <EmptyState title="No managers configured">Add managers in <Link className="text-accent hover:underline" href="/config/jobs">Jobs configuration</Link>, then run the 13F ownership job to load filings.</EmptyState> : null}
+      {data?.length === 0 ? <EmptyState title="No managers configured">Add managers in <Link className="text-accent-ink hover:underline" href="/config/jobs">Jobs configuration</Link>, then run the 13F ownership job to load filings.</EmptyState> : null}
       {data && data.length > 0 ? <div className="overflow-x-auto border border-border"><table className="w-full min-w-[42rem] text-sm">
         <thead><tr className="border-b border-border text-text-muted">{["Manager", "Latest quarter", "Filed", "Reported value", "Prior reported value", "Positions"].map((v) => <th key={v} className="px-3 py-2 text-left font-medium">{v}</th>)}</tr></thead>
-        <tbody>{data.map((manager) => <tr key={manager.cik} className="border-b border-border last:border-0"><th scope="row" className="px-3 py-2 text-left font-medium"><Link className="text-accent hover:underline" href={`/investors/${manager.cik}`}>{manager.name}</Link></th><td className="num px-3 py-2">{manager.period ? formatDate(manager.period) : "No filing loaded"}</td><td className="num px-3 py-2">{manager.filed ? formatDate(manager.filed) : "—"}</td><td className="num px-3 py-2">{money(manager.reported_value_usd)}</td><td className="num px-3 py-2" title={manager.earlier_period ? `Quarter ended ${formatDate(manager.earlier_period)}` : undefined}>{money(manager.previous_value_usd)}</td><td className="num px-3 py-2">{manager.positions}</td></tr>)}</tbody>
+        <tbody>{data.map((manager) => <tr key={manager.cik} className="border-b border-border last:border-0"><th scope="row" className="px-3 py-2 text-left font-medium"><Link className="text-accent-ink hover:underline" href={`/investors/${manager.cik}`}>{manager.name}</Link></th><td className="num px-3 py-2">{manager.period ? formatDate(manager.period) : "No filing loaded"}</td><td className="num px-3 py-2">{manager.filed ? formatDate(manager.filed) : "—"}</td><td className="num px-3 py-2">{money(manager.reported_value_usd)}</td><td className="num px-3 py-2" title={manager.earlier_period ? `Quarter ended ${formatDate(manager.earlier_period)}` : undefined}>{money(manager.previous_value_usd)}</td><td className="num px-3 py-2">{manager.positions}</td></tr>)}</tbody>
       </table></div> : null}
     </Blueprint>
   </div>;

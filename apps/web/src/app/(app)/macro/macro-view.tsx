@@ -162,12 +162,12 @@ export function MacroView() {
       ) : null}
 
       {/* Only once this holding's context has arrived: while it loads there are no targets yet, which must not read as "nothing mapped". */}
-      {ticker && contextData ? <ContextCards key={ticker} targets={targets} ticker={ticker} /> : null}
+      {ticker && contextData ? <ContextCards key={`context|${ticker}`} targets={targets} ticker={ticker} /> : null}
 
-      <TradePanel key={ticker ?? "none"} initial={initialTrade} />
+      <TradePanel key={`trade|${ticker ?? "none"}`} initial={initialTrade} />
 
       <ResourceBoundary state={exposures.state} what="exposure mappings">
-        {(list) => <ExposureEditor key={ticker ?? "none"} mappings={list} issuers={issuers} defaultIssuerId={defaultIssuerId} ticker={ticker} onChanged={reloadAll} />}
+        {(list) => <ExposureEditor key={`exposure|${ticker ?? "none"}`} mappings={list} issuers={issuers} defaultIssuerId={defaultIssuerId} ticker={ticker} onChanged={reloadAll} />}
       </ResourceBoundary>
     </div>
   );

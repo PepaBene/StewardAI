@@ -93,7 +93,7 @@ export function IdentityPanel({ identity, asOfParam, asOfDate }: { identity: Hol
   );
 }
 
-function LeiHistory({ lei, asOfParam }: { lei: string; asOfParam: string | undefined }) {
+export function LeiHistory({ lei, asOfParam }: { lei: string; asOfParam: string | undefined }) {
   const fetcher = useCallback(() => fetchLegalEntityHistory(lei, asOfParam), [lei, asOfParam]);
   const { state } = useApiResource(fetcher);
   return (
@@ -104,8 +104,8 @@ function LeiHistory({ lei, asOfParam }: { lei: string; asOfParam: string | undef
       {state.kind === "ok" && state.data.length === 0 ? <StatePlaceholder state="not_covered" reason="No GLEIF snapshot is stored at or before this date." minHeight={60} /> : null}
       {state.kind === "ok" && state.data.length > 0 ? (
         <ul className="mt-1">
-          {state.data.map((h) => (
-            <li key={`${h.lei}|${h.known_at}`} className="border-t border-border-soft py-1.5 text-sm first:border-0">
+          {state.data.map((h, i) => (
+            <li key={`${i}|${h.lei}|${h.known_at}`} className="border-t border-border-soft py-1.5 text-sm first:border-0">
               <span className="font-medium">{h.legal_name ?? "name not stated"}</span>
               <span className="num block text-xs text-text-muted">
                 known {formatDate(h.known_at.slice(0, 10))} · valid {h.valid_from ?? "?"} to {h.valid_to ?? "open"} · {h.entity_status ?? "status ?"} / {h.registration_status ?? "registration ?"}
@@ -119,7 +119,7 @@ function LeiHistory({ lei, asOfParam }: { lei: string; asOfParam: string | undef
   );
 }
 
-function ListingHistory({ isin, asOfParam }: { isin: string; asOfParam: string | undefined }) {
+export function ListingHistory({ isin, asOfParam }: { isin: string; asOfParam: string | undefined }) {
   const fetcher = useCallback(() => fetchListingHistory(isin, asOfParam), [isin, asOfParam]);
   const { state } = useApiResource(fetcher);
   return (
@@ -130,8 +130,10 @@ function ListingHistory({ isin, asOfParam }: { isin: string; asOfParam: string |
       {state.kind === "ok" && state.data.length === 0 ? <StatePlaceholder state="not_covered" reason="No listing lifecycle snapshot is stored for this ISIN at this date." minHeight={60} /> : null}
       {state.kind === "ok" && state.data.length > 0 ? (
         <ul className="mt-1">
-          {state.data.map((h) => (
-            <li key={`${h.mic}|${h.publication_date}|${h.known_at}`} className="num border-t border-border-soft py-1.5 text-xs first:border-0">
+          {state.data.map((h, i) => (
+            // ESMA publishes several records for one venue and date (a modification beside the unchanged
+            // record, one per trading-venue identifier): the position keeps the rows apart.
+            <li key={`${i}|${h.mic}|${h.publication_date}|${h.known_at}`} className="num border-t border-border-soft py-1.5 text-xs first:border-0">
               {h.mic} · {h.status ?? "status ?"} · published {h.publication_date ?? "?"}
               {h.terminated_at ? ` · terminated ${formatDate(h.terminated_at)}` : ""}
               {h.issuer_lei ? ` · issuer LEI ${h.issuer_lei}` : ""} · <SourceLink href={h.source_url}>source</SourceLink>

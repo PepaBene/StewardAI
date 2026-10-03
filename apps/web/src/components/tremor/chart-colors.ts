@@ -9,7 +9,7 @@ export const chartColors = {
     fill: "fill-neutral-signal",
     text: "text-neutral-signal",
   },
-  accent: { bg: "bg-accent", stroke: "stroke-accent", fill: "fill-accent", text: "text-accent" },
+  accent: { bg: "bg-accent", stroke: "stroke-accent", fill: "fill-accent", text: "text-accent-ink" },
   gain: { bg: "bg-gain", stroke: "stroke-gain", fill: "fill-gain", text: "text-gain" },
   loss: { bg: "bg-loss", stroke: "stroke-loss", fill: "fill-loss", text: "text-loss" },
   "categorical-1": {

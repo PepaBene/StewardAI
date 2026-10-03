@@ -120,7 +120,7 @@ function useAction() {
   return { pending, result, run };
 }
 
-function HitRow({ hit, onChanged }: { hit: FilingHit; onChanged: () => void }) {
+export function HitRow({ hit, onChanged }: { hit: FilingHit; onChanged: () => void }) {
   const a = useAction();
   const [armed, setArmed] = useState(false);
   const triggerRef = useRef<HTMLButtonElement>(null);

@@ -12,7 +12,7 @@ export function Facts({ items, className }: { items: readonly Fact[]; className?
         <div key={f.label} className="min-w-0 border-l-2 border-border pl-3">
           <dt className="kicker">{f.label}</dt>
           <dd className="num mt-0.5 text-[22px] leading-tight font-semibold text-text">{f.value}</dd>
-          {f.note ? <p className="mt-0.5 text-xs text-text-muted">{f.note}</p> : null}
+          {f.note ? <dd className="mt-0.5 text-xs text-text-muted">{f.note}</dd> : null}
         </div>
       ))}
     </dl>

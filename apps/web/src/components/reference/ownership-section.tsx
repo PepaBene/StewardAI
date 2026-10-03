@@ -149,7 +149,7 @@ export function OwnershipSection({ resource }: { resource: ReturnType<typeof use
                           <span title="of shares outstanding">{formatOutstandingPct(h.pct_of_shares_outstanding)}</span>
                         ) : null}
                         {filing ? (
-                          <a href={filing} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-xs text-accent hover:underline">
+                          <a href={filing} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-xs text-accent-ink hover:underline">
                             filing
                             <ExternalLinkIcon aria-hidden="true" className="size-3" />
                             <span className="sr-only">{h.accession} on SEC EDGAR</span>

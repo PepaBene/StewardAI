@@ -86,13 +86,13 @@ export function SourceLinksLine({ source, className }: { source: Source; classNa
   return (
     <p className={cn("flex flex-wrap gap-x-3 gap-y-1 text-xs", className)}>
       {links.internal ? (
-        <Link href={links.internal} className="inline-flex items-center gap-1 text-accent hover:underline">
+        <Link href={links.internal} className="inline-flex items-center gap-1 text-accent-ink hover:underline">
           <FileSearchIcon aria-hidden="true" className="size-3" />
           Open in the app <span className="font-mono">{links.internal}</span>
         </Link>
       ) : null}
       {links.external ? (
-        <a href={links.external} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 break-all text-accent hover:underline">
+        <a href={links.external} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 break-all text-accent-ink hover:underline">
           {hostOf(links.external)}
           <ExternalLinkIcon aria-hidden="true" className="size-3 shrink-0" />
           <span className="sr-only">(opens in a new tab)</span>

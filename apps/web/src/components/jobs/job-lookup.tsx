@@ -29,7 +29,7 @@ export function JobLookup() {
       <p className="text-sm text-text-muted">
         Open a run to see its steps, errors, detail and model cost. Its number is shown when you start a check, next to the
         last news check and on each holding&rsquo;s last earnings check and verdict run. Every run is listed in the{" "}
-        <Link href="/activity#job-log" className="text-accent hover:underline">
+        <Link href="/activity#job-log" className="text-accent-ink hover:underline">
           job log
         </Link>
         .

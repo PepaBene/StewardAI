@@ -276,11 +276,11 @@ export function CoverageRings() {
               ariaLabel={`${r.title} coverage`}
             />
             <div className="min-w-0">
-              <h3 className="text-lg leading-tight font-semibold">
+              <h2 className="text-lg leading-tight font-semibold">
                 <Link href={r.href} className="hover:underline">
                   {r.title}
                 </Link>
-              </h3>
+              </h2>
               <p className="text-xs text-text-muted">
                 {r.ratio ? (
                   <>

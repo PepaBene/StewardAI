@@ -75,7 +75,7 @@ export function SaveBar({
         )}
       >
         <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
-          <CircleDotIcon aria-hidden="true" className={cn("size-4 shrink-0", dirty ? "text-accent" : "text-text-faint")} />
+          <CircleDotIcon aria-hidden="true" className={cn("size-4 shrink-0", dirty ? "text-accent-ink" : "text-text-faint")} />
           <p className="min-w-0 flex-1 text-sm" role="status">
             {dirty && summary ? (
               <>

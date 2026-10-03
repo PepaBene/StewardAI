@@ -10,7 +10,7 @@ import { formatDateTime } from "@/lib/format";
 import { useApiResource } from "@/lib/hooks/use-api-resource";
 
 const fetchGaps = () => getBrowserApiClient().GET("/reference/gaps");
-const LINK = "text-accent underline-offset-4 hover:underline";
+const LINK = "text-accent-ink underline-offset-4 hover:underline";
 
 /**
  * Instruments whose identity could not be resolved and symbols Stooq returns no history

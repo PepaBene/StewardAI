@@ -12,7 +12,7 @@ import { TIERS } from "@/lib/news/labels";
 import { useAnchoredPosition } from "@/lib/hooks/use-anchored-position";
 import { cn } from "@/lib/utils";
 
-const CHIP = "num rounded-sm border border-border px-1 text-xs text-accent hover:border-accent";
+const CHIP = "num rounded-sm border border-border px-1 text-xs text-accent-ink hover:border-accent";
 
 /**
  * A claim-level citation ("[2]", "fact 12"). Hovering it, or focusing it with the keyboard,

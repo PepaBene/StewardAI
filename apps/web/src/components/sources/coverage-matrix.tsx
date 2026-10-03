@@ -91,18 +91,22 @@ function Cell({ cell, now }: { cell: MatrixCell; now: Date }) {
 }
 
 /** Two-step owner action: lift a hard block once the credential or plan was fixed. */
-function ResetBlock({ row, onReset }: { row: AccessRow; onReset: (provider: string, endpoint: string) => Promise<string | null> }) {
+export function ResetBlock({ row, onReset }: { row: AccessRow; onReset: (provider: string, endpoint: string) => Promise<string | null> }) {
   const [step, setStep] = useState<"idle" | "confirm" | "busy" | "done">("idle");
   const [error, setError] = useState<string | null>(null);
   // Arming replaces the trigger with the confirm group: move focus to the safe choice (Cancel)
   // and, when it closes again, back to the trigger, so keyboard focus is never dropped on the body.
   const triggerRef = useRef<HTMLButtonElement>(null);
   const cancelRef = useRef<HTMLButtonElement>(null);
+  const doneRef = useRef<HTMLSpanElement>(null);
   const previous = useRef(step);
   useEffect(() => {
     if (previous.current !== step) {
       if (step === "confirm") cancelRef.current?.focus();
       else if (step === "idle") triggerRef.current?.focus();
+      // The confirm group and the trigger are both gone once the block is lifted: the result
+      // line takes focus, so keyboard focus is not dropped on <body> and the result is announced.
+      else if (step === "done") doneRef.current?.focus();
       previous.current = step;
     }
   }, [step]);
@@ -114,7 +118,13 @@ function ResetBlock({ row, onReset }: { row: AccessRow; onReset: (provider: stri
     setError(failure);
     setStep(failure ? "idle" : "done");
   }
-  if (step === "done") return <span className="text-xs text-text">Block lifted; reload to see the new state.</span>;
+  if (step === "done") {
+    return (
+      <span ref={doneRef} role="status" tabIndex={-1} className="text-xs text-text outline-offset-2">
+        Block lifted; reload to see the new state.
+      </span>
+    );
+  }
   return (
     <span className="flex flex-col items-start gap-1">
       {step === "confirm" || step === "busy" ? (

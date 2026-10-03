@@ -86,7 +86,7 @@ export function OverviewHero({
       <BlueprintCorners />
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div className="min-w-0">
-          <h2 id="hero-total" className="text-[11px] font-semibold tracking-[0.14em] uppercase opacity-85">
+          <h2 id="hero-total" className="text-[11px] font-semibold tracking-[0.14em] uppercase">
             Total value · {currency}
           </h2>
           <p className="mt-1.5 font-heading text-[44px] leading-none font-semibold tracking-[-0.02em] sm:text-[68px]">
@@ -104,26 +104,26 @@ export function OverviewHero({
               </span>
             ) : null}
             {ytd !== null ? (
-              <span className="num opacity-90">
+              <span className="num">
                 TWR YTD <b>{formatSignedPct(ytd)}</b>
                 {ytdBench !== null ? <> vs benchmark {formatSignedPct(ytdBench)}</> : null}
               </span>
             ) : null}
           </div>
-          {subline ? <p className="num mt-1.5 text-xs opacity-80">{subline}</p> : null}
+          {subline ? <p className="num mt-1.5 text-xs">{subline}</p> : null}
         </div>
         <RangeButtons options={HERO_RANGES} value={range} onChange={onRange} label="Chart range" inverse />
       </div>
 
       {history.kind === "loading" ? (
-        <p className="flex min-h-40 items-center gap-2 text-sm opacity-85" role="status">
+        <p className="flex min-h-40 items-center gap-2 text-sm" role="status">
           <LoaderCircleIcon aria-hidden="true" className="size-4 animate-spin" />
           Loading performance…
         </p>
       ) : history.kind === "error" ? (
-        <p className="min-h-40 text-sm opacity-90">Performance could not be loaded: {history.message}</p>
+        <p className="min-h-40 text-sm">Performance could not be loaded: {history.message}</p>
       ) : !usable ? (
-        <p className="min-h-40 text-sm opacity-90">{historyGapMessage(data?.gap ?? null)}</p>
+        <p className="min-h-40 text-sm">{historyGapMessage(data?.gap ?? null)}</p>
       ) : series && series.portfolio.length >= 2 ? (
         <>
           <LineChart
@@ -143,7 +143,7 @@ export function OverviewHero({
             <span className="opacity-85 sm:ml-auto">Indexed to 100 · flow-adjusted, deposits excluded</span>
           </div>
           {!series.benchmark ? (
-            <p className="text-xs opacity-85">
+            <p className="text-xs">
               {data.benchmark_symbol
                 ? `No ${data.benchmark_symbol} close near the start of this range, so the benchmark is not drawn.`
                 : "No benchmark is configured (Config: Jobs, Prices)."}
@@ -151,7 +151,7 @@ export function OverviewHero({
           ) : null}
         </>
       ) : (
-        <p className="min-h-40 text-sm opacity-90">Not enough history in this range yet — pick a longer one.</p>
+        <p className="min-h-40 text-sm">Not enough history in this range yet — pick a longer one.</p>
       )}
     </section>
   );

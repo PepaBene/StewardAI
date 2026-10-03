@@ -52,12 +52,13 @@ export function HBar({
 
   return (
     <div
-      role="meter"
-      aria-label={label}
-      aria-valuemin={min}
-      aria-valuemax={max}
+      // A meter must carry a value (aria-valuenow); with no data it is a labelled image instead.
+      role={has ? "meter" : "img"}
+      aria-label={has ? label : `${label}: ${valueText}`}
+      aria-valuemin={has ? min : undefined}
+      aria-valuemax={has ? max : undefined}
       aria-valuenow={has ? value : undefined}
-      aria-valuetext={valueText}
+      aria-valuetext={has ? valueText : undefined}
       className={cn("relative w-full bg-surface-muted", size === "sm" ? "h-1" : "h-2", className)}
       title={`${label}: ${valueText}`}
     >

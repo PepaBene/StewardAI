@@ -17,7 +17,7 @@ export function InvestorView({ cik }: { cik: string }) {
   const { state } = useApiResource(fetcher);
   const data = state.kind === "ok" ? state.data : state.kind === "error" ? state.previous : null;
   return <div className="space-y-5">
-    <Link href="/investors" className="text-sm text-accent hover:underline">← All 13F investors</Link>
+    <Link href="/investors" className="text-sm text-accent-ink hover:underline">← All 13F investors</Link>
     {data ? <PageHeader title={data.name} description={`SEC CIK ${data.cik} · Quarter ended ${data.period ? formatDate(data.period) : "—"} · filed ${data.filed ? formatDate(data.filed) : "—"}`} /> : <PageHeader title="13F manager" description="Loading manager filing…" />}
     {state.kind === "error" ? <AlertMessage title={`Could not load manager: ${state.title}`}>{state.detail}</AlertMessage> : null}
     {data ? <>

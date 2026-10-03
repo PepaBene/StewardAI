@@ -93,7 +93,7 @@ export function Treemap({
                 {fits ? (
                   <span aria-hidden="true" className="flex items-start justify-between gap-1 text-[11px] leading-none">
                     <span className="truncate font-mono font-semibold">{item.label}</span>
-                    {roomy ? <span className="num shrink-0 opacity-80">{formatWeight(item.weight)}</span> : null}
+                    {roomy ? <span className="num shrink-0">{formatWeight(item.weight)}</span> : null}
                   </span>
                 ) : null}
                 {roomy ? (

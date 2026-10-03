@@ -19,7 +19,7 @@ export function EvidenceLinks({ fact, showHost = false }: { fact: Pick<FactOut, 
     <span className="inline-flex flex-wrap items-center gap-3 text-xs">
       <Link
         href={`/evidence/${fact.id}`}
-        className="inline-flex items-center gap-1 text-accent underline-offset-4 hover:underline"
+        className="inline-flex items-center gap-1 text-accent-ink underline-offset-4 hover:underline"
       >
         <FileSearchIcon aria-hidden="true" className="size-3.5" />
         Evidence

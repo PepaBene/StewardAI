@@ -608,7 +608,7 @@ function ActionCard({ action: a, onDecide }: { action: ActionOut; onDecide: (act
     >
       <BlueprintCorners />
       <div className="flex items-start gap-2.5">
-        <Icon aria-hidden="true" className={cn("mt-0.5 size-[18px] shrink-0", proposed ? "text-accent" : "text-text-muted")} />
+        <Icon aria-hidden="true" className={cn("mt-0.5 size-[18px] shrink-0", proposed ? "text-accent-ink" : "text-text-muted")} />
         <div className="min-w-0 flex-1 space-y-0.5">
           <p className="font-semibold">
             {actionLabel(a)}

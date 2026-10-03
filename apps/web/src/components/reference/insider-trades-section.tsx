@@ -70,13 +70,13 @@ export function InsiderTradesSection({ ticker }: { ticker: string }) {
           <td className="num px-3 py-2">{row.shares == null ? "—" : Number(row.shares).toLocaleString()}</td>
           <td className="num px-3 py-2">{row.price_per_share == null ? "—" : `$${Number(row.price_per_share).toFixed(2)}`}</td>
           <td className="num px-3 py-2">{row.shares_owned_after == null ? "—" : Number(row.shares_owned_after).toLocaleString()}</td>
-          <td className="px-3 py-2"><a href={row.source_url} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-accent hover:underline">SEC <ExternalLinkIcon aria-hidden="true" className="size-3" /></a></td>
+          <td className="px-3 py-2"><a href={row.source_url} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-accent-ink hover:underline">SEC <ExternalLinkIcon aria-hidden="true" className="size-3" /></a></td>
         </tr>)}</tbody>
       </table>
       <p className="px-3 py-2 text-xs text-text-muted">Showing at most 100 transaction rows. SEC filing data are reported by the filer and may include grants, tax withholding, gifts and derivative securities.</p>
     </div> : null}
     <div className="flex items-center gap-3">
-      <button type="button" disabled={refreshing} className="text-xs text-accent hover:underline disabled:opacity-50"
+      <button type="button" disabled={refreshing} className="text-xs text-accent-ink hover:underline disabled:opacity-50"
         onClick={() => {
           setRefreshing(true); setRefreshMessage("");
           void getBrowserApiClient().POST("/jobs/insider-trades").then((result) => {

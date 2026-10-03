@@ -55,7 +55,7 @@ import { cn } from "@/lib/utils";
 
 const POLL_MS = 5000;
 const POLL_LIMIT_MS = 3 * 60 * 1000;
-const LINK = "text-accent underline-offset-4 hover:underline";
+const LINK = "text-accent-ink underline-offset-4 hover:underline";
 
 type Decision = { action: "confirm" | "reject"; result: RelationshipDecision };
 

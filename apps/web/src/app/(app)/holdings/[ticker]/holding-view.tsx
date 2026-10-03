@@ -558,7 +558,7 @@ function KpiRows({
             onClick={onToggle}
             aria-expanded={expanded}
             aria-controls={panelId}
-            className="inline-flex items-start gap-1 rounded-sm text-left hover:text-accent"
+            className="inline-flex items-start gap-1 rounded-sm text-left hover:text-accent-ink"
           >
             {expanded ? (
               <ChevronDownIcon aria-hidden="true" className="mt-0.5 size-4 shrink-0" />

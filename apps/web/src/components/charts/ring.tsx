@@ -54,12 +54,12 @@ export function Ring({
       width={size}
       height={size}
       className={cn("block shrink-0", className)}
-      role="meter"
-      aria-label={ariaLabel}
-      aria-valuemin={0}
-      aria-valuemax={max}
+      role={has ? "meter" : "img"}
+      aria-label={has ? ariaLabel : `${ariaLabel}: no data`}
+      aria-valuemin={has ? 0 : undefined}
+      aria-valuemax={has ? max : undefined}
       aria-valuenow={has ? value : undefined}
-      aria-valuetext={has ? `${formatValue(value)} of ${formatValue(max)}` : "No data"}
+      aria-valuetext={has ? `${formatValue(value)} of ${formatValue(max)}` : undefined}
     >
       <circle cx={20} cy={20} r={r} fill="none" className="stroke-border" strokeWidth={thickness} />
       {fraction > 0 ? (
@@ -140,12 +140,12 @@ export function Gauge({
       <svg
         viewBox="0 0 240 140"
         className={SVG_BASE}
-        role="meter"
-        aria-label={ariaLabel}
-        aria-valuemin={0}
-        aria-valuemax={max}
+        role={has ? "meter" : "img"}
+        aria-label={has ? ariaLabel : `${ariaLabel}: no data`}
+        aria-valuemin={has ? 0 : undefined}
+        aria-valuemax={has ? max : undefined}
         aria-valuenow={has ? value : undefined}
-        aria-valuetext={has ? `${formatValue(value)} of ${formatValue(max)}` : "No data"}
+        aria-valuetext={has ? `${formatValue(value)} of ${formatValue(max)}` : undefined}
       >
         <path d={arcs.track} className="fill-surface-muted stroke-border" strokeWidth={1} />
         {arcs.value ? <path d={arcs.value} className={GAUGE_FILL[tone]} /> : null}

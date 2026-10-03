@@ -62,7 +62,16 @@ export function ContributionCard() {
   );
 }
 
-function ContributionContent({ data }: { data: ContributionReport }) {
+export function ContributionContent({ data }: { data: ContributionReport }) {
+  // One snapshot has no period: the API answers with a zero for every holding and no gap. Those
+  // zeros are "nothing to attribute yet", not "no holding contributed"; they are never drawn.
+  if (!data.gap && data.holdings.length > 0 && data.period_start && data.as_of && data.period_start >= data.as_of) {
+    return (
+      <p className="text-sm text-text-muted">
+        Only one snapshot exists (as of {data.as_of}), so there is no period to attribute yet. Contributions appear after the next sync.
+      </p>
+    );
+  }
   if (data.gap || data.holdings.length === 0) {
     return (
       <p className="text-sm text-text-muted">

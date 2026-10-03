@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 
+import { ScrollRegionFocus } from "@/components/scroll-region-focus";
 import { ThemeProvider } from "@/components/theme-provider";
 import { colorModeInitScript } from "@/lib/color-mode";
 
@@ -36,6 +37,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
       </head>
       <body className="min-h-dvh bg-surface text-text">
         <ThemeProvider>{children}</ThemeProvider>
+        <ScrollRegionFocus />
       </body>
     </html>
   );

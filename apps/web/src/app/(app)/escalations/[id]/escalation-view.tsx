@@ -239,7 +239,7 @@ function Escalation({ initial }: { initial: EscalationOut }) {
                     {typeof s.tier === "number" ? <TierBadge tier={s.tier} /> : null}
                   </span>
                 </p>
-                <a href={s.url} target="_blank" rel="noreferrer" className="mt-1 inline-flex items-start gap-1 [overflow-wrap:anywhere] hover:text-accent hover:underline">
+                <a href={s.url} target="_blank" rel="noreferrer" className="mt-1 inline-flex items-start gap-1 [overflow-wrap:anywhere] hover:text-accent-ink hover:underline">
                   {s.headline ?? s.url}
                   <ExternalLinkIcon aria-hidden="true" className="mt-0.5 size-3 shrink-0 text-text-muted" />
                 </a>

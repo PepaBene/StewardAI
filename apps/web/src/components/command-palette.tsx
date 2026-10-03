@@ -178,7 +178,7 @@ export function CommandPalette() {
         }}
       >
         <div className="flex items-center gap-2.5 border-b border-border px-4">
-          <SearchIcon aria-hidden="true" className="size-[18px] text-accent" />
+          <SearchIcon aria-hidden="true" className="size-[18px] text-accent-ink" />
           <input
             ref={input}
             role="combobox"

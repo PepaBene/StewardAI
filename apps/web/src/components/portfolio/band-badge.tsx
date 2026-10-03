@@ -24,7 +24,7 @@ export function BandBadge({ status, className }: { status: DriftStatus; classNam
         "inline-flex items-center px-1.5 py-0.5 text-[10px] leading-none font-semibold tracking-[0.05em] whitespace-nowrap uppercase",
         b.tone === "quiet" && "bg-border-soft text-text-muted",
         b.tone === "strong" && "bg-accent text-accent-foreground",
-        b.tone === "alarm" && "bg-warning-signal text-accent-foreground",
+        b.tone === "alarm" && "bg-warning-signal text-warning-signal-foreground",
         b.tone === "none" && "border border-border text-text-muted",
         className,
       )}

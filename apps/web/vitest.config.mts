@@ -8,6 +8,8 @@ export default defineConfig({
   },
   test: {
     environment: "node",
-    include: ["src/**/*.test.ts", "scripts/**/*.test.ts"],
+    // `.test.tsx` files render components in jsdom (they opt in with a `@vitest-environment jsdom`
+    // docblock); `.test.ts` files stay in node.
+    include: ["src/**/*.test.{ts,tsx}", "scripts/**/*.test.ts"],
   },
 });

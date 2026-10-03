@@ -50,7 +50,7 @@ export function EvidenceLedger({ summary }: { summary: EvidenceSummary }) {
       ) : (
         <ul className="flex flex-col gap-3">
           {items.map((it) => (
-            <li key={it.key} className="min-w-0 border-l-2 border-border pl-3 text-sm">
+            <li key={it.key} className="min-w-0 wrap-anywhere border-l-2 border-border pl-3 text-sm">
               <p className="font-medium">{it.title}</p>
               {it.detail ? <p className="text-xs text-text-muted">{it.detail}</p> : null}
               {it.passage && it.passage.trim() !== "" ? <blockquote className="mt-1 max-w-prose border-l border-border-soft pl-2 text-xs whitespace-pre-line text-text">{it.passage.length > 600 ? `${it.passage.slice(0, 600)}…` : it.passage}</blockquote> : <p className="mt-1 text-xs text-text-muted">No passage: {it.passageReason ?? "no reason is stored for this row."}</p>}

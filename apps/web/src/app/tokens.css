@@ -53,10 +53,10 @@
   --border-soft: rgba(20, 23, 28, 0.06);
   --text: #14171c;
   --text-muted: #5a6270;
-  --text-faint: #8a919c;
+  --text-faint: #646c79;
 
   /* The single accent (primary actions, focus, primary chart series). */
-  --accent: #2f6bff;
+  --accent: #2c66f5;
   --accent-ink: #1d4fd8;
   --accent-strong: #2356db;
   --accent-soft: #e5edff;
@@ -75,27 +75,28 @@
   --accent-ramp-6: #e5edff;
 
   /* Financial state. Always paired with a sign and an arrow. */
-  --gain: #0f8a63;
+  --gain: #0a7653;
   --gain-subtle: #e0f3ea;
-  --loss: #d4411f;
+  --loss: #c23a19;
   --loss-subtle: #fbe6df;
 
   /* Evidence confidence — four roles, always icon + label. Verified is the accent's
      ink; corroborated a cyan-blue so the two stay apart in a stacked bar. */
   --verified: #1d4fd8;
   --verified-subtle: #e5edff;
-  --corroborated: #0b7a96;
+  --corroborated: #0a6e88;
   --corroborated-subtle: #dff1f6;
-  --unconfirmed: #a86f00;
+  --unconfirmed: #9a6500;
   --unconfirmed-subtle: #f7ecd2;
   --disputed: #b8254a;
   --disputed-subtle: #f9e1e7;
 
   /* Severity / drift (muted; never gain/loss, never the confidence roles above). */
-  --neutral-signal: #6b7483;
+  --neutral-signal: #5f6877;
   --neutral-signal-subtle: #e9ebef;
-  --warning-signal: #a86f00;
+  --warning-signal: #9a6500;
   --warning-signal-subtle: #f7ecd2;
+  --warning-signal-foreground: #ffffff;
   --info-signal: #1d4fd8;
   --info-signal-subtle: #e5edff;
 
@@ -118,7 +119,7 @@
   --diverging-neutral: #e1e4ea;
 
   /* Heat scale for daily-move / monthly-return heatmaps: blue up, red-orange down. */
-  --heat-up-strong: #2f6bff;
+  --heat-up-strong: #2c66f5;
   --heat-up: #9dbaff;
   --heat-up-soft: #cbdaff;
   --heat-down-soft: #f1cfc4;
@@ -142,9 +143,9 @@
   --border-soft: rgba(232, 235, 240, 0.06);
   --text: #e8ebf0;
   --text-muted: #9aa3b1;
-  --text-faint: #6b7483;
+  --text-faint: #7d8795;
 
-  --accent: #3d78ff;
+  --accent: #2f66e8;
   --accent-ink: #8fb0ff;
   --accent-strong: #5b8cff;
   --accent-soft: #142042;
@@ -178,6 +179,7 @@
   --neutral-signal-subtle: #1a1f28;
   --warning-signal: #e0a63a;
   --warning-signal-subtle: #2c2310;
+  --warning-signal-foreground: #14171c;
   --info-signal: #8fb0ff;
   --info-signal-subtle: #142042;
 
@@ -196,7 +198,7 @@
   --diverging-over-subtle: #2c2310;
   --diverging-neutral: #1f2530;
 
-  --heat-up-strong: #3d78ff;
+  --heat-up-strong: #2f66e8;
   --heat-up: #2d4f9e;
   --heat-up-soft: #1c2d5c;
   --heat-down-soft: #3a1c14;
@@ -257,6 +259,7 @@
   --color-neutral-signal-subtle: var(--neutral-signal-subtle);
   --color-warning-signal: var(--warning-signal);
   --color-warning-signal-subtle: var(--warning-signal-subtle);
+  --color-warning-signal-foreground: var(--warning-signal-foreground);
   --color-info-signal: var(--info-signal);
   --color-info-signal-subtle: var(--info-signal-subtle);
 

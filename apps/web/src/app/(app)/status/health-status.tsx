@@ -81,7 +81,7 @@ export function HealthStatus() {
           <dl className="grid grid-cols-[max-content_1fr] gap-x-6 gap-y-2 text-sm">
             <dt className="text-text-muted">Status</dt>
             <dd className="flex items-center gap-1.5 font-medium">
-              <CircleCheckIcon aria-hidden="true" className="size-4 text-accent" />
+              <CircleCheckIcon aria-hidden="true" className="size-4 text-accent-ink" />
               {result.data.status}
             </dd>
             <dt className="text-text-muted">HTTP</dt>
