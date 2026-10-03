@@ -30,6 +30,7 @@ import { OwnershipSection, useHoldingOwnership } from "@/components/reference/ow
 import { PriceRiskSection } from "@/components/reference/price-risk-section";
 import { ValuationPanel } from "@/components/reference/valuation-panel";
 import { SegmentsPanel } from "@/components/reference/segments-panel";
+import { DataContextSections, EvidenceSections, HoldingAsOfBar } from "@/components/holding/data-context-section";
 import { HoldingResearch } from "@/components/research/holding-research";
 import { Blueprint, PanelHeading } from "@/components/ui/blueprint";
 import { Button } from "@/components/ui/button";
@@ -60,6 +61,9 @@ import { allowedReviewActions, isHeld, REVIEW_ACTIONS, reviewQueueHref, scaleHin
 import { formatDate, formatRelative } from "@/lib/format";
 import { useApiResource } from "@/lib/hooks/use-api-resource";
 import { useNow } from "@/lib/hooks/use-now";
+import { useEvidenceSummary, useHoldingDataContext } from "@/lib/holding-data/hooks";
+import { isFutureDay } from "@/lib/holding-data/logic";
+import { isIsoDate } from "@/lib/network/logic";
 import { jobHref } from "@/lib/jobs/job-detail";
 import { byLead, groupByStory } from "@/lib/news/feed-filters";
 import { kpiAnchorId } from "@/lib/portfolio/kpi-anchor";
@@ -181,6 +185,24 @@ export function HoldingContent({
   const news = useHoldingNews(ticker);
   const intraday = useHoldingIntraday(ticker);
 
+  // The as-of day of the data-context and evidence sections ("" = now), kept in ?asof=.
+  const today = isoDay(now);
+  const [asOfDay, setAsOfDayState] = useState(() => {
+    const v = typeof window === "undefined" ? "" : (new URLSearchParams(window.location.search).get("asof") ?? "");
+    return isIsoDate(v) ? v : "";
+  });
+  const setAsOfDay = useCallback((v: string) => {
+    setAsOfDayState(v);
+    const url = new URL(window.location.href);
+    if (v) url.searchParams.set("asof", v);
+    else url.searchParams.delete("asof");
+    window.history.replaceState(null, "", url);
+  }, []);
+  // The API refuses a future as_of; ask for "now" instead of sending it.
+  const requestedDay = isFutureDay(asOfDay, today) ? "" : asOfDay;
+  const dataContext = useHoldingDataContext(ticker, requestedDay).state;
+  const evidence = useEvidenceSummary(ticker, requestedDay).state;
+
   const priceData = current(prices);
   const boardData = current(board);
   const row = boardData?.rows.find((r) => r.ticker === ticker) ?? null;
@@ -274,6 +296,9 @@ export function HoldingContent({
 
       <SegmentsPanel ticker={ticker} />
 
+      <HoldingAsOfBar value={asOfDay} onChange={setAsOfDay} today={today} knownAsOf={current(dataContext)?.known_as_of ?? current(evidence)?.known_as_of ?? null} />
+      <DataContextSections ticker={ticker} asOf={requestedDay} context={dataContext} evidence={evidence} />
+
       <Blueprint aria-labelledby="thesis-heading" className="space-y-5 px-[22px] py-5">
         <PanelHeading
           kicker="Thesis & evidence"
@@ -336,6 +361,8 @@ export function HoldingContent({
       <OwnershipSection resource={ownership} />
 
       <InsiderTradesSection ticker={ticker} />
+
+      <EvidenceSections ticker={ticker} evidence={evidence} />
 
       <IdentitySection ticker={ticker} resource={identity} />
     </>

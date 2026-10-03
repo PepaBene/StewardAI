@@ -20,6 +20,8 @@ import { FeedbackControl } from "@/components/feedback/feedback-control";
 import { AsOfLabel } from "@/components/freshness/as-of-label";
 import { JobStatusBadge } from "@/components/jobs/job-status-badge";
 import { TierBadge } from "@/components/news/severity-badge";
+import { ClaimKnownAsOf } from "@/components/holding/claim-known-as-of";
+import { sourceDateRange } from "@/lib/holding-data/logic";
 import { SourceChips, SourceLinksLine } from "@/components/sources/source-list";
 import { Blueprint, BlueprintCorners } from "@/components/ui/blueprint";
 import { Button } from "@/components/ui/button";
@@ -170,6 +172,7 @@ function Report({ report }: { report: ResearchReportOut }) {
     getBrowserApiClient().GET("/holdings/{ticker}/segments", { params: { path: { ticker: body.ticker } } }),
   );
   const regionFig = salesRegionFigure(segments, formatDate);
+  const dateRange = sourceDateRange(body.sources);
   const duration = job ? durationBetween(job.started_at, job.finished_at) : null;
 
   return (
@@ -212,6 +215,15 @@ function Report({ report }: { report: ResearchReportOut }) {
             </li>
           </ul>
           <h1 className="page-title text-balance">{body.headline || report.title}</h1>
+          <p className="num mt-2 text-xs text-text-muted" data-testid="known-as-of-range">
+            Report written {formatDate(new Date(report.created_at))}.{" "}
+            {dateRange.max ? `Cited sources are dated ${dateRange.min === dateRange.max ? dateRange.max : `${dateRange.min} to ${dateRange.max}`}${dateRange.undated > 0 ? `; ${dateRange.undated} of ${body.sources.length} sources have no usable date` : ""}.` : "No cited source carries a usable date."} The report stores no per-claim known-at date; each claim shows the latest date of the sources it cites.{" "}
+            {body.owned ? (
+              <Link href={`${holdingHref(body.ticker)}#evidence`} className={LINK}>
+                Evidence for {body.ticker}
+              </Link>
+            ) : null}
+          </p>
           <p className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-text-muted">
             <span className="font-medium text-text">{body.name}</span>
             {body.owned ? (
@@ -629,6 +641,7 @@ function ResearchSentence({
       {by !== sectionWriter ? <WriterTag by={by} className="mr-1 align-middle" /> : <span className="sr-only">{WRITTEN_BY[by].label}: </span>}
       <span className={checkedTextClass(sentence)}>{sentence.text}</span>
       <SourceChips ids={sentence.source_ids} index={index} className="font-sans" />
+      <ClaimKnownAsOf ids={sentence.source_ids} sources={index.byId} />
       {(sentence.source_ids ?? []).length === 0 ? <span className="ml-1 font-sans text-xs text-text-muted">(no source)</span> : null}
       <span className="font-sans">
         <SentenceCheckMark sentence={sentence} />
@@ -658,6 +671,7 @@ function InlineSentence({
     <span>
       <span className={checkedTextClass(sentence)}>{sentence.text}</span>
       <SourceChips ids={sentence.source_ids} index={index} className="font-sans" />
+      <ClaimKnownAsOf ids={sentence.source_ids} sources={index.byId} />
       <span className="font-sans">
         <SentenceCheckMark sentence={sentence} />
         <FeedbackControl
