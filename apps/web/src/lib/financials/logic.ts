@@ -1,100 +1,333 @@
+import type { HoldingSegments } from "@/lib/api/client";
 import { isFiniteNumber } from "@/lib/charts/scale";
+import type { DataState } from "@/lib/data-state/states";
 
 import type {
+  ActualPoint,
+  ActualVsConsensus,
   CashWalk,
+  ConsensusSeries,
   DebtSchedule,
-  EarningsEvent,
-  EstimateSet,
-  ForwardPoint,
+  EstimateModel,
+  FactRow,
+  ForwardObs,
+  LeaseFact,
   LineVersion,
-  PeerRow,
-  PeerSet,
+  PeerMetricRow,
+  PeerMetricsPayload,
+  PeriodBasis,
+  RevisionSlope,
+  SegmentRowView,
   SegmentSet,
+  SeriesOption,
+  StateAndReason,
+  StatementKind,
   StatementLine,
   StatementPeriod,
+  StatementView,
   VersionMode,
 } from "./types";
 
+const DAY_MS = 86_400_000;
+
+function days(from: string, to: string): number {
+  return Math.round((Date.parse(to) - Date.parse(from)) / DAY_MS);
+}
+
+function toNumber(value: number | string | null | undefined): number | null {
+  if (value === null || value === undefined || value === "") return null;
+  const n = typeof value === "number" ? value : Number(value);
+  return Number.isFinite(n) ? n : null;
+}
+
 // ---------------------------------------------------------------------------------------
-// As-filed versions and point-in-time
+// Fact selection
 // ---------------------------------------------------------------------------------------
 
-/** The version a mode selects for a period, or null when none was public yet. */
+/** A consolidated, numeric statement fact: not a breakdown, not a text block, has a value. */
+export function isStatementFact(f: FactRow): boolean {
+  return !f.dimensional && !f.textBlock && f.lineItem !== null && f.value !== null;
+}
+
+/** Facts a reconciliation check failed are never used in a figure (they are flagged and counted). */
+export function usable(f: FactRow): boolean {
+  return f.reconciliation !== "failed";
+}
+
+export type PeriodClass = "annual" | "quarter" | "other" | "instant";
+
+export function periodClass(f: Pick<FactRow, "periodStart" | "periodEnd">): PeriodClass {
+  if (!f.periodStart) return "instant";
+  const d = days(f.periodStart, f.periodEnd);
+  if (d >= 330 && d <= 380) return "annual";
+  if (d >= 80 && d <= 100) return "quarter";
+  return "other";
+}
+
+/** The most recent version of a set of facts of one value: latest `known_at`, then revision, then id. */
+export function newest(facts: readonly FactRow[]): FactRow | null {
+  let best: FactRow | null = null;
+  for (const f of facts) {
+    if (!best || f.knownAt > best.knownAt || (f.knownAt === best.knownAt && ((f.revision ?? 0) > (best.revision ?? 0) || ((f.revision ?? 0) === (best.revision ?? 0) && f.id > best.id)))) best = f;
+  }
+  return best;
+}
+
+// ---------------------------------------------------------------------------------------
+// As-filed statements: versions and point-in-time
+// ---------------------------------------------------------------------------------------
+
+/** Concepts shown elsewhere (debt ladder, leases): not statement lines of the explorer. */
+const NOT_STATEMENT_LINES = /^(debt_maturity_|lease_payments_due_)/;
+
+function humanize(lineItem: string): string {
+  const text = lineItem.replaceAll("_", " ");
+  return text.charAt(0).toUpperCase() + text.slice(1);
+}
+
+function toVersions(facts: readonly FactRow[]): LineVersion[] {
+  // One version per filing (accession); several rows of one accession are one filed value.
+  const byFiling = new Map<string, FactRow>();
+  for (const f of facts) {
+    const key = f.accession ?? `fact:${f.id}`;
+    const prev = byFiling.get(key);
+    if (!prev || newest([prev, f]) === f) byFiling.set(key, f);
+  }
+  const sorted = [...byFiling.values()].sort((a, b) => (a.knownAt === b.knownAt ? (a.revision ?? 0) - (b.revision ?? 0) || a.id - b.id : a.knownAt < b.knownAt ? -1 : 1));
+  return sorted.map((f, i) => ({
+    version: i + 1,
+    value: f.value as number,
+    knownAt: f.knownAt,
+    accession: f.accession,
+    form: f.form,
+    restates: f.amendsFactId !== null || f.amendsAccession !== null || f.isAmendment,
+    reconciliation: f.reconciliation,
+    concept: f.concept,
+    sourceUrl: f.sourceUrl,
+  }));
+}
+
+/** The version a mode selects for a period, or null when none was filed. */
 export function versionAt(period: StatementPeriod, mode: VersionMode): LineVersion | null {
   const versions = [...period.versions].sort((a, b) => a.version - b.version);
   if (versions.length === 0) return null;
-  if (mode.kind === "latest") return versions[versions.length - 1];
-  if (mode.kind === "original") return versions[0];
-  const known = versions.filter((v) => v.filedAt.slice(0, 10) <= mode.date.slice(0, 10));
-  return known.length ? known[known.length - 1] : null;
+  return mode.kind === "original" ? versions[0] : versions[versions.length - 1];
 }
 
 export type LinePoint = { period: string; end: string; value: number | null; restated: boolean; version: number | null };
 
-/**
- * The line's values under a mode. A period filed after an as-of date has value null (not yet
- * known), and `restated` marks a displayed value that is itself a restatement.
- */
+/** The line's values under a mode. A period with nothing filed is null (never zero). */
 export function linePoints(line: StatementLine, mode: VersionMode): LinePoint[] {
   return line.periods.map((p) => {
     const v = versionAt(p, mode);
-    return { period: p.period, end: p.end, value: v ? v.value : null, restated: !!v && v.restates, version: v ? v.version : null };
+    return { period: p.label, end: p.end, value: v ? v.value : null, restated: !!v && v.restates, version: v ? v.version : null };
   });
 }
 
-/** Periods whose latest version differs from the original: what a restatement changed. */
+/** Periods whose latest version has a different value than the first filing: what a restatement changed. */
 export function restatements(line: StatementLine): { period: string; original: number; latest: number; delta: number; filedAt: string }[] {
   const out: { period: string; original: number; latest: number; delta: number; filedAt: string }[] = [];
   for (const p of line.periods) {
     const first = versionAt(p, { kind: "original" });
     const last = versionAt(p, { kind: "latest" });
     if (first && last && first.version !== last.version && first.value !== last.value) {
-      out.push({ period: p.period, original: first.value, latest: last.value, delta: last.value - first.value, filedAt: last.filedAt });
+      out.push({ period: p.label, original: first.value, latest: last.value, delta: last.value - first.value, filedAt: last.knownAt });
     }
   }
   return out;
 }
 
-/** Every filing date in the statements, newest first: the choices for an "as known on" selector. */
+/** Every filing date among the versions, newest first. */
 export function knownDates(lines: readonly StatementLine[]): string[] {
   const dates = new Set<string>();
-  for (const l of lines) for (const p of l.periods) for (const v of p.versions) dates.add(v.filedAt.slice(0, 10));
+  for (const l of lines) for (const p of l.periods) for (const v of p.versions) dates.add(v.knownAt.slice(0, 10));
   return [...dates].sort().reverse();
 }
 
+/** The period ends of a basis present in a set of facts (flow facts decide; instants join by end date). */
+function periodEndsOf(facts: readonly FactRow[], basis: PeriodBasis): Set<string> {
+  const wanted: PeriodClass = basis === "annual" ? "annual" : "quarter";
+  const ends = new Set<string>();
+  for (const f of facts) if (isStatementFact(f) && periodClass(f) === wanted) ends.add(f.periodEnd);
+  return ends;
+}
+
+/**
+ * One statement as lines across period ends. `allFacts` are the facts of every statement
+ * fetched (so an instant balance-sheet fact joins the flow period that ends on its date).
+ * Failed-reconciliation facts are counted, never drawn. A line takes the one concept with
+ * the most periods, so two tags of one line item are never mixed within a series.
+ */
+export function buildStatement(allFacts: readonly FactRow[], kind: StatementKind, basis: PeriodBasis, maxPeriods = 8): StatementView {
+  const ends = periodEndsOf(allFacts, basis);
+  const wanted: PeriodClass = basis === "annual" ? "annual" : "quarter";
+  const inKind = allFacts.filter((f) => isStatementFact(f) && f.statement === kind && !NOT_STATEMENT_LINES.test(f.lineItem as string));
+  const inBasis = inKind.filter((f) => {
+    const c = periodClass(f);
+    return c === wanted || (c === "instant" && ends.has(f.periodEnd));
+  });
+  const counts = { reconciled: 0, unchecked: 0, failed: 0, total: 0 };
+  for (const f of inBasis) {
+    counts.total += 1;
+    counts[f.reconciliation] += 1;
+  }
+  const used = inBasis.filter(usable);
+
+  const byLine = new Map<string, FactRow[]>();
+  for (const f of used) byLine.set(f.lineItem as string, [...(byLine.get(f.lineItem as string) ?? []), f]);
+
+  const allEnds = [...new Set(used.map((f) => f.periodEnd))].sort().slice(-maxPeriods);
+  const labels = new Map<string, string>();
+  for (const end of allEnds) {
+    const fp = used.filter((f) => f.periodEnd === end && f.fiscalPeriod).map((f) => f.fiscalPeriod as string);
+    const tally = new Map<string, number>();
+    for (const l of fp) tally.set(l, (tally.get(l) ?? 0) + 1);
+    const top = [...tally.entries()].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))[0];
+    labels.set(end, top ? top[0] : end);
+  }
+
+  const lines: StatementLine[] = [];
+  for (const [lineItem, facts] of byLine) {
+    // Unit: the one with most facts (a USD line is never mixed with a EUR line).
+    const unitCount = new Map<string, number>();
+    for (const f of facts) unitCount.set(f.unit ?? "", (unitCount.get(f.unit ?? "") ?? 0) + 1);
+    const unit = [...unitCount.entries()].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))[0][0];
+    const sameUnit = facts.filter((f) => (f.unit ?? "") === unit && allEnds.includes(f.periodEnd));
+    if (sameUnit.length === 0) continue;
+    const conceptEnds = new Map<string, Set<string>>();
+    for (const f of sameUnit) conceptEnds.set(f.concept, (conceptEnds.get(f.concept) ?? new Set()).add(f.periodEnd));
+    const concept = [...conceptEnds.entries()].sort((a, b) => b[1].size - a[1].size || a[0].localeCompare(b[0]))[0][0];
+    const chosen = sameUnit.filter((f) => f.concept === concept);
+    const periods: StatementPeriod[] = allEnds.map((end) => ({
+      end,
+      label: labels.get(end) ?? end,
+      versions: toVersions(chosen.filter((f) => f.periodEnd === end)),
+    }));
+    lines.push({
+      id: lineItem,
+      label: chosen.find((f) => f.label)?.label ?? humanize(lineItem),
+      statement: kind,
+      unit: unit || "units",
+      concept,
+      periods,
+    });
+  }
+  lines.sort((a, b) => a.id.localeCompare(b.id));
+  return { kind, basis, lines, periods: allEnds.map((end) => ({ end, label: labels.get(end) ?? end })), counts };
+}
+
+/** The data state a statement view wears, from its reconciliation counts. */
+export function statementState(view: StatementView, droppedRows = 0): StateAndReason {
+  const { counts } = view;
+  if (counts.total === 0 || view.lines.length === 0) {
+    return { state: "not_covered", reason: counts.failed > 0 ? `All ${counts.failed} stored facts for this view failed reconciliation and are not drawn.` : "No filed statement facts are stored for this statement and period type." };
+  }
+  if (counts.failed > 0) {
+    return { state: "disputed", reason: `${counts.failed} of ${counts.total} facts failed a reconciliation check and are left out; the figures drawn are the ones that did not fail.` };
+  }
+  if (counts.unchecked > 0 || droppedRows > 0) {
+    return {
+      state: "partial",
+      reason: `${counts.unchecked} of ${counts.total} facts were not covered by any reconciliation check (kept, flagged)${droppedRows > 0 ? `; ${droppedRows} malformed rows were dropped` : ""}.`,
+    };
+  }
+  return { state: "verified", reason: null };
+}
+
 // ---------------------------------------------------------------------------------------
-// Cash-to-earnings walk
+// Cash-to-earnings walk, from filed facts only
 // ---------------------------------------------------------------------------------------
+
+const ADJUSTMENT_ITEMS: readonly { id: string; label: string }[] = [
+  { id: "depreciation_amortization", label: "Depreciation and amortisation" },
+  { id: "share_based_compensation", label: "Share-based compensation" },
+];
+
+function factsOf(facts: readonly FactRow[], lineItem: string): FactRow[] {
+  return facts.filter((f) => isStatementFact(f) && f.lineItem === lineItem && usable(f));
+}
+
+function pick(facts: readonly FactRow[], lineItem: string, start: string | null, end: string, unit: string | null): FactRow | null {
+  return newest(factsOf(facts, lineItem).filter((f) => f.periodStart === start && f.periodEnd === end && f.unit === unit));
+}
+
+export type CashWalkResult = { walk: CashWalk; reason?: undefined } | { walk: null; reason: string };
+
+/**
+ * The latest full fiscal year for which net income and cash from operations are both filed
+ * in one unit. Only filed lines are used; free cash flow is derived (CFO − capex) and
+ * labelled so. Facts a reconciliation check failed are never used.
+ */
+export function cashWalkFromFacts(facts: readonly FactRow[]): CashWalkResult {
+  const cfoFacts = factsOf(facts, "cash_from_operations").filter((f) => periodClass(f) === "annual");
+  if (cfoFacts.length === 0) {
+    const failed = facts.some((f) => f.lineItem === "cash_from_operations" && f.reconciliation === "failed");
+    return { walk: null, reason: failed ? "Cash from operations failed a reconciliation check and is not used." : "No filed annual cash-from-operations fact is stored." };
+  }
+  const candidates = [...new Map(cfoFacts.map((f) => [`${f.periodStart}|${f.periodEnd}|${f.unit}`, f])).values()].sort((a, b) => (a.periodEnd < b.periodEnd ? 1 : -1));
+  for (const c of candidates) {
+    const ni = pick(facts, "net_income", c.periodStart, c.periodEnd, c.unit);
+    if (!ni) continue;
+    const cfo = newest(cfoFacts.filter((f) => f.periodStart === c.periodStart && f.periodEnd === c.periodEnd && f.unit === c.unit)) as FactRow;
+    const adjustments: { id: string; label: string; value: number }[] = [];
+    const used: FactRow[] = [ni, cfo];
+    for (const a of ADJUSTMENT_ITEMS) {
+      const f = pick(facts, a.id, c.periodStart, c.periodEnd, c.unit);
+      if (f) {
+        adjustments.push({ id: a.id, label: a.label, value: f.value as number });
+        used.push(f);
+      }
+    }
+    const capexFact = pick(facts, "capex", c.periodStart, c.periodEnd, c.unit);
+    if (capexFact) used.push(capexFact);
+    const accessions = [...new Set(used.map((f) => f.accession).filter((a): a is string => !!a))];
+    return {
+      walk: {
+        label: cfo.fiscalPeriod ?? `year to ${c.periodEnd}`,
+        periodStart: c.periodStart as string,
+        periodEnd: c.periodEnd,
+        currency: cfo.currency ?? cfo.unit ?? "",
+        netIncome: ni.value as number,
+        adjustments,
+        cfo: cfo.value as number,
+        capex: capexFact ? Math.abs(capexFact.value as number) : null,
+        knownAt: used.map((f) => f.knownAt).sort().pop() as string,
+        accessions,
+        source: cfo.source,
+        sourceUrl: cfo.sourceUrl,
+      },
+    };
+  }
+  return { walk: null, reason: "No fiscal year has both net income and cash from operations filed in the same unit." };
+}
 
 export type WalkStep = {
   label: string;
   /** The change this step contributes (for totals, the running level). */
   value: number;
   kind: "start" | "delta" | "subtotal" | "end";
-  /** Bar spans [from, to] on the value axis. */
   from: number;
   to: number;
 };
 
 export type WalkResult = {
   steps: WalkStep[];
-  /** Net income plus adjustments, before comparison to the reported figure. */
+  /** Net income plus the filed adjustments. */
   derivedCfo: number;
-  /** derivedCfo − reportedCfo: nonzero means the parts do not explain the filed total. */
+  /** derivedCfo − filed CFO: what the stored lines do not explain (working capital, other items). */
   cfoGap: number;
-  derivedFcf: number;
-  fcfGap: number;
+  /** Filed CFO less filed capex; null without capex. */
+  fcf: number | null;
   reconciles: boolean;
-  /** Free cash flow ÷ net income; null when net income is not positive. */
   fcfConversion: number | null;
   cfoConversion: number | null;
 };
 
 /**
- * Net income → operating cash flow → free cash flow, with a running level for each step and
- * a reconciliation against the *filed* totals. A walk whose parts do not add up to the
- * reported figures (beyond `tolerance` of the larger total) is flagged and must not feed
- * valuation or peer use.
+ * Net income → filed adjustments → operating cash flow → free cash flow. The walk
+ * `reconciles` only when net income plus the filed adjustments equals filed operating cash
+ * flow within `tolerance` of it; otherwise the unexplained gap is returned and no waterfall
+ * may be drawn from it.
  */
 export function cashWalk(w: CashWalk, tolerance = 0.005): WalkResult {
   const steps: WalkStep[] = [];
@@ -106,84 +339,137 @@ export function cashWalk(w: CashWalk, tolerance = 0.005): WalkResult {
     steps.push({ label: a.label, value: a.value, kind: "delta", from, to: level });
   }
   const derivedCfo = level;
-  steps.push({ label: "Operating cash flow", value: derivedCfo, kind: "subtotal", from: 0, to: derivedCfo });
-  const from = level;
-  level -= Math.abs(w.capex);
-  steps.push({ label: "Capital expenditure", value: -Math.abs(w.capex), kind: "delta", from, to: level });
-  const derivedFcf = level;
-  steps.push({ label: "Free cash flow", value: derivedFcf, kind: "end", from: 0, to: derivedFcf });
-
-  const cfoGap = derivedCfo - w.reportedCfo;
-  const fcfGap = derivedFcf - w.reportedFcf;
-  const scale = Math.max(Math.abs(w.reportedCfo), Math.abs(w.reportedFcf), 1);
+  const cfoGap = derivedCfo - w.cfo;
+  const reconciles = Math.abs(cfoGap) / Math.max(Math.abs(w.cfo), 1) <= tolerance;
+  steps.push({ label: "Operating cash flow", value: w.cfo, kind: "subtotal", from: 0, to: w.cfo });
+  let fcf: number | null = null;
+  if (w.capex !== null) {
+    fcf = w.cfo - Math.abs(w.capex);
+    steps.push({ label: "Capital expenditure", value: -Math.abs(w.capex), kind: "delta", from: w.cfo, to: fcf });
+    steps.push({ label: "Free cash flow (derived)", value: fcf, kind: "end", from: 0, to: fcf });
+  }
   return {
     steps,
     derivedCfo,
     cfoGap,
-    derivedFcf,
-    fcfGap,
-    reconciles: Math.abs(cfoGap) / scale <= tolerance && Math.abs(fcfGap) / scale <= tolerance,
-    fcfConversion: w.netIncome > 0 ? w.reportedFcf / w.netIncome : null,
-    cfoConversion: w.netIncome > 0 ? w.reportedCfo / w.netIncome : null,
+    fcf,
+    reconciles,
+    fcfConversion: fcf !== null && w.netIncome > 0 ? fcf / w.netIncome : null,
+    cfoConversion: w.netIncome > 0 ? w.cfo / w.netIncome : null,
   };
 }
 
 // ---------------------------------------------------------------------------------------
-// Debt maturities
+// Debt maturities, leases
 // ---------------------------------------------------------------------------------------
 
-export type DebtBucket = {
-  /** Calendar year, or "later" for beyond the horizon. */
-  key: string;
-  label: string;
-  /** Amount per currency, in the reporting currency. */
-  byCurrency: Record<string, number>;
-  total: number;
-};
+const MATURITY_ITEMS: readonly { id: string; label: string }[] = [
+  { id: "debt_maturity_remainder", label: "Rest of fiscal year" },
+  { id: "debt_maturity_y1", label: "Next 12 months" },
+  { id: "debt_maturity_y2", label: "Year 2" },
+  { id: "debt_maturity_y3", label: "Year 3" },
+  { id: "debt_maturity_y4", label: "Year 4" },
+  { id: "debt_maturity_y5", label: "Year 5" },
+  { id: "debt_maturity_after_y5", label: "After year 5" },
+];
+
+const LEASE_ITEMS: readonly { id: string; label: string }[] = [
+  { id: "lease_liability", label: "Lease liability" },
+  { id: "lease_liability_current", label: "Lease liability, current" },
+  { id: "lease_liability_noncurrent", label: "Lease liability, non-current" },
+  { id: "right_of_use_asset", label: "Right-of-use asset" },
+  { id: "lease_payments_due_y1", label: "Lease payments due, next 12 months" },
+  { id: "lease_payments_due_y2", label: "Lease payments due, year 2" },
+  { id: "lease_payments_due_after_y5", label: "Lease payments due, after year 5" },
+];
+
+/** The debt maturity ladder of the latest balance date that has one, from filed note facts. */
+export function debtFromFacts(facts: readonly FactRow[]): DebtSchedule | null {
+  const ids = new Set(MATURITY_ITEMS.map((m) => m.id));
+  const mat = facts.filter((f) => isStatementFact(f) && usable(f) && ids.has(f.lineItem as string));
+  if (mat.length === 0) return null;
+  const end = mat.map((f) => f.periodEnd).sort().pop() as string;
+  const atEnd = mat.filter((f) => f.periodEnd === end);
+  const unitCount = new Map<string, number>();
+  for (const f of atEnd) unitCount.set(f.unit ?? "", (unitCount.get(f.unit ?? "") ?? 0) + 1);
+  const unit = [...unitCount.entries()].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))[0][0];
+  const tranches: { key: string; label: string; amount: number }[] = [];
+  const used: FactRow[] = [];
+  for (const m of MATURITY_ITEMS) {
+    const f = newest(atEnd.filter((x) => x.lineItem === m.id && (x.unit ?? "") === unit));
+    if (f) {
+      tranches.push({ key: m.id, label: m.label, amount: f.value as number });
+      used.push(f);
+    }
+  }
+  const at = (item: string) => newest(factsOf(facts, item).filter((f) => f.periodEnd === end && f.periodStart === null && (f.unit ?? "") === unit));
+  let total = at("long_term_debt_total") ?? at("borrowings_total");
+  let totalBasis: string | null = total ? total.concept : null;
+  let reportedTotal = total ? (total.value as number) : null;
+  if (!total) {
+    const nc = at("long_term_debt_noncurrent") ?? at("borrowings_noncurrent");
+    const c = at("long_term_debt_current") ?? at("borrowings_current");
+    if (nc && c) {
+      reportedTotal = (nc.value as number) + (c.value as number);
+      totalBasis = `${nc.concept} + ${c.concept}`;
+      total = nc;
+    }
+  }
+  if (total) used.push(total);
+  const leases: LeaseFact[] = [];
+  for (const l of LEASE_ITEMS) {
+    const cands = factsOf(facts, l.id).filter((x) => (x.unit ?? "") === unit && x.periodEnd <= end);
+    const latestEnd = cands.map((x) => x.periodEnd).sort().pop();
+    const f = latestEnd ? newest(cands.filter((x) => x.periodEnd === latestEnd)) : null;
+    if (f) leases.push({ id: l.id, label: l.label, value: f.value as number, periodEnd: f.periodEnd });
+  }
+  const first = used[0];
+  return {
+    periodEnd: end,
+    currency: first.currency ?? (unit || ""),
+    tranches,
+    reportedTotal,
+    totalBasis,
+    leases,
+    knownAt: used.map((f) => f.knownAt).sort().pop() as string,
+    accession: first.accession,
+    source: first.source,
+    sourceUrl: first.sourceUrl,
+  };
+}
 
 export type DebtBreakdown = {
-  buckets: DebtBucket[];
-  currencies: string[];
-  /** Maturity-classified total in reporting currency. */
   classified: number;
-  /** reportedTotal − classified, never negative: the explicit unclassified remainder. */
+  reportedTotal: number | null;
+  /** reportedTotal − classified when positive beyond tolerance: the explicit unclassified remainder. */
   unclassified: number;
   unclassifiedShare: number | null;
-  /** The classified amount exceeds the reported total: a data error, not a negative remainder. */
+  /** The maturity table exceeds reported debt beyond tolerance: a data error, not a negative remainder. */
   overClassified: boolean;
-  hasNonReportingCurrency: boolean;
+  /** Maturity table and balance-sheet debt agree within tolerance. */
+  reconciles: boolean;
 };
 
-export function debtBreakdown(d: DebtSchedule, horizonYears = 6): DebtBreakdown {
-  const rate = (c: string) => (c === d.reportingCurrency ? 1 : d.fxToReporting[c]);
-  const buckets: DebtBucket[] = [];
-  for (let k = 0; k < horizonYears; k++) {
-    const y = d.baseYear + k;
-    buckets.push({ key: String(y), label: String(y), byCurrency: {}, total: 0 });
+/**
+ * Compares the maturity ladder with balance-sheet debt. Principal due can differ from the
+ * carrying amount by discounts and issuance costs, so agreement is within `tolerance` of the
+ * reported total; beyond it the remainder is shown as unclassified, never spread over years.
+ */
+export function debtBreakdown(d: DebtSchedule, tolerance = 0.02): DebtBreakdown {
+  const classified = d.tranches.reduce((s, t) => s + (isFiniteNumber(t.amount) ? t.amount : 0), 0);
+  const total = d.reportedTotal;
+  if (total === null || total <= 0) {
+    return { classified, reportedTotal: total, unclassified: 0, unclassifiedShare: null, overClassified: false, reconciles: false };
   }
-  const later: DebtBucket = { key: "later", label: `After ${d.baseYear + horizonYears - 1}`, byCurrency: {}, total: 0 };
-  const currencies = new Set<string>();
-  let classified = 0;
-  for (const t of d.tranches) {
-    const r = rate(t.currency);
-    if (!isFiniteNumber(r) || !isFiniteNumber(t.amount) || t.amount <= 0 || t.year < d.baseYear) continue;
-    const amount = t.amount * r;
-    const b = buckets.find((x) => x.key === String(t.year)) ?? later;
-    b.byCurrency[t.currency] = (b.byCurrency[t.currency] ?? 0) + amount;
-    b.total += amount;
-    classified += amount;
-    currencies.add(t.currency);
-  }
-  const all = later.total > 0 ? [...buckets, later] : buckets;
-  const unclassified = Math.max(0, d.reportedTotal - classified);
+  const gap = total - classified;
+  const within = Math.abs(gap) / total <= tolerance;
   return {
-    buckets: all,
-    currencies: [...currencies].sort((a, b) => (a === d.reportingCurrency ? -1 : b === d.reportingCurrency ? 1 : a.localeCompare(b))),
     classified,
-    unclassified,
-    unclassifiedShare: d.reportedTotal > 0 ? unclassified / d.reportedTotal : null,
-    overClassified: classified > d.reportedTotal * (1 + 1e-6),
-    hasNonReportingCurrency: [...currencies].some((c) => c !== d.reportingCurrency),
+    reportedTotal: total,
+    unclassified: gap > 0 && !within ? gap : 0,
+    unclassifiedShare: gap > 0 && !within ? gap / total : null,
+    overClassified: gap < 0 && !within,
+    reconciles: within,
   };
 }
 
@@ -192,6 +478,66 @@ export function debtBreakdown(d: DebtSchedule, horizonYears = 6): DebtBreakdown 
 // ---------------------------------------------------------------------------------------
 
 export type SegmentColorBy = "growth" | "margin";
+export type SegmentAxisKey = "geographic" | "segment" | "product";
+
+function localName(member: string): string {
+  return member.split(":").pop()!.toLowerCase();
+}
+
+/**
+ * Segment operating profit facts (`statement=segment&line_item=operating_income`) matched to
+ * the drawn rows by XBRL member, for the same period end and an annual duration.
+ */
+function profitFor(rows: readonly { member: string | null }[], periodEnd: string, facts: readonly FactRow[] | null): Map<string, { value: number; concept: string }> {
+  const out = new Map<string, { value: number; concept: string }>();
+  if (!facts) return out;
+  const eligible = facts.filter((f) => f.statement === "segment" && f.lineItem === "operating_income" && f.value !== null && usable(f) && f.periodEnd === periodEnd && periodClass(f) === "annual" && f.members.length === 1);
+  for (const r of rows) {
+    if (!r.member) continue;
+    const key = localName(r.member);
+    const f = newest(eligible.filter((x) => localName(x.members[0].member) === key));
+    if (f) out.set(r.member, { value: f.value as number, concept: f.concept });
+  }
+  return out;
+}
+
+/**
+ * The tiles of one breakdown of `/segments`: area = reported revenue (subtotal rows left out),
+ * prior-year revenue from the same member of the period one year earlier, and, for the
+ * business-segment breakdown, segment profit from filed segment facts.
+ */
+export function buildSegmentSet(data: HoldingSegments, axis: SegmentAxisKey, profitFacts: readonly FactRow[] | null): SegmentSet | null {
+  const period = data.period;
+  if (!period || !data.currency) return null;
+  const rows = data[axis];
+  const drawn = rows.filter((r) => !r.subtotal && (toNumber(r.value) ?? 0) > 0);
+  if (drawn.length === 0) return null;
+  const history = data.history?.[axis] ?? [];
+  const priorPoint = history.find((h) => h.period.months === period.months && h.period.basis === period.basis && Math.abs(days(h.period.end, period.end) - 365) <= 20);
+  const profit = axis === "segment" ? profitFor(drawn, period.end, profitFacts) : new Map();
+  const segments: SegmentRowView[] = drawn.map((r) => {
+    const prior = priorPoint?.rows.find((p) => !p.subtotal && (r.member ? p.member === r.member : p.label === r.label));
+    const p = r.member ? profit.get(r.member) : undefined;
+    return {
+      name: r.label,
+      member: r.member,
+      revenue: toNumber(r.value) as number,
+      priorRevenue: prior ? toNumber(prior.value) : null,
+      operatingProfit: p ? p.value : null,
+      profitDefinition: p ? p.concept : null,
+    };
+  });
+  segments.sort((a, b) => b.revenue - a.revenue);
+  return {
+    axis,
+    period: period.label,
+    periodEnd: period.end,
+    currency: data.currency,
+    segments,
+    totalRevenue: toNumber(data.total_revenue),
+    subtotalsLeftOut: rows.filter((r) => r.subtotal).length,
+  };
+}
 
 export type SegmentAlignment = {
   growth: { aligned: boolean; reason: string | null };
@@ -200,39 +546,39 @@ export type SegmentAlignment = {
 
 /**
  * Whether segments may be coloured by growth or margin on one scale. Growth needs a prior-year
- * figure for every segment; margin additionally needs one shared profit definition. When not
- * aligned the treemap keeps the area (reported revenue) and drops the colour, with the reason.
+ * figure for every segment; margin additionally needs a filed profit for each and one shared
+ * profit definition. Otherwise the treemap keeps the area and drops the colour, with the reason.
  */
 export function segmentAlignment(set: SegmentSet): SegmentAlignment {
   const segs = set.segments;
   const missingPrior = segs.filter((s) => !isFiniteNumber(s.priorRevenue) || s.priorRevenue <= 0);
   const growth = missingPrior.length
-    ? { aligned: false, reason: `No prior-year revenue for ${missingPrior.map((s) => s.name).join(", ")}.` }
+    ? { aligned: false, reason: `No comparable prior-year revenue for ${missingPrior.map((s) => s.name).join(", ")}.` }
     : { aligned: true, reason: null };
-  const noProfit = segs.filter((s) => !isFiniteNumber(s.operatingProfit));
-  const defs = new Set(segs.map((s) => s.profitDefinition));
-  const margin = noProfit.length
-    ? { aligned: false, reason: `No segment profit for ${noProfit.map((s) => s.name).join(", ")}.` }
-    : defs.size > 1
-      ? { aligned: false, reason: `Segment profit is defined differently (${[...defs].filter(Boolean).join(" vs ")}); margins are not comparable.` }
-      : { aligned: true, reason: null };
+  let margin: { aligned: boolean; reason: string | null };
+  if (set.axis !== "segment") margin = { aligned: false, reason: "Profit is reported by business segment only; regions and products carry no profit." };
+  else {
+    const noProfit = segs.filter((s) => !isFiniteNumber(s.operatingProfit));
+    const defs = new Set(segs.map((s) => s.profitDefinition));
+    margin = noProfit.length
+      ? { aligned: false, reason: `No filed segment profit for ${noProfit.map((s) => s.name).join(", ")}.` }
+      : defs.size > 1
+        ? { aligned: false, reason: `Segment profit is tagged with different definitions (${[...defs].filter(Boolean).join(" vs ")}); margins are not comparable.` }
+        : { aligned: true, reason: null };
+  }
   return { growth, margin };
 }
 
-/** A treemap tile: area = reported revenue, colour value null when the colour is not comparable. */
 export type SegmentTile = { id: string; label: string; weight: number; change: number | null };
 
 export function segmentTiles(set: SegmentSet, colorBy: SegmentColorBy): { items: SegmentTile[]; colored: boolean; reason: string | null; cap: number } {
   const align = segmentAlignment(set)[colorBy];
-  const items: SegmentTile[] = set.segments
-    .filter((s) => s.revenue > 0)
-    .map((s) => {
-      let change: number | null = null;
-      if (align.aligned) {
-        change = colorBy === "growth" ? s.revenue / s.priorRevenue! - 1 : s.operatingProfit! / s.revenue;
-      }
-      return { id: s.name, label: s.name, weight: s.revenue, change };
-    });
+  const items: SegmentTile[] = set.segments.map((s) => ({
+    id: s.member ?? s.name,
+    label: s.name,
+    weight: s.revenue,
+    change: align.aligned ? (colorBy === "growth" ? s.revenue / (s.priorRevenue as number) - 1 : (s.operatingProfit as number) / s.revenue) : null,
+  }));
   return { items, colored: align.aligned, reason: align.reason, cap: colorBy === "growth" ? 0.2 : 0.4 };
 }
 
@@ -240,129 +586,278 @@ export function segmentTiles(set: SegmentSet, colorBy: SegmentColorBy): { items:
 // Forward estimates
 // ---------------------------------------------------------------------------------------
 
-/** The same estimate series across vintages: same metric, period, basis, currency and provider. */
-export function comparableSnapshots(points: readonly ForwardPoint[], ref: Pick<ForwardPoint, "metric" | "period" | "basis" | "currency" | "provider" | "kind">): ForwardPoint[] {
-  return points
-    .filter((p) => p.metric === ref.metric && p.period === ref.period && p.basis === ref.basis && p.currency === ref.currency && p.provider === ref.provider && p.kind === ref.kind && isFiniteNumber(p.mean))
-    .sort((a, b) => a.vintage.localeCompare(b.vintage));
-}
-
-export type RevisionSlope = {
-  period: string;
-  from: { vintage: string; mean: number };
-  to: { vintage: string; mean: number };
-  change: number;
-  pct: number | null;
-  days: number;
-  perMonthPct: number | null;
+/** Consensus / guidance metric -> the statement line item that is its actual (as the backend maps it). */
+export const ACTUAL_LINE_ITEM: Readonly<Record<string, string>> = {
+  revenue: "revenue",
+  eps_diluted: "eps_diluted",
+  net_income: "net_income",
+  operating_income: "operating_income",
+  capex: "capex",
 };
 
-const dayMs = 86_400_000;
+export function seriesId(s: { provider: string | null; currency: string | null; basis: string | null }): string {
+  return `${s.provider ?? ""}|${s.currency ?? ""}|${s.basis ?? ""}`;
+}
+
+function vintageDate(o: ForwardObs): string {
+  return (o.vintage ?? o.knownAt).slice(0, 10);
+}
 
 /**
- * Revision of the consensus mean between the first and last comparable snapshot. Snapshots
- * that differ in basis, currency or provider are never joined: they yield no slope.
+ * Revision of the consensus mean between the first and last snapshot of ONE series (same
+ * metric, period, provider, currency and basis, which is what `consensus_series` groups by).
+ * Snapshots dated the same day count once (the later known one).
  */
-export function revisionSlope(snapshots: readonly ForwardPoint[], ref: ForwardPoint): RevisionSlope | null {
-  const s = comparableSnapshots(snapshots, ref);
-  if (s.length < 2) return null;
-  const a = s[0];
-  const b = s[s.length - 1];
-  const days = Math.max(1, Math.round((Date.parse(b.vintage) - Date.parse(a.vintage)) / dayMs));
-  const change = b.mean! - a.mean!;
-  const pct = a.mean! !== 0 ? change / Math.abs(a.mean!) : null;
+export function revisionSlope(series: Pick<ConsensusSeries, "fiscalPeriod" | "vintages">): RevisionSlope | null {
+  const byDate = new Map<string, ForwardObs>();
+  for (const v of [...series.vintages].sort((a, b) => (a.knownAt < b.knownAt ? -1 : 1))) {
+    if (v.value === null) continue;
+    byDate.set(vintageDate(v), v);
+  }
+  const snaps = [...byDate.entries()].sort((a, b) => (a[0] < b[0] ? -1 : 1));
+  if (snaps.length < 2) return null;
+  const [d0, a] = snaps[0];
+  const [d1, b] = snaps[snaps.length - 1];
+  const change = (b.value as number) - (a.value as number);
+  const span = Math.max(1, days(d0, d1));
+  const pct = a.value !== 0 ? change / Math.abs(a.value as number) : null;
   return {
-    period: ref.period,
-    from: { vintage: a.vintage, mean: a.mean! },
-    to: { vintage: b.vintage, mean: b.mean! },
+    period: series.fiscalPeriod,
+    from: { vintage: d0, mean: a.value as number, analystCount: a.analystCount },
+    to: { vintage: d1, mean: b.value as number, analystCount: b.analystCount },
+    snapshots: snaps.length,
     change,
     pct,
-    days,
-    perMonthPct: pct !== null ? (pct / days) * 30 : null,
+    days: span,
+    perMonthPct: pct !== null ? (pct / span) * 30 : null,
   };
 }
 
+function latestPerKey(obs: readonly ForwardObs[]): ForwardObs[] {
+  const best = new Map<string, ForwardObs>();
+  for (const o of obs) {
+    const key = [o.kind, o.provider ?? "", o.basis ?? "", o.currency ?? "", o.fiscalPeriod].join("|");
+    const prev = best.get(key);
+    if (!prev || o.knownAt > prev.knownAt || (o.knownAt === prev.knownAt && o.id > prev.id)) best.set(key, o);
+  }
+  return [...best.values()];
+}
+
+function pointValues(o: ForwardObs): number[] {
+  return [o.value, o.low, o.high].filter((x): x is number => x !== null);
+}
+
+/** Actual values of a metric per fiscal period (annual and quarterly), newest filing per period. */
+export function actualsFor(metric: string, facts: readonly FactRow[]): { points: ActualPoint[]; currency: string | null } {
+  const lineItem = ACTUAL_LINE_ITEM[metric];
+  if (!lineItem) return { points: [], currency: null };
+  const f = facts.filter((x) => isStatementFact(x) && usable(x) && x.lineItem === lineItem && x.fiscalPeriod && periodClass(x) !== "other" && periodClass(x) !== "instant");
+  const units = new Map<string, number>();
+  for (const x of f) units.set(x.unit ?? "", (units.get(x.unit ?? "") ?? 0) + 1);
+  const unit = [...units.entries()].sort((a, b) => b[1] - a[1])[0]?.[0];
+  if (unit === undefined) return { points: [], currency: null };
+  const same = f.filter((x) => (x.unit ?? "") === unit);
+  const byPeriod = new Map<string, FactRow[]>();
+  for (const x of same) byPeriod.set(x.fiscalPeriod as string, [...(byPeriod.get(x.fiscalPeriod as string) ?? []), x]);
+  const points: ActualPoint[] = [];
+  for (const [period, list] of byPeriod) {
+    const n = newest(list) as FactRow;
+    points.push({ period, value: n.value as number, knownAt: n.knownAt });
+  }
+  points.sort((a, b) => a.period.localeCompare(b.period));
+  return { points, currency: same[0].currency };
+}
+
+/**
+ * The fan-chart model for one metric. One consensus series (provider, currency, basis) is
+ * plotted; guidance, scenario and calendar estimates are plotted only in the same currency.
+ * Anything left out is listed with the reason. Actuals are drawn only if their currency
+ * matches and their magnitude is plausible next to the estimates (a 100x gap means a unit or
+ * scale mismatch, not a miss).
+ */
+export function buildEstimates(payload: { observations: readonly ForwardObs[]; series: readonly ConsensusSeries[] }, facts: readonly FactRow[], metric: string, chosenSeries: string | null = null): EstimateModel {
+  const obs = payload.observations.filter((o) => o.metric === metric);
+  const consensus = payload.series.filter((s) => s.metric === metric);
+  const opts = new Map<string, SeriesOption>();
+  for (const s of consensus) {
+    const id = seriesId(s);
+    const cur = opts.get(id);
+    opts.set(id, cur ? { ...cur, periods: cur.periods + 1 } : { id, provider: s.provider, currency: s.currency, basis: s.basis, periods: 1 });
+  }
+  const seriesOptions = [...opts.values()].sort((a, b) => b.periods - a.periods || a.id.localeCompare(b.id));
+  const seriesChoice = chosenSeries && opts.has(chosenSeries) ? chosenSeries : (seriesOptions[0]?.id ?? null);
+  const chosen = seriesChoice ? opts.get(seriesChoice)! : null;
+
+  let currency: string | null = chosen?.currency ?? null;
+  if (!chosen) {
+    const tally = new Map<string, number>();
+    for (const o of obs) if (o.currency) tally.set(o.currency, (tally.get(o.currency) ?? 0) + 1);
+    currency = [...tally.entries()].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))[0]?.[0] ?? null;
+  }
+
+  const unplotted: { obs: ForwardObs; reason: string }[] = [];
+  const candidates: ForwardObs[] = [];
+  for (const o of latestPerKey(obs)) {
+    if (o.kind === "published_analyst_consensus") {
+      if (!chosen || seriesId(o) !== chosen.id) {
+        unplotted.push({ obs: o, reason: "A different provider, currency or basis than the plotted consensus series; series are never merged." });
+        continue;
+      }
+    } else if (o.currency !== currency) {
+      unplotted.push({ obs: o, reason: `Stated in ${o.currency ?? "no currency"}, the chart is in ${currency ?? "an unstated currency"}.` });
+      continue;
+    }
+    if (pointValues(o).length === 0) {
+      unplotted.push({ obs: o, reason: "The observation carries no value." });
+      continue;
+    }
+    candidates.push(o);
+  }
+  const points = candidates.sort((a, b) => a.fiscalPeriod.localeCompare(b.fiscalPeriod) || a.kind.localeCompare(b.kind));
+
+  const forwardPeriods = [...new Set(points.map((p) => p.fiscalPeriod))].sort();
+  const act = actualsFor(metric, facts);
+  let actuals: ActualPoint[] = act.points;
+  let actualsNote: string | null = null;
+  if (actuals.length > 0 && currency && act.currency && act.currency !== currency) {
+    actualsNote = `Actuals are filed in ${act.currency}, estimates in ${currency}: not drawn on one axis.`;
+    actuals = [];
+  } else if (actuals.length > 0 && points.length > 0) {
+    const est = points.flatMap(pointValues).map(Math.abs).filter((x) => x > 0);
+    const last = Math.abs(actuals[actuals.length - 1].value);
+    if (est.length > 0 && last > 0) {
+      const mid = [...est].sort((a, b) => a - b)[Math.floor(est.length / 2)];
+      const ratio = last / mid;
+      if (ratio > 100 || ratio < 0.01) {
+        actualsNote = "Actuals and estimates differ by more than 100x: a unit or scale mismatch, so actuals are not drawn on this axis.";
+        actuals = [];
+      }
+    }
+  }
+  const lastActualPeriods = actuals.slice(-4).map((a) => a.period);
+  const periods = [...new Set([...lastActualPeriods, ...forwardPeriods])].sort();
+
+  const revisions = chosen
+    ? consensus
+        .filter((s) => seriesId(s) === chosen.id)
+        .sort((a, b) => a.fiscalPeriod.localeCompare(b.fiscalPeriod))
+        .map((s) => {
+          const slope = revisionSlope(s);
+          return { period: s.fiscalPeriod, slope, reason: slope ? null : s.vintages.length < 2 ? "One snapshot only: no revision to show." : "Snapshots carry no comparable consensus value." };
+        })
+    : [];
+  const consensusPeriods = new Set(points.filter((p) => p.kind === "published_analyst_consensus").map((p) => p.fiscalPeriod));
+  const consensusGaps = forwardPeriods.filter((p) => !consensusPeriods.has(p));
+  return { metric, currency, seriesOptions, seriesId: seriesChoice, periods, actuals, actualsNote, points, unplotted, revisions, consensusGaps };
+}
+
+export function forwardMetrics(payload: { observations: readonly ForwardObs[] }): string[] {
+  return [...new Set(payload.observations.map((o) => o.metric))].sort();
+}
+
 export type Surprise = {
-  /** actual / mean − 1; null with no consensus. */
   pct: number | null;
-  /** Position vs the analyst range. */
   position: "above_range" | "within_range" | "below_range" | "no_range";
 };
 
-/** Actual versus available consensus. A missing consensus yields null: the model never creates one. */
-export function surprise(e: Pick<EarningsEvent, "actual" | "consensusMean" | "consensusLow" | "consensusHigh">): Surprise {
-  const pct = isFiniteNumber(e.consensusMean) && e.consensusMean !== 0 ? e.actual / e.consensusMean - 1 : null;
-  if (!isFiniteNumber(e.consensusLow) || !isFiniteNumber(e.consensusHigh)) return { pct, position: "no_range" };
-  return { pct, position: e.actual > e.consensusHigh ? "above_range" : e.actual < e.consensusLow ? "below_range" : "within_range" };
+/** Actual versus the consensus the API found before the report. No consensus yields null: nothing is invented. */
+export function surprise(a: Pick<ActualVsConsensus, "actual" | "consensus">): Surprise {
+  const actual = a.actual?.value ?? null;
+  const c = a.consensus;
+  if (actual === null || !c) return { pct: null, position: "no_range" };
+  const pct = isFiniteNumber(c.value) && c.value !== 0 ? actual / c.value - 1 : null;
+  if (!isFiniteNumber(c.low) || !isFiniteNumber(c.high)) return { pct, position: "no_range" };
+  return { pct, position: actual > c.high ? "above_range" : actual < c.low ? "below_range" : "within_range" };
 }
 
-/** Periods with a forward point of the given kind, so a chart can say which kinds exist where. */
-export function forwardByPeriod(set: EstimateSet): Map<string, ForwardPoint[]> {
-  const m = new Map<string, ForwardPoint[]>();
-  for (const p of set.forward) m.set(p.period, [...(m.get(p.period) ?? []), p]);
-  return m;
+/** Data state of an actual-vs-consensus answer. */
+export function avcState(a: ActualVsConsensus): StateAndReason {
+  switch (a.state) {
+    case "available":
+      return { state: a.actual?.reconciled ? "verified" : "partial", reason: a.actual?.reconciled ? null : "The reported figure was not covered by a reconciliation check." };
+    case "no_consensus_before_report":
+      return { state: "not_covered", reason: a.reason ?? "No consensus was known before the report." };
+    case "currency_mismatch":
+      return { state: "disputed", reason: a.reason ?? "Consensus and actual are in different currencies; no surprise is computed." };
+    case "unsupported_metric":
+      return { state: "not_covered", reason: "This metric has no matching reported line item." };
+    case "no_actual":
+      return { state: "not_covered", reason: a.reason ?? "No reported figure stored for this period." };
+    default:
+      return { state: "unavailable", reason: `Unrecognised answer state "${a.state}".` };
+  }
 }
 
 // ---------------------------------------------------------------------------------------
 // Peers
 // ---------------------------------------------------------------------------------------
 
-export type PeerExclusion = { name: string; ticker: string; reason: string };
-
-export type PeerComparison = {
-  metricId: string;
-  label: string;
-  definition: string;
-  rows: { name: string; ticker: string; value: number; subject: boolean; basis: string }[];
-  excluded: PeerExclusion[];
-  covered: number;
-  total: number;
-  /** Median of covered peers (subject excluded); null with none. */
-  peerMedian: number | null;
+export const PEER_METRIC_META: Readonly<Record<string, { label: string; unit: "percent" | "ratio" }>> = {
+  revenue_growth: { label: "Revenue growth", unit: "percent" },
+  gross_margin: { label: "Gross margin", unit: "percent" },
+  operating_margin: { label: "Operating margin", unit: "percent" },
+  roic: { label: "ROIC", unit: "percent" },
+  net_debt_to_equity: { label: "Net debt / equity", unit: "ratio" },
+  free_cash_flow_conversion: { label: "FCF conversion", unit: "percent" },
 };
 
-function median(values: readonly number[]): number | null {
-  if (values.length === 0) return null;
-  const s = [...values].sort((a, b) => a - b);
-  const mid = Math.floor(s.length / 2);
-  return s.length % 2 ? s[mid] : (s[mid - 1] + s[mid]) / 2;
-}
+export type PeerComparison = {
+  id: string;
+  label: string;
+  unit: "percent" | "ratio";
+  definition: string | null;
+  holdingValue: number | null;
+  holdingReason: string | null;
+  mean: number | null;
+  covered: number;
+  /** Confirmed peers: the denominator. */
+  total: number;
+  included: readonly string[];
+  excluded: readonly { ticker: string; reason: string }[];
+  periodEnd: string | null;
+  basis: string | null;
+};
 
 /**
- * One metric across the subject and its peers under the *one* current definition. A peer
- * whose figure uses another definition, has no value, or describes another fiscal period is
- * excluded with the reason (GAAP and IFRS peers compare only on a common definition), and the
- * covered/excluded counts are always reported.
+ * One metric: the holding against the mean of its comparable confirmed peers, with the
+ * covered/total count and the reason every other confirmed peer is out.
  */
-export function peerComparison(set: PeerSet, metricId: string): PeerComparison {
-  const def = set.definitions[metricId];
-  const reference = set.subject.metrics[metricId];
-  const excluded: PeerExclusion[] = [];
-  const rows: PeerComparison["rows"] = [];
-  const take = (p: PeerRow, subject: boolean) => {
-    const m = p.metrics[metricId];
-    if (!m || !isFiniteNumber(m.value)) {
-      excluded.push({ name: p.name, ticker: p.ticker, reason: "No value for this metric." });
-    } else if (reference && m.definition !== reference.definition) {
-      excluded.push({ name: p.name, ticker: p.ticker, reason: `Uses a different definition (${m.definition}); not comparable to ${reference.definition}.` });
-    } else if (p.period !== set.subject.period) {
-      excluded.push({ name: p.name, ticker: p.ticker, reason: `Describes ${p.period}, not ${set.subject.period}.` });
-    } else {
-      rows.push({ name: p.name, ticker: p.ticker, value: m.value, subject, basis: p.basis });
-    }
-  };
-  take(set.subject, true);
-  for (const p of set.peers) take(p, false);
-  rows.sort((a, b) => b.value - a.value);
-  const coveredPeers = rows.filter((r) => !r.subject);
+export function peerComparison(p: PeerMetricsPayload, metricId: string): PeerComparison | null {
+  const row: PeerMetricRow | undefined = p.metrics.find((m) => m.id === metricId);
+  if (!row) return null;
+  const meta = PEER_METRIC_META[metricId];
+  const total = p.confirmedPeers.length;
+  const excludedAll = p.confirmedPeers.map((c) => c.peerTicker).filter((t) => !row.included.includes(t));
+  const wholly = new Map(p.excludedPeers.map((e) => [e.peer, e.reason]));
   return {
-    metricId,
-    label: def?.label ?? metricId,
-    definition: def?.definition ?? "No definition recorded",
-    rows,
-    excluded: excluded.filter((e) => e.ticker !== set.subject.ticker),
-    covered: coveredPeers.length,
-    total: set.peers.length,
-    peerMedian: median(coveredPeers.map((r) => r.value)),
+    id: metricId,
+    label: meta?.label ?? metricId,
+    unit: meta?.unit ?? "ratio",
+    definition: p.formulas[metricId] ?? null,
+    holdingValue: row.holdingValue,
+    holdingReason: row.holdingReason,
+    mean: row.mean,
+    covered: row.included.length,
+    total,
+    included: row.included,
+    excluded: excludedAll.map((t) => ({ ticker: t, reason: row.excludedReasons[t] ?? wholly.get(t) ?? "No value for this metric." })),
+    periodEnd: row.periodEnd,
+    basis: row.basis,
   };
+}
+
+/** Data state of the peer comparison: partial whenever a confirmed peer is out; not covered with none confirmed. */
+export function peerState(p: PeerMetricsPayload, c: PeerComparison | null): StateAndReason {
+  if (p.confirmedPeers.length === 0) return { state: "not_covered", reason: "No peer is confirmed for this holding. Peers are the owner's decision; suggested peers are never averaged." };
+  if (!c) return { state: "not_covered", reason: "This metric is not in the response." };
+  if (c.covered === 0) return { state: "not_covered", reason: "No confirmed peer has a comparable figure for this metric." };
+  if (c.covered < c.total) return { state: "partial", reason: `${c.total - c.covered} of ${c.total} confirmed peers are excluded; see the reasons below.` };
+  return { state: p.holdingPeriod?.reconciliation === "reconciled" ? "verified" : "partial", reason: p.holdingPeriod?.reconciliation === "reconciled" ? null : "Some inputs were not covered by a reconciliation check." };
+}
+
+/** The DataState for a plain list outcome (used for forward-data panels). */
+export function forwardState(model: EstimateModel): StateAndReason {
+  if (model.points.length === 0) return { state: "not_covered", reason: "No forward figure is stored for this metric. The app never fills one in." };
+  const partial = model.consensusGaps.length > 0 || model.unplotted.length > 0 || model.actualsNote !== null;
+  return { state: partial ? "partial" : "verified", reason: partial ? "Some figures are not plotted or some periods lack consensus; the reasons are listed below." : null } as { state: DataState; reason: string | null };
 }

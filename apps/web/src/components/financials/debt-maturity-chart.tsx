@@ -1,110 +1,142 @@
-import { AXIS_TEXT, CATEGORICAL_FILL, SVG_BASE } from "@/components/charts/shared";
+import { AXIS_TEXT, SVG_BASE } from "@/components/charts/shared";
 import { ChartFrame } from "@/components/data-state";
 import { formatCompact, formatPct } from "@/lib/charts/format";
 import { bandScale, linearScale, niceTicks } from "@/lib/charts/scale";
 import { debtBreakdown } from "@/lib/financials/logic";
 import type { DebtSchedule } from "@/lib/financials/types";
+import { cn } from "@/lib/utils";
 
 const W = 760;
 const H = 270;
-const CAT = [0, 3, 5, 1];
 
 /**
- * Debt maturity ladder: stacked bars by maturity year, one segment per currency (expressed in
- * the reporting currency), and a separate dashed "Unclassified" bar for the part of reported
- * debt the maturity table does not explain. Nothing is spread over years to fill the gap.
+ * Debt maturity ladder from the filed debt note: one bar per filed maturity bucket (relative
+ * to the balance date, as the filing states them), and a separate dashed "Unclassified" bar
+ * for the part of balance-sheet debt the maturity table does not explain. Nothing is spread
+ * over years to fill the gap. Lease obligations stay a table: they are a different obligation.
  */
-export function DebtMaturityChart({ schedule, sourceUrl }: { schedule: DebtSchedule; sourceUrl: string | null }) {
+export function DebtMaturityChart({ schedule }: { schedule: DebtSchedule | null }) {
+  if (!schedule) {
+    return (
+      <ChartFrame
+        id="debt-maturity"
+        kicker="Debt maturity"
+        title="When debt falls due"
+        provenance={{ source: "Filed debt note (stored XBRL facts)", asOf: null, state: "not_covered", reason: "No debt-maturity facts are stored for this holding (the filing does not tag them, or it is not an XBRL filer)." }}
+        hasValue={false}
+      >
+        {null}
+      </ChartFrame>
+    );
+  }
   const b = debtBreakdown(schedule);
-  const cols = [...b.buckets.map((x) => ({ key: x.key, label: x.label, total: x.total, byCurrency: x.byCurrency, un: false })), ...(b.unclassified > 0 ? [{ key: "un", label: "Unclassified", total: b.unclassified, byCurrency: {} as Record<string, number>, un: true }] : [])];
+  const cur = schedule.currency;
+  const cols = [
+    ...schedule.tranches.map((t) => ({ key: t.key, label: t.label, total: t.amount, un: false })),
+    ...(b.unclassified > 0 ? [{ key: "un", label: "Unclassified", total: b.unclassified, un: true }] : []),
+  ];
   const max = Math.max(...cols.map((c) => c.total), 1);
   const ticks = niceTicks(0, max, 4);
-  const y = linearScale([0, ticks[ticks.length - 1]], [H - 30, 10]);
+  const y = linearScale([0, ticks[ticks.length - 1]], [H - 44, 10]);
   const band = bandScale(cols.length, [0, W - 52], { paddingInner: 0.28, maxBandwidth: 70 });
-  const cur = schedule.reportingCurrency;
-  const nearTerm = b.buckets.slice(0, 2).reduce((s, x) => s + x.total, 0);
+  const near = schedule.tranches.filter((t) => t.key === "debt_maturity_y1" || t.key === "debt_maturity_remainder").reduce((s, t) => s + t.amount, 0);
+  const total = b.reportedTotal;
+
+  const state = b.overClassified ? "disputed" : total === null ? "partial" : b.reconciles ? "verified" : "partial";
+  const reason = b.overClassified
+    ? "The maturity table sums to more than balance-sheet debt by more than 2%: check the extraction before using it."
+    : total === null
+      ? "The filing facts give no balance-sheet debt total for this date, so the table cannot be checked against it."
+      : b.unclassified > 0
+        ? "Part of balance-sheet debt (revolver draws, commercial paper or finance obligations) has no maturity bucket in the filed table."
+        : null;
 
   return (
     <ChartFrame
       id="debt-maturity"
       kicker="Debt maturity"
-      title="When debt falls due, by year and currency"
-      takeaway={`${formatPct(nearTerm / schedule.reportedTotal, 0)} of reported debt matures within two years (${formatCompact(nearTerm)} ${cur}m); ${b.unclassified > 0 ? `${formatPct(b.unclassifiedShare ?? 0, 0)} (${formatCompact(b.unclassified)}) is not assigned a year in the filed maturity table.` : "every reported dollar is assigned a year."}`}
-      units={`${cur} millions at the filed FX rates; reported total debt ${formatCompact(schedule.reportedTotal)}; maturity table explains ${formatPct(b.classified / schedule.reportedTotal, 0)}`}
+      title="When debt falls due"
+      takeaway={`${total !== null && total > 0 ? `${formatPct(near / total, 0)} of balance-sheet debt falls due within 12 months (${formatCompact(near)} ${cur}); ` : `${formatCompact(near)} ${cur} falls due within 12 months; `}${b.unclassified > 0 ? `${formatPct(b.unclassifiedShare ?? 0, 0)} (${formatCompact(b.unclassified)}) has no maturity bucket in the filed table.` : total === null ? "balance-sheet debt is not available to compare." : "the maturity table agrees with balance-sheet debt."}`}
+      units={`${cur}, as of ${schedule.periodEnd}; maturity table sums to ${formatCompact(b.classified)}${total !== null ? ` against ${formatCompact(total)} reported debt (${schedule.totalBasis})` : ""}`}
       provenance={{
-        source: schedule.citation,
-        sourceUrl,
-        asOf: schedule.asOf,
-        method: "Maturity table from the debt note; non-reporting currencies converted at the stated rates; remainder shown as Unclassified",
-        state: b.overClassified ? "disputed" : b.unclassified > 0 ? "partial" : "verified",
-        reason: b.overClassified ? "The maturity table sums to more than reported debt: check the extraction." : b.unclassified > 0 ? "Part of reported debt (revolver draws, leases or finance obligations) has no maturity year in the table." : null,
-        coverage: { covered: Math.round(b.classified), total: Math.round(schedule.reportedTotal), unit: `${cur}m of reported debt` },
+        source: schedule.source ?? "Filed debt note",
+        sourceUrl: schedule.sourceUrl,
+        asOf: schedule.periodEnd,
+        knownAt: schedule.knownAt,
+        method: "Principal maturities from the debt note, buckets as filed (relative to the balance date); remainder against balance-sheet debt shown as Unclassified",
+        state,
+        reason,
+        coverage: total !== null && total > 0 ? { covered: Math.round(Math.min(b.classified, total)), total: Math.round(total), unit: `${cur} of reported debt` } : null,
       }}
       table={{
-        caption: "Debt maturities by year and currency",
-        columns: ["Year", ...b.currencies, `Total (${cur}m)`],
-        rows: [
-          ...b.buckets.map((x) => [x.label, ...b.currencies.map((c) => (x.byCurrency[c] ? formatCompact(x.byCurrency[c]) : "—")), formatCompact(x.total)]),
-          ["Unclassified", ...b.currencies.map(() => "—"), formatCompact(b.unclassified)],
-        ],
+        caption: "Debt maturities as filed",
+        columns: ["Bucket", `Amount (${cur})`],
+        rows: [...schedule.tranches.map((t) => [t.label, formatCompact(t.amount)]), ...(b.unclassified > 0 ? [["Unclassified", formatCompact(b.unclassified)]] : [])],
       }}
     >
-      <svg viewBox={`0 0 ${W} ${H}`} className={SVG_BASE} role="img" aria-label={`Debt maturities: ${cols.map((c) => `${c.label} ${formatCompact(c.total)}`).join(", ")} ${cur} millions`}>
-        {ticks.map((t) => (
-          <g key={t}>
-            <line x1={0} x2={W - 52} y1={y(t)} y2={y(t)} className="stroke-chart-grid" strokeWidth={1} shapeRendering="crispEdges" />
-            <text x={W} y={y(t) + 4} textAnchor="end" fontSize={11} className={AXIS_TEXT}>
-              {formatCompact(t)}
-            </text>
-          </g>
-        ))}
-        {cols.map((c, i) => {
-          const bx = band.x(i);
-          let acc = 0;
-          return (
-            <g key={c.key}>
-              {c.un ? (
-                <rect x={bx} y={y(c.total)} width={band.bandwidth} height={y(0) - y(c.total)} className="fill-none stroke-text-muted" strokeWidth={1.5} strokeDasharray="4 3">
-                  <title>{`Unclassified: ${formatCompact(c.total)} ${cur}m, no maturity year in the filed table`}</title>
-                </rect>
-              ) : (
-                b.currencies.map((cc) => {
-                  const v = c.byCurrency[cc] ?? 0;
-                  if (v <= 0) return null;
-                  const seg = (
-                    <rect key={cc} x={bx} y={y(acc + v)} width={band.bandwidth} height={Math.max(1, y(acc) - y(acc + v))} className={CATEGORICAL_FILL[CAT[b.currencies.indexOf(cc) % CAT.length]]} stroke="none">
-                      <title>{`${c.label} · ${cc}: ${formatCompact(v)} ${cur}m`}</title>
-                    </rect>
-                  );
-                  acc += v;
-                  return seg;
-                })
-              )}
-              <text x={bx + band.bandwidth / 2} y={y(c.total) - 5} textAnchor="middle" fontSize={11} className="fill-text num font-semibold">
-                {formatCompact(c.total)}
-              </text>
-              <text x={bx + band.bandwidth / 2} y={H - 10} textAnchor="middle" fontSize={11} className={AXIS_TEXT}>
-                {c.label}
+      <div className="relative overflow-x-auto">
+        <svg viewBox={`0 0 ${W} ${H}`} className={cn(SVG_BASE, "min-w-[30rem]")} role="img" aria-label={`Debt maturities: ${cols.map((c) => `${c.label} ${formatCompact(c.total)}`).join(", ")} ${cur}`}>
+          {ticks.map((t) => (
+            <g key={t}>
+              <line x1={0} x2={W - 52} y1={y(t)} y2={y(t)} className="stroke-chart-grid" strokeWidth={1} shapeRendering="crispEdges" />
+              <text x={W} y={y(t) + 4} textAnchor="end" fontSize={11} className={AXIS_TEXT}>
+                {formatCompact(t)}
               </text>
             </g>
-          );
-        })}
-      </svg>
-      <ul className="m-0 flex list-none flex-wrap gap-x-4 gap-y-1 p-0 text-[11px] text-text-muted">
-        {b.currencies.map((c, i) => (
-          <li key={c} className="inline-flex items-center gap-1.5">
-            <i aria-hidden="true" className={`inline-block size-2.5 ${["bg-categorical-1", "bg-categorical-4", "bg-categorical-6", "bg-categorical-2"][i % 4]}`} />
-            {c}
-            {c !== cur ? <span className="num">(× {schedule.fxToReporting[c]} to {cur})</span> : null}
-          </li>
-        ))}
-        {b.unclassified > 0 ? (
-          <li className="inline-flex items-center gap-1.5">
-            <i aria-hidden="true" className="inline-block size-2.5 border border-dashed border-text-muted" />
-            Unclassified
-          </li>
-        ) : null}
-      </ul>
+          ))}
+          {cols.map((c, i) => {
+            const bx = band.x(i);
+            const cx = bx + band.bandwidth / 2;
+            const words = c.label.length > 12 ? [c.label.slice(0, c.label.lastIndexOf(" ", 12)), c.label.slice(c.label.lastIndexOf(" ", 12) + 1)] : [c.label];
+            return (
+              <g key={c.key}>
+                {c.un ? (
+                  <rect x={bx} y={y(c.total)} width={band.bandwidth} height={y(0) - y(c.total)} className="fill-none stroke-text-muted" strokeWidth={1.5} strokeDasharray="4 3">
+                    <title>{`Unclassified: ${formatCompact(c.total)} ${cur}, no maturity bucket in the filed table`}</title>
+                  </rect>
+                ) : (
+                  <rect x={bx} y={y(c.total)} width={band.bandwidth} height={Math.max(1, y(0) - y(c.total))} className="fill-accent">
+                    <title>{`${c.label}: ${formatCompact(c.total)} ${cur}`}</title>
+                  </rect>
+                )}
+                <text x={cx} y={y(c.total) - 5} textAnchor="middle" fontSize={11} className="fill-text num font-semibold">
+                  {formatCompact(c.total)}
+                </text>
+                <text x={cx} y={H - 24} textAnchor="middle" fontSize={11} className={AXIS_TEXT}>
+                  {words.map((t, k) => (
+                    <tspan key={k} x={cx} dy={k === 0 ? 0 : 13}>
+                      {t}
+                    </tspan>
+                  ))}
+                </text>
+              </g>
+            );
+          })}
+        </svg>
+      </div>
+      {schedule.leases.length > 0 ? (
+        <section aria-labelledby="leases-heading" className="flex min-w-0 flex-col gap-1">
+          <h3 id="leases-heading" className="font-heading text-lg font-semibold">
+            Lease facts (not part of the ladder)
+          </h3>
+          <div className="relative overflow-x-auto">
+            <table className="w-full min-w-[20rem] text-sm">
+              <caption className="sr-only">Filed lease facts</caption>
+              <tbody>
+                {schedule.leases.map((l) => (
+                  <tr key={l.id} className="border-b border-border-soft">
+                    <th scope="row" className="px-3 py-1 text-left font-normal">
+                      {l.label}
+                    </th>
+                    <td className="num px-3 py-1 text-right">{formatCompact(l.value)}</td>
+                    <td className="num px-3 py-1 text-right text-text-muted">{l.periodEnd}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </section>
+      ) : null}
     </ChartFrame>
   );
 }
