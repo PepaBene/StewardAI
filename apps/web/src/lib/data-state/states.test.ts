@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { coverageShare, describeCoverage, stateWithCoverage } from "./provenance";
-import { DATA_STATE_META, DATA_STATES, displayDecision, isDataState } from "./states";
+import { DATA_STATE_META, DATA_STATES, displayDecision, isDataState, parseDataState, toDataState } from "./states";
 
 describe("data states", () => {
   it("defines every state the plan lists, each with a label and a description", () => {
@@ -54,5 +54,26 @@ describe("coverage", () => {
     expect(stateWithCoverage("verified", { covered: 1, total: 2, unit: "x" })).toBe("partial");
     expect(stateWithCoverage("verified", { covered: 2, total: 2, unit: "x" })).toBe("verified");
     expect(stateWithCoverage("paid_only", { covered: 0, total: 2, unit: "x" })).toBe("paid_only");
+  });
+});
+
+describe("toDataState (backend vocabulary adapter)", () => {
+  it("maps every backend coverage and access state", () => {
+    expect(toDataState("available")).toBe("verified");
+    expect(toDataState("temporarily_failed")).toBe("unavailable");
+    expect(toDataState("vintage_unavailable")).toBe("not_covered");
+    expect(toDataState("missing")).toBe("not_covered");
+    expect(toDataState("never_succeeded")).toBe("access_unverified");
+    expect(toDataState("recent")).toBe("verified");
+    for (const s of ["paid_only", "quota_exhausted", "access_unverified", "disputed", "not_covered", "stale", "partial"] as const) {
+      expect(toDataState(s)).toBe(s);
+    }
+  });
+
+  it("never turns an unknown, empty or inherited key into verified", () => {
+    for (const bad of ["", "OK", "constructor", "__proto__", "toString", null, undefined]) {
+      expect(toDataState(bad)).toBe("unavailable");
+      expect(parseDataState(bad)).toBeNull();
+    }
   });
 });

@@ -3,7 +3,9 @@
  * view that consumes a new provider's data speaks these nine states, so "no data" never
  * reads as "zero" and a failed refresh never silently replaces a verified value.
  *
- * The strings match the backend's coverage-status values (`available` is shown as "verified").
+ * The backend speaks a slightly different vocabulary (`available`, `temporarily_failed`,
+ * `vintage_unavailable`, `missing`, ...). EVERY view converts a backend string with
+ * `toDataState` below; nothing else maps backend strings to these nine.
  */
 
 export const DATA_STATES = [
@@ -102,6 +104,52 @@ export const DATA_STATE_META: Record<DataState, DataStateMeta> = {
 
 export function isDataState(value: string): value is DataState {
   return (DATA_STATES as readonly string[]).includes(value);
+}
+
+/**
+ * Every state string the backend can emit (coverage_status.state, provider_access.state,
+ * provider freshness, macro read models) and the DataState it is shown as.
+ *
+ * - `available` -> verified; `temporarily_failed` -> unavailable (backend AccessState).
+ * - `vintage_unavailable` (macro as-of reads: the release history was not archived before
+ *   collection began) -> not_covered: a measured gap for that as-of date, not a failure.
+ * - `missing` (plan wording of an absent entry) -> not_covered.
+ * - freshness values of /sources/access: `recent` -> verified, `stale` -> stale,
+ *   `never_succeeded` -> access_unverified (no successful call is on record).
+ * `stale` and `partial` are derived states in the backend (freshness, coverage ratio), never
+ * stored in a ledger; they pass through when a view derives them.
+ */
+export const BACKEND_STATE_MAP: Readonly<Record<string, DataState>> = {
+  available: "verified",
+  verified: "verified",
+  recent: "verified",
+  stale: "stale",
+  partial: "partial",
+  not_covered: "not_covered",
+  missing: "not_covered",
+  vintage_unavailable: "not_covered",
+  paid_only: "paid_only",
+  quota_exhausted: "quota_exhausted",
+  access_unverified: "access_unverified",
+  never_succeeded: "access_unverified",
+  disputed: "disputed",
+  unavailable: "unavailable",
+  temporarily_failed: "unavailable",
+};
+
+/** The DataState for a backend string, or null when the string is not part of the vocabulary. */
+export function parseDataState(value: string | null | undefined): DataState | null {
+  if (typeof value !== "string") return null;
+  return Object.hasOwn(BACKEND_STATE_MAP, value) ? BACKEND_STATE_MAP[value] : null;
+}
+
+/**
+ * The single adapter from a backend state string to the nine-state vocabulary. An unknown or
+ * missing string becomes "unavailable" (never "verified", never a zero): the UI then says the
+ * state could not be determined instead of implying data exists.
+ */
+export function toDataState(value: string | null | undefined): DataState {
+  return parseDataState(value) ?? "unavailable";
 }
 
 /** Tone classes: written out in full so Tailwind finds them. */

@@ -1,109 +1,219 @@
 import type { DataState } from "@/lib/data-state/states";
 
 /**
- * Typed contract of the owner-only read APIs `GET /data/coverage`, `GET /sources/access`
- * and `GET /sources/usage` (plan: Concrete storage and API shape). The view consumes these
- * shapes today from a fixture; the loader in `client.ts` is the one seam to swap.
- *
- * No field carries a credential or a raw provider payload.
+ * Typed, adapted shapes of the owner-only read APIs behind the source-coverage view:
+ * `GET /data/coverage`, `/sources/access`, `/sources/usage`, `/sources/status` and
+ * `GET /verification/zero-cost-gate`. Backend state strings are converted once, by
+ * `toDataState`, when the rows are adapted (see `parse.ts`); the raw string is kept beside
+ * it for display. No field carries a credential or a raw provider payload (the API redacts
+ * them before they leave the backend).
  */
 
-export const PROVIDERS = [
-  "alpha_vantage",
-  "eodhd",
-  "world_bank",
-  "oecd",
-  "fmp",
-  "diffbot",
-  "people_data_labs",
-  "epo_ops",
-  "finnhub",
-  "twelve_data",
-  "bis",
-  "ecb",
-  "un_comtrade",
-] as const;
-
-export type ProviderId = (typeof PROVIDERS)[number];
-
-export const PROVIDER_LABELS: Record<ProviderId, string> = {
-  alpha_vantage: "Alpha Vantage",
-  eodhd: "EODHD",
-  world_bank: "World Bank",
-  oecd: "OECD",
-  fmp: "FMP",
-  diffbot: "Diffbot",
-  people_data_labs: "People Data Labs",
-  epo_ops: "EPO OPS",
-  finnhub: "Finnhub",
-  twelve_data: "Twelve Data",
-  bis: "BIS",
-  ecb: "ECB",
-  un_comtrade: "UN Comtrade",
+/** Filters of `GET /data/coverage` (all optional; `state` is the backend's own state string). */
+export type CoverageFilters = {
+  provider?: string;
+  dataset?: string;
+  entityKey?: string;
+  /** Backend ledger state, e.g. "available" or "paid_only" (not a DataState). */
+  state?: string;
+  /** ISO date: entries whose period span contains it. */
+  period?: string;
+  entityKind?: EntityKind;
 };
 
-export type EntityScope = "held" | "watchlist";
+export type EntityKind = "security" | "geography" | "other";
 
-/** One cell of the matrix: a provider's dataset for the held or the watchlist universe. */
-export type CoverageCell = {
+/** One coverage-ledger entry: (provider, dataset, entity). */
+export type CoverageEntry = {
+  /** Stable key: provider:dataset:entity. */
+  id: string;
+  provider: string;
+  dataset: string;
+  entityKey: string;
+  entityKind: EntityKind;
+  /** The adapted state; an available entry with a known ratio below 1 is "partial". */
   state: DataState;
-  /** Entities with a usable record / the expected universe for this scope. */
-  covered: number;
-  total: number;
-  /** Timestamp of the newest verified observation (the last-good value). */
-  lastVerifiedAt: string | null;
-  /** Newest refresh attempt, successful or not. */
-  lastAttemptAt: string | null;
-  /** A refresh is currently failing: the last verified value stays on screen. */
-  refreshFailing: boolean;
-  /** Why the state is not "verified": a denial message, an HTTP status, the reset time. */
+  /** The backend's own string (available, temporarily_failed, ...). */
+  rawState: string;
+  expectedPeriods: number | null;
+  availablePeriods: number | null;
+  /** available / expected periods; null unless both are known and expected is positive. */
+  coverageRatio: number | null;
+  earliestPeriod: string | null;
+  latestPeriod: string | null;
+  /** Days from latestPeriod to the day of the response; null without a period. */
+  ageDays: number | null;
+  /** Newest check of this entry, successful or not. */
+  checkedAt: string;
+  lastGoodObservationId: number | null;
   reason: string | null;
 };
 
-export type CoverageRow = {
-  /** Stable key: `${provider}:${dataset}`. */
+export type AccessFreshness = "never_succeeded" | "recent" | "stale";
+
+/** One (provider, endpoint) access ledger row from `GET /sources/access`. */
+export type AccessRow = {
   id: string;
-  provider: ProviderId;
-  /** Human dataset name, e.g. "Company overview". */
-  dataset: string;
-  /** Endpoint path or query kind, shown in the drill-through. */
+  provider: string;
   endpoint: string;
-  /** Job type that runs it; drives the Activity job-log link. Null when not scheduled yet. */
-  jobType: string | null;
-  /** Id of the latest failed job run, for a direct drill-through. */
-  failedJobId: number | null;
-  held: CoverageCell;
-  watchlist: CoverageCell;
+  accountTier: string;
+  /** Adapted ledger state after freshness: available + stale -> stale, never succeeded -> access_unverified. */
+  state: DataState;
+  /** The ledger's own state string. */
+  rawState: string;
+  freshness: AccessFreshness;
+  lastSuccessAt: string | null;
+  lastSuccessAgeSeconds: number | null;
+  staleAfterHours: number;
+  testedAt: string | null;
+  retryAt: string | null;
+  hardBlocked: boolean;
+  detail: string | null;
+  lastDenialAt: string | null;
+  lastDenialState: string | null;
+  lastDenialStatusCode: number | null;
+  lastDenialDetail: string | null;
+  /** Free allowance of this endpoint per `quotaPeriod`; null = no published cap. */
+  quota: number | null;
+  quotaPeriod: string | null;
+  resetTimezone: string | null;
+  requestWeight: number | null;
+  quotaWindowStart: string | null;
+  /** Credits spent in the current window; null when untracked or no quota. */
+  quotaUsed: number | null;
+  quotaRemaining: number | null;
+  /** remaining / quota in 0..1. */
+  quotaHeadroom: number | null;
+  /** Why headroom is null (no quota, untracked period, ...). */
+  headroomReason: string | null;
 };
 
-export type QuotaPeriod = "minute" | "day" | "week" | "month";
+/** One usage-ledger window from `GET /sources/usage`. */
+export type UsageWindow = {
+  provider: string;
+  endpoint: string;
+  windowKind: string;
+  windowStart: string;
+  windowEnd: string;
+  credits: number;
+  requests: number;
+};
 
-/** One provider's free allowance and how much of it the ledger shows spent. */
-export type BudgetUsage = {
-  provider: ProviderId;
-  /** Unit of the allowance: "calls", "credits", "GB". */
-  unit: string;
-  period: QuotaPeriod;
-  /** Null when no cap is published: the access state, not "unlimited", is shown. */
+/** One row of `GET /sources/status` (the day/month spend view). */
+export type SourceStatusRow = {
+  provider: string;
+  endpoint: string;
+  rawState: string;
+  state: DataState;
+  hardBlocked: boolean;
+  quota: number | null;
+  quotaPeriod: string | null;
+  lastSuccessAt: string | null;
+  retryAt: string | null;
+  dayCredits: number;
+  monthCredits: number;
+};
+
+export type GateFinding = {
+  provider: string;
+  endpoint: string;
+  severity: "violation" | "warning";
+  code: string;
+  message: string;
+};
+
+/** `GET /verification/zero-cost-gate`. The API reports credits and findings, not dollars. */
+export type ZeroCostGate = {
+  passed: boolean;
+  checked: number;
+  freeAvailable: number;
+  disabledOk: number;
+  gatedUnverified: number;
+  violationCount: number;
+  warningCount: number;
+  warningsByCode: Record<string, number>;
+  findings: readonly GateFinding[];
+};
+
+// ---------------------------------------------------------------------------------------
+// Matrix
+// ---------------------------------------------------------------------------------------
+
+/** Where a coverage entity belongs. `other` = countries, peers, benchmarks, unmatched keys. */
+export type EntityScope = "held" | "watchlist" | "other";
+export const ENTITY_SCOPES = ["held", "watchlist", "other"] as const satisfies readonly EntityScope[];
+
+/** The held / watchlist ticker sets used to classify security entity keys. */
+export type EntityScopes = {
+  held: ReadonlySet<string>;
+  watchlist: ReadonlySet<string>;
+};
+
+/** One (provider, dataset, scope) cell. `state` is null when the ledger has no entry: unknown, not zero. */
+export type MatrixCell = {
+  scope: EntityScope;
+  state: DataState | null;
+  /** Ledger entries in this cell. */
+  entries: number;
+  /** Entries whose backend state is available. */
+  available: number;
+  byState: Partial<Record<DataState, number>>;
+  /** Newest check across the entries. */
+  lastCheckedAt: string | null;
+  /** Newest checked_at of an available entry: the last verified value's age. */
+  lastVerifiedAt: string | null;
+  latestPeriod: string | null;
+  /** Largest entry age in days (the stalest latest_period); null when no entry has a period. */
+  maxAgeDays: number | null;
+  expectedPeriods: number | null;
+  availablePeriods: number | null;
+  /** Some entry is failing/exhausted but keeps its last good observation. */
+  refreshFailing: boolean;
+  /** Distinct reasons, most frequent first (max 3). */
+  reasons: readonly string[];
+  /** Entity keys of the entries that are not available (for the drill-down). */
+  gapKeys: readonly string[];
+};
+
+export type MatrixRow = {
+  id: string;
+  provider: string;
+  providerLabel: string;
+  dataset: string;
+  cells: Record<EntityScope, MatrixCell>;
+};
+
+export type ProviderGroup = {
+  provider: string;
+  label: string;
+  rows: MatrixRow[];
+  /** Access rows of the provider (from /sources/access). */
+  access: readonly AccessRow[];
+};
+
+/** One endpoint's request budget. `limit` is null when the API publishes no cap. */
+export type BudgetItem = {
+  id: string;
+  provider: string;
+  providerLabel: string;
+  endpoint: string;
+  state: DataState;
+  period: string | null;
   limit: number | null;
-  used: number;
-  /** Credits held back for retries and urgent events (configurable after the shadow run). */
-  reserve: number;
-  /** Demand deferred to the next window because the budget was spent. */
-  deferred: number;
+  /** null when usage is not tracked per window or no cap is known. */
+  used: number | null;
+  remaining: number | null;
+  headroom: number | null;
+  /** End of the current window (from the usage ledger); null when not reported. */
   resetsAt: string | null;
-  /** Spend per past window, oldest first (14 windows). */
+  resetTimezone: string | null;
+  /** Credits per past window of the cap's period, oldest first (recorded windows only). */
   history: readonly number[];
-  /** The ledger proves no paid endpoint or overage was used. */
-  overageEvents: number;
-  /** Access state of the provider's best endpoint, from the Phase 0 probe. */
-  accessState: DataState;
+  spentDay: number | null;
+  spentMonth: number | null;
+  tone: BudgetTone;
+  /** Why no figure is shown. */
+  note: string | null;
 };
 
-export type SourceCoverageReport = {
-  generatedAt: string;
-  rows: readonly CoverageRow[];
-  budgets: readonly BudgetUsage[];
-  /** Total spend recorded by the usage ledger, in dollars. Must be 0. */
-  spendUsd: number;
-};
+export type BudgetTone = "ok" | "low" | "exhausted" | "uncapped" | "untracked";
