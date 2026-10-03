@@ -18,7 +18,7 @@ update public.config_version p set active = true
    and not exists (select 1 from public.config_version o where o.domain = 'jobs' and o.active);
 
 update public.provider_access
-   set detail = replace(detail, '; collected by default (jobs config on)', '')
+   set detail = replace(detail, ' - collected by default (jobs config on)', '')
  where ((provider = 'world_bank' and endpoint = 'indicators')
         or (provider in ('oecd', 'bis') and endpoint = 'sdmx'))
-   and detail like '%; collected by default (jobs config on)';
+   and detail like '% - collected by default (jobs config on)';

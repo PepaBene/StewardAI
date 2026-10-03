@@ -33,7 +33,7 @@ select 'jobs', c.body, c.schema_version, c.parent_id,
   from changed c join retired r on r.id = c.parent_id;
 
 -- The gate rows say what the default now is.
-update public.provider_access set detail = detail || '; collected by default (jobs config on)'
+update public.provider_access set detail = detail || ' - collected by default (jobs config on)'
  where ((provider = 'world_bank' and endpoint = 'indicators')
         or (provider in ('oecd', 'bis') and endpoint = 'sdmx'))
    and detail like 'keyless public%' and detail not like '%collected by default%';
