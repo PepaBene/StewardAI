@@ -1,235 +1,317 @@
 import { describe, expect, it } from "vitest";
 
-import { CORRELATION_FIXTURE, DIAGNOSTICS_FIXTURE, LISTINGS_FIXTURE, VENUE_CALENDARS } from "./fixture";
 import {
-  barsForBasis,
-  classifySessions,
+  addDays,
+  assembleCorrelation,
+  buildSessionCells,
+  chosenSeries,
   clusterOrder,
-  completeness,
-  correlationMatrix,
+  describeAction,
   describeQuote,
   eventStudyGate,
   eventWindows,
-  looksLikeUnitError,
-  majorUnit,
   meanWindow,
-  pairCorrelation,
   placeActions,
+  portfolioPriceCoverage,
+  seriesCompleteness,
+  seriesState,
+  sessionCompleteness,
   sessionCounts,
-  sharedObservationStats,
-  simpleReturns,
-  totalReturnBlockers,
   unexplainedJumps,
+  weekdaysBetween,
 } from "./logic";
-import type { Bar, CorporateAction } from "./types";
+import type { CorporateAction, HoldingPrices, PriceDiagnostic, ReturnsReport } from "./types";
 
-const [uk, adr, cz] = LISTINGS_FIXTURE;
-const bar = (date: string, close: number): Bar => ({ date, open: close, high: close, low: close, close, volume: null });
-const action = (date: string, extra: Partial<CorporateAction> = {}): CorporateAction => ({
-  id: date,
-  date,
-  type: "cash_dividend",
-  detail: "1 USD",
-  factor: null,
-  source: "issuer",
-  sourceUrl: null,
-  confirmed: true,
-  ...extra,
+function action(over: Partial<CorporateAction> = {}): CorporateAction {
+  return {
+    id: 1,
+    symbol: "ABC",
+    type: "split",
+    exDate: "2026-09-10",
+    recordDate: null,
+    paymentDate: null,
+    ratio: 4,
+    cashAmount: null,
+    currency: null,
+    source: "Issuer",
+    sourceUrl: null,
+    knownAt: null,
+    evidenceId: 1,
+    status: "confirmed",
+    decidedAt: null,
+    decisionReason: null,
+    per: null,
+    amountBasis: null,
+    ...over,
+  };
+}
+
+function diag(over: Partial<PriceDiagnostic> = {}): PriceDiagnostic {
+  return {
+    symbol: "abc.us",
+    source: "stooq",
+    mic: "XNAS",
+    currency: "USD",
+    quote_unit: "USD",
+    bar_type: "adjusted",
+    last_session: "2026-10-02",
+    observed_sessions: 100,
+    disagreements: 0,
+    missing_days: 0,
+    access_state: "available",
+    chosen: true,
+    expected_sessions: 100,
+    calendar_basis: "confirmed_calendar",
+    stale_sessions: 0,
+    ...over,
+  };
+}
+
+function returns(over: Partial<NonNullable<ReturnsReport["result"]>> = {}): ReturnsReport {
+  return {
+    ticker: "ABC",
+    knownAsOf: "2026-10-03",
+    reason: null,
+    result: {
+      symbol: "abc.us",
+      source: "stooq",
+      currency: "USD",
+      mic: "XNAS",
+      priceReturn: { value: 0.1, reason: null },
+      rawPriceReturn: { value: -0.7, reason: null },
+      totalReturn: { value: 0.12, reason: null },
+      actionCoverage: "available",
+      coverage: 1,
+      expectedSessions: 250,
+      observedSessions: 250,
+      calendarBasis: "confirmed_calendar",
+      missingActions: { priceRaw: [], priceAdjusted: [], totalReturn: [] },
+      start: "2025-10-03",
+      end: "2026-10-03",
+      ...over,
+    },
+  };
+}
+
+describe("dates", () => {
+  it("adds days across month ends and lists weekdays only", () => {
+    expect(addDays("2026-02-27", 3)).toBe("2026-03-02");
+    expect(weekdaysBetween("2026-10-02", "2026-10-06")).toEqual(["2026-10-02", "2026-10-05", "2026-10-06"]);
+    expect(weekdaysBetween("2026-10-03", "2026-10-04")).toEqual([]);
+  });
 });
 
 describe("quote units", () => {
-  it("never lets a pence quote pass for pounds", () => {
-    expect(majorUnit("GBX")).toEqual({ currency: "GBP", divisor: 100 });
-    expect(majorUnit("USD")).toEqual({ currency: "USD", divisor: 1 });
+  it("shows pence and the pound value together, and leaves a major currency alone", () => {
     expect(describeQuote(1240.5, "GBX")).toBe("1,240.50 GBX (12.41 GBP)");
-    expect(describeQuote(43.1, "USD")).toBe("43.10 USD");
+    expect(describeQuote(12.34, "USD")).toBe("12.34 USD");
   });
-
-  it("recognises a 100x disagreement as a unit error, not a price difference", () => {
-    expect(looksLikeUnitError({ primary: 1204.5, other: 12.045 })).toBe(true);
-    expect(looksLikeUnitError({ primary: 43.12, other: 43.55 })).toBe(false);
-    expect(looksLikeUnitError({ primary: 10, other: 50 })).toBe(false);
-  });
-});
-
-describe("action placement", () => {
-  const bars = ["2026-03-10", "2026-03-11", "2026-03-13"].map((d) => bar(d, 10));
-  it("places on the first session on or after the date and flags a shift", () => {
-    const [p] = placeActions(bars, [action("2026-03-12")]);
-    expect(p).toMatchObject({ index: 2, shifted: true });
-    expect(placeActions(bars, [action("2026-03-11")])[0]).toMatchObject({ index: 1, shifted: false });
-  });
-  it("leaves out-of-range actions unplaced", () => {
-    expect(placeActions(bars, [action("2025-01-01"), action("2027-01-01")]).map((p) => p.index)).toEqual([null, null]);
-  });
-  it("the ADR fixture's split lands on its own session", () => {
-    const placed = placeActions(adr.raw, adr.actions).find((p) => p.action.type === "split")!;
-    expect(adr.raw[placed.index!].date).toBe("2026-03-12");
-    expect(placed.shifted).toBe(false);
+  it("describes a dividend amount with its unit and ADS basis, and a missing amount as null", () => {
+    expect(describeAction(action({ type: "cash_dividend", ratio: null, cashAmount: 31, currency: "GBp", per: "ordinary_share" }))).toBe("31 GBp per ordinary share");
+    expect(describeAction(action({ type: "cash_dividend", ratio: null, cashAmount: null }))).toBeNull();
+    expect(describeAction(action())).toBe("ratio 4");
   });
 });
 
-describe("raw versus adjusted series", () => {
-  it("shows a 4x step in the raw ADR series that the adjusted series does not have", () => {
-    const i = adr.raw.findIndex((b) => b.date === "2026-03-12");
-    const rawJump = adr.raw[i].close / adr.raw[i - 1].close;
-    const adjJump = adr.adjusted![i].close / adr.adjusted![i - 1].close;
-    expect(rawJump).toBeLessThan(0.4);
-    expect(adjJump).toBeGreaterThan(0.85);
+describe("series selection and completeness", () => {
+  it("serves the chosen adjusted row and never invents a share without a denominator", () => {
+    const rows = [diag({ chosen: false, bar_type: "raw" }), diag()];
+    expect(chosenSeries(rows)?.bar_type).toBe("adjusted");
+    expect(seriesCompleteness({ expected_sessions: 0, missing_days: 0 })).toBeNull();
+    expect(seriesCompleteness({ expected_sessions: 100, missing_days: 5 })).toBeCloseTo(0.95);
   });
+});
 
-  it("the economic value across the split is preserved: raw close x factor equals adjusted before the split", () => {
-    const split = adr.actions.find((a) => a.type === "split")!;
-    const i = adr.raw.findIndex((b) => b.date === split.date);
-    expect(adr.raw[i - 1].close / split.factor!).toBeCloseTo(adr.adjusted![i - 1].close, 1);
+describe("seriesState", () => {
+  const base = { barCount: 10, gap: null, plausibility: null, chosen: diag() };
+  it("is not covered with no bars, carrying the backend's gap reason", () => {
+    expect(seriesState({ ...base, barCount: 0, gap: "no Stooq symbol" })).toEqual({ state: "not_covered", reason: "no Stooq symbol" });
   });
-
-  it("flags a large move no action explains, but not one a recorded action does", () => {
-    expect(unexplainedJumps(adr.raw, adr.actions)).toEqual([]);
-    expect(unexplainedJumps(adr.raw, []).map((j) => j.date)).toEqual(["2026-03-12"]);
+  it("prefers disputed (plausibility, disagreements) over stale over partial", () => {
+    expect(seriesState({ ...base, plausibility: { flagged: true, difference_pct: 4.2, date: "2026-10-01" } }).state).toBe("disputed");
+    expect(seriesState({ ...base, chosen: diag({ disagreements: 2, stale_sessions: 3, missing_days: 4 }) }).state).toBe("disputed");
+    expect(seriesState({ ...base, chosen: diag({ stale_sessions: 3, missing_days: 4 }) }).state).toBe("stale");
+    expect(seriesState({ ...base, chosen: diag({ missing_days: 4 }) }).state).toBe("partial");
+    expect(seriesState(base).state).toBe("verified");
   });
-
-  it("refuses an unreconciled adjusted series instead of substituting raw under its name", () => {
-    expect(barsForBasis(cz, "adjusted")).toMatchObject({ available: false });
-    expect(barsForBasis(cz, "raw").available).toBe(true);
-    expect(barsForBasis(adr, "adjusted").available).toBe(true);
+  it("is partial, never verified, without diagnostics, and honours a non-available access state", () => {
+    expect(seriesState({ ...base, chosen: null }).state).toBe("partial");
+    expect(seriesState({ ...base, chosen: diag({ access_state: "paid_only" }) }).state).toBe("paid_only");
+    expect(seriesState({ ...base, chosen: diag({ access_state: "weird" }) }).state).toBe("unavailable");
   });
+});
 
-  it("withholds total return while a dividend has no amount or a split is unconfirmed", () => {
-    expect(uk.totalReturn).toBeNull();
-    expect(totalReturnBlockers(uk.actions)).toHaveLength(1);
-    expect(totalReturnBlockers(cz.actions)).toHaveLength(1);
-    expect(totalReturnBlockers(adr.actions)).toEqual([]);
-    expect(adr.totalReturn).not.toBeNull();
+describe("action markers", () => {
+  const bars = [{ date: "2026-09-08" }, { date: "2026-09-09" }, { date: "2026-09-14" }];
+  it("places an action at the first session on or after its ex-date and flags a shift", () => {
+    const placed = placeActions(bars, [action({ exDate: "2026-09-09" }), action({ id: 2, exDate: "2026-09-12" }), action({ id: 3, exDate: "2026-08-01" })]);
+    expect(placed.map((p) => [p.index, p.shifted])).toEqual([
+      [1, false],
+      [2, true],
+      [null, false],
+    ]);
+  });
+  it("flags a big move only when no non-rejected action explains it", () => {
+    const series = [
+      { date: "2026-09-08", close: 100 },
+      { date: "2026-09-09", close: 25 },
+      { date: "2026-09-10", close: 60 },
+    ];
+    expect(unexplainedJumps(series, [action({ exDate: "2026-09-09" })]).map((j) => j.date)).toEqual(["2026-09-10"]);
+    expect(unexplainedJumps(series, [action({ exDate: "2026-09-09", status: "rejected" })]).map((j) => j.date)).toEqual(["2026-09-09", "2026-09-10"]);
+    expect(unexplainedJumps([{ date: "a", close: null }, { date: "b", close: 5 }], [])).toEqual([]);
   });
 });
 
 describe("event study", () => {
-  const bars = Array.from({ length: 20 }, (_, i) => bar(`2026-01-${String(i + 1).padStart(2, "0")}`, 100 + i));
-  it("indexes to 100 at the last session before the event and omits windows that run off the series", () => {
-    const w = eventWindows(bars, [{ date: "2026-01-10", label: "e" }, { date: "2026-01-02", label: "early" }, { date: "2026-01-19", label: "late" }], 3, 3);
-    expect(w).toHaveLength(1);
-    const at = (o: number) => w[0].points.find((p) => p.offset === o)!.value;
-    expect(at(0)).toBeCloseTo((109 / 108) * 100);
-    expect(at(-1)).toBeCloseTo((108 / 108) * 100);
-  });
-  it("averages identical-shape windows and returns null for none", () => {
-    const w = eventWindows(bars, [{ date: "2026-01-08", label: "a" }, { date: "2026-01-12", label: "b" }], 2, 2);
-    expect(meanWindow(w)).toHaveLength(5);
+  const closes = Array.from({ length: 30 }, (_, i) => ({ date: addDays("2026-09-01", i), close: 100 + i }));
+  it("indexes to 100 at the session before the event and omits windows that run off the series", () => {
+    const w = eventWindows(closes, [{ date: "2026-09-15", label: "mid" }, { date: "2026-09-02", label: "early" }, { date: "2026-09-29", label: "late" }], 3, 3);
+    expect(w.map((x) => x.label)).toEqual(["mid"]);
+    expect(w[0].points.find((p) => p.offset === -1)!.value).toBeCloseTo(100 * (113 / 113));
+    expect(w[0].points.find((p) => p.offset === 0)!.value).toBeCloseTo((114 / 113) * 100);
+    expect(meanWindow(w)!.length).toBe(7);
     expect(meanWindow([])).toBeNull();
   });
-  it("is gated until the adjustment is reconciled and every split confirmed", () => {
-    expect(eventStudyGate(adr)).toEqual({ allowed: true });
-    expect(eventStudyGate(cz)).toMatchObject({ allowed: false });
+  it("skips a window containing a missing close instead of padding it", () => {
+    const gappy = closes.map((b, i) => (i === 14 ? { ...b, close: null } : b));
+    expect(eventWindows(gappy, [{ date: "2026-09-15", label: "x" }], 3, 3)).toEqual([]);
+  });
+  it("is allowed only when coverage is verified, nothing is flagged and no split is open", () => {
+    const ok = { hasAdjustedBars: true, returns: returns(), actions: [action()] };
+    expect(eventStudyGate(ok)).toEqual({ allowed: true });
+    expect(eventStudyGate({ ...ok, hasAdjustedBars: false }).allowed).toBe(false);
+    expect(eventStudyGate({ ...ok, returns: null }).allowed).toBe(false);
+    expect(eventStudyGate({ ...ok, returns: { ticker: "ABC", knownAsOf: null, result: null, reason: "no stored price series" } })).toEqual({ allowed: false, reason: "no stored price series" });
+    expect(eventStudyGate({ ...ok, returns: returns({ actionCoverage: "incomplete" }) }).allowed).toBe(false);
+    expect(eventStudyGate({ ...ok, returns: returns({ missingActions: { priceRaw: [], priceAdjusted: ["split on 2026-09-10 is not valued"], totalReturn: [] } }) }).allowed).toBe(false);
+    const gate = eventStudyGate({ ...ok, actions: [action({ status: "suggested" })] });
+    expect(gate.allowed).toBe(false);
+    expect(eventStudyGate({ ...ok, actions: [action({ status: "rejected" })] }).allowed).toBe(true);
   });
 });
 
-describe("correlation", () => {
-  it("computes Pearson r on shared observations and returns null below the minimum", () => {
-    const a = Array.from({ length: 30 }, (_, i) => i + (i % 3));
-    const b = a.map((v) => v * 2 + 1);
-    expect(pairCorrelation(a, b, 20).r).toBeCloseTo(1);
-    expect(pairCorrelation(a, a.map((v) => -v), 20).r).toBeCloseTo(-1);
-    expect(pairCorrelation(a, b.map((v, i) => (i < 5 ? v : null)), 20)).toEqual({ r: null, shared: 5 });
-    expect(pairCorrelation([1, 1, 1, 1], [1, 2, 3, 4], 3).r).toBeNull();
+describe("correlation arrangement", () => {
+  const rows = [
+    { ticker: "A", correlations: [{ ticker: "B", correlation: 0.8 }, { ticker: "C", correlation: null }] },
+    { ticker: "B", correlations: [{ ticker: "A", correlation: 0.8 }, { ticker: "C", correlation: -0.2 }] },
+    { ticker: "C", correlations: [{ ticker: "A", correlation: null }, { ticker: "B", correlation: -0.2 }] },
+    { ticker: "D", correlations: null },
+  ];
+  it("keeps backend values, mirrors a one-sided pair, leaves blanks null and drops series-less holdings", () => {
+    const g = assembleCorrelation(rows);
+    expect(g.tickers).toEqual(["A", "B", "C"]);
+    expect(g.matrix).toEqual([
+      [1, 0.8, null],
+      [0.8, 1, -0.2],
+      [null, -0.2, 1],
+    ]);
+    expect(g.withoutSeries).toEqual(["D"]);
+    expect(g.asymmetricPairs).toBe(0);
   });
-
-  it("builds a symmetric matrix with a unit diagonal and counts", () => {
-    const s = [Array.from({ length: 30 }, (_, i) => Math.sin(i)), Array.from({ length: 30 }, (_, i) => Math.sin(i) * 2), Array.from({ length: 30 }, (_, i) => Math.cos(i * 3))];
-    const { matrix, counts } = correlationMatrix(s, 10);
-    expect(matrix[0][0]).toBe(1);
-    expect(matrix[0][1]).toBeCloseTo(1);
-    expect(matrix[1][0]).toBe(matrix[0][1]);
-    expect(counts[0][2]).toBe(30);
+  it("mirrors when only the other holding returned the value, and counts asymmetric pairs", () => {
+    const g = assembleCorrelation([
+      { ticker: "A", correlations: [{ ticker: "B", correlation: null }] },
+      { ticker: "B", correlations: [{ ticker: "A", correlation: 0.5 }] },
+    ]);
+    expect(g.matrix[0][1]).toBe(0.5);
+    const asym = assembleCorrelation([
+      { ticker: "A", correlations: [{ ticker: "B", correlation: 0.5 }] },
+      { ticker: "B", correlations: [{ ticker: "A", correlation: 0.3 }] },
+    ]);
+    expect(asym.asymmetricPairs).toBe(1);
+    expect(asym.matrix[0][1]).toBe(0.5);
   });
-
-  it("orders so that correlated listings are adjacent", () => {
-    // 0 and 2 are strongly correlated, 1 is independent of both.
+  it("orders correlated holdings together; a missing value counts as unrelated, not identical", () => {
     const m = [
       [1, 0.1, 0.9],
-      [0.1, 1, 0.05],
-      [0.9, 0.05, 1],
+      [0.1, 1, 0.2],
+      [0.9, 0.2, 1],
     ];
     const order = clusterOrder(m);
     expect(Math.abs(order.indexOf(0) - order.indexOf(2))).toBe(1);
-    expect([...order].sort()).toEqual([0, 1, 2]);
-  });
-
-  it("treats a missing correlation as unrelated, not as perfectly similar", () => {
-    const m = [
-      [1, null, 0.2],
-      [null, 1, 0.8],
-      [0.2, 0.8, 1],
+    const blank = [
+      [1, null, 0.9],
+      [null, 1, null],
+      [0.9, null, 1],
     ];
-    const order = clusterOrder(m);
-    expect(Math.abs(order.indexOf(1) - order.indexOf(2))).toBe(1);
-  });
-
-  it("the fixture leaves a thinly-observed pair blank and reports shared counts", () => {
-    const w = CORRELATION_FIXTURE.windows.find((x) => x.id === "1Y")!;
-    const iO = w.order.indexOf("ORCH");
-    const offDiagonal = w.matrix[iO].filter((_, j) => j !== iO);
-    expect(offDiagonal.every((v) => v === null)).toBe(true);
-    expect(w.counts[iO][iO === 0 ? 1 : 0]).toBe(15);
-    const stats = sharedObservationStats(w.counts)!;
-    expect(stats.min).toBe(15);
-    expect(stats.median).toBeGreaterThan(100);
-    // Every window is symmetric.
-    for (const win of CORRELATION_FIXTURE.windows) for (let i = 0; i < win.order.length; i++) for (let j = 0; j < win.order.length; j++) expect(win.matrix[i][j]).toBe(win.matrix[j][i]);
-  });
-
-  it("simple returns leave a gap where either close is missing", () => {
-    expect(simpleReturns([100, 110, null, 121])).toEqual([null, 0.10000000000000009, null, null]);
+    const o = clusterOrder(blank);
+    expect(Math.abs(o.indexOf(0) - o.indexOf(2))).toBe(1);
+    expect(clusterOrder([])).toEqual([]);
   });
 });
 
 describe("sessions", () => {
-  const cal = (days: [string, "open" | "half_day" | "closed", string | null][]) => ({
-    mic: "X",
-    venue: "X",
-    days: days.map(([date, kind, nat]) => ({ date, kind, reason: kind === "closed" ? "closed" : null, nationalHoliday: nat, confirmed: true })),
-  });
+  // Mon 2026-09-28 .. Fri 2026-10-09 with today = Wed 2026-10-07.
+  const base = {
+    mic: "XPRA",
+    start: "2026-09-28",
+    end: "2026-10-09",
+    today: "2026-10-07",
+    sessions: [],
+    calendar: { closures: [], suggestions: [] },
+    firstBar: "2026-09-01",
+  };
+  const days = weekdaysBetween(base.start, base.end);
+  const expected = (excluded: string[] = []) => ({ mic: "XPRA", start: base.start, end: base.end, count: 0, basis: "weekdays_minus_configured_closures", confirmedDays: 0, days: days.filter((d) => !excluded.includes(d)) });
+  const status = (cells: ReturnType<typeof buildSessionCells>, d: string) => cells.find((c) => c.date === d)!.status;
 
-  it("separates a genuine missing bar from an exchange holiday, an ad hoc closure and a national holiday on an open day", () => {
-    const cells = classifySessions(
-      cal([
-        ["2026-07-01", "open", null],
-        ["2026-07-02", "open", null], // no bar held
-        ["2026-07-03", "closed", "Independence Day"],
-        ["2026-07-06", "closed", null], // closure without a national holiday
-        ["2026-07-07", "open", "Regional holiday"], // national holiday, venue trades
-        ["2026-07-08", "half_day", null],
-      ]),
-      ["2026-07-01", "2026-07-07", "2026-07-08"],
-    );
-    expect(cells.map((c) => c.status)).toEqual(["trading", "missing_bar", "exchange_holiday", "exchange_closure", "national_holiday_open", "half_day"]);
+  it("separates a missing bar, a holiday, an ad hoc closure, a national holiday with the exchange open, and future days", () => {
+    const cells = buildSessionCells({
+      ...base,
+      expected: expected(["2026-09-28", "2026-09-29"]),
+      calendar: { closures: [{ mic: "XPRA", date: "2026-09-28", name: "Statehood Day" }], suggestions: [{ mic: "XPRA", date: "2026-10-01", name: "Local day" }, { mic: "XPRA", date: "2026-10-02", name: "Another" }] },
+      sessions: [{ mic: "XPRA", sessionDate: "2026-09-29", state: "closed", source: "exchange", confirmed: true, reason: "Technical halt", evidenceUrl: null, knownAt: null }],
+      // Held: 09-30, 10-01 (national holiday, open), not 10-02 (national holiday, open, but no bar), 10-05, 10-06.
+      barDates: ["2026-09-30", "2026-10-01", "2026-10-05", "2026-10-06", "2026-10-07"],
+    });
+    expect(status(cells, "2026-09-28")).toBe("exchange_holiday");
+    expect(status(cells, "2026-09-29")).toBe("exchange_closure");
+    expect(status(cells, "2026-09-30")).toBe("trading");
+    expect(status(cells, "2026-10-01")).toBe("national_holiday_open");
+    expect(status(cells, "2026-10-02")).toBe("missing_bar");
+    expect(cells.find((c) => c.date === "2026-10-02")!.note).toMatch(/still a gap/);
+    expect(status(cells, "2026-10-08")).toBe("upcoming");
+    const counts = sessionCounts(cells);
+    expect(counts.missing_bar).toBe(1);
+    expect(sessionCompleteness(cells)).toEqual({ held: 5, expected: 6, share: 5 / 6 });
   });
-
-  it("a national holiday does not excuse a missing bar when the exchange was open", () => {
-    const [c] = classifySessions(cal([["2026-08-03", "open", "Summer bank holiday (Scotland)"]]), []);
-    expect(c.status).toBe("missing_bar");
+  it("does not count today without a bar, or days before the first stored bar, as missing", () => {
+    const cells = buildSessionCells({ ...base, expected: expected(), firstBar: "2026-10-01", barDates: ["2026-10-01", "2026-10-02", "2026-10-05", "2026-10-06"] });
+    expect(status(cells, "2026-09-29")).toBe("before_history");
+    expect(status(cells, "2026-10-07")).toBe("upcoming");
   });
-
-  it("measures completeness over open days only", () => {
-    const cells = classifySessions(cal([["2026-07-01", "open", null], ["2026-07-02", "open", null], ["2026-07-03", "closed", "H"]]), ["2026-07-01"]);
-    expect(completeness(cells)).toBe(0.5);
-    expect(sessionCounts(cells).exchange_holiday).toBe(1);
-    expect(completeness(classifySessions(cal([["2026-07-03", "closed", "H"]]), []))).toBeNull();
-  });
-
-  it("the fixture planted one missing bar, one ad hoc closure and one national-holiday trading day", () => {
-    const adrCells = classifySessions(VENUE_CALENDARS.XNYS, adr.raw.map((b) => b.date));
-    expect(adrCells.filter((c) => c.status === "missing_bar").map((c) => c.date)).toEqual(["2026-08-12"]);
-    const czCells = classifySessions(VENUE_CALENDARS.XPRA, cz.raw.map((b) => b.date));
-    expect(czCells.find((c) => c.date === "2026-07-15")!.status).toBe("exchange_closure");
-    expect(sessionCounts(classifySessions(VENUE_CALENDARS.XLON, uk.raw.map((b) => b.date))).national_holiday_open).toBe(1);
+  it("marks a confirmed half day, treats a holiday-worded closed row as a holiday, and has no share without expected sessions", () => {
+    const cells = buildSessionCells({
+      ...base,
+      expected: expected(["2026-09-30"]),
+      sessions: [
+        { mic: "XPRA", sessionDate: "2026-10-01", state: "half_day", source: "exchange", confirmed: true, reason: "Early close", evidenceUrl: null, knownAt: null },
+        { mic: "XPRA", sessionDate: "2026-09-30", state: "closed", source: "exchange", confirmed: true, reason: "Public holiday", evidenceUrl: null, knownAt: null },
+      ],
+      barDates: ["2026-09-28", "2026-09-29", "2026-10-01"],
+    });
+    expect(status(cells, "2026-10-01")).toBe("half_day");
+    expect(status(cells, "2026-09-30")).toBe("exchange_holiday");
+    expect(sessionCompleteness([])).toEqual({ held: 0, expected: 0, share: null });
   });
 });
 
-describe("fixture diagnostics", () => {
-  it("has diagnostics for every listing, with the planted GBX/GBP unit mismatch flagged", () => {
-    for (const l of LISTINGS_FIXTURE) expect(DIAGNOSTICS_FIXTURE[l.listingId]).toBeDefined();
-    const d = DIAGNOSTICS_FIXTURE["L-SMPL-XLON"].disagreements[0];
-    expect(looksLikeUnitError(d)).toBe(true);
+describe("portfolio price coverage", () => {
+  const h = (ticker: string, as_of: string | null, bars: number): HoldingPrices => ({
+    ticker,
+    name: null,
+    symbol: null,
+    source: null,
+    as_of,
+    last_close: null,
+    previous_close: null,
+    day_change_pct: null,
+    bars: Array.from({ length: bars }, (_, i) => ({ date: addDays("2026-09-01", i), close: 1 })),
+  });
+  it("names holdings without bars and holdings behind the newest, and never counts missing as flat", () => {
+    const c = portfolioPriceCoverage([h("A", "2026-10-02", 20), h("B", null, 0), h("C", "2026-09-20", 10)]);
+    expect(c).toMatchObject({ total: 3, withBars: 2, withoutBars: ["B"], stale: ["C"], newestAsOf: "2026-10-02" });
+    expect(portfolioPriceCoverage([])).toMatchObject({ total: 0, withBars: 0, newestAsOf: null });
   });
 });
