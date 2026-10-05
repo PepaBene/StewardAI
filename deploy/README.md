@@ -52,6 +52,18 @@ outage alerts even when the host itself is gone:
    `HEARTBEAT_PING_URL` to its ping URL. The worker pings it with every heartbeat, so the
    check alerts when the worker stops, even if the API is still up.
 
+## Railway (API and worker in one service)
+
+Create a Railway service from the repository with **Root Directory `apps/backend`**. It builds
+`apps/backend/Dockerfile` (`railway.json` sets the builder, health check `/health` and restart
+policy). The image's default command, `start.sh`, runs the API on `$PORT` and a worker beside it
+that is restarted if it exits, so one service covers both. Set the `[backend]` variables from
+`.env.example` in the service's Variables and generate a domain under Settings → Networking.
+
+Monitor `https://<domain>/health/ready`, not `/health`: it fails when the worker heartbeat goes
+stale, which a container that is up but has no worker would otherwise hide. Keep Serverless
+(App Sleeping) off, or the worker stops with the container.
+
 ## Vercel (web app)
 
 Import the repository in Vercel with **Root Directory `apps/web`** (framework preset
