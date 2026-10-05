@@ -13437,8 +13437,7 @@ export interface components {
         };
         /**
          * PositionWeightRule
-         * @description Limit on a single position's weight; with no ticker it applies to every position
-         *     except those in `exclude` (e.g. a core index ETF held above the single-stock cap).
+         * @description Limit on a single position's weight; with no ticker it applies to every position.
          */
         PositionWeightRule: {
             /**
@@ -13477,11 +13476,6 @@ export interface components {
             value: number;
             /** Ticker */
             ticker?: string | null;
-            /**
-             * Exclude
-             * @description Positions this rule skips when it applies to every position.
-             */
-            exclude?: string[];
         };
         /** Positions */
         Positions: {
