@@ -18,6 +18,17 @@ update supabase_migrations.schema_migrations set version = '20261003120000' wher
 update supabase_migrations.schema_migrations set version = '20261004110000' where version = '20261002061346' and name = 'free_source_alert_trail';
 update supabase_migrations.schema_migrations set version = '20261004120000' where version = '20261002061421' and name = 'free_sources_verification';
 
+-- 1b. Applied through the Supabase tool on 2026-10-03/04 (the tool stamps the apply time):
+--     renamed to the repo versions.
+update supabase_migrations.schema_migrations set version = '20261006130000' where version = '20261003154526' and name = 'patent_forward_citations_nullable';
+update supabase_migrations.schema_migrations set version = '20261006140000' where version = '20261003154533' and name = 'ticker_case_insensitive_indexes';
+update supabase_migrations.schema_migrations set version = '20261007120000' where version = '20261003160906' and name = 'macro_release_calendar';
+update supabase_migrations.schema_migrations set version = '20261007130000' where version = '20261003164932' and name = 'macro_release_calendar_cnb_ecfin';
+update supabase_migrations.schema_migrations set version = '20261007140000' where version = '20261003182834' and name = 'macro_release_calendar_third_pass';
+update supabase_migrations.schema_migrations set version = '20261007160000' where version = '20261003182955' and name = 'hs_concordance_subheadings';
+update supabase_migrations.schema_migrations set version = '20261007170000' where version = '20261003191447' and name = 'keyless_public_providers_enabled';
+update supabase_migrations.schema_migrations set version = '20261007171000' where version = '20261003184533' and name = 'price_bar_pse_source';
+
 -- 2. provider_state_latch was applied in four pieces (three through the tool, the rest by hand):
 --    replace the pieces by the one repo migration.
 delete from supabase_migrations.schema_migrations
@@ -94,7 +105,15 @@ begin
     ('20261005140000','graph_integrity'),
     ('20261005150000','funds_stream_hardening'),
     ('20261005160000','free_source_alert_gates'),
-    ('20261005170000','verification_gate_hardening')
+    ('20261005170000','verification_gate_hardening'),
+    ('20261006130000','patent_forward_citations_nullable'),
+    ('20261006140000','ticker_case_insensitive_indexes'),
+    ('20261007120000','macro_release_calendar'),
+    ('20261007130000','macro_release_calendar_cnb_ecfin'),
+    ('20261007140000','macro_release_calendar_third_pass'),
+    ('20261007160000','hs_concordance_subheadings'),
+    ('20261007170000','keyless_public_providers_enabled'),
+    ('20261007171000','price_bar_pse_source')
   ) r(version,name)
   where not exists (select 1 from supabase_migrations.schema_migrations s where s.version = r.version and s.name = r.name);
   if missing > 0 then raise exception 'migration history still differs from the repo (% missing)', missing; end if;
