@@ -17,6 +17,7 @@ RUN uv sync --locked --no-dev --no-install-project
 
 COPY src ./src
 COPY README.md ./
+COPY --chmod=755 start.sh /app/start.sh
 RUN uv sync --locked --no-dev
 
 RUN useradd --system --uid 10001 steward
