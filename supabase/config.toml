@@ -29,6 +29,13 @@ jwt_expiry = 3600
 enable_signup = false
 enable_anonymous_sign_ins = false
 
+# Per-IP limits (requests per 5 minutes unless noted). Mirror in the dashboard:
+# Authentication -> Rate Limits. Tight values suit a single-user app.
+[auth.rate_limit]
+sign_in_sign_ups = 10
+token_verifications = 10
+token_refresh = 150
+
 [auth.email]
 enable_signup = false
 enable_confirmations = false
