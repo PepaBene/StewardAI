@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { indexed, orderSeries, seriesView, type SeriesInput, type SeriesPointInput } from "./series";
+import { indexed, indexView, orderSeries, seriesView, type SeriesInput, type SeriesPointInput } from "./series";
 
 const pt = (period: string, first: string | null, latest: string | null, vintages = 2): SeriesPointInput => ({
   period,
@@ -55,6 +55,16 @@ describe("orderSeries", () => {
     const none = seriesView(series("none", [pt("2025-11-01", null, "5", 1)]));
     const small = seriesView(series("small", [pt("2025-11-01", "1", "2")]));
     expect(orderSeries([none, small, big], "revised").map((v) => v.title)).toEqual(["big", "small", "none"]);
+  });
+});
+
+describe("indexView", () => {
+  it("rebases first and latest together so the revision gap is kept", () => {
+    const v = indexView(seriesView(series("a", [pt("p1", "10", "10"), pt("p2", "10", "12")])));
+    expect(v.points.map((p) => p.latest)).toEqual([100, 120]);
+    expect(v.points[1].first).toBe(100);
+    expect(v.points[1].revision).toBeCloseTo(20);
+    expect(v.change).toBeCloseTo(20);
   });
 });
 

@@ -126,6 +126,31 @@ export function orderSeries(views: readonly SeriesView[], order: SeriesOrder): S
  * Rebase to 100 at the first charted period with a latest value, so series in different units
  * share one axis. Null when the base is missing or zero (the ratio would be meaningless).
  */
+/** A view re-expressed on an index scale, with its change and revision statistics recomputed. */
+export function indexView(v: SeriesView): SeriesView {
+  const points = rebased(v.points);
+  const revs = points.flatMap((p) => (p.revision === null ? [] : [Math.abs(p.revision)]));
+  const known = points.filter((p) => p.latest !== null);
+  return {
+    ...v,
+    unit: "index (first period = 100)",
+    points,
+    meanAbsRevision: revs.length > 0 ? revs.reduce((a, b) => a + b, 0) / revs.length : null,
+    change: known.length >= 2 ? known[known.length - 1].latest! - known[0].latest! : null,
+  };
+}
+
+/** Same rebasing applied to both the first and the latest value, so the revision gap survives. */
+export function rebased(points: readonly SeriesPoint[]): SeriesPoint[] {
+  const base = points.find((p) => p.latest !== null)?.latest ?? null;
+  const scale = (n: number | null) => (n === null || base === null || base === 0 ? null : (n / base) * 100);
+  return points.map((p) => {
+    const first = scale(p.first);
+    const latest = scale(p.latest);
+    return { ...p, first, latest, revision: first !== null && latest !== null ? latest - first : null };
+  });
+}
+
 export function indexed(points: readonly SeriesPoint[]): (number | null)[] {
   const base = points.find((p) => p.latest !== null)?.latest ?? null;
   if (base === null || base === 0) return points.map(() => null);

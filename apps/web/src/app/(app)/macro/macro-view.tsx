@@ -12,7 +12,7 @@ import { Input } from "@/components/ui/input";
 import { getBrowserApiClient } from "@/lib/api/client";
 import { formatNumber } from "@/lib/charts/format";
 import { useApiResource } from "@/lib/hooks/use-api-resource";
-import { BASIS_LABEL, BASIS_SHORT, orderSeries, seriesView, type SeriesOrder, type SeriesView } from "@/lib/macro/series";
+import { BASIS_LABEL, BASIS_SHORT, indexView, orderSeries, seriesView, type SeriesOrder, type SeriesView } from "@/lib/macro/series";
 
 const SELECT = "h-9 border border-border bg-surface-raised px-2 text-sm text-text focus-visible:border-focus focus-visible:ring-2 focus-visible:ring-focus/30 focus-visible:outline-none";
 
@@ -43,7 +43,15 @@ export function MacroView() {
   );
   const { state } = useApiResource(fetcher);
   const data = state.kind === "ok" ? state.data : state.kind === "error" ? state.previous : null;
-  const views = useMemo(() => (data ? orderSeries(data.map(seriesView), order) : []), [data, order]);
+  const [asIndex, setAsIndex] = useState(false);
+  const views = useMemo(() => {
+    if (!data) return [];
+    const base = data.map(seriesView);
+    // Index mode rebases each series to 100 at its first charted period, so different units can
+    // share one axis. A series with no usable base keeps null points and shows as unknown.
+    const shown = asIndex ? base.map(indexView) : base;
+    return orderSeries(shown, order);
+  }, [data, order, asIndex]);
 
   return (
     <div className="flex flex-col gap-5">
@@ -72,6 +80,10 @@ export function MacroView() {
                 </option>
               ))}
             </select>
+          </label>
+          <label className="flex items-center gap-2 pb-2 text-sm">
+            <input type="checkbox" checked={asIndex} onChange={(e) => setAsIndex(e.target.checked)} className="size-4 accent-[var(--color-accent)]" />
+            Show as index (first period = 100)
           </label>
           <label className="flex items-center gap-2 pb-2 text-sm">
             <input type="checkbox" checked={sharedScale} onChange={(e) => setSharedScale(e.target.checked)} className="size-4 accent-[var(--color-accent)]" />
