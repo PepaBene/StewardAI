@@ -108,7 +108,7 @@ export function MacroView() {
         {state.kind === "error" ? <AlertMessage title={`Could not load series: ${state.title}`}>{state.detail}</AlertMessage> : null}
         {data && views.length === 0 ? (
           <EmptyState title="No macro observations stored">
-            {geo ? `Nothing is stored for ${geo}. Clear the country code to see every series.` : "Enable a source in Config: Jobs and run the public-data job to fetch country series."}{" "}
+            {geo ? `Nothing is stored for ${geo}. Clear the country code to see every series.` : "Country series arrive when the public-data job has run (it starts with the worker, after the source audit). Check Data sources for its status."}{" "}
             <Link href="/data-sources" className="text-accent-ink hover:underline">
               Open Data sources
             </Link>

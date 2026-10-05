@@ -86,8 +86,8 @@ export function CoverageMatrixPanel() {
 
           {rows.length === 0 ? (
             <EmptyState title="No coverage recorded yet">
-              Coverage appears after a source job has checked a security or country. Enable a provider in Config: Jobs,
-              then run its job.
+              Coverage appears after a source job has checked a security or country. Sources run on their own once their
+              API key is set and the worker has started; you can also run a source job from this page.
             </EmptyState>
           ) : (
             <div className="relative overflow-x-auto border border-border">

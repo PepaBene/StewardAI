@@ -391,7 +391,7 @@ async def collect_eodhd_fallbacks(
     the EODHD symbol: `close` as the raw basis and `adjusted_close` (split and dividend
     adjusted) as the adjusted basis readers use.
     """
-    if not provider_settings.enabled or not api_key:
+    if not api_key:
         return {}
     gates = await pool.fetch(
         """select endpoint,state,hard_blocked,retry_at from public.provider_access
@@ -552,7 +552,7 @@ async def collect_alpha_vantage_fallbacks(
     refunded when the request never reached the provider. Both access gates must be available
     so an unverified or paid endpoint is never called.
     """
-    if not provider_settings.enabled or not api_key:
+    if not api_key:
         return {}
     gates = await pool.fetch(
         """select endpoint,state,hard_blocked,retry_at from public.provider_access

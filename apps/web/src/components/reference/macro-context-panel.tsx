@@ -53,11 +53,12 @@ export function MacroContextPanel({ ticker }: { ticker: string }) {
 
       {view && view.cards.length === 0 && !view.exposureUnknown ? (
         <p className="max-w-[68ch] text-sm text-text-muted">
-          No macro observations are stored for the mapped countries yet. Enable a source in{" "}
+          No macro observations are stored for the mapped countries yet. The public data job fetches them once the
+          worker has run the source audit; see its schedule in{" "}
           <Link href="/config/jobs" className="text-accent-ink hover:underline">
             Config: Jobs
           </Link>{" "}
-          and run the public data job, then check{" "}
+          and check{" "}
           <Link href="/data-sources" className="text-accent-ink hover:underline">
             Data sources
           </Link>{" "}

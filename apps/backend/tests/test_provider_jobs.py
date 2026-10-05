@@ -157,17 +157,14 @@ def test_stalest_first_orders_never_then_oldest_and_skips_fresh() -> None:
     assert stalest_first(["never"], last.get, now=now, refresh_hours=168, limit=0) == []
 
 
-def test_new_jobs_are_registered_budgeted_and_off_by_default() -> None:
+def test_new_jobs_are_registered_budgeted_and_scheduled() -> None:
     names = {"fmp_company", "alpha_vantage_statements", "epo_patents"}
     assert names <= set(get_args(JobType)) <= set(JOB_HANDLERS)
     assert names <= set(get_args(BudgetJobType))
-    config = JobsConfig()
-    schedules = config.schedules()
+    schedules = JobsConfig().schedules()
+    # They run whenever their provider key is set; a missing key skips the run.
     for name in names:
-        assert name in JOB_HANDLERS and schedules[name].enabled is False
-    # the providers they spend are opt-in as well
-    for provider in ("fmp", "alpha_vantage", "epo_ops"):
-        assert config.providers[provider].enabled is False
+        assert name in JOB_HANDLERS and schedules[name].enabled is True
 
 
 OPS_MULTI_OFFICE = """<?xml version="1.0" encoding="UTF-8"?>

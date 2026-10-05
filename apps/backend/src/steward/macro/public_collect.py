@@ -207,8 +207,8 @@ async def _world_bank_step(
     step: Any,
 ) -> None:
     settings = jobs.providers["world_bank"]
-    if not settings.enabled or await _gate(ctx, "world_bank", "indicators") != "available":
-        step.detail["skipped"] = "provider disabled or access gate not available"
+    if await _gate(ctx, "world_bank", "indicators") != "available":
+        step.detail["skipped"] = "access gate closed (see Data sources)"
         return
     indicators = [item.key for item in jobs.public_data.world_bank]
     first_year, last_year = now.year - 10, now.year
@@ -334,8 +334,8 @@ async def _sdmx_step(
     step: Any,
 ) -> None:
     provider_settings = jobs.providers[series.provider]
-    if not provider_settings.enabled or await _gate(ctx, series.provider, "sdmx") != "available":
-        step.detail["skipped"] = "provider disabled or access gate not available"
+    if await _gate(ctx, series.provider, "sdmx") != "available":
+        step.detail["skipped"] = "access gate closed (see Data sources)"
         return
 
     async def fail(state: AccessState, reason: str) -> None:
@@ -462,12 +462,8 @@ async def _comtrade_step(
     step: Any,
 ) -> None:
     comtrade = jobs.providers["un_comtrade"]
-    if (
-        not comtrade.enabled
-        or not deps.comtrade_key
-        or await _gate(ctx, "un_comtrade", "trade") != "available"
-    ):
-        step.detail["skipped"] = "provider disabled, key missing, or audit gate unavailable"
+    if not deps.comtrade_key or await _gate(ctx, "un_comtrade", "trade") != "available":
+        step.detail["skipped"] = "key missing or access gate closed (see Data sources)"
         return
     try:
         await governor.reserve("un_comtrade", "trade", Decimal(1), _budget(comtrade))

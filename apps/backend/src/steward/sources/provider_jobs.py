@@ -1,8 +1,8 @@
 """Scheduled refreshes that spend free-tier provider credits: FMP profile and estimates,
 Alpha Vantage annual statements and EPO OPS patent families (D4.2, D4.4, D5.4).
 
-All three are opt-in twice over: the job schedule is off by default and the provider's
-`ProviderJobSettings.enabled` must be true. Each reuses the ingestion function its manual route
+Each runs on its schedule whenever its provider's API key is set (a missing key skips the run
+with a reason, never an error). Each reuses the ingestion function its manual route
 already calls, spends credits only through the Postgres governor at background priority (the
 owner's manual requests may use the reserve a scheduled run leaves), works through the stalest
 holdings first and stops at the first quota, gate or authentication refusal, so a run can never
@@ -105,8 +105,8 @@ async def fmp_company_handler(ctx: JobContext) -> None:
     async with ctx.step("fmp_company") as step:
         jobs, profiles = await _configs(ctx.pool)
         provider = jobs.providers["fmp"]
-        if not provider.enabled or not settings.fmp_api_key:
-            step.detail["skipped"] = "providers.fmp is disabled or FMP_API_KEY is not set"
+        if not settings.fmp_api_key:
+            step.detail["skipped"] = "FMP_API_KEY is not set"
             return
         tickers = await holding_tickers(ctx.pool)
         # The free plan covers US listings under their EDGAR/Finnhub symbol (or an explicit
@@ -162,10 +162,8 @@ async def alpha_vantage_statements_handler(ctx: JobContext) -> None:
     async with ctx.step("alpha_vantage_statements") as step:
         jobs, profiles = await _configs(ctx.pool)
         provider = jobs.providers["alpha_vantage"]
-        if not provider.enabled or not settings.alpha_vantage_api_key:
-            step.detail["skipped"] = (
-                "providers.alpha_vantage is disabled or ALPHA_VANTAGE_API_KEY is not set"
-            )
+        if not settings.alpha_vantage_api_key:
+            step.detail["skipped"] = "ALPHA_VANTAGE_API_KEY is not set"
             return
         tickers = await holding_tickers(ctx.pool)
         # The manual route's two preconditions: an explicit symbol mapping and a confirmed
@@ -238,12 +236,8 @@ async def epo_patents_handler(ctx: JobContext) -> None:
     async with ctx.step("epo_patents") as step:
         jobs, profiles = await _configs(ctx.pool)
         provider = jobs.providers["epo_ops"]
-        if (
-            not provider.enabled
-            or not settings.epo_ops_client_id
-            or not settings.epo_ops_client_secret
-        ):
-            step.detail["skipped"] = "providers.epo_ops is disabled or OPS credentials are not set"
+        if not settings.epo_ops_client_id or not settings.epo_ops_client_secret:
+            step.detail["skipped"] = "EPO OPS credentials are not set"
             return
         from steward.graph.jobs import load_graph_holdings
 
@@ -364,10 +358,8 @@ async def companies_house_filings_handler(ctx: JobContext) -> None:
     async with ctx.step("companies_house_filings") as step:
         jobs, profiles = await _configs(ctx.pool)
         provider = _provider_settings(jobs, "companies_house")
-        if not provider.enabled or not settings.companies_house_api_key:
-            step.detail["skipped"] = (
-                "providers.companies_house is disabled or COMPANIES_HOUSE_API_KEY is not set"
-            )
+        if not settings.companies_house_api_key:
+            step.detail["skipped"] = "COMPANIES_HOUSE_API_KEY is not set"
             return
         tickers = await holding_tickers(ctx.pool)
         mapped = companies_house_numbers(profiles, tickers)
@@ -421,8 +413,8 @@ async def edinet_filings_handler(ctx: JobContext) -> None:
     async with ctx.step("edinet_filings") as step:
         jobs, profiles = await _configs(ctx.pool)
         provider = _provider_settings(jobs, "edinet")
-        if not provider.enabled or not settings.edinet_api_key:
-            step.detail["skipped"] = "providers.edinet is disabled or EDINET_API_KEY is not set"
+        if not settings.edinet_api_key:
+            step.detail["skipped"] = "EDINET_API_KEY is not set"
             return
         tickers = await holding_tickers(ctx.pool)
         holdings = edinet_holdings(profiles, tickers)
@@ -470,10 +462,8 @@ async def twelve_data_corporate_actions_handler(ctx: JobContext) -> None:
     async with ctx.step("twelve_data_corporate_actions") as step:
         jobs, _profiles = await _configs(ctx.pool)
         provider = _provider_settings(jobs, "twelve_data")
-        if not provider.enabled or not settings.twelve_data_api_key:
-            step.detail["skipped"] = (
-                "providers.twelve_data is disabled or TWELVE_DATA_API_KEY is not set"
-            )
+        if not settings.twelve_data_api_key:
+            step.detail["skipped"] = "TWELVE_DATA_API_KEY is not set"
             return
         tickers = await holding_tickers(ctx.pool)
         # The route's precondition: a confirmed canonical listing; the symbol is its ticker.

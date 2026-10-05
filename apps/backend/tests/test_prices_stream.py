@@ -549,7 +549,7 @@ async def open_gates(pool: asyncpg.Pool) -> None:
         )
 
 
-ENABLED = ProviderJobSettings(enabled=True, daily_quota=25, reserve_credits=1)
+ENABLED = ProviderJobSettings(daily_quota=25, reserve_credits=1)
 
 
 @pytest.mark.db

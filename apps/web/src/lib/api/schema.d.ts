@@ -11080,7 +11080,7 @@ export interface components {
             catch_up_on_start: boolean;
             /**
              * Providers
-             * @description Per-provider switch, refresh interval and hard free-tier budgets. All new providers default off until their sample audit passes.
+             * @description Per-provider refresh interval and hard free-tier budgets. A provider is used whenever it is available (its API key is set, or it needs none).
              */
             providers?: {
                 [key: string]: components["schemas"]["ProviderJobSettings"];
@@ -11104,9 +11104,9 @@ export interface components {
             holiday_refresh?: components["schemas"]["JobSchedule"];
             /** @description FRED, ECB and Eurostat macro series; macro surprises on release days. Default: daily 11:30 (after Eurostat's 11:00 releases). */
             macro_collect?: components["schemas"]["JobSchedule"];
-            /** @description Curated World Bank, OECD, BIS and UN Comtrade releases. Disabled until the corresponding provider audit gate passes. */
+            /** @description Curated World Bank, OECD, BIS and UN Comtrade releases. A source is skipped until the source audit has verified its access. Default: Sundays 04:00. */
             public_data_collect?: components["schemas"]["JobSchedule"];
-            /** @description Repeat the endpoint-level free-access audit. Disabled until test-account credentials are configured. */
+            /** @description Probe every free endpoint once (one request each, inside its free quota) and record whether it is available, so the collectors use it. Also runs at worker start when a key was added or changed. Default: Mondays 03:00. */
             source_audit?: components["schemas"]["JobSchedule"];
             /** @description Alert on failed jobs, missed runs and coverage gaps. Default: every 15 minutes. */
             monitor?: components["schemas"]["JobSchedule"];
@@ -11126,7 +11126,7 @@ export interface components {
             control_stakes?: components["schemas"]["JobSchedule"];
             /** @description Load public SEC N-PORT fund holdings for held US funds. Default: Sat 05:15. */
             nport_holdings?: components["schemas"]["JobSchedule"];
-            /** @description Probe optional Finnhub/FMP fund endpoints for free access. Off by default. */
+            /** @description Probe optional Finnhub/FMP fund endpoints for free access. Default: Sundays 04:00. */
             fund_probes?: components["schemas"]["JobSchedule"];
             /** @description Check iShares/Vanguard fund valuation figures for parser drift. Default: daily 07:30. */
             fund_characteristics_audit?: components["schemas"]["JobSchedule"];
@@ -11142,7 +11142,7 @@ export interface components {
             zero_cost_gate?: components["schemas"]["JobSchedule"];
             /** @description Compute and store price and total returns for held securities. Default: weekdays 23:45. */
             returns_refresh?: components["schemas"]["JobSchedule"];
-            /** @description Probe free price endpoints per exchange (one held symbol each). Off by default. */
+            /** @description Probe free price endpoints per exchange (one held symbol each). Default: the 2nd of each month, 05:00. */
             exchange_probes?: components["schemas"]["JobSchedule"];
             /** @description Fetch and version registered issuer IR pages (guidance, consensus, capital return). Default: daily 07:20. */
             ir_releases?: components["schemas"]["JobSchedule"];
@@ -11152,17 +11152,17 @@ export interface components {
             pdmr_uk?: components["schemas"]["JobSchedule"];
             /** @description Review SEC relationship candidates, extract deal events and reconcile parent changes. Default: daily 07:40. */
             graph_review?: components["schemas"]["JobSchedule"];
-            /** @description FMP free tier: company profile (sector, industry) and annual analyst estimates of holdings that map an EDGAR/Finnhub ticker. Off by default; also needs providers.fmp.enabled and a passed endpoint probe. At most two requests per holding, inside the provider's daily budget. */
+            /** @description FMP free tier: company profile (sector, industry) and annual analyst estimates of holdings that map an EDGAR/Finnhub ticker. Runs when FMP_API_KEY is set and the endpoint probe passed. At most two requests per holding, inside the provider's daily budget. */
             fmp_company?: components["schemas"]["JobSchedule"];
-            /** @description Alpha Vantage annual statements of holdings with a confirmed listing and an explicit symbol mapping, stalest first, a few per run so the shared 25-a-day budget keeps its reserve. Off by default; also needs providers.alpha_vantage.enabled. */
+            /** @description Alpha Vantage annual statements of holdings with a confirmed listing and an explicit symbol mapping, stalest first, a few per run so the shared 25-a-day budget keeps its reserve. Runs when ALPHA_VANTAGE_API_KEY is set. */
             alpha_vantage_statements?: components["schemas"]["JobSchedule"];
-            /** @description EPO OPS patent-family refresh for the stalest holdings (a few per run). Off by default; also needs providers.epo_ops.enabled and the OPS client credentials. */
+            /** @description EPO OPS patent-family refresh for the stalest holdings (a few per run). Runs when the OPS client credentials are set. */
             epo_patents?: components["schemas"]["JobSchedule"];
-            /** @description Companies House company profile and filing history of UK holdings whose profile has a companies_house_number. Off by default; also needs providers.companies_house.enabled and COMPANIES_HOUSE_API_KEY. Two requests per holding, at most 20 holdings a run. */
+            /** @description Companies House company profile and filing history of UK holdings whose profile has a companies_house_number. Runs when COMPANIES_HOUSE_API_KEY is set. Two requests per holding, at most 20 holdings a run. */
             companies_house_filings?: components["schemas"]["JobSchedule"];
-            /** @description EDINET (Japan FSA) document list of the last days, kept for holdings whose profile has an edinet_code (list and links only, no XBRL parsing). Off by default; also needs providers.edinet.enabled and EDINET_API_KEY. */
+            /** @description EDINET (Japan FSA) document list of the last days, kept for holdings whose profile has an edinet_code (list and links only, no XBRL parsing). Runs when EDINET_API_KEY is set. */
             edinet_filings?: components["schemas"]["JobSchedule"];
-            /** @description Twelve Data dividends and splits of holdings with a confirmed listing, stored as suggested corporate actions for the owner to confirm. Off by default; also needs providers.twelve_data.enabled. A few holdings per run inside the Basic plan's credits; a plan denial latches the endpoint as paid-only. */
+            /** @description Twelve Data dividends and splits of holdings with a confirmed listing, stored as suggested corporate actions for the owner to confirm. Runs when TWELVE_DATA_API_KEY is set. A few holdings per run inside the Basic plan's credits; a plan denial latches the endpoint as paid-only. */
             twelve_data_corporate_actions?: components["schemas"]["JobSchedule"];
             /** @description Fundamentals (SEC XBRL, ESEF) of holdings that filed since the last read (all of them weekly) and the ETF providers' fund P/E and P/B. Default: daily 07:45. */
             valuation_refresh?: components["schemas"]["JobSchedule"];
@@ -13769,14 +13769,10 @@ export interface components {
         };
         /**
          * ProviderJobSettings
-         * @description A free provider is opt-in until its account-specific endpoint audit passes.
+         * @description Limits for a free provider. There is no on/off switch: a provider is used as soon as it is
+         *     available, meaning its API key is set when it needs one.
          */
         ProviderJobSettings: {
-            /**
-             * Enabled
-             * @default false
-             */
-            enabled: boolean;
             /**
              * Refresh Hours
              * @default 168

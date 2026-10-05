@@ -32344,7 +32344,7 @@
             },
             "type": "object",
             "title": "Providers",
-            "description": "Per-provider switch, refresh interval and hard free-tier budgets. All new providers default off until their sample audit passes."
+            "description": "Per-provider refresh interval and hard free-tier budgets. A provider is used whenever it is available (its API key is set, or it needs none)."
           },
           "public_data": {
             "$ref": "#/components/schemas/PublicDataSettings"
@@ -32387,11 +32387,11 @@
           },
           "public_data_collect": {
             "$ref": "#/components/schemas/JobSchedule",
-            "description": "Curated World Bank, OECD, BIS and UN Comtrade releases. Disabled until the corresponding provider audit gate passes."
+            "description": "Curated World Bank, OECD, BIS and UN Comtrade releases. A source is skipped until the source audit has verified its access. Default: Sundays 04:00."
           },
           "source_audit": {
             "$ref": "#/components/schemas/JobSchedule",
-            "description": "Repeat the endpoint-level free-access audit. Disabled until test-account credentials are configured."
+            "description": "Probe every free endpoint once (one request each, inside its free quota) and record whether it is available, so the collectors use it. Also runs at worker start when a key was added or changed. Default: Mondays 03:00."
           },
           "monitor": {
             "$ref": "#/components/schemas/JobSchedule",
@@ -32431,7 +32431,7 @@
           },
           "fund_probes": {
             "$ref": "#/components/schemas/JobSchedule",
-            "description": "Probe optional Finnhub/FMP fund endpoints for free access. Off by default."
+            "description": "Probe optional Finnhub/FMP fund endpoints for free access. Default: Sundays 04:00."
           },
           "fund_characteristics_audit": {
             "$ref": "#/components/schemas/JobSchedule",
@@ -32463,7 +32463,7 @@
           },
           "exchange_probes": {
             "$ref": "#/components/schemas/JobSchedule",
-            "description": "Probe free price endpoints per exchange (one held symbol each). Off by default."
+            "description": "Probe free price endpoints per exchange (one held symbol each). Default: the 2nd of each month, 05:00."
           },
           "ir_releases": {
             "$ref": "#/components/schemas/JobSchedule",
@@ -32483,27 +32483,27 @@
           },
           "fmp_company": {
             "$ref": "#/components/schemas/JobSchedule",
-            "description": "FMP free tier: company profile (sector, industry) and annual analyst estimates of holdings that map an EDGAR/Finnhub ticker. Off by default; also needs providers.fmp.enabled and a passed endpoint probe. At most two requests per holding, inside the provider's daily budget."
+            "description": "FMP free tier: company profile (sector, industry) and annual analyst estimates of holdings that map an EDGAR/Finnhub ticker. Runs when FMP_API_KEY is set and the endpoint probe passed. At most two requests per holding, inside the provider's daily budget."
           },
           "alpha_vantage_statements": {
             "$ref": "#/components/schemas/JobSchedule",
-            "description": "Alpha Vantage annual statements of holdings with a confirmed listing and an explicit symbol mapping, stalest first, a few per run so the shared 25-a-day budget keeps its reserve. Off by default; also needs providers.alpha_vantage.enabled."
+            "description": "Alpha Vantage annual statements of holdings with a confirmed listing and an explicit symbol mapping, stalest first, a few per run so the shared 25-a-day budget keeps its reserve. Runs when ALPHA_VANTAGE_API_KEY is set."
           },
           "epo_patents": {
             "$ref": "#/components/schemas/JobSchedule",
-            "description": "EPO OPS patent-family refresh for the stalest holdings (a few per run). Off by default; also needs providers.epo_ops.enabled and the OPS client credentials."
+            "description": "EPO OPS patent-family refresh for the stalest holdings (a few per run). Runs when the OPS client credentials are set."
           },
           "companies_house_filings": {
             "$ref": "#/components/schemas/JobSchedule",
-            "description": "Companies House company profile and filing history of UK holdings whose profile has a companies_house_number. Off by default; also needs providers.companies_house.enabled and COMPANIES_HOUSE_API_KEY. Two requests per holding, at most 20 holdings a run."
+            "description": "Companies House company profile and filing history of UK holdings whose profile has a companies_house_number. Runs when COMPANIES_HOUSE_API_KEY is set. Two requests per holding, at most 20 holdings a run."
           },
           "edinet_filings": {
             "$ref": "#/components/schemas/JobSchedule",
-            "description": "EDINET (Japan FSA) document list of the last days, kept for holdings whose profile has an edinet_code (list and links only, no XBRL parsing). Off by default; also needs providers.edinet.enabled and EDINET_API_KEY."
+            "description": "EDINET (Japan FSA) document list of the last days, kept for holdings whose profile has an edinet_code (list and links only, no XBRL parsing). Runs when EDINET_API_KEY is set."
           },
           "twelve_data_corporate_actions": {
             "$ref": "#/components/schemas/JobSchedule",
-            "description": "Twelve Data dividends and splits of holdings with a confirmed listing, stored as suggested corporate actions for the owner to confirm. Off by default; also needs providers.twelve_data.enabled. A few holdings per run inside the Basic plan's credits; a plan denial latches the endpoint as paid-only."
+            "description": "Twelve Data dividends and splits of holdings with a confirmed listing, stored as suggested corporate actions for the owner to confirm. Runs when TWELVE_DATA_API_KEY is set. A few holdings per run inside the Basic plan's credits; a plan denial latches the endpoint as paid-only."
           },
           "valuation_refresh": {
             "$ref": "#/components/schemas/JobSchedule",
@@ -39772,11 +39772,6 @@
       },
       "ProviderJobSettings": {
         "properties": {
-          "enabled": {
-            "type": "boolean",
-            "title": "Enabled",
-            "default": false
-          },
           "refresh_hours": {
             "type": "integer",
             "maximum": 8760.0,
@@ -39818,7 +39813,7 @@
         "additionalProperties": false,
         "type": "object",
         "title": "ProviderJobSettings",
-        "description": "A free provider is opt-in until its account-specific endpoint audit passes."
+        "description": "Limits for a free provider. There is no on/off switch: a provider is used as soon as it is\navailable, meaning its API key is set when it needs one."
       },
       "ProviderStatus": {
         "properties": {

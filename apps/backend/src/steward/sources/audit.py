@@ -10,6 +10,7 @@ from dataclasses import dataclass
 from decimal import Decimal
 from typing import Any
 
+import asyncpg
 import httpx
 
 from steward import __version__
@@ -360,6 +361,29 @@ def probes(settings: Settings) -> list[Probe]:
     ]
 
 
+def _credential_hash(credential: str | None, auth_secret: str | None) -> str:
+    return hashlib.sha256(f"{credential or ''}:{auth_secret or ''}".encode()).hexdigest()
+
+
+async def credentials_changed(pool: asyncpg.Pool, settings: Settings) -> bool:
+    """True when a key was added, replaced or removed since the last audit: a probed endpoint
+    whose credential hash differs from the one recorded, ignoring keyless endpoints that were
+    simply never audited (the audit's own schedule and first run cover those)."""
+    stored = {
+        (r["provider"], r["endpoint"]): r["configuration_hash"]
+        for r in await pool.fetch(
+            "select provider, endpoint, configuration_hash from public.provider_access"
+        )
+    }
+    for probe in probes(settings):
+        recorded = stored.get((probe.provider, probe.endpoint))
+        if recorded == _credential_hash(probe.credential, probe.auth_secret):
+            continue
+        if recorded is not None or probe.credential or probe.auth_secret:
+            return True
+    return False
+
+
 async def run_source_audit(ctx: JobContext, http: httpx.AsyncClient, settings: Settings) -> None:
     stored = await load_active(ctx.pool, "jobs", JobsConfig)
     jobs = stored.body if stored else JobsConfig()
@@ -368,9 +392,7 @@ async def run_source_audit(ctx: JobContext, http: httpx.AsyncClient, settings: S
     governor = PostgresRequestGovernor(ctx.pool)
     for probe in probes(settings):
         async with ctx.step(f"{probe.provider}:{probe.endpoint}") as step:
-            config_hash = hashlib.sha256(
-                f"{probe.credential or ''}:{probe.auth_secret or ''}".encode()
-            ).hexdigest()
+            config_hash = _credential_hash(probe.credential, probe.auth_secret)
             gate = await ctx.pool.fetchrow(
                 """select state,hard_blocked,retry_at,configuration_hash
                    from public.provider_access where provider=$1 and endpoint=$2""",

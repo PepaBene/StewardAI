@@ -216,14 +216,17 @@ def test_reconciliation_and_unknown_exposure() -> None:
     assert weighted_effect(rows, {}) is None
 
 
-def test_new_providers_are_disabled_by_default() -> None:
+def test_providers_have_no_switch_and_source_jobs_run_by_default() -> None:
     config = JobsConfig()
     assert len(config.providers) == 15
-    assert all(not provider.enabled for provider in config.providers.values())
+    assert all("enabled" not in p.model_dump() for p in config.providers.values())
+    # A saved config from before the switch was removed still loads.
+    legacy = JobsConfig.model_validate({"providers": {"fmp": {"enabled": False}}})
+    assert "enabled" not in legacy.providers["fmp"].model_dump()
     assert len(config.public_data.world_bank) == 9
     assert all(item.consumer for item in config.public_data.world_bank)
-    assert not config.public_data_collect.enabled
-    assert not config.source_audit.enabled
+    assert config.public_data_collect.enabled
+    assert config.source_audit.enabled
 
 
 def test_ecb_macro_defaults_cover_rates_credit_and_monetary_aggregates() -> None:

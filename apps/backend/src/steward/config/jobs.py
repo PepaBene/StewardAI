@@ -651,9 +651,17 @@ class MacroSettings(ConfigModel):
 
 
 class ProviderJobSettings(ConfigModel):
-    """A free provider is opt-in until its account-specific endpoint audit passes."""
+    """Limits for a free provider. There is no on/off switch: a provider is used as soon as it is
+    available, meaning its API key is set when it needs one."""
 
-    enabled: bool = False
+    @model_validator(mode="before")
+    @classmethod
+    def _drop_legacy_enabled(cls, data: Any) -> Any:
+        # Older saved configs carried a per-provider `enabled` switch; it no longer exists.
+        if isinstance(data, dict) and "enabled" in data:
+            return {k: v for k, v in data.items() if k != "enabled"}
+        return data
+
     refresh_hours: int = Field(default=168, ge=1, le=8760)
     daily_quota: int | None = Field(default=None, ge=1)
     monthly_quota: int | None = Field(default=None, ge=1)
@@ -1315,8 +1323,8 @@ class JobsConfig(ConfigModel):
     )
     providers: dict[str, ProviderJobSettings] = Field(
         default_factory=_provider_defaults,
-        description="Per-provider switch, refresh interval and hard free-tier budgets. All new "
-        "providers default off until their sample audit passes.",
+        description="Per-provider refresh interval and hard free-tier budgets. A provider is "
+        "used whenever it is available (its API key is set, or it needs none).",
     )
     public_data: PublicDataSettings = Field(default_factory=PublicDataSettings)
     portfolio_sync: JobSchedule = Field(
@@ -1362,14 +1370,15 @@ class JobsConfig(ConfigModel):
         "Default: daily 11:30 (after Eurostat's 11:00 releases).",
     )
     public_data_collect: JobSchedule = Field(
-        default_factory=lambda: JobSchedule(enabled=False, cron="0 4 * * 0"),
-        description="Curated World Bank, OECD, BIS and UN Comtrade releases. Disabled until "
-        "the corresponding provider audit gate passes.",
+        default_factory=lambda: JobSchedule(cron="0 4 * * 0"),
+        description="Curated World Bank, OECD, BIS and UN Comtrade releases. A source is "
+        "skipped until the source audit has verified its access. Default: Sundays 04:00.",
     )
     source_audit: JobSchedule = Field(
-        default_factory=lambda: JobSchedule(enabled=False, cron="0 3 1 * *"),
-        description="Repeat the endpoint-level free-access audit. Disabled until test-account "
-        "credentials are configured.",
+        default_factory=lambda: JobSchedule(cron="0 3 * * 1"),
+        description="Probe every free endpoint once (one request each, inside its free quota) "
+        "and record whether it is available, so the collectors use it. Also runs at worker "
+        "start when a key was added or changed. Default: Mondays 03:00.",
     )
     monitor: JobSchedule = Field(
         default_factory=lambda: JobSchedule(cron="*/15 * * * *"),
@@ -1414,8 +1423,9 @@ class JobsConfig(ConfigModel):
         description="Load public SEC N-PORT fund holdings for held US funds. Default: Sat 05:15.",
     )
     fund_probes: JobSchedule = Field(
-        default_factory=lambda: JobSchedule(cron="0 4 * * 0", enabled=False),
-        description="Probe optional Finnhub/FMP fund endpoints for free access. Off by default.",
+        default_factory=lambda: JobSchedule(cron="0 4 * * 0"),
+        description="Probe optional Finnhub/FMP fund endpoints for free access. Default: "
+        "Sundays 04:00.",
     )
     fund_characteristics_audit: JobSchedule = Field(
         default_factory=lambda: JobSchedule(cron="30 7 * * *"),
@@ -1456,9 +1466,10 @@ class JobsConfig(ConfigModel):
         ),
     )
     exchange_probes: JobSchedule = Field(
-        default_factory=lambda: JobSchedule(cron="0 5 2 * *", enabled=False),
+        default_factory=lambda: JobSchedule(cron="0 5 2 * *"),
         description=(
-            "Probe free price endpoints per exchange (one held symbol each). Off by default."
+            "Probe free price endpoints per exchange (one held symbol each). Default: the 2nd "
+            "of each month, 05:00."
         ),
     )
     ir_releases: JobSchedule = Field(
@@ -1490,54 +1501,52 @@ class JobsConfig(ConfigModel):
         ),
     )
     fmp_company: JobSchedule = Field(
-        default_factory=lambda: JobSchedule(cron="20 9 * * 6", enabled=False),
+        default_factory=lambda: JobSchedule(cron="20 9 * * 6"),
         description=(
             "FMP free tier: company profile (sector, industry) and annual analyst estimates "
-            "of holdings that map an EDGAR/Finnhub ticker. Off by default; also needs "
-            "providers.fmp.enabled and a passed endpoint probe. At most two requests per "
-            "holding, inside the provider's daily budget."
+            "of holdings that map an EDGAR/Finnhub ticker. Runs when FMP_API_KEY is set and "
+            "the endpoint probe passed. At most two requests per holding, inside the "
+            "provider's daily budget."
         ),
     )
     alpha_vantage_statements: JobSchedule = Field(
-        default_factory=lambda: JobSchedule(cron="40 9 * * 6", enabled=False),
+        default_factory=lambda: JobSchedule(cron="40 9 * * 6"),
         description=(
             "Alpha Vantage annual statements of holdings with a confirmed listing and an "
             "explicit symbol mapping, stalest first, a few per run so the shared 25-a-day "
-            "budget keeps its reserve. Off by default; also needs "
-            "providers.alpha_vantage.enabled."
+            "budget keeps its reserve. Runs when ALPHA_VANTAGE_API_KEY is set."
         ),
     )
     epo_patents: JobSchedule = Field(
-        default_factory=lambda: JobSchedule(cron="0 10 1 * *", enabled=False),
+        default_factory=lambda: JobSchedule(cron="0 10 1 * *"),
         description=(
-            "EPO OPS patent-family refresh for the stalest holdings (a few per run). Off by "
-            "default; also needs providers.epo_ops.enabled and the OPS client credentials."
+            "EPO OPS patent-family refresh for the stalest holdings (a few per run). Runs "
+            "when the OPS client credentials are set."
         ),
     )
     companies_house_filings: JobSchedule = Field(
-        default_factory=lambda: JobSchedule(cron="10 10 * * 6", enabled=False),
+        default_factory=lambda: JobSchedule(cron="10 10 * * 6"),
         description=(
             "Companies House company profile and filing history of UK holdings whose profile "
-            "has a companies_house_number. Off by default; also needs "
-            "providers.companies_house.enabled and COMPANIES_HOUSE_API_KEY. Two requests per "
-            "holding, at most 20 holdings a run."
+            "has a companies_house_number. Runs when COMPANIES_HOUSE_API_KEY is set. Two "
+            "requests per holding, at most 20 holdings a run."
         ),
     )
     edinet_filings: JobSchedule = Field(
-        default_factory=lambda: JobSchedule(cron="30 10 * * *", enabled=False),
+        default_factory=lambda: JobSchedule(cron="30 10 * * *"),
         description=(
             "EDINET (Japan FSA) document list of the last days, kept for holdings whose profile "
-            "has an edinet_code (list and links only, no XBRL parsing). Off by default; also "
-            "needs providers.edinet.enabled and EDINET_API_KEY."
+            "has an edinet_code (list and links only, no XBRL parsing). Runs when "
+            "EDINET_API_KEY is set."
         ),
     )
     twelve_data_corporate_actions: JobSchedule = Field(
-        default_factory=lambda: JobSchedule(cron="50 10 * * 6", enabled=False),
+        default_factory=lambda: JobSchedule(cron="50 10 * * 6"),
         description=(
             "Twelve Data dividends and splits of holdings with a confirmed listing, stored as "
-            "suggested corporate actions for the owner to confirm. Off by default; also needs "
-            "providers.twelve_data.enabled. A few holdings per run inside the Basic plan's "
-            "credits; a plan denial latches the endpoint as paid-only."
+            "suggested corporate actions for the owner to confirm. Runs when TWELVE_DATA_API_KEY "
+            "is set. A few holdings per run inside the Basic plan's credits; a plan denial "
+            "latches the endpoint as paid-only."
         ),
     )
     valuation_refresh: JobSchedule = Field(

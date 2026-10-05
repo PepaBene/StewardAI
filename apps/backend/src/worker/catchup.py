@@ -30,11 +30,27 @@ from steward.config.store import load_active
 from steward.jobs.runner import lock_connection, lock_key, try_lock, unlock
 from steward.monitor import MAX_OPEN_RUN, last_slot
 from steward.settings import get_settings
+from steward.sources.audit import credentials_changed
 from worker.backfill import DATA_SEQUENCE, MAX_OWNERSHIP_RUNS, NEEDS_CLAUDE, ownership_remaining
 
 logger = logging.getLogger("worker.catchup")
 
-CATCH_UP_SEQUENCE = [*DATA_SEQUENCE, "fact_reconcile"]
+# Free-source jobs that run when their provider's key is set. The audit runs first, because the
+# collectors only call an endpoint the audit has verified; the rest follow the core data jobs.
+SOURCE_AUDIT = "source_audit"
+SOURCE_JOBS = [
+    "public_data_collect",
+    "fmp_company",
+    "alpha_vantage_statements",
+    "epo_patents",
+    "companies_house_filings",
+    "edinet_filings",
+    "twelve_data_corporate_actions",
+    "insider_trades",
+    "control_stakes",
+    "nport_holdings",
+]
+CATCH_UP_SEQUENCE = [SOURCE_AUDIT, *DATA_SEQUENCE, *SOURCE_JOBS, "fact_reconcile"]
 CATCH_UP_PARAMS: dict[str, Any] = {"catch_up": True}
 # How far back a job's latest slot is looked for: the rarest default schedules are
 # half-yearly (holidays) and quarterly (the full earnings calendar).
@@ -61,18 +77,24 @@ def plan_catch_up(
     *,
     in_flight: Iterable[str] = (),
     has_claude: bool = True,
+    credentials_changed: bool = False,
 ) -> list[CatchUp]:
     """The jobs to run at start, in order. `last_success` maps a job type to the start of
-    its latest successful run; `in_flight` names types with a run open now (left to it)."""
+    its latest successful run; `in_flight` names types with a run open now (left to it).
+    `credentials_changed` (a key was added or replaced since the last source audit) re-runs
+    the audit and every source job, so the new key is verified and used at once."""
     if not config.catch_up_on_start:
         return []
     schedules = config.schedules()
     busy = set(in_flight)
+    forced = {SOURCE_AUDIT, *SOURCE_JOBS} if credentials_changed else set()
 
     def due(job_type: str) -> str | None:
         schedule = schedules[job_type]
         if not schedule.enabled:
             return None
+        if job_type in forced:
+            return "an API key was added or changed"
         last = last_success.get(job_type)
         if last is None:
             return "never succeeded"
@@ -154,12 +176,14 @@ async def catch_up(
         return []
     now = now or dt.datetime.now(dt.UTC)
     last, in_flight = await job_history(pool, CANDIDATES, now)
+    settings = get_settings()
     plan = plan_catch_up(
         config,
         last,
         now,
         in_flight=in_flight,
-        has_claude=get_settings().anthropic_api_key is not None,
+        has_claude=settings.anthropic_api_key is not None,
+        credentials_changed=await credentials_changed(pool, settings),
     )
     if not plan:
         logger.info("catch-up: every data job is up to date")
