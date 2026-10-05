@@ -886,6 +886,35 @@ async def test_firds_name_history_windows_and_entity_graph_snapshots(
     )
 
 
+@pytest.mark.db
+async def test_firds_name_equal_to_the_legal_name_is_not_a_duplicate(
+    backend_pool: asyncpg.Pool,
+) -> None:
+    # FIRDS often publishes the legal name as the instrument name; the legal alias row has the
+    # same (issuer, name, valid_from), which the unique constraint treats as one row.
+    entity = _entity("lifecycle_gleif_before_rename.json")
+    seen = dt.datetime(2024, 2, 1, tzinfo=UTC)
+    issuer_id = (
+        await sync_gleif_issuer(
+            backend_pool, entity, before_name=None, today=seen.date(), known_at=seen
+        )
+    ).issuer_id
+    history = [
+        esma.FirdsRecord(
+            isin="XS0000000001", mic="XETR", full_name=entity.legal_name, short_name=None,
+            cfi=None, currency=None, issuer_lei=entity.lei, admitted_at=None,
+            first_trade_at=None, terminated_at=None, status="NEWR", raw={},
+        )
+    ]  # fmt: skip
+    assert await sync_firds_names(backend_pool, issuer_id, history, known_at=seen) == 0
+    kinds = await backend_pool.fetch(
+        "select kind from public.issuer_alias where issuer_id = $1 and lower(name) = lower($2)",
+        issuer_id,
+        entity.legal_name,
+    )
+    assert [r["kind"] for r in kinds] == ["legal"]
+
+
 # ---------------------------------------------- D1.8 / C-13: documents, evidence, immutability
 
 

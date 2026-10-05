@@ -244,7 +244,8 @@ async def sync_firds_names(
             " (issuer_id, name, kind, valid_from, valid_to, valid_to_known_at, known_at)"
             " select $1, $2, 'trading', $3, $4::date, case when $4::date is null then null"
             " else $5::timestamptz end, $5 where not exists (select 1 from public.issuer_alias"
-            "  where issuer_id = $1 and lower(name) = lower($2) and kind = 'trading')",
+            "  where issuer_id = $1 and lower(name) = lower($2) and kind = 'trading')"
+            " on conflict do nothing",  # the legal row of the same name and window may exist
             issuer_id,
             name,
             valid_from,
