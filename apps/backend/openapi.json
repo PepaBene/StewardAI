@@ -39017,18 +39017,6 @@
               }
             ],
             "title": "Ticker"
-          },
-          "exclude": {
-            "items": {
-              "type": "string",
-              "pattern": "^[A-Za-z0-9._-]{1,32}$",
-              "examples": [
-                "AAPL_US_EQ"
-              ]
-            },
-            "type": "array",
-            "title": "Exclude",
-            "description": "Positions this rule skips when it applies to every position."
           }
         },
         "additionalProperties": false,
@@ -39040,7 +39028,7 @@
           "value"
         ],
         "title": "PositionWeightRule",
-        "description": "Limit on a single position's weight; with no ticker it applies to every position\nexcept those in `exclude` (e.g. a core index ETF held above the single-stock cap)."
+        "description": "Limit on a single position's weight; with no ticker it applies to every position."
       },
       "Positions": {
         "properties": {
