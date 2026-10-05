@@ -19,7 +19,7 @@ OWNER = "7f0c3d4e-0000-4000-8000-000000000001"
 
 
 @pytest.fixture
-def client() -> Iterator[TestClient]:
+def client(auth_configured: None) -> Iterator[TestClient]:
     with TestClient(create_app()) as test_client:
         yield test_client
 

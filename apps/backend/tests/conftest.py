@@ -39,6 +39,19 @@ def _no_channel_credentials(monkeypatch: pytest.MonkeyPatch) -> Iterator[None]:
     get_settings.cache_clear()
 
 
+@pytest.fixture
+def auth_configured(monkeypatch: pytest.MonkeyPatch) -> Iterator[None]:
+    """For tests that use the real owner dependency without a bearer token and expect a 401.
+
+    Without a project URL the verifier is not built and the API answers 503 "Auth is not
+    configured" before it looks at the token. The URL is never contacted: no token, no JWKS."""
+    from api import auth
+
+    monkeypatch.setenv("SUPABASE_URL", "https://test-project.supabase.co")
+    monkeypatch.setattr(auth, "_verifier", None)
+    yield
+
+
 # ---------------------------------------------------------------------------------------
 # Offline guard (plan D8.1): CI must never need third-party keys or the internet. Any
 # attempt to open a socket to a non-local address fails the test that made it. Loopback and
