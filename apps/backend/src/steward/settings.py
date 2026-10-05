@@ -137,6 +137,8 @@ class Settings(BaseSettings):
             self.diffbot_api_key,
             self.epo_ops_client_id,
             self.epo_ops_client_secret,
+            self.edinet_api_key,
+            self.companies_house_api_key,
             self.openfigi_api_key,
             self.fred_api_key,
             self.stooq_api_key,
