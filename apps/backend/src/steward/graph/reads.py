@@ -124,7 +124,8 @@ async def decision_history(
     )
     entries = history_entries([dict(r) for r in log], row["decided_by"], row["status"])
     if not entries and row["decided_at"] is not None:
-        # No logged change (a table without the log trigger): the row's own last decision.
+        # Nothing logged (a row decided before its table's log trigger existed): fall back to the
+        # row's own last decision.
         entries = [
             {
                 "changed_at": row["decided_at"],
