@@ -49,6 +49,7 @@ export type ReviewAction = FactReview["action"];
 export type ThesesConfig = Schemas["ThesesConfig"];
 export type ThesisConfig = Schemas["ThesisConfig"];
 export type ThesisKPI = Schemas["ThesisKPI"];
+export type ThesisPriceTarget = Schemas["ThesisPriceTarget"];
 export type HoldingProfilesConfig = Schemas["HoldingProfilesConfig"];
 export type HoldingProfile = Schemas["HoldingProfile"];
 export type Exposure = Schemas["Exposure"];

@@ -337,7 +337,8 @@ def _thesis_text(thesis: ThesisConfig | None) -> str:
     exits = "\n".join(f"{i + 1}. {e}" for i, e in enumerate(thesis.exit_conditions))
     return (
         f"Why owned: {thesis.why_owned}\nKPIs:\n{kpis or '- none'}\n"
-        f"Exit conditions:\n{exits or 'none'}"
+        f"Exit conditions:\n{exits or 'none'}\n"
+        f"Price target: {thesis.price_target.describe() if thesis.price_target else 'none'}"
     )
 
 

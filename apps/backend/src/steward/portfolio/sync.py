@@ -21,6 +21,7 @@ from pydantic import BaseModel
 from steward import __version__
 from steward.config.store import load_active
 from steward.config.strategy import StrategyConfig
+from steward.config.thesis import ThesesConfig
 from steward.fx.convert import FxRate, FxSourceName, FxTable, MissingRateError
 from steward.fx.sources import FxSourceError, fetch_rates
 from steward.jobs.runner import JobContext, JobFailed
@@ -29,6 +30,7 @@ from steward.portfolio.drift import HoldingValue, compute_drift
 from steward.portfolio.fees import FeeBasis, FeeCharge, fee_basis, fee_charges
 from steward.portfolio.risk_limits import evaluate_risk, gather_risk_inputs
 from steward.portfolio.snapshot import Snapshot, build_snapshot, snapshot_date_for
+from steward.portfolio.targets import evaluate_targets
 from steward.reference.calendar import fx_stale
 from steward.settings import get_settings
 from steward.trading212.client import Trading212Client
@@ -156,9 +158,20 @@ async def portfolio_sync(ctx: JobContext, deps: SyncDeps) -> None:
         risk_inputs = await gather_risk_inputs(pool, strategy, list(snapshot.positions))
         if risk_inputs.unavailable:
             step.detail["risk_unavailable"] = risk_inputs.unavailable
+        theses = await load_active(pool, "theses", ThesesConfig)
+        await ctx.record_config_version(theses.id if theses else None)
+        targets = evaluate_targets(
+            list(snapshot.positions), theses.body if theses else ThesesConfig()
+        )
+        if targets.unavailable:
+            step.detail["targets_unavailable"] = targets.unavailable
         breaches = await record_breaches(
             pool,
-            [*evaluate(report, strategy), *evaluate_risk(risk_inputs, strategy.risk)],
+            [
+                *evaluate(report, strategy),
+                *evaluate_risk(risk_inputs, strategy.risk),
+                *targets.findings,
+            ],
             job_id=ctx.job_id,
             config_version_id=stored.id if stored else None,
             now=deps.now(),

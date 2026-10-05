@@ -43308,6 +43308,16 @@
               }
             ],
             "title": "Review Date"
+          },
+          "price_target": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ThesisPriceTarget"
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         },
         "additionalProperties": false,
@@ -43400,6 +43410,71 @@
         ],
         "title": "ThesisKPI",
         "description": "An absolute threshold the owner sets. v1 has no consensus-estimate comparisons."
+      },
+      "ThesisPriceTarget": {
+        "properties": {
+          "sell_target": {
+            "anyOf": [
+              {
+                "type": "number",
+                "exclusiveMinimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sell Target",
+            "description": "Price at which the thesis has played out."
+          },
+          "buy_target": {
+            "anyOf": [
+              {
+                "type": "number",
+                "exclusiveMinimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Buy Target",
+            "description": "Price at or below which buying more is attractive."
+          },
+          "currency": {
+            "type": "string",
+            "pattern": "^[A-Z]{3}$",
+            "title": "Currency",
+            "description": "Currency of both targets, as Trading212 quotes the instrument (GBX for pence).",
+            "examples": [
+              "CZK"
+            ]
+          },
+          "method": {
+            "type": "string",
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Method",
+            "description": "Valuation method the targets come from.",
+            "examples": [
+              "DCF, 10% discount rate",
+              "20x 2027 EPS"
+            ]
+          },
+          "set_on": {
+            "type": "string",
+            "format": "date",
+            "title": "Set On",
+            "description": "Date of the valuation the targets come from."
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "currency",
+          "method",
+          "set_on"
+        ],
+        "title": "ThesisPriceTarget",
+        "description": "The price levels the thesis's valuation sets, checked after each sync against the\nTrading212 price. Reaching the sell target asks for the research to be re-run: sell\nunless the new thesis raises the target. At or below the buy target the holding is a\ncandidate to add to."
       },
       "ThesisVerdictsRequest": {
         "properties": {

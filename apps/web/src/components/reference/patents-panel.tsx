@@ -3,6 +3,7 @@
 import { useCallback, useMemo } from "react";
 
 import { SrTable } from "@/components/charts";
+import { PatentActions } from "@/components/reference/patent-actions";
 import { Blueprint, PanelHeading } from "@/components/ui/blueprint";
 import { getBrowserApiClient } from "@/lib/api/client";
 import { formatNumber } from "@/lib/charts/format";
@@ -23,7 +24,7 @@ export function PatentsPanel({ ticker }: { ticker: string }) {
     () => getBrowserApiClient().GET("/holdings/{ticker}/patent-trends", { params: { path: { ticker } } }),
     [ticker],
   );
-  const { state } = useApiResource(fetcher);
+  const { state, reload } = useApiResource(fetcher);
   const raw = state.kind === "ok" ? state.data : state.kind === "error" ? state.previous : null;
   const m = useMemo(() => parsePatentTrends(raw), [raw]);
 
@@ -107,6 +108,7 @@ export function PatentsPanel({ ticker }: { ticker: string }) {
           />
         </>
       ) : null}
+      <PatentActions ticker={ticker} onChanged={reload} />
     </Blueprint>
   );
 }

@@ -9,6 +9,7 @@ import { AlertMessage } from "@/components/alert-message";
 import { RevisionLine, type RevisionLinePoint } from "@/components/charts";
 import { EmptyState } from "@/components/empty-state";
 import { PageHeader } from "@/components/page-header";
+import { MacroCoverageSummary } from "@/components/reference/macro-coverage-summary";
 import { BlueprintCorners } from "@/components/ui/blueprint";
 import { Input } from "@/components/ui/input";
 import { getBrowserApiClient } from "@/lib/api/client";
@@ -127,6 +128,7 @@ export function MacroView() {
           </ul>
         ) : null}
       </section>
+      <MacroCoverageSummary />
     </div>
   );
 }

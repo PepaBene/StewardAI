@@ -15206,6 +15206,7 @@ export interface components {
             exit_conditions?: string[];
             /** Review Date */
             review_date?: string | null;
+            price_target?: components["schemas"]["ThesisPriceTarget"] | null;
         };
         /**
          * ThesisKPI
@@ -15254,6 +15255,44 @@ export interface components {
              * @default
              */
             description: string;
+        };
+        /**
+         * ThesisPriceTarget
+         * @description The price levels the thesis's valuation sets, checked after each sync against the
+         *     Trading212 price. Reaching the sell target asks for the research to be re-run: sell
+         *     unless the new thesis raises the target. At or below the buy target the holding is a
+         *     candidate to add to.
+         */
+        ThesisPriceTarget: {
+            /**
+             * Sell Target
+             * @description Price at which the thesis has played out.
+             */
+            sell_target?: number | null;
+            /**
+             * Buy Target
+             * @description Price at or below which buying more is attractive.
+             */
+            buy_target?: number | null;
+            /**
+             * Currency
+             * @description Currency of both targets, as Trading212 quotes the instrument (GBX for pence).
+             * @example CZK
+             */
+            currency: string;
+            /**
+             * Method
+             * @description Valuation method the targets come from.
+             * @example DCF, 10% discount rate
+             * @example 20x 2027 EPS
+             */
+            method: string;
+            /**
+             * Set On
+             * Format: date
+             * @description Date of the valuation the targets come from.
+             */
+            set_on: string;
         };
         /** ThesisVerdictsRequest */
         ThesisVerdictsRequest: {

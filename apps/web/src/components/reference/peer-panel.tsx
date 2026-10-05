@@ -4,6 +4,7 @@ import { useCallback, useMemo } from "react";
 
 import { Blueprint, PanelHeading } from "@/components/ui/blueprint";
 import { getBrowserApiClient } from "@/lib/api/client";
+import { PeerSetEditor } from "@/components/reference/peer-set-editor";
 import { formatDate } from "@/lib/format";
 import { useApiResource } from "@/lib/hooks/use-api-resource";
 import { formatPeerValue, parsePeerMetrics, peerDelta, trackPositions, trackRange, type PeerRow } from "@/lib/reference/peers";
@@ -14,7 +15,7 @@ export function PeerPanel({ ticker }: { ticker: string }) {
     () => getBrowserApiClient().GET("/holdings/{ticker}/peer-metrics", { params: { path: { ticker }, query: {} } }),
     [ticker],
   );
-  const { state } = useApiResource(fetcher);
+  const { state, reload } = useApiResource(fetcher);
   const raw = state.kind === "ok" ? state.data : state.kind === "error" ? state.previous : null;
   const view = useMemo(() => parsePeerMetrics(raw), [raw]);
 
@@ -82,6 +83,7 @@ export function PeerPanel({ ticker }: { ticker: string }) {
           <p className="text-xs text-text-muted">{view.universe}</p>
         </>
       ) : null}
+      <PeerSetEditor ticker={ticker} onChanged={reload} />
     </Blueprint>
   );
 }

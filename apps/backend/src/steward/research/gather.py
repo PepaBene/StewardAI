@@ -646,7 +646,8 @@ async def gather(
             app_path=f"/holdings/{ticker}",
             tier=1,
             snippet=f"Why owned: {thesis.why_owned} KPIs: {kpis or 'none'}. Exit conditions: "
-            f"{'; '.join(thesis.exit_conditions) or 'none'}.",
+            f"{'; '.join(thesis.exit_conditions) or 'none'}. Price target: "
+            f"{thesis.price_target.describe() if thesis.price_target else 'none'}.",
         )
         verdicts = await pool.fetch(
             "select distinct on (kpi_id) id, kpi_id, status, period, rationale from"

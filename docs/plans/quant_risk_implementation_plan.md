@@ -4,7 +4,7 @@ Research snapshot: 5 October 2026. **Sequencing:** implemented after the [Mornin
 
 ## Goal and the line this plan does not cross
 
-The owner's strategy is fundamental and thesis-driven: "a price move alone is never a reason to buy or sell" (principle 4), and "a risk-limit breach only forces a review of the thesis; it is never a sell signal on its own" (principle 6). The horizon is 2–3 years and capital preservation is explicit: a deep drawdown may not recover in time.
+The owner's strategy is fundamental and thesis-driven. Price drives a trade in two cases only (principle 4): a position reaching its thesis price target is sold unless a re-researched thesis raises the target (principle 17), and a holding with an intact thesis may be added to after a 15 % fall (principle 18). "A price fall alone is never a reason to sell", and "a risk-limit breach only forces a review of the thesis; it is never a sell signal on its own" (principle 6). The horizon is 2–3 years and capital preservation is explicit: a deep drawdown may not recover in time.
 
 So quant finance here does **not** mean signals, timing or automated trading. It does three jobs:
 
@@ -51,7 +51,7 @@ The portfolio is small (8–25 positions), multi-currency (CZK base, USD/EUR lis
 ### Not doing, and why
 
 - **Mean-variance optimisation of the whole portfolio.** Expected-return error dominates; the owner's book is chosen by thesis, not by an optimizer. The deposit optimizer is deliberately small and constrained.
-- **Trend, momentum or volatility-timing signals.** Contradict principle 4. Volatility regime appears only as context in reviews.
+- **Trend, momentum or volatility-timing signals.** Principle 4 allows price-driven trades only on a reached thesis target or an add on weakness, not on trend. Volatility regime appears only as context in reviews.
 - **Hierarchical risk parity / risk parity as a target.** Useful for systematic books; here, risk contributions are diagnostic, and tier risk budgets are the only "parity" idea used.
 - **Option-based hedging, leverage, shorting.** Excluded by principle 15a.
 - **GARCH-family models.** EWMA is close in accuracy for portfolio-level forecasting at this size and far easier to validate; revisit only if the VaR backtest fails.

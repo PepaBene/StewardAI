@@ -5,6 +5,9 @@ import { PageHeader } from "@/components/page-header";
 import { AccessPanel } from "./access-panel";
 import { BudgetPanel } from "./budget-panel";
 import { CoverageMatrixPanel } from "./coverage-matrix-panel";
+import { CoverageSummaryPanel } from "./coverage-summary-panel";
+import { JobTriggersPanel } from "./job-triggers-panel";
+import { TrailPanel } from "./trail-panel";
 import { UsagePanel } from "./usage-panel";
 
 const SECTIONS = [
@@ -12,6 +15,9 @@ const SECTIONS = [
   { id: "budget", label: "Free quota used" },
   { id: "access", label: "Endpoint access" },
   { id: "usage", label: "Usage over time" },
+  { id: "coverage-summary", label: "Coverage in numbers" },
+  { id: "trail", label: "Alert decisions" },
+  { id: "run-job", label: "Run a job now" },
 ] as const;
 
 /**
@@ -42,6 +48,9 @@ export function DataSourcesView() {
       <BudgetPanel />
       <AccessPanel />
       <UsagePanel />
+      <CoverageSummaryPanel />
+      <TrailPanel />
+      <JobTriggersPanel />
     </div>
   );
 }

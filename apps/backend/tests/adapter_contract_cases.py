@@ -79,7 +79,8 @@ def jfix(*parts: str) -> Any:
 
 
 def tfix(*parts: str) -> str:
-    return FIX.joinpath(*parts).read_text()
+    # UTF-8 explicitly: the default on Windows is cp1250, which mangles the BOM some fixtures carry.
+    return FIX.joinpath(*parts).read_text(encoding="utf-8")
 
 
 def bfix(*parts: str) -> bytes:

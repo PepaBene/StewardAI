@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useCallback, useMemo } from "react";
 
+import { MacroExposureEditor } from "@/components/reference/macro-exposure-editor";
 import { Blueprint, PanelHeading } from "@/components/ui/blueprint";
 import { getBrowserApiClient } from "@/lib/api/client";
 import { formatPct } from "@/lib/charts/format";
@@ -25,6 +26,7 @@ export function MacroContextPanel({ ticker }: { ticker: string }) {
   const view = useMemo(() => (data ? contextView(data) : null), [data]);
 
   return (
+    <>
     <Blueprint aria-labelledby="macro-heading" className="flex min-w-0 flex-col gap-3 px-[22px] py-5">
       <PanelHeading
         kicker="Country and industry context"
@@ -41,7 +43,11 @@ export function MacroContextPanel({ ticker }: { ticker: string }) {
       {view && view.exposureUnknown ? (
         <p className="max-w-[68ch] border border-dashed border-border px-3 py-2 text-sm text-text-muted">
           This holding has no mapped country or product exposure, so no figure below is attributed to it. Map its revenue
-          by region in the exposure editor to see how these figures could affect it.
+          by region in the{" "}
+          <a href="#exposure-editor" className="text-accent-ink underline">
+            exposure editor
+          </a>{" "}
+          below to see how these figures could affect it.
         </p>
       ) : null}
 
@@ -105,6 +111,8 @@ export function MacroContextPanel({ ticker }: { ticker: string }) {
         </details>
       ) : null}
     </Blueprint>
+    <MacroExposureEditor ticker={ticker} />
+    </>
   );
 }
 

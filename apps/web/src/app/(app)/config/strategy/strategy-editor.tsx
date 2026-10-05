@@ -734,7 +734,7 @@ function RiskPanel({ form, errors, set }: SectionProps) {
         </h2>
         <p className="text-sm text-text-muted">
           Checked after every sync; leave a field blank to switch that limit off. A breach asks for a thesis review, it
-          never means sell: trades follow fundamentals and news, not price.
+          never means sell: a price fall alone is not a reason to sell.
         </p>
       </div>
       <div className="grid gap-3 sm:grid-cols-2">

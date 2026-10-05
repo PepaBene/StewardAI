@@ -1,4 +1,9 @@
-import type { ThesesConfig, ThesisConfig, ThesisKPI } from "@/lib/api/client";
+import type {
+  ThesesConfig,
+  ThesisConfig,
+  ThesisKPI,
+  ThesisPriceTarget,
+} from "@/lib/api/client";
 
 /*
  * Editable form state for the theses config, and the conversion to and from the body the
@@ -36,7 +41,17 @@ export const KNOWN_METRICS = [
   "bookings",
 ] as const;
 
-export const UNIT_EXAMPLES = ["%", "x", "count", "USD", "USD m", "USD bn", "EUR m", "EUR bn", "USD per share"];
+export const UNIT_EXAMPLES = [
+  "%",
+  "x",
+  "count",
+  "USD",
+  "USD m",
+  "USD bn",
+  "EUR m",
+  "EUR bn",
+  "USD per share",
+];
 
 export type KpiForm = {
   key: string; // React key only
@@ -57,6 +72,24 @@ export type ThesisForm = {
   exit_conditions: string; // one per line
   review_date: string; // yyyy-mm-dd or ""
   kpis: KpiForm[];
+  target: TargetForm;
+};
+
+/** The thesis price target; all fields blank means no target. */
+export type TargetForm = {
+  sell_target: string;
+  buy_target: string;
+  currency: string;
+  method: string;
+  set_on: string; // yyyy-mm-dd or ""
+};
+
+export const EMPTY_TARGET: TargetForm = {
+  sell_target: "",
+  buy_target: "",
+  currency: "",
+  method: "",
+  set_on: "",
 };
 
 let counter = 0;
@@ -93,7 +126,40 @@ export function newKpi(metric = "revenue_growth_yoy"): KpiForm {
 }
 
 export function newThesis(ticker = ""): ThesisForm {
-  return { key: nextKey(), ticker, why_owned: "", exit_conditions: "", review_date: "", kpis: [] };
+  return {
+    key: nextKey(),
+    ticker,
+    why_owned: "",
+    exit_conditions: "",
+    review_date: "",
+    kpis: [],
+    target: EMPTY_TARGET,
+  };
+}
+
+export function targetFromBody(
+  target: ThesisPriceTarget | null | undefined,
+): TargetForm {
+  if (!target) return EMPTY_TARGET;
+  return {
+    sell_target: target.sell_target == null ? "" : String(target.sell_target),
+    buy_target: target.buy_target == null ? "" : String(target.buy_target),
+    currency: target.currency,
+    method: target.method,
+    set_on: target.set_on,
+  };
+}
+
+/** Null when every field is blank; otherwise sent as typed, so the API's 422 reports gaps. */
+export function targetToBody(form: TargetForm): ThesisPriceTarget | null {
+  if (Object.values(form).every((v) => !v.trim())) return null;
+  return {
+    sell_target: parseThreshold(form.sell_target),
+    buy_target: parseThreshold(form.buy_target),
+    currency: form.currency.trim().toUpperCase(),
+    method: form.method.trim(),
+    set_on: form.set_on,
+  };
 }
 
 export function kpiFromBody(kpi: ThesisKPI): KpiForm {
@@ -118,6 +184,7 @@ export function thesesFromBody(body: ThesesConfig | null): ThesisForm[] {
     exit_conditions: (thesis.exit_conditions ?? []).join("\n"),
     review_date: thesis.review_date ?? "",
     kpis: (thesis.kpis ?? []).map(kpiFromBody),
+    target: targetFromBody(thesis.price_target),
   }));
 }
 
@@ -132,25 +199,22 @@ export function parseThreshold(text: string): number | null {
 export function thesesToBody(forms: ThesisForm[]): ThesesConfig {
   return {
     schema_version: 1,
-    theses: forms.map(
-      (form): ThesisConfig => ({
-        ticker: form.ticker.trim(),
-        why_owned: form.why_owned.trim(),
-        exit_conditions: lines(form.exit_conditions),
-        review_date: form.review_date || null,
-        kpis: form.kpis.map(
-          (kpi): ThesisKPI => ({
-            id: kpi.id.trim(),
-            metric: kpi.metric.trim(),
-            operator: kpi.operator,
-            threshold: parseThreshold(kpi.threshold) as number,
-            unit: kpi.unit.trim(),
-            basis: kpi.basis,
-            period: kpi.period,
-            description: kpi.description.trim(),
-          }),
-        ),
-      }),
-    ),
+    theses: forms.map((form): ThesisConfig => ({
+      ticker: form.ticker.trim(),
+      why_owned: form.why_owned.trim(),
+      exit_conditions: lines(form.exit_conditions),
+      review_date: form.review_date || null,
+      kpis: form.kpis.map((kpi): ThesisKPI => ({
+        id: kpi.id.trim(),
+        metric: kpi.metric.trim(),
+        operator: kpi.operator,
+        threshold: parseThreshold(kpi.threshold) as number,
+        unit: kpi.unit.trim(),
+        basis: kpi.basis,
+        period: kpi.period,
+        description: kpi.description.trim(),
+      })),
+      price_target: targetToBody(form.target),
+    })),
   };
 }
