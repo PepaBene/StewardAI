@@ -1,6 +1,6 @@
 "use client";
 
-import { LoaderCircleIcon, RefreshCwIcon } from "lucide-react";
+import { LoaderCircleIcon, PencilIcon, RefreshCwIcon } from "lucide-react";
 import Link from "next/link";
 import { useMemo, useState } from "react";
 
@@ -11,7 +11,10 @@ import { Button } from "@/components/ui/button";
 import { getBrowserApiClient } from "@/lib/api/client";
 import { formatDate } from "@/lib/format";
 import { useApiResource } from "@/lib/hooks/use-api-resource";
+import type { LedgerDraft } from "@/lib/funds/forms";
 import { flagText, rankRows, TIERS, tierCounts, tierLabel, type LedgerRow } from "@/lib/funds/ledger";
+
+import { draftFromRow, LedgerEditor } from "./ledger-editor";
 
 const fetchLedger = () => getBrowserApiClient().GET("/funds/coverage-ledger");
 
@@ -27,6 +30,7 @@ export function LedgerPanel() {
   const counts = useMemo(() => tierCounts(rows), [rows]);
   const [busy, setBusy] = useState(false);
   const [note, setNote] = useState<string | null>(null);
+  const [editor, setEditor] = useState<{ key: number; draft: LedgerDraft | null } | null>(null);
 
   const refresh = async () => {
     setBusy(true);
@@ -75,7 +79,7 @@ export function LedgerPanel() {
               </thead>
               <tbody>
                 {rows.map((r) => (
-                  <LedgerLine key={`${r.subject_kind}:${r.subject_key}`} row={r} />
+                  <LedgerLine key={`${r.subject_kind}:${r.subject_key}`} row={r} onEdit={() => setEditor({ key: Date.now(), draft: draftFromRow(r) })} />
                 ))}
               </tbody>
             </table>
@@ -101,7 +105,20 @@ export function LedgerPanel() {
         </dl>
       </details>
 
+      {editor ? (
+        <LedgerEditor
+          key={editor.key}
+          initial={editor.draft}
+          onSaved={reload}
+          onClose={() => setEditor(null)}
+        />
+      ) : null}
+
       <div className="flex flex-wrap items-center gap-3">
+        <Button type="button" variant="outline" size="sm" onClick={() => setEditor({ key: Date.now(), draft: null })}>
+          <PencilIcon aria-hidden="true" className="size-4" />
+          Record an entry
+        </Button>
         <Button type="button" variant="outline" size="sm" onClick={refresh} disabled={busy}>
           {busy ? <LoaderCircleIcon aria-hidden="true" className="size-4 animate-spin" /> : <RefreshCwIcon aria-hidden="true" className="size-4" />}
           Refresh ledger
@@ -114,11 +131,14 @@ export function LedgerPanel() {
   );
 }
 
-function LedgerLine({ row }: { row: LedgerRow }) {
+function LedgerLine({ row, onEdit }: { row: LedgerRow; onEdit: () => void }) {
   return (
     <tr className="border-b border-border-soft align-top last:border-0">
       <td className="px-3 py-2">
         <div className="font-medium">{row.label}</div>
+        <button type="button" onClick={onEdit} className="text-xs text-accent-ink hover:underline" aria-label={`Correct the entry for ${row.label}`}>
+          {row.origin === "manual" ? "Correct" : "Verify by hand"}
+        </button>
         <div className="font-mono text-[11px] text-text-muted">
           {row.subject_kind === "fund" ? row.subject_key : `Index ${row.subject_key}`}
           {row.origin === "manual" ? " · verified by you" : ""}

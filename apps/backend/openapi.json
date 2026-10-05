@@ -14604,7 +14604,10 @@
                 "ir_releases",
                 "sec_fsds_backfill",
                 "pdmr_uk",
-                "graph_review"
+                "graph_review",
+                "fmp_company",
+                "alpha_vantage_statements",
+                "epo_patents"
               ]
             },
             "type": "array",
@@ -14658,7 +14661,10 @@
                 "ir_releases",
                 "sec_fsds_backfill",
                 "pdmr_uk",
-                "graph_review"
+                "graph_review",
+                "fmp_company",
+                "alpha_vantage_statements",
+                "epo_patents"
               ]
             },
             "type": "object",
@@ -30270,6 +30276,18 @@
           "graph_review": {
             "$ref": "#/components/schemas/JobSchedule",
             "description": "Review SEC relationship candidates, extract deal events and reconcile parent changes. Default: daily 07:40."
+          },
+          "fmp_company": {
+            "$ref": "#/components/schemas/JobSchedule",
+            "description": "FMP free tier: company profile (sector, industry) and annual analyst estimates of holdings that map an EDGAR/Finnhub ticker. Off by default; also needs providers.fmp.enabled and a passed endpoint probe. At most two requests per holding, inside the provider's daily budget."
+          },
+          "alpha_vantage_statements": {
+            "$ref": "#/components/schemas/JobSchedule",
+            "description": "Alpha Vantage annual statements of holdings with a confirmed listing and an explicit symbol mapping, stalest first, a few per run so the shared 25-a-day budget keeps its reserve. Off by default; also needs providers.alpha_vantage.enabled."
+          },
+          "epo_patents": {
+            "$ref": "#/components/schemas/JobSchedule",
+            "description": "EPO OPS patent-family refresh for the stalest holdings (a few per run). Off by default; also needs providers.epo_ops.enabled and the OPS client credentials."
           },
           "valuation_refresh": {
             "$ref": "#/components/schemas/JobSchedule",

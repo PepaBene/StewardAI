@@ -1487,6 +1487,31 @@ class JobsConfig(ConfigModel):
             "changes. Default: daily 07:40."
         ),
     )
+    fmp_company: JobSchedule = Field(
+        default_factory=lambda: JobSchedule(cron="20 9 * * 6", enabled=False),
+        description=(
+            "FMP free tier: company profile (sector, industry) and annual analyst estimates "
+            "of holdings that map an EDGAR/Finnhub ticker. Off by default; also needs "
+            "providers.fmp.enabled and a passed endpoint probe. At most two requests per "
+            "holding, inside the provider's daily budget."
+        ),
+    )
+    alpha_vantage_statements: JobSchedule = Field(
+        default_factory=lambda: JobSchedule(cron="40 9 * * 6", enabled=False),
+        description=(
+            "Alpha Vantage annual statements of holdings with a confirmed listing and an "
+            "explicit symbol mapping, stalest first, a few per run so the shared 25-a-day "
+            "budget keeps its reserve. Off by default; also needs "
+            "providers.alpha_vantage.enabled."
+        ),
+    )
+    epo_patents: JobSchedule = Field(
+        default_factory=lambda: JobSchedule(cron="0 10 1 * *", enabled=False),
+        description=(
+            "EPO OPS patent-family refresh for the stalest holdings (a few per run). Off by "
+            "default; also needs providers.epo_ops.enabled and the OPS client credentials."
+        ),
+    )
     valuation_refresh: JobSchedule = Field(
         default_factory=lambda: JobSchedule(cron="45 7 * * *"),
         description="Fundamentals (SEC XBRL, ESEF) of holdings that filed since the last read "
@@ -1558,6 +1583,9 @@ class JobsConfig(ConfigModel):
             "sec_fsds_backfill": self.sec_fsds_backfill,
             "pdmr_uk": self.pdmr_uk,
             "graph_review": self.graph_review,
+            "fmp_company": self.fmp_company,
+            "alpha_vantage_statements": self.alpha_vantage_statements,
+            "epo_patents": self.epo_patents,
             "etf_look_through": self.etf_look_through,
             "sec_xbrl": self.sec_xbrl,
         }

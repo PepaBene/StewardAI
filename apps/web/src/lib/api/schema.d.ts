@@ -4811,7 +4811,7 @@ export interface components {
              * Critical Job Types
              * @description Job types that run normally at the monthly cap.
              */
-            critical_job_types?: ("portfolio_sync" | "earnings_check" | "thesis_verdicts" | "earnings_calendar" | "earnings_calendar_full" | "earnings_due" | "fact_reconcile" | "reference_data" | "price_history" | "intraday_prices" | "holiday_refresh" | "macro_collect" | "public_data_collect" | "source_audit" | "event_escalation" | "monitor" | "news_ingest" | "daily_digest" | "weekly_digest" | "research" | "ownership_13f" | "insider_trades" | "etf_look_through" | "monthly_review" | "chat" | "sec_xbrl" | "valuation_refresh" | "control_stakes" | "nport_holdings" | "fund_probes" | "fund_characteristics_audit" | "free_source_alerts" | "shadow_snapshot" | "shadow_report" | "raw_retention" | "zero_cost_gate" | "returns_refresh" | "exchange_probes" | "ir_releases" | "sec_fsds_backfill" | "pdmr_uk" | "graph_review")[];
+            critical_job_types?: ("portfolio_sync" | "earnings_check" | "thesis_verdicts" | "earnings_calendar" | "earnings_calendar_full" | "earnings_due" | "fact_reconcile" | "reference_data" | "price_history" | "intraday_prices" | "holiday_refresh" | "macro_collect" | "public_data_collect" | "source_audit" | "event_escalation" | "monitor" | "news_ingest" | "daily_digest" | "weekly_digest" | "research" | "ownership_13f" | "insider_trades" | "etf_look_through" | "monthly_review" | "chat" | "sec_xbrl" | "valuation_refresh" | "control_stakes" | "nport_holdings" | "fund_probes" | "fund_characteristics_audit" | "free_source_alerts" | "shadow_snapshot" | "shadow_report" | "raw_retention" | "zero_cost_gate" | "returns_refresh" | "exchange_probes" | "ir_releases" | "sec_fsds_backfill" | "pdmr_uk" | "graph_review" | "fmp_company" | "alpha_vantage_statements" | "epo_patents")[];
             /**
              * Per Job Cap Usd
              * @description Most AI spend of one run of a job type, in USD. A run over it fails.
@@ -10467,6 +10467,12 @@ export interface components {
             pdmr_uk?: components["schemas"]["JobSchedule"];
             /** @description Review SEC relationship candidates, extract deal events and reconcile parent changes. Default: daily 07:40. */
             graph_review?: components["schemas"]["JobSchedule"];
+            /** @description FMP free tier: company profile (sector, industry) and annual analyst estimates of holdings that map an EDGAR/Finnhub ticker. Off by default; also needs providers.fmp.enabled and a passed endpoint probe. At most two requests per holding, inside the provider's daily budget. */
+            fmp_company?: components["schemas"]["JobSchedule"];
+            /** @description Alpha Vantage annual statements of holdings with a confirmed listing and an explicit symbol mapping, stalest first, a few per run so the shared 25-a-day budget keeps its reserve. Off by default; also needs providers.alpha_vantage.enabled. */
+            alpha_vantage_statements?: components["schemas"]["JobSchedule"];
+            /** @description EPO OPS patent-family refresh for the stalest holdings (a few per run). Off by default; also needs providers.epo_ops.enabled and the OPS client credentials. */
+            epo_patents?: components["schemas"]["JobSchedule"];
             /** @description Fundamentals (SEC XBRL, ESEF) of holdings that filed since the last read (all of them weekly) and the ETF providers' fund P/E and P/B. Default: daily 07:45. */
             valuation_refresh?: components["schemas"]["JobSchedule"];
             /** @description ETF look-through: the funds' holdings from iShares and Vanguard, skipped when the as-of date has not moved. Default: Saturdays 06:40. */

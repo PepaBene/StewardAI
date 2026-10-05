@@ -21,6 +21,8 @@ import {
 import { parseSurprise } from "@/lib/reference/holding-charts";
 import { cn } from "@/lib/utils";
 
+import { ForwardEntry } from "./forward-entry";
+
 const fmt = (v: number | null) => (v === null ? "Not published" : formatNumber(v, 2));
 
 /**
@@ -34,7 +36,7 @@ export function EstimatesPanel({ ticker }: { ticker: string }) {
     () => getBrowserApiClient().GET("/holdings/{ticker}/forward-data/consensus", { params: { path: { ticker }, query: {} } }),
     [ticker],
   );
-  const { state } = useApiResource(fetcher);
+  const { state, reload } = useApiResource(fetcher);
   const raw = state.kind === "ok" ? state.data : state.kind === "error" ? state.previous : null;
   const view = useMemo(() => parseForward(raw), [raw]);
   const periods = view ? consensusPeriods(view) : [];
@@ -94,6 +96,8 @@ export function EstimatesPanel({ ticker }: { ticker: string }) {
       {view && view.consensus.length > 0 ? <SurpriseCharts ticker={ticker} series={view.consensus} /> : null}
 
       {view && view.others.length > 0 ? <OtherEstimates rows={view.others} /> : null}
+
+      <ForwardEntry ticker={ticker} onSaved={reload} />
     </Blueprint>
   );
 }

@@ -7,6 +7,7 @@ import { useCallback, useMemo, useState } from "react";
 import { LineChart } from "@/components/charts";
 import { EmptyState } from "@/components/empty-state";
 import { dataOf, Panel, ResourceNotice } from "@/components/oversight/panel";
+import { OwnerTag } from "@/components/reference/form-bits";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -16,6 +17,8 @@ import { expenseSeries, ISIN_RE, parseFactsheets } from "@/lib/funds/funds";
 import { useApiResource } from "@/lib/hooks/use-api-resource";
 import { formatCompactMoney } from "@/lib/portfolio/money";
 import { titleCase } from "@/lib/parse-untyped";
+
+import { FactsheetEditor } from "./factsheet-editor";
 
 const NOT_PUBLISHED = <span className="text-text-muted">Not published</span>;
 
@@ -63,7 +66,7 @@ function FactsheetBody({ isin }: { isin: string }) {
     () => getBrowserApiClient().GET("/funds/{isin}/factsheet", { params: { path: { isin }, query: { limit: 24 } } }),
     [isin],
   );
-  const { state } = useApiResource(fetcher);
+  const { state, reload } = useApiResource(fetcher);
   const data = dataOf(state);
   const rows = useMemo(() => (data ? parseFactsheets(data) : []), [data]);
   const series = useMemo(() => expenseSeries(rows), [rows]);
@@ -72,6 +75,7 @@ function FactsheetBody({ isin }: { isin: string }) {
   return (
     <div className="space-y-4">
       <ResourceNotice state={state} what="factsheet" />
+      <FactsheetEditor isin={isin} onSaved={reload} />
       {data && rows.length === 0 ? (
         <EmptyState title="No factsheet recorded for this fund">
           Neither the issuer feed nor a manual entry has produced one for {isin}.
@@ -87,7 +91,14 @@ function FactsheetBody({ isin }: { isin: string }) {
             <Fact label="Benchmark" value={latest.benchmark ?? NOT_PUBLISHED} />
             <Fact label="NAV basis" value={latest.navBasis ?? NOT_PUBLISHED} />
             <Fact label="Share class" value={latest.shareClass ?? NOT_PUBLISHED} />
-            <Fact label="As of" value={<span className="num">{latest.asOf ?? "Unknown"}</span>} />
+            <Fact
+              label="As of"
+              value={
+                <span className="num">
+                  {latest.asOf ?? "Unknown"} {latest.source === "manual" ? <OwnerTag>Entered by you</OwnerTag> : null}
+                </span>
+              }
+            />
           </dl>
           {!latest.fieldNamesVerified ? (
             <p className="text-xs text-text-muted">The issuer payload field names for this row are unverified; check the figures against the issuer factsheet.</p>
@@ -121,7 +132,9 @@ function FactsheetBody({ isin }: { isin: string }) {
                   <tr key={`${r.asOf}-${i}`} className="border-b border-border-soft">
                     <td className="num py-1.5 pr-3">{r.asOf ?? "Unknown"}</td>
                     <td className="num py-1.5 pr-3 text-right">{r.expenseRatio === null ? NOT_PUBLISHED : formatPct(r.expenseRatio, 2)}</td>
-                    <td className="py-1.5 pr-3 text-xs text-text-muted">{r.source ?? "Unknown"}</td>
+                    <td className="py-1.5 pr-3 text-xs text-text-muted">
+                      {r.source === "manual" ? <OwnerTag>Entered by you</OwnerTag> : (r.source ?? "Unknown")}
+                    </td>
                     <td className="py-1.5 text-xs text-text-muted">{r.note ?? ""}</td>
                   </tr>
                 ))}

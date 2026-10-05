@@ -12,6 +12,8 @@ import { formatPct } from "@/lib/charts/format";
 import { parseLookThrough } from "@/lib/funds/funds";
 import { useApiResource } from "@/lib/hooks/use-api-resource";
 
+import { PinSnapshot } from "./pin-snapshot";
+
 function today(): string {
   const d = new Date();
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
@@ -93,6 +95,7 @@ export function LookThroughPanel() {
               <li key={n}>{n}</li>
             ))}
           </ul>
+          <PinSnapshot key={asOf} asOf={asOf} snapshotCount={lt.snapshotIds.length} />
         </div>
       ) : null}
     </Panel>

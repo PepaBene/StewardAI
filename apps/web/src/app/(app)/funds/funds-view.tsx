@@ -8,6 +8,7 @@ import { PageHeader } from "@/components/page-header";
 import { ISIN_RE } from "@/lib/funds/funds";
 
 import { AggregatePanel } from "./aggregate-panel";
+import { CharacteristicsAuditPanel } from "./characteristics-audit-panel";
 import { FactsheetPanel } from "./factsheet-panel";
 import { LedgerPanel } from "./ledger-panel";
 import { LookThroughPanel } from "./look-through-panel";
@@ -19,6 +20,7 @@ const SECTIONS = [
   { id: "look-through", label: "Look-through" },
   { id: "factsheet", label: "Factsheet" },
   { id: "ledger", label: "Where data comes from" },
+  { id: "audit", label: "P/E and P/B audit" },
 ] as const;
 
 /**
@@ -42,6 +44,7 @@ export function FundsView() {
       <LookThroughPanel />
       <FactsheetPanel isin={isin} />
       <LedgerPanel />
+      <CharacteristicsAuditPanel />
       <p className="text-xs text-text-muted">
         Related:{" "}
         <Link href="/holdings" className="text-accent-ink hover:underline">

@@ -20,7 +20,7 @@ from steward.graph.patents import store_patent_family  # noqa: F401 - re-exporte
 from steward.market_analysis import UNHANDLED_KINDS, Action, PricePoint, calculate_return
 from steward.reference.calendar import expected_sessions
 from steward.reference.price_series import series_mic
-from steward.sources.base import AccessResult, AccessState
+from steward.sources.base import AccessResult, AccessState, Priority
 from steward.sources.free_market import (
     FreeSourceError,
     alpha_statement,
@@ -158,8 +158,13 @@ async def collect_alpha_vantage_statement(
     symbol: str,
     function: Literal["INCOME_STATEMENT", "BALANCE_SHEET", "CASH_FLOW"],
     api_key: str,
+    priority: Priority = Priority.NORMAL,
+    reserve_credits: int = 0,
 ) -> dict[str, int | str]:
-    """Fetch one gated Alpha Vantage statement, preserving revisions and provenance."""
+    """Fetch one gated Alpha Vantage statement, preserving revisions and provenance.
+
+    Scheduled callers pass `Priority.BACKGROUND` and the provider's reserve so an
+    owner-triggered request can still spend the credits they leave."""
     gates = await pool.fetch(
         """select endpoint,state,hard_blocked from public.provider_access
            where provider='alpha_vantage' and endpoint in ('account_free','financial_statements')"""
@@ -172,10 +177,14 @@ async def collect_alpha_vantage_statement(
     ):
         raise RuntimeError("Alpha Vantage account and statement access gates must be available")
     governor = PostgresRequestGovernor(pool)
-    budget = Budget(daily=Decimal(25))
+    budget = Budget(daily=Decimal(25), reserve=Decimal(reserve_credits))
     try:
-        await governor.reserve("alpha_vantage", "account_free", Decimal(1), budget)
-        await governor.reserve("alpha_vantage", "financial_statements", Decimal(1), budget)
+        await governor.reserve(
+            "alpha_vantage", "account_free", Decimal(1), budget, priority=priority
+        )
+        await governor.reserve(
+            "alpha_vantage", "financial_statements", Decimal(1), budget, priority=priority
+        )
         payload = await alpha_statement(http, api_key, symbol, function)
         statement = {
             "INCOME_STATEMENT": "income",

@@ -43,6 +43,11 @@ from steward.research.run import research_handler
 from steward.review.monthly import monthly_review_handler
 from steward.sources.audit import source_audit_handler
 from steward.sources.fund_probes import fund_probes_handler
+from steward.sources.provider_jobs import (
+    alpha_vantage_statements_handler,
+    epo_patents_handler,
+    fmp_company_handler,
+)
 from steward.valuation.collect import valuation_refresh_handler
 from steward.verify_sources.jobs import (
     raw_retention_handler,
@@ -94,6 +99,9 @@ JobType = Literal[
     "sec_fsds_backfill",
     "pdmr_uk",
     "graph_review",
+    "fmp_company",
+    "alpha_vantage_statements",
+    "epo_patents",
 ]
 
 JOB_HANDLERS: dict[str, JobHandler] = {
@@ -139,4 +147,7 @@ JOB_HANDLERS: dict[str, JobHandler] = {
     "sec_fsds_backfill": sec_fsds_backfill_handler,
     "pdmr_uk": pdmr_uk_handler,
     "graph_review": graph_review_handler,
+    "fmp_company": fmp_company_handler,
+    "alpha_vantage_statements": alpha_vantage_statements_handler,
+    "epo_patents": epo_patents_handler,
 }

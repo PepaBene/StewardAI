@@ -953,6 +953,11 @@ NON_ADAPTER_MODULES: dict[str, str] = {
     "steward.sources.ciks": "CIK normalisation helper, covered by test_funds_stream_hardening",
     "steward.sources.credit_group": "governor credit-group reservation helper: no parser and no "
     "network contract of its own",
+    "steward.sources.fmp": "FMP profile/estimates parsers and transport, covered by "
+    "tests/test_provider_jobs.py (drift, empty, 402/429 and error-envelope cases; payload field "
+    "names unverified against a live response)",
+    "steward.sources.provider_jobs": "scheduled job orchestration over the governed collectors: "
+    "no parser and no network contract of its own (planning covered by test_provider_jobs)",
     "steward.sources.xbrl_concepts": "static XBRL concept classification table: no parser and no "
     "network contract of its own (the parsers that use it are covered under steward.sources.xbrl)",
 }
