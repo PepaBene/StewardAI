@@ -107,7 +107,7 @@ export function ReturnsPanel({ ticker }: { ticker: string }) {
     <ReadPanel id="returns" kicker="Performance · computed on request" title="Returns over a window" fetcher={fetcher} intro="Raw price change, price change adjusted for splits, and total return including dividends. Total return is shown only when corporate actions are confirmed and complete; otherwise it stays unknown with the reason.">
       {(raw) => {
         const v = parseReturns(raw);
-        const max = Math.max(0.0001, ...(v?.bars.map((b) => Math.abs(b.value ?? 0)) ?? []));
+        const max = Math.max(0.0001, ...v.bars.map((b) => Math.abs(b.value ?? 0)));
         return (
           <>
             <form
@@ -203,8 +203,7 @@ export function CompanyObservationsPanel({ ticker }: { ticker: string }) {
   return (
     <ReadPanel id="observations" kicker="Company research · vendor-reported" title="Company research observations" fetcher={fetcher} intro="Facts a research provider reported about the company. They are the provider's claims, not filings, and are kept apart from your own entries.">
       {(d) => {
-        const rows = listIn(d, ["observations"]);
-        return rows.length === 0 ? <Empty>No provider has reported observations for {ticker}. Fetch them under Fetch more data.</Empty> : <RecordTable rows={rows} caption="Company research observations" />;
+        return d.observations.length === 0 ? <Empty>No provider has reported observations for {ticker}. Fetch them under Fetch more data.</Empty> : <RecordTable rows={d.observations} caption="Company research observations" />;
       }}
     </ReadPanel>
   );

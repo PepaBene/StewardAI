@@ -22,7 +22,7 @@ export function InputCostsPanel({ ticker }: { ticker: string }) {
   );
   const { state } = useApiResource(fetcher);
   const raw = state.kind === "ok" ? state.data : state.kind === "error" ? state.previous : null;
-  const view = useMemo(() => parseExposureInputs(raw), [raw]);
+  const view = useMemo(() => (raw ? parseExposureInputs(raw) : null), [raw]);
 
   return (
     <Blueprint aria-labelledby="inputs-heading" className="flex min-w-0 flex-col gap-3 px-[22px] py-5">

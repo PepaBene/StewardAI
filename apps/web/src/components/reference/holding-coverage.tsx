@@ -175,7 +175,7 @@ export function CorporateActionCoveragePanel({ ticker }: { ticker: string }) {
   );
   const { state, reload } = useApiResource(fetcher);
   const raw = state.kind === "ok" ? state.data : state.kind === "error" ? state.previous : null;
-  const entries = useMemo(() => parseCoverage(raw), [raw]);
+  const entries = useMemo(() => parseCoverage(raw ?? null), [raw]);
 
   const uid = useId();
   const [draft, setDraft] = useState<CoverageDraft>({ through: "", sourceUrl: "", reason: "" });

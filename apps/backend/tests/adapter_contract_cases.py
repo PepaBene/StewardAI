@@ -946,6 +946,12 @@ NON_ADAPTER_MODULES: dict[str, str] = {
     "steward.sources.base": "the contract itself (AccessState, access_from_http)",
     "steward.sources.governor": "quota governor, covered by test_quota_reset_* in the harness",
     "steward.sources.store": "persistence boundary, covered by DB tests",
+    "steward.sources.governed_http": "governed GET that needs a database pool; denial mapping "
+    "is covered by the shared classifier cases",
+    "steward.sources.companies_house": "parsers covered by test_registry_sources; the fetch "
+    "needs a database pool and is exercised by the DB tests",
+    "steward.sources.edinet": "parsers covered by test_registry_sources; the fetch needs a "
+    "database pool and is exercised by the DB tests",
     "steward.sources.reconcile": "pure comparison, covered by test_free_sources",
     "steward.sources.documents": "persistence of fetched documents, covered by DB tests",
     "steward.sources.audit": "endpoint probe classifier, covered by CLASSIFIER_CASES",

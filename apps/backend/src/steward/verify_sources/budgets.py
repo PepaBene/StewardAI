@@ -47,6 +47,9 @@ NO_OVERAGE_PROVIDERS: dict[str, str] = {
     "fred": "free API key, no paid tier; requests over the rate limit are refused",
     "finnhub": "free key limited to 60 calls/minute; over the limit answers 429, never bills",
     "twelve_data": "Basic plan has fixed daily/minute credits; over them answers 429, never bills",
+    "companies_house": "free API key with a 600-requests-per-5-minutes limit; over it answers "
+    "429, there is no paid tier",
+    "edinet": "free Subscription-Key API of the Japan FSA; no paid tier exists",
     "epo_ops": "non-paying OPS use has a weekly volume allowance; over it requests are "
     "throttled or refused, and billing needs a signed contract",
 }
@@ -61,6 +64,7 @@ BUDGET_SITES: dict[str, int] = {
     "steward/sources/audit.py": 2,
     "steward/sources/company_research.py": 4,
     "steward/sources/fund_probes.py": 1,
+    "steward/sources/twelvedata.py": 1,
     "steward/valuation/collect.py": 1,
 }
 
@@ -96,6 +100,7 @@ def capped_settings_budget(settings: Any, cap: int) -> Budget:
 
 def literal_budgets() -> list[CollectorBudget]:
     from steward.reference.exchange_probes import FINNHUB_BUDGET, TWELVE_BUDGET
+    from steward.sources.twelvedata import ACTIONS_BUDGET
     from steward.valuation.collect import ALPHA_VANTAGE_DAILY_LIMIT
 
     av = "alpha_vantage"
@@ -124,6 +129,8 @@ def literal_budgets() -> list[CollectorBudget]:
         # the module's own constants, so the registry cannot drift from them
         ("finnhub", ANY_ENDPOINT, FINNHUB_BUDGET, "steward/reference/exchange_probes.py"),
         ("twelve_data", ANY_ENDPOINT, TWELVE_BUDGET, "steward/reference/exchange_probes.py"),
+        ("twelve_data", "corporate_actions", ACTIONS_BUDGET, "steward/sources/twelvedata.py"),
+        ("twelve_data", "splits", ACTIONS_BUDGET, "steward/sources/twelvedata.py"),
     ]
     return [CollectorBudget(p, e, b, w, "literal") for p, e, b, w in rows]
 

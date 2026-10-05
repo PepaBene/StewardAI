@@ -168,35 +168,26 @@ export type AuditEntry = {
   indexPb: number | null;
 };
 
-const isRec = (v: unknown): v is Record<string, unknown> => typeof v === "object" && v !== null && !Array.isArray(v);
-const s = (v: unknown): string | null => (typeof v === "string" && v ? v : null);
-const n = (v: unknown): number | null => {
-  if (v === null || v === undefined || v === "" || typeof v === "boolean") return null;
-  const x = typeof v === "number" ? v : Number(v);
-  return Number.isFinite(x) ? x : null;
-};
+type AuditRow = components["schemas"]["CharacteristicsAuditRow"];
 
-export function parseAudit(payload: unknown): AuditEntry[] {
-  if (!Array.isArray(payload)) return [];
+/** Typed rows from GET /funds/characteristics-audit; an unrecognised verdict is shown as "unknown". */
+export function parseAudit(rows: readonly AuditRow[]): AuditEntry[] {
   const ids = new Set<string>(VERDICTS.map((v) => v.id));
-  return payload.filter(isRec).map((r, i) => {
-    const verdict = s(r.verdict);
-    return {
-      key: `${s(r.fund_key) ?? "?"}|${s(r.observed_at) ?? i}|${i}`,
-      fundKey: s(r.fund_key) ?? "Unknown",
-      provider: s(r.provider),
-      asOf: s(r.as_of),
-      observedAt: s(r.observed_at),
-      verdict: verdict && ids.has(verdict) ? (verdict as AuditVerdict) : "unknown",
-      alert: r.alert === true,
-      fingerprint: s(r.fingerprint),
-      basis: s(r.basis),
-      pe: n(r.pe),
-      pb: n(r.pb),
-      indexPe: n(r.index_pe),
-      indexPb: n(r.index_pb),
-    };
-  });
+  return rows.map((r, i) => ({
+    key: `${r.fund_key}|${r.observed_at}|${i}`,
+    fundKey: r.fund_key || "Unknown",
+    provider: r.provider || null,
+    asOf: r.as_of || null,
+    observedAt: r.observed_at || null,
+    verdict: ids.has(r.verdict) ? (r.verdict as AuditVerdict) : "unknown",
+    alert: r.alert,
+    fingerprint: r.fingerprint || null,
+    basis: r.basis || null,
+    pe: r.pe ?? null,
+    pb: r.pb ?? null,
+    indexPe: r.index_pe ?? null,
+    indexPb: r.index_pb ?? null,
+  }));
 }
 
 export const verdictLabel = (v: AuditEntry["verdict"]): string => VERDICTS.find((x) => x.id === v)?.label ?? "Unknown";

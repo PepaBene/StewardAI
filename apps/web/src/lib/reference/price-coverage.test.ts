@@ -56,32 +56,30 @@ describe("exchange sessions", () => {
     expect(basisLabel(null)).toBe("Calendar basis not stated");
   });
 
-  it("reads special days from strings and objects", () => {
+  it("reads the typed confirmed special days, sorted, skipping malformed dates", () => {
     const info = parseExpected({
-      basis: "confirmed_sessions",
-      count: 20,
-      confirmed_days: ["2026-09-02", { date: "2026-08-31", kind: "half_day", close_time: "13:00" }, { foo: 1 }],
+      mic: "XNYS", start: "2026-08-01", end: "2026-09-30", basis: "confirmed_sessions", count: 20, confirmed_days: ["2026-09-02", "2026-08-31", "bad"], days: [],
     });
-    expect(info?.count).toBe(20);
-    expect(info?.special.map((s) => s.date)).toEqual(["2026-08-31", "2026-09-02"]);
-    expect(info?.special[0].label).toBe("half day (closes 13:00)");
-    expect(parseExpected("nope")).toBeNull();
+    expect(info.count).toBe(20);
+    expect(info.special.map((s) => s.date)).toEqual(["2026-08-31", "2026-09-02"]);
   });
 });
 
 describe("corporate-action coverage", () => {
+  const entry = { provider: "x", checked_at: "2026-09-01", owner_verified: false };
   it("never calls a missing or unknown state covered", () => {
-    expect(parseCoverage({ entries: [] })).toEqual([]);
-    expect(parseCoverage(undefined)).toEqual([]);
-    const [e] = parseCoverage({ entries: [{ provider: "x", state: "no_data" }] });
+    expect(parseCoverage({ symbol: "X", entries: [] })).toEqual([]);
+    expect(parseCoverage(null)).toEqual([]);
+    const [e] = parseCoverage({ symbol: "X", entries: [{ ...entry, state: "no_data" }] });
     expect(e.covered).toBe(false);
     expect(e.stateLabel).toBe("no data");
-    expect(parseCoverage({ entries: [{ provider: "x", state: "not_covered" }] })[0].covered).toBe(false);
-    expect(parseCoverage({ entries: [{ provider: "x", state: "available" }] })[0].covered).toBe(true);
+    expect(parseCoverage({ symbol: "X", entries: [{ ...entry, state: "not_covered" }] })[0].covered).toBe(false);
+    expect(parseCoverage({ symbol: "X", entries: [{ ...entry, state: "available" }] })[0].covered).toBe(true);
   });
 
   it("lists the owner-verified entry first", () => {
     const rows = parseCoverage({
+      symbol: "X",
       entries: [
         { provider: "a", state: "available", checked_at: "2026-09-02", owner_verified: false },
         { provider: "owner", state: "available", checked_at: "2026-08-01", owner_verified: true },

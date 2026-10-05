@@ -7,6 +7,7 @@ import { Field, FormFrame, OwnerTag, SaveNote, SELECT_CLASS, type SaveState } fr
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { getBrowserApiClient } from "@/lib/api/client";
+import type { components } from "@/lib/api/schema";
 import { formatDate, formatDateTime } from "@/lib/format";
 import { useApiResource, type ApiResult } from "@/lib/hooks/use-api-resource";
 import { isoToday } from "@/lib/reference/calendar";
@@ -47,13 +48,13 @@ export function SessionsSection({ mics, onRecorded }: { mics: string[]; onRecord
   const cleanMic = mic.trim().toUpperCase();
 
   const enabled = micOk && windowError === null;
-  const fetcher = useCallback(async (): Promise<ApiResult<unknown>> => {
+  const fetcher = useCallback(async (): Promise<ApiResult<components["schemas"]["ExchangeSessionRow"][]>> => {
     if (!enabled) return { data: [], response: new Response(null, { status: 200 }) };
     return getBrowserApiClient().GET("/exchange-sessions/{mic}", { params: { path: { mic: cleanMic }, query: { start, end } } });
   }, [enabled, cleanMic, start, end]);
   const { state, reload } = useApiResource(fetcher);
   const raw = state.kind === "ok" ? state.data : state.kind === "error" ? state.previous : null;
-  const rows = useMemo(() => parseSessions(raw), [raw]);
+  const rows = useMemo(() => parseSessions(raw ?? []), [raw]);
   const counts = useMemo(() => stateCounts(rows), [rows]);
 
   return (

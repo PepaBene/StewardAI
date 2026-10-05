@@ -1,5 +1,9 @@
 /** Pure helpers for the owner forms and read-only views over the free-source endpoints. They mirror the pydantic models in apps/backend/src/api. */
+import type { components } from "@/lib/api/schema";
 import { isRecord, num, str, recs, type Rec } from "@/lib/parse-untyped";
+
+type HoldingReturnsResponse = components["schemas"]["HoldingReturnsResponse"];
+type PeerSetResponse = components["schemas"]["PeerSetResponse"];
 
 import { parseOptionalNumber, trimOrNull, URL_RE } from "./form-utils";
 
@@ -83,18 +87,14 @@ export type PeerEntry = {
   history: { status: string; reason: string | null; at: string | null }[];
 };
 
-export function parsePeerSet(raw: unknown): PeerEntry[] {
-  if (!isRecord(raw)) return [];
-  return recs(raw.peers).flatMap((p) => {
-    const id = num(p.id);
-    const ticker = str(p.peer_ticker);
-    const status = str(p.status);
-    if (id === null || !ticker) return [];
-    const s = status === "confirmed" || status === "rejected" ? status : "suggested";
+export function parsePeerSet(raw: PeerSetResponse): PeerEntry[] {
+  return raw.peers.map((p) => {
+    const status = p.status === "confirmed" || p.status === "rejected" ? p.status : "suggested";
+    // `status_history` is a free-form list on the wire, so it is still read defensively.
     const history = Array.isArray(p.status_history)
       ? recs(p.status_history).map((h) => ({ status: str(h.status) ?? "unknown", reason: str(h.reason), at: str(h.at) ?? str(h.changed_at) ?? str(h.known_at) }))
       : [];
-    return [{ id, ticker, basis: str(p.basis), source: str(p.source), status: s, evidenceId: num(p.evidence_id), validFrom: str(p.valid_from), validTo: str(p.valid_to), history }];
+    return { id: p.id, ticker: p.peer_ticker, basis: p.basis || null, source: p.source || null, status, evidenceId: p.evidence_id ?? null, validFrom: p.valid_from ?? null, validTo: p.valid_to ?? null, history };
   });
 }
 
@@ -300,29 +300,28 @@ export type ReturnsView = {
   reason: string | null;
 } | null;
 
-export function parseReturns(raw: unknown): ReturnsView {
-  if (!isRecord(raw)) return null;
-  const r = recs(raw.results)[0];
+export function parseReturns(raw: HoldingReturnsResponse): NonNullable<ReturnsView> {
+  const r = raw.results.find((x) => x.chosen) ?? raw.results[0];
   if (!r) {
-    return { symbol: null, currency: null, start: null, end: null, bars: [], actionCoverage: null, coverage: null, expected: null, observed: null, missingActions: null, reason: str(raw.reason) ?? "No return could be computed." };
+    return { symbol: null, currency: null, start: null, end: null, bars: [], actionCoverage: null, coverage: null, expected: null, observed: null, missingActions: null, reason: raw.reason ?? "No return could be computed." };
   }
-  const total = num(r.total_return);
+  const total = r.total_return ?? null;
   return {
-    symbol: str(r.symbol),
-    currency: str(r.currency),
-    start: str(r.start),
-    end: str(r.end),
+    symbol: r.symbol,
+    currency: r.currency ?? null,
+    start: r.start,
+    end: r.end,
     reason: null,
     bars: [
-      { id: "raw", label: "Raw price", value: num(r.raw_price_return), reason: null },
-      { id: "adjusted", label: "Adjusted price", value: num(r.price_return), reason: str(r.price_return_reason) },
-      { id: "total", label: "Total return", value: total, reason: total === null ? (str(r.total_return_reason) ?? "Unavailable") : null },
+      { id: "raw", label: "Raw price", value: r.raw_price_return ?? null, reason: null },
+      { id: "adjusted", label: "Adjusted price", value: r.price_return ?? null, reason: r.price_return_reason ?? null },
+      { id: "total", label: "Total return", value: total, reason: total === null ? (r.total_return_reason ?? "Unavailable") : null },
     ],
-    actionCoverage: str(r.action_coverage),
-    coverage: num(r.coverage),
-    expected: num(r.expected_sessions),
-    observed: num(r.observed_sessions),
-    missingActions: Array.isArray(r.missing_actions) ? r.missing_actions.length : num(r.missing_actions),
+    actionCoverage: r.action_coverage,
+    coverage: r.coverage,
+    expected: r.expected_sessions,
+    observed: r.observed_sessions,
+    missingActions: Object.values(r.missing_actions).reduce((n, list) => n + (Array.isArray(list) ? list.length : 0), 0),
   };
 }
 

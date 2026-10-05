@@ -3,7 +3,7 @@
 import json
 from datetime import date, datetime
 from decimal import Decimal
-from typing import Annotated, Any, Literal
+from typing import Annotated, Any, Literal, cast
 from urllib.parse import urlsplit
 
 import asyncpg
@@ -13,6 +13,25 @@ from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from api.auth import Owner
 from api.db import Pool
+from api.response_models import (
+    ActionCoverageConfirmedResponse,
+    ActionCoverageResponse,
+    AlphaExposureRefreshResponse,
+    CompanyResearchObservationsResponse,
+    ConfirmedListingResponse,
+    DerivedListingResponse,
+    DiffbotRefreshResponse,
+    EpoRefreshResponse,
+    ExchangeSessionRow,
+    ExpectedSessionsResponse,
+    ExposureContextResponse,
+    HoldingReturnsResponse,
+    ListingOverviewResponse,
+    PdlRefreshResponse,
+    PeerSetResponse,
+    RecordedExchangeSessionResponse,
+    RecordedPeerResponse,
+)
 from steward.config.holding_profiles import HoldingProfile, HoldingProfilesConfig
 from steward.config.jobs import JobsConfig
 from steward.config.store import StoredConfig, load_active
@@ -398,24 +417,31 @@ def _profile_domain(profile: HoldingProfile) -> str | None:
 
 
 @router.get(
-    "/holdings/{ticker}/company-research-observations", tags=["holdings"], response_model=None
+    "/holdings/{ticker}/company-research-observations",
+    tags=["holdings"],
+    response_model=CompanyResearchObservationsResponse,
 )
 async def company_research_observations(
     ticker: TickerPath,
     pool: Pool,
     _owner: Owner,
     as_of: Annotated[datetime | None, Query()] = None,
-) -> dict[str, Any]:
+) -> CompanyResearchObservationsResponse:
     rows = await company_research_rows(pool, ticker, as_of)
-    return {"ticker": ticker, "known_as_of": as_of, "observations": rows}
+    return cast(
+        CompanyResearchObservationsResponse,
+        {"ticker": ticker, "known_as_of": as_of, "observations": rows},
+    )
 
 
 @router.post(
-    "/holdings/{ticker}/exposure-context/alpha-vantage", tags=["holdings"], response_model=None
+    "/holdings/{ticker}/exposure-context/alpha-vantage",
+    tags=["holdings"],
+    response_model=AlphaExposureRefreshResponse,
 )
 async def refresh_alpha_exposure(
     ticker: TickerPath, body: AlphaExposureRequest, pool: Pool, _owner: Owner
-) -> dict[str, Any]:
+) -> AlphaExposureRefreshResponse:
     settings = get_settings()
     if not settings.alpha_vantage_api_key:
         raise HTTPException(409, "ALPHA_VANTAGE_API_KEY is not configured")
@@ -467,11 +493,18 @@ async def refresh_alpha_exposure(
         raise HTTPException(502, "Alpha Vantage exposure series request failed") from exc
     except httpx.HTTPError as exc:
         raise HTTPException(502, "Alpha Vantage network request failed") from exc
-    return {"ticker": ticker, "series": body.series_name, "observations_stored": count}
+    return cast(
+        AlphaExposureRefreshResponse,
+        {"ticker": ticker, "series": body.series_name, "observations_stored": count},
+    )
 
 
-@router.get("/holdings/{ticker}/exposure-context", tags=["holdings"], response_model=None)
-async def exposure_context(ticker: TickerPath, pool: Pool, _owner: Owner) -> dict[str, Any]:
+@router.get(
+    "/holdings/{ticker}/exposure-context", tags=["holdings"], response_model=ExposureContextResponse
+)
+async def exposure_context(
+    ticker: TickerPath, pool: Pool, _owner: Owner
+) -> ExposureContextResponse:
     stored = await load_active(pool, "holding_profiles", HoldingProfilesConfig)
     profile = _holding_research_profile(stored, ticker)
     observations = await pool.fetch(
@@ -481,7 +514,7 @@ async def exposure_context(ticker: TickerPath, pool: Pool, _owner: Owner) -> dic
            order by metric,period_end desc,known_at desc""",
         ticker,
     )
-    return {
+    payload: dict[str, Any] = {
         "ticker": ticker,
         "exposure_assumptions": [e.model_dump(mode="json") for e in profile.exposures]
         if profile
@@ -492,12 +525,17 @@ async def exposure_context(ticker: TickerPath, pool: Pool, _owner: Owner) -> dic
             "Exposure shares are shown only when entered in the holding profile.",
         ],
     }
+    return cast(ExposureContextResponse, payload)
 
 
-@router.post("/holdings/{ticker}/company-research/diffbot", tags=["holdings"], response_model=None)
+@router.post(
+    "/holdings/{ticker}/company-research/diffbot",
+    tags=["holdings"],
+    response_model=DiffbotRefreshResponse,
+)
 async def refresh_diffbot_company_research(
     ticker: TickerPath, pool: Pool, _owner: Owner
-) -> dict[str, Any]:
+) -> DiffbotRefreshResponse:
     settings = get_settings()
     if not settings.diffbot_api_key:
         raise HTTPException(409, "DIFFBOT_API_KEY is not configured")
@@ -523,13 +561,18 @@ async def refresh_diffbot_company_research(
         raise HTTPException(502, "Diffbot request failed; inspect source access status") from exc
     except httpx.HTTPError as exc:
         raise HTTPException(502, "Diffbot network request failed") from exc
-    return {"ticker": ticker, "suggested_edges": count}
+    return cast(DiffbotRefreshResponse, {"ticker": ticker, "suggested_edges": count})
 
 
-@router.post("/holdings/{ticker}/company-research/pdl", tags=["holdings"], response_model=None)
+@router.post(
+    "/holdings/{ticker}/company-research/pdl",
+    tags=["holdings"],
+    response_model=PdlRefreshResponse,
+    response_model_exclude_unset=True,
+)
 async def refresh_pdl_company_research(
     ticker: TickerPath, pool: Pool, _owner: Owner
-) -> dict[str, Any]:
+) -> PdlRefreshResponse:
     settings = get_settings()
     if not settings.people_data_labs_api_key:
         raise HTTPException(409, "PEOPLE_DATA_LABS_API_KEY is not configured")
@@ -540,7 +583,9 @@ async def refresh_pdl_company_research(
         raise HTTPException(422, "a resolved company website domain is required")
     skipped = await pdl_skip_reason(pool, ticker)
     if skipped is not None:
-        return {"ticker": ticker, "matched_records": 0, "skipped": skipped}
+        return cast(
+            PdlRefreshResponse, {"ticker": ticker, "matched_records": 0, "skipped": skipped}
+        )
     try:
         async with httpx.AsyncClient(timeout=30) as http:
             count = await collect_pdl_company(
@@ -560,13 +605,15 @@ async def refresh_pdl_company_research(
         ) from exc
     except httpx.HTTPError as exc:
         raise HTTPException(502, "PDL network request failed") from exc
-    return {"ticker": ticker, "matched_records": count}
+    return cast(PdlRefreshResponse, {"ticker": ticker, "matched_records": count})
 
 
 @router.post(
-    "/holdings/{ticker}/patent-families/epo-ops/refresh", tags=["holdings"], response_model=None
+    "/holdings/{ticker}/patent-families/epo-ops/refresh",
+    tags=["holdings"],
+    response_model=EpoRefreshResponse,
 )
-async def refresh_epo_patents(ticker: TickerPath, pool: Pool, _owner: Owner) -> dict[str, Any]:
+async def refresh_epo_patents(ticker: TickerPath, pool: Pool, _owner: Owner) -> EpoRefreshResponse:
     settings = get_settings()
     if not settings.epo_ops_client_id or not settings.epo_ops_client_secret:
         raise HTTPException(409, "EPO_OPS_CLIENT_ID and EPO_OPS_CLIENT_SECRET are required")
@@ -604,17 +651,17 @@ async def refresh_epo_patents(ticker: TickerPath, pool: Pool, _owner: Owner) -> 
         ) from exc
     except httpx.HTTPError as exc:
         raise HTTPException(502, "EPO OPS network request failed") from exc
-    return {"ticker": ticker, "patent_candidates": count}
+    return cast(EpoRefreshResponse, {"ticker": ticker, "patent_candidates": count})
 
 
-@router.get("/exchange-sessions/{mic}", tags=["reference"], response_model=None)
+@router.get("/exchange-sessions/{mic}", tags=["reference"], response_model=list[ExchangeSessionRow])
 async def exchange_sessions(
     mic: Annotated[str, Path(pattern=r"^[A-Z0-9]{4}$")],
     pool: Pool,
     _owner: Owner,
     start: Annotated[date, Query()],
     end: Annotated[date, Query()],
-) -> list[dict[str, Any]]:
+) -> list[ExchangeSessionRow]:
     if end < start:
         raise HTTPException(422, "end must not precede start")
     rows = await pool.fetch(
@@ -626,17 +673,19 @@ async def exchange_sessions(
         start,
         end,
     )
-    return [dict(row) for row in rows]
+    return cast(list[ExchangeSessionRow], [dict(row) for row in rows])
 
 
-@router.get("/exchange-sessions/{mic}/expected", tags=["reference"], response_model=None)
+@router.get(
+    "/exchange-sessions/{mic}/expected", tags=["reference"], response_model=ExpectedSessionsResponse
+)
 async def expected_exchange_sessions(
     mic: Annotated[str, Path(pattern=r"^[A-Z0-9]{4}$")],
     pool: Pool,
     _owner: Owner,
     start: Annotated[date, Query()],
     end: Annotated[date, Query()],
-) -> dict[str, Any]:
+) -> ExpectedSessionsResponse:
     """The sessions the exchange held in a window: confirmed `exchange_session` rows first
     (half-days, ad hoc closures), else weekdays less the closures confirmed in the Jobs config.
     This is the denominator of return-window coverage and the yardstick of price freshness."""
@@ -646,21 +695,26 @@ async def expected_exchange_sessions(
     expected = await expected_sessions(
         pool, (jobs.body if jobs else JobsConfig()).calendar, mic, start, end
     )
-    return {
-        "mic": mic,
-        "start": start,
-        "end": end,
-        "count": expected.count,
-        "basis": expected.basis,
-        "confirmed_days": expected.confirmed_days,
-        "days": expected.days,
-    }
+    return cast(
+        ExpectedSessionsResponse,
+        {
+            "mic": mic,
+            "start": start,
+            "end": end,
+            "count": expected.count,
+            "basis": expected.basis,
+            "confirmed_days": expected.confirmed_days,
+            "days": expected.days,
+        },
+    )
 
 
-@router.post("/exchange-sessions", tags=["reference"], response_model=None)
+@router.post(
+    "/exchange-sessions", tags=["reference"], response_model=RecordedExchangeSessionResponse
+)
 async def record_exchange_session(
     body: ExchangeSessionInput, pool: Pool, _owner: Owner
-) -> dict[str, Any]:
+) -> RecordedExchangeSessionResponse:
     row_id = await pool.fetchval(
         """insert into public.exchange_session
            (mic,session_date,open_at,close_at,state,source,confirmed,evidence_url,reason)
@@ -678,13 +732,13 @@ async def record_exchange_session(
         body.evidence_url,
         body.reason,
     )
-    return {"session_date": row_id}
+    return cast(RecordedExchangeSessionResponse, {"session_date": row_id})
 
 
-@router.get("/holdings/{ticker}/peer-set", tags=["holdings"], response_model=None)
+@router.get("/holdings/{ticker}/peer-set", tags=["holdings"], response_model=PeerSetResponse)
 async def peer_set(
     ticker: TickerPath, pool: Pool, _owner: Owner, as_of: Annotated[datetime | None, Query()] = None
-) -> dict[str, Any]:
+) -> PeerSetResponse:
     """Peers as known at `as_of`, each with the status that was in force at that moment."""
     rows = await pool.fetch(
         f"""select p.id,p.peer_ticker,p.basis,{peer_status_as_of("p", "$2")} as status,
@@ -695,17 +749,20 @@ async def peer_set(
         ticker,
         as_of,
     )
-    return {
-        "ticker": ticker,
-        "known_as_of": as_of,
-        "peers": decode_rows(rows, ("detail", "status_history")),
-    }
+    return cast(
+        PeerSetResponse,
+        {
+            "ticker": ticker,
+            "known_as_of": as_of,
+            "peers": decode_rows(rows, ("detail", "status_history")),
+        },
+    )
 
 
-@router.post("/holdings/{ticker}/peer-set", tags=["holdings"], response_model=None)
+@router.post("/holdings/{ticker}/peer-set", tags=["holdings"], response_model=RecordedPeerResponse)
 async def record_peer(
     ticker: TickerPath, body: PeerInput, pool: Pool, _owner: Owner
-) -> dict[str, Any]:
+) -> RecordedPeerResponse:
     """Record a peer. Posting an existing peer again changes neither its status nor when it
     became known (`known_at` is set once); a status change is the `.../status` route."""
     if body.peer_ticker.casefold() == ticker.casefold():
@@ -722,7 +779,7 @@ async def record_peer(
         valid_to=body.valid_to,
         detail=body.detail,
     )
-    return {"id": row_id}
+    return cast(RecordedPeerResponse, {"id": row_id})
 
 
 class PeerStatusInput(BaseModel):
@@ -845,7 +902,12 @@ async def price_diagnostics(ticker: TickerPath, pool: Pool, _owner: Owner) -> li
     return [PriceDiagnostic(**row) for row in await holding_price_diagnostics(pool, ticker)]
 
 
-@router.get("/holdings/{ticker}/returns", tags=["holdings"], response_model=None)
+@router.get(
+    "/holdings/{ticker}/returns",
+    tags=["holdings"],
+    response_model=HoldingReturnsResponse,
+    response_model_exclude_unset=True,
+)
 async def holding_returns(
     ticker: TickerPath,
     pool: Pool,
@@ -853,7 +915,7 @@ async def holding_returns(
     start: Annotated[date, Query()],
     end: Annotated[date, Query()],
     withholding_rate: Annotated[Decimal, Query(ge=0, lt=1)] = Decimal(0),
-) -> dict[str, Any]:
+) -> HoldingReturnsResponse:
     """Raw price, adjusted price and total return of the holding's chosen series (the one every
     reader serves). Computed on request and never written: the scheduled `returns_refresh` job
     stores them. Total return needs raw closes, confirmed actions and owner-verified action
@@ -865,12 +927,15 @@ async def holding_returns(
     symbols = (await holding_symbols(pool, [ticker], body))[ticker]
     inputs = await return_inputs(pool, ticker, symbols, body)
     if inputs is None:
-        return {
-            "ticker": ticker,
-            "known_as_of": end,
-            "results": [],
-            "reason": "no stored price series with a known quote currency",
-        }
+        return cast(
+            HoldingReturnsResponse,
+            {
+                "ticker": ticker,
+                "known_as_of": end,
+                "results": [],
+                "reason": "no stored price series with a known quote currency",
+            },
+        )
     out = await compute_for(
         pool, inputs, start, end, store=False, withholding_rate=withholding_rate
     )
@@ -896,7 +961,7 @@ async def holding_returns(
         "start": start,
         "end": end,
     }
-    return {"ticker": ticker, "known_as_of": end, "results": [result]}
+    return cast(HoldingReturnsResponse, {"ticker": ticker, "known_as_of": end, "results": [result]})
 
 
 @router.get("/holdings/{ticker}/corporate-actions", tags=["holdings"], response_model=None)
@@ -1027,8 +1092,14 @@ async def decide_corporate_action(
     return {"id": action_id, "previous_status": current["status"], "status": body.decision}
 
 
-@router.get("/holdings/{ticker}/corporate-actions/coverage", tags=["holdings"], response_model=None)
-async def get_action_coverage(ticker: TickerPath, pool: Pool, _owner: Owner) -> dict[str, Any]:
+@router.get(
+    "/holdings/{ticker}/corporate-actions/coverage",
+    tags=["holdings"],
+    response_model=ActionCoverageResponse,
+)
+async def get_action_coverage(
+    ticker: TickerPath, pool: Pool, _owner: Owner
+) -> ActionCoverageResponse:
     """Where corporate-action coverage stands for the holding's symbol: every provider's
     recorded state, newest first, with the owner-verified row (if any) marked."""
     symbol = await pool.fetchval(
@@ -1045,18 +1116,20 @@ async def get_action_coverage(ticker: TickerPath, pool: Pool, _owner: Owner) -> 
         symbol,
     )
     entries = [{**dict(r), "owner_verified": r["provider"] == "owner_review"} for r in rows]
-    return {"symbol": symbol, "entries": entries}
+    return cast(ActionCoverageResponse, {"symbol": symbol, "entries": entries})
 
 
 @router.post(
-    "/holdings/{ticker}/corporate-actions/coverage", tags=["holdings"], response_model=None
+    "/holdings/{ticker}/corporate-actions/coverage",
+    tags=["holdings"],
+    response_model=ActionCoverageConfirmedResponse,
 )
 async def confirm_action_coverage(
     ticker: TickerPath,
     body: CorporateActionCoverageInput,
     pool: Pool,
     _owner: Owner,
-) -> dict[str, Any]:
+) -> ActionCoverageConfirmedResponse:
     symbol = await pool.fetchval(
         """select coalesce(price_symbol,t212_ticker) from public.instrument
            where t212_ticker=$1""",
@@ -1074,21 +1147,28 @@ async def confirm_action_coverage(
         body.through,
         f"Owner-verified coverage through {body.through}: {body.reason}; {body.source_url}",
     )
-    return {"symbol": symbol, "covered_through": body.through, "state": "available"}
+    return cast(
+        ActionCoverageConfirmedResponse,
+        {"symbol": symbol, "covered_through": body.through, "state": "available"},
+    )
 
 
-@router.get("/holdings/{ticker}/listing", tags=["holdings"], response_model=None)
-async def holding_listing(ticker: TickerPath, pool: Pool, _owner: Owner) -> dict[str, Any]:
+@router.get("/holdings/{ticker}/listing", tags=["holdings"], response_model=ListingOverviewResponse)
+async def holding_listing(ticker: TickerPath, pool: Pool, _owner: Owner) -> ListingOverviewResponse:
     """The holding's derived canonical listing, the evidence it was matched on and the provider
     symbols mapped to it."""
     overview = await listing_overview(pool, ticker)
     if overview is None:
         raise HTTPException(404, "no listing derived for this holding yet")
-    return overview
+    return cast(ListingOverviewResponse, overview)
 
 
-@router.post("/holdings/{ticker}/listing/derive", tags=["holdings"], response_model=None)
-async def derive_holding_listing(ticker: TickerPath, pool: Pool, _owner: Owner) -> dict[str, Any]:
+@router.post(
+    "/holdings/{ticker}/listing/derive", tags=["holdings"], response_model=DerivedListingResponse
+)
+async def derive_holding_listing(
+    ticker: TickerPath, pool: Pool, _owner: Owner
+) -> DerivedListingResponse:
     """(Re)derive the holding's listing from the instrument, ESMA FIRDS and OpenFIGI. A link is
     `confirmed` automatically only when all three agree; otherwise it is `suggested` and waits
     for the owner. An owner decision is never overwritten."""
@@ -1097,24 +1177,32 @@ async def derive_holding_listing(ticker: TickerPath, pool: Pool, _owner: Owner) 
         pool, [ticker], profiles.body if profiles else HoldingProfilesConfig()
     )
     result = results[0]
-    return {
-        "ticker": ticker,
-        "status": result.status,
-        "listing_id": result.listing_id,
-        "reason": result.reason,
-        "score": result.score,
-    }
+    return cast(
+        DerivedListingResponse,
+        {
+            "ticker": ticker,
+            "status": result.status,
+            "listing_id": result.listing_id,
+            "reason": result.reason,
+            "score": result.score,
+        },
+    )
 
 
-@router.post("/holdings/{ticker}/listing/confirm", tags=["holdings"], response_model=None)
+@router.post(
+    "/holdings/{ticker}/listing/confirm", tags=["holdings"], response_model=ConfirmedListingResponse
+)
 async def confirm_holding_listing(
     ticker: TickerPath, body: ListingDecision, pool: Pool, owner: Owner
-) -> dict[str, Any]:
+) -> ConfirmedListingResponse:
     """The owner confirms or rejects the holding's listing match. Confirmation is what lets
     corporate actions be recorded and the EODHD/Alpha Vantage fallbacks run for the holding."""
     try:
-        return await confirm_listing(
-            pool, ticker, body.decision, owner.user_id, body.reason, listing_id=body.listing_id
+        return cast(
+            ConfirmedListingResponse,
+            await confirm_listing(
+                pool, ticker, body.decision, owner.user_id, body.reason, listing_id=body.listing_id
+            ),
         )
     except ListingDecisionError as exc:
         raise HTTPException(404 if exc.not_found else 422, str(exc)) from exc

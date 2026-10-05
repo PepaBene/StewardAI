@@ -14,6 +14,7 @@ import { useApiResource, type ApiResult } from "@/lib/hooks/use-api-resource";
 import { normTicker, parseNetwork, parseQueue, parseReconciliations, validateTicker, type Disclosure } from "@/lib/relationships/relationships";
 
 import { ActionsPanel } from "./actions-panel";
+import { AllRecordsPanel } from "./all-records-panel";
 import { ContradictionsPanel } from "./contradictions-panel";
 import { EventsPanel } from "./events-panel";
 import { GraphPanel } from "./graph-panel";
@@ -25,6 +26,7 @@ const SECTIONS = [
   { id: "graph", label: "Graph edges" },
   { id: "decisions", label: "Disclosure and event decisions" },
   { id: "actions", label: "Corporate actions" },
+  { id: "all-records", label: "All recorded relationships" },
 ] as const;
 
 const fetchQueue = () => getBrowserApiClient().GET("/relationship-review/queue", { params: { query: { limit: 500 } } });
@@ -125,6 +127,7 @@ export function RelationshipsView() {
       />
       <EventsPanel ticker={ticker} disclosures={net?.disclosures ?? null} events={net?.events ?? null} note={ticker ? <ResourceNotice state={network.state} what={`records for ${ticker}`} /> : null} onChanged={reloadAll} />
       <ActionsPanel ticker={ticker} />
+      <AllRecordsPanel ticker={ticker} />
       <p className="text-xs text-text-muted">
         Related:{" "}
         <Link href="/review" className="text-accent-ink hover:underline">

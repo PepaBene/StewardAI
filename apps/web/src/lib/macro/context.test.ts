@@ -60,23 +60,25 @@ describe("macro context", () => {
 });
 
 describe("commodity and FX inputs", () => {
+  const obs = { id: 1, provider: "av", dataset: "d", source_url: "https://x", unit: "usd/tonne", currency: "USD" };
   const payload = {
+    ticker: "X",
     exposure_assumptions: [{ kind: "commodity_input", name: "Copper", share: 0.2 }, { kind: "revenue_currency", name: "USD" }],
     observations: [
-      { metric: "COPPER", period_end: "2026-09-01", value: "9000", unit: "usd/tonne", currency: "USD", known_at: "2026-09-02" },
-      { metric: "COPPER", period_end: "2026-08-01", value: "8000", unit: "usd/tonne", currency: "USD", known_at: "2026-08-02" },
-      { metric: "COPPER", period_end: "2026-08-01", value: "8100", unit: "usd/tonne", currency: "USD", known_at: "2026-08-05" },
-      { metric: "EURUSD", period_end: "2026-09-01", value: null },
+      { ...obs, metric: "COPPER", period_end: "2026-09-01", value: 9000, known_at: "2026-09-02" },
+      { ...obs, metric: "COPPER", period_end: "2026-08-01", value: 8000, known_at: "2026-08-02" },
+      { ...obs, metric: "COPPER", period_end: "2026-08-01", value: 8100, known_at: "2026-08-05" },
+      { ...obs, metric: "EURUSD", period_end: "2026-09-01", value: null, known_at: "2026-09-02" },
     ],
     limitations: ["Price series are contextual inputs."],
   };
 
   it("builds one ordered series per metric and drops value-less rows", () => {
-    const r = parseExposureInputs(payload)!;
+    const r = parseExposureInputs(payload);
     expect(r.series).toHaveLength(1);
     expect(r.series[0].points).toEqual([{ date: "2026-08-01", value: 8100 }, { date: "2026-09-01", value: 9000 }]);
     expect(windowChange(r.series[0])).toBeCloseTo(900 / 8100);
     expect(r.assumptions[1].share).toBeNull();
-    expect(parseExposureInputs(null)).toBeNull();
+    expect(r.limitations).toEqual(["Price series are contextual inputs."]);
   });
 });

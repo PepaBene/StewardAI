@@ -57,6 +57,12 @@ const FULL: JobsConfig = {
   sec_fsds_backfill: { enabled: false, cron: "45 10 * * mon", timezone: "UTC" },
   pdmr_uk: { enabled: true, cron: "52 11 * * mon", timezone: "UTC" },
   graph_review: { enabled: false, cron: "59 12 * * mon", timezone: "UTC" },
+  fmp_company: { enabled: false, cron: "20 9 * * 6", timezone: "UTC" },
+  alpha_vantage_statements: { enabled: false, cron: "40 9 * * 6", timezone: "UTC" },
+  epo_patents: { enabled: false, cron: "0 10 1 * *", timezone: "UTC" },
+  companies_house_filings: { enabled: false, cron: "10 10 * * 6", timezone: "UTC" },
+  edinet_filings: { enabled: false, cron: "30 10 * * *", timezone: "UTC" },
+  twelve_data_corporate_actions: { enabled: false, cron: "50 10 * * 6", timezone: "UTC" },
   earnings_check: {
     extraction_model: "claude-opus-5-5",
     locate_model: "claude-sonnet-5",

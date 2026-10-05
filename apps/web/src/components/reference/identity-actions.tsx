@@ -10,7 +10,7 @@ import { Input } from "@/components/ui/input";
 import { getBrowserApiClient } from "@/lib/api/client";
 import { useApiResource } from "@/lib/hooks/use-api-resource";
 import { cellText, emptyOverrideDraft, overrideRequest, validateListingDecision, validateOverride, type OverrideDraft } from "@/lib/reference/endpoint-forms";
-import { isRecord, titleCase } from "@/lib/parse-untyped";
+import { titleCase } from "@/lib/parse-untyped";
 
 /**
  * Listing match and identity decisions for one holding: GET /holdings/{ticker}/listing, POST
@@ -24,7 +24,17 @@ export function IdentityActions({ ticker }: { ticker: string }) {
   const data = state.kind === "ok" ? state.data : state.kind === "error" ? state.previous : null;
   const derive = useMutation();
 
-  const scalars = isRecord(data) ? Object.entries(data).filter(([, v]) => v === null || ["string", "number", "boolean"].includes(typeof v)).slice(0, 12) : [];
+  // Typed ListingOverviewResponse; a missing figure reads "Unknown", never 0.
+  const rows = data
+    ? [
+        { label: "Status", value: titleCase(data.status) },
+        { label: "Match score", value: cellText(data.score) },
+        { label: "Decided at", value: cellText(data.decided_at) },
+        { label: "Listing", value: data.listing ? [data.listing.mic, data.listing.ticker, data.listing.currency].filter(Boolean).join(" · ") || `#${data.listing.id}` : "No listing chosen" },
+        { label: "ISIN", value: cellText(data.listing?.isin) },
+        ...data.provider_symbols.map((p) => ({ label: `${titleCase(p.provider)} symbol`, value: `${p.identifier}${p.match_status ? ` (${p.match_status.replaceAll("_", " ")})` : ""}` })),
+      ]
+    : [];
 
   return (
     <Blueprint aria-labelledby="listing-heading" className="flex min-w-0 flex-col gap-3 px-[22px] py-5">
@@ -36,7 +46,7 @@ export function IdentityActions({ ticker }: { ticker: string }) {
 
       {state.kind === "loading" && !data ? <p className="text-sm text-text-muted">Loading listing…</p> : null}
       {state.kind === "error" && !data ? <p className="text-sm text-text-muted">No listing is derived for {ticker} yet ({state.title}). Derive it below.</p> : null}
-      {scalars.length > 0 ? <KeyRows rows={scalars.map(([k, v]) => ({ label: titleCase(k), value: cellText(v) }))} /> : null}
+      {rows.length > 0 ? <KeyRows rows={rows} /> : null}
 
       <div className="flex flex-wrap items-center gap-3">
         <Button
@@ -47,7 +57,7 @@ export function IdentityActions({ ticker }: { ticker: string }) {
           onClick={() =>
             derive.run(
               () => getBrowserApiClient().POST("/holdings/{ticker}/listing/derive", { params: { path: { ticker } } }),
-              (d) => (isRecord(d) ? `Derived: ${cellText(d.status)}${typeof d.reason === "string" ? `. ${d.reason}` : ""}` : "Derived."),
+              (d) => `Derived: ${cellText(d.status)}${d.reason ? `. ${d.reason}` : ""}`,
               reload,
             )
           }

@@ -1,7 +1,7 @@
 /**
  * View models for the country/industry context and the commodity/FX input panels.
- * `/macro/context/{ticker}` is typed; `/holdings/{ticker}/exposure-context` is not, so that
- * payload is read defensively. A missing value stays null and is shown as missing, never zero.
+ * `/macro/context/{ticker}` and `/holdings/{ticker}/exposure-context` are both typed (the
+ * latter's assumption rows stay open-ended). A missing value stays null, never zero.
  */
 import type { components } from "@/lib/api/schema";
 import { toNumber } from "@/lib/reference/peers";
@@ -131,36 +131,27 @@ export type InputAssumption = { kind: string; name: string; share: number | null
 
 export type ExposureInputs = { series: InputSeries[]; assumptions: InputAssumption[]; limitations: string[] };
 
-const isRecord = (v: unknown): v is Record<string, unknown> => typeof v === "object" && v !== null && !Array.isArray(v);
 const str = (v: unknown): string | null => (typeof v === "string" && v ? v : null);
 
-export function parseExposureInputs(payload: unknown): ExposureInputs | null {
-  if (!isRecord(payload)) return null;
+export function parseExposureInputs(payload: components["schemas"]["ExposureContextResponse"]): ExposureInputs {
   const byMetric = new Map<string, InputSeries>();
-  for (const o of Array.isArray(payload.observations) ? payload.observations : []) {
-    if (!isRecord(o)) continue;
-    const value = toNumber(o.value);
-    const date = str(o.period_end);
-    const metric = str(o.metric);
-    if (value === null || !date || !metric) continue;
-    let s = byMetric.get(metric);
+  for (const o of payload.observations) {
+    // value is a JSON number (or null when the provider gave only text): null never becomes a point.
+    const value = o.value ?? null;
+    const date = o.period_end ?? null;
+    if (value === null || !date || !o.metric) continue;
+    let s = byMetric.get(o.metric);
     if (!s) {
-      s = { metric, unit: str(o.unit), currency: str(o.currency), points: [], sourceUrl: str(o.source_url), knownAt: str(o.known_at) };
-      byMetric.set(metric, s);
+      s = { metric: o.metric, unit: o.unit ?? null, currency: o.currency ?? null, points: [], sourceUrl: o.source_url || null, knownAt: o.known_at || null };
+      byMetric.set(o.metric, s);
     }
     s.points.push({ date, value });
-    const known = str(o.known_at);
-    if (known && (!s.knownAt || known > s.knownAt)) s.knownAt = known;
+    if (o.known_at && (!s.knownAt || o.known_at > s.knownAt)) s.knownAt = o.known_at;
   }
   const series = [...byMetric.values()].map((s) => ({ ...s, points: dedupe(s.points) })).sort((a, b) => a.metric.localeCompare(b.metric));
-  const assumptions: InputAssumption[] = (Array.isArray(payload.exposure_assumptions) ? payload.exposure_assumptions : [])
-    .filter(isRecord)
-    .map((e) => ({ kind: str(e.kind) ?? "other", name: str(e.name) ?? "Unnamed", share: toNumber(e.share) }));
-  return {
-    series,
-    assumptions,
-    limitations: Array.isArray(payload.limitations) ? payload.limitations.filter((l): l is string => typeof l === "string") : [],
-  };
+  // `exposure_assumptions` rows are still free-form on the wire (the model leaves them open).
+  const assumptions: InputAssumption[] = payload.exposure_assumptions.map((e) => ({ kind: str(e.kind) ?? "other", name: str(e.name) ?? "Unnamed", share: toNumber(e.share) }));
+  return { series, assumptions, limitations: payload.limitations };
 }
 
 /** One value per date (the last one wins), oldest first. */

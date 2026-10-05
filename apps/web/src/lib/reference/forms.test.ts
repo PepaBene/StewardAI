@@ -17,10 +17,11 @@ describe("exchange session form", () => {
     expect(sessionRequest({ ...goodSession, state: "closed" })).toMatchObject({ open_at: null, close_at: null });
   });
   it("sorts recorded rows with the confirmed one first and keeps unknown states", () => {
+    const row = { mic: "XNYS", source: "owner", known_at: "2026-01-01" };
     const rows = parseSessions([
-      { session_date: "2026-01-02", state: "closed", confirmed: false, known_at: "2026-01-01" },
-      { session_date: "2026-01-02", state: "half_day", confirmed: true },
-      { session_date: "2026-01-01", state: "odd" },
+      { ...row, session_date: "2026-01-02", state: "closed", confirmed: false },
+      { ...row, session_date: "2026-01-02", state: "half_day", confirmed: true },
+      { ...row, session_date: "2026-01-01", state: "odd", confirmed: false },
     ]);
     expect(rows.map((r) => r.state)).toEqual(["unknown", "half_day", "closed"]);
   });

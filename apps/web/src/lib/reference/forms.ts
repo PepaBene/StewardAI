@@ -79,30 +79,21 @@ export type SessionRow = {
   knownAt: string | null;
 };
 
-const isRec = (v: unknown): v is Record<string, unknown> => typeof v === "object" && v !== null && !Array.isArray(v);
-const s = (v: unknown): string | null => (typeof v === "string" && v ? v : null);
-
 /** Rows by date; where one day has several rows the confirmed, most recently known one comes first. */
-export function parseSessions(payload: unknown): SessionRow[] {
-  if (!Array.isArray(payload)) return [];
-  return payload
-    .filter(isRec)
-    .map((r, i) => {
-      const st = s(r.state);
-      const date = s(r.session_date) ?? "";
-      return {
-        key: `${date}|${s(r.source) ?? ""}|${i}`,
-        date,
-        state: (st === "open" || st === "half_day" || st === "closed" ? st : "unknown") as SessionRow["state"],
-        openAt: s(r.open_at),
-        closeAt: s(r.close_at),
-        source: s(r.source),
-        confirmed: r.confirmed === true,
-        evidenceUrl: s(r.evidence_url),
-        reason: s(r.reason),
-        knownAt: s(r.known_at),
-      };
-    })
+export function parseSessions(rows: readonly components["schemas"]["ExchangeSessionRow"][]): SessionRow[] {
+  return rows
+    .map((r, i): SessionRow => ({
+      key: `${r.session_date}|${r.source}|${i}`,
+      date: r.session_date,
+      state: r.state === "open" || r.state === "half_day" || r.state === "closed" ? r.state : "unknown",
+      openAt: r.open_at ?? null,
+      closeAt: r.close_at ?? null,
+      source: r.source || null,
+      confirmed: r.confirmed,
+      evidenceUrl: r.evidence_url ?? null,
+      reason: r.reason ?? null,
+      knownAt: r.known_at || null,
+    }))
     .sort((a, b) => a.date.localeCompare(b.date) || Number(b.confirmed) - Number(a.confirmed) || (b.knownAt ?? "").localeCompare(a.knownAt ?? ""));
 }
 

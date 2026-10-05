@@ -7,7 +7,12 @@ import {
   decisionsFor,
   emptyActionDraft,
   parseNetwork,
+  pageRange,
+  parseGraphPage,
+  parseHistory,
   parseQueue,
+  reconcileBody,
+  reconcileConfirmText,
   parseReconciliations,
   safeUrl,
   shareText,
@@ -43,18 +48,53 @@ describe("decision validation", () => {
 describe("parsers", () => {
   it("reads the queue and keeps unknown values null", () => {
     const q = parseQueue({
-      filing_hits: [{ id: 1, ticker: "AAA", review_state: "pending", url: "https://sec.gov/x" }, { id: "x" }],
-      suggested_disclosures: [{ id: 5, ticker: "AAA", relationship: "customer", counterparty_name: "Acme", reported_share: "0.12", passage: "p" }, { id: 6, ticker: "AAA", anonymous_counterparty: true }],
-      contradictions: [{ id: 9, ticker: "AAA", kind: "share_mismatch", disclosure_id: 5, other_disclosure_id: 7, detail: { a: 1 } }],
+      filing_hits: [{ id: 1, ticker: "AAA", review_state: "pending", status: "open", url: "https://sec.gov/x" }],
+      suggested_disclosures: [
+        { id: 5, ticker: "AAA", relationship: "customer", direction: "incoming", counterparty_name: "Acme", anonymous_counterparty: false, reported_share: 0.12, passage: "p", known_at: "t", status: "suggested" },
+        { id: 6, ticker: "AAA", relationship: "customer", direction: "incoming", anonymous_counterparty: true, known_at: "t", status: "disputed" },
+      ],
+      contradictions: [{ id: 9, ticker: "AAA", kind: "share_mismatch", disclosure_id: 5, other_disclosure_id: 7, detail: { a: 1 }, created_at: "t", status: "open" }],
     });
-    expect(q.hits).toHaveLength(1);
-    expect(q.disclosures[0]).toMatchObject({ id: 5, share: 0.12, status: null, counterparty: "Acme" });
-    expect(q.disclosures[1]).toMatchObject({ anonymous: true, share: null, counterparty: "Not named by the filer" });
-    expect(q.contradictions[0]).toMatchObject({ otherId: 7, detail: "A: 1" });
+    expect(q.hits).toMatchObject([{ id: 1, status: "open", filer: null }]);
+    expect(q.disclosures[0]).toMatchObject({ id: 5, share: 0.12, status: "suggested", counterparty: "Acme" });
+    expect(q.disclosures[1]).toMatchObject({ anonymous: true, share: null, status: "disputed", counterparty: "Not named by the filer" });
+    expect(q.contradictions[0]).toMatchObject({ otherId: 7, detail: "A: 1", status: "open" });
   });
-  it("survives junk payloads", () => {
-    expect(parseQueue(null)).toEqual({ hits: [], disclosures: [], contradictions: [] });
-    expect(parseReconciliations("x")).toEqual([]);
+  it("reads the typed reconciliations and global lists, keeping nulls", () => {
+    expect(parseReconciliations({ open: [{ id: 3, ticker: "AAA", change_kind: "parent_change", observed_source: "s", observed_at: "2026-09-01T00:00:00Z", outcome: "unexplained" }] })).toMatchObject([{ id: 3, fromKey: null, toKey: null }]);
+    const page = parseGraphPage({
+      total: 30,
+      limit: 25,
+      offset: 0,
+      rows: [
+        { id: 1, ticker: "AAA", kind: "supplier", status: "disputed", source: "s", source_url: "https://x.example/a", known_at: "2026-09-01T00:00:00Z" },
+        { id: 2, ticker: "AAA", kind: "customer", status: "weird", source: "s", source_url: "", known_at: "t", anonymous_counterparty: true, reported_share: null },
+      ],
+    });
+    expect(page.rows[0]).toMatchObject({ status: "disputed", rawStatus: "disputed", counterparty: null, reportedShare: null });
+    expect(page.rows[1]).toMatchObject({ status: null, rawStatus: "weird", counterparty: "Not named by the filer", sourceUrl: null });
+    expect(pageRange(page)).toBe("1 to 2 of 30");
+  });
+  it("orders decision history newest first and keeps an unknown status as its word", () => {
+    const h = parseHistory({
+      kind: "edge",
+      id: 4,
+      current_status: "confirmed",
+      limitations: ["only owner decisions are logged"],
+      entries: [
+        { changed_at: "2026-09-01T10:00:00Z", from_status: null, to_status: "suggested" },
+        { changed_at: "2026-09-02T10:00:00Z", from_status: "suggested", to_status: "confirmed", reason: "checked the filing", decided_by: "owner" },
+      ],
+    });
+    expect(h.entries.map((e) => e.to)).toEqual(["confirmed", "suggested"]);
+    expect(h.entries[0]).toMatchObject({ from: "suggested", reason: "checked the filing", by: "owner" });
+    expect(h.entries[1].from).toBeNull();
+  });
+  it("builds the reconciliation resolve body from the owner's trimmed reason", () => {
+    expect(reconcileBody("dismissed", "  not a real change  ")).toEqual({ resolution: "dismissed", reason: "not a real change" });
+    expect(reconcileConfirmText({ id: 3, ticker: "AAA" }, "resolved")).toContain("#3");
+  });
+  it("survives a missing holding network", () => {
     expect(parseNetwork(undefined, "AAA")).toEqual({ edges: [], events: [], disclosures: [] });
   });
   it("reads the network with statuses", () => {

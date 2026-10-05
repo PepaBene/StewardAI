@@ -63,25 +63,43 @@ describe("aggregate", () => {
 
 describe("look-through and factsheet", () => {
   it("parses the report and keeps a missing share null", () => {
+    const holding = { key: "a", name: "A", isin: null, isins: [], ticker: null, sector: null, country: null, currency: null, weight: 0.05, value_base: 5, via: [{}, {}] as never, benchmark_weight: null };
     const l = parseLookThrough({
       as_of: "2026-09-30",
-      snapshot_ids: [1, "2", "x"],
-      report: { available: true, coverage: {}, top_holdings: [{ key: "a", name: "A", weight: 0.05, via: [{}, {}] }, { name: "B" }] },
-    })!;
+      snapshot_ids: { IE00B4L5Y983: 1, IE00B3RBWM25: 2 },
+      report: {
+        snapshot_date: "2026-09-30",
+        base_currency: "EUR",
+        available: true,
+        method: "m",
+        coverage: null,
+        exposures: [],
+        top_holdings: [holding],
+        concentration: null,
+        benchmark: null,
+        benchmarks: [],
+        fx: null,
+        funds: [],
+        notes: ["n"],
+      },
+    });
     expect(l.snapshotIds).toEqual([1, 2]);
     expect(l.portfolioShareLookedThrough).toBeNull();
+    expect(l.effectiveN).toBeNull();
     expect(l.top[0].viaFunds).toBe(2);
-    expect(l.top[1].weight).toBeNull();
-    expect(parseLookThrough({})).toBeNull();
+    expect(l.top[0].sector).toBeNull();
+    expect(l.notes).toEqual(["n"]);
   });
   it("builds an expense series without inventing zeros", () => {
+    const base = { id: 1, fund_isin: "X", source: "issuer", holdings_count: 0, reconcile_tolerance: 0.01, lookthrough_basis: "b", missing_fields: [], fetched_at: "t", field_names_verified: true, extraction_warnings: [] };
     const rows = parseFactsheets([
-      { as_of: "2026-06-30", expense_ratio: "0.0020" },
-      { as_of: "2026-03-31", expense_ratio: null },
-      { as_of: "2025-12-31", expense_ratio: 0.0022, field_names_verified: false },
+      { ...base, as_of: "2026-06-30", expense_ratio: 0.002 },
+      { ...base, as_of: "2026-03-31", expense_ratio: null },
+      { ...base, as_of: "2025-12-31", expense_ratio: 0.0022, field_names_verified: false, coverage_note: "c" },
     ]);
     expect(expenseSeries(rows)).toEqual([{ date: "2025-12-31", value: 0.0022 }, { date: "2026-06-30", value: 0.002 }]);
     expect(rows[2].fieldNamesVerified).toBe(false);
+    expect(rows[2].note).toBe("c");
     expect(rows[1].expenseRatio).toBeNull();
   });
 });

@@ -4,7 +4,20 @@ import { EmptyState } from "@/components/empty-state";
 import { Panel } from "@/components/oversight/panel";
 import { getBrowserApiClient } from "@/lib/api/client";
 import { titleCase } from "@/lib/parse-untyped";
-import { DECISION_LABEL, decisionBody, decisionsFor, DECISION_RESULT, safeUrl, type Edge, type GraphDecision, type Reconciliation } from "@/lib/relationships/relationships";
+import {
+  DECISION_LABEL,
+  decisionBody,
+  decisionsFor,
+  DECISION_RESULT,
+  RECONCILE_LABEL,
+  reconcileBody,
+  reconcileConfirmText,
+  safeUrl,
+  type Edge,
+  type GraphDecision,
+  type ReconcileResolution,
+  type Reconciliation,
+} from "@/lib/relationships/relationships";
 
 import { callApi, DecisionForm } from "./decision-form";
 import { Fact, SourceLink, StatusMark } from "./status-mark";
@@ -52,23 +65,38 @@ export function GraphPanel({ ticker, edges, edgesNote, reconciliations, onChange
     <Panel
       id="graph"
       title="Company graph edges"
-      description="Links between companies with the reason behind the last decision. The API keeps the full status log but returns only the current status and the last reason, so that is what is shown."
+      description="Links between companies with the reason behind the last decision. The full status log of any row is under All recorded relationships below."
     >
       {reconciliations.length > 0 ? (
         <div className="space-y-2">
           <h3 className="text-sm font-semibold">Changes no closed deal explains ({reconciliations.length})</h3>
           <ul className="space-y-1.5">
             {reconciliations.map((r) => (
-              <li key={r.id} className="border border-dashed border-border px-3 py-2 text-sm">
-                <span className="num font-semibold">{r.ticker}</span> {titleCase(r.changeKind)}: {r.fromKey ?? "unknown"} to {r.toKey ?? "unknown"}
-                <span className="text-text-muted">
-                  {" "}
-                  · {titleCase(r.outcome)} · seen {r.observedAt?.slice(0, 10) ?? "on an unrecorded date"} via {r.source ?? "an unrecorded source"}
-                </span>
+              <li key={r.id} className="space-y-2 border border-dashed border-border px-3 py-2 text-sm">
+                <div>
+                  <span className="num font-semibold">{r.ticker}</span> {titleCase(r.changeKind)}: {r.fromKey ?? "unknown"} to {r.toKey ?? "unknown"}
+                  <span className="text-text-muted">
+                    {" "}
+                    · {titleCase(r.outcome)} · seen {r.observedAt?.slice(0, 10) ?? "on an unrecorded date"} via {r.source ?? "an unrecorded source"}
+                  </span>
+                </div>
+                <DecisionForm
+                  summary="Resolve or dismiss this change"
+                  options={(Object.keys(RECONCILE_LABEL) as ReconcileResolution[]).map((v) => ({ value: v, label: RECONCILE_LABEL[v] }))}
+                  confirmText={(v) => reconcileConfirmText(r, v as ReconcileResolution)}
+                  onSubmit={async (v, reason) => {
+                    const res = await callApi(
+                      () => getBrowserApiClient().POST("/company-graph/reconciliations/{reconciliation_id}/resolve", { params: { path: { reconciliation_id: r.id } }, body: reconcileBody(v as ReconcileResolution, reason) }),
+                      `Saved: change #${r.id} is ${v === "resolved" ? "resolved" : "dismissed"} with your reason.`,
+                    );
+                    if (res.ok) onChanged();
+                    return res;
+                  }}
+                />
               </li>
             ))}
           </ul>
-          <p className="text-xs text-text-muted">The API offers no way to close a change from here. Record the deal that explains it, or fix the edge below.</p>
+          <p className="text-xs text-text-muted">Resolving says a record you made explains the change; dismissing says it is not a real change. Either keeps your reason. Record the deal that explains it first, or fix the edge below.</p>
         </div>
       ) : null}
       {edgesNote}

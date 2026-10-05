@@ -62,6 +62,12 @@ export type ProfileForm = {
   yahoo_symbol: string;
   /** Exact EODHD exchange:symbol code (e.g. "SAP.XETRA"); empty = not used. */
   eodhd_symbol: string;
+  /** Financial Modeling Prep symbol (e.g. "AAPL"); empty = the FMP job skips this holding. */
+  fmp_symbol: string;
+  /** Companies House number of a UK company (e.g. "00445790"); empty = not looked up. */
+  companies_house_number: string;
+  /** EDINET code of a Japanese issuer (e.g. "E02144"); empty = not looked up. */
+  edinet_code: string;
   reporting_currency: string;
   competitors: string;
   suppliers: string;
@@ -99,6 +105,9 @@ export function newProfile(ticker = ""): ProfileForm {
     price_symbol: "",
     yahoo_symbol: "",
     eodhd_symbol: "",
+    fmp_symbol: "",
+    companies_house_number: "",
+    edinet_code: "",
     reporting_currency: "",
     competitors: "",
     suppliers: "",
@@ -131,6 +140,9 @@ export function profilesFromBody(body: HoldingProfilesConfig | null): ProfileFor
     price_symbol: p.price_symbol ?? "",
     yahoo_symbol: p.yahoo_symbol ?? "",
     eodhd_symbol: p.eodhd_symbol ?? "",
+    fmp_symbol: p.fmp_symbol ?? "",
+    companies_house_number: p.companies_house_number ?? "",
+    edinet_code: p.edinet_code ?? "",
     reporting_currency: p.reporting_currency ?? "",
     competitors: joined(p.competitors),
     suppliers: joined(p.suppliers),
@@ -203,6 +215,9 @@ export function profilesToBody(forms: ProfileForm[]): HoldingProfilesConfig {
         price_symbol: orNull(f.price_symbol)?.toLowerCase() ?? null,
         yahoo_symbol: orNull(f.yahoo_symbol)?.toUpperCase() ?? null,
         eodhd_symbol: orNull(f.eodhd_symbol) ?? null,
+        fmp_symbol: orNull(f.fmp_symbol)?.toUpperCase() ?? null,
+        companies_house_number: orNull(f.companies_house_number)?.toUpperCase() ?? null,
+        edinet_code: orNull(f.edinet_code)?.toUpperCase() ?? null,
         reporting_currency: orNull(f.reporting_currency)?.toUpperCase() ?? null,
         competitors: lines(f.competitors),
         suppliers: lines(f.suppliers),

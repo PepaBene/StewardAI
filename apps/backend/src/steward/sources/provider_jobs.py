@@ -22,19 +22,27 @@ import httpx
 
 from steward import __version__
 from steward.config.holding_profiles import HoldingProfilesConfig
-from steward.config.jobs import JobsConfig
+from steward.config.jobs import JobsConfig, ProviderJobSettings
 from steward.config.store import load_active
 from steward.free_sources import collect_alpha_vantage_statement
 from steward.jobs.runner import JobContext
 from steward.reference.identity import holding_tickers
 from steward.settings import get_settings
 from steward.sources.base import Priority
+from steward.sources.companies_house import collect_companies_house
 from steward.sources.company_research import collect_epo_patents
+from steward.sources.edinet import collect_edinet_day
 from steward.sources.fmp import collect_fmp_company
 from steward.sources.free_market import FreeSourceError
 from steward.sources.governor import QuotaExceeded
+from steward.sources.twelvedata import TwelveDataError, collect_corporate_actions
 
 FMP_HOLDINGS_PER_RUN = 20  # two credits each: well inside the 125-per-endpoint daily cap
+COMPANIES_HOUSE_HOLDINGS_PER_RUN = 20  # two requests each, far below the 600 per 5 minutes
+EDINET_DAYS_PER_RUN = 7  # one request a day of filings
+EDINET_FIRST_LOOKBACK_DAYS = 3
+TWELVE_DATA_HOLDINGS_PER_RUN = 6  # two credits each: 12 of the 40-a-day-per-endpoint cap
+TWELVE_DATA_LOOKBACK_DAYS = 365
 ALPHA_STATEMENTS_PER_RUN = 4  # two ledger credits each of the shared 25 a day
 EPO_HOLDINGS_PER_RUN = 3
 AlphaFunction = Literal["INCOME_STATEMENT", "BALANCE_SHEET", "CASH_FLOW"]
@@ -81,6 +89,17 @@ async def _save_state(pool: asyncpg.Pool, key: str, value: dict[str, Any]) -> No
 # ------------------------------------------------------------------------------------- FMP
 
 
+def fmp_symbols(profiles: HoldingProfilesConfig, tickers: Sequence[str]) -> dict[str, str]:
+    """Holding -> FMP symbol: the profile's `fmp_symbol`, else its `sec_ticker`; none, no call."""
+    out: dict[str, str] = {}
+    for ticker in tickers:
+        profile = profiles.for_ticker(ticker)
+        symbol = profile and (profile.fmp_symbol or profile.sec_ticker)
+        if symbol:
+            out[ticker] = symbol
+    return out
+
+
 async def fmp_company_handler(ctx: JobContext) -> None:
     settings = get_settings()
     async with ctx.step("fmp_company") as step:
@@ -90,10 +109,9 @@ async def fmp_company_handler(ctx: JobContext) -> None:
             step.detail["skipped"] = "providers.fmp is disabled or FMP_API_KEY is not set"
             return
         tickers = await holding_tickers(ctx.pool)
-        # The free plan covers US listings under their EDGAR/Finnhub symbol; no mapping, no call.
-        mapped = {
-            t: p.sec_ticker for t in tickers if (p := profiles.for_ticker(t)) and p.sec_ticker
-        }
+        # The free plan covers US listings under their EDGAR/Finnhub symbol (or an explicit
+        # `fmp_symbol`); no mapping, no call.
+        mapped = fmp_symbols(profiles, tickers)
         step.detail["unmapped"] = [t for t in tickers if t not in mapped]
         rows = await ctx.pool.fetch(
             "select ticker, max(last_seen_at) seen from public.company_research_observation"
@@ -280,4 +298,230 @@ async def epo_patents_handler(ctx: JobContext) -> None:
                 await _save_state(
                     ctx.pool, epo_state_key(ticker), {"at": dt.datetime.now(dt.UTC).isoformat()}
                 )
+        step.detail["refreshed"] = results
+
+
+# ------------------------------------------------------- Companies House, EDINET, Twelve Data
+
+
+def _provider_settings(jobs: JobsConfig, name: str) -> ProviderJobSettings:
+    """The provider's settings; a config saved before the provider existed has none (off)."""
+    return jobs.providers.get(name) or ProviderJobSettings()
+
+
+def companies_house_numbers(
+    profiles: HoldingProfilesConfig, tickers: Sequence[str]
+) -> dict[str, str]:
+    out: dict[str, str] = {}
+    for ticker in tickers:
+        profile = profiles.for_ticker(ticker)
+        if profile and profile.companies_house_number:
+            out[ticker] = profile.companies_house_number
+    return out
+
+
+def edinet_holdings(profiles: HoldingProfilesConfig, tickers: Sequence[str]) -> dict[str, str]:
+    """EDINET code -> holding ticker."""
+    out: dict[str, str] = {}
+    for ticker in tickers:
+        profile = profiles.for_ticker(ticker)
+        if profile and profile.edinet_code:
+            out[profile.edinet_code] = ticker
+    return out
+
+
+def edinet_days_to_fetch(
+    last_day: dt.date | None, today: dt.date, *, limit: int = EDINET_DAYS_PER_RUN
+) -> list[dt.date]:
+    """Weekdays (Japan time) from the last fetched day, which is read again because a day's list
+    can still grow, up to `today`; the first run looks back `EDINET_FIRST_LOOKBACK_DAYS`. At most
+    `limit` days, oldest first, so a long gap is worked off over several runs."""
+    start = last_day or today - dt.timedelta(days=EDINET_FIRST_LOOKBACK_DAYS)
+    days = [start + dt.timedelta(days=n) for n in range((today - start).days + 1)]
+    return [d for d in days if d.weekday() < 5][: max(limit, 0)]
+
+
+async def _state_times(pool: asyncpg.Pool, keys: list[str], field: str = "at") -> dict[str, Any]:
+    rows = await pool.fetch(
+        "select key, value from public.sync_state where key = any($1::text[])", keys
+    )
+    out: dict[str, Any] = {}
+    for row in rows:
+        value = json.loads(row["value"]) if isinstance(row["value"], str) else row["value"]
+        out[row["key"]] = value.get(field) if isinstance(value, dict) else None
+    return out
+
+
+def _as_datetime(value: object) -> dt.datetime | None:
+    try:
+        return dt.datetime.fromisoformat(str(value))
+    except ValueError:
+        return None
+
+
+async def companies_house_filings_handler(ctx: JobContext) -> None:
+    settings = get_settings()
+    async with ctx.step("companies_house_filings") as step:
+        jobs, profiles = await _configs(ctx.pool)
+        provider = _provider_settings(jobs, "companies_house")
+        if not provider.enabled or not settings.companies_house_api_key:
+            step.detail["skipped"] = (
+                "providers.companies_house is disabled or COMPANIES_HOUSE_API_KEY is not set"
+            )
+            return
+        tickers = await holding_tickers(ctx.pool)
+        mapped = companies_house_numbers(profiles, tickers)
+        step.detail["unmapped"] = [t for t in tickers if t not in mapped]
+        rows = await ctx.pool.fetch(
+            "select ticker, max(last_seen_at) seen from public.company_research_observation"
+            " where provider='companies_house' and dataset='profile' and ticker = any($1::text[])"
+            " group by ticker",
+            list(mapped),
+        )
+        seen = {r["ticker"]: r["seen"] for r in rows}
+        due = stalest_first(
+            list(mapped),
+            seen.get,
+            now=dt.datetime.now(dt.UTC),
+            refresh_hours=provider.refresh_hours,
+            limit=COMPANIES_HOUSE_HOLDINGS_PER_RUN,
+        )
+        results: dict[str, Any] = {}
+        async with httpx.AsyncClient(
+            timeout=30, headers={"User-Agent": f"StewardAI/{__version__}"}
+        ) as http:
+            for ticker in due:
+                try:
+                    results[ticker] = await collect_companies_house(
+                        ctx.pool,
+                        http,
+                        ticker=ticker,
+                        number=mapped[ticker],
+                        api_key=settings.companies_house_api_key.get_secret_value(),
+                        provider_settings=provider,
+                    )
+                except (QuotaExceeded, RuntimeError) as exc:
+                    step.detail["stopped"] = f"{type(exc).__name__}: {exc}"[:200]
+                    break
+                except FreeSourceError as exc:
+                    results[ticker] = f"failed: {exc.status_code or 'error'}"
+                    if exc.status_code in {401, 403, 429}:
+                        step.detail["stopped"] = f"HTTP {exc.status_code}"
+                        break
+                except httpx.HTTPError as exc:
+                    results[ticker] = f"failed: {type(exc).__name__}"
+        step.detail["refreshed"] = results
+
+
+EDINET_STATE_KEY = "edinet_filings:last_day"
+
+
+async def edinet_filings_handler(ctx: JobContext) -> None:
+    settings = get_settings()
+    async with ctx.step("edinet_filings") as step:
+        jobs, profiles = await _configs(ctx.pool)
+        provider = _provider_settings(jobs, "edinet")
+        if not provider.enabled or not settings.edinet_api_key:
+            step.detail["skipped"] = "providers.edinet is disabled or EDINET_API_KEY is not set"
+            return
+        tickers = await holding_tickers(ctx.pool)
+        holdings = edinet_holdings(profiles, tickers)
+        step.detail["unmapped"] = [t for t in tickers if t not in holdings.values()]
+        if not holdings:
+            step.detail["skipped"] = "no holding has an edinet_code"
+            return
+        raw_last = (await _state_times(ctx.pool, [EDINET_STATE_KEY], "day")).get(EDINET_STATE_KEY)
+        try:
+            last_day = dt.date.fromisoformat(str(raw_last)) if raw_last else None
+        except ValueError:
+            last_day = None
+        today = dt.datetime.now(dt.timezone(dt.timedelta(hours=9))).date()
+        results: dict[str, Any] = {}
+        async with httpx.AsyncClient(
+            timeout=45, headers={"User-Agent": f"StewardAI/{__version__}"}
+        ) as http:
+            for day in edinet_days_to_fetch(last_day, today):
+                try:
+                    results[day.isoformat()] = await collect_edinet_day(
+                        ctx.pool,
+                        http,
+                        day=day,
+                        holdings=holdings,
+                        api_key=settings.edinet_api_key.get_secret_value(),
+                        provider_settings=provider,
+                    )
+                except (QuotaExceeded, RuntimeError) as exc:
+                    step.detail["stopped"] = f"{type(exc).__name__}: {exc}"[:200]
+                    break
+                except (FreeSourceError, httpx.HTTPError) as exc:
+                    results[day.isoformat()] = f"failed: {type(exc).__name__}"
+                    step.detail["stopped"] = "provider error"
+                    break
+                await _save_state(ctx.pool, EDINET_STATE_KEY, {"day": day.isoformat()})
+        step.detail["fetched_days"] = results
+
+
+def twelve_data_state_key(ticker: str) -> str:
+    return f"twelve_data_actions:{ticker}"
+
+
+async def twelve_data_corporate_actions_handler(ctx: JobContext) -> None:
+    settings = get_settings()
+    async with ctx.step("twelve_data_corporate_actions") as step:
+        jobs, _profiles = await _configs(ctx.pool)
+        provider = _provider_settings(jobs, "twelve_data")
+        if not provider.enabled or not settings.twelve_data_api_key:
+            step.detail["skipped"] = (
+                "providers.twelve_data is disabled or TWELVE_DATA_API_KEY is not set"
+            )
+            return
+        tickers = await holding_tickers(ctx.pool)
+        # The route's precondition: a confirmed canonical listing; the symbol is its ticker.
+        rows = await ctx.pool.fetch(
+            "select distinct on (m.ticker) m.ticker, m.listing_id, l.ticker as symbol"
+            " from public.instrument_security_link m"
+            " join public.security_listing l on l.id = m.listing_id"
+            " where m.status='confirmed' and m.ticker = any($1::text[])",
+            tickers,
+        )
+        listings = {r["ticker"]: (r["listing_id"], r["symbol"]) for r in rows}
+        step.detail["without_confirmed_listing"] = [t for t in tickers if t not in listings]
+        done = await _state_times(ctx.pool, [twelve_data_state_key(t) for t in listings])
+        now = dt.datetime.now(dt.UTC)
+        due = stalest_first(
+            list(listings),
+            lambda t: _as_datetime(done.get(twelve_data_state_key(t))),
+            now=now,
+            refresh_hours=provider.refresh_hours,
+            limit=TWELVE_DATA_HOLDINGS_PER_RUN,
+        )
+        results: dict[str, Any] = {}
+        async with httpx.AsyncClient(
+            timeout=30, headers={"User-Agent": f"StewardAI/{__version__}"}
+        ) as http:
+            for ticker in due:
+                listing_id, symbol = listings[ticker]
+                try:
+                    results[ticker] = await collect_corporate_actions(
+                        ctx.pool,
+                        http,
+                        listing_id=listing_id,
+                        symbol=symbol,
+                        api_key=settings.twelve_data_api_key.get_secret_value(),
+                        since=now.date() - dt.timedelta(days=TWELVE_DATA_LOOKBACK_DAYS),
+                    )
+                except (QuotaExceeded, RuntimeError) as exc:
+                    # HardBlocked (a paid-plan latch) is a QuotaExceeded: stop, never retry.
+                    step.detail["stopped"] = f"{type(exc).__name__}: {exc}"[:200]
+                    break
+                except FreeSourceError as exc:
+                    results[ticker] = f"failed: {exc.status_code or 'error'}"
+                    if exc.status_code in {401, 403, 429}:
+                        step.detail["stopped"] = f"HTTP {exc.status_code}"
+                        break
+                    continue
+                except (TwelveDataError, httpx.HTTPError) as exc:
+                    results[ticker] = f"failed: {type(exc).__name__}"
+                    continue
+                await _save_state(ctx.pool, twelve_data_state_key(ticker), {"at": now.isoformat()})
         step.detail["refreshed"] = results

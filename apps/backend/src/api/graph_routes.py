@@ -6,7 +6,7 @@ Mount this router next to `free_sources_router`:
     app.include_router(graph_router)
 """
 
-from datetime import datetime
+from datetime import date, datetime
 from typing import Annotated, Any, Literal
 
 import httpx
@@ -27,6 +27,12 @@ from steward.graph.decisions import (
 from steward.graph.kpi import kpi_event_links
 from steward.graph.passages import review_hit
 from steward.graph.patents import competitor_overlap_rows
+from steward.graph.reads import (
+    HistoryKind,
+    decision_history,
+    list_graph_rows,
+    resolve_reconciliation,
+)
 from steward.graph.relationships import portfolio_knock_on, review_queue
 from steward.graph.successors import open_reconciliations
 from steward.settings import get_settings
@@ -99,16 +105,66 @@ async def decide_relationship_disclosure(
     return {"id": disclosure_id, "status": row["status"]}
 
 
-@router.get("/relationship-review/queue", tags=["research"], response_model=None)
+class QueueFilingHit(BaseModel):
+    id: int
+    ticker: str
+    filer_name: str | None = None
+    form: str | None = None
+    filed_at: datetime | None = None
+    url: str | None = None
+    review_state: str
+    status: str  # same value as review_state: pending, fetched or failed
+    review_note: str | None = None
+    attempts: int | None = None
+    disclosure_id: int | None = None
+
+
+class QueueDisclosure(BaseModel):
+    id: int
+    ticker: str
+    relationship: str
+    direction: str
+    counterparty_name: str | None = None
+    anonymous_counterparty: bool
+    reported_share: float | None = None
+    share_basis: str | None = None
+    fiscal_period: str | None = None
+    passage: str | None = None
+    source_url: str | None = None
+    known_at: datetime
+    origin: str | None = None
+    status: Literal["suggested", "disputed"]
+
+
+class QueueContradiction(BaseModel):
+    id: int
+    ticker: str
+    relationship: str | None = None
+    fiscal_period: str | None = None
+    kind: str
+    disclosure_id: int | None = None
+    other_disclosure_id: int | None = None
+    detail: Any = None
+    created_at: datetime
+    status: str
+
+
+class ReviewQueueResponse(BaseModel):
+    filing_hits: list[QueueFilingHit]
+    suggested_disclosures: list[QueueDisclosure]
+    contradictions: list[QueueContradiction]
+
+
+@router.get("/relationship-review/queue", tags=["research"], response_model=ReviewQueueResponse)
 async def relationship_review_queue(
     pool: Pool,
     _owner: Owner,
     ticker: Annotated[str | None, Query(pattern=r"^[A-Za-z0-9._-]{1,32}$")] = None,
     limit: Annotated[int, Query(ge=1, le=500)] = 100,
-) -> dict[str, Any]:
+) -> ReviewQueueResponse:
     """Filing hits waiting for a passage read, suggested disclosures awaiting a decision and
-    open contradictions."""
-    return dict(await review_queue(pool, ticker, limit))
+    open contradictions. Every item carries its `status`."""
+    return ReviewQueueResponse.model_validate(dict(await review_queue(pool, ticker, limit)))
 
 
 @router.post("/relationship-review/hits/{hit_id}/review", tags=["research"], response_model=None)
@@ -205,14 +261,244 @@ async def patent_overlap(
     return {"ticker": ticker, "peers": await competitor_overlap_rows(pool, ticker, as_of)}
 
 
-@router.get("/company-graph/reconciliations", tags=["research"], response_model=None)
+class ReconciliationItem(BaseModel):
+    id: int
+    ticker: str
+    change_kind: str
+    from_key: str | None = None
+    to_key: str | None = None
+    observed_source: str
+    observed_at: datetime
+    outcome: str
+    deal_event_id: int | None = None
+    detail: Any = None
+
+
+class ReconciliationsResponse(BaseModel):
+    open: list[ReconciliationItem]
+
+
+@router.get(
+    "/company-graph/reconciliations", tags=["research"], response_model=ReconciliationsResponse
+)
 async def graph_reconciliations(
     pool: Pool,
     _owner: Owner,
     ticker: Annotated[str | None, Query(pattern=r"^[A-Za-z0-9._-]{1,32}$")] = None,
-) -> dict[str, Any]:
-    """Parent / successor changes that no closed deal explains."""
-    return {"open": await open_reconciliations(pool, ticker)}
+) -> ReconciliationsResponse:
+    """Parent / successor changes that no closed deal explains and the owner has not closed."""
+    rows = await open_reconciliations(pool, ticker)
+    return ReconciliationsResponse(open=[ReconciliationItem.model_validate(r) for r in rows])
+
+
+class ReconciliationResolution(BaseModel):
+    resolution: Literal["resolved", "dismissed"]
+    reason: str = Field(min_length=10, max_length=2000)
+
+
+class ReconciliationResolved(BaseModel):
+    id: int
+    ticker: str
+    status: Literal["accepted", "dismissed"]
+
+
+@router.post(
+    "/company-graph/reconciliations/{reconciliation_id}/resolve",
+    tags=["research"],
+    response_model=ReconciliationResolved,
+)
+async def resolve_graph_reconciliation(
+    reconciliation_id: int, body: ReconciliationResolution, pool: Pool, owner: Owner
+) -> ReconciliationResolved:
+    """Close an open reconciliation with the owner's reason; it stops showing as unexplained.
+    `resolved` is stored as status `accepted`; the reason is kept in `detail.resolution`."""
+    reason = body.reason.strip()
+    if len(reason) < 10:
+        raise HTTPException(422, "the reason needs at least 10 characters")
+    row = await resolve_reconciliation(
+        pool, reconciliation_id, body.resolution, reason, str(owner.user_id)
+    )
+    if row is None:
+        raise HTTPException(404, "no open reconciliation with that id")
+    return ReconciliationResolved.model_validate(row)
+
+
+class GraphRow(BaseModel):
+    """One edge, event or disclosure; `kind` is the edge type, event type or relationship."""
+
+    id: int
+    ticker: str
+    kind: str
+    direction: str | None = None
+    counterparty: str | None = None
+    status: str
+    evidence_tier: str | None = None
+    source: str
+    source_url: str
+    evidence_id: int | None = None
+    passage: str | None = None
+    known_at: datetime
+    decided_at: datetime | None = None
+    decision_reason: str | None = None
+    valid_from: date | None = None
+    valid_to: date | None = None
+    object_key: str | None = None
+    event_state: str | None = None
+    announced_at: date | None = None
+    effective_at: date | None = None
+    anonymous_counterparty: bool | None = None
+    reported_share: float | None = None
+    fiscal_period: str | None = None
+
+
+class GraphRowsPage(BaseModel):
+    total: int
+    limit: int
+    offset: int
+    rows: list[GraphRow]
+
+
+GraphStatus = Literal["suggested", "confirmed", "rejected", "disputed"]
+TickerQuery = Annotated[str | None, Query(pattern=r"^[A-Za-z0-9._-]{1,32}$")]
+KindQuery = Annotated[str | None, Query(pattern=r"^[a-z_]{2,40}$")]
+LimitQuery = Annotated[int, Query(ge=1, le=500)]
+OffsetQuery = Annotated[int, Query(ge=0)]
+
+
+async def _page(
+    pool: Pool,
+    what: Literal["edges", "events", "disclosures"],
+    status: str | None,
+    ticker: str | None,
+    kind: str | None,
+    limit: int,
+    offset: int,
+) -> GraphRowsPage:
+    total, rows = await list_graph_rows(
+        pool, what, status=status, ticker=ticker, kind=kind, limit=limit, offset=offset
+    )
+    return GraphRowsPage(
+        total=total, limit=limit, offset=offset, rows=[GraphRow.model_validate(r) for r in rows]
+    )
+
+
+@router.get("/company-graph/edges", tags=["research"], response_model=GraphRowsPage)
+async def list_company_edges(
+    pool: Pool,
+    _owner: Owner,
+    status: GraphStatus | None = None,
+    ticker: TickerQuery = None,
+    kind: KindQuery = None,
+    limit: LimitQuery = 100,
+    offset: OffsetQuery = 0,
+) -> GraphRowsPage:
+    """Company-graph edges across all holdings, newest first, with each edge's current status,
+    evidence / source URL, `known_at` and last decision reason. `kind` is the edge type."""
+    return await _page(pool, "edges", status, ticker, kind, limit, offset)
+
+
+@router.get("/company-graph/events", tags=["research"], response_model=GraphRowsPage)
+async def list_company_events(
+    pool: Pool,
+    _owner: Owner,
+    status: GraphStatus | None = None,
+    ticker: TickerQuery = None,
+    kind: KindQuery = None,
+    limit: LimitQuery = 100,
+    offset: OffsetQuery = 0,
+) -> GraphRowsPage:
+    """Company events across all holdings. `kind` is the event type."""
+    return await _page(pool, "events", status, ticker, kind, limit, offset)
+
+
+@router.get("/company-graph/disclosures", tags=["research"], response_model=GraphRowsPage)
+async def list_relationship_disclosures(
+    pool: Pool,
+    _owner: Owner,
+    status: GraphStatus | None = None,
+    ticker: TickerQuery = None,
+    kind: KindQuery = None,
+    limit: LimitQuery = 100,
+    offset: OffsetQuery = 0,
+) -> GraphRowsPage:
+    """Relationship disclosures across all holdings. `kind` is customer, supplier or
+    procurement_award."""
+    return await _page(pool, "disclosures", status, ticker, kind, limit, offset)
+
+
+class HistoryEntry(BaseModel):
+    changed_at: datetime
+    from_status: str | None = None
+    to_status: str
+    reason: str | None = None
+    decided_by: str | None = None  # known only for the newest entry (the current decider)
+
+
+class DecisionHistory(BaseModel):
+    kind: HistoryKind
+    id: int
+    current_status: str
+    entries: list[HistoryEntry]  # oldest first
+    limitations: list[str]
+
+
+async def _history(pool: Pool, kind: HistoryKind, row_id: int) -> DecisionHistory:
+    found = await decision_history(pool, kind, row_id)
+    if found is None:
+        raise HTTPException(404, f"no {kind} {row_id}")
+    status, _by, entries = found
+    return DecisionHistory(
+        kind=kind,
+        id=row_id,
+        current_status=status,
+        entries=[HistoryEntry.model_validate(e) for e in entries],
+        limitations=[
+            "The status log records each status change and its reason; only the current"
+            " decider is known, so earlier deciders are not listed.",
+        ],
+    )
+
+
+@router.get(
+    "/company-graph/edges/{edge_id}/decision-history",
+    tags=["research"],
+    response_model=DecisionHistory,
+)
+async def edge_decision_history(edge_id: int, pool: Pool, _owner: Owner) -> DecisionHistory:
+    return await _history(pool, "edge", edge_id)
+
+
+@router.get(
+    "/company-graph/events/{event_id}/decision-history",
+    tags=["research"],
+    response_model=DecisionHistory,
+)
+async def event_decision_history(event_id: int, pool: Pool, _owner: Owner) -> DecisionHistory:
+    return await _history(pool, "event", event_id)
+
+
+@router.get(
+    "/company-graph/disclosures/{disclosure_id}/decision-history",
+    tags=["research"],
+    response_model=DecisionHistory,
+)
+async def disclosure_decision_history(
+    disclosure_id: int, pool: Pool, _owner: Owner
+) -> DecisionHistory:
+    return await _history(pool, "disclosure", disclosure_id)
+
+
+@router.get(
+    "/relationship-review/suggestions/{suggestion_id}/decision-history",
+    tags=["research"],
+    response_model=DecisionHistory,
+)
+async def suggestion_decision_history(
+    suggestion_id: int, pool: Pool, _owner: Owner
+) -> DecisionHistory:
+    """History of an owner relationship suggestion (entity_relationship). That table has no
+    status-log trigger, so the entry is its last recorded decision only."""
+    return await _history(pool, "suggestion", suggestion_id)
 
 
 @router.post(

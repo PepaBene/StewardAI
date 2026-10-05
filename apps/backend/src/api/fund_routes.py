@@ -13,6 +13,11 @@ from pydantic import BaseModel, Field
 
 from api.auth import Owner
 from api.db import Pool
+from api.response_models import (
+    CharacteristicsAuditRow,
+    FactsheetRow,
+    LookThroughAsOfResponse,
+)
 from steward.config.jobs import JobsConfig
 from steward.config.store import load_active
 from steward.funds.aggregate import (
@@ -58,20 +63,18 @@ async def get_fund_overlap(pool: Pool, _owner: Owner, as_of: AsOf = None) -> Fun
     return await fund_overlap(pool, as_of=as_of)
 
 
-@router.get("/funds/look-through", tags=["funds"], response_model=None)
+@router.get("/funds/look-through", tags=["funds"])
 async def get_look_through_as_of(
     pool: Pool,
     _owner: Owner,
     as_of: Annotated[dt.date, Query(description="Only records known by the end of this day.")],
     top: Annotated[int, Query(ge=1, le=100)] = 25,
-) -> dict[str, Any]:
+) -> LookThroughAsOfResponse:
     """The base look-through report as it could have been computed at `as_of`."""
     result: AsOfLookThrough = await portfolio_look_through_as_of(pool, as_of, top=top)
-    return {
-        "as_of": result.as_of,
-        "snapshot_ids": result.snapshot_ids,
-        "report": result.report.model_dump(mode="json"),
-    }
+    return LookThroughAsOfResponse(
+        as_of=result.as_of, snapshot_ids=result.snapshot_ids, report=result.report
+    )
 
 
 @router.get("/funds/coverage-ledger", tags=["funds"])
@@ -127,7 +130,7 @@ async def put_coverage_entry(pool: Pool, _owner: Owner, body: LedgerEntryInput) 
     return await read_ledger(pool)
 
 
-@router.get("/funds/{isin}/factsheet", tags=["funds"], response_model=None)
+@router.get("/funds/{isin}/factsheet", tags=["funds"], response_model=list[FactsheetRow])
 async def get_factsheet(
     pool: Pool, _owner: Owner, isin: IsinPath, limit: Annotated[int, Query(ge=1, le=120)] = 24
 ) -> list[dict[str, Any]]:
@@ -208,7 +211,9 @@ async def pin_snapshots(pool: Pool, _owner: Owner, body: PinInput) -> dict[str, 
     return {"pinned": pinned}
 
 
-@router.get("/funds/characteristics-audit", tags=["funds"], response_model=None)
+@router.get(
+    "/funds/characteristics-audit", tags=["funds"], response_model=list[CharacteristicsAuditRow]
+)
 async def get_characteristics_audit(
     pool: Pool,
     _owner: Owner,

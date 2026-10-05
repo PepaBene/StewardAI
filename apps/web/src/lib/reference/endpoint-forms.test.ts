@@ -30,7 +30,7 @@ describe("peer validation", () => {
     expect(validatePeerStatus("confirmed", "looks right", "", true)).toEqual({});
   });
   it("parses the peer set with unknown status as suggested", () => {
-    const p = parsePeerSet({ peers: [{ id: 1, peer_ticker: "X", status: "weird", evidence_id: null }, { peer_ticker: "bad" }] });
+    const p = parsePeerSet({ ticker: "Y", peers: [{ id: 1, peer_ticker: "X", basis: "b", source: "s", status: "weird", evidence_id: null, known_at: "t" }] });
     expect(p).toHaveLength(1);
     expect(p[0].status).toBe("suggested");
     expect(p[0].evidenceId).toBeNull();
@@ -70,12 +70,18 @@ describe("other forms", () => {
 
 describe("returns", () => {
   it("keeps total return unknown with its reason, never 0", () => {
-    const v = parseReturns({ results: [{ symbol: "X", raw_price_return: "0.1", price_return: 0.12, total_return: null, total_return_reason: "actions incomplete" }] });
+    const result = {
+      symbol: "X", source: "s", chosen: true, raw_price_return: 0.1, price_return: 0.12, total_return: null, total_return_reason: "actions incomplete",
+      action_coverage: "partial", coverage: 0.9, expected_sessions: 250, observed_sessions: 225, calendar_basis: "weekdays",
+      missing_actions: { price_raw: [], price_adjusted: ["a"], total_return: ["b", "c"] }, observations: 225, start: "2025-01-01", end: "2026-01-01",
+    };
+    const v = parseReturns({ ticker: "X", known_as_of: "t", results: [result] });
     expect(v?.bars.find((b) => b.id === "total")).toMatchObject({ value: null, reason: "actions incomplete" });
     expect(v?.bars[0].value).toBeCloseTo(0.1);
+    expect(v?.missingActions).toBe(3);
   });
   it("explains an empty result", () => {
-    expect(parseReturns({ results: [], reason: "no stored price series" })?.reason).toBe("no stored price series");
+    expect(parseReturns({ ticker: "X", known_as_of: "t", results: [], reason: "no stored price series" })?.reason).toBe("no stored price series");
   });
   it("finds the list in an untyped response", () => {
     expect(listIn({ ticker: "X", deals: [{ a: 1 }] }, ["deals"])).toHaveLength(1);

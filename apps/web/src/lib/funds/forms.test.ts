@@ -51,7 +51,11 @@ describe("pin and audit", () => {
     expect(pinRequest("2026-03-01", " ")).toEqual({ ref_kind: "manual", ref_id: "look-through:2026-03-01", as_of: "2026-03-01", reason: null });
   });
   it("parses audit rows with missing figures as null", () => {
-    const rows = parseAudit([{ fund_key: "A", verdict: "value_change", alert: true, pe: "21.5", pb: null }, { fund_key: "B", verdict: "weird" }]);
+    const base = { provider: "p", as_of: "2026-09-30", fingerprint: "f", basis: "b", observed_at: "2026-10-01T00:00:00Z" };
+    const rows = parseAudit([
+      { ...base, fund_key: "A", verdict: "value_change", alert: true, pe: 21.5, pb: null },
+      { ...base, fund_key: "B", verdict: "weird", alert: false },
+    ]);
     expect(rows[0]).toMatchObject({ pe: 21.5, pb: null, alert: true });
     expect(rows[1].verdict).toBe("unknown");
     expect(verdictCounts(rows)).toEqual([{ id: "value_change", label: "Value changed", count: 1 }]);

@@ -45,7 +45,11 @@ def test_denials_and_throttling_are_not_empty_successes() -> None:
 
 def test_phase_zero_probe_manifest_covers_every_named_provider() -> None:
     registered = probes(Settings())
-    assert {probe.provider for probe in registered} == set(JobsConfig().providers)
+    # Companies House and EDINET are probed by their first governed call, not a phase-zero probe.
+    assert {probe.provider for probe in registered} == set(JobsConfig().providers) - {
+        "companies_house",
+        "edinet",
+    }
     assert {(p.provider, p.endpoint) for p in registered} >= {
         ("fmp", "analyst_estimates"),
         ("fmp", "sector_snapshot"),
@@ -214,7 +218,7 @@ def test_reconciliation_and_unknown_exposure() -> None:
 
 def test_new_providers_are_disabled_by_default() -> None:
     config = JobsConfig()
-    assert len(config.providers) == 13
+    assert len(config.providers) == 15
     assert all(not provider.enabled for provider in config.providers.values())
     assert len(config.public_data.world_bank) == 9
     assert all(item.consumer for item in config.public_data.world_bank)

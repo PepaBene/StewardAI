@@ -34,7 +34,10 @@ export function DecisionForm({
   validate,
   onSubmit,
   summary = "Decide",
+  confirmText,
 }: {
+  /** When set, the first press asks "are you sure" with this text and the second one submits. */
+  confirmText?: (value: string) => string;
   options: readonly DecisionOption[];
   reasonMin?: number;
   reasonMax?: number;
@@ -48,6 +51,7 @@ export function DecisionForm({
   const [reason, setReason] = useState("");
   const [evidence, setEvidence] = useState("");
   const [touched, setTouched] = useState(false);
+  const [confirming, setConfirming] = useState(false);
   const [save, setSave] = useState<SaveState>({ kind: "idle" });
   const errors = validate ? validate(value, reason, evidence) : { reason: validateReason(reason, reasonMin, reasonMax) };
 
@@ -55,6 +59,12 @@ export function DecisionForm({
     e.preventDefault();
     setTouched(true);
     if (errors.reason || errors.evidence) return;
+    // A second, explicit press records it: nothing is sent on the first one.
+    if (confirmText && !confirming) {
+      setConfirming(true);
+      return;
+    }
+    setConfirming(false);
     setSave({ kind: "saving" });
     const r = await onSubmit(value, reason, evidence);
     if (r.ok) {
@@ -72,7 +82,7 @@ export function DecisionForm({
       <form onSubmit={submit} noValidate className="mt-2 space-y-3 border border-border bg-surface-muted p-3">
         <div className="grid gap-3 sm:grid-cols-[14rem_1fr]">
           <Field label="Decision">
-            <select value={value} onChange={(e) => setValue(e.target.value)} className={SELECT_CLASS}>
+            <select value={value} onChange={(e) => { setValue(e.target.value); setConfirming(false); }} className={SELECT_CLASS}>
               {options.map((o) => (
                 <option key={o.value} value={o.value}>
                   {o.label}
@@ -87,12 +97,22 @@ export function DecisionForm({
           ) : null}
         </div>
         <Field label="Reason (required)" hint={`${reason.trim().length} of ${reasonMax} characters, at least ${reasonMin}.`} error={touched ? errors.reason : undefined}>
-          <textarea value={reason} onChange={(e) => setReason(e.target.value)} maxLength={reasonMax} className={TEXTAREA_CLASS} />
+          <textarea value={reason} onChange={(e) => { setReason(e.target.value); setConfirming(false); }} maxLength={reasonMax} className={TEXTAREA_CLASS} />
         </Field>
+        {confirming && confirmText ? (
+          <p role="alert" className="border border-dashed border-border bg-surface-raised px-3 py-2 text-sm">
+            {confirmText(value)} Press the button again to record it, or change anything above to cancel.
+          </p>
+        ) : null}
         <div className="flex flex-wrap items-center gap-3">
           <Button type="submit" size="sm" disabled={save.kind === "saving"}>
-            {label}
+            {confirming ? `Yes, record: ${label}` : label}
           </Button>
+          {confirming ? (
+            <Button type="button" size="sm" variant="ghost" onClick={() => setConfirming(false)}>
+              Cancel
+            </Button>
+          ) : null}
           <SaveNote state={save} />
         </div>
       </form>

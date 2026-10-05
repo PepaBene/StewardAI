@@ -898,6 +898,8 @@ def _provider_defaults() -> dict[str, ProviderJobSettings]:
         "bis": (None, None),
         "ecb": (None, None),
         "epo_ops": (None, None),
+        "edinet": (500, None),
+        "companies_house": (2000, None),
     }
     return {
         name: ProviderJobSettings(daily_quota=daily, monthly_quota=monthly)
@@ -1512,6 +1514,32 @@ class JobsConfig(ConfigModel):
             "default; also needs providers.epo_ops.enabled and the OPS client credentials."
         ),
     )
+    companies_house_filings: JobSchedule = Field(
+        default_factory=lambda: JobSchedule(cron="10 10 * * 6", enabled=False),
+        description=(
+            "Companies House company profile and filing history of UK holdings whose profile "
+            "has a companies_house_number. Off by default; also needs "
+            "providers.companies_house.enabled and COMPANIES_HOUSE_API_KEY. Two requests per "
+            "holding, at most 20 holdings a run."
+        ),
+    )
+    edinet_filings: JobSchedule = Field(
+        default_factory=lambda: JobSchedule(cron="30 10 * * *", enabled=False),
+        description=(
+            "EDINET (Japan FSA) document list of the last days, kept for holdings whose profile "
+            "has an edinet_code (list and links only, no XBRL parsing). Off by default; also "
+            "needs providers.edinet.enabled and EDINET_API_KEY."
+        ),
+    )
+    twelve_data_corporate_actions: JobSchedule = Field(
+        default_factory=lambda: JobSchedule(cron="50 10 * * 6", enabled=False),
+        description=(
+            "Twelve Data dividends and splits of holdings with a confirmed listing, stored as "
+            "suggested corporate actions for the owner to confirm. Off by default; also needs "
+            "providers.twelve_data.enabled. A few holdings per run inside the Basic plan's "
+            "credits; a plan denial latches the endpoint as paid-only."
+        ),
+    )
     valuation_refresh: JobSchedule = Field(
         default_factory=lambda: JobSchedule(cron="45 7 * * *"),
         description="Fundamentals (SEC XBRL, ESEF) of holdings that filed since the last read "
@@ -1586,6 +1614,9 @@ class JobsConfig(ConfigModel):
             "fmp_company": self.fmp_company,
             "alpha_vantage_statements": self.alpha_vantage_statements,
             "epo_patents": self.epo_patents,
+            "companies_house_filings": self.companies_house_filings,
+            "edinet_filings": self.edinet_filings,
+            "twelve_data_corporate_actions": self.twelve_data_corporate_actions,
             "etf_look_through": self.etf_look_through,
             "sec_xbrl": self.sec_xbrl,
         }

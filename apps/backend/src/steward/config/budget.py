@@ -64,6 +64,9 @@ BudgetJobType = Literal[
     "fmp_company",
     "alpha_vantage_statements",
     "epo_patents",
+    "companies_house_filings",
+    "edinet_filings",
+    "twelve_data_corporate_actions",
 ]
 
 AtCap = Literal["alert_only", "pause_noncritical", "downgrade_noncritical"]

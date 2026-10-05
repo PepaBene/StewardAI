@@ -8,21 +8,22 @@ import { SaveNote, type SaveState } from "@/components/reference/form-bits";
 import { Button } from "@/components/ui/button";
 import { apiErrorText } from "@/lib/reference/form-utils";
 
-type Settled = { response: Response; error?: unknown; data?: unknown };
+type Settled<T = unknown> = { response: Response; error?: unknown; data?: T };
 
 /**
  * Runs one mutation and tracks saving, success and error for a SaveNote. `okText` turns the
- * response body into the confirmation line; `onOk` is where callers refresh their data.
+ * response body into the confirmation line; `onOk` is where callers refresh their data. The
+ * body takes the call's generated response type, so a typed route needs no cast.
  */
 export function useMutation() {
   const [state, setState] = useState<SaveState>({ kind: "idle" });
-  const run = useCallback(async (call: () => Promise<Settled>, okText: (data: unknown) => string, onOk?: (data: unknown) => void) => {
+  const run = useCallback(async <T = unknown,>(call: () => Promise<Settled<T>>, okText: (data: T) => string, onOk?: (data: T) => void) => {
     setState({ kind: "saving" });
     try {
       const r = await call();
       if (r.response.ok) {
-        setState({ kind: "ok", text: okText(r.data) });
-        onOk?.(r.data);
+        setState({ kind: "ok", text: okText(r.data as T) });
+        onOk?.(r.data as T);
         return true;
       }
       setState({ kind: "error", text: apiErrorText(r.error, r.response.status) });

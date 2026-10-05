@@ -5,7 +5,11 @@
  * fund's unknown weight is its own bucket and is never redistributed, and a missing figure is
  * null, shown as "Unknown" or "Not published", never 0.
  */
+import type { components } from "@/lib/api/schema";
 import { arr, isRecord, num, recs, str, type Rec } from "@/lib/parse-untyped";
+
+type LookThroughAsOfResponse = components["schemas"]["LookThroughAsOfResponse"];
+type FactsheetRow = components["schemas"]["FactsheetRow"];
 
 const strings = (v: unknown): string[] => arr(v).filter((x): x is string => typeof x === "string");
 
@@ -211,27 +215,24 @@ export type LookThrough = {
   notes: string[];
 };
 
-export function parseLookThrough(payload: unknown): LookThrough | null {
-  if (!isRecord(payload) || !isRecord(payload.report)) return null;
+export function parseLookThrough(payload: LookThroughAsOfResponse): LookThrough {
   const r = payload.report;
-  const cov = isRecord(r.coverage) ? r.coverage : null;
-  const conc = isRecord(r.concentration) ? r.concentration : null;
   return {
-    asOf: str(payload.as_of),
-    snapshotIds: arr(payload.snapshot_ids).map(num).filter((n): n is number => n !== null),
-    available: r.available === true,
-    portfolioShareLookedThrough: cov ? num(cov.portfolio_share_looked_through) : null,
-    top: recs(r.top_holdings).map((h) => ({
-      key: str(h.key) ?? str(h.name) ?? "",
-      name: str(h.name) ?? str(h.key) ?? "Unnamed",
-      weight: num(h.weight),
-      sector: str(h.sector),
-      country: str(h.country),
-      viaFunds: arr(h.via).length,
+    asOf: payload.as_of,
+    snapshotIds: Object.values(payload.snapshot_ids ?? {}),
+    available: r.available,
+    portfolioShareLookedThrough: r.coverage?.portfolio_share_looked_through ?? null,
+    top: r.top_holdings.map((h) => ({
+      key: h.key || h.name,
+      name: h.name || h.key || "Unnamed",
+      weight: h.weight ?? null,
+      sector: h.sector ?? null,
+      country: h.country ?? null,
+      viaFunds: h.via.length,
     })),
-    effectiveN: conc ? num(conc.effective_n) : null,
-    top10Share: conc ? num(conc.top10_share) : null,
-    notes: strings(r.notes),
+    effectiveN: r.concentration?.effective_n ?? null,
+    top10Share: r.concentration?.top10_share ?? null,
+    notes: r.notes,
   };
 }
 
@@ -254,21 +255,22 @@ export type Factsheet = {
   note: string | null;
 };
 
-export function parseFactsheets(payload: unknown): Factsheet[] {
-  return recs(payload).map((f) => ({
-    asOf: str(f.as_of),
-    source: str(f.source),
-    shareClass: str(f.share_class),
-    totalAssets: num(f.total_assets),
-    totalAssetsCurrency: str(f.total_assets_currency),
-    expenseRatio: num(f.expense_ratio),
-    benchmark: str(f.benchmark_name),
-    distribution: str(f.distribution_policy),
-    navBasis: str(f.nav_basis),
-    fieldNamesVerified: f.field_names_verified !== false,
-    warnings: strings(f.extraction_warnings),
+export function parseFactsheets(rows: readonly FactsheetRow[]): Factsheet[] {
+  return rows.map((f) => ({
+    asOf: f.as_of,
+    source: f.source,
+    shareClass: f.share_class ?? null,
+    totalAssets: f.total_assets ?? null,
+    totalAssetsCurrency: f.total_assets_currency ?? null,
+    expenseRatio: f.expense_ratio ?? null,
+    benchmark: f.benchmark_name ?? null,
+    distribution: f.distribution_policy ?? null,
+    navBasis: f.nav_basis ?? null,
+    fieldNamesVerified: f.field_names_verified,
+    warnings: f.extraction_warnings.filter((w): w is string => typeof w === "string"),
+    // `charges` is a free-form issuer object, so it stays untyped by design.
     charges: isRecord(f.charges) ? Object.entries(f.charges).map(([name, value]) => ({ name, value: num(value) })) : [],
-    note: str(f.note),
+    note: f.coverage_note ?? null,
   }));
 }
 

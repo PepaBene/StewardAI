@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { getBrowserApiClient } from "@/lib/api/client";
 import { DECISION_LABEL, decisionBody, decisionsFor, DECISION_RESULT, safeUrl, shareText, type Disclosure, type FilingHit, type GraphDecision } from "@/lib/relationships/relationships";
 
+import { DecisionHistory } from "./all-records-panel";
 import { callApi, DecisionForm } from "./decision-form";
 import { Fact, SourceLink, StatusMark } from "./status-mark";
 
@@ -55,6 +56,7 @@ export function DisclosureCard({ d, onChanged }: { d: Disclosure; onChanged: () 
         <SourceLink href={link} /> {d.source ? `· ${d.source}` : ""} {d.origin ? `· found by ${d.origin.replaceAll("_", " ")}` : ""}
       </p>
       {d.decisionReason ? <p className="text-xs text-text-muted">Last decision: {d.decisionReason}</p> : null}
+      <DecisionHistory kind="suggestion" id={d.id} />
       {d.ticker ? (
         <DecisionForm
           options={options}

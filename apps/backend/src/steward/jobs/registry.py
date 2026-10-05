@@ -45,8 +45,11 @@ from steward.sources.audit import source_audit_handler
 from steward.sources.fund_probes import fund_probes_handler
 from steward.sources.provider_jobs import (
     alpha_vantage_statements_handler,
+    companies_house_filings_handler,
+    edinet_filings_handler,
     epo_patents_handler,
     fmp_company_handler,
+    twelve_data_corporate_actions_handler,
 )
 from steward.valuation.collect import valuation_refresh_handler
 from steward.verify_sources.jobs import (
@@ -102,6 +105,9 @@ JobType = Literal[
     "fmp_company",
     "alpha_vantage_statements",
     "epo_patents",
+    "companies_house_filings",
+    "edinet_filings",
+    "twelve_data_corporate_actions",
 ]
 
 JOB_HANDLERS: dict[str, JobHandler] = {
@@ -150,4 +156,7 @@ JOB_HANDLERS: dict[str, JobHandler] = {
     "fmp_company": fmp_company_handler,
     "alpha_vantage_statements": alpha_vantage_statements_handler,
     "epo_patents": epo_patents_handler,
+    "companies_house_filings": companies_house_filings_handler,
+    "edinet_filings": edinet_filings_handler,
+    "twelve_data_corporate_actions": twelve_data_corporate_actions_handler,
 }

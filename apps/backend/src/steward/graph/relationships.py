@@ -283,8 +283,8 @@ async def review_queue(
     """Everything awaiting an owner decision: filing hits to read, suggested disclosures and
     open contradictions."""
     hits = await pool.fetch(
-        """select id,ticker,filer_name,form,filed_at,url,review_state,review_note,attempts,
-                  disclosure_id
+        """select id,ticker,filer_name,form,filed_at,url,review_state,review_state status,
+                  review_note,attempts,disclosure_id
            from public.filing_hit
            where kind='relationship_candidate' and review_state in ('pending','fetched','failed')
              and ($1::text is null or ticker=$1)
@@ -294,7 +294,8 @@ async def review_queue(
     )
     suggested = await pool.fetch(
         """select id,ticker,relationship,direction,counterparty_name,anonymous_counterparty,
-                  reported_share,share_basis,fiscal_period,passage,source_url,known_at,origin
+                  reported_share,share_basis,fiscal_period,passage,source_url,known_at,origin,
+                  status
            from public.relationship_disclosure
            where status in ('suggested','disputed') and ($1::text is null or ticker=$1)
            order by known_at desc,id desc limit $2""",
@@ -303,7 +304,7 @@ async def review_queue(
     )
     contradictions = await pool.fetch(
         """select id,ticker,relationship,fiscal_period,kind,disclosure_id,other_disclosure_id,
-                  detail,created_at
+                  detail,created_at,status
            from public.relationship_contradiction
            where status='open' and ($1::text is null or ticker=$1)
            order by created_at desc,id desc limit $2""",

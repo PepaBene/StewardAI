@@ -2,7 +2,12 @@
  * Pure helpers for the price coverage calendar and the corporate-action coverage panel. The
  * exchange-session and coverage responses are untyped, so everything is parsed defensively.
  */
-import { isRec, num, text } from "./holding-charts";
+import type { components } from "@/lib/api/schema";
+
+import { isRec, text } from "./holding-charts";
+
+type ExpectedSessionsResponse = components["schemas"]["ExpectedSessionsResponse"];
+type ActionCoverageResponse = components["schemas"]["ActionCoverageResponse"];
 
 const arr = (v: unknown): unknown[] => (Array.isArray(v) ? v : []);
 const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
@@ -80,24 +85,14 @@ export function basisLabel(basis: string | null): string {
   return basis.replace(/_/g, " ");
 }
 
-/** Special days from `confirmed_days`: each entry may be a date string or an object with a date and a kind. */
-export function parseExpected(raw: unknown): ExpectedInfo | null {
-  if (!isRec(raw)) return null;
-  const basis = text(raw.basis);
-  const special: SpecialDay[] = [];
-  for (const d of arr(raw.confirmed_days)) {
-    if (typeof d === "string" && ISO_DATE.test(d)) {
-      special.push({ date: d, label: "Confirmed special day" });
-    } else if (isRec(d)) {
-      const date = text(d.session) ?? text(d.date) ?? text(d.day);
-      if (!date || !ISO_DATE.test(date)) continue;
-      const kind = text(d.kind) ?? text(d.session_type) ?? text(d.type) ?? text(d.status);
-      const close = text(d.close_time) ?? text(d.close);
-      special.push({ date, label: kind ? kind.replace(/_/g, " ") + (close ? ` (closes ${close})` : "") : "Confirmed special day" });
-    }
-  }
-  special.sort((a, b) => a.date.localeCompare(b.date));
-  return { basis, basisLabel: basisLabel(basis), count: num(raw.count), special };
+/** `confirmed_days` is the list of dates the owner confirmed as special days (typed `string[]`). */
+export function parseExpected(raw: ExpectedSessionsResponse): ExpectedInfo {
+  const basis = raw.basis || null;
+  const special: SpecialDay[] = raw.confirmed_days
+    .filter((d) => ISO_DATE.test(d))
+    .map((date) => ({ date, label: "Confirmed special day" }))
+    .sort((a, b) => a.date.localeCompare(b.date));
+  return { basis, basisLabel: basisLabel(basis), count: raw.count, special };
 }
 
 // ---------------------------------------------------------------- corporate-action coverage
@@ -119,23 +114,21 @@ export type CoverageEntry = {
 // quota_exhausted, temporarily_failed, disputed; only `available` means the data is there.
 const COVERED_STATES = new Set(["available"]);
 
-export function parseCoverage(raw: unknown): CoverageEntry[] {
-  const entries = isRec(raw) ? arr(raw.entries).filter(isRec) : [];
-  return entries
+export function parseCoverage(raw: ActionCoverageResponse | null): CoverageEntry[] {
+  return (raw?.entries ?? [])
     .map((e, i): CoverageEntry => {
-      const state = text(e.state) ?? "unknown";
-      const ownerVerified = e.owner_verified === true;
+      const state = e.state || "unknown";
       const covered = COVERED_STATES.has(state.toLowerCase());
       return {
-        key: `${text(e.provider) ?? i}:${text(e.checked_at) ?? i}`,
-        provider: text(e.provider) ?? "Unknown provider",
+        key: `${e.provider || i}:${e.checked_at || i}`,
+        provider: e.provider || "Unknown provider",
         state,
         stateLabel: covered ? "Covered" : state.replace(/_/g, " "),
         covered,
-        latestPeriod: text(e.latest_period),
-        checkedAt: text(e.checked_at),
-        reason: text(e.reason),
-        ownerVerified,
+        latestPeriod: e.latest_period ?? null,
+        checkedAt: e.checked_at || null,
+        reason: e.reason ?? null,
+        ownerVerified: e.owner_verified,
       };
     })
     .sort((a, b) => Number(b.ownerVerified) - Number(a.ownerVerified) || (b.checkedAt ?? "").localeCompare(a.checkedAt ?? ""));

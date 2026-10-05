@@ -1,8 +1,10 @@
+import type { components } from "@/lib/api/schema";
 import { isRecord, num, recs, str, titleCase, type Rec } from "@/lib/parse-untyped";
 import { URL_RE } from "@/lib/reference/form-utils";
 
-/* Parsers, validation and request mapping for the Relationship review page. The graph read
- * endpoints are untyped in OpenAPI, so every reader is defensive: missing stays null. */
+/* Parsers, validation and request mapping for the Relationship review page. The review queue,
+ * reconciliations, the global graph lists and decision history are typed; the per-holding
+ * business-network and corporate-action lists are still read defensively: missing stays null. */
 
 export const TICKER_RE = /^[A-Za-z0-9._-]{1,32}$/;
 export const DECISION_REASON_MIN = 10;
@@ -92,40 +94,116 @@ export function parseDisclosure(r: Rec, fallbackTicker?: string): Disclosure | n
   };
 }
 
-export type FilingHit = { id: number; ticker: string; filer: string | null; form: string | null; filedAt: string | null; url: string | null; state: string; note: string | null; attempts: number | null };
-export type Contradiction = { id: number; ticker: string; relationship: string; fiscalPeriod: string | null; kind: string; disclosureId: number | null; otherId: number | null; detail: string | null; createdAt: string | null };
+export type FilingHit = { id: number; ticker: string; filer: string | null; form: string | null; filedAt: string | null; url: string | null; state: string; note: string | null; attempts: number | null; status: string };
+export type Contradiction = { status: string; id: number; ticker: string; relationship: string; fiscalPeriod: string | null; kind: string; disclosureId: number | null; otherId: number | null; detail: string | null; createdAt: string | null };
 export type ReviewQueue = { hits: FilingHit[]; disclosures: Disclosure[]; contradictions: Contradiction[] };
 
-export function parseQueue(raw: unknown): ReviewQueue {
-  const o = isRecord(raw) ? raw : {};
-  const hits: FilingHit[] = [];
-  for (const r of recs(o.filing_hits)) {
-    const id = num(r.id);
-    const ticker = str(r.ticker);
-    if (id === null || !ticker) continue;
-    hits.push({ id, ticker, filer: str(r.filer_name), form: str(r.form), filedAt: str(r.filed_at), url: str(r.url), state: str(r.review_state) ?? "pending", note: str(r.review_note), attempts: num(r.attempts) });
-  }
-  const disclosures = recs(o.suggested_disclosures).flatMap((r) => parseDisclosure(r) ?? []);
-  const contradictions: Contradiction[] = [];
-  for (const r of recs(o.contradictions)) {
-    const id = num(r.id);
-    const ticker = str(r.ticker);
-    if (id === null || !ticker) continue;
-    const d = r.detail;
-    contradictions.push({
-      id,
-      ticker,
-      relationship: str(r.relationship) ?? "unknown",
-      fiscalPeriod: str(r.fiscal_period),
-      kind: str(r.kind) ?? "unknown",
-      disclosureId: num(r.disclosure_id),
-      otherId: num(r.other_disclosure_id),
+/** The typed queue (GET /relationship-review/queue). Each row carries its own `status`, so a disclosure is "suggested" or "disputed" by the API, not by guesswork. */
+export function parseQueue(raw: components["schemas"]["ReviewQueueResponse"]): ReviewQueue {
+  const hits: FilingHit[] = raw.filing_hits.map((r) => ({ id: r.id, ticker: r.ticker, filer: r.filer_name ?? null, form: r.form ?? null, filedAt: r.filed_at ?? null, url: r.url ?? null, state: r.review_state || "pending", note: r.review_note ?? null, attempts: r.attempts ?? null, status: r.status }));
+  const disclosures = raw.suggested_disclosures.flatMap((r) => parseDisclosure(r) ?? []);
+  const contradictions: Contradiction[] = raw.contradictions.map((r) => {
+    const d = r.detail; // `detail` is free-form on the wire
+    return {
+      id: r.id,
+      ticker: r.ticker,
+      relationship: r.relationship ?? "unknown",
+      fiscalPeriod: r.fiscal_period ?? null,
+      kind: r.kind || "unknown",
+      disclosureId: r.disclosure_id ?? null,
+      otherId: r.other_disclosure_id ?? null,
       detail: typeof d === "string" ? d : isRecord(d) ? Object.entries(d).map(([k, v]) => `${titleCase(k)}: ${String(v)}`).join("; ") : null,
-      createdAt: str(r.created_at),
-    });
-  }
+      createdAt: r.created_at || null,
+      status: r.status,
+    };
+  });
   return { hits, disclosures, contradictions };
 }
+
+/* ---- global lists and decision history ---- */
+
+export type GraphKind = "edges" | "events" | "disclosures";
+export const GRAPH_KINDS: readonly { id: GraphKind; label: string }[] = [
+  { id: "edges", label: "Edges" },
+  { id: "events", label: "Events" },
+  { id: "disclosures", label: "Disclosures" },
+];
+export const STATUS_FILTERS: readonly GraphStatus[] = ["suggested", "confirmed", "disputed", "rejected"];
+export const PAGE_SIZE = 25;
+
+export type GraphListRow = {
+  id: number;
+  ticker: string;
+  kind: string;
+  direction: string | null;
+  counterparty: string | null;
+  status: GraphStatus | null;
+  /** The raw word when it is none of the four known statuses; shown as is, never as "confirmed". */
+  rawStatus: string;
+  tier: string | null;
+  source: string;
+  sourceUrl: string | null;
+  passage: string | null;
+  knownAt: string;
+  decidedAt: string | null;
+  decisionReason: string | null;
+  validFrom: string | null;
+  validTo: string | null;
+  anonymous: boolean;
+  /** Fraction 0 to 1 as reported by the filer; null stays "not reported". */
+  reportedShare: number | null;
+  fiscalPeriod: string | null;
+};
+export type GraphListPage = { total: number; limit: number; offset: number; rows: GraphListRow[] };
+
+export function parseGraphPage(p: components["schemas"]["GraphRowsPage"]): GraphListPage {
+  return {
+    total: p.total,
+    limit: p.limit,
+    offset: p.offset,
+    rows: p.rows.map((r) => ({
+      id: r.id,
+      ticker: r.ticker,
+      kind: r.kind,
+      direction: r.direction ?? null,
+      counterparty: r.anonymous_counterparty ? "Not named by the filer" : (r.counterparty ?? r.object_key ?? null),
+      status: toStatus(r.status),
+      rawStatus: r.status,
+      tier: r.evidence_tier ?? null,
+      source: r.source,
+      sourceUrl: r.source_url || null,
+      passage: r.passage ?? null,
+      knownAt: r.known_at,
+      decidedAt: r.decided_at ?? null,
+      decisionReason: r.decision_reason ?? null,
+      validFrom: r.valid_from ?? null,
+      validTo: r.valid_to ?? null,
+      anonymous: r.anonymous_counterparty === true,
+      reportedShare: r.reported_share ?? null,
+      fiscalPeriod: r.fiscal_period ?? null,
+    })),
+  };
+}
+
+export const pageRange = (p: GraphListPage): string => (p.total === 0 ? "No rows" : `${p.offset + 1} to ${Math.min(p.offset + p.rows.length, p.total)} of ${p.total}`);
+
+export type HistoryEntry = { at: string; from: GraphStatus | null; to: GraphStatus | null; toWord: string; reason: string | null; by: string | null };
+export type History = { kind: "edge" | "event" | "disclosure" | "suggestion"; id: number; current: GraphStatus | null; currentWord: string; entries: HistoryEntry[]; limitations: string[] };
+
+/** Newest first. A status the owner never set (a first record) has no `from`. */
+export function parseHistory(h: components["schemas"]["DecisionHistory"]): History {
+  const entries = h.entries
+    .map((e) => ({ at: e.changed_at, from: toStatus(e.from_status), to: toStatus(e.to_status), toWord: e.to_status, reason: e.reason ?? null, by: e.decided_by ?? null }))
+    .sort((a, b) => b.at.localeCompare(a.at));
+  return { kind: h.kind, id: h.id, current: toStatus(h.current_status), currentWord: h.current_status, entries, limitations: h.limitations };
+}
+
+export type ReconcileResolution = "resolved" | "dismissed";
+export const RECONCILE_LABEL: Record<ReconcileResolution, string> = { resolved: "Resolve: the change is explained", dismissed: "Dismiss: not a real change" };
+/** POST /company-graph/reconciliations/{id}/resolve; the reason is the owner's, trimmed. */
+export const reconcileBody = (resolution: ReconcileResolution, reason: string) => ({ resolution, reason: reason.trim() });
+export const reconcileConfirmText = (r: { id: number; ticker: string }, resolution: ReconcileResolution): string =>
+  `Record ${resolution === "resolved" ? "this change as resolved" : "this change as dismissed"} for ${r.ticker} (change #${r.id})? Your reason is stored with it.`;
 
 export type Edge = { id: number; objectName: string; objectKey: string | null; edgeType: string; direction: string; status: GraphStatus | null; validFrom: string | null; validTo: string | null; tier: string | null; source: string | null; sourceUrl: string | null; passage: string | null; decisionReason: string | null; knownAt: string | null };
 export type CompanyEvent = { id: number; eventType: string; eventState: string; announcedAt: string | null; effectiveAt: string | null; status: GraphStatus | null; source: string | null; sourceUrl: string | null; counterparty: string | null; evidenceId: number | null };
@@ -151,16 +229,8 @@ export function parseNetwork(raw: unknown, ticker: string): Network {
 
 export type Reconciliation = { id: number; ticker: string; changeKind: string; fromKey: string | null; toKey: string | null; source: string | null; observedAt: string | null; outcome: string };
 
-export function parseReconciliations(raw: unknown): Reconciliation[] {
-  const o = isRecord(raw) ? raw : {};
-  const out: Reconciliation[] = [];
-  for (const r of recs(o.open)) {
-    const id = num(r.id);
-    const ticker = str(r.ticker);
-    if (id === null || !ticker) continue;
-    out.push({ id, ticker, changeKind: str(r.change_kind) ?? "change", fromKey: str(r.from_key), toKey: str(r.to_key), source: str(r.observed_source), observedAt: str(r.observed_at), outcome: str(r.outcome) ?? "unexplained" });
-  }
-  return out;
+export function parseReconciliations(raw: components["schemas"]["ReconciliationsResponse"]): Reconciliation[] {
+  return raw.open.map((r) => ({ id: r.id, ticker: r.ticker, changeKind: r.change_kind || "change", fromKey: r.from_key ?? null, toKey: r.to_key ?? null, source: r.observed_source || null, observedAt: r.observed_at || null, outcome: r.outcome || "unexplained" }));
 }
 
 export type CorporateAction = { id: number; symbol: string; actionType: string; exDate: string | null; ratio: number | null; cashAmount: number | null; currency: string | null; source: string | null; sourceUrl: string | null; status: GraphStatus | null; evidenceId: number | null; decisionReason: string | null };
