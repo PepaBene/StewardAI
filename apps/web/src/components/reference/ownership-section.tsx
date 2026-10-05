@@ -1,7 +1,12 @@
 "use client";
 
 import { ExternalLinkIcon, LoaderCircleIcon } from "lucide-react";
-import { useCallback } from "react";
+import { useCallback, useMemo, useState } from "react";
+
+import { BarChart, SrTable } from "@/components/charts";
+import { formatCompact, formatPct } from "@/lib/charts/format";
+import { ownershipSeries, type OwnershipMetric } from "@/lib/reference/holding-charts";
+import { cn } from "@/lib/utils";
 
 import { AlertMessage } from "@/components/alert-message";
 import { EmptyState } from "@/components/empty-state";
@@ -44,6 +49,54 @@ export function useHoldingOwnership(ticker: string) {
   return useApiResource(fetcher);
 }
 
+const HISTORY_METRICS: { id: OwnershipMetric; label: string; unit: string }[] = [
+  { id: "holders", label: "Holders", unit: "13F managers holding the stock" },
+  { id: "shares", label: "Shares", unit: "shares held by those managers" },
+  { id: "pct", label: "% of shares outstanding", unit: "share of the issuer's shares outstanding" },
+];
+
+/** One 13F metric per quarter, oldest to newest, from a zero baseline. A quarter without the figure has no bar. */
+function OwnershipHistoryChart({ periods }: { periods: readonly unknown[] }) {
+  const [metric, setMetric] = useState<OwnershipMetric>("holders");
+  const meta = HISTORY_METRICS.find((m) => m.id === metric) ?? HISTORY_METRICS[0];
+  const points = useMemo(() => ownershipSeries(periods, metric), [periods, metric]);
+  const fmt = (v: number) => (metric === "pct" ? formatPct(v, Math.abs(v) < 0.001 ? 2 : 1) : formatCompact(v));
+  if (points.length < 2) return null;
+  return (
+    <div className="space-y-1.5">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <h3 className="text-sm font-medium">13F history by quarter</h3>
+        <div role="group" aria-label="Metric" className="inline-flex border border-border text-xs font-semibold">
+          {HISTORY_METRICS.map((m, i) => (
+            <button
+              key={m.id}
+              type="button"
+              aria-pressed={metric === m.id}
+              onClick={() => setMetric(m.id)}
+              className={cn("px-2.5 py-1.5", i > 0 && "border-l border-border", metric === m.id ? "bg-accent text-accent-foreground" : "text-text hover:bg-border-soft")}
+            >
+              {m.label}
+            </button>
+          ))}
+        </div>
+      </div>
+      <BarChart
+        label={`${meta.label} by quarter`}
+        data={points.map((p) => ({ label: p.period.slice(0, 7), value: p.value }))}
+        formatValue={fmt}
+        highlightLast
+        height={150}
+      />
+      <p className="text-xs text-text-muted">Quarter ends, oldest to newest. Unit: {meta.unit}. A quarter with no figure has no bar.</p>
+      <SrTable
+        caption={`${meta.label} by quarter`}
+        columns={["Quarter ended", meta.label]}
+        rows={points.map((p) => [p.period, p.value === null ? "Not available" : fmt(p.value)])}
+      />
+    </div>
+  );
+}
+
 export function OwnershipSection({ resource }: { resource: ReturnType<typeof useHoldingOwnership> }) {
   const { state } = resource;
   const data = state.kind === "ok" ? state.data : state.kind === "error" ? state.previous : null;
@@ -83,6 +136,7 @@ export function OwnershipSection({ resource }: { resource: ReturnType<typeof use
             <span className="text-text-muted"> · {periodLabel(view.latest, formatDate)}</span>
           </p>
           <OutstandingNote data={data} />
+          <OwnershipHistoryChart periods={view.periods} />
           <div className="relative overflow-x-auto border border-border">
             <table className="w-full min-w-[46rem] text-sm">
               <caption className="px-3 pt-2 text-left text-xs text-text-muted">

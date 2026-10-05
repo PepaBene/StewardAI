@@ -456,7 +456,7 @@ async def test_legacy_unclassified_rows_never_use_the_raw_code(backend_pool: asy
 
 
 def pdmr_text() -> str:
-    return html_to_text((FIXTURES / "pdmr_uk" / "rns_pdmr.html").read_text())
+    return html_to_text((FIXTURES / "pdmr_uk" / "rns_pdmr.html").read_text(encoding="utf-8"))
 
 
 def test_pdmr_items_are_selected_from_the_rns_listing() -> None:

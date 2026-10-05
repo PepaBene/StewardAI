@@ -123,7 +123,10 @@ The variables, grouped by what they're for:
 | `OPENFIGI_API_KEY` | no | Raises the identifier-mapping rate limit (works unauthenticated too). |
 | `ALPHA_VANTAGE_API_KEY` | no | Free key (25 requests/day, one shared budget). Fills a missing price series or valuation input and feeds owner-triggered exposure and statement lookups. |
 | `EODHD_API_KEY` | no | Free plan (20 requests/day): last-resort fallback for a price series Stooq, Yahoo and Alpha Vantage could not supply. |
-| `FMP_API_KEY`, `TWELVE_DATA_API_KEY` | no | Access probes only (the Source audit and fund probes record whether your free plan covers an endpoint); nothing else reads them yet. |
+| `FMP_API_KEY` | no | Free FMP key: the optional `fmp_company` job stores company profile (sector, industry) and annual analyst estimates for holdings with a `sec_ticker` or `fmp_symbol` in their profile; also used by the access probes. |
+| `TWELVE_DATA_API_KEY` | no | Free Twelve Data Basic key (8 credits/minute, 800/day): access probes, and the optional `twelve_data_corporate_actions` job that proposes dividends and splits as suggestions you confirm; a paid-plan answer is recorded and never retried. |
+| `EDINET_API_KEY` | no | Free EDINET (Japan FSA) key: the optional `edinet_filings` job keeps the filing list and links of holdings whose profile has an `edinet_code` (no financial figures are parsed). |
+| `COMPANIES_HOUSE_API_KEY` | no | Free UK Companies House key: the optional `companies_house_filings` job stores the company profile and filing history of holdings whose profile has a `companies_house_number`. |
 | `UN_COMTRADE_API_KEY` | no | Free registered UN Comtrade key (500 calls/day). Needed for trade data and trade-exposure alerts; also requires the provider to be enabled in `/config/jobs` and an audit pass. |
 | `EPO_OPS_CLIENT_ID`, `EPO_OPS_CLIENT_SECRET` | no | EPO Open Patent Services OAuth client: owner-triggered patent family refresh and legal-status alerts. |
 | `DIFFBOT_API_KEY`, `PEOPLE_DATA_LABS_API_KEY` | no | Owner-triggered company research enrichment (company data only). Off by default. |

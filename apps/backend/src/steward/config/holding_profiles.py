@@ -174,6 +174,24 @@ class HoldingProfile(ConfigModel):
             "When empty, the EDGAR ticker is tried."
         ),
     )
+    fmp_symbol: str | None = Field(
+        default=None,
+        pattern=r"^[A-Z0-9][A-Z0-9.\-]{0,23}$",
+        description="Financial Modeling Prep symbol for the profile and estimates refresh. "
+        "When empty, the EDGAR ticker (sec_ticker) is used; with neither, FMP is not called.",
+    )
+    companies_house_number: str | None = Field(
+        default=None,
+        pattern=r"^[A-Z0-9]{8}$",
+        description="UK Companies House company number (8 characters, e.g. 00102498 or "
+        "SC123456). Enables the Companies House profile and filing-history refresh.",
+    )
+    edinet_code: str | None = Field(
+        default=None,
+        pattern=r"^E[0-9]{5}$",
+        description="EDINET code of a Japanese filer (E followed by five digits, e.g. E02144). "
+        "Enables the EDINET filing-list refresh.",
+    )
     fiscal_year_end_month: int = Field(
         default=12,
         ge=1,

@@ -4,6 +4,7 @@ import { ExternalLinkIcon, LoaderCircleIcon } from "lucide-react";
 import { useCallback, useState } from "react";
 
 import { AlertMessage } from "@/components/alert-message";
+import { InsiderActivityChart } from "@/components/reference/holding-data-panels";
 import { Blueprint, PanelHeading } from "@/components/ui/blueprint";
 import { getBrowserApiClient } from "@/lib/api/client";
 import { formatDate } from "@/lib/format";
@@ -40,6 +41,7 @@ export function InsiderTradesSection({ ticker }: { ticker: string }) {
       <PanelHeading kicker="SEC ownership filings" title={<span id="insider-heading">Insider transactions</span>} />
       <p className="mt-1 text-xs text-text-muted">Forms 3, 4 and 5 report beneficial ownership. A reported transaction is not necessarily an open market trade.</p>
     </div>
+    <InsiderActivityChart ticker={ticker} />
     <div className="flex flex-wrap gap-2" aria-label="Filter by SEC form">
       {formOptions.map((form) => <button key={form} type="button" aria-pressed={selectedForms.includes(form)}
         onClick={() => setSelectedForms((current) => current.includes(form) ? current.filter((item) => item !== form) : [...current, form])}

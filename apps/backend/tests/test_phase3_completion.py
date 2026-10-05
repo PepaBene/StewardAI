@@ -670,7 +670,7 @@ async def seed_prices(pool: asyncpg.Pool, move_pct: float) -> dt.date:
     close = 100 * (1 + move_pct / 100)
     await pool.executemany(
         "insert into price_bar (symbol, date, close, source) values ('aapl.us', $1, $2, 'stooq')"
-        " on conflict (symbol, date, source) do update set close = excluded.close",
+        " on conflict (symbol, date, source, bar_type) do update set close = excluded.close",
         [(today - dt.timedelta(days=1), Decimal(100)), (today, Decimal(str(close)))],
     )
     return today

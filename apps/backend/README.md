@@ -165,7 +165,8 @@ the providers' documented formats, not recorded from live calls.
 Environment variables (backend only, listed in `.env.example`, read in
 `src/steward/settings.py`): `SEC_USER_AGENT`, `STOOQ_API_KEY`, `FINNHUB_API_KEY`,
 `ALPHA_VANTAGE_API_KEY`, `EODHD_API_KEY`, `FMP_API_KEY`, `TWELVE_DATA_API_KEY`, `FRED_API_KEY`,
-`UN_COMTRADE_API_KEY`, `EPO_OPS_CLIENT_ID`, `EPO_OPS_CLIENT_SECRET`, `DIFFBOT_API_KEY`,
+`UN_COMTRADE_API_KEY`, `EPO_OPS_CLIENT_ID`, `EPO_OPS_CLIENT_SECRET`, `EDINET_API_KEY`,
+`COMPANIES_HOUSE_API_KEY`, `DIFFBOT_API_KEY`,
 `PEOPLE_DATA_LABS_API_KEY`, `OPENFIGI_API_KEY`. A missing key makes that source `unavailable`
 (`access_unverified`, "credential not configured"); it is never stored as zero or as an empty
 success, and stored observations stay readable. Free providers are additionally switched by

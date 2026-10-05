@@ -45,7 +45,11 @@ def test_denials_and_throttling_are_not_empty_successes() -> None:
 
 def test_phase_zero_probe_manifest_covers_every_named_provider() -> None:
     registered = probes(Settings())
-    assert {probe.provider for probe in registered} == set(JobsConfig().providers)
+    # Companies House and EDINET are probed by their first governed call, not a phase-zero probe.
+    assert {probe.provider for probe in registered} == set(JobsConfig().providers) - {
+        "companies_house",
+        "edinet",
+    }
     assert {(p.provider, p.endpoint) for p in registered} >= {
         ("fmp", "analyst_estimates"),
         ("fmp", "sector_snapshot"),
@@ -212,14 +216,17 @@ def test_reconciliation_and_unknown_exposure() -> None:
     assert weighted_effect(rows, {}) is None
 
 
-def test_new_providers_are_disabled_by_default() -> None:
+def test_providers_have_no_switch_and_source_jobs_run_by_default() -> None:
     config = JobsConfig()
-    assert len(config.providers) == 13
-    assert all(not provider.enabled for provider in config.providers.values())
+    assert len(config.providers) == 15
+    assert all("enabled" not in p.model_dump() for p in config.providers.values())
+    # A saved config from before the switch was removed still loads.
+    legacy = JobsConfig.model_validate({"providers": {"fmp": {"enabled": False}}})
+    assert "enabled" not in legacy.providers["fmp"].model_dump()
     assert len(config.public_data.world_bank) == 9
     assert all(item.consumer for item in config.public_data.world_bank)
-    assert not config.public_data_collect.enabled
-    assert not config.source_audit.enabled
+    assert config.public_data_collect.enabled
+    assert config.source_audit.enabled
 
 
 def test_ecb_macro_defaults_cover_rates_credit_and_monetary_aggregates() -> None:

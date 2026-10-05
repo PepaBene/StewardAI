@@ -2,7 +2,7 @@
 
 from typing import Annotated, Any
 
-from fastapi import APIRouter, HTTPException, Path
+from fastapi import APIRouter, HTTPException, Path, Query
 
 from api.auth import Owner
 from api.db import Pool
@@ -82,6 +82,39 @@ async def get_signal_gate(
     gates: dict[str, Any] = await get_signal_gates(pool, _owner)
     result: dict[str, Any] = gates[signal_name]
     return result
+
+
+@router.get("/signals/{signal_name}/history")
+async def get_signal_history(
+    pool: Pool,
+    _owner: Owner,
+    signal_name: Annotated[str, Path(pattern=r"^[a-z][a-z0-9_]{0,63}$")],
+    limit: Annotated[int, Query(ge=1, le=200)] = 60,
+) -> dict[str, Any]:
+    """Every recorded audit of one signal, oldest first. Precision is evidence_correct over
+    sample_size and is null for an empty sample, never zero."""
+    if signal_name not in SIGNAL_REQUIREMENTS:
+        raise HTTPException(404, "unknown signal")
+    rows = await pool.fetch(
+        """select * from (
+             select id, jurisdiction, metric, sample_size, evidence_correct, pit_checked,
+                    pit_violations, reviewer, audited_at
+             from public.signal_audit_result where signal_name=$1
+             order by audited_at desc, id desc limit $2) recent
+           order by audited_at, id""",
+        signal_name,
+        limit,
+    )
+    audits = [
+        {
+            **dict(r),
+            "evidence_precision": (
+                None if r["sample_size"] == 0 else r["evidence_correct"] / r["sample_size"]
+            ),
+        }
+        for r in rows
+    ]
+    return {"signal": signal_name, "audits": audits}
 
 
 @router.get("/coverage")

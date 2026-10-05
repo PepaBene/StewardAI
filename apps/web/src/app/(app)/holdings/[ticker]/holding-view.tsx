@@ -24,8 +24,20 @@ import { ProvenanceTag } from "@/components/evidence/provenance-tag";
 import { VerdictStatusBadge } from "@/components/evidence/verdict-status-badge";
 import { FeedbackControl } from "@/components/feedback/feedback-control";
 import { HoldingNews, useHoldingNews } from "@/components/news/holding-news";
+import { HoldingMorePanels } from "@/components/reference/holding-more-panels";
 import { IdentitySection, useHoldingIdentity } from "@/components/reference/identity-section";
+import { CashDebtPanel } from "@/components/reference/cash-debt-panel";
+import { ConcentrationPanel, PatentOverlapPanel, PriceDataPanel, StakesPanel } from "@/components/reference/holding-data-panels";
+import { CorporateActionCoveragePanel } from "@/components/reference/holding-coverage";
+import { EstimatesPanel } from "@/components/reference/estimates-panel";
+import { FinancialHistoryPanel } from "@/components/reference/financial-history-panel";
 import { InsiderTradesSection } from "@/components/reference/insider-trades-section";
+import { InputCostsPanel } from "@/components/reference/input-costs-panel";
+import { MacroContextPanel } from "@/components/reference/macro-context-panel";
+import { TradePanel } from "@/components/reference/trade-panel";
+import { NetworkPanel } from "@/components/reference/network-panel";
+import { PatentsPanel } from "@/components/reference/patents-panel";
+import { PeerPanel } from "@/components/reference/peer-panel";
 import { OwnershipSection, useHoldingOwnership } from "@/components/reference/ownership-section";
 import { PriceRiskSection } from "@/components/reference/price-risk-section";
 import { ValuationPanel } from "@/components/reference/valuation-panel";
@@ -274,6 +286,28 @@ export function HoldingContent({
 
       <SegmentsPanel ticker={ticker} />
 
+      <FinancialHistoryPanel ticker={ticker} />
+
+      <CashDebtPanel ticker={ticker} />
+
+      <PeerPanel ticker={ticker} />
+
+      <EstimatesPanel ticker={ticker} />
+
+      <NetworkPanel ticker={ticker} />
+
+      <PatentsPanel ticker={ticker} />
+
+      <PatentOverlapPanel ticker={ticker} />
+
+      <ConcentrationPanel ticker={ticker} />
+
+      <MacroContextPanel ticker={ticker} />
+
+      <TradePanel ticker={ticker} />
+
+      <InputCostsPanel ticker={ticker} />
+
       <Blueprint aria-labelledby="thesis-heading" className="space-y-5 px-[22px] py-5">
         <PanelHeading
           kicker="Thesis & evidence"
@@ -335,9 +369,17 @@ export function HoldingContent({
 
       <OwnershipSection resource={ownership} />
 
+      <StakesPanel ticker={ticker} />
+
+      <PriceDataPanel ticker={ticker} />
+
+      <CorporateActionCoveragePanel ticker={ticker} />
+
       <InsiderTradesSection ticker={ticker} />
 
       <IdentitySection ticker={ticker} resource={identity} />
+
+      <HoldingMorePanels ticker={ticker} />
     </>
   );
 }

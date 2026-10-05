@@ -232,7 +232,10 @@ async def record_breaches(
         what = {"hard_limit": "hard limit", "band": "target band"}.get(f.kind, "strategy rule")
         if f.key.startswith("risk:"):
             what = "risk limit"
-        lines = [f"[Severity {f.severity}] Portfolio: {what} breached", f.detail]
+        headline = f"{what} breached"
+        if f.key.startswith("target:"):
+            headline = "thesis price target reached"
+        lines = [f"[Severity {f.severity}] Portfolio: {headline}", f.detail]
         if app_url:
             lines.append(f"{app_url.rstrip('/')}/")
         created = await create_alerts(

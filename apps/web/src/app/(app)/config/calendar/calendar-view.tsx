@@ -14,6 +14,8 @@ import { formatDate } from "@/lib/format";
 import { useApiResource } from "@/lib/hooks/use-api-resource";
 import { CALENDAR_NOTE, closureKey, isoToday, isPast, selectedClosures, sortClosures } from "@/lib/reference/calendar";
 
+import { SessionsSection } from "./sessions-section";
+
 const fetchCalendar = () => getBrowserApiClient().GET("/calendar/exchanges");
 const LINK = "text-accent-ink underline-offset-4 hover:underline";
 
@@ -123,6 +125,7 @@ function CalendarContent({ data, reload }: { data: ExchangeCalendar; reload: () 
       </section>
       <Suggestions data={data} reload={reload} />
       <Confirmed data={data} />
+      <SessionsSection mics={exchanges.map(([mic]) => mic)} />
     </>
   );
 }

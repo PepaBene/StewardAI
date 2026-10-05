@@ -33,15 +33,26 @@ def names(plan: list[Any]) -> list[str]:
 
 def test_backfill_and_catch_up_share_one_order() -> None:
     assert DEFAULT_SEQUENCE == [*DATA_SEQUENCE, "monitor"]
-    assert CATCH_UP_SEQUENCE[: len(DATA_SEQUENCE)] == DATA_SEQUENCE
+    # The source audit comes first: collectors only call endpoints it has verified.
+    assert CATCH_UP_SEQUENCE[0] == "source_audit"
+    assert CATCH_UP_SEQUENCE[1 : 1 + len(DATA_SEQUENCE)] == DATA_SEQUENCE
     assert JobsConfig().catch_up_on_start is True
 
 
 def test_never_succeeded_runs_everything_in_order() -> None:
     plan = plan_catch_up(JobsConfig(), {}, NOW)
     assert names(plan) == CATCH_UP_SEQUENCE
-    assert names(plan)[0] == "portfolio_sync"
+    assert names(plan)[:2] == ["source_audit", "portfolio_sync"]
     assert all(p.reason == "never succeeded" for p in plan)
+
+
+def test_a_new_key_reruns_the_audit_and_the_source_jobs() -> None:
+    plan = plan_catch_up(JobsConfig(), fresh(), NOW, credentials_changed=True)
+    assert names(plan)[0] == "source_audit"
+    assert {"fmp_company", "edinet_filings", "public_data_collect"} <= set(names(plan))
+    assert "portfolio_sync" not in names(plan)
+    assert all(p.reason == "an API key was added or changed" for p in plan)
+    assert plan_catch_up(JobsConfig(), fresh(), NOW, credentials_changed=False) == []
 
 
 def test_succeeded_after_last_slot_is_left_alone() -> None:

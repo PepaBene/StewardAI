@@ -2,7 +2,15 @@ import { describe, expect, it } from "vitest";
 
 import type { ThesesConfig } from "@/lib/api/client";
 
-import { lines, newKpi, parseThreshold, slugFromMetric, thesesFromBody, thesesToBody } from "./theses-form";
+import {
+  EMPTY_TARGET,
+  lines,
+  newKpi,
+  parseThreshold,
+  slugFromMetric,
+  thesesFromBody,
+  thesesToBody,
+} from "./theses-form";
 
 const BODY: ThesesConfig = {
   schema_version: 1,
@@ -24,6 +32,13 @@ const BODY: ThesesConfig = {
           description: "",
         },
       ],
+      price_target: {
+        sell_target: 260,
+        buy_target: 180,
+        currency: "USD",
+        method: "DCF",
+        set_on: "2026-10-01",
+      },
     },
   ],
 };
@@ -44,7 +59,24 @@ describe("theses form", () => {
     expect(parseThreshold("abc")).toBeNull();
     const forms = thesesFromBody(BODY);
     forms[0].kpis.push(newKpi("gross_margin"));
-    expect(thesesToBody(forms).theses![0].kpis![1]).toMatchObject({ id: "gross-margin", threshold: null });
+    expect(thesesToBody(forms).theses![0].kpis![1]).toMatchObject({
+      id: "gross-margin",
+      threshold: null,
+    });
+  });
+
+  it("sends a blank price target as none and a partial one for the API to check", () => {
+    const forms = thesesFromBody(BODY);
+    forms[0].target = { ...EMPTY_TARGET };
+    expect(thesesToBody(forms).theses![0].price_target).toBeNull();
+    forms[0].target = { ...EMPTY_TARGET, sell_target: "300", currency: "usd" };
+    expect(thesesToBody(forms).theses![0].price_target).toEqual({
+      sell_target: 300,
+      buy_target: null,
+      currency: "USD",
+      method: "",
+      set_on: "",
+    });
   });
 
   it("splits lists and builds ids", () => {

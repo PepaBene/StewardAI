@@ -41,6 +41,7 @@ from api.reference_routes import router as reference_router
 from api.research_context_routes import router as research_context_router
 from api.research_routes import router as research_router
 from api.routes import router
+from api.screen_routes import router as screen_router
 from api.source_routes import router as source_router
 from api.valuation_routes import router as valuation_router
 from api.verify_routes import router as verify_router
@@ -248,6 +249,7 @@ def create_app() -> FastAPI:
     app.include_router(fundamentals_router)
     app.include_router(free_sources_router)
     app.include_router(watchlist_router)
+    app.include_router(screen_router)
     app.include_router(insider_router)
     app.include_router(investor_router)
     app.include_router(control_stake_router)

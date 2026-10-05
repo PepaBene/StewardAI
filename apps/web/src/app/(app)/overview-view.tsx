@@ -12,6 +12,8 @@ import { CashFlowPanel } from "@/components/portfolio/cash-flow-panel";
 import { ConcentrationCompliance } from "@/components/portfolio/concentration-compliance";
 import { ContributionCard } from "@/components/portfolio/contribution-card";
 import { DriftPanel, DriftTable } from "@/components/portfolio/drift-panel";
+import { PortfolioDataContextSection } from "@/components/portfolio/data-context-section";
+import { KnockOnSection } from "@/components/portfolio/knock-on-section";
 import { ExposurePanel } from "@/components/portfolio/exposure-panel";
 import { useLookThrough } from "@/components/portfolio/look-through-exposure";
 import { FreshnessLabel } from "@/components/portfolio/freshness-label";
@@ -271,6 +273,10 @@ function Overview({ data }: { data: PortfolioOverview }) {
         <ContributionCard />
         <DriftTable data={data} />
       </div>
+
+      <PortfolioDataContextSection />
+
+      <KnockOnSection />
 
       <ValuationBenchmarkPanel state={valuation} />
 

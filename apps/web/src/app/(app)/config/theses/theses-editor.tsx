@@ -6,11 +6,19 @@ import { useEffect, useMemo, useState } from "react";
 import { AlertMessage } from "@/components/alert-message";
 import { ConfigHeader } from "@/components/config/config-header";
 import { SaveBar } from "@/components/config/save-bar";
-import { SelectField, TextAreaField, TextField } from "@/components/config/fields";
+import {
+  SelectField,
+  TextAreaField,
+  TextField,
+} from "@/components/config/fields";
 import { EmptyState } from "@/components/empty-state";
 import { Button } from "@/components/ui/button";
-import { getBrowserApiClient, type Holding, type ThesesConfig } from "@/lib/api/client";
-import type { FieldErrors } from "@/lib/api/validation-errors";
+import {
+  getBrowserApiClient,
+  type Holding,
+  type ThesesConfig,
+} from "@/lib/api/client";
+import { errorsAt, type FieldErrors } from "@/lib/api/validation-errors";
 import {
   BASES,
   KNOWN_METRICS,
@@ -23,9 +31,13 @@ import {
   thesesToBody,
   UNIT_EXAMPLES,
   type KpiForm,
+  type TargetForm,
   type ThesisForm,
 } from "@/lib/config/theses-form";
-import { configSaveQuery, useConfigEditor } from "@/lib/hooks/use-config-editor";
+import {
+  configSaveQuery,
+  useConfigEditor,
+} from "@/lib/hooks/use-config-editor";
 import { BlueprintCorners } from "@/components/ui/blueprint";
 
 const api = () => getBrowserApiClient();
@@ -38,7 +50,11 @@ export function ThesesEditor() {
 
   const editor = useConfigEditor<ThesesConfig>({
     load: () => api().GET("/config/theses"),
-    save: (body, note, base) => api().PUT("/config/theses", { body, params: { query: configSaveQuery(note, base) } }),
+    save: (body, note, base) =>
+      api().PUT("/config/theses", {
+        body,
+        params: { query: configSaveQuery(note, base) },
+      }),
     validate: (body) => api().POST("/config/theses/validate", { body }),
     onLoaded: (body) => {
       const loaded = thesesFromBody(body);
@@ -63,12 +79,16 @@ export function ThesesEditor() {
   // Jump to the thesis named in the URL hash (links from a holding page).
   useEffect(() => {
     if (editor.status.kind !== "ready" || !window.location.hash) return;
-    document.getElementById(decodeURIComponent(window.location.hash.slice(1)))?.scrollIntoView();
+    document
+      .getElementById(decodeURIComponent(window.location.hash.slice(1)))
+      ?.scrollIntoView();
   }, [editor.status.kind]);
 
   const body = useMemo(() => thesesToBody(forms), [forms]);
   const dirty = JSON.stringify(body) !== baseline;
-  const withoutThesis = holdings.filter((h) => !forms.some((f) => f.ticker === h.ticker));
+  const withoutThesis = holdings.filter(
+    (h) => !forms.some((f) => f.ticker === h.ticker),
+  );
 
   const update = (key: string, change: (form: ThesisForm) => ThesisForm) =>
     setForms((all) => all.map((f) => (f.key === key ? change(f) : f)));
@@ -93,27 +113,38 @@ export function ThesesEditor() {
     <div className="space-y-6">
       <ConfigHeader title="Theses" domain="theses">
         <p>
-          Why you own each holding, and the KPIs that must hold. Thresholds are absolute: the
-          earnings check extracts the figures from the company&rsquo;s release and judges each KPI
-          pass, breach or unknown. Saving creates a new version; earlier verdicts stay tied to the
+          Why you own each holding, and the KPIs that must hold. Thresholds are
+          absolute: the earnings check extracts the figures from the
+          company&rsquo;s release and judges each KPI pass, breach or unknown.
+          Saving creates a new version; earlier verdicts stay tied to the
           version they were judged under.
         </p>
       </ConfigHeader>
 
       {editor.status.kind === "loading" ? (
-        <p className="flex items-center gap-2 text-sm text-text-muted" role="status">
-          <LoaderCircleIcon aria-hidden="true" className="size-4 animate-spin" />
+        <p
+          className="flex items-center gap-2 text-sm text-text-muted"
+          role="status"
+        >
+          <LoaderCircleIcon
+            aria-hidden="true"
+            className="size-4 animate-spin"
+          />
           Loading theses…
         </p>
       ) : null}
       {editor.status.kind === "error" ? (
-        <AlertMessage title="Could not load the theses">{editor.status.message}</AlertMessage>
+        <AlertMessage title="Could not load the theses">
+          {editor.status.message}
+        </AlertMessage>
       ) : null}
 
       {editor.status.kind === "ready" ? (
         <>
           {forms.length === 0 ? (
-            <EmptyState title="No theses yet">Add one for each holding you want monitored.</EmptyState>
+            <EmptyState title="No theses yet">
+              Add one for each holding you want monitored.
+            </EmptyState>
           ) : null}
 
           {forms.map((form, index) => (
@@ -123,12 +154,17 @@ export function ThesesEditor() {
               index={index}
               errors={editor.errors}
               onChange={(change) => update(form.key, change)}
-              onRemove={() => setForms((all) => all.filter((f) => f.key !== form.key))}
+              onRemove={() =>
+                setForms((all) => all.filter((f) => f.key !== form.key))
+              }
             />
           ))}
 
           <div className="flex flex-wrap gap-2">
-            <Button variant="outline" onClick={() => setForms((all) => [...all, newThesis()])}>
+            <Button
+              variant="outline"
+              onClick={() => setForms((all) => [...all, newThesis()])}
+            >
               <PlusIcon aria-hidden="true" />
               Add thesis
             </Button>
@@ -162,7 +198,11 @@ export function ThesesEditor() {
             ))}
           </datalist>
 
-          {verdictJob ? <AlertMessage tone="info" title="Saved">{verdictJob}</AlertMessage> : null}
+          {verdictJob ? (
+            <AlertMessage tone="info" title="Saved">
+              {verdictJob}
+            </AlertMessage>
+          ) : null}
           <SaveBar
             dirty={dirty}
             savedVersionId={editor.version?.id ?? null}
@@ -195,7 +235,12 @@ function ThesisCard({
   const set = <K extends keyof ThesisForm>(key: K, value: ThesisForm[K]) =>
     onChange((f) => ({ ...f, [key]: value }));
   const setKpi = (key: string, change: Partial<KpiForm>) =>
-    onChange((f) => ({ ...f, kpis: f.kpis.map((k) => (k.key === key ? { ...k, ...change } : k)) }));
+    onChange((f) => ({
+      ...f,
+      kpis: f.kpis.map((k) => (k.key === key ? { ...k, ...change } : k)),
+    }));
+  const setTarget = (change: Partial<TargetForm>) =>
+    onChange((f) => ({ ...f, target: { ...f.target, ...change } }));
 
   return (
     <section
@@ -225,7 +270,12 @@ function ThesisCard({
           value={form.review_date}
           onChange={(v) => set("review_date", v)}
         />
-        <Button variant="ghost" size="sm" className="ml-auto" onClick={onRemove}>
+        <Button
+          variant="ghost"
+          size="sm"
+          className="ml-auto"
+          onClick={onRemove}
+        >
           <Trash2Icon aria-hidden="true" />
           Remove thesis
         </Button>
@@ -248,9 +298,73 @@ function ThesisCard({
       />
 
       <fieldset className="space-y-2">
+        <legend className="text-sm font-medium">Price target</legend>
+        <p className="text-sm text-text-muted">
+          Checked after each sync. At the sell target, re-run the research: sell
+          unless the new thesis raises the target. At or below the buy target,
+          the holding is a candidate to add to. Leave all blank for none.
+        </p>
+        <div className="grid grid-cols-2 items-start gap-2 sm:grid-cols-3 lg:grid-cols-[0.8fr_0.8fr_0.6fr_1.6fr_0.9fr]">
+          <TextField
+            label="Sell target"
+            path={`${path}.price_target.sell_target`}
+            errors={errors}
+            value={form.target.sell_target}
+            inputMode="decimal"
+            className="num"
+            onChange={(v) => setTarget({ sell_target: v })}
+          />
+          <TextField
+            label="Buy target"
+            path={`${path}.price_target.buy_target`}
+            errors={errors}
+            value={form.target.buy_target}
+            inputMode="decimal"
+            className="num"
+            onChange={(v) => setTarget({ buy_target: v })}
+          />
+          <TextField
+            label="Currency"
+            path={`${path}.price_target.currency`}
+            errors={errors}
+            value={form.target.currency}
+            placeholder="USD"
+            hint="As Trading212 quotes it (GBX for pence)"
+            onChange={(v) => setTarget({ currency: v })}
+          />
+          <TextField
+            label="Valuation method"
+            path={`${path}.price_target.method`}
+            errors={errors}
+            value={form.target.method}
+            placeholder="DCF, 10% discount rate"
+            onChange={(v) => setTarget({ method: v })}
+          />
+          <TextField
+            label="Set on"
+            type="date"
+            path={`${path}.price_target.set_on`}
+            errors={errors}
+            value={form.target.set_on}
+            onChange={(v) => setTarget({ set_on: v })}
+          />
+        </div>
+        {errorsAt(errors, `${path}.price_target`).map((m) => (
+          <p key={m} className="text-xs text-text">
+            <span aria-hidden="true" className="text-warning-signal">
+              ●{" "}
+            </span>
+            {m}
+          </p>
+        ))}
+      </fieldset>
+
+      <fieldset className="space-y-2">
         <legend className="text-sm font-medium">KPIs</legend>
         {form.kpis.length === 0 ? (
-          <p className="text-sm text-text-muted">No KPIs: this holding gets no verdicts.</p>
+          <p className="text-sm text-text-muted">
+            No KPIs: this holding gets no verdicts.
+          </p>
         ) : null}
         {form.kpis.map((kpi, k) => {
           const kpiPath = `${path}.kpis.${k}`;
@@ -268,7 +382,9 @@ function ThesisCard({
                 onChange={(v) =>
                   setKpi(kpi.key, {
                     metric: v,
-                    ...(kpi.id === slugFromMetric(kpi.metric) ? { id: slugFromMetric(v) } : {}),
+                    ...(kpi.id === slugFromMetric(kpi.metric)
+                      ? { id: slugFromMetric(v) }
+                      : {}),
                   })
                 }
               />
@@ -317,7 +433,10 @@ function ThesisCard({
                 path={`${kpiPath}.period`}
                 errors={errors}
                 value={kpi.period}
-                options={KPI_PERIODS.map((p) => ({ value: p, label: p === "ttm" ? "TTM" : p }))}
+                options={KPI_PERIODS.map((p) => ({
+                  value: p,
+                  label: p === "ttm" ? "TTM" : p,
+                }))}
                 onChange={(v) => setKpi(kpi.key, { period: v })}
               />
               <Button
@@ -325,7 +444,12 @@ function ThesisCard({
                 size="icon"
                 className="self-end"
                 aria-label={`Remove KPI ${kpi.id || k + 1}`}
-                onClick={() => onChange((f) => ({ ...f, kpis: f.kpis.filter((x) => x.key !== kpi.key) }))}
+                onClick={() =>
+                  onChange((f) => ({
+                    ...f,
+                    kpis: f.kpis.filter((x) => x.key !== kpi.key),
+                  }))
+                }
               >
                 <Trash2Icon aria-hidden="true" />
               </Button>
@@ -344,7 +468,9 @@ function ThesisCard({
         <Button
           variant="outline"
           size="sm"
-          onClick={() => onChange((f) => ({ ...f, kpis: [...f.kpis, newKpi()] }))}
+          onClick={() =>
+            onChange((f) => ({ ...f, kpis: [...f.kpis, newKpi()] }))
+          }
         >
           <PlusIcon aria-hidden="true" />
           Add KPI

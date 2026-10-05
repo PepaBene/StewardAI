@@ -372,6 +372,11 @@ function AckPanel({ stats, items }: { stats: EscalationStats | null; items: Esca
       {times.length > 0 ? (
         <BarChart
           data={times.map((t, i) => ({ label: shortDay(new Date(t.createdAt)), value: t.minutes / 60, highlight: i === times.length - 1 }))}
+          threshold={
+            stats?.median_minutes_to_ack != null
+              ? { value: stats.median_minutes_to_ack / 60, label: `Median ${formatMinutes(stats.median_minutes_to_ack)}` }
+              : undefined
+          }
           valueLabels={false}
           xLabels={times.length <= 12}
           height={140}

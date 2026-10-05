@@ -36,7 +36,7 @@ must be confirmed in `provider_access` during the account-specific probe.
 | Finnhub | `api/v1/calendar/earnings?token=$FINNHUB_API_KEY` | key; free account limits | US earnings calendar | seeded `access_unverified` until the existing collector succeeds | 1 |
 | Finnhub | `api/v1/stock/ownership?symbol=AAPL&token=…` | key | ownership | `access_unverified`; owner-key probe required | 1; not blocked, the first request is the probe |
 | Twelve Data | `time_series?symbol=AAPL&interval=1day&apikey=$TWELVE_DATA_API_KEY` | key; Basic credit/minute/day limits | US plus trial symbols | `access_unverified` owner-key probe required | endpoint credits |
-| Twelve Data | `dividends?symbol=AAPL&apikey=…` and `splits?...` | key | corporate actions | `access_unverified`; owner-key probe required | no retry after observed denial |
+| Twelve Data | `dividends?symbol=AAPL&apikey=…` (`corporate_actions`) and `splits?...` (`splits`) | key; Basic 8 credits/min, 800/day | corporate actions | `access_unverified`; the `twelve_data_corporate_actions` job's first call is the probe: a 403 or plan wording latches the endpoint `paid_only` | collector hard stop 4/min and 40/day per endpoint; no retry after an observed denial; rows are stored `suggested` only |
 | BIS | `stats.bis.org/api/v2/data/dataflow/BIS/WS_TC/2.0/.?startPeriod=2020` | none | public SDMX financial cycle | seeded `access_unverified` (keyless) | Retry-After |
 | ECB | `data-api.ecb.europa.eu/service/data/FM/D.U2.EUR.4F.KR.DFR.LEV?format=csvdata` | none | public SDMX, revision history | seeded `access_unverified` until the existing collector succeeds | courteous pacing |
 | UN Comtrade | `comtradeapi.un.org/public/v1/preview/C/A/HS?reporterCode=124&period=2025&cmdCode=27` | preview keyless; subscription key for free registered quota (500/day, 100k rows/call) | selected reporter/partner/HS slices | seeded `access_unverified`; the collector calls `/data/v1/get/C/A/HS` with the registered key (the keyless preview route is not used) | 1 call |
@@ -54,8 +54,8 @@ must be confirmed in `provider_access` during the account-specific probe.
 | Eurostat / FRED / ECB / ČNB | dissemination API; FRED observations/vintages; ECB Data Portal; ČNB ARAD files | FRED key only; Eurostat live API has no old vintages | documented routes; seeded `access_unverified` in `provider_access`; pre-activation Eurostat `vintage_unavailable` |
 | ETF issuer files / issuer IR | configured iShares/Vanguard downloads and issuer URLs | none; undocumented endpoints/parser drift | documented for configured funds; never probed |
 | FCA NSM | `data.fca.org.uk/#/nsm/nationalstoragemechanism` public search/download UI | no general extraction API verified; PIP API is write-only | `temporarily_failed` automation gap, not licensing |
-| EDINET | public EDINET API document list/download | API key registration; filings retained | `access_unverified` until key |
-| Companies House | public company filing-history API | free API key; statutory filings | `access_unverified` until key |
+| EDINET | `api.edinet-fsa.go.jp/api/v2/documents.json?date=…&type=2` (list, `documents_list`) and `/documents/{docID}` (`document_download`) | free Subscription-Key; one list request per weekday; list and links only, no XBRL parsing | `access_unverified` until the first call (probe); migration `20261005180000`; hard stop `providers.edinet` (500/day); `edinet_filings` job off by default |
+| Companies House | `api.company-information.service.gov.uk/company/{n}` (`profile`) and `/filing-history` (`filing_history`), HTTP Basic key as username | free API key, about 600 requests/5 min; two requests per holding with a `companies_house_number` | `access_unverified` until the first call (probe); hard stop `providers.companies_house` (2000/day); `companies_house_filings` job off by default |
 | TED | `api.ted.europa.eu/v3/notices/search` | public API; EU notices | documented route; no `provider_access` row, never probed |
 | SEDAR+ | public search UI and issuer-hosted Canadian filings pilot | interactive retrieval; stability/throughput unresolved | `temporarily_failed` automated route under active pilot |
 
@@ -76,8 +76,10 @@ success for your account.
 | Alpha Vantage | `ALPHA_VANTAGE_API_KEY` | alphavantage.co free key | 25 requests/day, one budget shared by every use | price-gap fallback in `price_history`, valuation `OVERVIEW` fallback, the `alpha_vantage` news source (when enabled in the news-sources config; sentiment is a hint, never a verified fact), owner-triggered exposure context and statement history (`POST /holdings/{ticker}/exposure-context/alpha-vantage`, `.../financial-history/alpha-vantage/{statement}`) | daily bars end of day; fundamentals lag the filing |
 | EODHD | `EODHD_API_KEY` | eodhd.com free plan | 20 requests/day, one year of history | last-resort price-gap fallback in `price_history` only | end of day |
 | Finnhub | `FINNHUB_API_KEY` | finnhub.io dashboard | free-account limits | US earnings calendar, US company news, `/stock/metric` valuation cross-check, owner-triggered peer/EPS surprise refresh, optional fund/ownership probes | calendar daily; news minutes |
-| FMP | `FMP_API_KEY` | financialmodelingprep.com | Basic 250 requests/day | access probes only (`source_audit`, `fund_probes`); no data consumer reads FMP rows except the probed fund records | n/a |
-| Twelve Data | `TWELVE_DATA_API_KEY` | twelvedata.com | credit/minute/day limits | access probes only (`source_audit`); no consumer yet | n/a |
+| FMP | `FMP_API_KEY` | financialmodelingprep.com | Basic 250 requests/day | probes (`source_audit`, `fund_probes`) and the `fmp_company` job: profile (sector, industry) and annual estimates for holdings with `fmp_symbol` or `sec_ticker` | n/a |
+| Twelve Data | `TWELVE_DATA_API_KEY` | twelvedata.com | 8 credits/min, 800/day | probes (`source_audit`, `exchange_probes`) and the `twelve_data_corporate_actions` job (dividends and splits as `suggested` corporate actions) | n/a |
+| EDINET | `EDINET_API_KEY` | disclosure2.edinet-fsa.go.jp key registration (free) | no published free limit; own cap 500/day | `edinet_filings` job: filing list and links of holdings with an `edinet_code` | n/a |
+| Companies House | `COMPANIES_HOUSE_API_KEY` | developer.company-information.service.gov.uk (free) | about 600 requests/5 min; own cap 2000/day | `companies_house_filings` job: profile and filing history of holdings with a `companies_house_number` | n/a |
 | FRED / ALFRED | `FRED_API_KEY` | fredaccount.stlouisfed.org | generous; key required | US CPI, unemployment, Fed funds in `macro_collect` and vintage history (`alfred` rows) | release day; revisions kept as new vintages |
 | UN Comtrade | `UN_COMTRADE_API_KEY` | comtradedeveloper.un.org (free registered subscription key) | 500 calls/day, 100k rows/call | reporter/partner/HS trade slices in `public_data_collect` (needs provider enabled, key, and an open provider gate), mapped exposure trade alerts | annual slice (the collector requests `/C/A/HS`), published months after year end |
 | EPO OPS | `EPO_OPS_CLIENT_ID`, `EPO_OPS_CLIENT_SECRET` | developers.epo.org OAuth client | about 4 GB/week | owner-triggered patent family refresh, patent trends, legal-status alerts | publication about 18 months after filing; legal status as EPO updates it |
@@ -122,7 +124,10 @@ appears as a coverage gap (`GET /data/coverage`, `GET /sources/access`).
 | `ALPHA_VANTAGE_API_KEY` | no OVERVIEW/price/news fallback; its routes answer 409 | everything else |
 | `EODHD_API_KEY` | last price fallback gone | other fallbacks |
 | `FINNHUB_API_KEY` | report dates come from the IR calendar page; no Finnhub news; no tier-2 valuation cross-check; fund probes `access_unverified` | EDGAR sources |
-| `FMP_API_KEY`, `TWELVE_DATA_API_KEY` | probes record `access_unverified`; nothing else reads them | all |
+| `FMP_API_KEY` | probes record `access_unverified`; `fmp_company` skips; stored FMP profile fields and estimates stay | all |
+| `TWELVE_DATA_API_KEY` | probes record `access_unverified`; `twelve_data_corporate_actions` skips; stored suggestions stay | all |
+| `EDINET_API_KEY` | `edinet_filings` skips; no new Japanese filing events | stored filings, all other sources |
+| `COMPANIES_HOUSE_API_KEY` | `companies_house_filings` skips; no new UK profile fields or filing events | stored filings, all other sources |
 | `FRED_API_KEY` | FRED series skipped (US CPI, unemployment, Fed funds, and FRED credit rules); ALFRED vintages stop | Eurostat, ECB, ČNB |
 | `UN_COMTRADE_API_KEY` | Comtrade steps skipped; trade-exposure alerts have no new observations | World Bank, OECD, BIS |
 | `EPO_OPS_*` | patent refresh route answers 409; no new legal-status readings, so no patent alerts | stored patent families (a missing reading keeps the last known status, never "expired") |

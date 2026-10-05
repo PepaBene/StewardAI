@@ -5,7 +5,14 @@ from typing import Literal, Self
 
 from pydantic import Field, field_validator, model_validator
 
-from steward.config.common import ComparisonOperator, ConfigModel, Slug, Ticker, require_unique
+from steward.config.common import (
+    ComparisonOperator,
+    ConfigModel,
+    CurrencyCode,
+    Slug,
+    Ticker,
+    require_unique,
+)
 from steward.earnings.units import parse_kpi_unit
 
 
@@ -38,6 +45,51 @@ class ThesisKPI(ConfigModel):
         return value
 
 
+class ThesisPriceTarget(ConfigModel):
+    """The price levels the thesis's valuation sets, checked after each sync against the
+    Trading212 price. Reaching the sell target asks for the research to be re-run: sell
+    unless the new thesis raises the target. At or below the buy target the holding is a
+    candidate to add to."""
+
+    sell_target: float | None = Field(
+        default=None, gt=0, description="Price at which the thesis has played out."
+    )
+    buy_target: float | None = Field(
+        default=None, gt=0, description="Price at or below which buying more is attractive."
+    )
+    currency: CurrencyCode = Field(
+        description="Currency of both targets, as Trading212 quotes the instrument (GBX for pence)."
+    )
+    method: str = Field(
+        min_length=1,
+        max_length=200,
+        examples=["DCF, 10% discount rate", "20x 2027 EPS"],
+        description="Valuation method the targets come from.",
+    )
+    set_on: dt.date = Field(description="Date of the valuation the targets come from.")
+
+    def describe(self) -> str:
+        """'sell 260 USD, buy 180 USD (DCF, set 2026-10-01)', for prompts and evidence."""
+        levels = [
+            f"{side} {value:g} {self.currency}"
+            for side, value in (("sell", self.sell_target), ("buy", self.buy_target))
+            if value is not None
+        ]
+        return f"{', '.join(levels)} ({self.method}, set {self.set_on.isoformat()})"
+
+    @model_validator(mode="after")
+    def _consistent(self) -> Self:
+        if self.sell_target is None and self.buy_target is None:
+            raise ValueError("set a sell target, a buy target or both")
+        if (
+            self.sell_target is not None
+            and self.buy_target is not None
+            and self.buy_target >= self.sell_target
+        ):
+            raise ValueError("the buy target must be below the sell target")
+        return self
+
+
 class ThesisConfig(ConfigModel):
     ticker: Ticker
     why_owned: str = Field(min_length=1)
@@ -46,6 +98,7 @@ class ThesisConfig(ConfigModel):
         default_factory=list, description="Conditions that would end the thesis, in plain words."
     )
     review_date: dt.date | None = None
+    price_target: ThesisPriceTarget | None = None
 
     @model_validator(mode="after")
     def _unique_kpi_ids(self) -> Self:

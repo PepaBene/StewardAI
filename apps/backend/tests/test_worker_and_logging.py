@@ -1,5 +1,6 @@
 import logging
 import os
+import re
 import signal
 import subprocess
 import sys
@@ -13,7 +14,8 @@ from steward.logging import REDACTED, SecretScrubFilter, scrub
 BACKEND_DIR = Path(__file__).resolve().parents[1]
 
 
-def test_worker_starts_with_zero_jobs_and_stops_on_sigterm() -> None:
+@pytest.mark.skipif(sys.platform == "win32", reason="Windows has no SIGTERM; stop with Ctrl+C")
+def test_worker_starts_and_stops_on_sigterm() -> None:
     env = {k: v for k, v in os.environ.items() if k not in {"DATABASE_URL"}}
     proc = subprocess.Popen(
         [sys.executable, "-m", "worker"],
@@ -25,12 +27,13 @@ def test_worker_starts_with_zero_jobs_and_stops_on_sigterm() -> None:
     )
     try:
         output = ""
-        deadline = time.monotonic() + 15
+        deadline = time.monotonic() + 45  # importing the whole app can be slow on a busy machine
         assert proc.stdout is not None
         while time.monotonic() < deadline and "scheduler started" not in output:
             output += proc.stdout.readline()
         assert "scheduler started" in output
-        assert "0 jobs registered" in output
+        # The registry grows with every phase, so assert the log line, not a fixed count.
+        assert re.search(r"\d+ jobs registered", output)
         proc.send_signal(signal.SIGTERM)
         remaining, _ = proc.communicate(timeout=10)
         assert proc.returncode == 0

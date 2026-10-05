@@ -13,7 +13,7 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 
 import { AlertMessage } from "@/components/alert-message";
-import { BarChart, CATEGORICAL_BG, Donut, Gauge, SparkArea } from "@/components/charts";
+import { BarChart, Gauge, SparkArea, StackedBar } from "@/components/charts";
 import { EmptyState } from "@/components/empty-state";
 import { JobStatusBadge } from "@/components/jobs/job-status-badge";
 import { PageHeader } from "@/components/page-header";
@@ -294,27 +294,13 @@ function StatRow({ board }: { board: ThesisBoard }) {
 
   return (
     <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-[1fr_1.3fr_1fr_1fr]">
-      <Blueprint className="flex items-center gap-4 px-5 py-[18px]" aria-label="Theses by state">
-        <Donut
+      <Blueprint className="flex flex-col justify-center gap-2 px-5 py-[18px]" aria-label="Theses by state">
+        <StackedBar
           segments={segments.map((s) => ({ label: s.label, value: s.value }))}
-          centerValue={board.rows.length}
-          centerLabel={board.rows.length === 1 ? "thesis" : "theses"}
-          legend={false}
-          size={110}
-          label="Theses by state"
+          title="Theses by state"
+          note={`${board.rows.length} ${board.rows.length === 1 ? "thesis" : "theses"}`}
+          formatShare={(f) => String(Math.round(f * board.rows.length))}
         />
-        <ul className="flex flex-col gap-2 text-[13px]">
-          {THESIS_STATE_ORDER.filter((s) => s !== "unjudged" || counts.unjudged > 0).map((s) => {
-            const slot = segments.findIndex((x) => x.state === s);
-            return (
-              <li key={s} className="grid grid-cols-[10px_64px_auto] items-center gap-2">
-                <span aria-hidden="true" className={cn("size-2.5", slot >= 0 ? CATEGORICAL_BG[slot] : "border border-border")} />
-                <span>{THESIS_STATE[s].label}</span>
-                <b className="num font-semibold">{counts[s]}</b>
-              </li>
-            );
-          })}
-        </ul>
       </Blueprint>
 
       <Blueprint className="flex flex-col gap-2 px-5 py-[18px]">

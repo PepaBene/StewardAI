@@ -54,7 +54,7 @@ async def api(backend_pool: asyncpg.Pool) -> AsyncIterator[httpx.AsyncClient]:
 
 
 @pytest.fixture
-async def anonymous_api() -> AsyncIterator[httpx.AsyncClient]:
+async def anonymous_api(auth_configured: None) -> AsyncIterator[httpx.AsyncClient]:
     """Same routes, real owner dependency, no bearer token."""
     app = create_app()
     app.include_router(data_context_router)

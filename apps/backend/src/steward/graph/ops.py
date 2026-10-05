@@ -10,8 +10,12 @@ only attributes that matter on `exchange-document` are `family-id`, `country`, `
 and `kind`. The family key is the OPS family-id, so the A1 in one office and the B2 in another
 merge into one family.
 
-Recorded fixtures under tests/fixtures/graph follow the OPS reference documentation; they have
-not been compared with a live payload (that needs a registered OPS client). Forward citations
+UNVERIFIED AGAINST A LIVE RESPONSE: the fixtures under tests/fixtures/graph (and the inline
+sample in tests/test_provider_jobs.py) follow the OPS reference documentation only. They have
+never been compared with a payload from ops.epo.org, because that needs a registered OPS client
+and network access that the authors did not have. The scheduled `epo_patents` job is therefore
+opt-in (job and `providers.epo_ops` both off by default); check the first live run's job step
+and `provider_access` row before trusting its output. Forward citations
 are not part of the OPS bibliographic response and are therefore reported as unknown, never 0.
 """
 

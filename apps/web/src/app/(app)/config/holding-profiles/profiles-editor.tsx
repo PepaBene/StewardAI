@@ -243,6 +243,27 @@ function ProfileCard({
           hint="Exact exchange code with its verified suffix, e.g. SAP.XETRA. Free plan: one year of daily closes, 20 calls a day."
           {...text("eodhd_symbol")}
         />
+        <TextField
+          label="FMP symbol"
+          placeholder="not used unless set"
+          spellCheck={false}
+          hint="Financial Modeling Prep symbol for the sector, industry and estimates job, e.g. AAPL. Free tier."
+          {...text("fmp_symbol")}
+        />
+        <TextField
+          label="Companies House number"
+          placeholder="UK companies only"
+          spellCheck={false}
+          hint="The company number from Companies House, e.g. 00445790. Read by the Companies House filings job."
+          {...text("companies_house_number")}
+        />
+        <TextField
+          label="EDINET code"
+          placeholder="Japanese issuers only"
+          spellCheck={false}
+          hint="The issuer's EDINET code, e.g. E02144. Read by the EDINET filings job (document list and links only)."
+          {...text("edinet_code")}
+        />
       </fieldset>
 
       <fieldset className="grid gap-3 lg:grid-cols-2">

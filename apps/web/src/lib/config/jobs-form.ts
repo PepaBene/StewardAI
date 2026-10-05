@@ -235,8 +235,46 @@ export const SCHEDULES: Record<ScheduleKey, { label: string; description: string
       "Review SEC relationship candidates, extract deal events and reconcile parent changes.",
     cron: "40 7 * * *",
   },
+  fmp_company: {
+    label: "FMP company profile",
+    description:
+      "Sector, industry and annual analyst estimates from the Financial Modeling Prep free tier, for holdings with an FMP symbol. Off by default; also needs the FMP provider enabled and a passed endpoint probe.",
+    cron: "20 9 * * 6",
+  },
+  alpha_vantage_statements: {
+    label: "Alpha Vantage statements",
+    description:
+      "Annual statements for holdings with a confirmed listing and an Alpha Vantage symbol, a few per run so the shared daily allowance keeps its reserve. Off by default; also needs the Alpha Vantage provider enabled.",
+    cron: "40 9 * * 6",
+  },
+  epo_patents: {
+    label: "EPO patent families",
+    description: "Patent-family refresh from EPO Open Patent Services for the stalest holdings. Off by default; also needs the EPO provider enabled and its client credentials.",
+    cron: "0 10 1 * *",
+  },
+  companies_house_filings: {
+    label: "Companies House filings",
+    description:
+      "Company profile and filing history of UK holdings that have a Companies House number. Off by default; also needs the Companies House provider enabled and its API key.",
+    cron: "10 10 * * 6",
+  },
+  edinet_filings: {
+    label: "EDINET filings",
+    description:
+      "Japan FSA (EDINET) document list for holdings that have an EDINET code: list and links only, no figures parsed. Off by default; also needs the EDINET provider enabled and its API key.",
+    cron: "30 10 * * *",
+  },
+  twelve_data_corporate_actions: {
+    label: "Twelve Data corporate actions",
+    description:
+      "Dividends and splits of holdings with a confirmed listing, stored as suggestions for you to confirm. Off by default; also needs the Twelve Data provider enabled.",
+    cron: "50 10 * * 6",
+  },
 };
 export const SCHEDULE_KEYS = Object.keys(SCHEDULES) as ScheduleKey[];
+
+/** Schedules that start off: they spend a provider's free allowance or need a key, so you switch them on yourself. */
+const OFF_BY_DEFAULT: readonly ScheduleKey[] = ["fmp_company", "alpha_vantage_statements", "epo_patents", "companies_house_filings", "edinet_filings", "twelve_data_corporate_actions"];
 export const DEFAULT_TIMEZONE = "Europe/Prague";
 
 /** The backend's defaults, for when nothing is saved yet (a 404). */
@@ -244,7 +282,7 @@ export const DEFAULT_JOBS: JobsConfig = {
   schema_version: 1,
   catch_up_on_start: true,
   ...(Object.fromEntries(
-    SCHEDULE_KEYS.map((k) => [k, { enabled: true, cron: SCHEDULES[k].cron, timezone: DEFAULT_TIMEZONE }]),
+    SCHEDULE_KEYS.map((k) => [k, { enabled: !OFF_BY_DEFAULT.includes(k), cron: SCHEDULES[k].cron, timezone: DEFAULT_TIMEZONE }]),
   ) as Record<ScheduleKey, JobSchedule>),
   earnings_check: {
     extraction_model: "claude-sonnet-5",

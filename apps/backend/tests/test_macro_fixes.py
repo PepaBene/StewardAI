@@ -734,7 +734,7 @@ def _public_config(
     )
     for name in ("world_bank", "oecd", "un_comtrade"):
         config.providers[name] = ProviderJobSettings(
-            enabled=True, daily_quota=quota, reserve_credits=0 if quota is None else 1
+            daily_quota=quota, reserve_credits=0 if quota is None else 1
         )
     return config
 
