@@ -366,6 +366,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/macro/series": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Macro Series
+         * @description Per-period first-recorded and latest values with vintage counts, for small multiples.
+         */
+        get: operations["get_macro_series"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/macro/coverage/portfolio": {
         parameters: {
             query?: never;
@@ -3335,6 +3355,27 @@ export interface paths {
         head?: never;
         /** Update Watchlist Item */
         patch: operations["update_watchlist_item"];
+        trace?: never;
+    };
+    "/screens/run": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Run Screen Route
+         * @description Run numeric filters over each issuer's latest computable period. Every issuer left out
+         *     is counted with its reason; a missing metric is excluded or flagged, never read as zero.
+         */
+        post: operations["run_screen_route"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
         trace?: never;
     };
     "/jobs/insider-trades": {
@@ -7336,6 +7377,15 @@ export interface components {
              */
             reason?: string | null;
         };
+        /** ExcludedGroup */
+        ExcludedGroup: {
+            /** Reason */
+            reason: string;
+            /** Count */
+            count: number;
+            /** Tickers */
+            tickers: string[];
+        };
         /** ExclusionOut */
         ExclusionOut: {
             /** Reason */
@@ -10948,6 +10998,34 @@ export interface components {
             /** Portfolio Value */
             portfolio_value: number | string;
         };
+        /** MacroSeriesHistory */
+        MacroSeriesHistory: {
+            /** Source */
+            source: string;
+            /** Series Id */
+            series_id: string;
+            /** Geography */
+            geography: string;
+            /** Label */
+            label: string | null;
+            /** Unit */
+            unit: string;
+            /** Frequency */
+            frequency: string | null;
+            /** Seasonal Adjustment */
+            seasonal_adjustment: string | null;
+            /**
+             * First Basis
+             * @enum {string}
+             */
+            first_basis: "provider_vintage" | "first_recorded";
+            /** Source Url */
+            source_url: string | null;
+            /** Points */
+            points: components["schemas"]["SeriesPoint"][];
+            /** Revised Periods */
+            revised_periods: number;
+        };
         /**
          * MacroSettings
          * @description Macro series collected into `macro_series` (numbers in digests come only from here).
@@ -13945,6 +14023,126 @@ export interface components {
             /** Score */
             score: number;
         };
+        /** ScreenFilter */
+        ScreenFilter: {
+            /**
+             * Metric
+             * @enum {string}
+             */
+            metric: "revenue_growth" | "gross_margin" | "operating_margin" | "roic" | "net_debt_to_equity" | "free_cash_flow_conversion";
+            /**
+             * Op
+             * @description gte: value >= threshold. lte: value <= threshold.
+             * @enum {string}
+             */
+            op: "gte" | "lte";
+            /**
+             * Value
+             * @description Threshold in the metric's own unit: fractions for margins, growth, ROIC and cash conversion (0.15 = 15%), a ratio for net debt to equity.
+             */
+            value: number | string;
+        };
+        /** ScreenRequest */
+        ScreenRequest: {
+            /**
+             * Universe
+             * @default covered
+             * @enum {string}
+             */
+            universe: "covered" | "watchlist" | "holdings";
+            /** Filters */
+            filters?: components["schemas"]["ScreenFilter"][];
+            /**
+             * Missing
+             * @description exclude: drop an issuer whose filtered metric is missing. keep_unknown: keep it and list the unknown metrics.
+             * @default exclude
+             * @enum {string}
+             */
+            missing: "exclude" | "keep_unknown";
+            /** Sort By */
+            sort_by?: ("revenue_growth" | "gross_margin" | "operating_margin" | "roic" | "net_debt_to_equity" | "free_cash_flow_conversion") | null;
+            /**
+             * Limit
+             * @default 100
+             */
+            limit: number;
+            /**
+             * As Of
+             * @description Use only statement facts known by this time.
+             */
+            as_of?: string | null;
+            /**
+             * Reconciled Only
+             * @description Only facts a reconciliation check passed.
+             * @default false
+             */
+            reconciled_only: boolean;
+        };
+        /** ScreenResult */
+        ScreenResult: {
+            /** Universe */
+            universe: string;
+            /** Universe Definition */
+            universe_definition: string;
+            /** Universe Size */
+            universe_size: number;
+            /**
+             * Evaluated
+             * @description Issuers with a computable latest period.
+             */
+            evaluated: number;
+            /** Matched */
+            matched: number;
+            /** Shown */
+            shown: number;
+            /**
+             * No Data
+             * @description Left out because a filtered metric had no value.
+             */
+            no_data: number;
+            /**
+             * Filtered Out
+             * @description Had every filtered value and failed a filter.
+             */
+            filtered_out: number;
+            /** Excluded */
+            excluded: components["schemas"]["ExcludedGroup"][];
+            /**
+             * Missing Treatment
+             * @enum {string}
+             */
+            missing_treatment: "exclude" | "keep_unknown";
+            /** Filters */
+            filters: components["schemas"]["ScreenFilter"][];
+            /** Rows */
+            rows: components["schemas"]["ScreenRow"][];
+            /** Formula Definitions */
+            formula_definitions: {
+                [key: string]: string;
+            };
+            /** Caveats */
+            caveats: string[];
+        };
+        /** ScreenRow */
+        ScreenRow: {
+            /** Ticker */
+            ticker: string;
+            /** Name */
+            name?: string | null;
+            /** Basis */
+            basis: string;
+            /** Period End */
+            period_end: string;
+            /** Metrics */
+            metrics: {
+                [key: string]: number | string | null;
+            };
+            /**
+             * Unknown
+             * @description Filtered metrics with no value for this issuer (only with keep_unknown).
+             */
+            unknown: string[];
+        };
         /** SectionCoverage */
         SectionCoverage: {
             /**
@@ -14097,6 +14295,34 @@ export interface components {
             covered_weight: number | string;
             /** Geographies */
             geographies: string[];
+        };
+        /** SeriesPoint */
+        SeriesPoint: {
+            /**
+             * Period
+             * Format: date
+             */
+            period: string;
+            /** First Value */
+            first_value: number | string | null;
+            /**
+             * First Known At
+             * Format: date-time
+             */
+            first_known_at: string;
+            /** Latest Value */
+            latest_value: number | string | null;
+            /**
+             * Latest Known At
+             * Format: date-time
+             */
+            latest_known_at: string;
+            /** Release At */
+            release_at: string | null;
+            /** Vintages */
+            vintages: number;
+            /** Revised */
+            revised: boolean;
         };
         /** SeverityDay */
         SeverityDay: {
@@ -16366,6 +16592,42 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["MacroContext"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_macro_series: {
+        parameters: {
+            query?: {
+                geography?: string | null;
+                source?: string | null;
+                series_id?: string | null;
+                periods?: number;
+                limit_series?: number;
+                as_of?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MacroSeriesHistory"][];
                 };
             };
             /** @description Validation Error */
@@ -21542,6 +21804,39 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["WatchlistItem"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    run_screen_route: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ScreenRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ScreenResult"];
                 };
             };
             /** @description Validation Error */

@@ -14,6 +14,7 @@ from api.routes import _enqueue
 from steward.macro.hs import normalize_hs_revision
 from steward.macro.providers import TradePoint, flow_totals, trade_metrics
 from steward.macro.read import MacroContext, context_for_holding
+from steward.macro.series import MacroSeriesHistory, macro_series_history
 from steward.portfolio.read import JobSummary
 
 router = APIRouter()
@@ -98,6 +99,29 @@ async def get_macro_context(
 ) -> MacroContext:
     """Latest point-in-time country context, ranges, provenance and mapped exposure."""
     return await context_for_holding(pool, ticker, as_of or dt.datetime.now(dt.UTC))
+
+
+@router.get("/macro/series", response_model=list[MacroSeriesHistory], tags=["macro"])
+async def get_macro_series(
+    pool: Pool,
+    _owner: Owner,
+    geography: Annotated[str | None, Query(max_length=16)] = None,
+    source: Annotated[str | None, Query(max_length=32)] = None,
+    series_id: Annotated[str | None, Query(max_length=128)] = None,
+    periods: Annotated[int, Query(ge=2, le=240)] = 40,
+    limit_series: Annotated[int, Query(ge=1, le=60)] = 12,
+    as_of: Annotated[dt.datetime | None, Query()] = None,
+) -> list[MacroSeriesHistory]:
+    """Per-period first-recorded and latest values with vintage counts, for small multiples."""
+    return await macro_series_history(
+        pool,
+        geography=geography,
+        source=source,
+        series_id=series_id,
+        periods=periods,
+        limit_series=limit_series,
+        as_of=as_of,
+    )
 
 
 @router.get("/macro/coverage/portfolio", response_model=PortfolioMacroCoverage, tags=["macro"])

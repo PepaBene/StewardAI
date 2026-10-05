@@ -903,6 +903,141 @@
         }
       }
     },
+    "/macro/series": {
+      "get": {
+        "tags": [
+          "macro"
+        ],
+        "summary": "Get Macro Series",
+        "description": "Per-period first-recorded and latest values with vintage counts, for small multiples.",
+        "operationId": "get_macro_series",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "geography",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "maxLength": 16
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Geography"
+            }
+          },
+          {
+            "name": "source",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "maxLength": 32
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Source"
+            }
+          },
+          {
+            "name": "series_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "maxLength": 128
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Series Id"
+            }
+          },
+          {
+            "name": "periods",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 240,
+              "minimum": 2,
+              "default": 40,
+              "title": "Periods"
+            }
+          },
+          {
+            "name": "limit_series",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 60,
+              "minimum": 1,
+              "default": 12,
+              "title": "Limit Series"
+            }
+          },
+          {
+            "name": "as_of",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date-time"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "As Of"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/MacroSeriesHistory"
+                  },
+                  "title": "Response Get Macro Series"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/macro/coverage/portfolio": {
       "get": {
         "tags": [
@@ -10286,6 +10421,53 @@
             }
           }
         }
+      }
+    },
+    "/screens/run": {
+      "post": {
+        "tags": [
+          "screens"
+        ],
+        "summary": "Run Screen Route",
+        "description": "Run numeric filters over each issuer's latest computable period. Every issuer left out\nis counted with its reason; a missing metric is excluded or flagged, never read as zero.",
+        "operationId": "run_screen_route",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ScreenRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ScreenResult"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
       }
     },
     "/jobs/insider-trades": {
@@ -21073,6 +21255,32 @@
         ],
         "title": "ExchangeSessionInput"
       },
+      "ExcludedGroup": {
+        "properties": {
+          "reason": {
+            "type": "string",
+            "title": "Reason"
+          },
+          "count": {
+            "type": "integer",
+            "title": "Count"
+          },
+          "tickers": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Tickers"
+          }
+        },
+        "type": "object",
+        "required": [
+          "reason",
+          "count",
+          "tickers"
+        ],
+        "title": "ExcludedGroup"
+      },
       "ExclusionOut": {
         "properties": {
           "reason": {
@@ -31634,6 +31842,104 @@
         ],
         "title": "MacroSensitivity"
       },
+      "MacroSeriesHistory": {
+        "properties": {
+          "source": {
+            "type": "string",
+            "title": "Source"
+          },
+          "series_id": {
+            "type": "string",
+            "title": "Series Id"
+          },
+          "geography": {
+            "type": "string",
+            "title": "Geography"
+          },
+          "label": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Label"
+          },
+          "unit": {
+            "type": "string",
+            "title": "Unit"
+          },
+          "frequency": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Frequency"
+          },
+          "seasonal_adjustment": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Seasonal Adjustment"
+          },
+          "first_basis": {
+            "type": "string",
+            "enum": [
+              "provider_vintage",
+              "first_recorded"
+            ],
+            "title": "First Basis"
+          },
+          "source_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Url"
+          },
+          "points": {
+            "items": {
+              "$ref": "#/components/schemas/SeriesPoint"
+            },
+            "type": "array",
+            "title": "Points"
+          },
+          "revised_periods": {
+            "type": "integer",
+            "title": "Revised Periods"
+          }
+        },
+        "type": "object",
+        "required": [
+          "source",
+          "series_id",
+          "geography",
+          "label",
+          "unit",
+          "frequency",
+          "seasonal_adjustment",
+          "first_basis",
+          "source_url",
+          "points",
+          "revised_periods"
+        ],
+        "title": "MacroSeriesHistory"
+      },
       "MacroSettings": {
         "properties": {
           "history_years": {
@@ -39689,6 +39995,294 @@
         ],
         "title": "ScorePoint"
       },
+      "ScreenFilter": {
+        "properties": {
+          "metric": {
+            "type": "string",
+            "enum": [
+              "revenue_growth",
+              "gross_margin",
+              "operating_margin",
+              "roic",
+              "net_debt_to_equity",
+              "free_cash_flow_conversion"
+            ],
+            "title": "Metric"
+          },
+          "op": {
+            "type": "string",
+            "enum": [
+              "gte",
+              "lte"
+            ],
+            "title": "Op",
+            "description": "gte: value >= threshold. lte: value <= threshold."
+          },
+          "value": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              }
+            ],
+            "title": "Value",
+            "description": "Threshold in the metric's own unit: fractions for margins, growth, ROIC and cash conversion (0.15 = 15%), a ratio for net debt to equity."
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "metric",
+          "op",
+          "value"
+        ],
+        "title": "ScreenFilter"
+      },
+      "ScreenRequest": {
+        "properties": {
+          "universe": {
+            "type": "string",
+            "enum": [
+              "covered",
+              "watchlist",
+              "holdings"
+            ],
+            "title": "Universe",
+            "default": "covered"
+          },
+          "filters": {
+            "items": {
+              "$ref": "#/components/schemas/ScreenFilter"
+            },
+            "type": "array",
+            "maxItems": 6,
+            "title": "Filters"
+          },
+          "missing": {
+            "type": "string",
+            "enum": [
+              "exclude",
+              "keep_unknown"
+            ],
+            "title": "Missing",
+            "description": "exclude: drop an issuer whose filtered metric is missing. keep_unknown: keep it and list the unknown metrics.",
+            "default": "exclude"
+          },
+          "sort_by": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "revenue_growth",
+                  "gross_margin",
+                  "operating_margin",
+                  "roic",
+                  "net_debt_to_equity",
+                  "free_cash_flow_conversion"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sort By"
+          },
+          "limit": {
+            "type": "integer",
+            "maximum": 200.0,
+            "minimum": 1.0,
+            "title": "Limit",
+            "default": 100
+          },
+          "as_of": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "As Of",
+            "description": "Use only statement facts known by this time."
+          },
+          "reconciled_only": {
+            "type": "boolean",
+            "title": "Reconciled Only",
+            "description": "Only facts a reconciliation check passed.",
+            "default": false
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "ScreenRequest"
+      },
+      "ScreenResult": {
+        "properties": {
+          "universe": {
+            "type": "string",
+            "title": "Universe"
+          },
+          "universe_definition": {
+            "type": "string",
+            "title": "Universe Definition"
+          },
+          "universe_size": {
+            "type": "integer",
+            "title": "Universe Size"
+          },
+          "evaluated": {
+            "type": "integer",
+            "title": "Evaluated",
+            "description": "Issuers with a computable latest period."
+          },
+          "matched": {
+            "type": "integer",
+            "title": "Matched"
+          },
+          "shown": {
+            "type": "integer",
+            "title": "Shown"
+          },
+          "no_data": {
+            "type": "integer",
+            "title": "No Data",
+            "description": "Left out because a filtered metric had no value."
+          },
+          "filtered_out": {
+            "type": "integer",
+            "title": "Filtered Out",
+            "description": "Had every filtered value and failed a filter."
+          },
+          "excluded": {
+            "items": {
+              "$ref": "#/components/schemas/ExcludedGroup"
+            },
+            "type": "array",
+            "title": "Excluded"
+          },
+          "missing_treatment": {
+            "type": "string",
+            "enum": [
+              "exclude",
+              "keep_unknown"
+            ],
+            "title": "Missing Treatment"
+          },
+          "filters": {
+            "items": {
+              "$ref": "#/components/schemas/ScreenFilter"
+            },
+            "type": "array",
+            "title": "Filters"
+          },
+          "rows": {
+            "items": {
+              "$ref": "#/components/schemas/ScreenRow"
+            },
+            "type": "array",
+            "title": "Rows"
+          },
+          "formula_definitions": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "type": "object",
+            "title": "Formula Definitions"
+          },
+          "caveats": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Caveats"
+          }
+        },
+        "type": "object",
+        "required": [
+          "universe",
+          "universe_definition",
+          "universe_size",
+          "evaluated",
+          "matched",
+          "shown",
+          "no_data",
+          "filtered_out",
+          "excluded",
+          "missing_treatment",
+          "filters",
+          "rows",
+          "formula_definitions",
+          "caveats"
+        ],
+        "title": "ScreenResult"
+      },
+      "ScreenRow": {
+        "properties": {
+          "ticker": {
+            "type": "string",
+            "title": "Ticker"
+          },
+          "name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
+          },
+          "basis": {
+            "type": "string",
+            "title": "Basis"
+          },
+          "period_end": {
+            "type": "string",
+            "title": "Period End"
+          },
+          "metrics": {
+            "additionalProperties": {
+              "anyOf": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "string",
+                  "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "type": "object",
+            "title": "Metrics"
+          },
+          "unknown": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Unknown",
+            "description": "Filtered metrics with no value for this issuer (only with keep_unknown)."
+          }
+        },
+        "type": "object",
+        "required": [
+          "ticker",
+          "basis",
+          "period_end",
+          "metrics",
+          "unknown"
+        ],
+        "title": "ScreenRow"
+      },
       "SectionCoverage": {
         "properties": {
           "state": {
@@ -40136,6 +40730,87 @@
         ],
         "title": "SeriesEffect",
         "description": "Exposure-weighted latest change of one country series: sum of weight x (latest minus\nprevious period) over the mapped geographies that have both. `covered_weight` is the share\nof the issuer those geographies represent; the rest is unknown, not unchanged."
+      },
+      "SeriesPoint": {
+        "properties": {
+          "period": {
+            "type": "string",
+            "format": "date",
+            "title": "Period"
+          },
+          "first_value": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "First Value"
+          },
+          "first_known_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "First Known At"
+          },
+          "latest_value": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Latest Value"
+          },
+          "latest_known_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Latest Known At"
+          },
+          "release_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Release At"
+          },
+          "vintages": {
+            "type": "integer",
+            "title": "Vintages"
+          },
+          "revised": {
+            "type": "boolean",
+            "title": "Revised"
+          }
+        },
+        "type": "object",
+        "required": [
+          "period",
+          "first_value",
+          "first_known_at",
+          "latest_value",
+          "latest_known_at",
+          "release_at",
+          "vintages",
+          "revised"
+        ],
+        "title": "SeriesPoint"
       },
       "SeverityDay": {
         "properties": {
