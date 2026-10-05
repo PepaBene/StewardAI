@@ -40,6 +40,7 @@ from steward.valuation.collect import (
     pick_esef,
     preferred_currencies,
     run_valuation,
+    store_fundamentals,
 )
 from steward.valuation.fundamentals import (
     ALL_CONCEPTS,
@@ -637,6 +638,19 @@ async def _refresh(
             await run_valuation(ctx, deps)
 
         return await run_job(pool, "valuation_refresh", job, trigger="manual", params=params)
+
+
+@pytestmark_db
+async def test_store_fundamentals_accepts_a_bare_number_eps(backend_pool: asyncpg.Pool) -> None:
+    # Finnhub's cross-check stores eps_ttm as a plain number, not a {value, currency} figure.
+    body = {"source": "finnhub", "basis": None, "pe": 30.1, "pb": 45.0, "eps_ttm": 8.72}
+    await store_fundamentals(backend_pool, "AAPL_US_EQ", "finnhub", body, {}, "AAPL", "u")
+    row = await backend_pool.fetchrow(
+        "select currency, period_end, figures from public.fundamentals"
+        " where ticker = 'AAPL_US_EQ' and source = 'finnhub'"
+    )
+    assert row["currency"] is None and row["period_end"] is None
+    assert json.loads(row["figures"])["eps_ttm"] == 8.72
 
 
 @pytestmark_db

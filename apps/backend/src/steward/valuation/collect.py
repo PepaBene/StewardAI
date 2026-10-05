@@ -147,7 +147,9 @@ async def store_fundamentals(
     document_url: str,
 ) -> None:
     body = figures.model_dump(mode="json") if isinstance(figures, SourceFigures) else figures
-    eps = body.get("eps_ttm") or {}
+    eps = body.get("eps_ttm")
+    if not isinstance(eps, dict):  # Finnhub's figure is a bare number: no currency or period
+        eps = {}
     await pool.execute(
         "insert into public.fundamentals (ticker, source, basis, currency, document_ref,"
         " document_url, period_end, figures, raw) values ($1, $2, $3, $4, $5, $6, $7,"
