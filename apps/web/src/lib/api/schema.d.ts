@@ -13029,7 +13029,10 @@ export interface components {
              */
             as_of?: string | null;
         };
-        /** PinnedSnapshotsResponse */
+        /**
+         * PinnedSnapshotsResponse
+         * @description `POST /funds/snapshots/pin`: the ids of the snapshots now protected from pruning.
+         */
         PinnedSnapshotsResponse: {
             /** Pinned */
             pinned: number[];

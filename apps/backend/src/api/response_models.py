@@ -367,7 +367,3 @@ class CharacteristicsAuditRow(_Model):
 
 class FactsheetStoredResponse(_Model):
     id: int
-
-
-class PinnedSnapshotsResponse(_Model):
-    pinned: list[int]

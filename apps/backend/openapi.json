@@ -37688,7 +37688,8 @@
         "required": [
           "pinned"
         ],
-        "title": "PinnedSnapshotsResponse"
+        "title": "PinnedSnapshotsResponse",
+        "description": "`POST /funds/snapshots/pin`: the ids of the snapshots now protected from pruning."
       },
       "PlausibilityCheck": {
         "properties": {
