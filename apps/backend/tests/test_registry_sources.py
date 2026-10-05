@@ -241,17 +241,17 @@ def test_profile_ids_are_validated_and_mapped() -> None:
         _profiles(fmp_symbol="bad symbol")
 
 
-def test_new_jobs_are_registered_and_off_by_default() -> None:
+def test_new_jobs_are_registered_and_scheduled() -> None:
     jobs = JobsConfig()
     for name in NEW_JOBS:
         assert name in JOB_HANDLERS
         assert name in get_args(JobType)
         assert name in get_args(BudgetJobType)
-        assert getattr(jobs, name).enabled is False
+        # On by default: a missing API key skips the run, so nothing is spent without one.
+        assert getattr(jobs, name).enabled is True
     assert set(get_args(BudgetJobType)) == set(get_args(JobType))
     for provider in ("edinet", "companies_house"):
-        settings = jobs.providers[provider]
-        assert settings.enabled is False and settings.daily_quota
+        assert jobs.providers[provider].daily_quota
 
 
 def test_new_providers_have_hard_stops_in_the_zero_cost_registry() -> None:

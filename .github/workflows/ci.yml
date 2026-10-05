@@ -36,6 +36,15 @@ jobs:
         with:
           enable-cache: true
       - run: uv sync --locked
+      # The backup/restore test runs pg_dump against the Postgres 17 service; pg_dump refuses a
+      # server newer than itself and the runner image ships client 16.
+      - name: Install the PostgreSQL 17 client tools
+        run: |
+          sudo apt-get install -y postgresql-common
+          sudo /usr/share/postgresql-common/pgdg/apt.postgresql.org.sh -y
+          sudo apt-get install -y postgresql-client-17
+          echo "/usr/lib/postgresql/17/bin" >> "$GITHUB_PATH"
+        working-directory: .
       - run: uv run ruff check .
       - run: uv run ruff format --check .
       - run: uv run mypy

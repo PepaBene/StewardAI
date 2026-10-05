@@ -733,7 +733,8 @@ async def test_gates_default_deny_then_open_with_audit_data(backend_pool: asyncp
         " primary_value, primary_source, primary_url, abs_error, rel_error, matched,"
         " threshold_version, reviewer, sampled_at) select 'macro', 'series-' || g, 'value', 1, 1,"
         " 'ecb', 'https://data.ecb.europa.eu/t', 0, 0, true, '2026.10-defaults', 'owner',"
-        " now() - interval '1 day' from generate_series(1, 25) g"
+        " $1::timestamptz - interval '1 day' from generate_series(1, 25) g",
+        NOW,  # relative to the run's clock: a sample after it counts as future-dated and is ignored
     )
     opened = await evaluate_free_source_alerts(pool, rules, now=NOW, held=set())
     assert len(opened.raised) == 1
@@ -760,7 +761,8 @@ async def test_signal_gate_blocks_a_confirmed_deal_edge(backend_pool: asyncpg.Po
     await pool.execute(
         "insert into signal_audit_result (signal_name, sample_size, evidence_correct, pit_checked,"
         " pit_violations, reviewer, audited_at) values ('deal_state', 40, 40, 30, 0, 'owner',"
-        " now() - interval '2 days')"
+        " $1::timestamptz - interval '2 days')",
+        NOW,
     )
     summary = await evaluate_free_source_alerts(pool, rules, now=NOW)
     assert len(summary.raised) == 1
