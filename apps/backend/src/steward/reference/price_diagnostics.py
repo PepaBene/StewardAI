@@ -26,6 +26,7 @@ DISAGREEMENT_PCT = Decimal("0.02")
 # Only recent sessions are compared across sources: older closes differ legitimately by the
 # dividend adjustments some sources apply and others do not.
 COMPARE_SESSIONS = 20
+RECENT_STRIP = 120
 
 
 def _ref_key(symbol: str, source: str) -> SeriesRef:
@@ -96,6 +97,21 @@ async def holding_price_diagnostics(
                     continue
                 if abs(a - b) / max(a, b) > DISAGREEMENT_PCT:
                     differing.add(day)
+        # The latest expected sessions, each observed, missing or disagreeing with another source,
+        # so a calendar strip shows where the gaps are and not only how many there are.
+        recent_sessions = [
+            {
+                "session": d,
+                "state": (
+                    "missing"
+                    if d not in observed
+                    else "disagrees"
+                    if d in differing
+                    else "observed"
+                ),
+            }
+            for d in expected.days[-RECENT_STRIP:]
+        ]
         is_chosen = chosen is not None and chosen == _ref_key(symbol, source)
         stale = (
             (
@@ -121,6 +137,7 @@ async def holding_price_diagnostics(
                 "expected_sessions": expected.count,
                 "calendar_basis": expected.basis,
                 "stale_sessions": stale,
+                "recent_sessions": recent_sessions,
             }
         )
     out.sort(key=lambda r: (not r["chosen"], -(r["last_session"].toordinal()), r["source"]))

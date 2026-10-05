@@ -1,13 +1,14 @@
 "use client";
 
-import { useMemo } from "react";
+import { useCallback, useMemo, useState } from "react";
 
-import { HBar } from "@/components/charts";
+import { AuditTrail, HBar } from "@/components/charts";
 import { EmptyState } from "@/components/empty-state";
 import { dataOf, Panel, ResourceNotice } from "@/components/oversight/panel";
 import { getBrowserApiClient } from "@/lib/api/client";
 import { formatPct } from "@/lib/charts/format";
 import { useApiResource } from "@/lib/hooks/use-api-resource";
+import { parseHistory, TREND_TEXT } from "@/lib/verification/history";
 import { parseSignals, signalLabel } from "@/lib/verification/verification";
 
 import { Verdict } from "./gates-panel";
@@ -15,9 +16,67 @@ import { Verdict } from "./gates-panel";
 const fetchSignals = () => getBrowserApiClient().GET("/verification/signals");
 
 /**
- * One card per signal: may it be published? The API returns the latest audit only, so there is
- * no history to chart; precision is drawn as a meter against the audit's own sample.
+ * One card per signal: may it be published? The meter shows the latest audit; opening "Audit
+ * history" loads every recorded audit for that signal and plots precision by date.
  */
+function SignalHistory({ name }: { name: string }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <details className="text-sm" onToggle={(e) => setOpen(e.currentTarget.open)}>
+      <summary className="cursor-pointer text-xs text-accent-ink hover:underline">Audit history</summary>
+      {open ? <HistoryBody name={name} /> : null}
+    </details>
+  );
+}
+
+function HistoryBody({ name }: { name: string }) {
+  const fetcher = useCallback(
+    () => getBrowserApiClient().GET("/verification/signals/{signal_name}/history", { params: { path: { signal_name: name }, query: {} } }),
+    [name],
+  );
+  const { state } = useApiResource(fetcher);
+  const data = dataOf(state);
+  const history = useMemo(() => (data ? parseHistory(data) : null), [data]);
+  return (
+    <div className="mt-2 space-y-2">
+      <ResourceNotice state={state} what="audit history" />
+      {history && history.audits.length === 0 ? <p className="text-xs text-text-muted">This signal has never been audited, so there is nothing to chart.</p> : null}
+      {history && history.audits.length > 0 ? (
+        <>
+          <AuditTrail
+            label={`${signalLabel(name)}: evidence precision by audit`}
+            points={history.audits.map((a) => ({ at: a.at, value: a.precision, sample: a.sample }))}
+          />
+          <p className="text-xs text-text-muted">
+            {TREND_TEXT[history.trend]}. Share of audited evidence rows that were correct, by audit date; a larger square means a larger sample.
+          </p>
+          <table className="w-full text-xs">
+            <caption className="sr-only">Point-in-time checks by audit</caption>
+            <thead>
+              <tr className="text-left text-text-muted">
+                <th className="py-1 font-normal">Audited</th>
+                <th className="py-1 text-right font-normal">Sample</th>
+                <th className="py-1 text-right font-normal">Point-in-time violations</th>
+                <th className="py-1 font-normal">Reviewer</th>
+              </tr>
+            </thead>
+            <tbody>
+              {[...history.audits].reverse().map((a) => (
+                <tr key={`${a.id}-${a.at}`} className="border-t border-border-soft">
+                  <td className="num py-1">{a.at.slice(0, 10)}</td>
+                  <td className="num py-1 text-right">{a.sample ?? "Unknown"}</td>
+                  <td className="num py-1 text-right">{a.pitChecked === null ? "Not checked" : `${a.pitViolations ?? "Unknown"} of ${a.pitChecked}`}</td>
+                  <td className="py-1">{a.reviewer ?? "Not named"}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </>
+      ) : null}
+    </div>
+  );
+}
+
 export function SignalsPanel() {
   const { state } = useApiResource(fetchSignals);
   const data = dataOf(state);
@@ -59,6 +118,7 @@ export function SignalsPanel() {
                   ))}
                 </ul>
               ) : null}
+              <SignalHistory name={s.name} />
             </li>
           ))}
         </ul>

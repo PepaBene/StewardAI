@@ -17,6 +17,8 @@ import {
   parseDiagnostics,
   type StakeRow,
 } from "@/lib/reference/holding-charts";
+import { parseSessions } from "@/lib/reference/price-coverage";
+import { SessionStrip } from "./holding-coverage";
 
 function dataOf<T>(state: ResourceState<T>): T | null {
   return state.kind === "ok" ? state.data : state.kind === "error" ? state.previous : null;
@@ -248,8 +250,8 @@ export function ConcentrationPanel({ ticker }: { ticker: string }) {
 
 /**
  * GET /holdings/{ticker}/prices/diagnostics: how complete each stored price series is against the
- * exchange's own session calendar. The corporate-action coverage endpoint is write-only
- * (POST), so coverage is not drawn here.
+ * exchange's own session calendar, plus a per-session calendar strip. Corporate-action
+ * coverage has its own panel (holding-coverage.tsx).
  */
 export function PriceDataPanel({ ticker }: { ticker: string }) {
   const fetcher = useCallback(
@@ -290,6 +292,7 @@ export function PriceDataPanel({ ticker }: { ticker: string }) {
                 {s.lastSession ? `, last session ${formatDate(s.lastSession)}` : ", no last session"}
                 {s.basis ? `, calendar: ${s.basis}` : ""}
               </p>
+              <SessionStrip cells={parseSessions(s.recentSessions)} mic={s.mic} label={s.label} />
             </li>
           );
         })}

@@ -220,6 +220,10 @@ export type PriceSeries = {
   lastSession: string | null;
   basis: string | null;
   access: string | null;
+  mic: string | null;
+  /** Latest expected sessions with their state, as sent (parsed by price-coverage). */
+  recentSessions: unknown;
+  disagreements: number | null;
 };
 
 export function parseDiagnostics(payload: unknown): PriceSeries[] {
@@ -238,6 +242,9 @@ export function parseDiagnostics(payload: unknown): PriceSeries[] {
         lastSession: text(r.last_session),
         basis: text(r.calendar_basis),
         access: text(r.access_state),
+        mic: text(r.mic),
+        recentSessions: r.recent_sessions,
+        disagreements: num(r.disagreements),
       };
     })
     .sort((a, b) => Number(b.chosen) - Number(a.chosen));

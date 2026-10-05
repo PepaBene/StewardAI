@@ -9,6 +9,7 @@ import { ISIN_RE } from "@/lib/funds/funds";
 
 import { AggregatePanel } from "./aggregate-panel";
 import { FactsheetPanel } from "./factsheet-panel";
+import { LedgerPanel } from "./ledger-panel";
 import { LookThroughPanel } from "./look-through-panel";
 import { OverlapPanel } from "./overlap-panel";
 
@@ -17,6 +18,7 @@ const SECTIONS = [
   { id: "aggregate", label: "Combined exposure" },
   { id: "look-through", label: "Look-through" },
   { id: "factsheet", label: "Factsheet" },
+  { id: "ledger", label: "Where data comes from" },
 ] as const;
 
 /**
@@ -39,6 +41,7 @@ export function FundsView() {
       <AggregatePanel />
       <LookThroughPanel />
       <FactsheetPanel isin={isin} />
+      <LedgerPanel />
       <p className="text-xs text-text-muted">
         Related:{" "}
         <Link href="/holdings" className="text-accent-ink hover:underline">

@@ -27,6 +27,7 @@ import { HoldingNews, useHoldingNews } from "@/components/news/holding-news";
 import { IdentitySection, useHoldingIdentity } from "@/components/reference/identity-section";
 import { CashDebtPanel } from "@/components/reference/cash-debt-panel";
 import { ConcentrationPanel, PatentOverlapPanel, PriceDataPanel, StakesPanel } from "@/components/reference/holding-data-panels";
+import { CorporateActionCoveragePanel } from "@/components/reference/holding-coverage";
 import { EstimatesPanel } from "@/components/reference/estimates-panel";
 import { FinancialHistoryPanel } from "@/components/reference/financial-history-panel";
 import { InsiderTradesSection } from "@/components/reference/insider-trades-section";
@@ -370,6 +371,8 @@ export function HoldingContent({
       <StakesPanel ticker={ticker} />
 
       <PriceDataPanel ticker={ticker} />
+
+      <CorporateActionCoveragePanel ticker={ticker} />
 
       <InsiderTradesSection ticker={ticker} />
 

@@ -812,6 +812,11 @@ async def peer_metrics(
     }
 
 
+class SessionState(BaseModel):
+    session: date
+    state: Literal["observed", "missing", "disagrees"]
+
+
 class PriceDiagnostic(BaseModel):
     model_config = ConfigDict(extra="ignore")
     symbol: str
@@ -829,6 +834,7 @@ class PriceDiagnostic(BaseModel):
     expected_sessions: int = 0
     calendar_basis: str | None = None
     stale_sessions: int | None = None
+    recent_sessions: list[SessionState] = []
 
 
 @router.get("/holdings/{ticker}/prices/diagnostics", tags=["holdings"])
@@ -1019,6 +1025,27 @@ async def decide_corporate_action(
         body.reason,
     )
     return {"id": action_id, "previous_status": current["status"], "status": body.decision}
+
+
+@router.get("/holdings/{ticker}/corporate-actions/coverage", tags=["holdings"], response_model=None)
+async def get_action_coverage(ticker: TickerPath, pool: Pool, _owner: Owner) -> dict[str, Any]:
+    """Where corporate-action coverage stands for the holding's symbol: every provider's
+    recorded state, newest first, with the owner-verified row (if any) marked."""
+    symbol = await pool.fetchval(
+        """select coalesce(price_symbol,t212_ticker) from public.instrument
+           where t212_ticker=$1""",
+        ticker,
+    )
+    if symbol is None:
+        raise HTTPException(404, "holding not found")
+    rows = await pool.fetch(
+        """select provider, state, latest_period, checked_at, reason
+           from public.coverage_status where dataset='corporate_actions' and entity_key=$1
+           order by checked_at desc""",
+        symbol,
+    )
+    entries = [{**dict(r), "owner_verified": r["provider"] == "owner_review"} for r in rows]
+    return {"symbol": symbol, "entries": entries}
 
 
 @router.post(

@@ -2957,7 +2957,12 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        get?: never;
+        /**
+         * Get Action Coverage
+         * @description Where corporate-action coverage stands for the holding's symbol: every provider's
+         *     recorded state, newest first, with the owner-verified row (if any) marked.
+         */
+        get: operations["get_action_coverage"];
         put?: never;
         /** Confirm Action Coverage */
         post: operations["confirm_action_coverage"];
@@ -4224,6 +4229,27 @@ export interface paths {
         };
         /** Get Signal Gate */
         get: operations["get_signal_gate"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/verification/signals/{signal_name}/history": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Signal History
+         * @description Every recorded audit of one signal, oldest first. Precision is evidence_correct over
+         *     sample_size and is null for an empty sample, never zero.
+         */
+        get: operations["get_signal_history"];
         put?: never;
         post?: never;
         delete?: never;
@@ -12683,6 +12709,11 @@ export interface components {
             calendar_basis?: string | null;
             /** Stale Sessions */
             stale_sessions?: number | null;
+            /**
+             * Recent Sessions
+             * @default []
+             */
+            recent_sessions: components["schemas"]["SessionState"][];
         };
         /** PriceGap */
         PriceGap: {
@@ -14323,6 +14354,19 @@ export interface components {
             vintages: number;
             /** Revised */
             revised: boolean;
+        };
+        /** SessionState */
+        SessionState: {
+            /**
+             * Session
+             * Format: date
+             */
+            session: string;
+            /**
+             * State
+             * @enum {string}
+             */
+            state: "observed" | "missing" | "disagrees";
         };
         /** SeverityDay */
         SeverityDay: {
@@ -20962,6 +21006,37 @@ export interface operations {
             };
         };
     };
+    get_action_coverage: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                ticker: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     confirm_action_coverage: {
         parameters: {
             query?: never;
@@ -23194,6 +23269,41 @@ export interface operations {
     get_signal_gate: {
         parameters: {
             query?: never;
+            header?: never;
+            path: {
+                signal_name: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_signal_history: {
+        parameters: {
+            query?: {
+                limit?: number;
+            };
             header?: never;
             path: {
                 signal_name: string;

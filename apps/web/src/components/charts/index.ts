@@ -27,6 +27,7 @@ export {
 export { Treemap, type TreemapItem, type TreemapProps } from "./treemap";
 export { VintageFan, type VintageFanPoint, type VintageFanProps } from "./vintage-fan";
 export { WaterfallChart, type WaterfallChartProps, type WaterfallStep } from "./waterfall";
+export { AuditTrail, type AuditTrailProps, type AuditTrailPoint } from "./audit-trail";
 export { RevisionLine, type RevisionLineProps, type RevisionLinePoint } from "./revision-line";
 export { Sankey,type SankeyProps, type SankeyLinkInput, type SankeyNodeInput } from "./sankey";
 export { BarChart, Histogram, type BarChartProps, type BarDatum, type HistogramProps } from "./bar-chart";

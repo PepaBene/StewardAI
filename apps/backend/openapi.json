@@ -8961,6 +8961,51 @@
       }
     },
     "/holdings/{ticker}/corporate-actions/coverage": {
+      "get": {
+        "tags": [
+          "holdings"
+        ],
+        "summary": "Get Action Coverage",
+        "description": "Where corporate-action coverage stands for the holding's symbol: every provider's\nrecorded state, newest first, with the owner-verified row (if any) marked.",
+        "operationId": "get_action_coverage",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "ticker",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9._-]{1,32}$",
+              "title": "Ticker"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
       "post": {
         "tags": [
           "holdings"
@@ -13001,6 +13046,69 @@
                   "type": "object",
                   "additionalProperties": true,
                   "title": "Response Get Signal Gate"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/verification/signals/{signal_name}/history": {
+      "get": {
+        "tags": [
+          "verification"
+        ],
+        "summary": "Get Signal History",
+        "description": "Every recorded audit of one signal, oldest first. Precision is evidence_correct over\nsample_size and is null for an empty sample, never zero.",
+        "operationId": "get_signal_history",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "signal_name",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[a-z][a-z0-9_]{0,63}$",
+              "title": "Signal Name"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 200,
+              "minimum": 1,
+              "default": 60,
+              "title": "Limit"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "title": "Response Get Signal History"
                 }
               }
             }
@@ -36528,6 +36636,14 @@
               }
             ],
             "title": "Stale Sessions"
+          },
+          "recent_sessions": {
+            "items": {
+              "$ref": "#/components/schemas/SessionState"
+            },
+            "type": "array",
+            "title": "Recent Sessions",
+            "default": []
           }
         },
         "type": "object",
@@ -40811,6 +40927,30 @@
           "revised"
         ],
         "title": "SeriesPoint"
+      },
+      "SessionState": {
+        "properties": {
+          "session": {
+            "type": "string",
+            "format": "date",
+            "title": "Session"
+          },
+          "state": {
+            "type": "string",
+            "enum": [
+              "observed",
+              "missing",
+              "disagrees"
+            ],
+            "title": "State"
+          }
+        },
+        "type": "object",
+        "required": [
+          "session",
+          "state"
+        ],
+        "title": "SessionState"
       },
       "SeverityDay": {
         "properties": {
