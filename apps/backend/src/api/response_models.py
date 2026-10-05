@@ -298,6 +298,12 @@ class LookThroughAsOfResponse(_Model):
     report: LookThroughReport
 
 
+class PinnedSnapshotsResponse(_Model):
+    """`POST /funds/snapshots/pin`: the ids of the snapshots now protected from pruning."""
+
+    pinned: list[int]
+
+
 class FactsheetRow(_Model):
     """A `fund_factsheet` row (minus the raw `evidence` blob) with the evidence-derived
     `field_names_verified`, `field_provenance` and `extraction_warnings`. Weights and charges

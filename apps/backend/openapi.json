@@ -11573,7 +11573,9 @@
             "description": "Successful Response",
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "$ref": "#/components/schemas/PinnedSnapshotsResponse"
+                }
               }
             }
           },
@@ -37670,6 +37672,23 @@
           "ref_id"
         ],
         "title": "PinInput"
+      },
+      "PinnedSnapshotsResponse": {
+        "properties": {
+          "pinned": {
+            "items": {
+              "type": "integer"
+            },
+            "type": "array",
+            "title": "Pinned"
+          }
+        },
+        "additionalProperties": true,
+        "type": "object",
+        "required": [
+          "pinned"
+        ],
+        "title": "PinnedSnapshotsResponse"
       },
       "PlausibilityCheck": {
         "properties": {

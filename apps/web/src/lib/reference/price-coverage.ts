@@ -76,7 +76,15 @@ export function stripLayout(cells: readonly SessionCell[]): StripLayout {
 // ---------------------------------------------------------------- exchange sessions
 
 export type SpecialDay = { date: string; label: string };
-export type ExpectedInfo = { basis: string | null; basisLabel: string; count: number | null; special: SpecialDay[] };
+export type ExpectedInfo = {
+  basis: string | null;
+  basisLabel: string;
+  count: number | null;
+  /** How many sessions the owner confirmed in the window (the endpoint gives a count only). */
+  confirmedDays: number | null;
+  /** Days to mark as special. The endpoint does not say which days were confirmed, so this stays empty. */
+  special: SpecialDay[];
+};
 
 export function basisLabel(basis: string | null): string {
   if (!basis) return "Calendar basis not stated";
@@ -85,14 +93,10 @@ export function basisLabel(basis: string | null): string {
   return basis.replace(/_/g, " ");
 }
 
-/** `confirmed_days` is the list of dates the owner confirmed as special days (typed `string[]`). */
+/** `confirmed_days` is a count of confirmed sessions, not a list of dates. */
 export function parseExpected(raw: ExpectedSessionsResponse): ExpectedInfo {
   const basis = raw.basis || null;
-  const special: SpecialDay[] = raw.confirmed_days
-    .filter((d) => ISO_DATE.test(d))
-    .map((date) => ({ date, label: "Confirmed special day" }))
-    .sort((a, b) => a.date.localeCompare(b.date));
-  return { basis, basisLabel: basisLabel(basis), count: raw.count, special };
+  return { basis, basisLabel: basisLabel(basis), count: raw.count, confirmedDays: raw.confirmed_days, special: [] };
 }
 
 // ---------------------------------------------------------------- corporate-action coverage

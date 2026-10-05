@@ -17,6 +17,7 @@ from api.response_models import (
     CharacteristicsAuditRow,
     FactsheetRow,
     LookThroughAsOfResponse,
+    PinnedSnapshotsResponse,
 )
 from steward.config.jobs import JobsConfig
 from steward.config.store import load_active
@@ -188,15 +189,15 @@ class PinInput(BaseModel):
     )
 
 
-@router.post("/funds/snapshots/pin", tags=["funds"], response_model=None)
-async def pin_snapshots(pool: Pool, _owner: Owner, body: PinInput) -> dict[str, list[int]]:
+@router.post("/funds/snapshots/pin", tags=["funds"], response_model=PinnedSnapshotsResponse)
+async def pin_snapshots(pool: Pool, _owner: Owner, body: PinInput) -> PinnedSnapshotsResponse:
     """Protect the holdings snapshots a saved report/decision rests on from retention pruning."""
     if (body.snapshot_id is None) == (body.as_of is None):
         raise HTTPException(422, "give exactly one of snapshot_id or as_of")
     if body.snapshot_id is not None:
         if not await pin_snapshot(pool, body.snapshot_id, body.ref_kind, body.ref_id, body.reason):
             raise HTTPException(404, "snapshot not found")
-        return {"pinned": [body.snapshot_id]}
+        return PinnedSnapshotsResponse(pinned=[body.snapshot_id])
     assert body.as_of is not None
     stored = await load_active(pool, "jobs", JobsConfig)
     config = stored.body if stored else JobsConfig()
@@ -208,7 +209,7 @@ async def pin_snapshots(pool: Pool, _owner: Owner, body: PinInput) -> dict[str, 
         body.ref_id,
         body.reason,
     )
-    return {"pinned": pinned}
+    return PinnedSnapshotsResponse(pinned=list(pinned))
 
 
 @router.get(

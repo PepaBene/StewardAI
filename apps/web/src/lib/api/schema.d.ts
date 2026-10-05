@@ -13029,6 +13029,13 @@ export interface components {
              */
             as_of?: string | null;
         };
+        /** PinnedSnapshotsResponse */
+        PinnedSnapshotsResponse: {
+            /** Pinned */
+            pinned: number[];
+        } & {
+            [key: string]: unknown;
+        };
         /** PlausibilityCheck */
         PlausibilityCheck: {
             /**
@@ -23566,7 +23573,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["PinnedSnapshotsResponse"];
                 };
             };
             /** @description Validation Error */

@@ -56,12 +56,13 @@ describe("exchange sessions", () => {
     expect(basisLabel(null)).toBe("Calendar basis not stated");
   });
 
-  it("reads the typed confirmed special days, sorted, skipping malformed dates", () => {
+  it("reads the session count and the number of confirmed days, and invents no special days", () => {
     const info = parseExpected({
-      mic: "XNYS", start: "2026-08-01", end: "2026-09-30", basis: "confirmed_sessions", count: 20, confirmed_days: ["2026-09-02", "2026-08-31", "bad"], days: [],
+      mic: "XNYS", start: "2026-08-01", end: "2026-09-30", basis: "confirmed_sessions", count: 20, confirmed_days: 2, days: [],
     });
     expect(info.count).toBe(20);
-    expect(info.special.map((s) => s.date)).toEqual(["2026-08-31", "2026-09-02"]);
+    expect(info.confirmedDays).toBe(2);
+    expect(info.special).toEqual([]);
   });
 });
 

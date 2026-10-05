@@ -64,7 +64,7 @@ export function RelationshipsView() {
     return m;
   }, [q, net]);
 
-  const forTicker = <T extends { ticker: string }>(rows: T[]) => (ticker ? rows.filter((r) => r.ticker === ticker) : rows);
+  const forTicker = <T extends { ticker: string | null }>(rows: T[]) => (ticker ? rows.filter((r) => r.ticker === ticker) : rows);
   const queueDisclosures = (q?.disclosures ?? []).map((d) => ({ ...d, status: byId.get(d.id)?.status ?? d.status }));
   const reloadAll = () => {
     queue.reload();

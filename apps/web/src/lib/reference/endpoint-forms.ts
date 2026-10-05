@@ -87,7 +87,8 @@ export type PeerEntry = {
   history: { status: string; reason: string | null; at: string | null }[];
 };
 
-export function parsePeerSet(raw: PeerSetResponse): PeerEntry[] {
+export function parsePeerSet(raw: PeerSetResponse | null): PeerEntry[] {
+  if (!raw) return [];
   return raw.peers.map((p) => {
     const status = p.status === "confirmed" || p.status === "rejected" ? p.status : "suggested";
     // `status_history` is a free-form list on the wire, so it is still read defensively.
@@ -321,7 +322,7 @@ export function parseReturns(raw: HoldingReturnsResponse): NonNullable<ReturnsVi
     coverage: r.coverage,
     expected: r.expected_sessions,
     observed: r.observed_sessions,
-    missingActions: Object.values(r.missing_actions).reduce((n, list) => n + (Array.isArray(list) ? list.length : 0), 0),
+    missingActions: Object.values(r.missing_actions).reduce<number>((n, list) => n + (Array.isArray(list) ? list.length : 0), 0),
   };
 }
 
