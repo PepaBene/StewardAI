@@ -1,4 +1,6 @@
 # StewardAI backend image: the same image runs the API and the worker (see deploy/compose.yaml).
+# Its default command (start.sh) runs both in one container, for hosts that bill per service
+# (Railway). deploy/compose.yaml overrides the command to run them as separate services.
 FROM python:3.12-slim
 
 COPY --from=ghcr.io/astral-sh/uv:0.9 /uv /uvx /usr/local/bin/
@@ -24,4 +26,4 @@ RUN useradd --system --uid 10001 steward
 USER steward
 
 EXPOSE 8000
-CMD ["uvicorn", "api.main:app", "--host", "0.0.0.0", "--port", "8000", "--proxy-headers"]
+CMD ["/app/start.sh"]
