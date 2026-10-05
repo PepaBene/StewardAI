@@ -1,6 +1,7 @@
 "use client";
 
 import { TriangleAlertIcon } from "lucide-react";
+import Link from "next/link";
 import { useMemo, useState } from "react";
 
 import { HBar } from "@/components/charts";
@@ -175,7 +176,15 @@ function SensitivityPanel({ data }: { data: PortfolioDataContext }) {
   const rows = useMemo(() => sensitivityRows(data.macro_sensitivities), [data.macro_sensitivities]);
   return (
     <Blueprint aria-labelledby="sens-heading" className="flex min-w-0 flex-col gap-3 px-[22px] py-5">
-      <PanelHeading kicker="Macro sensitivity" title={<span id="sens-heading">How mapped economies moved</span>} />
+      <PanelHeading
+        kicker="Macro sensitivity"
+        title={<span id="sens-heading">How mapped economies moved</span>}
+        action={
+          <Link href="/macro" className="text-xs text-accent-ink hover:underline">
+            Macro series and revisions
+          </Link>
+        }
+      />
       {rows.length === 0 ? (
         <p className="max-w-[68ch] text-sm text-text-muted">
           No macro series is linked to a mapped exposure, so no change is attributed to the portfolio. Series appear once a

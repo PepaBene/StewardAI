@@ -1,6 +1,8 @@
 "use client";
 
 import { LoaderCircleIcon } from "lucide-react";
+import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import { useMemo, useState } from "react";
 
 import { AlertMessage } from "@/components/alert-message";
@@ -29,7 +31,7 @@ const ORDERS: readonly { id: SeriesOrder; label: string }[] = [
  * history that was not recorded.
  */
 export function MacroView() {
-  const [geography, setGeography] = useState("");
+  const [geography, setGeography] = useState(useSearchParams().get("geography") ?? "");
   const [order, setOrder] = useState<SeriesOrder>("recent");
   const [sharedScale, setSharedScale] = useState(false);
   const geo = geography.trim().toUpperCase();
@@ -105,7 +107,15 @@ export function MacroView() {
         {state.kind === "error" ? <AlertMessage title={`Could not load series: ${state.title}`}>{state.detail}</AlertMessage> : null}
         {data && views.length === 0 ? (
           <EmptyState title="No macro observations stored">
-            {geo ? `Nothing is stored for ${geo}. Clear the country code to see every series.` : "Run the public-data job from the Data sources page to fetch country series."}
+            {geo ? `Nothing is stored for ${geo}. Clear the country code to see every series.` : "Enable a source in Config: Jobs and run the public-data job to fetch country series."}{" "}
+            <Link href="/data-sources" className="text-accent-ink hover:underline">
+              Open Data sources
+            </Link>
+            {" or "}
+            <Link href="/config/jobs" className="text-accent-ink hover:underline">
+              Config: Jobs
+            </Link>
+            .
           </EmptyState>
         ) : null}
 

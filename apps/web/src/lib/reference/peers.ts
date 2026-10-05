@@ -110,6 +110,13 @@ export function trackPositions(row: PeerRow): { holding: number | null; mean: nu
   };
 }
 
+/** The scale `trackPositions` draws against: lowest and highest value on the track (zero included). */
+export function trackRange(row: PeerRow): { lo: number; hi: number } | null {
+  const vals = [row.holding, row.peerMean].filter((v): v is number => v !== null);
+  if (vals.length === 0) return null;
+  return { lo: Math.min(0, ...vals), hi: Math.max(0, ...vals) };
+}
+
 export function formatPeerValue(value: number | null, kind: PeerMetricKind): string {
   if (value === null) return "Not computable";
   if (kind === "multiple") return `${value.toFixed(2)}×`;

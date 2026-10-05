@@ -29,6 +29,7 @@ export const CLUSTERS: readonly Cluster[] = [
       { href: "/holdings", label: "Holdings" },
       { href: "/transactions", label: "Transactions" },
       { href: "/watchlist", label: "Watchlist" },
+      { href: "/funds", label: "Funds" },
     ],
   },
   {
@@ -59,6 +60,7 @@ export const CLUSTERS: readonly Cluster[] = [
       { href: "/reviews", label: "Reviews" },
       { href: "/activity", label: "Activity" },
       { href: "/data-sources", label: "Data sources" },
+      { href: "/verification", label: "Verification" },
     ],
     extra: ["/jobs", "/status"],
   },

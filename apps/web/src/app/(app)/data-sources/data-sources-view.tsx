@@ -5,11 +5,13 @@ import { PageHeader } from "@/components/page-header";
 import { AccessPanel } from "./access-panel";
 import { BudgetPanel } from "./budget-panel";
 import { CoverageMatrixPanel } from "./coverage-matrix-panel";
+import { UsagePanel } from "./usage-panel";
 
 const SECTIONS = [
   { id: "matrix", label: "What each source covers" },
   { id: "budget", label: "Free quota used" },
   { id: "access", label: "Endpoint access" },
+  { id: "usage", label: "Usage over time" },
 ] as const;
 
 /**
@@ -39,6 +41,7 @@ export function DataSourcesView() {
       <CoverageMatrixPanel />
       <BudgetPanel />
       <AccessPanel />
+      <UsagePanel />
     </div>
   );
 }

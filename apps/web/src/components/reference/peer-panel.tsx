@@ -6,7 +6,7 @@ import { Blueprint, PanelHeading } from "@/components/ui/blueprint";
 import { getBrowserApiClient } from "@/lib/api/client";
 import { formatDate } from "@/lib/format";
 import { useApiResource } from "@/lib/hooks/use-api-resource";
-import { formatPeerValue, parsePeerMetrics, peerDelta, trackPositions, type PeerRow } from "@/lib/reference/peers";
+import { formatPeerValue, parsePeerMetrics, peerDelta, trackPositions, trackRange, type PeerRow } from "@/lib/reference/peers";
 
 /** GET /holdings/{ticker}/peer-metrics: the holding against its owner-confirmed peers. */
 export function PeerPanel({ ticker }: { ticker: string }) {
@@ -54,7 +54,7 @@ export function PeerPanel({ ticker }: { ticker: string }) {
                   <th scope="col" className="px-3 py-2 text-left font-medium">Metric</th>
                   <th scope="col" className="px-3 py-2 text-right font-medium">Holding</th>
                   <th scope="col" className="px-3 py-2 text-right font-medium">Peer mean</th>
-                  <th scope="col" className="w-40 px-3 py-2 text-left font-medium">Position</th>
+                  <th scope="col" className="w-40 px-3 py-2 text-left font-medium">Position (own scale, min to max)</th>
                   <th scope="col" className="px-3 py-2 text-right font-medium">Peers used</th>
                 </tr>
               </thead>
@@ -88,6 +88,7 @@ export function PeerPanel({ ticker }: { ticker: string }) {
 
 function PeerTableRow({ row, confirmed }: { row: PeerRow; confirmed: number }) {
   const pos = trackPositions(row);
+  const range = trackRange(row);
   const delta = peerDelta(row);
   const unavailable = row.holding === null ? (row.holdingReason ?? "Not computable") : null;
   return (
@@ -127,6 +128,12 @@ function PeerTableRow({ row, confirmed }: { row: PeerRow; confirmed: number }) {
         ) : (
           <span className="text-xs text-text-muted">No values to plot</span>
         )}
+        {range ? (
+          <span className="num mt-0.5 flex justify-between text-[11px] text-text-faint" title="Scale of this row: lowest to highest value shown, zero included">
+            <span>{formatPeerValue(range.lo, row.kind)}</span>
+            <span>{formatPeerValue(range.hi, row.kind)}</span>
+          </span>
+        ) : null}
       </td>
       <td className="num px-3 py-2 text-right">
         {row.covered} of {confirmed}

@@ -118,7 +118,22 @@ export function ScreensView() {
               </option>
             ))}
           </select>
-          <span className="block text-xs text-text-muted">{UNIVERSES.find((u) => u.id === universe)?.hint}</span>
+          <span className="block text-xs text-text-muted">
+            {UNIVERSES.find((u) => u.id === universe)?.hint}{" "}
+            {universe === "watchlist" ? (
+              <Link href="/watchlist" className="text-accent-ink hover:underline">
+                Edit the watchlist
+              </Link>
+            ) : universe === "holdings" ? (
+              <Link href="/holdings" className="text-accent-ink hover:underline">
+                See your holdings
+              </Link>
+            ) : (
+              <Link href="/data-sources" className="text-accent-ink hover:underline">
+                See which issuers have data
+              </Link>
+            )}
+          </span>
         </label>
 
         <ul className="space-y-2" aria-label="Filters">

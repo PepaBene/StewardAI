@@ -2,7 +2,7 @@
 
 import { useCallback, useMemo, useState } from "react";
 
-import { VintageFan } from "@/components/charts";
+import { BarChart, SrTable, VintageFan } from "@/components/charts";
 import { Blueprint, PanelHeading } from "@/components/ui/blueprint";
 import { getBrowserApiClient } from "@/lib/api/client";
 import { formatNumber, formatPct } from "@/lib/charts/format";
@@ -18,6 +18,7 @@ import {
   type ConsensusSeries,
   type OtherEstimate,
 } from "@/lib/reference/forward";
+import { parseSurprise } from "@/lib/reference/holding-charts";
 import { cn } from "@/lib/utils";
 
 const fmt = (v: number | null) => (v === null ? "Not published" : formatNumber(v, 2));
@@ -90,8 +91,90 @@ export function EstimatesPanel({ ticker }: { ticker: string }) {
         </ul>
       ) : null}
 
+      {view && view.consensus.length > 0 ? <SurpriseCharts ticker={ticker} series={view.consensus} /> : null}
+
       {view && view.others.length > 0 ? <OtherEstimates rows={view.others} /> : null}
     </Blueprint>
+  );
+}
+
+const SURPRISE_METRICS = new Set(["revenue", "eps_diluted", "net_income", "operating_income", "capex"]);
+const FISCAL_PERIOD = /^FY\d{4}(Q[1-4]|H[12]|M9)?$/;
+
+/**
+ * GET /holdings/{ticker}/actual-vs-consensus, one call per consensus metric and fiscal period:
+ * the reported figure against the last consensus known before the report, as a percentage of
+ * the absolute consensus. Actuals and consensus are never blended: a period with no consensus
+ * known before its report is a gap with the reason, not a zero.
+ */
+function SurpriseCharts({ ticker, series }: { ticker: string; series: ConsensusSeries[] }) {
+  const pairs = useMemo(() => {
+    const seen = new Map<string, { metric: string; period: string }>();
+    for (const s of series) {
+      if (SURPRISE_METRICS.has(s.metric) && FISCAL_PERIOD.test(s.fiscalPeriod)) {
+        seen.set(`${s.metric}|${s.fiscalPeriod}`, { metric: s.metric, period: s.fiscalPeriod });
+      }
+    }
+    return [...seen.values()].sort((a, b) => a.period.localeCompare(b.period)).slice(-24);
+  }, [series]);
+  const pairKey = pairs.map((p) => `${p.metric}|${p.period}`).join(",");
+  const fetcher = useCallback(async () => {
+    const client = getBrowserApiClient();
+    const rows = await Promise.all(
+      pairs.map(async (p) => {
+        try {
+          const r = await client.GET("/holdings/{ticker}/actual-vs-consensus", {
+            params: { path: { ticker }, query: { metric: p.metric, fiscal_period: p.period } },
+          });
+          return parseSurprise(p.metric, p.period, r.response.ok ? r.data : null);
+        } catch {
+          return parseSurprise(p.metric, p.period, null);
+        }
+      }),
+    );
+    return { data: rows, response: new Response(null, { status: 200 }) };
+    // pairKey is the stable identity of `pairs`.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ticker, pairKey]);
+  const { state } = useApiResource(fetcher);
+  const rows = state.kind === "ok" ? state.data : state.kind === "error" ? state.previous : null;
+  const metrics = [...new Set((rows ?? []).map((r) => r.metric))];
+  if (!rows || pairs.length === 0) return null;
+
+  return (
+    <div className="space-y-2">
+      <h3 className="text-sm font-semibold">Surprise against consensus</h3>
+      <div className="grid gap-4 md:grid-cols-2">
+        {metrics.map((metric) => {
+          const mine = rows.filter((r) => r.metric === metric);
+          const missing = mine.filter((r) => r.fraction === null);
+          return (
+            <div key={metric} className="space-y-1">
+              <BarChart
+                label={`${metricLabel(metric)} surprise by fiscal period, percent of consensus`}
+                data={mine.map((r) => ({ label: r.period.replace("FY", ""), value: r.fraction === null ? null : r.fraction * 100 }))}
+                formatValue={(v) => `${formatNumber(v, 1)}%`}
+                height={140}
+              />
+              <p className="text-xs text-text-muted">
+                {metricLabel(metric)}: reported minus consensus, as % of the absolute consensus.
+                {missing.length > 0 ? ` No bar: ${missing.map((r) => `${r.period} (${r.reason ?? "not available"})`).join("; ")}.` : ""}
+              </p>
+              <SrTable
+                caption={`${metricLabel(metric)} reported figure against consensus`}
+                columns={["Period", "Reported", "Consensus", "Surprise"]}
+                rows={mine.map((r) => [
+                  r.period,
+                  r.actual === null ? "Not published" : fmt(r.actual),
+                  r.consensus === null ? "Not published" : fmt(r.consensus),
+                  r.fraction === null ? (r.reason ?? "Not available") : `${formatNumber(r.fraction * 100, 1)}%`,
+                ])}
+              />
+            </div>
+          );
+        })}
+      </div>
+    </div>
   );
 }
 

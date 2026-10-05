@@ -1,7 +1,7 @@
 import { CircleAlertIcon } from "lucide-react";
 import Link from "next/link";
 
-import { ChartEmpty, Donut } from "@/components/charts";
+import { ChartEmpty, HBar } from "@/components/charts";
 import { SeverityTimeline } from "@/components/news/severity-timeline";
 import { Blueprint, PanelHeading } from "@/components/ui/blueprint";
 import type { components } from "@/lib/api/schema";
@@ -61,14 +61,22 @@ export function NewsSummary({
             return segments.length === 0 ? (
               <ChartEmpty label="No classified stories in this window" minHeight={130} />
             ) : (
-              <Donut
-                segments={segments}
-                size={128}
-                centerValue={String(total)}
-                centerLabel="classified"
-                label="Stories by event type"
-                formatShare={(f) => String(Math.round(f * total))}
-              />
+              <div className="flex flex-col gap-2">
+                <ul className="m-0 flex list-none flex-col gap-2 p-0" aria-label="Stories by event type">
+                  {segments.map((s) => (
+                    <li key={s.label} className="grid grid-cols-[minmax(0,8.5rem)_1fr_4.5rem] items-center gap-2 text-xs">
+                      <span className="truncate" title={s.label}>
+                        {s.label}
+                      </span>
+                      <HBar value={s.value} max={segments[0].value} label={`${s.label} stories`} formatValue={(v) => String(v)} />
+                      <span className="num text-right text-text-muted">
+                        {s.value} · {Math.round((s.value / total) * 100)}%
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+                <p className="text-xs text-text-muted">Share of the {total} classified stories in this window.</p>
+              </div>
             );
           })()
         ) : (

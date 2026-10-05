@@ -26,6 +26,7 @@ import { FeedbackControl } from "@/components/feedback/feedback-control";
 import { HoldingNews, useHoldingNews } from "@/components/news/holding-news";
 import { IdentitySection, useHoldingIdentity } from "@/components/reference/identity-section";
 import { CashDebtPanel } from "@/components/reference/cash-debt-panel";
+import { ConcentrationPanel, PatentOverlapPanel, PriceDataPanel, StakesPanel } from "@/components/reference/holding-data-panels";
 import { EstimatesPanel } from "@/components/reference/estimates-panel";
 import { FinancialHistoryPanel } from "@/components/reference/financial-history-panel";
 import { InsiderTradesSection } from "@/components/reference/insider-trades-section";
@@ -295,6 +296,10 @@ export function HoldingContent({
 
       <PatentsPanel ticker={ticker} />
 
+      <PatentOverlapPanel ticker={ticker} />
+
+      <ConcentrationPanel ticker={ticker} />
+
       <MacroContextPanel ticker={ticker} />
 
       <TradePanel ticker={ticker} />
@@ -361,6 +366,10 @@ export function HoldingContent({
       <PriceRiskSection ticker={ticker} currency={detail.position?.instrument_currency} />
 
       <OwnershipSection resource={ownership} />
+
+      <StakesPanel ticker={ticker} />
+
+      <PriceDataPanel ticker={ticker} />
 
       <InsiderTradesSection ticker={ticker} />
 

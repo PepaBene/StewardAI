@@ -1,11 +1,11 @@
-import { CATEGORICAL_BG, Donut } from "@/components/charts";
+import { HBar } from "@/components/charts";
 import { AllocationBars, type AllocationItem } from "@/components/portfolio/allocation-bars";
 import { Blueprint, PanelHeading } from "@/components/ui/blueprint";
 import { formatMoney, formatPercent } from "@/lib/format";
 import { formatCompactMoney } from "@/lib/portfolio/money";
 import { cn } from "@/lib/utils";
 
-const HEAD = 6;
+const HEAD = 9;
 
 type Slice = { key: string; label: string; title: string; value: number };
 
@@ -47,30 +47,23 @@ export function AllocationPanel({
   return (
     <Blueprint className="flex min-w-0 flex-col gap-4 px-6 py-5.5" aria-labelledby="allocation-heading">
       <PanelHeading kicker="Allocation" title={<span id="allocation-heading">By holding</span>} />
-      <div className="flex flex-col items-center gap-5 sm:flex-row">
-        <Donut
-          segments={parts.map((p) => ({ label: p.label, value: p.value }))}
-          centerValue={positions}
-          centerLabel={positions === 1 ? "position" : "positions"}
-          legend={false}
-          label="Allocation by holding"
-          className="shrink-0"
-        />
-        <ul className="flex w-full min-w-0 flex-1 flex-col gap-1.5 text-xs">
-          {parts.map((p, i) => (
-            <li
-              key={p.key}
-              className="grid grid-cols-[10px_minmax(0,1fr)_auto_auto] items-center gap-2"
-              title={`${p.title}: ${formatMoney(p.value, currency, { decimals: 0 })}`}
-            >
-              <span aria-hidden="true" className={cn("size-2.5", CATEGORICAL_BG[i])} />
-              <span className={cn("truncate text-text", p.key !== "CASH" && !p.key.startsWith("__") && "font-mono text-[11px]")}>{p.label}</span>
-              <span className="num text-text-faint">{formatCompactMoney(p.value, currency)}</span>
-              <span className="num w-11 text-right text-text-muted">{formatPercent(total > 0 ? p.value / total : null)}</span>
-            </li>
-          ))}
-        </ul>
-      </div>
+      <p className="text-xs text-text-muted">
+        {positions} {positions === 1 ? "position" : "positions"}, largest first. Bars show each share of the portfolio total.
+      </p>
+      <ul className="flex w-full min-w-0 flex-col gap-1.5 text-xs" aria-label="Allocation by holding">
+        {parts.map((p) => (
+          <li
+            key={p.key}
+            className="grid grid-cols-[minmax(0,5.5rem)_1fr_auto_2.75rem] items-center gap-2"
+            title={`${p.title}: ${formatMoney(p.value, currency, { decimals: 0 })}`}
+          >
+            <span className={cn("truncate text-text", p.key !== "CASH" && !p.key.startsWith("__") && "font-mono text-[11px]")}>{p.label}</span>
+            <HBar value={total > 0 ? p.value / total : null} label={`${p.label} share of portfolio`} formatValue={(v) => formatPercent(v)} />
+            <span className="num text-text-faint">{formatCompactMoney(p.value, currency)}</span>
+            <span className="num text-right text-text-muted">{formatPercent(total > 0 ? p.value / total : null)}</span>
+          </li>
+        ))}
+      </ul>
       <p className="text-xs text-text-muted">
         In {currency} at {fxSource === "cnb" ? "ČNB" : "ECB"} reference rates.
       </p>
