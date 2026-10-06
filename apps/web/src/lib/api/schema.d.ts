@@ -8090,6 +8090,12 @@ export interface components {
              */
             extract_inputs: boolean;
             /**
+             * Extract Dependencies
+             * @description Read named customers and suppliers from the annual report; the AI approves them and the owner can overturn.
+             * @default true
+             */
+            extract_dependencies: boolean;
+            /**
              * Map Products
              * @description Map reported product lines to HS trade codes (always marked estimated).
              * @default true
@@ -14093,7 +14099,7 @@ export interface components {
              * Key
              * @enum {string}
              */
-            key: "earnings_extraction" | "earnings_locate" | "earnings_calendar" | "news_classification" | "news_corroboration" | "news_escalation" | "news_digest" | "research_writer" | "monthly_review" | "chat_assistant" | "claim_verifier" | "ir_discovery_search" | "ir_discovery_approve" | "web_gap_search" | "web_fact_approve" | "web_domain_tier" | "exposure_inputs" | "exposure_hs_mapping" | "listing_approval" | "peer_approval";
+            key: "earnings_extraction" | "earnings_locate" | "earnings_calendar" | "news_classification" | "news_corroboration" | "news_escalation" | "news_digest" | "research_writer" | "monthly_review" | "chat_assistant" | "claim_verifier" | "ir_discovery_search" | "ir_discovery_approve" | "web_gap_search" | "web_fact_approve" | "web_domain_tier" | "exposure_inputs" | "exposure_hs_mapping" | "dependency_extract" | "dependency_approve" | "listing_approval" | "peer_approval";
             /** Title */
             title: string;
             /** Description */

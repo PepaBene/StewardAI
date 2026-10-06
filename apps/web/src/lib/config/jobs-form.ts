@@ -364,6 +364,7 @@ export const DEFAULT_JOBS: JobsConfig = {
     effort: null,
     filings_per_run: 6,
     extract_inputs: true,
+    extract_dependencies: true,
     map_products: true,
   },
   gap_research_settings: {
@@ -669,6 +670,7 @@ export const SETTINGS: { [S in SettingsKey]: { title: string; description: strin
       { key: "effort", label: "Effort", kind: "effort-optional", hint: EFFORT_OPTIONAL_HINT },
       { key: "filings_per_run", label: "Reports per run", kind: "int", min: 1, max: 40, hint: "Cost guard. Each report is read once." },
       { key: "extract_inputs", label: "Read currency and commodity inputs", kind: "bool" },
+      { key: "extract_dependencies", label: "Read customers and suppliers", kind: "bool", hint: "The AI approves each one; you can overturn it on the AI decisions page." },
       { key: "map_products", label: "Map product lines to trade codes", kind: "bool", hint: "Stored as an estimate." },
     ],
   },

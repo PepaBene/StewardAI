@@ -257,6 +257,11 @@ class ExposureBuildSettings(ConfigModel):
     extract_inputs: bool = Field(
         default=True, description="Read currency and commodity inputs from the annual report."
     )
+    extract_dependencies: bool = Field(
+        default=True,
+        description="Read named customers and suppliers from the annual report; the AI approves "
+        "them and the owner can overturn.",
+    )
     map_products: bool = Field(
         default=True,
         description="Map reported product lines to HS trade codes (always marked estimated).",

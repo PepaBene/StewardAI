@@ -38,6 +38,8 @@ PromptKey = Literal[
     "web_domain_tier",
     "exposure_inputs",
     "exposure_hs_mapping",
+    "dependency_extract",
+    "dependency_approve",
     "listing_approval",
     "peer_approval",
 ]
@@ -144,6 +146,16 @@ PROMPTS: dict[PromptKey, PromptInfo] = {
         "Product lines to trade codes",
         "Maps reported product lines to HS headings (always an estimate).",
         "steward.exposures.hs:HS_SYSTEM",
+    ),
+    "dependency_extract": PromptInfo(
+        "Customers and suppliers",
+        "Reads an annual report for named customers, suppliers and the shares it prints.",
+        "steward.graph.dependencies:DEPENDENCY_SYSTEM",
+    ),
+    "dependency_approve": PromptInfo(
+        "Customer and supplier approval",
+        "Judges whether a quoted passage supports the claimed customer or supplier.",
+        "steward.graph.dependencies:APPROVE_SYSTEM",
     ),
     "listing_approval": PromptInfo(
         "Listing approval",

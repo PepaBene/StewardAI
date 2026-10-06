@@ -21,6 +21,14 @@ from steward.exposures.inputs import (
     extract_inputs,
     merge_exposures,
 )
+from steward.graph.dependencies import (
+    APPROVE_SYSTEM,
+    DEPENDENCY_SYSTEM,
+    check_findings,
+    extract_dependencies,
+    judge_dependencies,
+    store_and_approve,
+)
 from steward.jobs.runner import JobContext
 from steward.sources.edgar import EdgarClient, EdgarError
 
@@ -177,6 +185,71 @@ async def run_inputs(
             "exposure",
             filing.source_url,
             {**info, "rejected": accepted.rejected[:20]},
+        )
+        done += 1
+    return results
+
+
+async def run_dependencies(
+    ctx: JobContext,
+    client: anthropic.AsyncAnthropic,
+    cfg: ExposureBuildSettings,
+    edgar: EdgarClient,
+    holdings: list[asyncpg.Record],
+    profiles: HoldingProfilesConfig,
+    usage: Usage,
+    prompts: PromptsConfig,
+) -> dict[str, Any]:
+    """Customer and supplier disclosures from each holding's newest annual report: stored as
+    suggested, confirmed when the reviewer approves, never over an owner decision."""
+    results: dict[str, Any] = {}
+    done = 0
+    for row in holdings:
+        if done >= cfg.filings_per_run:
+            break
+        ticker = row["ticker"]
+        profile = profiles.for_ticker(ticker)
+        try:
+            annual = await latest_annual_filing(ctx.pool, edgar, ticker, profile)
+            if annual is None or await _extracted(ctx.pool, ticker, annual.accession, "dependency"):
+                continue
+            filing = await filing_text(edgar, ticker, annual)
+        except EdgarError as exc:
+            results[ticker] = f"filing not readable: {str(exc)[:80]}"
+            continue
+        if filing is None:
+            results[ticker] = "annual report text too short to read"
+            continue
+        name = await ctx.pool.fetchval(
+            "select name from public.instrument where t212_ticker = $1", ticker
+        )
+        found = await extract_dependencies(
+            client,
+            cfg.model,
+            cfg.effort,
+            filing,
+            usage,
+            prompts.text("dependency_extract", DEPENDENCY_SYSTEM),
+        )
+        checked = check_findings(found, filing, (str(name),) if name else ())
+        verdicts = await judge_dependencies(
+            client,
+            cfg.model,
+            cfg.effort,
+            filing,
+            checked.kept,
+            usage,
+            prompts.text("dependency_approve", APPROVE_SYSTEM),
+        )
+        counts = await store_and_approve(ctx.pool, filing, checked.kept, verdicts, cfg.model)
+        results[ticker] = {**counts, "rejected": len(checked.rejected)}
+        await _record(
+            ctx.pool,
+            ticker,
+            filing.accession,
+            "dependency",
+            filing.source_url,
+            {**counts, "rejected": checked.rejected[:20]},
         )
         done += 1
     return results

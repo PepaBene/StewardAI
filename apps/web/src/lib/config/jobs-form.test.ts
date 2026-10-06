@@ -80,7 +80,7 @@ const FULL: JobsConfig = {
   },
   earnings_calendar_settings: { model: "claude-haiku-4-5", effort: null, lookahead_days: 90, refresh_within_days: 21 },
   ai_approval: { model: "claude-sonnet-5", effort: null, listings: true, peers: true, refresh_peers: true, peer_refresh_days: 30, peer_refresh_per_run: 8, min_confidence: 0.8, max_confirmed_peers: 8, max_calls_per_run: 40 },
-  exposure_build_settings: { model: "claude-sonnet-5", effort: null, filings_per_run: 6, extract_inputs: true, map_products: true },
+  exposure_build_settings: { model: "claude-sonnet-5", effort: null, filings_per_run: 6, extract_inputs: true, extract_dependencies: true, map_products: true },
   gap_research_settings: { model: "claude-sonnet-5", effort: null, slots: ["next_report_date"], max_searches: 3, slots_per_run: 8, browser_fallback: false, cooldown_days: 30, min_confidence: 0.8, t1_domains: ["sec.gov"], t2_domains: ["reuters.com"], t3_domains: ["wikipedia.org"], denied_domains: ["reddit.com"] },
   ir_discovery_settings: { model: "claude-sonnet-5", effort: null, max_searches: 4, holdings_per_run: 6, browser_fallback: false, cooldown_days: 30, min_confidence: 0.8, denied_domains: ["wikipedia.org"] },
   news: {

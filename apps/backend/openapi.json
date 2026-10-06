@@ -23255,6 +23255,12 @@
             "description": "Read currency and commodity inputs from the annual report.",
             "default": true
           },
+          "extract_dependencies": {
+            "type": "boolean",
+            "title": "Extract Dependencies",
+            "description": "Read named customers and suppliers from the annual report; the AI approves them and the owner can overturn.",
+            "default": true
+          },
           "map_products": {
             "type": "boolean",
             "title": "Map Products",
@@ -40383,6 +40389,8 @@
               "web_domain_tier",
               "exposure_inputs",
               "exposure_hs_mapping",
+              "dependency_extract",
+              "dependency_approve",
               "listing_approval",
               "peer_approval"
             ],
@@ -40445,6 +40453,8 @@
                 "web_domain_tier",
                 "exposure_inputs",
                 "exposure_hs_mapping",
+                "dependency_extract",
+                "dependency_approve",
                 "listing_approval",
                 "peer_approval"
               ]

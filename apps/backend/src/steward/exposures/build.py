@@ -23,7 +23,7 @@ from steward.config.holding_profiles import HoldingProfilesConfig
 from steward.config.jobs import JobsConfig
 from steward.config.prompts import load_prompts
 from steward.config.store import load_active
-from steward.exposures.ai_steps import run_inputs, run_products
+from steward.exposures.ai_steps import run_dependencies, run_inputs, run_products
 from steward.jobs.runner import JobContext
 from steward.settings import get_settings
 from steward.sources.edgar import EdgarClient
@@ -272,7 +272,7 @@ async def _ai_steps(ctx: JobContext, rows: list[asyncpg.Record]) -> None:
     stored = await load_active(ctx.pool, "jobs", JobsConfig)
     await ctx.record_config_version(stored.id if stored else None)
     cfg = (stored.body if stored else JobsConfig()).exposure_build_settings
-    if not (cfg.map_products or cfg.extract_inputs):
+    if not (cfg.map_products or cfg.extract_inputs or cfg.extract_dependencies):
         return
     try:
         client = create_client(settings)
@@ -287,25 +287,32 @@ async def _ai_steps(ctx: JobContext, rows: list[asyncpg.Record]) -> None:
             step.detail["results"] = await run_products(ctx, client, cfg, rows, usage, prompts)
             step.usage = usage.step_usage()
     profiles_stored = await load_active(ctx.pool, "holding_profiles", HoldingProfilesConfig)
-    if cfg.extract_inputs and profiles_stored is not None:
-        async with ctx.step("inputs") as step:
-            if not settings.sec_user_agent:
-                step.detail["skipped"] = "SEC_USER_AGENT is not set"
-                return
-            async with httpx.AsyncClient(
-                timeout=httpx.Timeout(60.0, read=120.0),
-                headers={"User-Agent": f"StewardAI/{__version__}"},
-                follow_redirects=True,
-            ) as http:
-                step.detail["results"] = await run_inputs(
+    if not (cfg.extract_inputs or cfg.extract_dependencies) or profiles_stored is None:
+        return
+    async with ctx.step("filings") as step:
+        if not settings.sec_user_agent:
+            step.detail["skipped"] = "SEC_USER_AGENT is not set"
+            return
+        async with httpx.AsyncClient(
+            timeout=httpx.Timeout(60.0, read=120.0),
+            headers={"User-Agent": f"StewardAI/{__version__}"},
+            follow_redirects=True,
+        ) as http:
+            edgar = EdgarClient(http, settings.sec_user_agent)
+            if cfg.extract_inputs:
+                step.detail["inputs"] = await run_inputs(
                     ctx,
                     client,
                     cfg,
-                    EdgarClient(http, settings.sec_user_agent),
+                    edgar,
                     rows,
                     profiles_stored.id,
                     profiles_stored.body,
                     usage,
                     prompts,
                 )
-            step.usage = usage.step_usage()
+            if cfg.extract_dependencies:
+                step.detail["dependencies"] = await run_dependencies(
+                    ctx, client, cfg, edgar, rows, profiles_stored.body, usage, prompts
+                )
+        step.usage = usage.step_usage()
