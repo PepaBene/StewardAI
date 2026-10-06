@@ -117,6 +117,74 @@ def missing_numbers(sentence: str, evidence: Sequence[str]) -> list[str]:
     ]
 
 
+_MONTHS = {
+    m: i
+    for i, names in enumerate(
+        (
+            ("january", "jan"),
+            ("february", "feb"),
+            ("march", "mar"),
+            ("april", "apr"),
+            ("may",),
+            ("june", "jun"),
+            ("july", "jul"),
+            ("august", "aug"),
+            ("september", "sep", "sept"),
+            ("october", "oct"),
+            ("november", "nov"),
+            ("december", "dec"),
+        ),
+        start=1,
+    )
+    for m in names
+}
+_MONTH = "|".join(sorted(_MONTHS, key=len, reverse=True))
+_DATE_ISO = re.compile(r"(?<!\d)(\d{4})-(\d{2})-(\d{2})(?!\d)")
+_DATE_DMY = re.compile(rf"(?<!\d)(\d{{1,2}})(?:st|nd|rd|th)?\s+({_MONTH})\.?,?\s+(\d{{4}})\b", re.I)
+_DATE_MDY = re.compile(rf"\b({_MONTH})\.?\s+(\d{{1,2}})(?:st|nd|rd|th)?,?\s+(\d{{4}})\b", re.I)
+
+
+def dates_in(text: str) -> set[dt.date]:
+    """Full dates (with a year) the text states, in ISO, "12 November 2026" or "November 12,
+    2026" form. A month and day without a year are not dates here."""
+    found: set[dt.date] = set()
+    candidates = (
+        [(int(y), int(m), int(d)) for y, m, d in _DATE_ISO.findall(text)]
+        + [(int(y), _MONTHS[mo.lower()], int(d)) for d, mo, y in _DATE_DMY.findall(text)]
+        + [(int(y), _MONTHS[mo.lower()], int(d)) for mo, d, y in _DATE_MDY.findall(text)]
+    )
+    for year, month, day in candidates:
+        try:
+            found.add(dt.date(year, month, day))
+        except ValueError:
+            continue
+    return found
+
+
+def missing_dates(sentence: str, evidence: Sequence[str]) -> list[str]:
+    """Full dates in the sentence that no snippet states."""
+    available: set[dt.date] = set()
+    for snippet in evidence:
+        available |= dates_in(snippet)
+    return [d.isoformat() for d in sorted(dates_in(sentence) - available)]
+
+
+MIN_QUOTE_CHARS = 40
+
+
+def _words(text: str) -> str:
+    return " ".join(re.findall(r"[a-z0-9]+", text.lower()))
+
+
+def is_quote(sentence: str, evidence: Sequence[str]) -> bool:
+    """The sentence is a verbatim run of a snippet (case, spacing and punctuation aside). Too
+    short a run proves little, so a sentence under MIN_QUOTE_CHARS never counts."""
+    words = _words(sentence)
+    if len(words) < MIN_QUOTE_CHARS:
+        return False
+    return any(f" {words} " in f" {_words(snippet)} " for snippet in evidence)
+
+
 class ClaimVerdict(BaseModel):
     index: int
     supported: bool
@@ -264,6 +332,20 @@ async def check_claims(
                     f"figure not in the cited snippets: {', '.join(missing)}",
                 )
                 continue
+        if settings.date_check:
+            wrong = missing_dates(claim.text, claim.evidence)
+            if wrong:
+                results[claim.index] = ClaimResult(
+                    claim.index,
+                    "unsupported",
+                    f"date not in the cited snippets: {', '.join(wrong)}",
+                )
+                continue
+        if settings.quote_check and is_quote(claim.text, claim.evidence):
+            results[claim.index] = ClaimResult(
+                claim.index, "supported", "rule: a verbatim run of a cited snippet"
+            )
+            continue
         to_model.append(claim)
     outcome = ClaimCheckOutcome(results)
     if not to_model:

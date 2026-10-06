@@ -135,10 +135,10 @@ def fingerprint(component: Component) -> str:
 
 async def live_score(name: str) -> float:
     """Run one component's live eval; returns its score (0..1)."""
-    from steward.ai import create_client
+    from steward.llm.routing import create_routing_client
     from steward.settings import get_settings
 
-    client = create_client(get_settings())
+    client, llm = create_routing_client(get_settings())
     if name == "earnings":
         from steward.earnings.extract import ClaudeExtractor
         from steward.earnings.golden import evaluate, load_cases, summarise
@@ -152,7 +152,7 @@ async def live_score(name: str) -> float:
         from steward.news.eval import evaluate as evaluate_news
         from steward.news.eval import load_set
 
-        classifier = ClaudeClassifier(client, NewsSettings().classification_model)
+        classifier = ClaudeClassifier(client, NewsSettings().classification_model, llm=llm)
         return (await evaluate_news(classifier, load_set())).accuracy
     from steward.verify.claims import ClaudeClaimVerifier
     from steward.verify.eval import load_cases as load_claims

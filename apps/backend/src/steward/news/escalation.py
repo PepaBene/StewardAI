@@ -38,6 +38,8 @@ from steward.config.thesis import ThesesConfig, ThesisConfig
 from steward.config.verification import ClaimVerifierSettings, VerificationConfig
 from steward.jobs import queue
 from steward.jobs.runner import JobContext, JobFailed, create_job
+from steward.llm.client import create_llm
+from steward.llm.routing import routing_client
 from steward.news.corroborate import AUTO_CACHE, _result_urls
 from steward.settings import get_settings
 from steward.verify.claims import SYSTEM as CLAIM_SYSTEM
@@ -650,7 +652,8 @@ async def event_escalation_handler(ctx: JobContext) -> None:
     writer: ClaudeEscalator | None
     verifier: ClaimVerifier | None
     try:
-        client = create_client(settings)
+        anthropic_client = create_client(settings)
+        client = routing_client(anthropic_client, create_llm(settings, anthropic_client))
     except AINotConfigured:
         writer = verifier = None
     else:

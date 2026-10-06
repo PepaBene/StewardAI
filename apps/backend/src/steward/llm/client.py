@@ -9,6 +9,7 @@ another provider: the provider is chosen after the guard has had its say.
 
 import asyncio
 import logging
+from collections.abc import Sequence
 from typing import Any, cast
 
 import anthropic
@@ -16,7 +17,7 @@ import httpx
 
 from steward import budget_guard
 from steward.config.jobs import reasoning_kwargs
-from steward.jobs.runner import current_job, record_response
+from steward.jobs.runner import current_job, current_step, record_response
 from steward.llm import wire
 from steward.llm.types import (
     Citation,
@@ -34,6 +35,10 @@ logger = logging.getLogger(__name__)
 
 OPENAI_URL = "https://api.openai.com/v1/responses"
 GOOGLE_URL = "https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent"
+GOOGLE_MODELS = "https://generativelanguage.googleapis.com/v1beta/models"
+GOOGLE_BATCHES = "https://generativelanguage.googleapis.com/v1beta/batches"
+OPENAI_FILES = "https://api.openai.com/v1/files"
+OPENAI_BATCHES = "https://api.openai.com/v1/batches"
 RETRY_STATUS = {408, 409, 429, 500, 502, 503, 504}
 DEADLINE_MARGIN = 30.0
 MAX_PAUSES = 4
@@ -87,6 +92,11 @@ class LLM:
     async def _anthropic_complete(self, req: Request) -> Completion:
         if self._anthropic is None:
             raise LLMError("ANTHROPIC_API_KEY is not set", provider="anthropic")
+        if req.tools or any(m.role == "tool" for m in req.messages):
+            # Claude's tool loop (tool_use blocks) is kept by its call sites, not translated.
+            raise LLMError(
+                "app tools are not supported through LLM for Claude", provider="anthropic"
+            )
         system: list[dict[str, Any]] = [{"type": "text", "text": req.system}]
         if req.cache_system:
             system[0]["cache_control"] = {"type": "ephemeral"}
@@ -172,23 +182,35 @@ class LLM:
     async def _post(
         self, provider: str, url: str, headers: dict[str, str], body: dict[str, Any], req: Request
     ) -> dict[str, Any]:
-        """POST with retries on rate limits, server errors and timeouts, and a hard deadline
-        so a stalled connection cannot hang the job."""
+        response = await self._call("POST", provider, url, headers, req.timeout, json=body)
+        result: dict[str, Any] = response.json()
+        return result
+
+    async def _call(
+        self,
+        method: str,
+        provider: str,
+        url: str,
+        headers: dict[str, str],
+        timeout: float,  # noqa: ASYNC109 - an httpx request timeout, not a cancellation scope
+        **kwargs: Any,
+    ) -> httpx.Response:
+        """One HTTP call with retries on rate limits, server errors and timeouts, and a hard
+        deadline so a stalled connection cannot hang the job."""
         last = ""
-        deadline = req.timeout * (self._retries + 1) + DEADLINE_MARGIN
+        deadline = timeout * (self._retries + 1) + DEADLINE_MARGIN
         try:
             async with asyncio.timeout(deadline):
                 for attempt in range(self._retries + 1):
                     try:
-                        response = await self._http.post(
-                            url, headers=headers, json=body, timeout=req.timeout
+                        response = await self._http.request(
+                            method, url, headers=headers, timeout=timeout, **kwargs
                         )
                     except httpx.HTTPError as exc:
                         last = f"{type(exc).__name__}: {exc}"
                     else:
                         if response.status_code == 200:
-                            result: dict[str, Any] = response.json()
-                            return result
+                            return response
                         last = f"HTTP {response.status_code}: {wire.error_message(response.text)}"
                         if response.status_code not in RETRY_STATUS:
                             raise LLMError(
@@ -200,6 +222,164 @@ class LLM:
         except TimeoutError:
             last = f"no answer within {deadline:.0f}s"
         raise LLMError(f"{provider} call failed: {last}", provider=provider)
+
+    # ------------------------------------------------------------------ Batch
+
+    async def complete_batch(
+        self,
+        requests: Sequence[Request],
+        *,
+        poll_seconds: float = 30.0,
+        wait_minutes: float = 60.0,
+    ) -> list[Completion | None]:
+        """The answers to `requests` (one model) through the provider's batch API at half
+        price, in request order; None for a request that failed. All None when the batch
+        was not finished within `wait_minutes` (it is cancelled) or could not run, so the caller
+        asks again directly. The cost is counted by the caller's step (`Usage(batch=True)`)
+        and by the budget guard; the batch id is saved on the step when it is submitted."""
+        if not requests:
+            return []
+        none: list[Completion | None] = [None] * len(requests)
+        model = requests[0].model
+        provider = provider_of(model)
+        if provider == "anthropic" or any(r.model != model for r in requests):
+            return none
+        ctx = current_job.get()
+        if ctx is not None:
+            guarded = await budget_guard.before_request(ctx, model, can_switch_provider=True)
+            if guarded != model:
+                return none  # at the cap: the direct path applies the downgrade
+        try:
+            run = self._submit_openai if provider == "openai" else self._submit_google
+            batch_id, poll, collect = await run(requests)
+        except LLMError as exc:
+            logger.warning("%s batch could not start: %s", provider, exc)
+            return none
+        current = current_step.get()
+        if current is not None:
+            current[1].detail.setdefault("batch_ids", []).append(batch_id)
+        loop = asyncio.get_running_loop()
+        deadline = loop.time() + wait_minutes * 60
+        try:
+            while True:
+                state = await poll()
+                if state != "running":
+                    break
+                if loop.time() > deadline:
+                    await self._cancel(provider, batch_id)
+                    logger.warning("%s batch %s not done in time", provider, batch_id)
+                    return none
+                await asyncio.sleep(poll_seconds)
+            if state == "failed":
+                logger.warning("%s batch %s failed", provider, batch_id)
+                return none
+            done = await collect()
+        except LLMError as exc:
+            logger.warning("%s batch %s: %s", provider, batch_id, exc)
+            return none
+        if ctx is not None:
+            for item in done:
+                if item is not None:
+                    budget_guard.after_response(ctx, item.model, item.usage, batch=True)
+        return list(done)
+
+    async def _cancel(self, provider: Provider, batch_id: str) -> None:
+        try:
+            if provider == "openai":
+                await self._call(
+                    "POST",
+                    "openai",
+                    f"{OPENAI_BATCHES}/{batch_id}/cancel",
+                    {"authorization": f"Bearer {self._key('openai')}"},
+                    60.0,
+                )
+            else:
+                await self._call(
+                    "POST",
+                    "google",
+                    f"{GOOGLE_BATCHES}/{batch_id}:cancel",
+                    {"x-goog-api-key": self._key("google")},
+                    60.0,
+                )
+        except LLMError:
+            logger.warning("could not cancel %s batch %s", provider, batch_id)
+
+    async def _submit_openai(self, requests: Sequence[Request]) -> tuple[str, Any, Any]:
+        headers = {"authorization": f"Bearer {self._key('openai')}"}
+        uploaded = await self._call(
+            "POST",
+            "openai",
+            OPENAI_FILES,
+            headers,
+            120.0,
+            data={"purpose": "batch"},
+            files={
+                "file": (
+                    "batch.jsonl",
+                    wire.openai_batch_lines(requests).encode(),
+                    "application/jsonl",
+                )
+            },
+        )
+        created = await self._call(
+            "POST",
+            "openai",
+            OPENAI_BATCHES,
+            headers,
+            60.0,
+            json={
+                "input_file_id": uploaded.json()["id"],
+                "endpoint": "/v1/responses",
+                "completion_window": "24h",
+            },
+        )
+        batch_id = str(created.json()["id"])
+        last: dict[str, Any] = {}
+
+        async def poll() -> str:
+            got = await self._call("GET", "openai", f"{OPENAI_BATCHES}/{batch_id}", headers, 60.0)
+            last.update(got.json())
+            status = last.get("status")
+            if status == "completed":
+                return "done"
+            if status in ("failed", "expired", "cancelled", "cancelling"):
+                return "failed"
+            return "running"
+
+        async def collect() -> list[Completion | None]:
+            file_id = last.get("output_file_id")
+            if not file_id:
+                return [None] * len(requests)
+            body = await self._call(
+                "GET", "openai", f"{OPENAI_FILES}/{file_id}/content", headers, 120.0
+            )
+            return wire.openai_batch_results(body.text, requests)
+
+        return batch_id, poll, collect
+
+    async def _submit_google(self, requests: Sequence[Request]) -> tuple[str, Any, Any]:
+        headers = {"x-goog-api-key": self._key("google")}
+        created = await self._call(
+            "POST",
+            "google",
+            f"{GOOGLE_MODELS}/{requests[0].model}:batchGenerateContent",
+            headers,
+            120.0,
+            json=wire.google_batch_body(requests, "stewardai"),
+        )
+        batch_id = str(created.json()["name"]).removeprefix("batches/")
+        last: dict[str, Any] = {}
+
+        async def poll() -> str:
+            got = await self._call("GET", "google", f"{GOOGLE_BATCHES}/{batch_id}", headers, 60.0)
+            last.clear()
+            last.update(got.json())
+            return wire.google_batch_state(last)
+
+        async def collect() -> list[Completion | None]:
+            return wire.google_batch_results(last, requests)
+
+        return batch_id, poll, collect
 
 
 def _downgraded(req: Request, model: str) -> Request:

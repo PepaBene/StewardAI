@@ -18,10 +18,15 @@ logger = logging.getLogger(__name__)
 
 
 def request_key(
-    model: str, system: Any, messages: Any, schema: type[BaseModel], effort: str | None
+    model: str,
+    system: Any,
+    messages: Any,
+    schema: type[BaseModel],
+    effort: str | None,
+    tools: Any = None,
 ) -> str:
     payload = json.dumps(
-        [model, system, messages, schema.model_json_schema(), effort],
+        [model, system, messages, schema.model_json_schema(), effort] + ([tools] if tools else []),
         sort_keys=True,
         default=str,
         ensure_ascii=False,
@@ -30,20 +35,29 @@ def request_key(
 
 
 class ResultCache:
-    def __init__(self, pool: asyncpg.Pool, job_type: str, ttl_days: int = 30) -> None:
+    def __init__(
+        self,
+        pool: asyncpg.Pool,
+        job_type: str,
+        ttl_days: int = 30,
+        search_ttl_days: int | None = None,
+    ) -> None:
         self._pool = pool
         self._job_type = job_type
         self._ttl_days = ttl_days
+        # A web-search answer goes stale with the web: cached only when this is set, and for
+        # this many days (a repeated search within it costs nothing).
+        self.search_ttl_days = search_ttl_days
         self.hits = 0
         self.misses = 0
 
-    async def get(self, key: str) -> dict[str, Any] | None:
+    async def get(self, key: str, ttl_days: int | None = None) -> dict[str, Any] | None:
         try:
             raw = await self._pool.fetchval(
                 "select result from public.ai_result_cache where key = $1"
                 " and created_at > now() - make_interval(days => $2)",
                 key,
-                self._ttl_days,
+                ttl_days if ttl_days is not None else self._ttl_days,
             )
         except Exception:
             logger.exception("ai_result_cache read failed")

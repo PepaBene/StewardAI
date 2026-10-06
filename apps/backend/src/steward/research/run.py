@@ -29,6 +29,8 @@ from steward.config.strategy import StrategyConfig
 from steward.config.thesis import ThesesConfig
 from steward.config.verification import VerificationConfig
 from steward.jobs.runner import JobContext, JobFailed
+from steward.llm.client import create_llm
+from steward.llm.routing import routing_client
 from steward.news.normalize import host_of
 from steward.research.gather import Gathered, Valuation, gather
 from steward.research.sources import CitedSentence, Registry, Source
@@ -417,7 +419,8 @@ async def research_handler(ctx: JobContext) -> None:
     writer: ResearchWriter | None
     verifier: ClaimVerifier | None
     try:
-        client = create_client(settings)
+        anthropic_client = create_client(settings)
+        client = routing_client(anthropic_client, create_llm(settings, anthropic_client))
     except AINotConfigured:
         writer = verifier = None
     else:

@@ -37,6 +37,9 @@ from steward.config.thesis import ThesesConfig
 from steward.config.verification import ClaimVerifierSettings, VerificationConfig
 from steward.earnings.read import EvidenceRelation, FactCheck, evidence_relation
 from steward.jobs.runner import JobContext, JobHandler
+from steward.llm.client import LLM, create_llm
+from steward.llm.routing import routing_client
+from steward.llm.types import LLMError, Message, Request, provider_of
 from steward.news.link import short_name
 from steward.notify.channels import (
     MISSING_CHANNEL_HELP,
@@ -305,11 +308,13 @@ class ClaudeDigestWriter:
         settings: DigestSettings,
         poll_seconds: float = 30.0,
         system: str = SYSTEM_PROMPT,
+        llm: LLM | None = None,
     ) -> None:
         self._client = client
         self._settings = settings
         self._poll = poll_seconds
         self._system = system
+        self._llm = llm
 
     def _params(self, material: str, today: dt.date) -> dict[str, Any]:
         return {
@@ -325,7 +330,45 @@ class ClaudeDigestWriter:
             **reasoning_kwargs(self._settings.model, self._settings.effort, 8000, _output_config()),
         }
 
+    async def _write_other(self, material: str, today: dt.date) -> tuple[DigestDraft, Usage]:
+        """The draft from an OpenAI or Google model: through the provider's batch API (half
+        price) when `use_batch` is set, falling back to a direct call when the batch does not
+        finish in time or fails, as the Claude path does."""
+        assert self._llm is not None
+        usage = Usage(model=self._settings.model)
+        request = Request(
+            model=self._settings.model,
+            system=self._system,
+            messages=(Message("user", f"Today is {today.isoformat()}.\n\nMaterial:\n{material}"),),
+            schema=DigestDraft,
+            effort=self._settings.effort,
+            max_tokens=8000,
+            cache_key="digest",
+        )
+        done = None
+        if self._settings.use_batch:
+            (done,) = await self._llm.complete_batch(
+                [request],
+                poll_seconds=self._poll,
+                wait_minutes=self._settings.batch_wait_minutes,
+            )
+            usage.batch = done is not None
+        if done is None:
+            usage.batch = False
+            try:
+                done = await self._llm.complete(request)
+            except LLMError as exc:
+                raise DigestError(f"digest call failed: {exc}") from exc
+        usage.add(done.usage)
+        if done.stop_reason in ("refusal", "max_tokens"):
+            raise DigestError(f"digest stopped early ({done.stop_reason})")
+        if not isinstance(done.parsed, DigestDraft):
+            raise DigestError("digest draft is not valid JSON for the schema")
+        return done.parsed, usage
+
     async def write(self, material: str, today: dt.date) -> tuple[DigestDraft, Usage]:
+        if provider_of(self._settings.model) != "anthropic":
+            return await self._write_other(material, today)
         params = self._params(material, today)
         if self._settings.use_batch:
             draft = await self._write_batch(params)
@@ -1032,13 +1075,17 @@ def _handler(kind: DigestKind) -> JobHandler:
             writer = verifier = None
         else:
             prompts = await load_prompts(ctx.pool)
+            llm = create_llm(settings, client)
             writer = ClaudeDigestWriter(
-                client, digest_settings, system=prompts.text("news_digest", SYSTEM_PROMPT)
+                client,
+                digest_settings,
+                system=prompts.text("news_digest", SYSTEM_PROMPT, digest_settings.model),
+                llm=llm,
             )
             verifier = ClaudeClaimVerifier(
-                client,
+                routing_client(client, llm),
                 claim_settings.model,
-                prompts.text("claim_verifier", CLAIM_SYSTEM),
+                prompts.text("claim_verifier", CLAIM_SYSTEM, claim_settings.model),
                 effort=claim_settings.effort,
             )
         async with httpx.AsyncClient(

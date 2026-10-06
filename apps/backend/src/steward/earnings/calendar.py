@@ -40,8 +40,9 @@ from steward.documents.text import contains
 from steward.earnings.check import load_config, local_today
 from steward.jobs import queue
 from steward.jobs.runner import JobContext, create_job
-from steward.llm.client import create_llm
+from steward.llm.client import LLM, create_llm
 from steward.llm.routing import routing_client
+from steward.llm.types import Message, Request, provider_of
 from steward.settings import get_settings
 from steward.sources.finnhub import FinnhubError, next_earnings_date
 
@@ -59,6 +60,8 @@ class CalendarEntry(BaseModel):
 class CalendarPage(BaseModel):
     entries: list[CalendarEntry]
 
+
+DEFERRED = "deferred"  # the IR page was fetched and waits for the batch
 
 CALENDAR_SYSTEM = """\
 You read a company's investor-relations financial calendar page and list the dated \
@@ -117,8 +120,7 @@ async def dates_from_ir_page(
 ) -> tuple[dt.date | None, str, Usage]:
     usage = Usage(model=settings.model)
     url = str(profile.financial_calendar_url)
-    document = await fetch_document(http, url, max_bytes=5_000_000, headers=default_headers())
-    text = await document.text_async()
+    text = await fetch_calendar_text(http, url)
     response = await client.messages.parse(
         model=settings.model,
         system=system,
@@ -139,24 +141,56 @@ async def dates_from_ir_page(
         **effort_kwargs(settings.model, settings.effort, 4000),
     )
     usage.add(response.usage)
-    page = response.parsed_output
+    date, source = date_from_page(response.parsed_output, text, today, url)
+    return date, source, usage
+
+
+async def fetch_calendar_text(http: httpx.AsyncClient, url: str) -> str:
+    document = await fetch_document(http, url, max_bytes=5_000_000, headers=default_headers())
+    return await document.text_async()
+
+
+def calendar_request(
+    settings: EarningsCalendarSettings, system: str, url: str, text: str, today: dt.date
+) -> Request:
+    """The calendar-page call as a provider-neutral request (for the batch path)."""
+    return Request(
+        model=settings.model,
+        system=system,
+        messages=(
+            Message(
+                "user",
+                f'<document title="{url}">\n{text}\n</document>\n\n'
+                f"Today is {today.isoformat()}. List the events.",
+            ),
+        ),
+        schema=CalendarPage,
+        effort=settings.effort,
+        max_tokens=4000,
+    )
+
+
+def date_from_page(
+    page: CalendarPage | None, text: str, today: dt.date, url: str
+) -> tuple[dt.date | None, str]:
+    """The next results date the page states, checked in code: it must be quoted from the page
+    and must be the date the quote states. (None, reason) otherwise."""
     if page is None:
-        return None, "no parseable answer", usage
+        return None, "no parseable answer"
     candidates = []
     for entry in page.entries:
         try:
             date = dt.date.fromisoformat(entry.date)
         except ValueError:
             continue
-        # The date must be quoted from the page and must be the date the quote states.
         if entry.event != "results" or not contains(text, entry.snippet):
             continue
         if not date_in_text(date, entry.snippet) or date < today:
             continue
         candidates.append(date)
     if not candidates:
-        return None, "no upcoming results date on the page", usage
-    return min(candidates), url, usage
+        return None, "no upcoming results date on the page"
+    return min(candidates), url
 
 
 async def _holding_tickers(pool: asyncpg.Pool, theses_tickers: list[str]) -> list[str]:
@@ -261,13 +295,26 @@ async def refresh_calendar(ctx: JobContext, *, full: bool) -> None:
 
     end = today + dt.timedelta(days=cal_settings.lookahead_days)
     client: anthropic.AsyncAnthropic | None
+    llm: LLM | None
     try:
         anthropic_client = create_client(settings)
-        client = routing_client(anthropic_client, create_llm(settings, anthropic_client))
+        llm = create_llm(settings, anthropic_client)
+        client = routing_client(anthropic_client, llm)
     except AINotConfigured:
         client = None
+        llm = None
     finnhub_key = settings.finnhub_api_key.get_secret_value() if settings.finnhub_api_key else None
 
+    # With `use_batch` and an OpenAI or Google model, the IR pages that need the AI are read
+    # in one batch after the structured sources have been tried for every holding.
+    deferred: list[tuple[str, str, str]] | None = (
+        []
+        if cal_settings.use_batch
+        and provider_of(cal_settings.model) != "anthropic"
+        and llm is not None
+        and llm.configured(cal_settings.model)
+        else None
+    )
     async with httpx.AsyncClient(
         timeout=30.0, headers={"User-Agent": f"StewardAI/{__version__}"}
     ) as http:
@@ -276,9 +323,21 @@ async def refresh_calendar(ctx: JobContext, *, full: bool) -> None:
             try:
                 async with ctx.step(f"report_date:{ticker}") as step:
                     found, source = await _find_date(
-                        http, client, finnhub_key, profile, cal_settings, today, end, step, system
+                        http,
+                        client,
+                        finnhub_key,
+                        profile,
+                        cal_settings,
+                        today,
+                        end,
+                        step,
+                        system,
+                        deferred,
+                        ticker,
                     )
                     step.detail.update(next_report_date=found, source=source)
+                    if source == DEFERRED:
+                        continue
                     pending = await set_report_date(pool, ticker, found, source, today, retry_days)
                     if pending is not None:
                         step.detail["pending_report_date"] = pending
@@ -288,6 +347,46 @@ async def refresh_calendar(ctx: JobContext, *, full: bool) -> None:
             except Exception:
                 # The step is recorded as failed; one holding must not stop the others.
                 logger.exception("report date refresh failed for %s", ticker)
+        if deferred and llm is not None:
+            await _batch_pages(ctx, llm, cal_settings, system, deferred, today, retry_days)
+
+
+async def _batch_pages(
+    ctx: JobContext,
+    llm: LLM,
+    settings: EarningsCalendarSettings,
+    system: str,
+    pages: list[tuple[str, str, str]],
+    today: dt.date,
+    retry_days: int,
+) -> None:
+    """Read the deferred IR pages through the provider's batch API; a page the batch did not
+    answer is read directly."""
+    requests = [calendar_request(settings, system, url, text, today) for _, url, text in pages]
+    async with ctx.step("calendar_batch") as step:
+        answers = await llm.complete_batch(requests, wait_minutes=settings.batch_wait_minutes)
+        step.detail.update(pages=len(pages), answered=sum(a is not None for a in answers))
+    for (ticker, url, text), request, answer in zip(pages, requests, answers, strict=True):
+        try:
+            async with ctx.step(f"report_date:{ticker}:read") as step:
+                if answer is None:
+                    # The batch's own cost is counted by `complete_batch`; this one is direct.
+                    answer = await llm.complete(request)
+                    usage = Usage(model=settings.model)
+                    usage.add(answer.usage)
+                    step.usage = usage.step_usage()
+                page = answer.parsed if isinstance(answer.parsed, CalendarPage) else None
+                found, source = date_from_page(page, text, today, url)
+                step.detail.update(next_report_date=found, source=source or "")
+                pending = await set_report_date(
+                    ctx.pool, ticker, found, source if found else "", today, retry_days
+                )
+                if pending is not None:
+                    step.detail["pending_report_date"] = pending
+        except BudgetExceeded:
+            raise
+        except Exception:
+            logger.exception("report date read failed for %s", ticker)
 
 
 async def _find_date(
@@ -300,6 +399,8 @@ async def _find_date(
     end: dt.date,
     step: Any,
     system: str = CALENDAR_SYSTEM,
+    deferred: list[tuple[str, str, str]] | None = None,
+    ticker: str = "",
 ) -> tuple[dt.date | None, str]:
     notes: list[str] = []
     if finnhub_key:
@@ -313,7 +414,15 @@ async def _find_date(
             notes.append("finnhub: no date listed")
     else:
         notes.append("finnhub: FINNHUB_API_KEY not set")
-    if profile.financial_calendar_url and client is not None:
+    if profile.financial_calendar_url and deferred is not None:
+        url = str(profile.financial_calendar_url)
+        try:
+            deferred.append((ticker, url, await fetch_calendar_text(http, url)))
+        except (FetchError, httpx.HTTPError, ValueError) as exc:
+            notes.append(f"ir calendar: {exc}")
+        else:
+            return None, DEFERRED
+    elif profile.financial_calendar_url and client is not None:
         try:
             date, source, usage = await dates_from_ir_page(
                 client, http, profile, settings, today, system

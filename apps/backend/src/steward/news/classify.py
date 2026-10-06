@@ -27,8 +27,16 @@ from steward.config.event_rules import (
     EVENT_DESCRIPTIONS,
 )
 from steward.config.jobs import effort_kwargs
+from steward.llm.cache import ResultCache, request_key
 from steward.llm.client import LLM
-from steward.llm.types import LLMError, Message, Request, provider_of
+from steward.llm.types import (
+    Completion,
+    LLMError,
+    Message,
+    Request,
+    normalized_usage,
+    provider_of,
+)
 
 
 class ClassificationError(Exception):
@@ -278,7 +286,10 @@ class ClaudeClassifier:
         instructions: str = SYSTEM_PROMPT,
         effort: str | None = None,
         llm: LLM | None = None,
+        cache: ResultCache | None = None,
     ) -> None:
+        # Answers for a non-Claude model, kept so a repeated identical batch costs nothing.
+        self._cache = cache
         self._client = client
         self._model = model
         self._effort = effort
@@ -345,7 +356,54 @@ class ClaudeClassifier:
         """The same call on an OpenAI or Google model. The static instructions come first and
         the holdings block (which differs between batches) after them, then the items."""
         assert self._llm is not None
-        request = Request(
+        request = self._request(holdings, user)
+        done = await self._cached(request)
+        if done is None:
+            try:
+                done = await self._llm.complete(request)
+            except LLMError as exc:
+                raise ClassificationError(f"classification call failed: {exc}") from exc
+            await self._remember(request, done)
+        return self._finish(done, items, holdings, usage, result)
+
+    def _key(self, request: Request) -> str:
+        # The system prompt carries the holdings block and the user message the date and the
+        # items, so the same items under different holdings never share an answer.
+        return request_key(
+            request.model,
+            request.system,
+            [m.text for m in request.messages],
+            ClassificationOutput,
+            request.effort,
+        )
+
+    async def _cached(self, request: Request) -> Completion | None:
+        if self._cache is None:
+            return None
+        hit = await self._cache.get(self._key(request))
+        if hit is None:
+            return None
+        try:
+            parsed = ClassificationOutput.model_validate(hit)
+        except ValueError:
+            return None
+        return Completion(
+            model=request.model,
+            provider=provider_of(request.model),
+            text="",
+            parsed=parsed,
+            stop_reason="end",
+            usage=normalized_usage(),
+        )
+
+    async def _remember(self, request: Request, done: Completion) -> None:
+        if self._cache is not None and done.stop_reason == "end" and done.parsed is not None:
+            await self._cache.put(
+                self._key(request), request.model, done.parsed.model_dump(mode="json")
+            )
+
+    def _request(self, holdings: Sequence[HoldingContext], user: str) -> Request:
+        return Request(
             model=self._model,
             system=f"{self._system}\n\n{holdings_block(holdings)}",
             messages=(Message("user", user),),
@@ -355,16 +413,77 @@ class ClaudeClassifier:
             timeout=REQUEST_TIMEOUT,
             cache_key="news_classification",
         )
-        try:
-            done = await self._llm.complete(request)
-        except LLMError as exc:
-            raise ClassificationError(f"classification call failed: {exc}") from exc
+
+    def _finish(
+        self,
+        done: Completion,
+        items: Sequence[ClassifyItem],
+        holdings: Sequence[HoldingContext],
+        usage: Usage,
+        result: ClassifyResult,
+    ) -> tuple[ClassifyResult, Usage]:
         usage.add(done.usage)
         if done.stop_reason in ("refusal", "max_tokens"):
             raise ClassificationError(f"classification stopped early ({done.stop_reason})", usage)
         if not isinstance(done.parsed, ClassificationOutput):
             raise ClassificationError("classification returned no parseable JSON", usage)
         return self._label(done.parsed, items, holdings, result), usage
+
+    async def classify_many(
+        self,
+        groups: Sequence[tuple[Sequence[ClassifyItem], Sequence[HoldingContext]]],
+        today: dt.date,
+        *,
+        poll_seconds: float = 30.0,
+        wait_minutes: float = 60.0,
+    ) -> list[tuple[ClassifyResult, Usage] | ClassificationError | None]:
+        """Several groups of items through the provider's batch API (half price), in group
+        order. A group the batch did not answer is None (classify it directly); one whose answer
+        was unusable is its `ClassificationError`. Only for a non-Claude model."""
+        if self._llm is None or not groups:
+            return [None] * len(groups)
+        requests = [
+            self._request(
+                holdings,
+                f"Today is {today.isoformat()}. Label these {len(items)} items; return exactly "
+                f"one label per index.\n\n{items_block(items)}",
+            )
+            for items, holdings in groups
+        ]
+        known = [await self._cached(r) for r in requests]
+        asked = [r for r, hit in zip(requests, known, strict=True) if hit is None]
+        fresh = iter(
+            await self._llm.complete_batch(
+                asked, poll_seconds=poll_seconds, wait_minutes=wait_minutes
+            )
+        )
+        answers: list[Completion | None] = []
+        for request, hit in zip(requests, known, strict=True):
+            if hit is not None:
+                answers.append(hit)
+                continue
+            answer = next(fresh)
+            if answer is not None:
+                await self._remember(request, answer)
+            answers.append(answer)
+        out: list[tuple[ClassifyResult, Usage] | ClassificationError | None] = []
+        for (items, holdings), done in zip(groups, answers, strict=True):
+            if done is None:
+                out.append(None)
+                continue
+            try:
+                out.append(
+                    self._finish(
+                        done,
+                        items,
+                        holdings,
+                        Usage(model=self._model, batch=True),
+                        ClassifyResult(),
+                    )
+                )
+            except ClassificationError as exc:
+                out.append(exc)
+        return out
 
     @staticmethod
     def _label(

@@ -40,6 +40,7 @@ from pydantic import BaseModel, Field
 
 from steward import __version__
 from steward.ai import AINotConfigured, Usage, create_client
+from steward.budget_guard import BudgetExceeded
 from steward.config.holding_profiles import HoldingProfilesConfig
 from steward.config.jobs import GapResearchSettings, JobsConfig, effort_kwargs
 from steward.config.prompts import PromptsConfig, load_prompts
@@ -49,6 +50,10 @@ from steward.earnings.locate import _result_urls
 from steward.fundamentals.ir import IrError, document_lines
 from steward.fundamentals.ir_discovery import host_denied, is_blocked_page, registrable
 from steward.jobs.runner import JobContext, JobFailed
+from steward.llm.cache import ResultCache
+from steward.llm.client import create_llm
+from steward.llm.routing import batch_collector, routing_client
+from steward.llm.types import provider_of
 from steward.research.domains import (
     DOMAIN_SYSTEM,
     domain_key,
@@ -685,7 +690,11 @@ async def gap_research_handler(ctx: JobContext) -> None:
         (g for g in gaps if (last.get(g) or never) < cutoff), key=lambda g: last.get(g) or never
     )[: cfg.slots_per_run]
     try:
-        client = create_client(settings)
+        anthropic_client = create_client(settings)
+        llm = create_llm(settings, anthropic_client)
+        client = routing_client(
+            anthropic_client, llm, ResultCache(ctx.pool, "gap_research", search_ttl_days=3)
+        )
     except AINotConfigured as exc:
         raise JobFailed(str(exc)) from exc
     usage = Usage(model=cfg.model)
@@ -705,9 +714,10 @@ async def gap_research_handler(ctx: JobContext) -> None:
             stack.push_async_callback(fetcher.aclose)
             prompts = await load_prompts(ctx.pool)
             learned = await load_learned(ctx.pool)
-            for ticker, key in due:
+
+            async def research(ticker: str, key: str) -> tuple[str, dict[str, Any]]:
                 try:
-                    outcome, detail = await research_slot(
+                    return await research_slot(
                         ctx,
                         client,
                         fetcher,
@@ -721,7 +731,26 @@ async def gap_research_handler(ctx: JobContext) -> None:
                         learned,
                     )
                 except (anthropic.APIError, pydantic.ValidationError, ValueError) as exc:
-                    outcome, detail = "error", {"error": str(exc)[:200]}
+                    return "error", {"error": str(exc)[:200]}
+
+            # With `use_batch` and an OpenAI or Google model the slots run side by side and each
+            # round of calls (all the searches, then all the judgements) is one provider batch.
+            if (
+                cfg.use_batch
+                and provider_of(cfg.model) != "anthropic"
+                and llm.configured(cfg.model)
+            ):
+                with batch_collector(client, llm, cfg.batch_wait_minutes) as collector:
+                    ran = await collector.run([research(t, k) for t, k in due])
+                step.detail["batch_rounds"] = collector.rounds
+            else:
+                ran = [await research(t, k) for t, k in due]
+            for (ticker, key), outcome_detail in zip(due, ran, strict=True):
+                if isinstance(outcome_detail, BaseException):
+                    if isinstance(outcome_detail, BudgetExceeded):
+                        raise outcome_detail
+                    outcome_detail = ("error", {"error": str(outcome_detail)[:200]})
+                outcome, detail = outcome_detail
                 results[f"{ticker}/{key}"] = outcome
                 await ctx.pool.execute(
                     "insert into public.web_fact_attempt (ticker, slot, outcome, detail)"

@@ -46,6 +46,8 @@ from steward.earnings.store import archive, load_known, load_owner_rejected, sto
 from steward.earnings.validate import ValidationContext, validate
 from steward.earnings.verdicts import run_verdicts
 from steward.jobs.runner import JobContext, JobFailed
+from steward.llm.client import create_llm
+from steward.llm.routing import routing_client
 from steward.notify.breach import alert_breaches
 from steward.settings import get_settings
 from steward.sources.edgar import EdgarClient, EdgarError
@@ -109,7 +111,8 @@ async def earnings_check_handler(ctx: JobContext) -> None:
     if settings.supabase_url is None or settings.supabase_secret_key is None:
         raise JobFailed("SUPABASE_URL and SUPABASE_SECRET_KEY are needed to archive evidence")
     try:
-        client = create_client(settings)
+        anthropic_client = create_client(settings)
+        client = routing_client(anthropic_client, create_llm(settings, anthropic_client))
     except AINotConfigured as exc:
         raise JobFailed(str(exc)) from exc
     stored_jobs = await load_active(ctx.pool, "jobs", JobsConfig)
@@ -128,14 +131,14 @@ async def earnings_check_handler(ctx: JobContext) -> None:
                 client,
                 cfg.extraction_model,
                 cfg.effort,
-                prompts.text("earnings_extraction", EXTRACTION_SYSTEM),
+                prompts.text("earnings_extraction", EXTRACTION_SYSTEM, cfg.extraction_model),
             ),
             edgar=edgar,
             locator=ClaudeSearchLocator(
                 client,
                 cfg.locate_model,
                 cfg.max_searches,
-                prompts.text("earnings_locate", SEARCH_SYSTEM),
+                prompts.text("earnings_locate", SEARCH_SYSTEM, cfg.locate_model),
                 effort=cfg.locate_effort,
             ),
         )

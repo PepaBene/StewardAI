@@ -45,7 +45,9 @@ from steward.config.verification import TrustSettings, VerificationConfig
 from steward.documents.fetch import FetchError
 from steward.jobs import queue
 from steward.jobs.runner import JobContext, create_job
+from steward.llm.cache import ResultCache
 from steward.llm.client import create_llm
+from steward.llm.routing import routing_client
 from steward.news.classify import SYSTEM_PROMPT as CLASSIFICATION_PROMPT
 from steward.news.classify import (
     Candidate,
@@ -635,6 +637,7 @@ async def classify_pending(
     touched: set[int] = set()
     detail: dict[str, Any] = {"pending": len(rows), "labelled": 0, "missing": 0, "errors": []}
     size = settings.classification_batch_size
+    prepared = []
     for start in range(0, len(rows), size):
         chunk = rows[start : start + size]
         items = [
@@ -654,9 +657,30 @@ async def classify_pending(
         ]
         candidates = {c.ticker for item in items for c in item.candidates}
         context = [h for h in holdings.context if h.ticker in candidates]
+        prepared.append((start, chunk, items, context))
+    # With `classification_use_batch` and a non-Claude model, the whole backlog goes to the
+    # provider's batch API in one request set; a group it did not answer is classified directly.
+    answers: list[Any] = [None] * len(prepared)
+    many = getattr(classifier, "classify_many", None)
+    if settings.classification_use_batch and many is not None and len(prepared) > 0:
+        async with ctx.step("classify_batch") as batch_step:
+            answers = await many(
+                [(items, context) for _, _, items, context in prepared],
+                now.date(),
+                wait_minutes=settings.classification_batch_wait_minutes,
+            )
+            batch_step.detail["groups"] = len(prepared)
+            batch_step.detail["answered"] = sum(a is not None for a in answers)
+            batch_step.usage = None
+    for (start, chunk, items, context), answer in zip(prepared, answers, strict=True):
         async with ctx.step(f"classify:{start // size + 1}") as step:
             try:
-                result, usage = await classifier.classify(items, context, now.date())
+                if isinstance(answer, ClassificationError):
+                    raise answer
+                if answer is not None:
+                    result, usage = answer
+                else:
+                    result, usage = await classifier.classify(items, context, now.date())
             except ClassificationError as exc:
                 detail["errors"].append(str(exc))
                 step.detail["error"] = str(exc)
@@ -1272,16 +1296,17 @@ async def news_ingest_handler(ctx: JobContext) -> None:
         classifier = ClaudeClassifier(
             client,
             news.classification_model,
-            prompts.text("news_classification", CLASSIFICATION_PROMPT),
+            prompts.text("news_classification", CLASSIFICATION_PROMPT, news.classification_model),
             effort=news.classification_effort,
             llm=llm,
+            cache=ResultCache(ctx.pool, "news_classification"),
         )
     if client is not None:
         corroborator = ClaudeCorroborator(
-            client,
+            routing_client(client, llm),
             news.corroboration_model,
             news.corroboration_max_searches,
-            prompts.text("news_corroboration", SEARCH_SYSTEM),
+            prompts.text("news_corroboration", SEARCH_SYSTEM, news.corroboration_model),
             effort=news.corroboration_effort,
         )
     async with httpx.AsyncClient(

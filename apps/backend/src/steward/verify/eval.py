@@ -22,8 +22,8 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
-from steward.ai import create_client
 from steward.config.verification import ClaimVerifierSettings
+from steward.llm.routing import create_routing_client
 from steward.settings import get_settings
 from steward.verify.claims import Claim, ClaimVerifier, ClaudeClaimVerifier, check_claims
 
@@ -113,7 +113,11 @@ def main(argv: list[str] | None = None) -> int:
     args = parser.parse_args(argv)
     cases = load_cases()
     settings = ClaimVerifierSettings(model=args.model)
-    verifier = ClaudeClaimVerifier(create_client(get_settings()), args.model) if args.live else None
+    verifier = (
+        ClaudeClaimVerifier(create_routing_client(get_settings())[0], args.model)
+        if args.live
+        else None
+    )
     result = asyncio.run(score(cases, verifier, settings))
     print(json.dumps(result.as_dict()) if args.json else result.report())
     if args.live:

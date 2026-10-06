@@ -30,6 +30,7 @@ from pydantic import BaseModel, Field
 
 from steward import __version__
 from steward.ai import AINotConfigured, Usage, create_client
+from steward.budget_guard import BudgetExceeded
 from steward.config.holding_profiles import HoldingProfile, HoldingProfilesConfig
 from steward.config.jobs import IrDiscoverySettings, JobsConfig, effort_kwargs
 from steward.config.prompts import PromptsConfig, load_prompts
@@ -37,6 +38,10 @@ from steward.config.store import ConfigConflictError, load_active, save_config
 from steward.earnings.locate import _result_urls
 from steward.fundamentals.ir import IrError, assert_fetchable
 from steward.jobs.runner import JobContext, JobFailed
+from steward.llm.cache import ResultCache
+from steward.llm.client import create_llm
+from steward.llm.routing import batch_collector, routing_client
+from steward.llm.types import provider_of
 from steward.research.polite import PoliteFetcher, build_fetcher
 from steward.settings import get_settings
 
@@ -285,6 +290,23 @@ def merge_pages(
     return HoldingProfile.model_validate(body), added
 
 
+PROBE_PATHS = ("/investors", "/investor-relations")
+PROBE_HOSTS = ("ir.", "investors.")
+MAX_PROBES = 8
+
+
+def probe_urls(profile: HoldingProfile, denied: list[str]) -> list[str]:
+    """Likely IR landing pages on the domains the profile already names (its extra domains
+    and the hosts of any pages it has): `<domain>/investors`, `<domain>/investor-relations`,
+    `ir.<domain>` and `investors.<domain>`. A guess, so every one is fetched and judged."""
+    urls: list[str] = []
+    for domain in sorted({registrable(d) for d in profile.allowed_domains() if d}):
+        urls += [f"https://{domain}{p}" for p in PROBE_PATHS]
+        urls += [f"https://www.{domain}{p}" for p in PROBE_PATHS]
+        urls += [f"https://{h}{domain}/" for h in PROBE_HOSTS]
+    return [u for u in dict.fromkeys(urls) if not host_denied(u, denied)][:MAX_PROBES]
+
+
 async def discover_holding(
     ctx: JobContext,
     client: anthropic.AsyncAnthropic,
@@ -304,32 +326,45 @@ async def discover_holding(
         "Find its investor-relations website."
     )
     prompts = prompts or PromptsConfig()
-    pages, seen = await search_pages(
-        client, cfg, prompt, usage, prompts.text("ir_discovery_search", SEARCH_SYSTEM)
-    )
-    detail: dict[str, Any] = {"searched": True}
-    if pages is None or not pages.ir_url:
-        detail["reason"] = pages.reason if pages else "no answer"
-        return "none", detail, {}
-    detail["proposed"] = pages.model_dump()
-    ir_host = registrable(urlsplit(pages.ir_url).hostname or "")
-    proposed = [
-        pages.ir_url,
-        *pages.results_urls[:3],
-        *([pages.calendar_url] if pages.calendar_url else []),
-    ]
+    detail: dict[str, Any] = {}
     fetched: list[Fetched] = []
     rejected: dict[str, list[str]] = {}
-    for url in dict.fromkeys(proposed):
-        problems = check_url_shape(url, ir_host, seen, cfg.denied_domains)
-        if problems:
-            rejected[url] = problems
-            continue
-        page = await inspect_page(fetcher, url, names)
-        if page.usable:
-            fetched.append(page)
-        else:
-            rejected[url] = page.problems
+    # Code first: common investor-relations paths on a domain the profile already knows. The
+    # web search (the expensive call) runs only when no probe loads a page naming the company.
+    if cfg.probe_first:
+        for url in probe_urls(profile, cfg.denied_domains):
+            page = await inspect_page(fetcher, url, names)
+            if page.usable:
+                fetched.append(page)
+            else:
+                rejected[url] = page.problems
+        if fetched:
+            detail["probed"] = [p.url for p in fetched]
+    if not fetched:
+        pages, seen = await search_pages(
+            client, cfg, prompt, usage, prompts.text("ir_discovery_search", SEARCH_SYSTEM)
+        )
+        detail["searched"] = True
+        if pages is None or not pages.ir_url:
+            detail["reason"] = pages.reason if pages else "no answer"
+            return "none", detail, {}
+        detail["proposed"] = pages.model_dump()
+        ir_host = registrable(urlsplit(pages.ir_url).hostname or "")
+        proposed = [
+            pages.ir_url,
+            *pages.results_urls[:3],
+            *([pages.calendar_url] if pages.calendar_url else []),
+        ]
+        for url in dict.fromkeys(proposed):
+            problems = check_url_shape(url, ir_host, seen, cfg.denied_domains)
+            if problems:
+                rejected[url] = problems
+                continue
+            page = await inspect_page(fetcher, url, names)
+            if page.usable:
+                fetched.append(page)
+            else:
+                rejected[url] = page.problems
     detail["mechanical_rejections"] = rejected
     if not fetched:
         return "left", detail, {}
@@ -489,7 +524,11 @@ async def ir_discovery_handler(ctx: JobContext) -> None:
     async with ctx.step("register_pages") as step:
         step.detail["registered"] = await register_results_pages(ctx, profiles_stored.body)
     try:
-        client = create_client(settings)
+        anthropic_client = create_client(settings)
+        llm = create_llm(settings, anthropic_client)
+        client = routing_client(
+            anthropic_client, llm, ResultCache(ctx.pool, "ir_discovery", search_ttl_days=3)
+        )
     except AINotConfigured as exc:
         raise JobFailed(str(exc)) from exc
     last = {
@@ -538,14 +577,17 @@ async def ir_discovery_handler(ctx: JobContext) -> None:
         async with new_client() as http, AsyncExitStack() as stack:
             fetcher = build_fetcher(http, cfg.browser_fallback, agent)
             stack.push_async_callback(fetcher.aclose)
-            for _seen_at, profile in due:
+
+            async def discover(
+                profile: HoldingProfile,
+            ) -> tuple[str, dict[str, Any], dict[str, Any]]:
                 row = await ctx.pool.fetchrow(
                     "select name, isin from public.instrument where t212_ticker = $1",
                     profile.ticker,
                 )
                 name = (row["name"] if row else None) or profile.company_name
                 try:
-                    outcome, detail, fields = await discover_holding(
+                    return await discover_holding(
                         ctx,
                         client,
                         fetcher,
@@ -557,7 +599,27 @@ async def ir_discovery_handler(ctx: JobContext) -> None:
                         prompts,
                     )
                 except (anthropic.APIError, pydantic.ValidationError, ValueError) as exc:
-                    outcome, detail, fields = "error", {"error": str(exc)[:200]}, {}
+                    return "error", {"error": str(exc)[:200]}, {}
+
+            # With `use_batch` and an OpenAI or Google model every holding's search runs as one
+            # batch, then every judgement as a second; the flows are independent of each other
+            # and of the profiles, which are updated afterwards, one at a time.
+            if (
+                cfg.use_batch
+                and provider_of(cfg.model) != "anthropic"
+                and llm.configured(cfg.model)
+            ):
+                with batch_collector(client, llm, cfg.batch_wait_minutes) as collector:
+                    ran = await collector.run([discover(p) for _, p in due])
+                step.detail["batch_rounds"] = collector.rounds
+            else:
+                ran = [await discover(p) for _, p in due]
+            for (_seen_at, profile), outcome_detail in zip(due, ran, strict=True):
+                if isinstance(outcome_detail, BaseException):
+                    if isinstance(outcome_detail, BudgetExceeded):
+                        raise outcome_detail
+                    outcome_detail = ("error", {"error": str(outcome_detail)[:200]}, {})
+                outcome, detail, fields = outcome_detail
                 if outcome == "applied":
                     current = body.for_ticker(profile.ticker)
                     assert current is not None

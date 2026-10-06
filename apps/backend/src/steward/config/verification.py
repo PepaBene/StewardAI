@@ -66,6 +66,17 @@ class ClaimVerifierSettings(ConfigModel):
         description="Before the model call, code checks that every number in a sentence "
         "appears in a snippet it cites; a sentence that fails is unsupported without a call.",
     )
+    date_check: bool = Field(
+        default=True,
+        description="Code checks that every full date in a sentence (2026-11-12, 12 November "
+        "2026, November 12, 2026) appears in a snippet it cites; a sentence that fails is "
+        "unsupported without a model call.",
+    )
+    quote_check: bool = Field(
+        default=True,
+        description="A sentence that is a verbatim run of a cited snippet (and passed the "
+        "number and date checks) is supported without a model call.",
+    )
     applies_to: list[ClaimTarget] = Field(
         default_factory=lambda: list(ALL_CLAIM_TARGETS),
         description="Reports whose sentences are checked. Alerts are composed in code from "

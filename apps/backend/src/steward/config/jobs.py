@@ -210,6 +210,12 @@ class EarningsCalendarSettings(ConfigModel):
         description="The weekly run refreshes holdings reporting within this many days (and "
         "those with no date); the quarterly run refreshes every holding.",
     )
+    use_batch: bool = Field(
+        default=False,
+        description="Read the IR pages in one provider batch (about half the price, results "
+        "within hours). Only for OpenAI and Google models.",
+    )
+    batch_wait_minutes: int = Field(default=60, ge=1, le=1440)
 
     @model_validator(mode="after")
     def _effort_supported(self) -> Self:
@@ -242,6 +248,18 @@ class AiApprovalSettings(ConfigModel):
     )
     max_confirmed_peers: int = Field(default=8, ge=1, le=20)
     max_calls_per_run: int = Field(default=40, ge=1, le=200)
+    rules_first: bool = Field(
+        default=True,
+        description="Settle a listing in code when the market suffix, ISIN country and symbol "
+        "all agree (confirm) or the suffix and symbol both fail (reject); the AI only judges "
+        "the rest. Each decision records whether a rule or the model made it.",
+    )
+    use_batch: bool = Field(
+        default=False,
+        description="Judge the suggestions side by side and send them as one provider batch, "
+        "about half the price. Only for OpenAI and Google models.",
+    )
+    batch_wait_minutes: int = Field(default=60, ge=1, le=1440)
 
     @model_validator(mode="after")
     def _effort_supported(self) -> Self:
@@ -287,6 +305,19 @@ class IrDiscoverySettings(ConfigModel):
         default=4, ge=1, le=10, description="Web searches per holding, the expensive part."
     )
     holdings_per_run: int = Field(default=6, ge=1, le=40)
+    use_batch: bool = Field(
+        default=False,
+        description="Run the holdings side by side and send each round of calls (all the "
+        "searches, then all the judgements) as one provider batch, about half the price. Only "
+        "for OpenAI and Google models; the run waits for the batch.",
+    )
+    batch_wait_minutes: int = Field(default=60, ge=1, le=1440)
+    probe_first: bool = Field(
+        default=True,
+        description="Before the web search, try common investor-relations paths on the "
+        "domains the holding profile already names; search only when none loads a page "
+        "naming the company.",
+    )
     browser_fallback: bool = Field(
         default=False,
         description="Retry a page in a headless browser when a plain request is refused "
@@ -358,6 +389,12 @@ class GapResearchSettings(ConfigModel):
     )
     max_searches: int = Field(default=3, ge=1, le=10, description="Web searches per slot.")
     slots_per_run: int = Field(default=8, ge=1, le=60, description="Cost guard per run.")
+    use_batch: bool = Field(
+        default=False,
+        description="Run the slots side by side and send each round of calls as one provider "
+        "batch, about half the price. Only for OpenAI and Google models.",
+    )
+    batch_wait_minutes: int = Field(default=60, ge=1, le=1440)
     browser_fallback: bool = Field(
         default=False,
         description="Retry a page in a headless browser when a plain request is refused "
@@ -440,6 +477,16 @@ class NewsSettings(ConfigModel):
     classification_effort: Effort | None = Field(default=None, description=EFFORT_HELP)
     classification_batch_size: int = Field(
         default=50, ge=5, le=100, description="Items per classification call."
+    )
+    classification_use_batch: bool = Field(
+        default=False,
+        description="Send a run's classification calls through the provider's batch API (half"
+        " price, answers within minutes to hours) when the model is an OpenAI or Google one."
+        " A group the batch does not answer is classified directly. Off: every call is direct,"
+        " so a severe item is labelled at once.",
+    )
+    classification_batch_wait_minutes: float = Field(
+        default=30, ge=1, le=1440, description="How long a classification batch is waited for."
     )
     corroboration_model: ModelId = "claude-haiku-4-5"
     corroboration_effort: Effort | None = Field(default=None, description=EFFORT_HELP)
@@ -1185,6 +1232,11 @@ class ChatSettings(ConfigModel):
 
     model: ModelId = "claude-sonnet-5"
     effort: Effort | None = Field(default=None, description=EFFORT_HELP)
+    rules_first: bool = Field(
+        default=True,
+        description="Answer a short, closed question about the portfolio's value or cash from "
+        "the database with a template (no model call); everything else goes to the assistant.",
+    )
     max_steps: int = Field(
         default=30, ge=1, le=100, description="Claude calls plus tool rounds per answer."
     )

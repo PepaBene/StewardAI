@@ -14,7 +14,7 @@ from typing import Any, Literal
 from pydantic import BaseModel
 
 Provider = Literal["anthropic", "openai", "google"]
-StopReason = Literal["end", "max_tokens", "refusal", "other"]
+StopReason = Literal["end", "max_tokens", "refusal", "tool_use", "other"]
 
 
 def provider_of(model: str) -> Provider:
@@ -39,9 +39,34 @@ class LLMError(Exception):
 
 
 @dataclass(frozen=True)
+class ToolSpec:
+    """A function the model may call (the app's own read tools, not a web search)."""
+
+    name: str
+    description: str
+    schema: dict[str, Any]
+
+
+@dataclass(frozen=True)
+class ToolCall:
+    id: str
+    name: str
+    arguments: dict[str, Any]
+
+
+@dataclass(frozen=True)
 class Message:
-    role: Literal["user", "assistant"]
-    text: str
+    """One turn. `role="tool"` carries the result of the call `tool_call_id` (named
+    `tool_name`). An assistant turn that called tools keeps the provider's own output items in
+    `raw` and sends them back as they came: reasoning items (OpenAI) and thought signatures
+    (Google) are needed to continue the turn."""
+
+    role: Literal["user", "assistant", "tool"]
+    text: str = ""
+    tool_calls: tuple[ToolCall, ...] = ()
+    tool_call_id: str | None = None
+    tool_name: str | None = None
+    raw: Any = None
 
 
 @dataclass(frozen=True)
@@ -59,6 +84,7 @@ class Request:
     system: str
     messages: tuple[Message, ...]
     schema: type[BaseModel] | None = None
+    tools: tuple[ToolSpec, ...] = ()
     effort: str | None = None
     max_tokens: int = 4096
     search: SearchSpec | None = None
@@ -109,3 +135,7 @@ class Completion:
     # Google cannot restrict a search to a domain list: citations outside it are removed here
     # and counted, so a job with source tiers can reject an answer that leaned on them.
     off_list_citations: list[Citation] = field(default_factory=list)
+    # Set when the model asks for the app's tools (stop_reason "tool_use"); `raw` is what to
+    # send back as the assistant turn.
+    tool_calls: list[ToolCall] = field(default_factory=list)
+    raw: Any = None

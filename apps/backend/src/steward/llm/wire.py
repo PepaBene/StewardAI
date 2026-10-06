@@ -3,6 +3,7 @@ generateContent. Pure functions (no network), so they are tested against recorde
 
 import copy
 import json
+from collections.abc import Sequence
 from typing import Any
 from urllib.parse import urlparse
 
@@ -12,8 +13,10 @@ from steward.llm.types import (
     Citation,
     Completion,
     LLMError,
+    Message,
     Request,
     StopReason,
+    ToolCall,
     normalized_usage,
 )
 
@@ -67,7 +70,7 @@ def openai_body(req: Request) -> dict[str, Any]:
     body: dict[str, Any] = {
         "model": req.model,
         "instructions": req.system,
-        "input": [{"role": m.role, "content": m.text} for m in req.messages],
+        "input": _openai_input(req.messages),
         "max_output_tokens": req.max_tokens,
         "store": False,
     }
@@ -84,24 +87,63 @@ def openai_body(req: Request) -> dict[str, Any]:
                 "strict": True,
             }
         }
+    tools: list[dict[str, Any]] = [
+        {
+            "type": "function",
+            "name": t.name,
+            "description": t.description,
+            "parameters": t.schema,
+            "strict": False,
+        }
+        for t in req.tools
+    ]
     if req.search is not None:
         tool: dict[str, Any] = {"type": "web_search"}
         if req.search.allowed_domains:
             tool["filters"] = {"allowed_domains": list(req.search.allowed_domains[:100])}
-        body["tools"] = [tool]
+        tools.append(tool)
         body["max_tool_calls"] = req.search.max_uses
+    if tools:
+        body["tools"] = tools
     return body
+
+
+def _openai_input(messages: Sequence[Message]) -> list[Any]:
+    out: list[Any] = []
+    for m in messages:
+        if m.role == "tool":
+            out.append(
+                {"type": "function_call_output", "call_id": m.tool_call_id, "output": m.text}
+            )
+        elif m.role == "assistant" and m.raw is not None:
+            out.extend(m.raw)  # the previous output items, reasoning included
+        else:
+            out.append({"role": m.role, "content": m.text})
+    return out
 
 
 def openai_completion(req: Request, data: dict[str, Any]) -> Completion:
     text_parts: list[str] = []
     citations: list[Citation] = []
+    calls: list[ToolCall] = []
     searches = 0
     refused = False
     for item in data.get("output") or []:
         kind = item.get("type")
         if kind == "web_search_call":
             searches += 1
+        elif kind == "function_call":
+            try:
+                args = json.loads(item.get("arguments") or "{}")
+            except ValueError:
+                args = {}
+            calls.append(
+                ToolCall(
+                    str(item.get("call_id") or item.get("id")),
+                    str(item.get("name")),
+                    args if isinstance(args, dict) else {},
+                )
+            )
         elif kind == "message":
             for part in item.get("content") or []:
                 if part.get("type") == "output_text":
@@ -115,7 +157,9 @@ def openai_completion(req: Request, data: dict[str, Any]) -> Completion:
     cached = (usage.get("input_tokens_details") or {}).get("cached_tokens") or 0
     prompt = usage.get("input_tokens") or 0
     stop: StopReason = "end"
-    if refused:
+    if calls:
+        stop = "tool_use"
+    elif refused:
         stop = "refusal"
     elif data.get("status") == "incomplete":
         reason = (data.get("incomplete_details") or {}).get("reason")
@@ -140,6 +184,8 @@ def openai_completion(req: Request, data: dict[str, Any]) -> Completion:
             searches=searches,
         ),
         citations=_dedupe(citations),
+        tool_calls=calls,
+        raw=list(data.get("output") or []) if calls else None,
     )
 
 
@@ -157,15 +203,42 @@ def google_body(req: Request) -> dict[str, Any]:
         config["thinkingConfig"] = {"thinkingLevel": _GOOGLE_LEVEL.get(req.effort, "medium")}
     body: dict[str, Any] = {
         "systemInstruction": {"parts": [{"text": req.system}]},
-        "contents": [
-            {"role": "model" if m.role == "assistant" else "user", "parts": [{"text": m.text}]}
-            for m in req.messages
-        ],
+        "contents": _google_contents(req.messages),
         "generationConfig": config,
     }
+    tools: list[dict[str, Any]] = []
+    if req.tools:
+        tools.append(
+            {
+                "functionDeclarations": [
+                    {"name": t.name, "description": t.description, "parametersJsonSchema": t.schema}
+                    for t in req.tools
+                ]
+            }
+        )
     if req.search is not None:
-        body["tools"] = [{"googleSearch": {}}]
+        tools.append({"googleSearch": {}})
+    if tools:
+        body["tools"] = tools
     return body
+
+
+def _google_contents(messages: Sequence[Message]) -> list[dict[str, Any]]:
+    out: list[dict[str, Any]] = []
+    for m in messages:
+        if m.role == "tool":
+            part = {"functionResponse": {"name": m.tool_name, "response": {"result": m.text}}}
+            if out and out[-1].get("role") == "user" and out[-1].get("_tool"):
+                out[-1]["parts"].append(part)  # all results of one turn share one content
+            else:
+                out.append({"role": "user", "parts": [part], "_tool": True})
+        elif m.role == "assistant" and m.raw is not None:
+            out.append(m.raw)  # the model's own content, thought signatures included
+        else:
+            out.append(
+                {"role": "model" if m.role == "assistant" else "user", "parts": [{"text": m.text}]}
+            )
+    return [{k: v for k, v in c.items() if k != "_tool"} for c in out]
 
 
 def _host(url: str) -> str:
@@ -189,9 +262,18 @@ def google_completion(req: Request, data: dict[str, Any]) -> Completion:
         for p in (cand.get("content") or {}).get("parts") or []
         if not p.get("thought")
     )
+    calls = [
+        ToolCall(
+            str(p["functionCall"].get("id") or f"call_{i}"),
+            str(p["functionCall"].get("name")),
+            dict(p["functionCall"].get("args") or {}),
+        )
+        for i, p in enumerate((cand.get("content") or {}).get("parts") or [])
+        if isinstance(p.get("functionCall"), dict)
+    ]
     finish = cand.get("finishReason")
     stops: dict[str, StopReason] = {"STOP": "end", "MAX_TOKENS": "max_tokens"}
-    stop = stops.get(str(finish), "other")
+    stop = "tool_use" if calls else stops.get(str(finish), "other")
     if finish in ("SAFETY", "PROHIBITED_CONTENT", "RECITATION", "BLOCKLIST"):
         stop = "refusal"
     grounding = cand.get("groundingMetadata") or {}
@@ -223,7 +305,133 @@ def google_completion(req: Request, data: dict[str, Any]) -> Completion:
         ),
         citations=_dedupe(kept),
         off_list_citations=_dedupe(off),
+        tool_calls=calls,
+        raw=cand.get("content") if calls else None,
     )
+
+
+# --------------------------------------------------------------------------- Batch
+# Both providers take a set of requests, run them within a day at half price, and return one
+# answer per request. A request that failed comes back as None, so the caller can ask again
+# directly; one bad request never loses the others.
+
+
+def custom_id(index: int) -> str:
+    return f"r{index}"
+
+
+def openai_batch_lines(requests: Sequence[Request]) -> str:
+    """The JSONL file of an OpenAI batch: one /v1/responses request per line."""
+    return "\n".join(
+        json.dumps(
+            {
+                "custom_id": custom_id(i),
+                "method": "POST",
+                "url": "/v1/responses",
+                "body": openai_body(r),
+            }
+        )
+        for i, r in enumerate(requests)
+    )
+
+
+def _by_index(lines: Sequence[tuple[str, Any]], n: int) -> list[Any]:
+    out: list[Any] = [None] * n
+    for key, value in lines:
+        if key.startswith("r") and key[1:].isdigit() and int(key[1:]) < n:
+            out[int(key[1:])] = value
+    return out
+
+
+def openai_batch_results(text: str, requests: Sequence[Request]) -> list[Completion | None]:
+    """The answers in an OpenAI batch's output file (JSONL), by request; None where a request
+    failed, was refused or does not match its schema."""
+    found: list[tuple[str, Completion | None]] = []
+    for line in text.splitlines():
+        if not line.strip():
+            continue
+        try:
+            row = json.loads(line)
+        except ValueError:
+            continue
+        response = row.get("response") or {}
+        key = str(row.get("custom_id"))
+        index = int(key[1:]) if key[1:].isdigit() and key.startswith("r") else -1
+        if row.get("error") or response.get("status_code") != 200 or not 0 <= index < len(requests):
+            found.append((key, None))
+            continue
+        try:
+            found.append((key, openai_completion(requests[index], response.get("body") or {})))
+        except LLMError:
+            found.append((key, None))
+    return _by_index(found, len(requests))
+
+
+def google_batch_body(requests: Sequence[Request], name: str) -> dict[str, Any]:
+    """The `batchGenerateContent` body: the requests inline, each tagged with its key."""
+    return {
+        "batch": {
+            "display_name": name,
+            "input_config": {
+                "requests": {
+                    "requests": [
+                        {"request": google_body(r), "metadata": {"key": custom_id(i)}}
+                        for i, r in enumerate(requests)
+                    ]
+                }
+            },
+        }
+    }
+
+
+GOOGLE_DONE = {"BATCH_STATE_SUCCEEDED", "JOB_STATE_SUCCEEDED"}
+GOOGLE_FAILED = {
+    "BATCH_STATE_FAILED",
+    "BATCH_STATE_CANCELLED",
+    "BATCH_STATE_EXPIRED",
+    "JOB_STATE_FAILED",
+    "JOB_STATE_CANCELLED",
+    "JOB_STATE_EXPIRED",
+}
+
+
+def google_batch_state(data: dict[str, Any]) -> str:
+    """ "done", "failed" or "running" from a Google batch operation."""
+    state = str((data.get("metadata") or {}).get("state") or data.get("state") or "")
+    if state in GOOGLE_DONE or (data.get("done") and not data.get("error") and not state):
+        return "done"
+    if state in GOOGLE_FAILED or data.get("error"):
+        return "failed"
+    return "running"
+
+
+def _google_inlined(data: dict[str, Any]) -> list[Any]:
+    for holder in (data.get("response"), data.get("dest"), data.get("metadata"), data):
+        if not isinstance(holder, dict):
+            continue
+        inline = holder.get("inlinedResponses")
+        if isinstance(inline, dict):
+            inline = inline.get("inlinedResponses")
+        if isinstance(inline, list):
+            return inline
+    return []
+
+
+def google_batch_results(
+    data: dict[str, Any], requests: Sequence[Request]
+) -> list[Completion | None]:
+    found: list[tuple[str, Completion | None]] = []
+    for position, item in enumerate(_google_inlined(data)):
+        key = str((item.get("metadata") or {}).get("key") or custom_id(position))
+        index = int(key[1:]) if key[1:].isdigit() and key.startswith("r") else -1
+        if item.get("error") or not item.get("response") or not 0 <= index < len(requests):
+            found.append((key, None))
+            continue
+        try:
+            found.append((key, google_completion(requests[index], item["response"])))
+        except LLMError:
+            found.append((key, None))
+    return _by_index(found, len(requests))
 
 
 def _dedupe(citations: list[Citation]) -> list[Citation]:

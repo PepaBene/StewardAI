@@ -329,10 +329,12 @@ def main(argv: list[str] | None = None) -> int:
         cases = [c for c in cases if c.id in wanted]
     extractor: Extractor
     if args.live:
-        from steward.ai import create_client
+        from steward.llm.routing import create_routing_client
         from steward.settings import get_settings
 
-        extractor = ClaudeExtractor(create_client(get_settings()), args.model, args.effort)
+        extractor = ClaudeExtractor(
+            create_routing_client(get_settings())[0], args.model, args.effort
+        )
     elif args.replay:
         extractor = ReplayExtractor(args.replay, cases)
     else:

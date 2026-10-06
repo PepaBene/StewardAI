@@ -22,7 +22,6 @@ from typing import Any, Literal
 import anthropic
 import asyncpg
 import httpx
-import pydantic
 from pydantic import BaseModel, Field
 
 from steward import __version__
@@ -35,7 +34,7 @@ from steward.free_sources import collect_finnhub_research, set_peer_status
 from steward.jobs.runner import JobContext, JobFailed
 from steward.llm.cache import ResultCache
 from steward.llm.client import create_llm
-from steward.llm.routing import routing_client
+from steward.llm.routing import parse_many, routing_client
 from steward.reference.listings import ListingDecisionError, confirm_listing
 from steward.settings import get_settings
 from steward.sources.free_market import FreeSourceError
@@ -111,6 +110,20 @@ def _suffix(ticker: str) -> str | None:
     return match.group(0) if match else None
 
 
+def listing_rule(checks: list[Check]) -> tuple[Literal["confirmed", "rejected"], str, str] | None:
+    """(decision, rule id, why) when the mechanical checks settle a listing, else None (the AI
+    decides). Confirmed only when the market suffix, the ISIN country and the symbol all pass:
+    a check that is unknown or not applicable never settles anything. Rejected only when the
+    suffix and the symbol both fail, so the same company on another venue is left for the AI."""
+    by_name = {c.name: c.ok for c in checks}
+    needed = ("market suffix", "isin country", "symbol")
+    if all(by_name.get(n) is True for n in needed):
+        return "confirmed", "listing-exact-match", "market suffix, ISIN country and symbol agree"
+    if by_name.get("market suffix") is False and by_name.get("symbol") is False:
+        return "rejected", "listing-clear-mismatch", "neither the market suffix nor the symbol fit"
+    return None
+
+
 def listing_checks(
     ticker: str,
     isin: str | None,
@@ -156,6 +169,7 @@ async def approve_listings(
     )
     usage = Usage(model=cfg.model)
     out: dict[str, Any] = {"suggested": len(rows), "decisions": []}
+    asked: list[tuple[asyncpg.Record, list[Any], dict[str, Any]]] = []
     for row in rows:
         if budget["calls"] <= 0:
             out["stopped"] = "max_calls_per_run reached"
@@ -167,6 +181,29 @@ async def approve_listings(
             row["symbol"],
             profiles.for_ticker(row["ticker"]),
         )
+        ruled = listing_rule(checks) if cfg.rules_first else None
+        if ruled is not None:
+            ruled_decision, rule_id, why = ruled
+            entry: dict[str, Any] = {
+                "ticker": row["ticker"],
+                "checks": [c.text() for c in checks],
+                "decided_by": "rule",
+                "rule": rule_id,
+            }
+            try:
+                await confirm_listing(
+                    ctx.pool,
+                    row["ticker"],
+                    ruled_decision,
+                    None,
+                    f"{AI_PREFIX} (rule {rule_id}): {why}",
+                )
+                entry["result"] = ruled_decision
+            except ListingDecisionError as exc:
+                entry["result"] = f"not applied: {exc}"
+            out["decisions"].append(entry)
+            out["by_rule"] = out.get("by_rule", 0) + 1
+            continue
         prompt = (
             f"<instrument>\nTicker: {row['ticker']}\nName: {row['name']}\nISIN: {row['isin']}\n"
             "</instrument>\n"
@@ -177,20 +214,37 @@ async def approve_listings(
             + "\n</mechanical_checks>\n\nDecide whether to confirm, reject or defer this listing."
         )
         budget["calls"] -= 1
-        try:
-            response = await client.messages.parse(
-                model=cfg.model,
-                system=system,
-                messages=[{"role": "user", "content": prompt}],
-                output_format=ListingVerdict,
-                **effort_kwargs(cfg.model, cfg.effort, 1500),
+        asked.append(
+            (
+                row,
+                checks,
+                {
+                    "model": cfg.model,
+                    "system": system,
+                    "messages": [{"role": "user", "content": prompt}],
+                    "output_format": ListingVerdict,
+                    **effort_kwargs(cfg.model, cfg.effort, 1500),
+                },
             )
-        except (anthropic.APIError, pydantic.ValidationError, ValueError) as exc:
-            out["decisions"].append({"ticker": row["ticker"], "error": str(exc)[:160]})
+        )
+    # With `use_batch` and an OpenAI or Google model all the judgements are one provider batch.
+    answers = await parse_many(
+        client,
+        [call for _, _, call in asked],
+        batch=cfg.use_batch,
+        wait_minutes=cfg.batch_wait_minutes,
+    )
+    for (row, checks, _call), response in zip(asked, answers, strict=True):
+        if isinstance(response, BaseException):
+            out["decisions"].append({"ticker": row["ticker"], "error": str(response)[:160]})
             continue
         usage.add(response.usage)
         verdict = response.parsed_output
-        entry: dict[str, Any] = {"ticker": row["ticker"], "checks": [c.text() for c in checks]}
+        entry = {
+            "ticker": row["ticker"],
+            "checks": [c.text() for c in checks],
+            "decided_by": "model",
+        }
         if verdict is None:
             entry["result"] = "no answer"
             out["decisions"].append(entry)
@@ -294,6 +348,9 @@ async def approve_peers(
     if not rows:
         return out
     known = await sec_tickers(http)
+    asked: list[
+        tuple[str, dict[str, Any], list[tuple[asyncpg.Record, str]], int, dict[str, Any]]
+    ] = []
     for ticker, candidates in by_holding.items():
         profile = profiles.for_ticker(ticker)
         if profile is None:
@@ -336,16 +393,31 @@ async def approve_peers(
             "Give one verdict for every candidate."
         )
         budget["calls"] -= 1
-        try:
-            response = await client.messages.parse(
-                model=cfg.model,
-                system=system,
-                messages=[{"role": "user", "content": prompt}],
-                output_format=PeerVerdicts,
-                **effort_kwargs(cfg.model, cfg.effort, 3000),
+        asked.append(
+            (
+                ticker,
+                result,
+                eligible,
+                room,
+                {
+                    "model": cfg.model,
+                    "system": system,
+                    "messages": [{"role": "user", "content": prompt}],
+                    "output_format": PeerVerdicts,
+                    **effort_kwargs(cfg.model, cfg.effort, 3000),
+                },
             )
-        except (anthropic.APIError, pydantic.ValidationError, ValueError) as exc:
-            result["error"] = str(exc)[:160]
+        )
+    # With `use_batch` and an OpenAI or Google model all the judgements are one provider batch.
+    answers = await parse_many(
+        client,
+        [item[4] for item in asked],
+        batch=cfg.use_batch,
+        wait_minutes=cfg.batch_wait_minutes,
+    )
+    for (ticker, result, eligible, room, _call), response in zip(asked, answers, strict=True):
+        if isinstance(response, BaseException):
+            result["error"] = str(response)[:160]
             out["holdings"][ticker] = result
             continue
         usage.add(response.usage)

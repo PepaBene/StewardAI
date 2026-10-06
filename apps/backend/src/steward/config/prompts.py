@@ -186,9 +186,29 @@ class PromptsConfig(ConfigModel):
         description="System prompt text per AI step, replacing the built-in default.",
     )
 
-    def text(self, key: PromptKey, default: str) -> str:
-        """The prompt to send: the override when one is set, else the caller's default."""
-        return self.overrides.get(key) or default
+    override_providers: dict[PromptKey, list[Literal["anthropic", "openai", "google"]]] = Field(
+        default_factory=dict,
+        description="The providers an override applies to. An override with no entry here"
+        " applies to every provider; with an entry, only to those, and a step on another"
+        " provider sends the built-in default (the default is the one the evals cover).",
+    )
+
+    def text(self, key: PromptKey, default: str, model: str | None = None) -> str:
+        """The prompt to send: the override when one is set (and, if it is limited to some
+        providers, when `model` belongs to one of them), else the caller's default."""
+        override = self.overrides.get(key)
+        if not override:
+            return default
+        providers = self.override_providers.get(key)
+        if providers and model is not None:
+            from steward.llm.types import provider_of
+
+            try:
+                if provider_of(model) not in providers:
+                    return default
+            except ValueError:
+                return default
+        return override
 
 
 async def load_prompts(conn: asyncpg.Connection | asyncpg.Pool) -> PromptsConfig:

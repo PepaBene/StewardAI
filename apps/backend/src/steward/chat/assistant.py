@@ -28,6 +28,15 @@ from steward.config.prompts import load_prompts
 from steward.config.store import load_active
 from steward.config.verification import ClaimVerifierSettings
 from steward.jobs.runner import JobContext, JobFailed
+from steward.llm.client import LLM, create_llm
+from steward.llm.types import (
+    LLMError,
+    Message,
+    Request,
+    SearchSpec,
+    ToolSpec,
+    provider_of,
+)
 from steward.news.corroborate import AUTO_CACHE
 from steward.news.normalize import host_of
 from steward.research.sources import Registry, Source
@@ -137,15 +146,80 @@ class ClaudeChatAssistant:
         settings: ChatSettings,
         domains: tuple[str, ...],
         system: str = SYSTEM,
+        llm: LLM | None = None,
     ) -> None:
         self._client = client
         self._settings = settings
         self._domains = domains
         self._system = system
+        self._llm = llm
+
+    async def _answer_other(
+        self, history: list[dict[str, str]], question: str, tools: ChatTools, today: dt.date
+    ) -> AssistantResult:
+        """The same loop on an OpenAI or Google model: the app's read tools are plain function
+        calls, the web search is the provider's own, and the answer is the same structured
+        draft. The history is sent as plain turns, in a stable order so the prefix caches."""
+        assert self._llm is not None
+        usage = Usage(model=self._settings.model)
+        specs = tuple(
+            ToolSpec(t["name"], t["description"], t["input_schema"]) for t in TOOL_DEFINITIONS
+        )
+        searches_left = self._settings.max_searches if self._domains else 0
+        messages: list[Message] = [
+            *(Message(m["role"], m["content"]) for m in history),  # type: ignore[arg-type]
+            Message("user", f"Today is {today.isoformat()}.\n\n{question}"),
+        ]
+        titles: dict[str, str] = {}
+        for _ in range(self._settings.max_steps):
+            request = Request(
+                model=self._settings.model,
+                system=self._system,
+                messages=tuple(messages),
+                schema=ChatAnswerDraft,
+                tools=specs,
+                effort=self._settings.effort,
+                max_tokens=8000,
+                search=(
+                    SearchSpec(max_uses=searches_left, allowed_domains=self._domains)
+                    if searches_left > 0
+                    else None
+                ),
+                cache_key="chat",
+            )
+            try:
+                done = await self._llm.complete(request)
+            except LLMError as exc:
+                return AssistantResult(None, usage, titles, f"the call failed: {exc}"[:300])
+            usage.add(done.usage)
+            searches_left = max(0, searches_left - done.usage.server_tool_use.web_search_requests)
+            titles |= {c.url: c.title for c in done.citations if c.title}
+            if done.stop_reason == "refusal":
+                return AssistantResult(None, usage, titles, "the model declined")
+            if done.stop_reason == "tool_use":
+                messages.append(
+                    Message("assistant", done.text, tuple(done.tool_calls), raw=done.raw)
+                )
+                for call in done.tool_calls:
+                    output = await tools.call(call.name, dict(call.arguments))
+                    messages.append(
+                        Message(
+                            "tool",
+                            json.dumps(output, default=str)[:200_000],
+                            tool_call_id=call.id,
+                            tool_name=call.name,
+                        )
+                    )
+                continue
+            draft = done.parsed if isinstance(done.parsed, ChatAnswerDraft) else None
+            return AssistantResult(draft, usage, titles, draft_note(draft))
+        return AssistantResult(None, usage, titles, "the step cap was reached before an answer")
 
     async def answer(
         self, history: list[dict[str, str]], question: str, tools: ChatTools, today: dt.date
     ) -> AssistantResult:
+        if provider_of(self._settings.model) != "anthropic":
+            return await self._answer_other(history, question, tools, today)
         usage = Usage(model=self._settings.model)
         # `max_uses` caps one API request, and an answer takes several: pass what is left of
         # the per-answer budget each time, and drop web search once it is spent.
@@ -447,8 +521,17 @@ async def chat_handler(ctx: JobContext) -> None:
     else:
         prompts = await load_prompts(ctx.pool)
         assistant = ClaudeChatAssistant(
-            client, chat_settings, domains, prompts.text("chat_assistant", SYSTEM)
+            client,
+            chat_settings,
+            domains,
+            prompts.text("chat_assistant", SYSTEM, chat_settings.model),
+            llm=create_llm(settings, client),
         )
+    if chat_settings.rules_first:
+        # Closed questions (portfolio value, cash) are answered from the read models.
+        from steward.chat.rules import RuleChatAssistant
+
+        assistant = RuleChatAssistant(assistant, chat_settings.model)
     try:
         await run_chat(ctx, ChatDeps(assistant=assistant, now=dt.datetime.now(dt.UTC)))
     except Exception:

@@ -4765,6 +4765,23 @@ export interface components {
              * @default 40
              */
             max_calls_per_run: number;
+            /**
+             * Rules First
+             * @description Settle a listing in code when the market suffix, ISIN country and symbol all agree (confirm) or the suffix and symbol both fail (reject); the AI only judges the rest. Each decision records whether a rule or the model made it.
+             * @default true
+             */
+            rules_first: boolean;
+            /**
+             * Use Batch
+             * @description Judge the suggestions side by side and send them as one provider batch, about half the price. Only for OpenAI and Google models.
+             * @default false
+             */
+            use_batch: boolean;
+            /**
+             * Batch Wait Minutes
+             * @default 60
+             */
+            batch_wait_minutes: number;
         };
         /** AlertOut */
         AlertOut: {
@@ -5474,6 +5491,12 @@ export interface components {
              */
             effort?: ("low" | "medium" | "high" | "xhigh" | "max") | null;
             /**
+             * Rules First
+             * @description Answer a short, closed question about the portfolio's value or cash from the database with a template (no model call); everything else goes to the assistant.
+             * @default true
+             */
+            rules_first: boolean;
+            /**
              * Max Steps
              * @description Claude calls plus tool rounds per answer.
              * @default 30
@@ -5645,6 +5668,18 @@ export interface components {
              * @default true
              */
             numeric_check: boolean;
+            /**
+             * Date Check
+             * @description Code checks that every full date in a sentence (2026-11-12, 12 November 2026, November 12, 2026) appears in a snippet it cites; a sentence that fails is unsupported without a model call.
+             * @default true
+             */
+            date_check: boolean;
+            /**
+             * Quote Check
+             * @description A sentence that is a verbatim run of a cited snippet (and passed the number and date checks) is supported without a model call.
+             * @default true
+             */
+            quote_check: boolean;
             /**
              * Applies To
              * @description Reports whose sentences are checked. Alerts are composed in code from the source's own headline, so they have no model-written sentences to check.
@@ -7267,6 +7302,17 @@ export interface components {
              * @default 14
              */
             refresh_within_days: number;
+            /**
+             * Use Batch
+             * @description Read the IR pages in one provider batch (about half the price, results within hours). Only for OpenAI and Google models.
+             * @default false
+             */
+            use_batch: boolean;
+            /**
+             * Batch Wait Minutes
+             * @default 60
+             */
+            batch_wait_minutes: number;
         };
         /** EarningsCheckRequest */
         EarningsCheckRequest: {
@@ -9632,6 +9678,17 @@ export interface components {
              */
             slots_per_run: number;
             /**
+             * Use Batch
+             * @description Run the slots side by side and send each round of calls as one provider batch, about half the price. Only for OpenAI and Google models.
+             * @default false
+             */
+            use_batch: boolean;
+            /**
+             * Batch Wait Minutes
+             * @default 60
+             */
+            batch_wait_minutes: number;
+            /**
              * Browser Fallback
              * @description Retry a page in a headless browser when a plain request is refused (HTTP 403/429) or returns an empty JavaScript shell. Still obeys robots.txt and never logs in or gets past a challenge. Needs the browser build of the image.
              * @default false
@@ -11109,6 +11166,23 @@ export interface components {
              */
             holdings_per_run: number;
             /**
+             * Use Batch
+             * @description Run the holdings side by side and send each round of calls (all the searches, then all the judgements) as one provider batch, about half the price. Only for OpenAI and Google models; the run waits for the batch.
+             * @default false
+             */
+            use_batch: boolean;
+            /**
+             * Batch Wait Minutes
+             * @default 60
+             */
+            batch_wait_minutes: number;
+            /**
+             * Probe First
+             * @description Before the web search, try common investor-relations paths on the domains the holding profile already names; search only when none loads a page naming the company.
+             * @default true
+             */
+            probe_first: boolean;
+            /**
              * Browser Fallback
              * @description Retry a page in a headless browser when a plain request is refused (HTTP 403/429) or returns an empty JavaScript shell. Still obeys robots.txt and never logs in or gets past a challenge. Needs the browser build of the image.
              * @default false
@@ -11504,6 +11578,11 @@ export interface components {
              * @description Keeps running at the monthly cap.
              */
             critical: boolean;
+            /**
+             * Cache Hit Rate
+             * @description Cache-read tokens / all input tokens of the month's steps; a silent drop means a prompt prefix stopped being stable. Null: no input tokens.
+             */
+            cache_hit_rate?: number | null;
         };
         /**
          * JobsConfig
@@ -12617,6 +12696,12 @@ export interface components {
             steps: number;
             /** Cost Usd */
             cost_usd: number;
+            /**
+             * Provider
+             * @description anthropic, openai or google, from the model id.
+             * @default unknown
+             */
+            provider: string;
         };
         /** ModelPrice */
         ModelPrice: {
@@ -12854,6 +12939,18 @@ export interface components {
              * @default 50
              */
             classification_batch_size: number;
+            /**
+             * Classification Use Batch
+             * @description Send a run's classification calls through the provider's batch API (half price, answers within minutes to hours) when the model is an OpenAI or Google one. A group the batch does not answer is classified directly. Off: every call is direct, so a severe item is labelled at once.
+             * @default false
+             */
+            classification_use_batch: boolean;
+            /**
+             * Classification Batch Wait Minutes
+             * @description How long a classification batch is waited for.
+             * @default 30
+             */
+            classification_batch_wait_minutes: number;
             /**
              * Corroboration Model
              * @default claude-haiku-4-5
@@ -14225,6 +14322,13 @@ export interface components {
              */
             overrides?: {
                 [key: string]: string;
+            };
+            /**
+             * Override Providers
+             * @description The providers an override applies to. An override with no entry here applies to every provider; with an entry, only to those, and a step on another provider sends the built-in default (the default is the one the evals cover).
+             */
+            override_providers?: {
+                [key: string]: ("anthropic" | "openai" | "google")[];
             };
         };
         /** PromptsConfigVersion */

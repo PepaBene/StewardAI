@@ -14591,6 +14591,25 @@
             "minimum": 1.0,
             "title": "Max Calls Per Run",
             "default": 40
+          },
+          "rules_first": {
+            "type": "boolean",
+            "title": "Rules First",
+            "description": "Settle a listing in code when the market suffix, ISIN country and symbol all agree (confirm) or the suffix and symbol both fail (reject); the AI only judges the rest. Each decision records whether a rule or the model made it.",
+            "default": true
+          },
+          "use_batch": {
+            "type": "boolean",
+            "title": "Use Batch",
+            "description": "Judge the suggestions side by side and send them as one provider batch, about half the price. Only for OpenAI and Google models.",
+            "default": false
+          },
+          "batch_wait_minutes": {
+            "type": "integer",
+            "maximum": 1440.0,
+            "minimum": 1.0,
+            "title": "Batch Wait Minutes",
+            "default": 60
           }
         },
         "additionalProperties": false,
@@ -16483,6 +16502,12 @@
             "title": "Effort",
             "description": "Unset: effort is not sent and the model's default applies. On Haiku 4 models the level sets an extended-thinking budget instead (low 2k to max 32k tokens)."
           },
+          "rules_first": {
+            "type": "boolean",
+            "title": "Rules First",
+            "description": "Answer a short, closed question about the portfolio's value or cash from the database with a template (no model call); everything else goes to the assistant.",
+            "default": true
+          },
           "max_steps": {
             "type": "integer",
             "maximum": 100.0,
@@ -16900,6 +16925,18 @@
             "type": "boolean",
             "title": "Numeric Check",
             "description": "Before the model call, code checks that every number in a sentence appears in a snippet it cites; a sentence that fails is unsupported without a call.",
+            "default": true
+          },
+          "date_check": {
+            "type": "boolean",
+            "title": "Date Check",
+            "description": "Code checks that every full date in a sentence (2026-11-12, 12 November 2026, November 12, 2026) appears in a snippet it cites; a sentence that fails is unsupported without a model call.",
+            "default": true
+          },
+          "quote_check": {
+            "type": "boolean",
+            "title": "Quote Check",
+            "description": "A sentence that is a verbatim run of a cited snippet (and passed the number and date checks) is supported without a model call.",
             "default": true
           },
           "applies_to": {
@@ -21366,6 +21403,19 @@
             "title": "Refresh Within Days",
             "description": "The weekly run refreshes holdings reporting within this many days (and those with no date); the quarterly run refreshes every holding.",
             "default": 14
+          },
+          "use_batch": {
+            "type": "boolean",
+            "title": "Use Batch",
+            "description": "Read the IR pages in one provider batch (about half the price, results within hours). Only for OpenAI and Google models.",
+            "default": false
+          },
+          "batch_wait_minutes": {
+            "type": "integer",
+            "maximum": 1440.0,
+            "minimum": 1.0,
+            "title": "Batch Wait Minutes",
+            "default": 60
           }
         },
         "additionalProperties": false,
@@ -27598,6 +27648,19 @@
             "description": "Cost guard per run.",
             "default": 8
           },
+          "use_batch": {
+            "type": "boolean",
+            "title": "Use Batch",
+            "description": "Run the slots side by side and send each round of calls as one provider batch, about half the price. Only for OpenAI and Google models.",
+            "default": false
+          },
+          "batch_wait_minutes": {
+            "type": "integer",
+            "maximum": 1440.0,
+            "minimum": 1.0,
+            "title": "Batch Wait Minutes",
+            "default": 60
+          },
           "browser_fallback": {
             "type": "boolean",
             "title": "Browser Fallback",
@@ -32136,6 +32199,25 @@
             "title": "Holdings Per Run",
             "default": 6
           },
+          "use_batch": {
+            "type": "boolean",
+            "title": "Use Batch",
+            "description": "Run the holdings side by side and send each round of calls (all the searches, then all the judgements) as one provider batch, about half the price. Only for OpenAI and Google models; the run waits for the batch.",
+            "default": false
+          },
+          "batch_wait_minutes": {
+            "type": "integer",
+            "maximum": 1440.0,
+            "minimum": 1.0,
+            "title": "Batch Wait Minutes",
+            "default": 60
+          },
+          "probe_first": {
+            "type": "boolean",
+            "title": "Probe First",
+            "description": "Before the web search, try common investor-relations paths on the domains the holding profile already names; search only when none loads a page naming the company.",
+            "default": true
+          },
           "browser_fallback": {
             "type": "boolean",
             "title": "Browser Fallback",
@@ -33196,6 +33278,18 @@
             "type": "boolean",
             "title": "Critical",
             "description": "Keeps running at the monthly cap."
+          },
+          "cache_hit_rate": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cache Hit Rate",
+            "description": "Cache-read tokens / all input tokens of the month's steps; a silent drop means a prompt prefix stopped being stable. Null: no input tokens."
           }
         },
         "type": "object",
@@ -36255,6 +36349,12 @@
           "cost_usd": {
             "type": "number",
             "title": "Cost Usd"
+          },
+          "provider": {
+            "type": "string",
+            "title": "Provider",
+            "description": "anthropic, openai or google, from the model id.",
+            "default": "unknown"
           }
         },
         "type": "object",
@@ -36921,6 +37021,20 @@
             "title": "Classification Batch Size",
             "description": "Items per classification call.",
             "default": 50
+          },
+          "classification_use_batch": {
+            "type": "boolean",
+            "title": "Classification Use Batch",
+            "description": "Send a run's classification calls through the provider's batch API (half price, answers within minutes to hours) when the model is an OpenAI or Google one. A group the batch does not answer is classified directly. Off: every call is direct, so a severe item is labelled at once.",
+            "default": false
+          },
+          "classification_batch_wait_minutes": {
+            "type": "number",
+            "maximum": 1440.0,
+            "minimum": 1.0,
+            "title": "Classification Batch Wait Minutes",
+            "description": "How long a classification batch is waited for.",
+            "default": 30
           },
           "corroboration_model": {
             "type": "string",
@@ -40682,6 +40796,48 @@
             "type": "object",
             "title": "Overrides",
             "description": "System prompt text per AI step, replacing the built-in default."
+          },
+          "override_providers": {
+            "additionalProperties": {
+              "items": {
+                "type": "string",
+                "enum": [
+                  "anthropic",
+                  "openai",
+                  "google"
+                ]
+              },
+              "type": "array"
+            },
+            "propertyNames": {
+              "enum": [
+                "earnings_extraction",
+                "earnings_locate",
+                "earnings_calendar",
+                "news_classification",
+                "news_corroboration",
+                "news_escalation",
+                "news_digest",
+                "research_writer",
+                "monthly_review",
+                "chat_assistant",
+                "claim_verifier",
+                "ir_discovery_search",
+                "ir_discovery_approve",
+                "web_gap_search",
+                "web_fact_approve",
+                "web_domain_tier",
+                "exposure_inputs",
+                "exposure_hs_mapping",
+                "dependency_extract",
+                "dependency_approve",
+                "listing_approval",
+                "peer_approval"
+              ]
+            },
+            "type": "object",
+            "title": "Override Providers",
+            "description": "The providers an override applies to. An override with no entry here applies to every provider; with an entry, only to those, and a step on another provider sends the built-in default (the default is the one the evals cover)."
           }
         },
         "additionalProperties": false,

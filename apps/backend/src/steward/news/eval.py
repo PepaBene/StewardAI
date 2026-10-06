@@ -17,8 +17,8 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-from steward.ai import create_client
 from steward.config.jobs import NewsSettings
+from steward.llm.routing import create_routing_client
 from steward.news.classify import (
     Candidate,
     Classifier,
@@ -163,7 +163,8 @@ def main() -> None:
     labelled = load_set()
     classifier: Classifier
     if args.live:
-        classifier = ClaudeClassifier(create_client(get_settings()), args.model)
+        client, llm = create_routing_client(get_settings())
+        classifier = ClaudeClassifier(client, args.model, llm=llm)
     else:
         classifier = OracleClassifier(labelled)
     score = asyncio.run(evaluate(classifier, labelled))

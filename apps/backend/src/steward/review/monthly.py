@@ -40,6 +40,9 @@ from steward.config.strategy import (
 )
 from steward.config.thesis import ThesesConfig
 from steward.jobs.runner import JobContext
+from steward.llm.client import LLM, create_llm
+from steward.llm.routing import routing_client
+from steward.llm.types import Message, Request, provider_of
 from steward.ownership.read import holding_ownership
 from steward.portfolio.breaches import _holds, evaluate
 from steward.portfolio.drift import DriftReport
@@ -178,11 +181,13 @@ class ClaudeReviewWriter:
         settings: ReviewSettings,
         system: str = SYSTEM,
         poll_seconds: float = 30.0,
+        llm: LLM | None = None,
     ) -> None:
         self._client = client
         self._settings = settings
         self._system = system
         self._poll = poll_seconds
+        self._llm = llm
 
     def _messages(self, material: str, today: dt.date) -> list[MessageParam]:
         return [cast(MessageParam, {"role": "user", "content": f"Today is {today}.\n\n{material}"})]
@@ -191,7 +196,10 @@ class ClaudeReviewWriter:
         self, material: str, today: dt.date
     ) -> tuple[ReviewDraft | None, Usage, str | None]:
         if self._settings.use_batch:
-            batched = await self._propose_batch(material, today)
+            if provider_of(self._settings.model) == "anthropic":
+                batched = await self._propose_batch(material, today)
+            else:
+                batched = await self._propose_batch_other(material, today)
             if batched is not None:
                 return batched
         return await self._propose_direct(material, today)
@@ -251,6 +259,36 @@ class ClaudeReviewWriter:
             logger.warning("review batch failed (%s); calling directly", exc)
             return None
         return None
+
+    async def _propose_batch_other(
+        self, material: str, today: dt.date
+    ) -> tuple[ReviewDraft | None, Usage, str | None] | None:
+        """The draft through OpenAI's or Google's batch API, or None to fall back to direct
+        calls. An answer that came back is final, parseable or not."""
+        if self._llm is None:
+            return None
+        request = Request(
+            model=self._settings.model,
+            system=self._system,
+            messages=(Message("user", f"Today is {today}.\n\n{material}"),),
+            schema=ReviewDraft,
+            effort=self._settings.effort,
+            max_tokens=16000,
+        )
+        (done,) = await self._llm.complete_batch(
+            [request],
+            poll_seconds=self._poll,
+            wait_minutes=self._settings.batch_wait_minutes,
+        )
+        if done is None:
+            return None
+        usage = Usage(model=self._settings.model, batch=True)
+        usage.add(done.usage)
+        if done.stop_reason == "refusal":
+            return None, usage, "the model declined"
+        if isinstance(done.parsed, ReviewDraft):
+            return done.parsed, usage, None
+        return None, usage, f"no parseable answer ({done.stop_reason})"
 
     async def _propose_direct(
         self, material: str, today: dt.date
@@ -730,9 +768,13 @@ async def monthly_review_handler(ctx: JobContext) -> None:
     settings = get_settings()
     jobs = await load_active(ctx.pool, "jobs", JobsConfig)
     review = (jobs.body if jobs else JobsConfig()).review
-    system = (await load_prompts(ctx.pool)).text("monthly_review", SYSTEM)
+    system = (await load_prompts(ctx.pool)).text("monthly_review", SYSTEM, review.model)
     try:
-        writer: ReviewWriter | None = ClaudeReviewWriter(create_client(settings), review, system)
+        anthropic_client = create_client(settings)
+        llm = create_llm(settings, anthropic_client)
+        writer: ReviewWriter | None = ClaudeReviewWriter(
+            routing_client(anthropic_client, llm), review, system, llm=llm
+        )
     except AINotConfigured:
         writer = None
     await run_review(ctx, ReviewDeps(writer=writer, now=dt.datetime.now(dt.UTC)))
