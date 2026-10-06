@@ -235,6 +235,7 @@ async def test_schedule_follows_the_jobs_config() -> None:
         "holiday_refresh",
         "insider_trades",
         "intraday_prices",
+        "ir_discovery",
         "ir_releases",
         "macro_collect",
         "monitor",

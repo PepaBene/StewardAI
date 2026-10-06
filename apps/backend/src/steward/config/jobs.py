@@ -8,6 +8,7 @@ from apscheduler.triggers.cron import CronTrigger
 from pydantic import AnyHttpUrl, Field, field_validator, model_validator
 
 from steward.config.common import ConfigModel, Ticker, require_unique
+from steward.config.holding_profiles import Domain
 
 
 class JobSchedule(ConfigModel):
@@ -234,6 +235,51 @@ class AiApprovalSettings(ConfigModel):
     )
     max_confirmed_peers: int = Field(default=8, ge=1, le=20)
     max_calls_per_run: int = Field(default=40, ge=1, le=200)
+
+    @model_validator(mode="after")
+    def _effort_supported(self) -> Self:
+        check_effort(self.model, self.effort, "effort")
+        return self
+
+
+class IrDiscoverySettings(ConfigModel):
+    """Finding each holding's investor-relations pages by web search, checking them, and having
+    AI approve them. Pages the owner already set are never changed."""
+
+    model: ModelId = Field(
+        default="claude-sonnet-5", description="Searches for the pages and approves them."
+    )
+    effort: Effort | None = Field(default=None, description=EFFORT_HELP)
+    max_searches: int = Field(
+        default=4, ge=1, le=10, description="Web searches per holding, the expensive part."
+    )
+    holdings_per_run: int = Field(default=6, ge=1, le=40)
+    cooldown_days: int = Field(
+        default=30, ge=1, le=365, description="Days before a holding without a result is retried."
+    )
+    min_confidence: float = Field(
+        default=0.8,
+        ge=0.5,
+        le=1.0,
+        description="Below this a page is not applied (it stays in the decision log).",
+    )
+    denied_domains: list[Domain] = Field(
+        default_factory=lambda: [
+            "wikipedia.org",
+            "linkedin.com",
+            "facebook.com",
+            "x.com",
+            "twitter.com",
+            "youtube.com",
+            "reddit.com",
+            "seekingalpha.com",
+            "finance.yahoo.com",
+            "marketwatch.com",
+            "investing.com",
+            "stocktwits.com",
+        ],
+        description="Domains never accepted as an investor page.",
+    )
 
     @model_validator(mode="after")
     def _effort_supported(self) -> Self:
@@ -1609,7 +1655,13 @@ class JobsConfig(ConfigModel):
         description="AI approval of suggested listings and peers (and the Finnhub peer "
         "refresh that feeds it). The owner can overturn any decision. Default: daily 07:10.",
     )
+    ir_discovery: JobSchedule = Field(
+        default_factory=lambda: JobSchedule(cron="30 7 * * 1"),
+        description="Finds investor-relations pages for holdings that have none (web search, "
+        "checked and approved by AI). Default: Mondays 07:30.",
+    )
     earnings_check: EarningsCheckSettings = Field(default_factory=EarningsCheckSettings)
+    ir_discovery_settings: IrDiscoverySettings = Field(default_factory=IrDiscoverySettings)
     ai_approval: AiApprovalSettings = Field(default_factory=AiApprovalSettings)
     earnings_calendar_settings: EarningsCalendarSettings = Field(
         default_factory=EarningsCalendarSettings
@@ -1671,6 +1723,7 @@ class JobsConfig(ConfigModel):
             "companies_house_filings": self.companies_house_filings,
             "edinet_filings": self.edinet_filings,
             "ai_approvals": self.ai_approvals,
+            "ir_discovery": self.ir_discovery,
             "twelve_data_corporate_actions": self.twelve_data_corporate_actions,
             "etf_look_through": self.etf_look_through,
             "sec_xbrl": self.sec_xbrl,

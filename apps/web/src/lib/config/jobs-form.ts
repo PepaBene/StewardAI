@@ -18,6 +18,7 @@ export type SettingsKey =
   | "earnings_check"
   | "earnings_calendar_settings"
   | "ai_approval"
+  | "ir_discovery_settings"
   | "news"
   | "digest"
   | "escalation"
@@ -277,6 +278,12 @@ export const SCHEDULES: Record<ScheduleKey, { label: string; description: string
       "Approves suggested listings and peers with AI (and refreshes Finnhub peer candidates first). Every decision is recorded and you can overturn it.",
     cron: "10 7 * * *",
   },
+  ir_discovery: {
+    label: "Investor page discovery",
+    description:
+      "Finds investor-relations pages for holdings that have none, by web search; checks them and has AI approve them. Pages you set yourself are never changed.",
+    cron: "30 7 * * 1",
+  },
 };
 export const SCHEDULE_KEYS = Object.keys(SCHEDULES) as ScheduleKey[];
 
@@ -314,6 +321,28 @@ export const DEFAULT_JOBS: JobsConfig = {
     min_confidence: 0.8,
     max_confirmed_peers: 8,
     max_calls_per_run: 40,
+  },
+  ir_discovery_settings: {
+    model: "claude-sonnet-5",
+    effort: null,
+    max_searches: 4,
+    holdings_per_run: 6,
+    cooldown_days: 30,
+    min_confidence: 0.8,
+    denied_domains: [
+      "wikipedia.org",
+      "linkedin.com",
+      "facebook.com",
+      "x.com",
+      "twitter.com",
+      "youtube.com",
+      "reddit.com",
+      "seekingalpha.com",
+      "finance.yahoo.com",
+      "marketwatch.com",
+      "investing.com",
+      "stocktwits.com",
+    ],
   },
   news: {
     classification_model: "claude-haiku-4-5",
@@ -546,6 +575,18 @@ export const SETTINGS: { [S in SettingsKey]: { title: string; description: strin
       { key: "min_confidence", label: "Minimum confidence", kind: "number", hint: "Below this a suggestion stays as it is, for the next run or for you. 0.5 to 1." },
       { key: "max_confirmed_peers", label: "Peers confirmed per holding", kind: "int", min: 1, max: 20 },
       { key: "max_calls_per_run", label: "AI calls per run", kind: "int", min: 1, max: 200, hint: "Cost guard." },
+    ],
+  },
+  ir_discovery_settings: {
+    title: "Investor page discovery",
+    description: "Finds each holding's investor-relations pages by web search; the deny list of domains is edited in the config JSON.",
+    fields: [
+      { key: "model", label: "Model", kind: "model", hint: "Searches for the pages and approves them." },
+      { key: "effort", label: "Effort", kind: "effort-optional", hint: EFFORT_OPTIONAL_HINT },
+      { key: "max_searches", label: "Web searches per holding", kind: "int", min: 1, max: 10, hint: "The expensive part." },
+      { key: "holdings_per_run", label: "Holdings per run", kind: "int", min: 1, max: 40 },
+      { key: "cooldown_days", label: "Retry a holding after (days)", kind: "int", min: 1, max: 365 },
+      { key: "min_confidence", label: "Minimum confidence", kind: "number", hint: "Below this a page is not applied. 0.5 to 1." },
     ],
   },
   news: {

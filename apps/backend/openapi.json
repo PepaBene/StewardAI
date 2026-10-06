@@ -15431,7 +15431,8 @@
                 "companies_house_filings",
                 "edinet_filings",
                 "twelve_data_corporate_actions",
-                "ai_approvals"
+                "ai_approvals",
+                "ir_discovery"
               ]
             },
             "type": "array",
@@ -15492,7 +15493,8 @@
                 "companies_house_filings",
                 "edinet_filings",
                 "twelve_data_corporate_actions",
-                "ai_approvals"
+                "ai_approvals",
+                "ir_discovery"
               ]
             },
             "type": "object",
@@ -31388,6 +31390,87 @@
         ],
         "title": "IrConsensusRelease"
       },
+      "IrDiscoverySettings": {
+        "properties": {
+          "model": {
+            "type": "string",
+            "pattern": "^claude-[a-z0-9.-]{1,64}$",
+            "title": "Model",
+            "description": "Searches for the pages and approves them.",
+            "default": "claude-sonnet-5",
+            "examples": [
+              "claude-sonnet-5"
+            ]
+          },
+          "effort": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "low",
+                  "medium",
+                  "high",
+                  "xhigh",
+                  "max"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Effort",
+            "description": "Unset: effort is not sent and the model's default applies. On Haiku 4 models the level sets an extended-thinking budget instead (low 2k to max 32k tokens)."
+          },
+          "max_searches": {
+            "type": "integer",
+            "maximum": 10.0,
+            "minimum": 1.0,
+            "title": "Max Searches",
+            "description": "Web searches per holding, the expensive part.",
+            "default": 4
+          },
+          "holdings_per_run": {
+            "type": "integer",
+            "maximum": 40.0,
+            "minimum": 1.0,
+            "title": "Holdings Per Run",
+            "default": 6
+          },
+          "cooldown_days": {
+            "type": "integer",
+            "maximum": 365.0,
+            "minimum": 1.0,
+            "title": "Cooldown Days",
+            "description": "Days before a holding without a result is retried.",
+            "default": 30
+          },
+          "min_confidence": {
+            "type": "number",
+            "maximum": 1.0,
+            "minimum": 0.5,
+            "title": "Min Confidence",
+            "description": "Below this a page is not applied (it stays in the decision log).",
+            "default": 0.8
+          },
+          "denied_domains": {
+            "items": {
+              "type": "string",
+              "maxLength": 253,
+              "pattern": "^([a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?\\.)+[a-z]{2,63}$",
+              "examples": [
+                "investor.apple.com"
+              ]
+            },
+            "type": "array",
+            "title": "Denied Domains",
+            "description": "Domains never accepted as an investor page."
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "IrDiscoverySettings",
+        "description": "Finding each holding's investor-relations pages by web search, checking them, and having\nAI approve them. Pages the owner already set are never changed."
+      },
       "IssuerAliasOut": {
         "properties": {
           "name": {
@@ -32616,8 +32699,15 @@
             "$ref": "#/components/schemas/JobSchedule",
             "description": "AI approval of suggested listings and peers (and the Finnhub peer refresh that feeds it). The owner can overturn any decision. Default: daily 07:10."
           },
+          "ir_discovery": {
+            "$ref": "#/components/schemas/JobSchedule",
+            "description": "Finds investor-relations pages for holdings that have none (web search, checked and approved by AI). Default: Mondays 07:30."
+          },
           "earnings_check": {
             "$ref": "#/components/schemas/EarningsCheckSettings"
+          },
+          "ir_discovery_settings": {
+            "$ref": "#/components/schemas/IrDiscoverySettings"
           },
           "ai_approval": {
             "$ref": "#/components/schemas/AiApprovalSettings"

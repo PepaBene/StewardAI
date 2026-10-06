@@ -64,6 +64,7 @@ const FULL: JobsConfig = {
   edinet_filings: { enabled: false, cron: "30 10 * * *", timezone: "UTC" },
   twelve_data_corporate_actions: { enabled: false, cron: "50 10 * * 6", timezone: "UTC" },
   ai_approvals: { enabled: true, cron: "10 7 * * *", timezone: "UTC" },
+  ir_discovery: { enabled: true, cron: "30 7 * * 1", timezone: "UTC" },
   earnings_check: {
     extraction_model: "claude-opus-5-5",
     locate_model: "claude-sonnet-5",
@@ -77,6 +78,7 @@ const FULL: JobsConfig = {
   },
   earnings_calendar_settings: { model: "claude-haiku-4-5", effort: null, lookahead_days: 90, refresh_within_days: 21 },
   ai_approval: { model: "claude-sonnet-5", effort: null, listings: true, peers: true, refresh_peers: true, peer_refresh_days: 30, peer_refresh_per_run: 8, min_confidence: 0.8, max_confirmed_peers: 8, max_calls_per_run: 40 },
+  ir_discovery_settings: { model: "claude-sonnet-5", effort: null, max_searches: 4, holdings_per_run: 6, cooldown_days: 30, min_confidence: 0.8, denied_domains: ["wikipedia.org"] },
   news: {
     classification_model: "claude-haiku-4-5",
     classification_effort: null,

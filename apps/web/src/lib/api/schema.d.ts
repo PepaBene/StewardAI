@@ -5050,7 +5050,7 @@ export interface components {
              * Critical Job Types
              * @description Job types that run normally at the monthly cap.
              */
-            critical_job_types?: ("portfolio_sync" | "earnings_check" | "thesis_verdicts" | "earnings_calendar" | "earnings_calendar_full" | "earnings_due" | "fact_reconcile" | "reference_data" | "price_history" | "intraday_prices" | "holiday_refresh" | "macro_collect" | "public_data_collect" | "source_audit" | "event_escalation" | "monitor" | "news_ingest" | "daily_digest" | "weekly_digest" | "research" | "ownership_13f" | "insider_trades" | "etf_look_through" | "monthly_review" | "chat" | "sec_xbrl" | "valuation_refresh" | "control_stakes" | "nport_holdings" | "fund_probes" | "fund_characteristics_audit" | "free_source_alerts" | "shadow_snapshot" | "shadow_report" | "raw_retention" | "zero_cost_gate" | "returns_refresh" | "exchange_probes" | "ir_releases" | "sec_fsds_backfill" | "pdmr_uk" | "graph_review" | "fmp_company" | "alpha_vantage_statements" | "epo_patents" | "companies_house_filings" | "edinet_filings" | "twelve_data_corporate_actions" | "ai_approvals")[];
+            critical_job_types?: ("portfolio_sync" | "earnings_check" | "thesis_verdicts" | "earnings_calendar" | "earnings_calendar_full" | "earnings_due" | "fact_reconcile" | "reference_data" | "price_history" | "intraday_prices" | "holiday_refresh" | "macro_collect" | "public_data_collect" | "source_audit" | "event_escalation" | "monitor" | "news_ingest" | "daily_digest" | "weekly_digest" | "research" | "ownership_13f" | "insider_trades" | "etf_look_through" | "monthly_review" | "chat" | "sec_xbrl" | "valuation_refresh" | "control_stakes" | "nport_holdings" | "fund_probes" | "fund_characteristics_audit" | "free_source_alerts" | "shadow_snapshot" | "shadow_report" | "raw_retention" | "zero_cost_gate" | "returns_refresh" | "exchange_probes" | "ir_releases" | "sec_fsds_backfill" | "pdmr_uk" | "graph_review" | "fmp_company" | "alpha_vantage_statements" | "epo_patents" | "companies_house_filings" | "edinet_filings" | "twelve_data_corporate_actions" | "ai_approvals" | "ir_discovery")[];
             /**
              * Per Job Cap Usd
              * @description Most AI spend of one run of a job type, in USD. A run over it fails.
@@ -10749,6 +10749,53 @@ export interface components {
             /** Source Url */
             source_url: string;
         };
+        /**
+         * IrDiscoverySettings
+         * @description Finding each holding's investor-relations pages by web search, checking them, and having
+         *     AI approve them. Pages the owner already set are never changed.
+         */
+        IrDiscoverySettings: {
+            /**
+             * Model
+             * @description Searches for the pages and approves them.
+             * @default claude-sonnet-5
+             * @example claude-sonnet-5
+             */
+            model: string;
+            /**
+             * Effort
+             * @description Unset: effort is not sent and the model's default applies. On Haiku 4 models the level sets an extended-thinking budget instead (low 2k to max 32k tokens).
+             */
+            effort?: ("low" | "medium" | "high" | "xhigh" | "max") | null;
+            /**
+             * Max Searches
+             * @description Web searches per holding, the expensive part.
+             * @default 4
+             */
+            max_searches: number;
+            /**
+             * Holdings Per Run
+             * @default 6
+             */
+            holdings_per_run: number;
+            /**
+             * Cooldown Days
+             * @description Days before a holding without a result is retried.
+             * @default 30
+             */
+            cooldown_days: number;
+            /**
+             * Min Confidence
+             * @description Below this a page is not applied (it stays in the decision log).
+             * @default 0.8
+             */
+            min_confidence: number;
+            /**
+             * Denied Domains
+             * @description Domains never accepted as an investor page.
+             */
+            denied_domains?: string[];
+        };
         /** IssuerAliasOut */
         IssuerAliasOut: {
             /** Name */
@@ -11235,7 +11282,10 @@ export interface components {
             sec_xbrl?: components["schemas"]["JobSchedule"];
             /** @description AI approval of suggested listings and peers (and the Finnhub peer refresh that feeds it). The owner can overturn any decision. Default: daily 07:10. */
             ai_approvals?: components["schemas"]["JobSchedule"];
+            /** @description Finds investor-relations pages for holdings that have none (web search, checked and approved by AI). Default: Mondays 07:30. */
+            ir_discovery?: components["schemas"]["JobSchedule"];
             earnings_check?: components["schemas"]["EarningsCheckSettings"];
+            ir_discovery_settings?: components["schemas"]["IrDiscoverySettings"];
             ai_approval?: components["schemas"]["AiApprovalSettings"];
             earnings_calendar_settings?: components["schemas"]["EarningsCalendarSettings"];
             news?: components["schemas"]["NewsSettings"];

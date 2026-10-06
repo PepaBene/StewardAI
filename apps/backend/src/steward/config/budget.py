@@ -68,6 +68,7 @@ BudgetJobType = Literal[
     "edinet_filings",
     "twelve_data_corporate_actions",
     "ai_approvals",
+    "ir_discovery",
 ]
 
 AtCap = Literal["alert_only", "pause_noncritical", "downgrade_noncritical"]

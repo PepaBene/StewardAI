@@ -19,6 +19,7 @@ from steward.free_source_alerts import free_source_alerts_handler
 from steward.fundamentals.collect import sec_xbrl_handler
 from steward.fundamentals.fsds import sec_fsds_backfill_handler
 from steward.fundamentals.ir import ir_releases_handler
+from steward.fundamentals.ir_discovery import ir_discovery_handler
 from steward.funds.drift import fund_characteristics_audit_handler
 from steward.graph.jobs import graph_review_handler
 from steward.jobs.runner import JobHandler
@@ -110,6 +111,7 @@ JobType = Literal[
     "edinet_filings",
     "twelve_data_corporate_actions",
     "ai_approvals",
+    "ir_discovery",
 ]
 
 JOB_HANDLERS: dict[str, JobHandler] = {
@@ -162,4 +164,5 @@ JOB_HANDLERS: dict[str, JobHandler] = {
     "edinet_filings": edinet_filings_handler,
     "twelve_data_corporate_actions": twelve_data_corporate_actions_handler,
     "ai_approvals": ai_approvals_handler,
+    "ir_discovery": ir_discovery_handler,
 }
