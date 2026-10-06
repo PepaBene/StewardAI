@@ -15,6 +15,7 @@ from steward.earnings.calendar import (
 )
 from steward.earnings.check import earnings_check_handler, thesis_verdicts_handler
 from steward.earnings.reconcile import fact_reconcile_handler
+from steward.exposures.build import exposure_build_handler
 from steward.free_source_alerts import free_source_alerts_handler
 from steward.fundamentals.collect import sec_xbrl_handler
 from steward.fundamentals.fsds import sec_fsds_backfill_handler
@@ -114,6 +115,7 @@ JobType = Literal[
     "ai_approvals",
     "ir_discovery",
     "gap_research",
+    "exposure_build",
 ]
 
 JOB_HANDLERS: dict[str, JobHandler] = {
@@ -168,4 +170,5 @@ JOB_HANDLERS: dict[str, JobHandler] = {
     "ai_approvals": ai_approvals_handler,
     "ir_discovery": ir_discovery_handler,
     "gap_research": gap_research_handler,
+    "exposure_build": exposure_build_handler,
 }

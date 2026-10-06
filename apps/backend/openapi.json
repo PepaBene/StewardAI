@@ -15586,7 +15586,8 @@
                 "twelve_data_corporate_actions",
                 "ai_approvals",
                 "ir_discovery",
-                "gap_research"
+                "gap_research",
+                "exposure_build"
               ]
             },
             "type": "array",
@@ -15649,7 +15650,8 @@
                 "twelve_data_corporate_actions",
                 "ai_approvals",
                 "ir_discovery",
-                "gap_research"
+                "gap_research",
+                "exposure_build"
               ]
             },
             "type": "object",
@@ -32996,6 +32998,10 @@
           "gap_research": {
             "$ref": "#/components/schemas/JobSchedule",
             "description": "Searches reliable web pages for facts the structured sources left empty (next report date, shares outstanding, description); AI approves them. Default: Wednesdays 08:00."
+          },
+          "exposure_build": {
+            "$ref": "#/components/schemas/JobSchedule",
+            "description": "Builds each holding's revenue-by-country exposure from its latest annual SEC XBRL filing (reported basis). Your own exposure entries are never changed. Default: Tuesdays 05:50."
           },
           "earnings_check": {
             "$ref": "#/components/schemas/EarningsCheckSettings"

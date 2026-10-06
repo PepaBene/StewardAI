@@ -291,6 +291,12 @@ export const SCHEDULES: Record<ScheduleKey, { label: string; description: string
       "Last resort for what the data sources left empty: searches reliable web pages for the next report date, shares outstanding and a description. AI approves each fact against source tiers; you can overturn it.",
     cron: "0 8 * * 3",
   },
+  exposure_build: {
+    label: "Exposure builder",
+    description:
+      "Builds each holding's revenue-by-country exposure from its latest annual SEC filing. Only single countries are mapped; your own exposure entries are never changed, and a row you delete is not rebuilt.",
+    cron: "50 5 * * 2",
+  },
 };
 export const SCHEDULE_KEYS = Object.keys(SCHEDULES) as ScheduleKey[];
 

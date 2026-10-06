@@ -1760,6 +1760,12 @@ class JobsConfig(ConfigModel):
         "(next report date, shares outstanding, description); AI approves them. Default: "
         "Wednesdays 08:00.",
     )
+    exposure_build: JobSchedule = Field(
+        default_factory=lambda: JobSchedule(cron="50 5 * * 2"),
+        description="Builds each holding's revenue-by-country exposure from its latest annual "
+        "SEC XBRL filing (reported basis). Your own exposure entries are never changed. "
+        "Default: Tuesdays 05:50.",
+    )
     earnings_check: EarningsCheckSettings = Field(default_factory=EarningsCheckSettings)
     ir_discovery_settings: IrDiscoverySettings = Field(default_factory=IrDiscoverySettings)
     gap_research_settings: GapResearchSettings = Field(default_factory=GapResearchSettings)
@@ -1826,6 +1832,7 @@ class JobsConfig(ConfigModel):
             "ai_approvals": self.ai_approvals,
             "ir_discovery": self.ir_discovery,
             "gap_research": self.gap_research,
+            "exposure_build": self.exposure_build,
             "twelve_data_corporate_actions": self.twelve_data_corporate_actions,
             "etf_look_through": self.etf_look_through,
             "sec_xbrl": self.sec_xbrl,

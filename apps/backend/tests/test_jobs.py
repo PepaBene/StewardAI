@@ -226,6 +226,7 @@ async def test_schedule_follows_the_jobs_config() -> None:
         "epo_patents",
         "etf_look_through",
         "exchange_probes",
+        "exposure_build",
         "fact_reconcile",
         "fmp_company",
         "free_source_alerts",
