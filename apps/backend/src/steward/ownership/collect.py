@@ -24,7 +24,13 @@ from steward.config.store import load_active
 from steward.jobs.runner import JobContext, JobFailed
 from steward.settings import get_settings
 from steward.sources.documents import link_public_document
-from steward.sources.form13f import Dataset, cusip_of_isin, dataset_links, parse_dataset
+from steward.sources.form13f import (
+    Dataset,
+    cusip_of_isin,
+    dataset_links,
+    issuer_key,
+    parse_dataset,
+)
 
 
 async def portfolio_cusips(pool: asyncpg.Pool) -> dict[str, str]:
@@ -43,6 +49,22 @@ async def portfolio_cusips(pool: asyncpg.Pool) -> dict[str, str]:
     return out
 
 
+async def depositary_names(pool: asyncpg.Pool, cusips: dict[str, str]) -> dict[str, str]:
+    """`issuer_key` name -> ticker for US-listed holdings with no known CUSIP (ADRs of
+    foreign issuers): their 13F rows are found by issuer name. A holding listed outside the
+    US is left out (holders of its ADR do not hold its local shares)."""
+    known = set(cusips.values())
+    rows = await pool.fetch(
+        "select t212_ticker, name from public.instrument where t212_ticker like '%\\_US\\_EQ'"
+    )
+    out: dict[str, str] = {}
+    for r in rows:
+        key = issuer_key(r["name"])
+        if r["t212_ticker"] not in known and key:
+            out.setdefault(key, r["t212_ticker"])
+    return out
+
+
 async def store_dataset(
     pool: asyncpg.Pool,
     url: str,
@@ -51,16 +73,21 @@ async def store_dataset(
     job_id: int | None,
     tracked_ciks: set[str] | None = None,
     source_hash: str | None = None,
+    searched: list[str] | None = None,
 ) -> tuple[int, int]:
+    """`searched`: the tickers this load looked for (a later holding re-reads the set)."""
+    tickers = {**tickers, **data.name_matched}
     async with pool.acquire() as conn, conn.transaction():
         await conn.execute(
-            "insert into public.form13f_dataset (url, filings, rows_kept, job_id)"
-            " values ($1, $2, $3, $4) on conflict (url) do update set loaded_at = now(),"
-            " filings = excluded.filings, rows_kept = excluded.rows_kept, job_id = excluded.job_id",
+            "insert into public.form13f_dataset (url, filings, rows_kept, job_id, tickers)"
+            " values ($1, $2, $3, $4, $5) on conflict (url) do update set loaded_at = now(),"
+            " filings = excluded.filings, rows_kept = excluded.rows_kept,"
+            " job_id = excluded.job_id, tickers = excluded.tickers",
             url,
             len(data.filings),
             len(data.positions),
             job_id,
+            sorted(set(searched if searched is not None else tickers.values())),
         )
         await conn.executemany(
             "insert into public.form13f_filing (accession, cik, manager_name, period, filed,"
@@ -205,12 +232,16 @@ async def collect(ctx: JobContext, http: httpx.AsyncClient, settings: OwnershipS
         response.raise_for_status()
         links = dataset_links(response.text, settings.index_url)
         # A dataset that kept no positions was stored before the portfolio's CUSIPs were
-        # known (identity lookups had failed), so it is loaded again once there are some.
-        has_cusips = bool(await portfolio_cusips(pool))
+        # known (identity lookups had failed), so it is loaded again once there are some; one
+        # not yet searched for a holding (bought, or its CUSIP found, since) is loaded again too.
+        tickers = await portfolio_cusips(pool)
+        names = await depositary_names(pool, tickers)
+        searching = set(tickers.values()) | set(names.values())
         loaded = {
             r["url"]
-            for r in await pool.fetch("select url, rows_kept from public.form13f_dataset")
-            if r["rows_kept"] > 0 or not has_cusips
+            for r in await pool.fetch("select url, rows_kept, tickers from public.form13f_dataset")
+            if (r["rows_kept"] > 0 or not tickers)
+            and (r.get("tickers") is None or searching <= set(r["tickers"]))
         }
         # The newest `history_datasets` are wanted; older ones are deliberately not loaded.
         wanted = links[: settings.history_datasets]
@@ -224,7 +255,6 @@ async def collect(ctx: JobContext, http: httpx.AsyncClient, settings: OwnershipS
             remaining=len(missing) - len(todo),
             older_not_loaded=len(links) - len(wanted),
         )
-    tickers = await portfolio_cusips(pool)
     tracked_ciks = {manager.cik.zfill(10) for manager in settings.tracked_managers}
     unprocessed = (
         await pool.fetch(
@@ -250,6 +280,7 @@ async def collect(ctx: JobContext, http: httpx.AsyncClient, settings: OwnershipS
                     path,
                     set(tickers),
                     tracked_ciks,
+                    names,
                 )
                 source_hash = await asyncio.to_thread(_sha256_file, path)
             filings, rows = await store_dataset(
@@ -260,8 +291,14 @@ async def collect(ctx: JobContext, http: httpx.AsyncClient, settings: OwnershipS
                 ctx.job_id,
                 tracked_ciks,
                 source_hash,
+                sorted(searching),
             )
-            step.detail.update(filings=filings, positions=rows, cusips=sorted(tickers))
+            step.detail.update(
+                filings=filings,
+                positions=rows,
+                cusips=sorted(tickers),
+                name_matched=data.name_matched,
+            )
 
 
 async def ownership_13f_handler(ctx: JobContext) -> None:

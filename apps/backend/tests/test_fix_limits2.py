@@ -254,7 +254,11 @@ async def test_13f_loads_within_history_and_reports_remaining(
     async def fake_store(*_: Any, **__: Any) -> tuple[int, int]:
         return 0, 0
 
+    async def no_names(*_: Any) -> dict[str, str]:
+        return {}
+
     monkeypatch.setattr(ownership_collect, "portfolio_cusips", no_cusips)
+    monkeypatch.setattr(ownership_collect, "depositary_names", no_names)
     monkeypatch.setattr(ownership_collect, "_download", fake_download)
     monkeypatch.setattr(ownership_collect, "parse_dataset", lambda *_: Dataset([], []))
     monkeypatch.setattr(ownership_collect, "store_dataset", fake_store)
