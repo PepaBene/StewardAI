@@ -67,7 +67,7 @@ async def _record(
 
 async def _source(
     ctx: JobContext,
-    edgar: EdgarClient,
+    edgar: EdgarClient | None,
     storage: EvidenceStore | None,
     ticker: str,
     profile: HoldingProfile | None,
@@ -76,15 +76,16 @@ async def _source(
     """The text still to be read for this holding and extraction kind: its newest annual report,
     or for an issuer with none on EDGAR its newest archived results document. A string is the
     reason it cannot be read; None means nothing is left to read."""
-    try:
-        annual = await latest_annual_filing(ctx.pool, edgar, ticker, profile)
-        if annual is not None:
-            if await _extracted(ctx.pool, ticker, annual.accession, kind):
-                return None
-            found = await filing_text(edgar, ticker, annual)
-            return found or "annual report text too short to read"
-    except EdgarError as exc:
-        return f"filing not readable: {str(exc)[:80]}"
+    if edgar is not None:
+        try:
+            annual = await latest_annual_filing(ctx.pool, edgar, ticker, profile)
+            if annual is not None:
+                if await _extracted(ctx.pool, ticker, annual.accession, kind):
+                    return None
+                found = await filing_text(edgar, ticker, annual)
+                return found or "annual report text too short to read"
+        except EdgarError as exc:
+            return f"filing not readable: {str(exc)[:80]}"
     if storage is None:
         return None
     archived = await archived_text(ctx.pool, storage, ticker)
@@ -147,7 +148,7 @@ async def run_inputs(
     ctx: JobContext,
     client: anthropic.AsyncAnthropic,
     cfg: ExposureBuildSettings,
-    edgar: EdgarClient,
+    edgar: EdgarClient | None,
     holdings: list[asyncpg.Record],
     profiles_id: int,
     profiles: HoldingProfilesConfig,
@@ -224,7 +225,7 @@ async def run_dependencies(
     ctx: JobContext,
     client: anthropic.AsyncAnthropic,
     cfg: ExposureBuildSettings,
-    edgar: EdgarClient,
+    edgar: EdgarClient | None,
     holdings: list[asyncpg.Record],
     profiles: HoldingProfilesConfig,
     usage: Usage,

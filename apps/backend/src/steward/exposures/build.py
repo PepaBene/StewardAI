@@ -292,14 +292,13 @@ async def _ai_steps(ctx: JobContext, rows: list[asyncpg.Record]) -> None:
         return
     async with ctx.step("filings") as step:
         if not settings.sec_user_agent:
-            step.detail["skipped"] = "SEC_USER_AGENT is not set"
-            return
+            step.detail["note"] = "SEC_USER_AGENT is not set: only archived documents are read"
         async with httpx.AsyncClient(
             timeout=httpx.Timeout(60.0, read=120.0),
             headers={"User-Agent": f"StewardAI/{__version__}"},
             follow_redirects=True,
         ) as http:
-            edgar = EdgarClient(http, settings.sec_user_agent)
+            edgar = EdgarClient(http, settings.sec_user_agent) if settings.sec_user_agent else None
             storage = (
                 SupabaseStorage(
                     http, settings.supabase_url, settings.supabase_secret_key.get_secret_value()
