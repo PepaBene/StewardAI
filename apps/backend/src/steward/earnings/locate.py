@@ -70,11 +70,11 @@ statement, news articles about the results, aggregator or data-vendor pages, and
 documents for another period (a prior year's release, or a different quarter).
 
 Match the period using the company's own fiscal labels (a fiscal Q3 can end in June). \
-If several results from the same release family appear, take the most recent one for \
-the requested period, and the original release over a later corrected or re-posted copy \
-unless the original is gone. Search for the company name with the period label and \
-"results" or "press release"; if the first search finds nothing, try one narrower \
-variant (the investor-relations site, the exact quarter label) before giving up.
+If several documents for the requested period appear, take the original release over a \
+later corrected or re-posted copy, unless the original is gone. Search for the company \
+name with the period label and "results" or "press release"; if the first search finds \
+nothing, try one narrower variant (the investor-relations site, the exact quarter label) \
+before giving up.
 
 The figures are checked against the company's thesis KPIs (revenue, margins, earnings \
 and cash flow, guidance), so prefer the document that prints the full income statement \

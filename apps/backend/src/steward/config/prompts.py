@@ -35,6 +35,7 @@ PromptKey = Literal[
     "ir_discovery_approve",
     "web_gap_search",
     "web_fact_approve",
+    "web_domain_tier",
     "listing_approval",
     "peer_approval",
 ]
@@ -126,6 +127,11 @@ PROMPTS: dict[PromptKey, PromptInfo] = {
         "Web fact approval",
         "Judges whether a quoted passage supports the proposed fact for this company.",
         "steward.research.web_facts:APPROVE_SYSTEM",
+    ),
+    "web_domain_tier": PromptInfo(
+        "Web source tier",
+        "Places a web domain the source lists do not name in tier 2, tier 3 or rejected.",
+        "steward.research.domains:DOMAIN_SYSTEM",
     ),
     "listing_approval": PromptInfo(
         "Listing approval",

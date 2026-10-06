@@ -340,6 +340,7 @@ export const DEFAULT_JOBS: JobsConfig = {
     effort: null,
     max_searches: 4,
     holdings_per_run: 6,
+    browser_fallback: false,
     cooldown_days: 30,
     min_confidence: 0.8,
     denied_domains: [
@@ -363,6 +364,7 @@ export const DEFAULT_JOBS: JobsConfig = {
     slots: ["next_report_date", "shares_outstanding", "company_description"],
     max_searches: 3,
     slots_per_run: 8,
+    browser_fallback: false,
     cooldown_days: 30,
     min_confidence: 0.8,
     t1_domains: [
@@ -648,6 +650,7 @@ export const SETTINGS: { [S in SettingsKey]: { title: string; description: strin
       { key: "holdings_per_run", label: "Holdings per run", kind: "int", min: 1, max: 40 },
       { key: "cooldown_days", label: "Retry a holding after (days)", kind: "int", min: 1, max: 365 },
       { key: "min_confidence", label: "Minimum confidence", kind: "number", hint: "Below this a page is not applied. 0.5 to 1." },
+      { key: "browser_fallback", label: "Retry refused pages in a browser", kind: "bool", hint: "For a 403/429 or a JavaScript-only page. Obeys robots.txt, never logs in or passes a challenge." },
     ],
   },
   gap_research_settings: {
@@ -660,6 +663,7 @@ export const SETTINGS: { [S in SettingsKey]: { title: string; description: strin
       { key: "slots_per_run", label: "Slots per run", kind: "int", min: 1, max: 60, hint: "Cost guard." },
       { key: "cooldown_days", label: "Retry an unfilled slot after (days)", kind: "int", min: 1, max: 365 },
       { key: "min_confidence", label: "Minimum confidence", kind: "number", hint: "Below this a fact waits for review. 0.5 to 1." },
+      { key: "browser_fallback", label: "Retry refused pages in a browser", kind: "bool", hint: "For a 403/429 or a JavaScript-only page. Obeys robots.txt, never logs in or passes a challenge." },
     ],
   },
   news: {

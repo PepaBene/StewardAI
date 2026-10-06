@@ -108,9 +108,9 @@ class EscalationBody(BaseModel):
 
 
 SYSTEM = """\
-You assess how a confirmed event affects an investment thesis. You get the event (its \
-sources, or a large price move), the holding's thesis: why it is owned, its KPIs with \
-thresholds, its exit conditions, and you may search allowed outlets for context.
+You assess how a confirmed event affects an investment thesis. You get <material>: the \
+event (its sources, or a large price move) and the holding's thesis: why it is owned, its \
+KPIs with thresholds, its exit conditions, and you may search allowed outlets for context.
 
 Return a short impact note: a headline and two to five factual sentences. Order them: \
 first what happened (who, what, how much, when), then what it means for the thesis, \
@@ -196,7 +196,11 @@ class ClaudeEscalator:
         if request.domains and min(self._settings.max_searches, self._settings.max_steps - 1) > 0:
             tools = [self._tool(request.domains)]
         messages: list[dict[str, Any]] = [
-            {"role": "user", "content": f"Today is {today.isoformat()}.\n\n{request.material}"}
+            {
+                "role": "user",
+                "content": f"<material>\n{request.material}\n</material>\n\n"
+                f"Today is {today.isoformat()}. Write the impact note for this event.",
+            }
         ]
         seen: set[str] = set()
         titles: dict[str, str] = {}

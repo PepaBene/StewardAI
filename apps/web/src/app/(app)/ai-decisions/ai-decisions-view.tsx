@@ -11,7 +11,7 @@ import { getBrowserApiClient } from "@/lib/api/client";
 import { formatDate } from "@/lib/format";
 import { useApiResource } from "@/lib/hooks/use-api-resource";
 import { parseAiDecisions, totalDecisions } from "@/lib/reference/ai-decisions";
-import { SLOT_LABELS } from "@/lib/reference/web-facts";
+import { SLOT_LABELS, displayValue } from "@/lib/reference/web-facts";
 
 const WINDOWS = [7, 14, 30] as const;
 
@@ -155,7 +155,7 @@ export function AiDecisionsView() {
                   })).error
                 }
               >
-                <span>{SLOT_LABELS[f.slot] ?? f.slot}</span> <span className="num">{f.value}</span>{" "}
+                <span>{SLOT_LABELS[f.slot] ?? f.slot}</span> <span className="num">{displayValue(f)}</span>{" "}
                 <span className="text-text-muted">
                   {f.tier} · {f.status}
                   {f.confidence !== null ? ` (${f.confidence.toFixed(2)})` : ""} · {formatDate(f.retrievedAt)}

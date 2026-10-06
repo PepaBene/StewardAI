@@ -31,6 +31,37 @@ def cand(value: str, quote: str, unit: str | None = None) -> Candidate:
     return Candidate(value=value, url="https://x.example/p", quote=quote, reason="r", unit=unit)
 
 
+def test_learned_domains_reach_tier_two_at_most() -> None:
+    own: set[str] = set()
+    learned = {"ft.com": "T2", "britannica.com": "T3", "spam.example": "rejected", "evil.com": "T1"}
+    assert classify("https://www.ft.com/x", own, CFG, learned) == "T2"
+    assert classify("https://www.britannica.com/x", own, CFG, learned) == "T3"
+    assert classify("https://spam.example/x", own, CFG, learned) == "rejected"
+    assert classify("https://unknown.example/x", own, CFG, learned) == "rejected"
+    # a stored "T1" is never honoured, and the deny list wins over a learned tier
+    assert classify("https://evil.com/x", own, CFG, learned) == "rejected"
+    assert classify("https://www.reddit.com/x", own, CFG, {"reddit.com": "T2"}) == "rejected"
+
+
+def test_segment_revenue_checks() -> None:
+    slot = SLOTS["segment_revenue"]
+    quote = "Revenue by segment 2025: Aerospace EUR 1,200 million; Defence EUR 800 million."
+    value = (
+        '[{"segment": "Defence", "amount": 800000000},'
+        ' {"segment": "Aerospace", "amount": 1200000000}]'
+    )
+    ok, problems = check_value(slot, cand(value, quote, "EUR"), TODAY)
+    assert problems == [] and ok is not None and ok.value_num == 2_000_000_000.0
+    assert ok.value_text.startswith('[{"segment": "Aerospace"')  # largest first
+    assert check_value(slot, cand(value, quote, None), TODAY)[1]
+    assert check_value(slot, cand(value.replace("800000000", "900000000"), quote, "EUR"), TODAY)[1]
+    assert check_value(slot, cand(value.replace("Defence", "Space"), quote, "EUR"), TODAY)[1]
+    assert check_value(
+        slot, cand('[{"segment": "Aerospace", "amount": 1200000000}]', quote, "EUR"), TODAY
+    )[1]
+    assert check_value(slot, cand("not json", quote, "EUR"), TODAY)[1]
+
+
 def test_scaled_amounts() -> None:
     assert scaled_in_text(1_234_500_000, "Revenue was EUR 1,234.5 million in 2025")
     assert scaled_in_text(12_000_000_000, "net sales of ¥12 billion")

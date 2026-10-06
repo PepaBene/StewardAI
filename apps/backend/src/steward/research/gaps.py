@@ -17,7 +17,7 @@ import asyncpg
 @dataclass(frozen=True)
 class Slot:
     key: str
-    kind: Literal["date", "number", "text"]
+    kind: Literal["date", "number", "text", "segments"]
     ask: str  # what to find, for the search prompt
     t2_alone: bool = False  # a tier-2 source may confirm it without a second source
     allow_t3: bool = False  # reference sites (Wikipedia) may fill it
@@ -56,6 +56,16 @@ SLOTS: dict[str, Slot] = {
         "the fiscal year as the period",
         money=True,
     ),
+    "segment_revenue": Slot(
+        "segment_revenue",
+        "segments",
+        "the company's revenue by reportable segment (or product line) for its latest completed "
+        "fiscal year, from its annual results or annual report. Give the value as a JSON list of "
+        '{"segment": name, "amount": whole currency units as an integer}, between 2 and 8 '
+        "entries, the ISO currency code as the unit and the fiscal year as the period. The quote "
+        "must be one passage (up to 600 characters) that prints every segment name and amount",
+        money=True,
+    ),
     "analyst_estimates": Slot(
         "analyst_estimates",
         "number",
@@ -80,6 +90,16 @@ async def is_filled(pool: asyncpg.Pool, ticker: str, slot: str, today: dt.date) 
         return bool(
             await pool.fetchval(
                 "select exists (select 1 from public.shares_outstanding where ticker = $1)",
+                ticker,
+            )
+        )
+    if slot == "segment_revenue":
+        return bool(
+            await pool.fetchval(
+                """select exists (select 1 from public.segment_revenue sr
+                                  join public.xbrl_filing f on f.id = sr.filing_id
+                                  where f.ticker = $1 and sr.kind in ('segment', 'product')
+                                    and sr.period_end - sr.period_start >= 350)""",
                 ticker,
             )
         )

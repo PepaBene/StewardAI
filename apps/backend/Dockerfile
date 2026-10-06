@@ -15,12 +15,22 @@ WORKDIR /app
 
 # Dependencies first, so code changes don't reinstall them.
 COPY pyproject.toml uv.lock .python-version ./
-RUN uv sync --locked --no-dev --no-install-project
+
+# The headless-browser fallback (Playwright + Chromium) adds roughly 400 MB to the image and is
+# used only when a job's browser_fallback setting is on. Build without it with
+# `--build-arg WITH_BROWSER=0`: the fallback then switches itself off.
+ARG WITH_BROWSER=1
+ENV PLAYWRIGHT_BROWSERS_PATH=/ms-playwright
+RUN if [ "$WITH_BROWSER" = "1" ]; then EXTRA="--extra browser"; else EXTRA=""; fi \
+    && uv sync --locked --no-dev --no-install-project $EXTRA \
+    && if [ "$WITH_BROWSER" = "1" ]; then playwright install --with-deps chromium \
+       && chmod -R a+rX /ms-playwright; fi
 
 COPY src ./src
 COPY README.md ./
 COPY --chmod=755 start.sh /app/start.sh
-RUN uv sync --locked --no-dev
+RUN if [ "$WITH_BROWSER" = "1" ]; then EXTRA="--extra browser"; else EXTRA=""; fi \
+    && uv sync --locked --no-dev $EXTRA
 
 RUN useradd --system --uid 10001 steward
 USER steward

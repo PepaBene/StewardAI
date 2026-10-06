@@ -7241,6 +7241,88 @@
         }
       }
     },
+    "/web-domains": {
+      "get": {
+        "tags": [
+          "holdings"
+        ],
+        "summary": "Web Domains",
+        "description": "Domains the AI judge placed in a source tier, with who decided, so any can be changed.",
+        "operationId": "web_domains",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/web-domains/{domain}": {
+      "put": {
+        "tags": [
+          "holdings"
+        ],
+        "summary": "Set Web Domain",
+        "description": "Set a domain's source tier yourself. Never above tier 2: tier 1 is the issuer's own\ndomain, regulators and exchanges, set in the gap-research config. Final: the AI judge never\noverwrites it.",
+        "operationId": "set_web_domain",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "domain",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[a-z0-9][a-z0-9.\\-]{0,251}\\.[a-z]{2,24}$",
+              "title": "Domain"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DomainTierInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/approvals/ai-summary": {
       "get": {
         "tags": [
@@ -21097,6 +21179,36 @@
         ],
         "title": "DomainTier"
       },
+      "DomainTierInput": {
+        "properties": {
+          "tier": {
+            "type": "string",
+            "enum": [
+              "T2",
+              "T3",
+              "rejected"
+            ],
+            "title": "Tier"
+          },
+          "note": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 300
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note"
+          }
+        },
+        "type": "object",
+        "required": [
+          "tier"
+        ],
+        "title": "DomainTierInput"
+      },
       "DriftReport": {
         "properties": {
           "weight_basis": {
@@ -27175,6 +27287,7 @@
                 "company_description",
                 "shares_outstanding",
                 "annual_revenue",
+                "segment_revenue",
                 "analyst_estimates"
               ]
             },
@@ -27197,6 +27310,12 @@
             "title": "Slots Per Run",
             "description": "Cost guard per run.",
             "default": 8
+          },
+          "browser_fallback": {
+            "type": "boolean",
+            "title": "Browser Fallback",
+            "description": "Retry a page in a headless browser when a plain request is refused (HTTP 403/429) or returns an empty JavaScript shell. Still obeys robots.txt and never logs in or gets past a challenge. Needs the browser build of the image.",
+            "default": false
           },
           "cooldown_days": {
             "type": "integer",
@@ -31728,6 +31847,12 @@
             "minimum": 1.0,
             "title": "Holdings Per Run",
             "default": 6
+          },
+          "browser_fallback": {
+            "type": "boolean",
+            "title": "Browser Fallback",
+            "description": "Retry a page in a headless browser when a plain request is refused (HTTP 403/429) or returns an empty JavaScript shell. Still obeys robots.txt and never logs in or gets past a challenge. Needs the browser build of the image.",
+            "default": false
           },
           "cooldown_days": {
             "type": "integer",
@@ -40148,6 +40273,7 @@
               "ir_discovery_approve",
               "web_gap_search",
               "web_fact_approve",
+              "web_domain_tier",
               "listing_approval",
               "peer_approval"
             ],
@@ -40207,6 +40333,7 @@
                 "ir_discovery_approve",
                 "web_gap_search",
                 "web_fact_approve",
+                "web_domain_tier",
                 "listing_approval",
                 "peer_approval"
               ]

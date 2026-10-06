@@ -44,15 +44,17 @@ Today's model in brackets. "Search" = uses a web search tool, the risky part of 
 | `earnings_calendar`, `earnings/calendar.py` | Haiku 4.5 | Reads dates off IR pages |
 | claim verification, `verify/claims.py` | Haiku 4.5 | Strips or marks unsupported claims |
 | `chat`, `chat/assistant.py` | Sonnet 5 | Your choice. It is a critical job with up to 30 tool rounds; watch quality |
+| web domain tier, `research/domains.py` (added 2026-10-06, uncommitted) | gap-research model (Sonnet 5) | Input is only a domain and a company, never above T2, and "rejected" when unsure; each domain is judged once and stored in `web_domain_tier`, so volume is tiny. Luna is enough, but its knowledge of publishers is weaker, so test it on known good and bad domains |
 | budget `downgrade_model` | Haiku 4.5 | Becomes luna |
 
 ## What has to be built
 
-1. **Provider interface** in front of `steward/ai.py`: one `complete()` call taking messages, tools, a pydantic output schema and an effort level, returning a normalised result and `Usage`. Call sites stop calling `messages.parse` directly (18 sites).
+1. **Provider interface** in front of `steward/ai.py`: one `complete()` call taking messages, tools, a pydantic output schema and an effort level, returning a normalised result and `Usage`. Call sites stop calling `messages.parse` directly (22 `messages.parse`/`create`/`batches.create` calls across the backend as of 2026-10-06).
 2. **Adapters**: OpenAI (Responses API), Google (`google-genai`); Anthropic stays for rollback.
-3. **Budget**: `BudgetedAnthropic` only guards Anthropic. Move the guard into the interface so every provider is capped and counted. `_downgrade` is Anthropic-specific and needs a per-provider version.
+3. **Budget**: `BudgetedAnthropic` only guards Anthropic. Move the guard into the interface so every provider is capped and counted. `_downgrade` is Anthropic-specific and needs a per-provider version. Keep the per-response recording added in commit `6769e50` (`record_response` in `jobs/runner.py`, called from `BudgetedAnthropic.post`): it saves each response's usage to its step row as it arrives, so failed or killed steps keep their cost. Every provider adapter must call it too, and map usage fields per provider (see Caching, accounting). Batch cost is still recorded only when the step finishes; a batch whose process dies is not costed, so record the batch id on the step when it is submitted.
 4. **Price table**: `BudgetConfig` has one set of cache multipliers and one search price. Make both per model. OpenAI cached input is about 0.05x of input with no write premium; Gemini cache read is 0.1x; search is $10 or $14 per 1k.
-5. **Config**: `ModelId` is a Literal of Claude IDs; extend it and keep older saved config versions valid.
+5. **Config**: `ModelId` (`config/jobs.py`) is a string that must match `^claude-...`; loosen the pattern to allow OpenAI and Google ids (or use a `provider/model` form) and keep older saved config versions valid. The model price table (`config/budget.py`) needs the new models too; a model without a price gets a null cost, which the spend totals skip.
+5a. **Prompts config** (`config/prompts.py`): 17 editable system prompts, one per AI step, written and evaluated for Claude. The CI evals gate fingerprints only the built-in defaults, and owner overrides are outside it. Decide per prompt key whether an override applies to every provider or only the one it was written for, and re-run the evals for each provider a step moves to.
 6. **Structured output**: map `output_format=SectionDraft` to each provider's schema mode; keep the parse-failure handling.
 7. **Search**: the `pause_turn` loop and `result_titles` in `research/writer.py` are Anthropic-specific. Each provider needs its own citation extraction.
 8. **Batch**: `digest.py` and `monthly.py` use Anthropic batches. Both OpenAI and Google offer batch; each needs its own submit/poll/collect.
@@ -136,7 +138,7 @@ Expected order of impact (verify with real spend from `/config/budget` before co
 
 ## Do it in code, not with AI
 
-Rule: if a result can be computed or checked reliably by code, code decides and AI is only the fallback for what the code cannot settle. This is cheaper, repeatable and auditable, and it needs no provider. Several pieces already work this way (thesis verdicts, `numeric_check` in claim verification, insider-trade classification, 8-K deal extraction, the `data_context` report sentences); extend the same pattern.
+Rule: if a result can be computed or checked reliably by code, code decides and AI is only the fallback for what the code cannot settle. This is cheaper, repeatable and auditable, and it needs no provider. Several pieces already work this way (thesis verdicts, `numeric_check` in claim verification, insider-trade classification, 8-K deal extraction, the `data_context` report sentences, and the new `exposure_build` job, which builds revenue-by-country exposure from SEC XBRL with no model); extend the same pattern. Reuse `research/polite.py` for any new page probing, so it fetches politely.
 
 | Job | Do in code | Leave to AI |
 |---|---|---|
@@ -152,12 +154,13 @@ Rule: if a result can be computed or checked reliably by code, code decides and 
 | Research report | Sections built from stored data by code: financial trend, valuation (computed from the valuation methods), ownership, liquidity, relationships, risk figures. Roughly half of the ten sections. | Business, moat and risks, strategy fit, open questions |
 | Digests | Template the low-severity items (headline, ticker, source, link); the tuned `min_severity_summarised` already limits summaries. | Narrative for items at or above the severity threshold |
 | Chat | Questions about positions, prices, exposure, dates and cost answered from read models and templates. | Synthesis, explanation, comparison, anything open-ended |
-| Gap research | Skip when a free source or earlier run has the fact (see free-source jobs); skip when inputs are unchanged since the last attempt. | Genuinely missing facts |
+| Gap research | Skip when a free source or earlier run has the fact (see free-source jobs); skip when inputs are unchanged since the last attempt. The new `annual_revenue` and segment slots overlap with SEC XBRL data: take them from `sec_xbrl`/`exposure_build` first and search the web only for holdings with no filing data. Keep the existing code checks (`check_segments`, quote must print every number) as the gate on anything AI returns. | Genuinely missing facts |
+| Web domain tier | List first (config lists, deny list, issuer's own domain, owner decisions, `web_domain_tier`); a TLD rule for government and regulator domains. | Unlisted publishers only |
 
 How to do it safely:
 1. Build the rule next to the current AI path, not instead of it. Run both on the labelled and golden sets (`tests/news/news_classification.json`, `tests/golden/earnings/`) and compare.
 2. Replace the AI step only for the slice where the rule agrees with the current labels at an agreed rate and is wrong in no costly direction (a missed severe event is worse than a wasted call).
-3. Store who decided (`decided_by: rule` or `model`) and the rule id on each result, so a wrong rule is found and fixed, and the share still reaching AI is visible.
+3. Store who decided (`decided_by: rule` or `model`) and the rule id on each result, so a wrong rule is found and fixed, and the share still reaching AI is visible. The new AI decisions page (`/ai-decisions`, `GET /approvals/ai-summary`) already lists approver decisions for listings, peers, pages and facts; extend it to show the deciding rule or model.
 4. Send to AI only on explicit "cannot settle" outcomes (no rule matched, signals conflict, source missing), never because code raised an error.
 5. Re-measure cost per job type after each replacement; the saving is the AI calls that no longer happen, so count them.
 

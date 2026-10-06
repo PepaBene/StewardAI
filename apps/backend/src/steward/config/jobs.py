@@ -254,6 +254,12 @@ class IrDiscoverySettings(ConfigModel):
         default=4, ge=1, le=10, description="Web searches per holding, the expensive part."
     )
     holdings_per_run: int = Field(default=6, ge=1, le=40)
+    browser_fallback: bool = Field(
+        default=False,
+        description="Retry a page in a headless browser when a plain request is refused "
+        "(HTTP 403/429) or returns an empty JavaScript shell. Still obeys robots.txt and never "
+        "logs in or gets past a challenge. Needs the browser build of the image.",
+    )
     cooldown_days: int = Field(
         default=30, ge=1, le=365, description="Days before a holding without a result is retried."
     )
@@ -292,6 +298,7 @@ GapSlotKey = Literal[
     "company_description",
     "shares_outstanding",
     "annual_revenue",
+    "segment_revenue",
     "analyst_estimates",
 ]
 
@@ -318,6 +325,12 @@ class GapResearchSettings(ConfigModel):
     )
     max_searches: int = Field(default=3, ge=1, le=10, description="Web searches per slot.")
     slots_per_run: int = Field(default=8, ge=1, le=60, description="Cost guard per run.")
+    browser_fallback: bool = Field(
+        default=False,
+        description="Retry a page in a headless browser when a plain request is refused "
+        "(HTTP 403/429) or returns an empty JavaScript shell. Still obeys robots.txt and never "
+        "logs in or gets past a challenge. Needs the browser build of the image.",
+    )
     cooldown_days: int = Field(
         default=30, ge=1, le=365, description="Days before an unfilled slot is searched again."
     )

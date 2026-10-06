@@ -76,7 +76,9 @@ is not printed on the line, take it from the nearest heading or table header tha
 states it; if none does, leave the event out.
 - One entry per event. A results release and its webcast on the same day are one \
 results entry. Keep the date of the release itself, not of the call, when they differ.
-- Past events are listed too, exactly as printed; do not filter by today's date.
+- Past events are listed too, exactly as printed; do not filter by today's date (code \
+filters them later).
+- If the page prints no dated event, return an empty entries list rather than a guess.
 - The owner schedules a thesis review after every quarterly report, so the results \
 dates matter most: label an interim or quarterly release, a half-year and an annual \
 report as results, and a capital markets day or AGM as something else.

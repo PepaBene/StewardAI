@@ -2412,6 +2412,48 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/web-domains": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Web Domains
+         * @description Domains the AI judge placed in a source tier, with who decided, so any can be changed.
+         */
+        get: operations["web_domains"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/web-domains/{domain}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Set Web Domain
+         * @description Set a domain's source tier yourself. Never above tier 2: tier 1 is the issuer's own
+         *     domain, regulators and exchanges, set in the gap-research config. Final: the AI judge never
+         *     overwrites it.
+         */
+        put: operations["set_web_domain"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/approvals/ai-summary": {
         parameters: {
             query?: never;
@@ -7143,6 +7185,16 @@ export interface components {
              */
             tier: 1 | 2 | 3;
         };
+        /** DomainTierInput */
+        DomainTierInput: {
+            /**
+             * Tier
+             * @enum {string}
+             */
+            tier: "T2" | "T3" | "rejected";
+            /** Note */
+            note?: string | null;
+        };
         /** DriftReport */
         DriftReport: {
             /**
@@ -9427,7 +9479,7 @@ export interface components {
              * Slots
              * @description Which gaps to research. `annual_revenue` is off by default: enable it to fill the latest fiscal-year revenue of holdings with no filing data. `analyst_estimates` is recorded as unavailable (a paid vendor product) and is never searched.
              */
-            slots?: ("next_report_date" | "company_description" | "shares_outstanding" | "annual_revenue" | "analyst_estimates")[];
+            slots?: ("next_report_date" | "company_description" | "shares_outstanding" | "annual_revenue" | "segment_revenue" | "analyst_estimates")[];
             /**
              * Max Searches
              * @description Web searches per slot.
@@ -9440,6 +9492,12 @@ export interface components {
              * @default 8
              */
             slots_per_run: number;
+            /**
+             * Browser Fallback
+             * @description Retry a page in a headless browser when a plain request is refused (HTTP 403/429) or returns an empty JavaScript shell. Still obeys robots.txt and never logs in or gets past a challenge. Needs the browser build of the image.
+             * @default false
+             */
+            browser_fallback: boolean;
             /**
              * Cooldown Days
              * @description Days before an unfilled slot is searched again.
@@ -10910,6 +10968,12 @@ export interface components {
              * @default 6
              */
             holdings_per_run: number;
+            /**
+             * Browser Fallback
+             * @description Retry a page in a headless browser when a plain request is refused (HTTP 403/429) or returns an empty JavaScript shell. Still obeys robots.txt and never logs in or gets past a challenge. Needs the browser build of the image.
+             * @default false
+             */
+            browser_fallback: boolean;
             /**
              * Cooldown Days
              * @description Days before a holding without a result is retried.
@@ -13974,7 +14038,7 @@ export interface components {
              * Key
              * @enum {string}
              */
-            key: "earnings_extraction" | "earnings_locate" | "earnings_calendar" | "news_classification" | "news_corroboration" | "news_escalation" | "news_digest" | "research_writer" | "monthly_review" | "chat_assistant" | "claim_verifier" | "ir_discovery_search" | "ir_discovery_approve" | "web_gap_search" | "web_fact_approve" | "listing_approval" | "peer_approval";
+            key: "earnings_extraction" | "earnings_locate" | "earnings_calendar" | "news_classification" | "news_corroboration" | "news_escalation" | "news_digest" | "research_writer" | "monthly_review" | "chat_assistant" | "claim_verifier" | "ir_discovery_search" | "ir_discovery_approve" | "web_gap_search" | "web_fact_approve" | "web_domain_tier" | "listing_approval" | "peer_approval";
             /** Title */
             title: string;
             /** Description */
@@ -21374,6 +21438,61 @@ export interface operations {
         requestBody: {
             content: {
                 "application/json": components["schemas"]["WebFactDecision"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    web_domains: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+        };
+    };
+    set_web_domain: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                domain: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DomainTierInput"];
             };
         };
         responses: {

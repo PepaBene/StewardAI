@@ -5,6 +5,7 @@ export const SLOT_LABELS: Record<string, string> = {
   shares_outstanding: "Shares outstanding",
   company_description: "Description",
   annual_revenue: "Revenue, latest fiscal year",
+  segment_revenue: "Revenue by segment",
 };
 
 export const TIER_LABELS: Record<string, string> = {
@@ -57,6 +58,23 @@ export function parseWebFacts(raw: unknown): WebFact[] {
     });
   }
   return out;
+}
+
+/** The value as shown: segment revenue is stored as a JSON list and read as "Name amount · Name amount". */
+export function displayValue(fact: Pick<WebFact, "slot" | "value">): string {
+  if (fact.slot !== "segment_revenue") return fact.value;
+  try {
+    const lines: unknown = JSON.parse(fact.value);
+    if (!Array.isArray(lines)) return fact.value;
+    const parts = lines.flatMap((l: unknown) =>
+      typeof l === "object" && l !== null && typeof (l as { segment?: unknown }).segment === "string" && typeof (l as { amount?: unknown }).amount === "number"
+        ? [`${(l as { segment: string }).segment} ${new Intl.NumberFormat("en", { notation: "compact", maximumFractionDigits: 2 }).format((l as { amount: number }).amount)}`]
+        : [],
+    );
+    return parts.length > 0 ? parts.join(" · ") : fact.value;
+  } catch {
+    return fact.value;
+  }
 }
 
 export function decidedByOwner(fact: WebFact): boolean {

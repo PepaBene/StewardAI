@@ -8,7 +8,7 @@ import { getBrowserApiClient } from "@/lib/api/client";
 import { formatDate } from "@/lib/format";
 import { useApiResource } from "@/lib/hooks/use-api-resource";
 import { isExternalUrl } from "@/lib/sources/sources";
-import { SLOT_LABELS, TIER_LABELS, decidedByOwner, parseWebFacts, type WebFact } from "@/lib/reference/web-facts";
+import { SLOT_LABELS, TIER_LABELS, decidedByOwner, displayValue, parseWebFacts, type WebFact } from "@/lib/reference/web-facts";
 
 /** GET /holdings/{ticker}/web-facts: facts that structured sources left empty, found on reliable web pages. */
 export function WebFactsPanel({ ticker }: { ticker: string }) {
@@ -60,7 +60,7 @@ function FactRow({ fact, onChanged }: { fact: WebFact; onChanged: () => void }) 
     <li className="flex flex-col gap-1 px-3 py-3 text-sm">
       <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
         <span className="font-medium">{SLOT_LABELS[fact.slot] ?? fact.slot}</span>
-        <span className="num">{fact.value}</span>
+        <span className="num">{displayValue(fact)}</span>
         <span className="rounded-sm border border-border px-1.5 text-xs text-text-muted" title={TIER_LABELS[fact.tier] ?? fact.tier}>
           {fact.tier}
         </span>

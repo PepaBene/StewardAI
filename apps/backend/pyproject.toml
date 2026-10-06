@@ -18,6 +18,11 @@ dependencies = [
     "uvicorn[standard]>=0.54.0",
 ]
 
+[project.optional-dependencies]
+# Headless-browser fallback for pages a plain request cannot read (research/browser.py).
+# The Docker image installs it together with Chromium; see the Dockerfile.
+browser = ["playwright>=1.50"]
+
 [build-system]
 requires = ["hatchling"]
 build-backend = "hatchling.build"

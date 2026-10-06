@@ -56,6 +56,47 @@ async def decide_web_fact(
     return dict(row)
 
 
+class DomainTierInput(BaseModel):
+    tier: Literal["T2", "T3", "rejected"]
+    note: str | None = Field(default=None, max_length=300)
+
+
+DomainPath = Annotated[str, Path(pattern=r"^[a-z0-9][a-z0-9.\-]{0,251}\.[a-z]{2,24}$")]
+
+
+@router.get("/web-domains", tags=["holdings"], response_model=None)
+async def web_domains(pool: Pool, _owner: Owner) -> dict[str, Any]:
+    """Domains the AI judge placed in a source tier, with who decided, so any can be changed."""
+    rows = await pool.fetch(
+        "select domain, tier, decided_by, confidence, reasons, decided_at"
+        " from public.web_domain_tier order by decided_at desc"
+    )
+    return {"domains": [dict(r) for r in rows]}
+
+
+@router.put("/web-domains/{domain}", tags=["holdings"], response_model=None)
+async def set_web_domain(
+    domain: DomainPath, body: DomainTierInput, pool: Pool, owner: Owner
+) -> dict[str, Any]:
+    """Set a domain's source tier yourself. Never above tier 2: tier 1 is the issuer's own
+    domain, regulators and exchanges, set in the gap-research config. Final: the AI judge never
+    overwrites it."""
+    row = await pool.fetchrow(
+        """insert into public.web_domain_tier (domain, tier, decided_by, reasons)
+           values ($1, $2, $3, $4)
+           on conflict (domain) do update set tier = excluded.tier,
+             decided_by = excluded.decided_by, reasons = excluded.reasons, confidence = null,
+             decided_at = now()
+           returning domain, tier, decided_by""",
+        domain,
+        body.tier,
+        f"owner:{owner.user_id}",
+        body.note or "set by the owner",
+    )
+    assert row is not None
+    return dict(row)
+
+
 @router.get("/approvals/ai-summary", tags=["approvals"], response_model=None)
 async def ai_approval_summary(
     pool: Pool, _owner: Owner, days: Annotated[int, Query(ge=1, le=90)] = 7
