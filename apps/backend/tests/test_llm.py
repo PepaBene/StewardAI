@@ -307,40 +307,48 @@ async def test_a_search_without_citations_does_not_forbid_the_urls_of_its_answer
     assert "returned no source links" in ask
 
 
-async def test_google_batch_with_search_and_schema_runs_two_rounds() -> None:
+def _google_answer(r: Request, search: bool) -> Any:
+    data = {
+        "candidates": [
+            {
+                "finishReason": "STOP",
+                "content": {
+                    "parts": [{"text": "found" if search else '{"url": "https://a.com/x"}'}]
+                },
+                "groundingMetadata": {
+                    "groundingChunks": [{"web": {"uri": "https://a.com/x", "title": "a"}}]
+                }
+                if search
+                else {},
+            }
+        ],
+        "usageMetadata": {"promptTokenCount": 1, "candidatesTokenCount": 1},
+    }
+    return wire.google_completion(r, data)
+
+
+async def test_google_batch_searches_directly_then_batches_the_structured_answers() -> None:
+    # Gemini's batch mode returns no grounding citations, so the search half is a direct call.
     llm = LLM(google_key="k")
     rounds: list[list[Request]] = []
+    direct: list[Request] = []
 
     async def fake_batch(requests: Any, poll_seconds: float, wait_minutes: float) -> Any:
         rounds.append(list(requests))
-        out = []
-        for r in requests:
-            first = r.schema is None  # a search-only request; the structured ones carry a schema
-            data = {
-                "candidates": [
-                    {
-                        "finishReason": "STOP",
-                        "content": {
-                            "parts": [{"text": "found" if first else '{"url": "https://a.com/x"}'}]
-                        },
-                        "groundingMetadata": {
-                            "groundingChunks": [{"web": {"uri": "https://a.com/x", "title": "a"}}]
-                        }
-                        if first
-                        else {},
-                    }
-                ],
-                "usageMetadata": {"promptTokenCount": 1, "candidatesTokenCount": 1},
-            }
-            out.append(wire.google_completion(r, data))
-        return out
+        return [_google_answer(r, search=False) for r in requests]
+
+    async def fake_direct(r: Request) -> Any:
+        direct.append(r)
+        return _google_answer(r, search=True)
 
     llm._batch_once = fake_batch  # type: ignore[method-assign]
+    llm._google_once = fake_direct  # type: ignore[method-assign]
     req = request(model="gemini-3.8-flash", schema=Link, search=SearchSpec(allowed_domains=()))
     plain = request(model="gemini-3.8-flash", schema=Link)
     done = await llm.complete_batch([req, plain])
-    assert len(rounds) == 2 and rounds[0][0].schema is None and rounds[1][0].search is None
-    assert len(rounds[1]) == 1  # the plain request was answered in round one
+    assert len(direct) == 1 and direct[0].schema is None and direct[0].search is not None
+    assert len(rounds) == 2 and rounds[0] == [plain]
+    assert len(rounds[1]) == 1 and rounds[1][0].search is None
     assert done[0] is not None and done[0].parsed == Link(url="https://a.com/x")
     assert [c.url for c in done[0].citations] == ["https://a.com/x"]
 

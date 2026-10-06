@@ -45,6 +45,8 @@ OPENAI_BATCHES = "https://api.openai.com/v1/batches"
 RETRY_STATUS = {408, 409, 429, 500, 502, 503, 504}
 DEADLINE_MARGIN = 30.0
 MAX_PAUSES = 4
+# Search calls a batch request makes directly (Gemini batch mode does not ground) at once.
+DIRECT_SEARCH_CONCURRENCY = 4
 
 
 class LLM:
@@ -306,13 +308,19 @@ class LLM:
         split = {i for i, r in enumerate(requests) if _search_with_schema(r)}
         if not split:
             return await self._batch_once(requests, poll_seconds, wait_minutes)
-        # Gemini returns no grounding citations when a search and a schema share a call: the
-        # search runs as one batch, then the structured answers as a second one.
-        first = [
-            dataclasses.replace(r, schema=None) if i in split else r for i, r in enumerate(requests)
-        ]
-        answers = await self._batch_once(first, poll_seconds, wait_minutes)
-        pending = [i for i in sorted(split) if answers[i] is not None]
+        # Gemini returns no grounding citations when a search and a schema share a call, and none
+        # at all for a search run in batch mode: the searches run as direct calls (full price),
+        # then the structured answers as one batch.
+        rest = [i for i in range(len(requests)) if i not in split]
+        searched = sorted(split)
+        answers: list[Completion | None] = [None] * len(requests)
+        batched = await self._batch_once([requests[i] for i in rest], poll_seconds, wait_minutes)
+        found = await self._search_directly(
+            [dataclasses.replace(requests[i], schema=None) for i in searched]
+        )
+        for i, done in [*zip(rest, batched, strict=True), *zip(searched, found, strict=True)]:
+            answers[i] = done
+        pending = [i for i in searched if answers[i] is not None]
         finished = await self._batch_once(
             [_finish_request(requests[i], cast(Completion, answers[i])) for i in pending],
             poll_seconds,
@@ -325,6 +333,31 @@ class LLM:
                 _merge_search(cast(Completion, answers[i]), final) if final is not None else None
             )
         return answers
+
+    async def _search_directly(self, requests: Sequence[Request]) -> list[Completion | None]:
+        """Google search calls made one by one (a few at a time); None for one that failed or
+        when the budget guard would change the model (the caller then asks directly)."""
+        if not requests:
+            return []
+        ctx = current_job.get()
+        model = requests[0].model
+        if ctx is not None:
+            if await budget_guard.before_request(ctx, model, can_switch_provider=True) != model:
+                return [None] * len(requests)
+        gate = asyncio.Semaphore(DIRECT_SEARCH_CONCURRENCY)
+
+        async def one(req: Request) -> Completion | None:
+            async with gate:
+                try:
+                    done = await self._google_once(req)
+                except LLMError as exc:
+                    logger.warning("google search call failed: %s", exc)
+                    return None
+            if ctx is not None:
+                budget_guard.after_response(ctx, done.model, done.usage)
+            return done
+
+        return list(await asyncio.gather(*(one(r) for r in requests)))
 
     async def _batch_once(
         self, requests: Sequence[Request], poll_seconds: float, wait_minutes: float
