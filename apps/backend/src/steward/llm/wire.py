@@ -434,6 +434,18 @@ def google_batch_results(
     return _by_index(found, len(requests))
 
 
+GROUNDING_HOST = "vertexaisearch.cloud.google.com"
+
+
+def is_grounding_redirect(url: str) -> bool:
+    """A Google Search grounding link (it redirects to the cited page)."""
+    return _host(url) == GROUNDING_HOST
+
+
+def dedupe(citations: list[Citation]) -> list[Citation]:
+    return _dedupe(citations)
+
+
 def _dedupe(citations: list[Citation]) -> list[Citation]:
     seen: set[str] = set()
     out = []

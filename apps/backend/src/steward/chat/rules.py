@@ -15,6 +15,7 @@ from typing import Any
 from steward.ai import Usage
 from steward.chat.assistant import AnswerSentence, AssistantResult, ChatAnswerDraft, ChatAssistant
 from steward.chat.tools import ChatTools
+from steward.earnings.read import holding_detail
 
 MAX_WORDS = 12
 # A question with any of these wants reasoning, comparison or a recommendation.
@@ -47,6 +48,41 @@ def classify(question: str) -> str | None:
     return None
 
 
+REASONING = re.compile(
+    r"\b(why|should|compare|versus|vs|better|worse|news|thesis|risk|sell|buy|hold|explain|"
+    r"because|how come|what if|forecast|expect|predict|tax|exit|kpi|beat|miss|dividend)\b",
+    re.I,
+)
+NEXT_REPORT = re.compile(
+    r"\bwhen\b.*\b(report|reports|earnings|results)\b|\bnext (earnings|report)\b"
+    r"|\b(earnings|report) date\b",
+    re.I,
+)
+TOKEN = re.compile(r"[A-Za-z0-9.]+")
+
+
+def asks_next_report(question: str) -> bool:
+    text = question.strip()
+    if not text or len(text.split()) > MAX_WORDS or REASONING.search(text):
+        return False
+    return bool(NEXT_REPORT.search(text))
+
+
+def match_holding(question: str, instruments: list[tuple[str, str | None]]) -> str | None:
+    """The one instrument the question names, by its base ticker as an upper-case word or by
+    its whole name; None when it names none or more than one."""
+    words = set(TOKEN.findall(question))
+    lowered = question.lower()
+    hits = set()
+    for ticker, name in instruments:
+        base = ticker.split("_")[0]
+        if base and base in words:
+            hits.add(ticker)
+        elif name and len(name) >= 4 and name.lower() in lowered:
+            hits.add(ticker)
+    return next(iter(hits)) if len(hits) == 1 else None
+
+
 class RuleChatAssistant:
     """Answers the closed questions from the portfolio overview and passes the rest to
     `inner` (the model assistant), or says so when there is none."""
@@ -63,11 +99,42 @@ class RuleChatAssistant:
             result = await self._from_overview(kind, tools)
             if result is not None:
                 return result
+        if asks_next_report(question):
+            result = await self._from_report_date(question, tools)
+            if result is not None:
+                return result
         if self._inner is None:
             return AssistantResult(
                 None, Usage(model=self._model), {}, "ANTHROPIC_API_KEY is not set"
             )
         return await self._inner.answer(history, question, tools, today)
+
+    async def _from_report_date(self, question: str, tools: ChatTools) -> AssistantResult | None:
+        rows = await tools.pool.fetch(
+            "select t212_ticker, name from public.instrument where next_report_date is not null"
+        )
+        ticker = match_holding(question, [(r["t212_ticker"], r["name"]) for r in rows])
+        if ticker is None:
+            return None
+        detail = await holding_detail(tools.pool, ticker)
+        info = detail.instrument if detail else None
+        if info is None or info.next_report_date is None:
+            return None
+        label = info.name or ticker.split("_")[0]
+        fact = f"{label} next report date {info.next_report_date.isoformat()}"
+        if info.report_date_source:
+            fact += f" (source {info.report_date_source})"
+        sid = tools.registry.add(
+            "position",
+            f"rule:report:{ticker}",
+            fact,
+            app_path=f"/holdings/{ticker}",
+            tier=1,
+            snippet=fact,
+            as_of=info.next_report_date.isoformat(),
+        )
+        draft = ChatAnswerDraft(sentences=[AnswerSentence(text=fact + ".", source_ids=[sid])])
+        return AssistantResult(draft, Usage(model=self._model), {}, None)
 
     async def _from_overview(self, kind: str, tools: ChatTools) -> AssistantResult | None:
         overview: dict[str, Any] = await tools.call("portfolio_overview", {})

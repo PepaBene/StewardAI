@@ -248,6 +248,12 @@ class AiApprovalSettings(ConfigModel):
     )
     max_confirmed_peers: int = Field(default=8, ge=1, le=20)
     max_calls_per_run: int = Field(default=40, ge=1, le=200)
+    use_sic: bool = Field(
+        default=True,
+        description="Look up each peer candidate's SEC industry code (SIC). A candidate with "
+        "the holding's four-digit code that the owner also names as a competitor is confirmed "
+        "in code; the model sees every code as extra evidence and decides the rest.",
+    )
     rules_first: bool = Field(
         default=True,
         description="Settle a listing in code when the market suffix, ISIN country and symbol "

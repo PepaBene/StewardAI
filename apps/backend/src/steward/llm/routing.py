@@ -168,7 +168,9 @@ class _Messages:
             ),
             schema=kwargs.get("output_format"),
             effort=_effort(kwargs),
-            max_tokens=int(kwargs.get("max_tokens") or 4096),
+            # OpenAI and Google count their reasoning tokens against the output limit, which
+            # call sites sized for an answer alone; the limit is a ceiling, not a cost.
+            max_tokens=max(int(kwargs.get("max_tokens") or 4096) * 3, 8000),
             search=_search(kwargs.get("tools")),
             timeout=float(kwargs["timeout"])
             if isinstance(kwargs.get("timeout"), int | float)

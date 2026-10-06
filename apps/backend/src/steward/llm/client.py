@@ -171,7 +171,38 @@ class LLM:
             wire.google_body(req),
             req,
         )
-        return wire.google_completion(req, data)
+        return await self._resolve_google(req, wire.google_completion(req, data))
+
+    async def _resolve_google(self, req: Request, done: Completion) -> Completion:
+        """Google's grounding citations are redirect links on vertexaisearch.cloud.google.com,
+        whose page title is the real site's domain. Follow each redirect to the real page (or
+        fall back to the domain in the title), then split kept from off-list citations again
+        by the request's allowed domains, which could not be done on the redirect host."""
+        every = [*done.citations, *done.off_list_citations]
+        if not any(wire.is_grounding_redirect(c.url) for c in every):
+            return done
+        resolved = [await self._real_url(c) for c in every]
+        domains = req.search.allowed_domains if req.search else ()
+        done.citations = wire.dedupe([c for c in resolved if wire.allowed(c.url, domains)])
+        done.off_list_citations = wire.dedupe(
+            [c for c in resolved if not wire.allowed(c.url, domains)]
+        )
+        return done
+
+    async def _real_url(self, citation: Citation) -> Citation:
+        if not wire.is_grounding_redirect(citation.url):
+            return citation
+        try:
+            response = await self._http.get(citation.url, follow_redirects=False, timeout=10.0)
+            target = response.headers.get("location")
+            if target and response.is_redirect:
+                return Citation(target, citation.title)
+        except httpx.HTTPError:
+            pass
+        title = citation.title.strip().lower()
+        if "." in title and " " not in title:
+            return Citation(f"https://{title}/", citation.title)
+        return citation
 
     def _key(self, provider: Provider) -> str:
         key = self._keys[provider]
@@ -377,7 +408,11 @@ class LLM:
             return wire.google_batch_state(last)
 
         async def collect() -> list[Completion | None]:
-            return wire.google_batch_results(last, requests)
+            results = wire.google_batch_results(last, requests)
+            return [
+                await self._resolve_google(r, done) if done is not None else None
+                for r, done in zip(requests, results, strict=True)
+            ]
 
         return batch_id, poll, collect
 

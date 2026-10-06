@@ -98,3 +98,30 @@ def test_no_snapshot_falls_back_to_the_assistant() -> None:
         )
     )
     assert inner.asked == 1
+
+
+@pytest.mark.parametrize(
+    ("question", "expected"),
+    [
+        ("When does AAPL report next?", True),
+        ("next earnings date for SAP", True),
+        ("Why did AAPL beat when it reported earnings?", False),
+        ("Should I buy before AAPL reports? When is the report", False),
+        ("What is my portfolio worth?", False),
+    ],
+)
+def test_next_report_question_is_closed_and_narrow(question: str, expected: bool) -> None:
+    from steward.chat.rules import asks_next_report
+
+    assert asks_next_report(question) is expected
+
+
+def test_holding_is_matched_exactly_one_way() -> None:
+    from steward.chat.rules import match_holding
+
+    held = [("AAPL_US_EQ", "Apple Inc"), ("SAPd_EQ", "SAP SE"), ("SAP_US_EQ", "SAP ADR")]
+    assert match_holding("When does AAPL report?", held) == "AAPL_US_EQ"
+    assert match_holding("when does apple inc report", held) == "AAPL_US_EQ"
+    assert match_holding("when does aapl report", held) is None  # ticker must be upper case
+    assert match_holding("When does SAP report?", held) == "SAP_US_EQ"
+    assert match_holding("When does AAPL or SAP report?", held) is None

@@ -37,6 +37,7 @@ from steward.llm.client import create_llm
 from steward.llm.routing import parse_many, routing_client
 from steward.reference.listings import ListingDecisionError, confirm_listing
 from steward.settings import get_settings
+from steward.sources.edgar import EdgarClient, EdgarError
 from steward.sources.free_market import FreeSourceError
 from steward.sources.governor import QuotaExceeded
 
@@ -326,6 +327,35 @@ async def sec_tickers(http: httpx.AsyncClient) -> dict[str, dict[str, Any]]:
     }
 
 
+async def sic_of(edgar: EdgarClient, cache: dict[int, str | None], cik: int) -> str | None:
+    """The issuer's SIC code (cached for the run); None when EDGAR has none or is unreachable."""
+    if cik not in cache:
+        try:
+            cache[cik] = await edgar.sic(str(cik))
+        except (EdgarError, httpx.HTTPError):
+            cache[cik] = None
+    return cache[cik]
+
+
+def names_competitor(title: str, competitors: list[str]) -> bool:
+    """The SEC company title is one the owner listed as a competitor (names compared without
+    case, punctuation or corporate suffixes: "Microsoft Corp" is "Microsoft")."""
+
+    def norm(name: str) -> str:
+        words = re.findall(r"[a-z0-9]+", name.lower())
+        while words and words[-1] in _SUFFIXES:
+            words.pop()
+        return " ".join(words)
+
+    wanted = {norm(c) for c in competitors if norm(c)}
+    return norm(title) in wanted
+
+
+_SUFFIXES = frozenset(
+    {"inc", "corp", "corporation", "co", "company", "ltd", "plc", "sa", "ag", "nv", "se", "llc"}
+)
+
+
 async def approve_peers(
     ctx: JobContext,
     client: anthropic.AsyncAnthropic,
@@ -348,6 +378,9 @@ async def approve_peers(
     if not rows:
         return out
     known = await sec_tickers(http)
+    agent = get_settings().sec_user_agent
+    edgar = EdgarClient(http, agent) if agent and "@" in agent else None
+    sic_cache: dict[int, str | None] = {}
     asked: list[
         tuple[str, dict[str, Any], list[tuple[asyncpg.Record, str]], int, dict[str, Any]]
     ] = []
@@ -380,13 +413,49 @@ async def approve_peers(
                 result["applied"][row["peer_ticker"]] = "rejected (same issuer)"
             else:
                 eligible.append((row, info["title"]))
+        sics: dict[str, str | None] = {}
+        own_sic: str | None = None
+        if eligible and cfg.use_sic and edgar is not None:
+            own_sic = await sic_of(edgar, sic_cache, own["cik"]) if own else None
+            for row, _title in eligible:
+                info = known[str(row["peer_ticker"]).upper()]
+                sics[str(row["peer_ticker"])] = await sic_of(edgar, sic_cache, info["cik"])
+        # Settled in code: the same four-digit industry code and named by the owner as a
+        # competitor. Everything else, with the codes as extra evidence, goes to the model.
+        remaining: list[tuple[asyncpg.Record, str]] = []
+        for row, title in eligible:
+            peer = str(row["peer_ticker"])
+            if (
+                own_sic is not None
+                and sics.get(peer) == own_sic
+                and names_competitor(title, profile.competitors)
+                and room > 0
+            ):
+                await set_peer_status(
+                    ctx.pool,
+                    row["id"],
+                    "confirmed",
+                    f"{AI_PREFIX} (rule peer-same-sic-named): SIC {own_sic} like the holding and "
+                    "named as a competitor in its profile",
+                )
+                result["applied"][peer] = "confirmed (rule)"
+                room -= 1
+                out["by_rule"] = out.get("by_rule", 0) + 1
+            else:
+                remaining.append((row, title))
+        eligible = remaining
         if not eligible:
             out["holdings"][ticker] = result
             continue
-        listing = "\n".join(f"- {r['peer_ticker']}: {title}" for r, title in eligible)
+        listing = "\n".join(
+            f"- {r['peer_ticker']}: {title}"
+            + (f" (SIC {sics[str(r['peer_ticker'])]})" if sics.get(str(r["peer_ticker"])) else "")
+            for r, title in eligible
+        )
         prompt = (
             f"<holding>\nName: {profile.company_name or ticker} ({profile.edgar_ticker()})\n"
-            f"Aliases: {', '.join(profile.aliases) or 'none'}\n"
+            + (f"SIC: {own_sic}\n" if own_sic else "")
+            + f"Aliases: {', '.join(profile.aliases) or 'none'}\n"
             f"Known competitors: {', '.join(profile.competitors) or 'none given'}\n"
             f"Topics followed: {', '.join(profile.watch_topics) or 'none given'}\n"
             f"</holding>\n<candidates>\n{listing}\n</candidates>\n\n"

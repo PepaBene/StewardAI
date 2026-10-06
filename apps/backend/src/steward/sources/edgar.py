@@ -127,6 +127,12 @@ class EdgarClient:
         data = (await self._get(SUBMISSIONS_URL.format(cik=pad_cik(cik)))).json()
         return [str(e) for e in data.get("exchanges") or [] if e]
 
+    async def sic(self, cik: str) -> str | None:
+        """The issuer's four-digit Standard Industrial Classification code, as EDGAR lists it."""
+        data = await self._get_json(SUBMISSIONS_URL.format(cik=pad_cik(cik)))
+        code = str(data.get("sic") or "").strip()
+        return code if code.isdigit() else None
+
     async def company_facts(self, cik: str) -> dict[str, Any]:
         """Every XBRL fact the issuer has filed (10-Q, 10-K, 20-F, ...), by taxonomy and
         concept. A 404 (no XBRL filings) is an empty result, not an error."""

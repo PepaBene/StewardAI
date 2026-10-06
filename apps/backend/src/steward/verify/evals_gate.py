@@ -253,7 +253,9 @@ def main(argv: list[str] | None = None) -> int:
     args = parser.parse_args(argv)
     global FULL_EARNINGS
     FULL_EARNINGS = args.full
-    have_key = bool(os.environ.get("ANTHROPIC_API_KEY"))
+    have_key = any(
+        os.environ.get(k) for k in ("ANTHROPIC_API_KEY", "OPENAI_API_KEY", "GOOGLE_API_KEY")
+    )
     if args.write_baseline and not have_key:
         print("--write-baseline needs ANTHROPIC_API_KEY: it records live results")
         return 1
