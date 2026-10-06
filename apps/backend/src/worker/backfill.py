@@ -4,9 +4,13 @@ Runs the data-collecting jobs one after another, in dependency order, through th
 runner as the worker (each is a normal `manual` job with its steps in the job log), and
 prints how each went. Without arguments it runs the default sequence below; the 13F job
 loads two quarterly data sets per run, so it is repeated `--ownership-runs` times. Jobs
-that need Claude are skipped when ANTHROPIC_API_KEY is not set.
+that need an AI model are skipped when neither OPENAI_API_KEY nor GOOGLE_API_KEY is set.
 
-Run it where the database is reachable (the worker's host), with the same environment.
+Run it where the database is reachable, with the same environment. Naming job types runs
+just those, so it is also how to run a fetch from your own machine when a site refuses the
+worker's cloud address (investor sites on shared hosting often do):
+
+    uv run python -m worker.backfill ir_releases
 """
 
 import argparse
@@ -50,7 +54,7 @@ DATA_SEQUENCE = [
     "news_ingest",
 ]
 DEFAULT_SEQUENCE = [*DATA_SEQUENCE, "monitor"]
-NEEDS_CLAUDE = {"news_ingest"}
+NEEDS_AI = {"news_ingest"}
 
 
 # 13F history loads a few data sets per run; catch-up repeats the job until the wanted
@@ -115,8 +119,8 @@ async def backfill(job_types: list[str], ownership_runs: int) -> int:
         if closed:
             print(f"closed {len(closed)} run(s) a previous, stopped backfill left open")
         for job_type in job_types:
-            if job_type in NEEDS_CLAUDE and settings.anthropic_api_key is None:
-                print(f"skip     {job_type}: ANTHROPIC_API_KEY is not set")
+            if job_type in NEEDS_AI and not (settings.openai_api_key or settings.google_api_key):
+                print(f"skip     {job_type}: neither OPENAI_API_KEY nor GOOGLE_API_KEY is set")
                 continue
             runs = ownership_runs if job_type == "ownership_13f" else 1
             for run in range(runs):

@@ -78,7 +78,7 @@ def test_disabled_schedule_and_flag_off() -> None:
 
 
 def test_news_needs_claude_and_running_jobs_are_left_alone() -> None:
-    plan = plan_catch_up(JobsConfig(), {}, NOW, has_claude=False, in_flight={"price_history"})
+    plan = plan_catch_up(JobsConfig(), {}, NOW, has_ai=False, in_flight={"price_history"})
     assert "news_ingest" not in names(plan)
     assert "price_history" not in names(plan)
     assert "portfolio_sync" in names(plan)

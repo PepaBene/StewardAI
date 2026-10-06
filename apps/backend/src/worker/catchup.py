@@ -31,7 +31,7 @@ from steward.jobs.runner import lock_connection, lock_key, try_lock, unlock
 from steward.monitor import MAX_OPEN_RUN, last_slot
 from steward.settings import get_settings
 from steward.sources.audit import credentials_changed
-from worker.backfill import DATA_SEQUENCE, MAX_OWNERSHIP_RUNS, NEEDS_CLAUDE, ownership_remaining
+from worker.backfill import DATA_SEQUENCE, MAX_OWNERSHIP_RUNS, NEEDS_AI, ownership_remaining
 
 logger = logging.getLogger("worker.catchup")
 
@@ -76,7 +76,7 @@ def plan_catch_up(
     now: dt.datetime,
     *,
     in_flight: Iterable[str] = (),
-    has_claude: bool = True,
+    has_ai: bool = True,
     credentials_changed: bool = False,
 ) -> list[CatchUp]:
     """The jobs to run at start, in order. `last_success` maps a job type to the start of
@@ -115,7 +115,7 @@ def plan_catch_up(
         if item.job_type in busy:
             logger.info("catch-up: %s is already running; left to that run", item.job_type)
             continue
-        if item.job_type in NEEDS_CLAUDE and not has_claude:
+        if item.job_type in NEEDS_AI and not has_ai:
             logger.info("catch-up: skipping %s (ANTHROPIC_API_KEY is not set)", item.job_type)
             continue
         plan.append(item)
@@ -182,7 +182,7 @@ async def catch_up(
         last,
         now,
         in_flight=in_flight,
-        has_claude=settings.anthropic_api_key is not None,
+        has_ai=bool(settings.openai_api_key or settings.google_api_key),
         credentials_changed=await credentials_changed(pool, settings),
     )
     if not plan:
