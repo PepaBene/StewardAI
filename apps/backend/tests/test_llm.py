@@ -266,6 +266,23 @@ async def test_google_search_and_schema_run_as_a_search_then_a_structured_call()
     assert done.usage.input_tokens == 30 and done.usage.server_tool_use.web_search_requests == 1
 
 
+async def test_a_search_without_citations_does_not_forbid_the_urls_of_its_answer() -> None:
+    from steward.llm.client import Completion, _finish_request
+
+    req = request(model="gemini-3.8-flash", schema=Link, search=SearchSpec(allowed_domains=()))
+    found = Completion(
+        text="IR page: https://example.com/ir",
+        model="gemini-3.8-flash",
+        provider="google",
+        parsed=None,
+        stop_reason="stop",
+        usage=None,
+    )
+    ask = _finish_request(req, found).messages[-1].text
+    assert "must be one of these" not in ask
+    assert "returned no source links" in ask
+
+
 async def test_google_batch_with_search_and_schema_runs_two_rounds() -> None:
     llm = LLM(google_key="k")
     rounds: list[list[Request]] = []

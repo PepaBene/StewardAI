@@ -2,10 +2,11 @@ from types import SimpleNamespace
 from typing import Any
 
 import httpx
+import pytest
 from pydantic import BaseModel
 
 from steward.llm.client import LLM
-from steward.llm.routing import RoutingClient
+from steward.llm.routing import ClaudeDisabled, RoutingClient
 
 
 class Out(BaseModel):
@@ -42,11 +43,12 @@ def routed(seen: list[httpx.Request]) -> tuple[RoutingClient, FakeAnthropic]:
     return RoutingClient(fake, llm), fake  # type: ignore[arg-type]
 
 
-async def test_a_claude_model_goes_to_the_anthropic_client_unchanged() -> None:
+async def test_a_claude_model_is_refused_and_nothing_is_sent() -> None:
     seen: list[httpx.Request] = []
     client, fake = routed(seen)
-    out = await client.messages.parse(model="claude-sonnet-5", system="s", messages=[])
-    assert out == "anthropic answer" and fake.calls and not seen
+    with pytest.raises(ClaudeDisabled, match="Claude is not used"):
+        await client.messages.parse(model="claude-sonnet-5", system="s", messages=[])
+    assert not fake.calls and not seen
 
 
 async def test_another_providers_model_answers_in_the_anthropic_shape() -> None:

@@ -362,6 +362,13 @@ class IrDiscoverySettings(ConfigModel):
         ],
         description="Domains never accepted as an investor page.",
     )
+    robots_exempt_domains: list[Domain] = Field(
+        default_factory=list,
+        description="Investor sites whose robots.txt is not applied when their pages are "
+        "read for discovery. Your decision per site: requests still go to public addresses "
+        "only, are spaced out, state who is asking, never log in and never get past a "
+        "challenge. Leave empty to obey robots.txt everywhere.",
+    )
 
     @model_validator(mode="after")
     def _effort_supported(self) -> Self:

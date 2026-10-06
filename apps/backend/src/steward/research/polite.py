@@ -2,8 +2,9 @@
 
 Every fetch of a page the owner did not enter goes through here: the host must resolve to
 public addresses only (no worker-internal network), the site's robots.txt must allow the
-fetch, and requests to one host are spaced out. No logins, no paywall or bot-check
-circumvention: a site that refuses is skipped and the reason is recorded.
+fetch (unless the owner listed the site as exempt), and requests to one host are spaced out.
+No logins, no paywall or bot-check circumvention: a site that refuses is skipped and the
+reason is recorded.
 """
 
 import asyncio
@@ -36,12 +37,16 @@ def is_js_shell(doc: FetchedDocument) -> bool:
 
 
 def build_fetcher(
-    http: httpx.AsyncClient, browser_fallback: bool, user_agent: str
+    http: httpx.AsyncClient,
+    browser_fallback: bool,
+    user_agent: str,
+    robots_exempt: tuple[str, ...] = (),
 ) -> "PoliteFetcher":
     """A fetcher, with the browser fallback when the setting asks for it and Playwright is
-    installed (otherwise it quietly behaves as a plain fetcher)."""
+    installed (otherwise it quietly behaves as a plain fetcher). `robots_exempt` lists the
+    sites the owner chose not to apply robots.txt to."""
     browser = BrowserRenderer(user_agent) if browser_fallback and browser_available() else None
-    return PoliteFetcher(http, browser=browser)
+    return PoliteFetcher(http, browser=browser, robots_exempt=robots_exempt)
 
 
 class PoliteFetcher:
@@ -52,9 +57,11 @@ class PoliteFetcher:
         min_interval: float = 2.0,
         resolve: Resolver = resolve_host,
         browser: BrowserRenderer | None = None,
+        robots_exempt: tuple[str, ...] = (),
     ) -> None:
         self._http = http
         self._browser = browser
+        self._robots_exempt = tuple(d.lower().lstrip(".") for d in robots_exempt)
         self._min_interval = min_interval
         self._resolve = resolve
         self._robots: dict[str, urllib.robotparser.RobotFileParser | None] = {}
@@ -91,6 +98,8 @@ class PoliteFetcher:
         host = (parts.hostname or "").lower()
         if not host:
             return False
+        if any(host == d or host.endswith(f".{d}") for d in self._robots_exempt):
+            return True  # the owner's choice for this site (see `robots_exempt_domains`)
         parser = await self._robots_for(parts.scheme or "https", host)
         return parser is not None and parser.can_fetch(ROBOTS_AGENT, url)
 

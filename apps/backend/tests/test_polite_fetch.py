@@ -33,6 +33,14 @@ async def test_robots_disallow_blocks_the_fetch() -> None:
     assert http.seen.count("/robots.txt") == 1  # type: ignore[attr-defined]
 
 
+async def test_an_exempt_site_is_fetched_despite_robots_and_others_are_not() -> None:
+    http = client((200, "User-agent: *\nDisallow: /"))
+    fetcher = PoliteFetcher(http, robots_exempt=("example.com",))
+    assert (await fetcher.get("https://investors.example.com/", 10_000)).body == PAGE
+    with pytest.raises(IrError, match=r"robots\.txt"):
+        await fetcher.get("https://investors.other.org/", 10_000)
+
+
 async def test_missing_robots_means_no_restriction() -> None:
     fetcher = PoliteFetcher(client((404, "")))
     assert (await fetcher.get("https://ir.example.com/x", 10_000)).content_type == "text/html"

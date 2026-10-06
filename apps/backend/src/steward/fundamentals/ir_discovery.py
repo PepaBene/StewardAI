@@ -566,7 +566,9 @@ async def ir_discovery_handler(ctx: JobContext) -> None:
 
     agent = f"{settings.sec_user_agent or 'StewardAI'} StewardAI/{__version__}"
     async with ctx.step("recheck") as step, new_client() as http:
-        rechecker = build_fetcher(http, cfg.browser_fallback, agent)
+        rechecker = build_fetcher(
+            http, cfg.browser_fallback, agent, tuple(cfg.robots_exempt_domains)
+        )
         try:
             body, config_id, summary = await recheck_found_pages(ctx, rechecker, body, config_id)
         finally:
@@ -575,7 +577,9 @@ async def ir_discovery_handler(ctx: JobContext) -> None:
     due = [(seen, p) for seen, p in due if (body.for_ticker(p.ticker) or p).ir_url is None]
     async with ctx.step("discover") as step:
         async with new_client() as http, AsyncExitStack() as stack:
-            fetcher = build_fetcher(http, cfg.browser_fallback, agent)
+            fetcher = build_fetcher(
+                http, cfg.browser_fallback, agent, tuple(cfg.robots_exempt_domains)
+            )
             stack.push_async_callback(fetcher.aclose)
 
             async def discover(

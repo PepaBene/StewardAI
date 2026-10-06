@@ -32264,6 +32264,19 @@
             "type": "array",
             "title": "Denied Domains",
             "description": "Domains never accepted as an investor page."
+          },
+          "robots_exempt_domains": {
+            "items": {
+              "type": "string",
+              "maxLength": 253,
+              "pattern": "^([a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?\\.)+[a-z]{2,63}$",
+              "examples": [
+                "investor.apple.com"
+              ]
+            },
+            "type": "array",
+            "title": "Robots Exempt Domains",
+            "description": "Investor sites whose robots.txt is not applied when their pages are read for discovery. Your decision per site: requests still go to public addresses only, are spaced out, state who is asking, never log in and never get past a challenge. Leave empty to obey robots.txt everywhere."
           }
         },
         "additionalProperties": false,

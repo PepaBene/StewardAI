@@ -487,9 +487,20 @@ def _finish_request(req: Request, found: Completion) -> Request:
     )
     # The shape is stated here too: Gemini's batch mode does not always apply the schema.
     shape = json.dumps(req.schema.model_json_schema()) if req.schema is not None else "{}"
+    if sources:
+        listed = (
+            "Sources the search returned (any URL in your answer must be one of these, "
+            f"written exactly as here):\n{sources}"
+        )
+    else:
+        # Gemini answers well-known companies from memory without searching. Its URLs are then
+        # unsourced; the caller still checks each one (fetch, domain, judgement) before use.
+        listed = (
+            "The search returned no source links. Use the URLs from your answer above, "
+            "written exactly as there."
+        )
     ask = (
-        "Sources the search returned (any URL in your answer must be one of these, written "
-        f"exactly as here):\n{sources or '- none'}\n\nNow give your answer as one JSON object "
+        f"{listed}\n\nNow give your answer as one JSON object "
         f"that matches this JSON schema, with nothing else:\n{shape}"
     )
     return dataclasses.replace(

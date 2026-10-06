@@ -32,6 +32,11 @@ from steward.llm.types import (
     provider_of,
 )
 
+
+class ClaudeDisabled(RuntimeError):
+    """A job asked for a Claude model; Claude is never used."""
+
+
 _STOP = {"end": "end_turn", "max_tokens": "max_tokens", "refusal": "refusal", "other": "end_turn"}
 
 
@@ -155,10 +160,13 @@ class _Messages:
 
     async def _send(self, kwargs: dict[str, Any]) -> Any:
         model = str(kwargs.get("model", ""))
-        anthropic_client = self._owner.anthropic
         if provider_of(model) == "anthropic":
-            assert anthropic_client is not None, "ANTHROPIC_API_KEY is not set"
-            return await anthropic_client.messages.parse(**kwargs)
+            # The owner's rule: Claude models are never called. A config that still names one
+            # fails the job loudly instead of quietly spending on the wrong provider.
+            raise ClaudeDisabled(
+                f"{model} is a Claude model and Claude is not used; set a gpt-* or gemini-* "
+                "model for this job in the config"
+            )
         system = kwargs.get("system") or ""
         request = Request(
             model=model,

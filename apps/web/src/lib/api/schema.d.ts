@@ -11217,6 +11217,11 @@ export interface components {
              * @description Domains never accepted as an investor page.
              */
             denied_domains?: string[];
+            /**
+             * Robots Exempt Domains
+             * @description Investor sites whose robots.txt is not applied when their pages are read for discovery. Your decision per site: requests still go to public addresses only, are spaced out, state who is asking, never log in and never get past a challenge. Leave empty to obey robots.txt everywhere.
+             */
+            robots_exempt_domains?: string[];
         };
         /** IssuerAliasOut */
         IssuerAliasOut: {

@@ -366,6 +366,7 @@ export const DEFAULT_JOBS: JobsConfig = {
       "investing.com",
       "stocktwits.com",
     ],
+    robots_exempt_domains: [],
   },
   exposure_build_settings: {
     model: "claude-sonnet-5",
@@ -680,7 +681,7 @@ export const SETTINGS: { [S in SettingsKey]: { title: string; description: strin
       { key: "probe_first", label: "Try common investor-page paths before searching", kind: "bool", hint: "Saves the web search when a probe loads a page naming the company." },
       { key: "use_batch", label: "Run through a provider batch (half price)", kind: "bool", hint: "Only for OpenAI and Google models; the run waits for the batch." },
       { key: "batch_wait_minutes", label: "Wait for the batch (minutes)", kind: "int", min: 1, max: 1440 },
-      { key: "browser_fallback", label: "Retry refused pages in a browser", kind: "bool", hint: "For a 403/429 or a JavaScript-only page. Obeys robots.txt, never logs in or passes a challenge." },
+      { key: "browser_fallback", label: "Retry refused pages in a browser", kind: "bool", hint: "For a 403/429 or a JavaScript-only page. Obeys robots.txt (except sites in robots_exempt_domains, edited in the config JSON), never logs in or passes a challenge." },
     ],
   },
   exposure_build_settings: {

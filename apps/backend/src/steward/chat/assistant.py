@@ -510,6 +510,11 @@ async def chat_handler(ctx: JobContext) -> None:
     jobs = await load_active(ctx.pool, "jobs", JobsConfig)
     sources = await load_active(ctx.pool, "news_sources", NewsSourcesConfig)
     chat_settings = (jobs.body if jobs else JobsConfig()).chat
+    if provider_of(chat_settings.model) == "anthropic":
+        raise JobFailed(
+            f"{chat_settings.model} is a Claude model and Claude is not used; "
+            "set a gpt-* or gemini-* chat model in the jobs config"
+        )
     registry = sources.body if sources else NewsSourcesConfig()
     domains = tuple(
         d.domain for d in registry.domain_tiers if d.tier in chat_settings.source_tiers
