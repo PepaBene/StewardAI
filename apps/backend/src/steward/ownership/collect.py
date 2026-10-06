@@ -204,7 +204,14 @@ async def collect(ctx: JobContext, http: httpx.AsyncClient, settings: OwnershipS
         response = await http.get(settings.index_url)
         response.raise_for_status()
         links = dataset_links(response.text, settings.index_url)
-        loaded = {r["url"] for r in await pool.fetch("select url from public.form13f_dataset")}
+        # A dataset that kept no positions was stored before the portfolio's CUSIPs were
+        # known (identity lookups had failed), so it is loaded again once there are some.
+        has_cusips = bool(await portfolio_cusips(pool))
+        loaded = {
+            r["url"]
+            for r in await pool.fetch("select url, rows_kept from public.form13f_dataset")
+            if r["rows_kept"] > 0 or not has_cusips
+        }
         # The newest `history_datasets` are wanted; older ones are deliberately not loaded.
         wanted = links[: settings.history_datasets]
         missing = [u for u in wanted if u not in loaded]

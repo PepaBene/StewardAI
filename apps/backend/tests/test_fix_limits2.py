@@ -219,7 +219,7 @@ class _Pool:
         self.loaded = loaded
 
     async def fetch(self, query: str, *args: Any) -> list[dict[str, Any]]:
-        return [{"url": u} for u in self.loaded]
+        return [{"url": u, "rows_kept": 5} for u in self.loaded]
 
 
 class _Ctx:
