@@ -31,7 +31,18 @@ const BODY: HoldingProfilesConfig = {
       suppliers: ["TSMC"],
       customers: [],
       watch_topics: ["App Store regulation"],
-      exposures: [{ kind: "revenue_region", name: "Greater China", share: 0.16 }],
+      exposures: [
+        { kind: "revenue_region", name: "Greater China", share: 0.16, origin: "owner" },
+        {
+          kind: "commodity_input",
+          name: "Copper",
+          share: null,
+          origin: "ai",
+          source_url: "https://www.sec.gov/x",
+          period: "FY2025",
+          quote: "We use copper in our products.",
+        },
+      ],
       valuation_source: "auto",
       manual_fundamentals: null,
     },
@@ -76,6 +87,15 @@ const BODY: HoldingProfilesConfig = {
 describe("holding profiles form", () => {
   it("round-trips the API body", () => {
     expect(profilesToBody(profilesFromBody(BODY))).toEqual(BODY);
+  });
+
+  it("makes an AI exposure the owner's as soon as it is edited", () => {
+    const forms = profilesFromBody(BODY);
+    const copper = forms[0]!.exposures[1]!;
+    expect(profilesToBody(forms).profiles![0].exposures![1]).toMatchObject({ origin: "ai", quote: "We use copper in our products." });
+    copper.share = "0.2";
+    const edited = profilesToBody(forms).profiles![0].exposures![1]!;
+    expect(edited).toEqual({ kind: "commodity_input", name: "Copper", share: 0.2, origin: "owner" });
   });
 
   it("normalises typed values", () => {

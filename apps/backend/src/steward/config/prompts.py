@@ -36,6 +36,8 @@ PromptKey = Literal[
     "web_gap_search",
     "web_fact_approve",
     "web_domain_tier",
+    "exposure_inputs",
+    "exposure_hs_mapping",
     "listing_approval",
     "peer_approval",
 ]
@@ -132,6 +134,16 @@ PROMPTS: dict[PromptKey, PromptInfo] = {
         "Web source tier",
         "Places a web domain the source lists do not name in tier 2, tier 3 or rejected.",
         "steward.research.domains:DOMAIN_SYSTEM",
+    ),
+    "exposure_inputs": PromptInfo(
+        "Currency and input exposures",
+        "Reads an annual report for the currencies and commodities a holding depends on.",
+        "steward.exposures.inputs:INPUTS_SYSTEM",
+    ),
+    "exposure_hs_mapping": PromptInfo(
+        "Product lines to trade codes",
+        "Maps reported product lines to HS headings (always an estimate).",
+        "steward.exposures.hs:HS_SYSTEM",
     ),
     "listing_approval": PromptInfo(
         "Listing approval",

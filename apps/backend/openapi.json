@@ -23085,6 +23085,53 @@
             ],
             "title": "Share",
             "description": "Share of revenue or cost, 0..1."
+          },
+          "origin": {
+            "type": "string",
+            "enum": [
+              "owner",
+              "ai"
+            ],
+            "title": "Origin",
+            "description": "Who entered it. `ai` rows come from a filing passage quoted below and are replaced by the next extraction; editing one in the form makes it yours.",
+            "default": "owner"
+          },
+          "source_url": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 2000
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Url"
+          },
+          "period": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 80
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Period"
+          },
+          "quote": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 700
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Quote",
+            "description": "The verbatim filing passage the row rests on."
           }
         },
         "additionalProperties": false,
@@ -23162,6 +23209,63 @@
           "benchmark_weight"
         ],
         "title": "ExposureBucket"
+      },
+      "ExposureBuildSettings": {
+        "properties": {
+          "model": {
+            "type": "string",
+            "pattern": "^claude-[a-z0-9.-]{1,64}$",
+            "title": "Model",
+            "description": "Reads annual reports for currencies and inputs.",
+            "default": "claude-sonnet-5",
+            "examples": [
+              "claude-sonnet-5"
+            ]
+          },
+          "effort": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "low",
+                  "medium",
+                  "high",
+                  "xhigh",
+                  "max"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Effort",
+            "description": "Unset: effort is not sent and the model's default applies. On Haiku 4 models the level sets an extended-thinking budget instead (low 2k to max 32k tokens)."
+          },
+          "filings_per_run": {
+            "type": "integer",
+            "maximum": 40.0,
+            "minimum": 1.0,
+            "title": "Filings Per Run",
+            "description": "Annual reports read per run (cost guard).",
+            "default": 6
+          },
+          "extract_inputs": {
+            "type": "boolean",
+            "title": "Extract Inputs",
+            "description": "Read currency and commodity inputs from the annual report.",
+            "default": true
+          },
+          "map_products": {
+            "type": "boolean",
+            "title": "Map Products",
+            "description": "Map reported product lines to HS trade codes (always marked estimated).",
+            "default": true
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "ExposureBuildSettings",
+        "description": "The AI steps of the exposure builder. The country split from XBRL needs no AI and always\nruns. Each annual report is read at most once; nothing is guessed: a figure is stored only\nwhen a verbatim quote in the filing prints it."
       },
       "ExposureContextResponse": {
         "properties": {
@@ -33132,6 +33236,9 @@
           "earnings_check": {
             "$ref": "#/components/schemas/EarningsCheckSettings"
           },
+          "exposure_build_settings": {
+            "$ref": "#/components/schemas/ExposureBuildSettings"
+          },
           "ir_discovery_settings": {
             "$ref": "#/components/schemas/IrDiscoverySettings"
           },
@@ -40274,6 +40381,8 @@
               "web_gap_search",
               "web_fact_approve",
               "web_domain_tier",
+              "exposure_inputs",
+              "exposure_hs_mapping",
               "listing_approval",
               "peer_approval"
             ],
@@ -40334,6 +40443,8 @@
                 "web_gap_search",
                 "web_fact_approve",
                 "web_domain_tier",
+                "exposure_inputs",
+                "exposure_hs_mapping",
                 "listing_approval",
                 "peer_approval"
               ]

@@ -13,7 +13,27 @@ export const EXPOSURE_KINDS: readonly ExposureKind[] = [
   "other",
 ];
 
-export type ExposureForm = { key: string; kind: ExposureKind; name: string; share: string };
+/** Where an AI-extracted exposure came from. Kept only while the row is unchanged: edit it and it becomes yours. */
+export type ExposureProvenance = {
+  source_url: string | null;
+  period: string | null;
+  quote: string | null;
+  baseline: { kind: ExposureKind; name: string; share: string };
+};
+
+export type ExposureForm = { key: string; kind: ExposureKind; name: string; share: string; ai?: ExposureProvenance };
+
+/** The saved shape of an exposure row: provenance survives only an unedited AI row. */
+export function exposureToBody(e: ExposureForm): Exposure {
+  const name = e.name.trim();
+  const share = e.share.trim() ? Number(e.share.trim().replace(",", ".")) : null;
+  const base = e.ai?.baseline;
+  const unchanged = base !== undefined && base.kind === e.kind && base.name === name && base.share === e.share.trim();
+  if (e.ai && unchanged) {
+    return { kind: e.kind, name, share, origin: "ai", source_url: e.ai.source_url, period: e.ai.period, quote: e.ai.quote };
+  }
+  return { kind: e.kind, name, share, origin: "owner" };
+}
 
 export type ValuationSource = NonNullable<HoldingProfile["valuation_source"]>;
 export const VALUATION_SOURCES: readonly { value: ValuationSource; label: string }[] = [
@@ -148,12 +168,25 @@ export function profilesFromBody(body: HoldingProfilesConfig | null): ProfileFor
     suppliers: joined(p.suppliers),
     customers: joined(p.customers),
     watch_topics: joined(p.watch_topics),
-    exposures: (p.exposures ?? []).map((e) => ({
-      key: nextKey(),
-      kind: e.kind,
-      name: e.name,
-      share: e.share === null || e.share === undefined ? "" : String(e.share),
-    })),
+    exposures: (p.exposures ?? []).map((e) => {
+      const share = e.share === null || e.share === undefined ? "" : String(e.share);
+      return {
+        key: nextKey(),
+        kind: e.kind,
+        name: e.name,
+        share,
+        ...(e.origin === "ai"
+          ? {
+              ai: {
+                source_url: e.source_url ?? null,
+                period: e.period ?? null,
+                quote: e.quote ?? null,
+                baseline: { kind: e.kind, name: e.name, share },
+              },
+            }
+          : {}),
+      };
+    }),
     valuation_source: p.valuation_source ?? "auto",
     manual: manualFromBody(p.manual_fundamentals),
     fundamentals: fundamentalsFromProfile(p),
@@ -223,11 +256,7 @@ export function profilesToBody(forms: ProfileForm[]): HoldingProfilesConfig {
         suppliers: lines(f.suppliers),
         customers: lines(f.customers),
         watch_topics: lines(f.watch_topics),
-        exposures: f.exposures.map((e) => ({
-          kind: e.kind,
-          name: e.name.trim(),
-          share: e.share.trim() ? Number(e.share.trim().replace(",", ".")) : null,
-        })),
+        exposures: f.exposures.map(exposureToBody),
         valuation_source: f.valuation_source,
         manual_fundamentals: manualToBody(f.manual),
         ...fundamentalsToProfile(f.fundamentals),

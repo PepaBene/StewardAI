@@ -242,6 +242,27 @@ class AiApprovalSettings(ConfigModel):
         return self
 
 
+class ExposureBuildSettings(ConfigModel):
+    """The AI steps of the exposure builder. The country split from XBRL needs no AI and always
+    runs. Each annual report is read at most once; nothing is guessed: a figure is stored only
+    when a verbatim quote in the filing prints it."""
+
+    model: ModelId = Field(
+        default="claude-sonnet-5", description="Reads annual reports for currencies and inputs."
+    )
+    effort: Effort | None = Field(default=None, description=EFFORT_HELP)
+    filings_per_run: int = Field(
+        default=6, ge=1, le=40, description="Annual reports read per run (cost guard)."
+    )
+    extract_inputs: bool = Field(
+        default=True, description="Read currency and commodity inputs from the annual report."
+    )
+    map_products: bool = Field(
+        default=True,
+        description="Map reported product lines to HS trade codes (always marked estimated).",
+    )
+
+
 class IrDiscoverySettings(ConfigModel):
     """Finding each holding's investor-relations pages by web search, checking them, and having
     AI approve them. Pages the owner already set are never changed."""
@@ -1786,6 +1807,7 @@ class JobsConfig(ConfigModel):
         "Default: Tuesdays 05:50.",
     )
     earnings_check: EarningsCheckSettings = Field(default_factory=EarningsCheckSettings)
+    exposure_build_settings: ExposureBuildSettings = Field(default_factory=ExposureBuildSettings)
     ir_discovery_settings: IrDiscoverySettings = Field(default_factory=IrDiscoverySettings)
     gap_research_settings: GapResearchSettings = Field(default_factory=GapResearchSettings)
     ai_approval: AiApprovalSettings = Field(default_factory=AiApprovalSettings)

@@ -20,6 +20,7 @@ export type SettingsKey =
   | "ai_approval"
   | "ir_discovery_settings"
   | "gap_research_settings"
+  | "exposure_build_settings"
   | "news"
   | "digest"
   | "escalation"
@@ -358,6 +359,13 @@ export const DEFAULT_JOBS: JobsConfig = {
       "stocktwits.com",
     ],
   },
+  exposure_build_settings: {
+    model: "claude-sonnet-5",
+    effort: null,
+    filings_per_run: 6,
+    extract_inputs: true,
+    map_products: true,
+  },
   gap_research_settings: {
     model: "claude-sonnet-5",
     effort: null,
@@ -651,6 +659,17 @@ export const SETTINGS: { [S in SettingsKey]: { title: string; description: strin
       { key: "cooldown_days", label: "Retry a holding after (days)", kind: "int", min: 1, max: 365 },
       { key: "min_confidence", label: "Minimum confidence", kind: "number", hint: "Below this a page is not applied. 0.5 to 1." },
       { key: "browser_fallback", label: "Retry refused pages in a browser", kind: "bool", hint: "For a 403/429 or a JavaScript-only page. Obeys robots.txt, never logs in or passes a challenge." },
+    ],
+  },
+  exposure_build_settings: {
+    title: "Exposure builder",
+    description: "The AI steps of the exposure build. The country split from XBRL needs no AI. A figure is stored only when a verbatim quote in the filing prints it.",
+    fields: [
+      { key: "model", label: "Model", kind: "model", hint: "Reads annual reports and maps product lines." },
+      { key: "effort", label: "Effort", kind: "effort-optional", hint: EFFORT_OPTIONAL_HINT },
+      { key: "filings_per_run", label: "Reports per run", kind: "int", min: 1, max: 40, hint: "Cost guard. Each report is read once." },
+      { key: "extract_inputs", label: "Read currency and commodity inputs", kind: "bool" },
+      { key: "map_products", label: "Map product lines to trade codes", kind: "bool", hint: "Stored as an estimate." },
     ],
   },
   gap_research_settings: {

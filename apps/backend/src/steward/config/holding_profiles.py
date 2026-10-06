@@ -24,6 +24,16 @@ class Exposure(ConfigModel):
     kind: Literal["revenue_currency", "revenue_region", "commodity_input", "other"]
     name: ShortText = Field(examples=["USD", "Greater China", "Copper"])
     share: Weight | None = Field(default=None, description="Share of revenue or cost, 0..1.")
+    origin: Literal["owner", "ai"] = Field(
+        default="owner",
+        description="Who entered it. `ai` rows come from a filing passage quoted below and are "
+        "replaced by the next extraction; editing one in the form makes it yours.",
+    )
+    source_url: str | None = Field(default=None, max_length=2000)
+    period: str | None = Field(default=None, max_length=80)
+    quote: str | None = Field(
+        default=None, max_length=700, description="The verbatim filing passage the row rests on."
+    )
 
 
 class ManualFundamentals(ConfigModel):

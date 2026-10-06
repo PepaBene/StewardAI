@@ -15,8 +15,18 @@ from decimal import Decimal
 from typing import Any
 
 import asyncpg
+import httpx
 
+from steward import __version__
+from steward.ai import AINotConfigured, Usage, create_client
+from steward.config.holding_profiles import HoldingProfilesConfig
+from steward.config.jobs import JobsConfig
+from steward.config.prompts import load_prompts
+from steward.config.store import load_active
+from steward.exposures.ai_steps import run_inputs, run_products
 from steward.jobs.runner import JobContext
+from steward.settings import get_settings
+from steward.sources.edgar import EdgarClient
 
 ANNUAL_FORMS = ("10-K", "20-F", "40-F")
 TOLERANCE = Decimal("1.005")
@@ -253,3 +263,49 @@ async def exposure_build_handler(ctx: JobContext) -> None:
             results[ticker] = {**counts, "countries": len(plan), "mapped": float(mapped)}
         step.detail["holdings"] = len(rows)
         step.detail["results"] = results
+    await _ai_steps(ctx, list(rows))
+
+
+async def _ai_steps(ctx: JobContext, rows: list[asyncpg.Record]) -> None:
+    """HS mapping and currency / input extraction; skipped when AI or EDGAR is not set up."""
+    settings = get_settings()
+    stored = await load_active(ctx.pool, "jobs", JobsConfig)
+    await ctx.record_config_version(stored.id if stored else None)
+    cfg = (stored.body if stored else JobsConfig()).exposure_build_settings
+    if not (cfg.map_products or cfg.extract_inputs):
+        return
+    try:
+        client = create_client(settings)
+    except AINotConfigured as exc:
+        async with ctx.step("ai") as step:
+            step.detail["skipped"] = str(exc)
+        return
+    usage = Usage(model=cfg.model)
+    prompts = await load_prompts(ctx.pool)
+    if cfg.map_products:
+        async with ctx.step("products") as step:
+            step.detail["results"] = await run_products(ctx, client, cfg, rows, usage, prompts)
+            step.usage = usage.step_usage()
+    profiles_stored = await load_active(ctx.pool, "holding_profiles", HoldingProfilesConfig)
+    if cfg.extract_inputs and profiles_stored is not None:
+        async with ctx.step("inputs") as step:
+            if not settings.sec_user_agent:
+                step.detail["skipped"] = "SEC_USER_AGENT is not set"
+                return
+            async with httpx.AsyncClient(
+                timeout=httpx.Timeout(60.0, read=120.0),
+                headers={"User-Agent": f"StewardAI/{__version__}"},
+                follow_redirects=True,
+            ) as http:
+                step.detail["results"] = await run_inputs(
+                    ctx,
+                    client,
+                    cfg,
+                    EdgarClient(http, settings.sec_user_agent),
+                    rows,
+                    profiles_stored.id,
+                    profiles_stored.body,
+                    usage,
+                    prompts,
+                )
+            step.usage = usage.step_usage()

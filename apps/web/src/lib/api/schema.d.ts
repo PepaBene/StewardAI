@@ -8004,6 +8004,22 @@ export interface components {
              * @description Share of revenue or cost, 0..1.
              */
             share?: number | null;
+            /**
+             * Origin
+             * @description Who entered it. `ai` rows come from a filing passage quoted below and are replaced by the next extraction; editing one in the form makes it yours.
+             * @default owner
+             * @enum {string}
+             */
+            origin: "owner" | "ai";
+            /** Source Url */
+            source_url?: string | null;
+            /** Period */
+            period?: string | null;
+            /**
+             * Quote
+             * @description The verbatim filing passage the row rests on.
+             */
+            quote?: string | null;
         };
         /** ExposureBucket */
         ExposureBucket: {
@@ -8041,6 +8057,44 @@ export interface components {
              * @description The primary benchmark's weight in this bucket (its looked-through part renormalised to 100%); null for buckets it has no counterpart for.
              */
             benchmark_weight: number | null;
+        };
+        /**
+         * ExposureBuildSettings
+         * @description The AI steps of the exposure builder. The country split from XBRL needs no AI and always
+         *     runs. Each annual report is read at most once; nothing is guessed: a figure is stored only
+         *     when a verbatim quote in the filing prints it.
+         */
+        ExposureBuildSettings: {
+            /**
+             * Model
+             * @description Reads annual reports for currencies and inputs.
+             * @default claude-sonnet-5
+             * @example claude-sonnet-5
+             */
+            model: string;
+            /**
+             * Effort
+             * @description Unset: effort is not sent and the model's default applies. On Haiku 4 models the level sets an extended-thinking budget instead (low 2k to max 32k tokens).
+             */
+            effort?: ("low" | "medium" | "high" | "xhigh" | "max") | null;
+            /**
+             * Filings Per Run
+             * @description Annual reports read per run (cost guard).
+             * @default 6
+             */
+            filings_per_run: number;
+            /**
+             * Extract Inputs
+             * @description Read currency and commodity inputs from the annual report.
+             * @default true
+             */
+            extract_inputs: boolean;
+            /**
+             * Map Products
+             * @description Map reported product lines to HS trade codes (always marked estimated).
+             * @default true
+             */
+            map_products: boolean;
         };
         /**
          * ExposureContextResponse
@@ -11485,6 +11539,7 @@ export interface components {
             /** @description Builds each holding's revenue-by-country exposure from its latest annual SEC XBRL filing (reported basis). Your own exposure entries are never changed. Default: Tuesdays 05:50. */
             exposure_build?: components["schemas"]["JobSchedule"];
             earnings_check?: components["schemas"]["EarningsCheckSettings"];
+            exposure_build_settings?: components["schemas"]["ExposureBuildSettings"];
             ir_discovery_settings?: components["schemas"]["IrDiscoverySettings"];
             gap_research_settings?: components["schemas"]["GapResearchSettings"];
             ai_approval?: components["schemas"]["AiApprovalSettings"];
@@ -14038,7 +14093,7 @@ export interface components {
              * Key
              * @enum {string}
              */
-            key: "earnings_extraction" | "earnings_locate" | "earnings_calendar" | "news_classification" | "news_corroboration" | "news_escalation" | "news_digest" | "research_writer" | "monthly_review" | "chat_assistant" | "claim_verifier" | "ir_discovery_search" | "ir_discovery_approve" | "web_gap_search" | "web_fact_approve" | "web_domain_tier" | "listing_approval" | "peer_approval";
+            key: "earnings_extraction" | "earnings_locate" | "earnings_calendar" | "news_classification" | "news_corroboration" | "news_escalation" | "news_digest" | "research_writer" | "monthly_review" | "chat_assistant" | "claim_verifier" | "ir_discovery_search" | "ir_discovery_approve" | "web_gap_search" | "web_fact_approve" | "web_domain_tier" | "exposure_inputs" | "exposure_hs_mapping" | "listing_approval" | "peer_approval";
             /** Title */
             title: string;
             /** Description */
