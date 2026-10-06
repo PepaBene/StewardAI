@@ -11,7 +11,7 @@ from pathlib import Path
 from typing import Annotated, Literal
 from urllib.parse import urlsplit
 
-from pydantic import Field, SecretStr, field_validator
+from pydantic import Field, SecretStr, ValidationInfo, field_validator
 from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
 
 # One .env at the repository root holds every setting for both apps (see /.env.example).
@@ -96,6 +96,15 @@ class Settings(BaseSettings):
     # Dead-man's switch: the worker GETs this URL every minute (e.g. a healthchecks.io check),
     # so a stopped or stuck worker raises an alert outside this host.
     heartbeat_ping_url: SecretStr | None = None
+
+    @field_validator("*", mode="before")
+    @classmethod
+    def _strip_secret_whitespace(cls, value: object, info: ValidationInfo) -> object:
+        """A pasted key often carries a trailing newline, which an HTTP header rejects."""
+        field = cls.model_fields.get(info.field_name or "")
+        if isinstance(value, str) and field is not None and "SecretStr" in str(field.annotation):
+            return value.strip()
+        return value
 
     @field_validator("cors_origins", mode="before")
     @classmethod
