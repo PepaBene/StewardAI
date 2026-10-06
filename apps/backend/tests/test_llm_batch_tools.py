@@ -201,11 +201,19 @@ def test_classify_many_returns_none_for_unanswered_groups_and_nothing_for_claude
 
 def test_an_override_limited_to_some_providers_is_not_sent_to_others() -> None:
     prompts = PromptsConfig(
-        overrides={"chat_assistant": "custom"},
+        overrides={"chat_assistant": "a custom prompt of enough length"},
         override_providers={"chat_assistant": ["anthropic"]},
     )
-    assert prompts.text("chat_assistant", "default", "claude-sonnet-5") == "custom"
+    assert (
+        prompts.text("chat_assistant", "default", "claude-sonnet-5")
+        == "a custom prompt of enough length"
+    )
     assert prompts.text("chat_assistant", "default", "gpt-6-luna") == "default"
-    assert prompts.text("chat_assistant", "default") == "custom"  # no model: unrestricted
-    unlimited = PromptsConfig(overrides={"chat_assistant": "custom"})
-    assert unlimited.text("chat_assistant", "default", "gpt-6-luna") == "custom"
+    assert (
+        prompts.text("chat_assistant", "default") == "a custom prompt of enough length"
+    )  # no model: unrestricted
+    unlimited = PromptsConfig(overrides={"chat_assistant": "a custom prompt of enough length"})
+    assert (
+        unlimited.text("chat_assistant", "default", "gpt-6-luna")
+        == "a custom prompt of enough length"
+    )

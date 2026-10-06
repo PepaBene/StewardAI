@@ -250,7 +250,9 @@ async def run() -> None:
     if settings.database_url is None:
         logger.warning("DATABASE_URL is not set: no jobs will run")
     else:
-        pool = await create_pool(settings, max_size=10)
+        # The Supabase session pooler allows 15 clients in all: worker + API (5) + a redeploy
+        # overlap or an ad-hoc script must fit, or jobs fail with EMAXCONNSESSION.
+        pool = await create_pool(settings, max_size=7)
         worker = Worker(pool)
         await worker.recover()
         await worker.refresh_schedule(scheduler)

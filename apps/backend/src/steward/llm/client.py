@@ -182,6 +182,18 @@ class LLM:
         if not any(wire.is_grounding_redirect(c.url) for c in every):
             return done
         resolved = [await self._real_url(c) for c in every]
+        # The model quotes the redirect links it was shown in its answer: write the real
+        # URLs there too, so a job that checks its answer against the citations matches them.
+        swaps = {
+            old.url: new.url for old, new in zip(every, resolved, strict=True) if old.url != new.url
+        }
+        if swaps and done.parsed is not None:
+            text = done.text
+            for old_url, new_url in swaps.items():
+                text = text.replace(old_url, new_url)
+            if text != done.text:
+                done.text = text
+                done.parsed = type(done.parsed).model_validate_json(text)
         domains = req.search.allowed_domains if req.search else ()
         done.citations = wire.dedupe([c for c in resolved if wire.allowed(c.url, domains)])
         done.off_list_citations = wire.dedupe(

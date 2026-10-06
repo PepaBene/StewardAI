@@ -182,6 +182,34 @@ def test_google_usage_search_count_and_off_list_citations() -> None:
     assert done.usage.output_tokens == 50 and done.usage.server_tool_use.web_search_requests == 2
 
 
+class Link(BaseModel):
+    url: str
+
+
+async def test_google_answer_urls_quoting_a_redirect_are_rewritten_to_the_real_page() -> None:
+    redirect = "https://vertexaisearch.cloud.google.com/grounding-api-redirect/AAA"
+    answer = {
+        "candidates": [
+            {
+                "finishReason": "STOP",
+                "content": {"parts": [{"text": f'{{"url": "{redirect}"}}'}]},
+                "groundingMetadata": {
+                    "groundingChunks": [{"web": {"uri": redirect, "title": "sec.gov"}}]
+                },
+            }
+        ]
+    }
+
+    def handler(request_: httpx.Request) -> httpx.Response:
+        return httpx.Response(302, headers={"location": "https://www.sec.gov/real"})
+
+    llm = LLM(http=httpx.AsyncClient(transport=httpx.MockTransport(handler)))
+    req = request(model="gemini-3.8-flash", schema=Link, search=SearchSpec(allowed_domains=()))
+    done = await llm._resolve_google(req, wire.google_completion(req, answer))
+    assert [c.url for c in done.citations] == ["https://www.sec.gov/real"]
+    assert done.parsed == Link(url="https://www.sec.gov/real")
+
+
 def test_google_blocked_prompt_is_an_error() -> None:
     with pytest.raises(LLMError):
         wire.google_completion(request(), {"promptFeedback": {"blockReason": "SAFETY"}})
