@@ -673,10 +673,14 @@ async def _load_xml(edgar: EdgarClient, filing: Filing) -> tuple[bytes, str] | N
         names = []
         if _transient(exc):
             failures.append(exc)
-    candidates = [filing.primary_document, *names]
+    # EDGAR lists the browser-rendered copy ("xslSCHEDULE_13G_X01/primary_doc.xml", an HTML
+    # page with a DOCTYPE) as the primary document; the raw XML sits beside it without the
+    # xsl folder.
+    raw_primary = re.sub(r"^xsl[^/]*/", "", filing.primary_document)
+    candidates = [raw_primary, *names]
     seen: set[str] = set()
     for name in candidates:
-        if name in seen or not name.lower().endswith(".xml"):
+        if name in seen or not name.lower().endswith(".xml") or name.lower().startswith("xsl"):
             continue
         seen.add(name)
         url = filing.url(name)

@@ -2,6 +2,7 @@
 
 import datetime as dt
 import json
+import re
 from collections.abc import Mapping, Sequence
 from itertools import pairwise
 from typing import Any, cast
@@ -255,13 +256,15 @@ async def relink_amendments(
 
 async def _load_filing(edgar: EdgarClient, filing: Filing) -> tuple[bytes, str]:
     names = await edgar.filing_files(filing)
+    # The primary document is often the browser-rendered copy ("xslF345X05/<file>.xml", HTML
+    # with a DOCTYPE); the raw XML sits beside it without the xsl folder.
     candidates = [
-        filing.primary_document,
+        re.sub(r"^xsl[^/]*/", "", filing.primary_document),
         *[name for name in names if name.lower().endswith(".xml")],
     ]
     seen: set[str] = set()
     for name in candidates:
-        if name in seen or not name.lower().endswith(".xml"):
+        if name in seen or not name.lower().endswith(".xml") or name.lower().startswith("xsl"):
             continue
         seen.add(name)
         url = filing.url(name)
