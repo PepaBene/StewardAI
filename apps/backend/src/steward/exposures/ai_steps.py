@@ -1,17 +1,21 @@
 """The AI steps of the exposure builder job: HS mapping of product lines, and currency and
-commodity inputs from the annual report. Each filing is read once (`filing_extraction`)."""
+commodity inputs and customer / supplier disclosures from the annual report. Each filing is read
+once (`filing_extraction`); a failure on one holding never stops the others."""
 
 import json
+from collections.abc import Mapping, Sequence
 from typing import Any
 
 import anthropic
 import asyncpg
+import pydantic
 
 from steward.ai import Usage
+from steward.budget_guard import BudgetExceeded
 from steward.config.holding_profiles import HoldingProfile, HoldingProfilesConfig
 from steward.config.jobs import ExposureBuildSettings
 from steward.config.prompts import PromptsConfig
-from steward.config.store import ConfigConflictError, save_config
+from steward.config.store import ConfigConflictError, load_active, save_config
 from steward.exposures.archived import archived_text
 from steward.exposures.filing_text import FilingText, filing_text, latest_annual_filing
 from steward.exposures.hs import HS_SYSTEM, ask_hs, hs_weights, product_lines, write_hs
@@ -21,6 +25,7 @@ from steward.exposures.inputs import (
     added_keys,
     extract_inputs,
     merge_exposures,
+    tombstone_keys,
 )
 from steward.graph.dependencies import (
     APPROVE_SYSTEM,
@@ -37,12 +42,20 @@ from steward.jobs.runner import JobContext
 from steward.sources.edgar import EdgarClient, EdgarError
 from steward.storage import EvidenceStore
 
+# What one holding's AI call can raise without the others being affected.
+AI_ERRORS = (anthropic.APIError, pydantic.ValidationError, ValueError)
+RETRY_EMPTY_AFTER_DAYS = 30
+
 
 async def _extracted(pool: asyncpg.Pool, ticker: str, accession: str, kind: str) -> bool:
+    """Was this document read already? A read that found no readable sections is retried after
+    a month (the layout may have been misparsed), any other read is final."""
     return bool(
         await pool.fetchval(
-            "select exists(select 1 from public.filing_extraction"
-            " where ticker = $1 and accession = $2 and kind = $3)",
+            "select exists(select 1 from public.filing_extraction"  # noqa: S608
+            " where ticker = $1 and accession = $2 and kind = $3"
+            " and not (coalesce(detail->>'no_sections', '') = 'true'"
+            f"          and extracted_at < now() - interval '{RETRY_EMPTY_AFTER_DAYS} days'))",
             ticker,
             accession,
             kind,
@@ -100,7 +113,7 @@ async def run_products(
     ctx: JobContext,
     client: anthropic.AsyncAnthropic,
     cfg: ExposureBuildSettings,
-    holdings: list[asyncpg.Record],
+    holdings: Sequence[Mapping[str, Any]],
     usage: Usage,
     prompts: PromptsConfig,
 ) -> dict[str, Any]:
@@ -111,6 +124,8 @@ async def run_products(
         if done >= cfg.filings_per_run:
             break
         ticker = row["ticker"]
+        if row["issuer_id"] is None:
+            continue
         found = await product_lines(ctx.pool, ticker)
         if found is None:
             continue
@@ -120,21 +135,32 @@ async def run_products(
         name = await ctx.pool.fetchval(
             "select name from public.instrument where t212_ticker = $1", ticker
         )
-        mapping = await ask_hs(
-            client,
-            cfg.model,
-            cfg.effort,
-            str(name or ticker),
-            [label for label, _ in lines],
-            usage,
-            prompts.text("exposure_hs_mapping", HS_SYSTEM),
-        )
+        try:
+            mapping = await ask_hs(
+                client,
+                cfg.model,
+                cfg.effort,
+                str(name or ticker),
+                [label for label, _ in lines],
+                usage,
+                prompts.text("exposure_hs_mapping", HS_SYSTEM),
+            )
+        except BudgetExceeded:
+            results["stopped"] = "the monthly AI budget is reached"
+            break
+        except AI_ERRORS as exc:
+            results[ticker] = f"AI step failed: {type(exc).__name__}"
+            continue
         weights = hs_weights(lines, mapping, total)
         if isinstance(weights, str):
             results[ticker] = weights
             detail: dict[str, Any] = {"result": weights, "mapping": mapping}
         else:
-            counts = await write_hs(ctx.pool, row["issuer_id"], weights, facts, cfg.model)
+            try:
+                counts = await write_hs(ctx.pool, row["issuer_id"], weights, facts, cfg.model)
+            except asyncpg.PostgresError as exc:
+                results[ticker] = f"rows refused by the database: {str(exc)[:100]}"
+                continue
             results[ticker] = {**counts, "headings": sorted(weights)}
             detail = {"result": counts, "mapping": mapping}
         await _record(
@@ -144,12 +170,21 @@ async def run_products(
     return results
 
 
+async def _previous_detail(pool: asyncpg.Pool, ticker: str) -> Any:
+    return await pool.fetchval(
+        "select detail from public.filing_extraction where ticker = $1 and kind = 'exposure'"
+        " and not coalesce(detail->>'no_sections', '') = 'true'"
+        " order by extracted_at desc limit 1",
+        ticker,
+    )
+
+
 async def run_inputs(
     ctx: JobContext,
     client: anthropic.AsyncAnthropic,
     cfg: ExposureBuildSettings,
     edgar: EdgarClient | None,
-    holdings: list[asyncpg.Record],
+    holdings: Sequence[Mapping[str, Any]],
     profiles_id: int,
     profiles: HoldingProfilesConfig,
     usage: Usage,
@@ -173,22 +208,42 @@ async def run_inputs(
             continue
         if filing is None:
             continue
-        findings, _sections = await extract_inputs(
-            client,
-            cfg.model,
-            cfg.effort,
-            filing,
-            usage,
-            prompts.text("exposure_inputs", INPUTS_SYSTEM),
-        )
+        try:
+            findings, sections = await extract_inputs(
+                client,
+                cfg.model,
+                cfg.effort,
+                filing,
+                usage,
+                prompts.text("exposure_inputs", INPUTS_SYSTEM),
+            )
+        except BudgetExceeded:
+            results["stopped"] = "the monthly AI budget is reached"
+            break
+        except AI_ERRORS as exc:
+            results[ticker] = f"AI step failed: {type(exc).__name__}"
+            continue
+        if not sections:
+            results[ticker] = "no readable exposure sections (retried in a month)"
+            await _record(
+                ctx.pool,
+                ticker,
+                filing.accession,
+                "exposure",
+                filing.source_url,
+                {"no_sections": True},
+            )
+            continue
         accepted = accept(findings, filing)
-        previous = await ctx.pool.fetchval(
-            "select detail from public.filing_extraction where ticker = $1 and kind = 'exposure'"
-            " order by extracted_at desc limit 1",
-            ticker,
-        )
-        merged, info = merge_exposures(profile, accepted.exposures, added_keys(previous))
-        if info["changed"]:
+        previous = await _previous_detail(ctx.pool, ticker)
+        info: dict[str, Any] = {}
+        stopped = False
+        for attempt in (1, 2):
+            merged, info = merge_exposures(
+                profile, accepted.exposures, added_keys(previous), tombstone_keys(previous)
+            )
+            if not info["changed"]:
+                break
             updated = profiles.model_copy(
                 update={
                     "profiles": [merged if p.ticker == ticker else p for p in profiles.profiles]
@@ -205,9 +260,19 @@ async def run_inputs(
                         expected_active_id=profiles_id,
                     )
             except ConfigConflictError:
-                results["stopped"] = "the profiles changed; the next run continues"
-                break
+                # The owner saved the profiles meanwhile: take theirs and merge again once.
+                latest = await load_active(ctx.pool, "holding_profiles", HoldingProfilesConfig)
+                fresh = latest.body.for_ticker(ticker) if latest else None
+                if latest is None or fresh is None or attempt == 2:
+                    stopped = True
+                    break
+                profiles_id, profiles, profile = latest.id, latest.body, fresh
+                continue
             profiles_id, profiles = saved.id, saved.body
+            break
+        if stopped:
+            results["stopped"] = "the profiles changed; the next run continues"
+            break
         results[ticker] = {**info, "rejected": len(accepted.rejected)}
         await _record(
             ctx.pool,
@@ -226,7 +291,7 @@ async def run_dependencies(
     client: anthropic.AsyncAnthropic,
     cfg: ExposureBuildSettings,
     edgar: EdgarClient | None,
-    holdings: list[asyncpg.Record],
+    holdings: Sequence[Mapping[str, Any]],
     profiles: HoldingProfilesConfig,
     usage: Usage,
     prompts: PromptsConfig,
@@ -256,29 +321,49 @@ async def run_dependencies(
         name = await ctx.pool.fetchval(
             "select name from public.instrument where t212_ticker = $1", ticker
         )
-        found = await extract_dependencies(
-            client,
-            cfg.model,
-            cfg.effort,
-            filing,
-            usage,
-            prompts.text("dependency_extract", DEPENDENCY_SYSTEM),
-        )
         own_names = tuple(
             next((h["names"] for h in graph_holdings if h["ticker"] == ticker), [str(name)])
         )
-        checked = check_findings(found, filing, own_names)
-        notes = await corroboration_notes(ctx.pool, ticker, own_names, checked.kept, graph_holdings)
-        verdicts = await judge_dependencies(
-            client,
-            cfg.model,
-            cfg.effort,
-            filing,
-            checked.kept,
-            usage,
-            prompts.text("dependency_approve", APPROVE_SYSTEM),
-            notes,
-        )
+        try:
+            found, sections = await extract_dependencies(
+                client,
+                cfg.model,
+                cfg.effort,
+                filing,
+                usage,
+                prompts.text("dependency_extract", DEPENDENCY_SYSTEM),
+            )
+            if not sections:
+                results[ticker] = "no readable customer or supplier sections (retried in a month)"
+                await _record(
+                    ctx.pool,
+                    ticker,
+                    filing.accession,
+                    "dependency",
+                    filing.source_url,
+                    {"no_sections": True},
+                )
+                continue
+            checked = check_findings(found, filing, own_names)
+            notes = await corroboration_notes(
+                ctx.pool, ticker, own_names, checked.kept, graph_holdings
+            )
+            verdicts = await judge_dependencies(
+                client,
+                cfg.model,
+                cfg.effort,
+                filing,
+                checked.kept,
+                usage,
+                prompts.text("dependency_approve", APPROVE_SYSTEM),
+                notes,
+            )
+        except BudgetExceeded:
+            results["stopped"] = "the monthly AI budget is reached"
+            break
+        except AI_ERRORS as exc:
+            results[ticker] = f"AI step failed: {type(exc).__name__}"
+            continue
         counts = await store_and_approve(ctx.pool, filing, checked.kept, verdicts, cfg.model)
         results[ticker] = {**counts, "rejected": len(checked.rejected)}
         await _record(

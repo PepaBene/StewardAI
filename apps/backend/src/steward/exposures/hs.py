@@ -10,7 +10,7 @@ map to one heading are left out rather than guessed.
 import datetime as dt
 import json
 import re
-from decimal import Decimal
+from decimal import ROUND_DOWN, Decimal
 from typing import Any
 
 import anthropic
@@ -149,10 +149,12 @@ def hs_weights(
         grouped[code] = (weight + value / total, [*labels, label])
     if not grouped:
         return "no product line maps to one HS heading"
-    if sum((w for w, _ in grouped.values()), Decimal(0)) > TOLERANCE:
+    mapped = sum((w for w, _ in grouped.values()), Decimal(0))
+    if mapped > TOLERANCE:
         return "mapped revenue exceeds total revenue"
+    scale = mapped if mapped > 1 else Decimal(1)  # rounding: keep under the database's 100% cap
     return {
-        code: (min(weight, Decimal(1)).quantize(Decimal("0.000001")), labels)
+        code: ((weight / scale).quantize(Decimal("0.000001"), ROUND_DOWN), labels)
         for code, (weight, labels) in grouped.items()
     }
 

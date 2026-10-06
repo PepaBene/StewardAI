@@ -19,13 +19,17 @@ from steward.ai import Usage
 from steward.config.holding_profiles import Exposure, HoldingProfile
 from steward.config.jobs import effort_kwargs
 from steward.exposures.filing_text import (
+    CURRENCY_NAMES,
     EXPOSURE_WORDS,
     FilingText,
     currency_in_quote,
+    percent_bound,
     sections_for,
     verified,
     word_in_quote,
 )
+
+MAX_FINDINGS = 25
 
 
 class InputFinding(BaseModel):
@@ -48,7 +52,7 @@ class InputFinding(BaseModel):
 
 
 class InputFindings(BaseModel):
-    findings: list[InputFinding] = Field(default_factory=list, max_length=25)
+    findings: list[InputFinding] = Field(default_factory=list)
 
 
 INPUTS_SYSTEM = """\
@@ -106,11 +110,11 @@ async def extract_inputs(
         system=system,
         messages=[{"role": "user", "content": inputs_prompt(filing, sections)}],
         output_format=InputFindings,
-        **effort_kwargs(model, effort, 6000),
+        **effort_kwargs(model, effort, 12000),
     )
     usage.add(response.usage)
     parsed = response.parsed_output
-    return (parsed.findings if parsed else []), sections
+    return (parsed.findings[:MAX_FINDINGS] if parsed else []), sections
 
 
 @dataclass
@@ -128,10 +132,15 @@ def accept(findings: list[InputFinding], filing: FilingText) -> Accepted:
         key = (f.kind, name)
         problems = verified(f.quote, filing.text, f.share, ())
         if f.kind == "revenue_currency":
+            terms = CURRENCY_NAMES.get(name, (name.lower(),))
             if len(name) != 3 or not currency_in_quote(name, f.quote):
                 problems.append(f"the quote does not mention {name}")
-        elif not name or not word_in_quote(name, f.quote):
-            problems.append(f"the quote does not mention {name}")
+        else:
+            terms = (name,)
+            if not name or not word_in_quote(name, f.quote):
+                problems.append(f"the quote does not mention {name}")
+        if f.share is not None and not problems and not percent_bound(f.share, terms, f.quote):
+            problems.append(f"the percentage is not next to {name}")
         if key in seen:
             problems.append("listed twice")
         if problems:
@@ -149,7 +158,22 @@ def accept(findings: list[InputFinding], filing: FilingText) -> Accepted:
                 quote=" ".join(f.quote.split())[:700],
             )
         )
+    _drop_impossible_currency_shares(out)
     return out
+
+
+def _drop_impossible_currency_shares(out: Accepted) -> None:
+    """Currency shares of one period that add up to more than the whole are not trusted: the
+    currencies stay (the quote names them) but their shares are dropped."""
+    by_period: dict[str, list[int]] = {}
+    for i, e in enumerate(out.exposures):
+        if e.kind == "revenue_currency" and e.share is not None:
+            by_period.setdefault(e.period or "", []).append(i)
+    for period, indexes in by_period.items():
+        if sum(out.exposures[i].share or 0 for i in indexes) > 1.001:
+            for i in indexes:
+                out.exposures[i] = out.exposures[i].model_copy(update={"share": None})
+            out.rejected.append(f"currency shares of {period or 'the period'} exceed 100%")
 
 
 def _key(e: Exposure) -> tuple[str, str]:
@@ -159,17 +183,28 @@ def _key(e: Exposure) -> tuple[str, str]:
 AI_KINDS = ("revenue_currency", "commodity_input")
 
 
+def _signature(e: Exposure) -> tuple[Any, ...]:
+    return (e.kind, e.name.casefold(), e.share, e.period, e.quote, e.source_url)
+
+
 def merge_exposures(
-    profile: HoldingProfile, new: list[Exposure], previously_added: set[tuple[str, str]]
+    profile: HoldingProfile,
+    new: list[Exposure],
+    previously_added: set[tuple[str, str]],
+    tombstones: set[tuple[str, str]] | None = None,
 ) -> tuple[HoldingProfile, dict[str, Any]]:
     """The profile with the AI rows replaced by `new`. Owner rows stay as they are and win a
-    clash; a key added before that is now missing was deleted by the owner and stays gone."""
+    clash. A key the last run wrote that is now missing was deleted by the owner; it becomes a
+    tombstone that outlives later runs, so a deleted row is never added back (dropping a tombstone
+    only when the owner puts the row in again)."""
     current = {_key(e) for e in profile.exposures}
-    deleted = {k for k in previously_added if k not in current}
+    deleted = ({k for k in previously_added if k not in current} | (tombstones or set())) - current
     owner_keys = {_key(e) for e in profile.exposures if e.origin == "owner"}
     kept = [e for e in profile.exposures if e.origin == "owner" or e.kind not in AI_KINDS]
     fresh = [e for e in new if _key(e) not in owner_keys and _key(e) not in deleted]
-    changed = {_key(e) for e in fresh} != {_key(e) for e in profile.exposures if e.origin == "ai"}
+    changed = {_signature(e) for e in fresh} != {
+        _signature(e) for e in profile.exposures if e.origin == "ai"
+    }
     merged = profile.model_copy(update={"exposures": [*kept, *fresh]})
     return merged, {
         "written": sorted(f"{k}:{n}" for k, n in (_key(e) for e in fresh)),
@@ -177,11 +212,25 @@ def merge_exposures(
             f"{k}:{n}" for k, n in (_key(e) for e in new) if (k, n) in owner_keys
         ),
         "skipped_deleted": sorted(f"{k}:{n}" for k, n in deleted),
+        "tombstones": sorted(f"{k}:{n}" for k, n in deleted),
         "changed": changed,
     }
 
 
+def _detail(detail: Any) -> dict[str, Any]:
+    data = json.loads(detail) if isinstance(detail, str) else (detail or {})
+    return data if isinstance(data, dict) else {}
+
+
+def _keys(items: Any) -> set[tuple[str, str]]:
+    return {(str(k), str(n)) for k, n in (str(i).split(":", 1) for i in items or [])}
+
+
 def added_keys(detail: Any) -> set[tuple[str, str]]:
     """The (kind, name) keys a previous extraction wrote, from its stored detail."""
-    data = json.loads(detail) if isinstance(detail, str) else (detail or {})
-    return {(str(k), str(n)) for k, n in (item.split(":", 1) for item in data.get("written", []))}
+    return _keys(_detail(detail).get("written"))
+
+
+def tombstone_keys(detail: Any) -> set[tuple[str, str]]:
+    """The keys the owner removed, carried from run to run in the stored detail."""
+    return _keys(_detail(detail).get("tombstones"))

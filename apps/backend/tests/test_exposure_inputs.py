@@ -5,6 +5,8 @@ from steward.config.holding_profiles import Exposure, HoldingProfile
 from steward.exposures.filing_text import (
     EXPOSURE_WORDS,
     FilingText,
+    currency_in_quote,
+    percent_bound,
     percent_in_quote,
     relevant,
     split_items,
@@ -12,7 +14,15 @@ from steward.exposures.filing_text import (
     word_in_quote,
 )
 from steward.exposures.hs import hs_weights, valid_heading
-from steward.exposures.inputs import InputFinding, accept, added_keys, merge_exposures
+from steward.exposures.inputs import (
+    Accepted,
+    InputFinding,
+    _drop_impossible_currency_shares,
+    accept,
+    added_keys,
+    merge_exposures,
+    tombstone_keys,
+)
 
 D = Decimal
 FILLER = "Our business is described elsewhere in this report and in the notes. " * 80
@@ -126,6 +136,66 @@ def test_a_row_the_owner_deleted_is_not_added_back() -> None:
     previously = added_keys({"written": ["commodity_input:copper"]})
     merged, info = merge_exposures(profile(), new, previously)
     assert merged.exposures == [] and info["skipped_deleted"] == ["commodity_input:copper"]
+
+
+def test_a_deleted_row_stays_gone_across_later_filings() -> None:
+    new = [Exposure(kind="commodity_input", name="Copper", origin="ai")]
+    # run 2: the owner deleted copper after run 1 wrote it
+    run1 = {"written": ["commodity_input:copper"]}
+    merged, info = merge_exposures(profile(), new, added_keys(run1), tombstone_keys(run1))
+    assert merged.exposures == [] and info["tombstones"] == ["commodity_input:copper"]
+    # run 3 only sees run 2's record, which wrote nothing: the tombstone carries on
+    run2 = {"written": info["written"], "tombstones": info["tombstones"]}
+    merged, info = merge_exposures(profile(), new, added_keys(run2), tombstone_keys(run2))
+    assert merged.exposures == [] and info["skipped_deleted"] == ["commodity_input:copper"]
+    # the owner entering it again lifts the tombstone, and the row is theirs
+    owner = Exposure(kind="commodity_input", name="Copper", share=0.1)
+    merged, info = merge_exposures(profile(owner), new, set(), tombstone_keys(run2))
+    assert [(e.origin, e.share) for e in merged.exposures] == [("owner", 0.1)]
+    assert info["tombstones"] == []
+
+
+def test_a_new_share_or_quote_counts_as_a_change() -> None:
+    old = Exposure(kind="revenue_currency", name="EUR", share=0.2, origin="ai", quote="q" * 30)
+    same = old.model_copy()
+    assert (
+        merge_exposures(profile(old), [same], {("revenue_currency", "eur")})[1]["changed"] is False
+    )
+    newer = old.model_copy(update={"share": 0.25, "quote": "r" * 30})
+    merged, info = merge_exposures(profile(old), [newer], {("revenue_currency", "eur")})
+    assert info["changed"] is True and merged.exposures[0].share == 0.25
+
+
+def test_a_percentage_must_sit_next_to_its_own_currency() -> None:
+    gap = " and the remaining sales were spread over many other regions of the world " * 3
+    quote = f"About 22% of revenue was in euros,{gap}while Japanese yen made up 3% of our sales"
+    assert percent_bound(0.22, ("euro",), quote) and not percent_bound(0.22, ("yen",), quote)
+    far = "Euros matter. " + "x " * 200 + "Approximately 22% of revenue is in dollars"
+    assert not percent_bound(0.22, ("euro",), far)
+
+
+def test_currency_words_are_not_ordinary_english() -> None:
+    quote = "We won the contract and sold real estate in Mexico worth 5% of revenue"
+    assert not currency_in_quote("KRW", quote)
+    assert not currency_in_quote("BRL", quote)
+    assert currency_in_quote("KRW", "revenue in Korean won rose")
+
+
+def test_impossible_currency_totals_lose_their_shares() -> None:
+    out = Accepted(
+        exposures=[
+            Exposure(kind="revenue_currency", name="EUR", share=0.6, origin="ai", period="FY2025"),
+            Exposure(kind="revenue_currency", name="USD", share=0.7, origin="ai", period="FY2025"),
+            Exposure(kind="revenue_currency", name="JPY", share=0.1, origin="ai", period="FY2024"),
+        ]
+    )
+    _drop_impossible_currency_shares(out)
+    assert [(e.name, e.share) for e in out.exposures] == [
+        ("EUR", None),
+        ("USD", None),
+        ("JPY", 0.1),
+    ]
+    assert len(out.rejected) == 1
 
 
 def test_hs_headings_and_weights() -> None:

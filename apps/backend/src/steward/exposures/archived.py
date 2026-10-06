@@ -13,6 +13,7 @@ from steward.fundamentals.ir import IrError, document_lines
 from steward.storage import EvidenceStore, StorageError
 
 MIN_CHARS = 2_000
+RECENT = 4
 
 
 async def archived_text(
@@ -20,17 +21,21 @@ async def archived_text(
 ) -> FilingText | str | None:
     """The newest archived document of the holding as text; a reason when it cannot be read;
     None when nothing is archived."""
-    row = await pool.fetchrow(
-        """select e.sha256, e.storage_path, e.source_url, e.content_type,
+    rows = await pool.fetch(
+        """select e.sha256, e.storage_path, e.source_url, e.content_type, e.byte_size,
                   max(f.period_end) as period_end
            from public.fact f join public.evidence e on e.sha256 = f.evidence_sha256
            where f.ticker = $1
-           group by e.sha256, e.storage_path, e.source_url, e.content_type
-           order by max(f.period_end) desc nulls last, max(f.extracted_at) desc limit 1""",
+           group by e.sha256, e.storage_path, e.source_url, e.content_type, e.byte_size
+           order by max(f.period_end) desc nulls last, max(f.extracted_at) desc limit $2""",
         ticker,
+        RECENT,
     )
-    if row is None:
+    if not rows:
         return None
+    # The newest few documents are releases and reports of one period; the longest one says
+    # the most about customers, suppliers and currencies.
+    row = max(rows, key=lambda r: r["byte_size"] or 0)
     try:
         data = await storage.get(row["storage_path"])
         text = "\n".join(document_lines(data, row["content_type"] or ""))

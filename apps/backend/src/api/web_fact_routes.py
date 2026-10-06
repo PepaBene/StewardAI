@@ -9,6 +9,8 @@ from pydantic import BaseModel, Field
 
 from api.auth import Owner
 from api.db import Pool
+from steward.config.holding_profiles import HoldingProfilesConfig
+from steward.config.store import load_active
 
 router = APIRouter()
 
@@ -133,10 +135,27 @@ async def ai_approval_summary(
            order by retrieved_at desc""",
         interval,
     )
+    disclosures = await pool.fetch(
+        """select id, ticker, relationship, counterparty_name, anonymous_counterparty,
+                  reported_share, share_basis, fiscal_period, decided_at, decision_reason
+           from public.relationship_disclosure
+           where status = 'confirmed' and decision_reason like 'AI approval%'
+             and decided_at >= now() - $1::interval order by decided_at desc""",
+        interval,
+    )
+    profiles = await load_active(pool, "holding_profiles", HoldingProfilesConfig)
+    exposures = [
+        {"ticker": p.ticker, **e.model_dump(mode="json")}
+        for p in (profiles.body.profiles if profiles else [])
+        for e in p.exposures
+        if e.origin == "ai"
+    ]
     return {
         "days": days,
         "listings": [dict(r) for r in listings],
         "peers": [dict(r) for r in peers],
         "investor_pages": [dict(r) for r in pages],
         "web_facts": [dict(r) for r in facts],
+        "disclosures": [dict(r) for r in disclosures],
+        "exposures": exposures,
     }

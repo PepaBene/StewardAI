@@ -580,6 +580,20 @@ async def remove_exposure(
                 )
         except ConfigConflictError as exc:
             raise HTTPException(409, "the profiles changed; reload and try again") from exc
+        if any(e.origin == "ai" and (e.kind, e.name.casefold()) == key for e in profile.exposures):
+            # Remember it next to the AI's own record, so no later filing adds it back.
+            await pool.execute(
+                """update public.filing_extraction set detail = jsonb_set(
+                     coalesce(detail, '{}'::jsonb), '{tombstones}',
+                     to_jsonb(array(select distinct x from unnest(
+                       array(select jsonb_array_elements_text(
+                         coalesce(detail->'tombstones', '[]'::jsonb))) || $2::text) x)))
+                   where ticker = $1 and kind = 'exposure' and accession = (
+                     select accession from public.filing_extraction
+                     where ticker = $1 and kind = 'exposure' order by extracted_at desc limit 1)""",
+                ticker,
+                f"{key[0]}:{key[1]}",
+            )
     return RemoveExposureResponse(ticker=ticker, removed=removed)
 
 

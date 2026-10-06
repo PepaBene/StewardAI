@@ -115,7 +115,13 @@ GEOGRAPHY_DEFINITIONS = {
     "EU27_2020": "European Union, 27 members (Eurostat aggregate)",
     "US": "United States (national series)",
     "CZ": "Czechia (national series)",
+    "WLD": "World price (a global benchmark, not a country series)",
 }
+
+
+def is_commodity(key: str) -> bool:
+    """Commodity price series are world benchmarks: they must never be read as US data."""
+    return key.startswith("commodity_")
 
 
 class MacroError(Exception):
@@ -258,7 +264,9 @@ def parse_fred(body: dict[str, Any], series: FredSeries) -> list[Observation]:
                 vintage=row.get("realtime_start"),
                 transformation=FRED_TRANSFORMATION.get(series.units),
                 release_calendar=RELEASE_CALENDARS["fred"],
-                geography_definition=GEOGRAPHY_DEFINITIONS["US"],
+                geography_definition=GEOGRAPHY_DEFINITIONS[
+                    "WLD" if is_commodity(series.key) else "US"
+                ],
             )
         )
     return out
@@ -579,6 +587,8 @@ def surprise(
 def _geography(series_id: str, source: str) -> str:
     if ":" in series_id:
         return series_id.rsplit(":", 1)[1]
+    if source == "fred" and is_commodity(series_id):
+        return "WLD"
     return {"fred": "US", "ecb": "EA", "cnb": "CZ"}.get(source, "unknown")
 
 
@@ -826,7 +836,7 @@ async def run_macro_collect(ctx: JobContext, deps: MacroDeps) -> None:
                     pool,
                     "fred",
                     fred.key,
-                    ["US"],
+                    ["WLD" if is_commodity(fred.key) else "US"],
                     AccessState.ACCESS_UNVERIFIED,
                     "FRED_API_KEY is not set",
                 )
@@ -847,7 +857,7 @@ async def run_macro_collect(ctx: JobContext, deps: MacroDeps) -> None:
                     pool,
                     "fred",
                     fred.key,
-                    ["US"],
+                    ["WLD" if is_commodity(fred.key) else "US"],
                     AccessState.TEMPORARILY_FAILED,
                     type(exc).__name__,
                 )

@@ -15,12 +15,35 @@ export type FactDecision = {
   retrievedAt: string;
 };
 
+export type DisclosureDecision = {
+  id: number;
+  ticker: string;
+  relationship: string;
+  counterparty: string;
+  share: number | null;
+  basis: string;
+  period: string;
+  at: string;
+  reason: string;
+};
+export type ExposureDecision = {
+  ticker: string;
+  kind: string;
+  name: string;
+  share: number | null;
+  period: string;
+  sourceUrl: string;
+  quote: string;
+};
+
 export type AiDecisions = {
   days: number;
   listings: ListingDecision[];
   peers: PeerDecision[];
   pages: PageDecision[];
   facts: FactDecision[];
+  disclosures: DisclosureDecision[];
+  exposures: ExposureDecision[];
 };
 
 function isRecord(v: unknown): v is Record<string, unknown> {
@@ -40,7 +63,7 @@ function appliedList(v: unknown): string[] {
 }
 
 export function parseAiDecisions(raw: unknown): AiDecisions {
-  const empty: AiDecisions = { days: 7, listings: [], peers: [], pages: [], facts: [] };
+  const empty: AiDecisions = { days: 7, listings: [], peers: [], pages: [], facts: [], disclosures: [], exposures: [] };
   if (!isRecord(raw)) return empty;
   return {
     days: typeof raw.days === "number" ? raw.days : 7,
@@ -78,9 +101,33 @@ export function parseAiDecisions(raw: unknown): AiDecisions {
         sourceUrl: String(r.source_url ?? ""),
         retrievedAt: String(r.retrieved_at ?? ""),
       })),
+    disclosures: rows(raw, "disclosures")
+      .filter((r) => typeof r.id === "number" && typeof r.ticker === "string")
+      .map((r) => ({
+        id: Number(r.id),
+        ticker: String(r.ticker),
+        relationship: String(r.relationship ?? ""),
+        counterparty: r.anonymous_counterparty === true ? "not named by the filer" : String(r.counterparty_name ?? "unnamed"),
+        share: r.reported_share === null || r.reported_share === undefined ? null : Number(r.reported_share),
+        basis: String(r.share_basis ?? ""),
+        period: String(r.fiscal_period ?? ""),
+        at: String(r.decided_at ?? ""),
+        reason: String(r.decision_reason ?? ""),
+      })),
+    exposures: rows(raw, "exposures")
+      .filter((r) => typeof r.ticker === "string" && typeof r.name === "string")
+      .map((r) => ({
+        ticker: String(r.ticker),
+        kind: String(r.kind ?? ""),
+        name: String(r.name),
+        share: r.share === null || r.share === undefined ? null : Number(r.share),
+        period: String(r.period ?? ""),
+        sourceUrl: String(r.source_url ?? ""),
+        quote: String(r.quote ?? ""),
+      })),
   };
 }
 
 export function totalDecisions(d: AiDecisions): number {
-  return d.listings.length + d.peers.length + d.pages.length + d.facts.length;
+  return d.listings.length + d.peers.length + d.pages.length + d.facts.length + d.disclosures.length + d.exposures.length;
 }

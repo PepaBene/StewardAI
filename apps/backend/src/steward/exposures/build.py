@@ -10,8 +10,8 @@ a built row the owner deleted is never rebuilt (`exposure_build_log`).
 
 import datetime as dt
 import json
-from dataclasses import dataclass
-from decimal import Decimal
+from dataclasses import dataclass, replace
+from decimal import ROUND_DOWN, Decimal
 from typing import Any
 
 import asyncpg
@@ -31,6 +31,7 @@ from steward.storage import SupabaseStorage
 
 ANNUAL_FORMS = ("10-K", "20-F", "40-F")
 TOLERANCE = Decimal("1.005")
+SIX_PLACES = Decimal("0.000001")
 
 # Single-country labels as filers write them, lower-cased. Combined or regional labels
 # ("China (including Hong Kong)", "US & Canada", "Europe") are deliberately absent.
@@ -92,7 +93,7 @@ def plan_geography(rows: list[tuple[str, Decimal]], total: Decimal) -> list[GeoS
         iso = country_iso(label)
         if iso is None or value < 0:
             continue
-        share = GeoShare(iso, (value / total).quantize(Decimal("0.000001")), label, value)
+        share = GeoShare(iso, (value / total).quantize(SIX_PLACES, ROUND_DOWN), label, value)
         prior = seen.get(iso)
         if prior is None:
             seen[iso] = share
@@ -101,8 +102,13 @@ def plan_geography(rows: list[tuple[str, Decimal]], total: Decimal) -> list[GeoS
     shares = [s for iso, s in seen.items() if iso not in ambiguous]
     if not shares:
         return "no single-country revenue labels"
-    if sum((s.weight for s in shares), Decimal(0)) > TOLERANCE:
+    mapped = sum((s.weight for s in shares), Decimal(0))
+    if mapped > TOLERANCE:
         return "country revenue exceeds total revenue"
+    if mapped > 1:  # rounding in the filing: scale down so the database's 100% cap holds
+        shares = [
+            replace(s, weight=(s.weight / mapped).quantize(SIX_PLACES, ROUND_DOWN)) for s in shares
+        ]
     return sorted(shares, key=lambda s: -s.weight)
 
 
@@ -236,8 +242,23 @@ async def write_geography(
     return counts
 
 
+AI_HOLDINGS = """
+    select distinct on (i.t212_ticker) i.t212_ticker as ticker, s.issuer_id
+    from public.instrument i
+    left join public.instrument_security_link l
+      on l.ticker = i.t212_ticker and l.status in ('confirmed', 'suggested')
+    left join public.security s on s.id = l.security_id
+    where i.t212_ticker in (
+      select ticker from public.position_snapshot where snapshot_date = coalesce(
+        (select max(snapshot_date) from public.account_snapshot),
+        (select max(snapshot_date) from public.position_snapshot)))
+    order by i.t212_ticker, (l.status = 'confirmed') desc nulls last
+"""
+
+
 async def exposure_build_handler(ctx: JobContext) -> None:
-    """Build the geography exposure of every holding that has an issuer and annual XBRL."""
+    """Build the geography exposure of every holding that has an issuer and annual XBRL, then
+    the AI steps for every open position."""
     only = ctx.params.get("ticker")
     rows = await ctx.pool.fetch(
         """select l.ticker, s.issuer_id from public.instrument_security_link l
@@ -259,16 +280,24 @@ async def exposure_build_handler(ctx: JobContext) -> None:
             if isinstance(plan, str):
                 results[ticker] = plan
                 continue
-            counts = await write_geography(ctx.pool, row["issuer_id"], plan, facts, total)
+            try:
+                counts = await write_geography(ctx.pool, row["issuer_id"], plan, facts, total)
+            except asyncpg.PostgresError as exc:  # one holding never stops the others
+                results[ticker] = f"rows refused by the database: {str(exc)[:100]}"
+                continue
             mapped = sum((s.weight for s in plan), Decimal(0))
             results[ticker] = {**counts, "countries": len(plan), "mapped": float(mapped)}
         step.detail["holdings"] = len(rows)
         step.detail["results"] = results
-    await _ai_steps(ctx, list(rows))
+    holdings = [dict(r) for r in await ctx.pool.fetch(AI_HOLDINGS)]
+    if isinstance(only, str) and only:
+        holdings = [h for h in holdings if h["ticker"] == only]
+    await _ai_steps(ctx, holdings)
 
 
-async def _ai_steps(ctx: JobContext, rows: list[asyncpg.Record]) -> None:
-    """HS mapping and currency / input extraction; skipped when AI or EDGAR is not set up."""
+async def _ai_steps(ctx: JobContext, rows: list[dict[str, Any]]) -> None:
+    """HS mapping, currency / input extraction and customer / supplier disclosures; skipped when
+    AI is not set up. Each step has its own usage so its cost is counted once."""
     settings = get_settings()
     stored = await load_active(ctx.pool, "jobs", JobsConfig)
     await ctx.record_config_version(stored.id if stored else None)
@@ -281,33 +310,34 @@ async def _ai_steps(ctx: JobContext, rows: list[asyncpg.Record]) -> None:
         async with ctx.step("ai") as step:
             step.detail["skipped"] = str(exc)
         return
-    usage = Usage(model=cfg.model)
     prompts = await load_prompts(ctx.pool)
     if cfg.map_products:
+        usage = Usage(model=cfg.model)
         async with ctx.step("products") as step:
             step.detail["results"] = await run_products(ctx, client, cfg, rows, usage, prompts)
             step.usage = usage.step_usage()
     profiles_stored = await load_active(ctx.pool, "holding_profiles", HoldingProfilesConfig)
     if not (cfg.extract_inputs or cfg.extract_dependencies) or profiles_stored is None:
         return
-    async with ctx.step("filings") as step:
-        if not settings.sec_user_agent:
-            step.detail["note"] = "SEC_USER_AGENT is not set: only archived documents are read"
-        async with httpx.AsyncClient(
-            timeout=httpx.Timeout(60.0, read=120.0),
-            headers={"User-Agent": f"StewardAI/{__version__}"},
-            follow_redirects=True,
-        ) as http:
-            edgar = EdgarClient(http, settings.sec_user_agent) if settings.sec_user_agent else None
-            storage = (
-                SupabaseStorage(
-                    http, settings.supabase_url, settings.supabase_secret_key.get_secret_value()
-                )
-                if settings.supabase_url and settings.supabase_secret_key
-                else None
+    async with httpx.AsyncClient(
+        timeout=httpx.Timeout(60.0, read=120.0),
+        headers={"User-Agent": f"StewardAI/{__version__}"},
+        follow_redirects=True,
+    ) as http:
+        edgar = EdgarClient(http, settings.sec_user_agent) if settings.sec_user_agent else None
+        storage = (
+            SupabaseStorage(
+                http, settings.supabase_url, settings.supabase_secret_key.get_secret_value()
             )
-            if cfg.extract_inputs:
-                step.detail["inputs"] = await run_inputs(
+            if settings.supabase_url and settings.supabase_secret_key
+            else None
+        )
+        if cfg.extract_inputs:
+            usage = Usage(model=cfg.model)
+            async with ctx.step("inputs") as step:
+                if edgar is None:
+                    step.detail["note"] = "SEC_USER_AGENT is not set: only archived documents"
+                step.detail["results"] = await run_inputs(
                     ctx,
                     client,
                     cfg,
@@ -319,8 +349,13 @@ async def _ai_steps(ctx: JobContext, rows: list[asyncpg.Record]) -> None:
                     prompts,
                     storage,
                 )
-            if cfg.extract_dependencies:
-                step.detail["dependencies"] = await run_dependencies(
+                step.usage = usage.step_usage()
+        if cfg.extract_dependencies:
+            usage = Usage(model=cfg.model)
+            async with ctx.step("dependencies") as step:
+                if edgar is None:
+                    step.detail["note"] = "SEC_USER_AGENT is not set: only archived documents"
+                step.detail["results"] = await run_dependencies(
                     ctx, client, cfg, edgar, rows, profiles_stored.body, usage, prompts, storage
                 )
-        step.usage = usage.step_usage()
+                step.usage = usage.step_usage()

@@ -41,8 +41,16 @@ COMMODITY_FRED: tuple[tuple[str, str, str, str, tuple[str, ...]], ...] = (
     ("commodity_wheat", "Wheat price", "PWHEAMTUSDM", "USD/t", ("wheat",)),
     ("commodity_maize", "Maize price", "PMAIZMTUSDM", "USD/t", ("maize", "corn")),
     ("commodity_cotton", "Cotton price", "PCOTTINDUSDM", "USc/lb", ("cotton",)),
-    ("commodity_rubber", "Rubber price", "PRUBBUSDM", "USc/kg", ("rubber",)),
+    ("commodity_rubber", "Rubber price", "PRUBBUSDM", "USc/lb", ("rubber",)),
     ("commodity_coffee", "Coffee price", "PCOFFOTMUSDM", "USc/lb", ("coffee",)),
+)
+
+
+# Other goods that share a word with a benchmark ("palm oil" is not crude oil, "tin plate" is
+# steel): removed from the name before it is matched.
+UNRELATED = re.compile(
+    r"(?i)\b(?:(?:palm|olive|vegetable|cooking|soybean|canola|coconut|edible|essential|sunflower"
+    r"|rapeseed|castor|fish) oils?|tin[ -]?(?:plate|foil|cans?|free)|corn (?:syrup|starch))\b"
 )
 
 
@@ -52,4 +60,5 @@ def word_in(name: str, phrase: str) -> bool:
 
 def series_keys_for(name: str) -> list[str]:
     """The commodity series keys a `commodity_input` name links to (empty when none)."""
-    return [key for key, *_rest, words in COMMODITY_FRED if any(word_in(name, w) for w in words)]
+    cleaned = UNRELATED.sub(" ", name)
+    return [key for key, *_rest, words in COMMODITY_FRED if any(word_in(cleaned, w) for w in words)]

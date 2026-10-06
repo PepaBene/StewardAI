@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useMemo } from "react";
+import { useCallback, useMemo, useState } from "react";
 
 import { Sparkline } from "@/components/charts";
 import { Blueprint, PanelHeading } from "@/components/ui/blueprint";
@@ -9,6 +9,12 @@ import { formatCompact, formatPct } from "@/lib/charts/format";
 import { formatDate } from "@/lib/format";
 import { useApiResource } from "@/lib/hooks/use-api-resource";
 import { ASSUMPTION_LABEL, parseExposureInputs, windowChange } from "@/lib/macro/context";
+
+/** Whole days between an observation date and today (monthly commodity series lag by weeks). */
+function staleDays(date: string): number {
+  const then = Date.parse(date);
+  return Number.isNaN(then) ? 0 : Math.floor((Date.now() - then) / 86_400_000);
+}
 
 /**
  * GET /holdings/{ticker}/exposure-context: commodity and currency series for the exposures you
@@ -21,6 +27,8 @@ export function InputCostsPanel({ ticker }: { ticker: string }) {
     [ticker],
   );
   const { state, reload } = useApiResource(fetcher);
+  const [confirming, setConfirming] = useState<string | null>(null);
+  const [failure, setFailure] = useState<string | null>(null);
   const raw = state.kind === "ok" ? state.data : state.kind === "error" ? state.previous : null;
   const view = useMemo(() => (raw ? parseExposureInputs(raw) : null), [raw]);
 
@@ -75,19 +83,29 @@ export function InputCostsPanel({ ticker }: { ticker: string }) {
                 type="button"
                 className="text-xs text-accent-ink hover:underline"
                 onClick={async () => {
+                  const id = `${a.kind}|${a.name}`;
+                  if (confirming !== id) {
+                    setConfirming(id);
+                    setFailure(null);
+                    return;
+                  }
                   const result = await getBrowserApiClient().POST("/holdings/{ticker}/exposures/remove", {
                     params: { path: { ticker } },
                     body: { kind: a.kind, name: a.name },
                   });
-                  if (!result.error) reload();
+                  setConfirming(null);
+                  if (result.error) setFailure("Could not remove it. Reload the page and try again.");
+                  else reload();
                 }}
               >
-                {a.origin === "ai" ? "Overturn" : "Remove"}
+                {confirming === `${a.kind}|${a.name}` ? "Confirm: it will not be added again" : a.origin === "ai" ? "Overturn" : "Remove"}
               </button>
             </li>
           ))}
         </ul>
       ) : null}
+
+      {failure ? <p className="text-xs text-danger">{failure}</p> : null}
 
       {view && view.unlinked.length > 0 ? (
         <p className="max-w-[68ch] text-xs text-text-muted">
@@ -112,7 +130,10 @@ export function InputCostsPanel({ ticker }: { ticker: string }) {
               <li key={s.metric} className="flex flex-col gap-1 bg-surface px-3 py-2.5">
                 <div className="flex items-baseline justify-between gap-2">
                   <span className="truncate text-sm font-medium">{s.metric}</span>
-                  <span className="num text-xs text-text-muted">{formatDate(last.date)}</span>
+                  <span className="num text-xs text-text-muted">
+                    {formatDate(last.date)}
+                    {staleDays(last.date) > 60 ? ` (${staleDays(last.date)} days old)` : ""}
+                  </span>
                 </div>
                 <div className="flex items-end justify-between gap-3">
                   <div>

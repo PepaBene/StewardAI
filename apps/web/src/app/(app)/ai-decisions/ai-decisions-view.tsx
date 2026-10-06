@@ -141,6 +141,58 @@ export function AiDecisionsView() {
           </ul>
         </Panel>
       ) : null}
+      {d && d.disclosures.length > 0 ? (
+        <Panel id="disclosures" title="Customers and suppliers" description="Relationships the AI confirmed from filings. Rejecting one removes it from concentration.">
+          <List>
+            {d.disclosures.map((x) => (
+              <Row
+                key={x.id}
+                ticker={x.ticker}
+                undo={async () =>
+                  !(await api.POST("/holdings/{ticker}/relationship-disclosures/{disclosure_id}/decision", {
+                    params: { path: { ticker: x.ticker, disclosure_id: x.id } },
+                    body: { decision: "reject", reason: "rejected by the owner after an AI decision" },
+                  })).error
+                }
+              >
+                <span>
+                  {x.relationship} · {x.counterparty}
+                </span>{" "}
+                <span className="num">{x.share === null ? "" : `${(x.share * 100).toFixed(0)}%`}</span>{" "}
+                <span className="text-text-muted">
+                  {x.basis} · {x.period} · {formatDate(x.at)} · {x.reason}
+                </span>
+              </Row>
+            ))}
+          </List>
+        </Panel>
+      ) : null}
+      {d && d.exposures.length > 0 ? (
+        <Panel id="exposures" title="Currencies and inputs" description="Exposures the AI added to holding profiles from annual reports, each with its quote. Rejecting one removes it for good.">
+          <List>
+            {d.exposures.map((x) => (
+              <Row
+                key={`${x.ticker}|${x.kind}|${x.name}`}
+                ticker={x.ticker}
+                undo={async () =>
+                  !(await api.POST("/holdings/{ticker}/exposures/remove", {
+                    params: { path: { ticker: x.ticker } },
+                    body: { kind: x.kind, name: x.name },
+                  })).error
+                }
+              >
+                <span>
+                  {x.kind.replaceAll("_", " ")} · {x.name}
+                </span>{" "}
+                <span className="num">{x.share === null ? "" : `${(x.share * 100).toFixed(0)}%`}</span>{" "}
+                <span className="text-text-muted">
+                  {x.period} {x.quote ? `· "${x.quote}"` : ""}
+                </span>
+              </Row>
+            ))}
+          </List>
+        </Panel>
+      ) : null}
       {d && d.facts.length > 0 ? (
         <Panel id="facts" title="Facts from the web" description="Found on reliable web pages where the data sources had nothing.">
           <List>

@@ -24,6 +24,7 @@ from steward.config.jobs import effort_kwargs
 from steward.exposures.filing_text import (
     DEPENDENCY_WORDS,
     FilingText,
+    percent_bound,
     sections_for,
     verified,
 )
@@ -35,10 +36,31 @@ ORIGIN = "ai_extraction"
 MIN_CONFIDENCE = 0.8
 DIRECTION = {"customer": "issuer_sells_to", "supplier": "issuer_buys_from"}
 BASIS = {"customer": "issuer_revenue", "supplier": "issuer_purchases"}
+MAX_FINDINGS = 25
 BASIS_WORDS = {
-    "customer": re.compile(r"(?i)revenue|sales|net sales"),
-    "supplier": re.compile(r"(?i)purchases|cost of|supply|supplies|procure|spend"),
+    "customer": re.compile(r"(?i)\b(?:net )?(?:revenues?|sales)\b"),
+    "supplier": re.compile(
+        r"(?i)\b(?:purchases|cost of (?:revenue|sales|goods)|procurement|inventory purchases)\b"
+    ),
 }
+# "... 12% of its revenue", "... of Acme's sales": the share is of someone else's figure.
+OTHER_PARTY_BASIS = re.compile(
+    r"(?:(?i:its|their)|\b[A-Z][\w&.-]*['’]s) (?i:(?:net |total |consolidated )?"  # noqa: RUF001
+    r"(?:revenues?|sales|purchases))"
+)
+OWN_BASIS = re.compile(
+    r"(?i)\b(?:our|the company['’]s|we|us)\b[^.]{0,60}\b(?:revenues?|sales|purchases|cost)\b"  # noqa: RUF001
+)
+ROLE_WORDS = (
+    "customer",
+    "vendor",
+    "supplier",
+    "distributor",
+    "reseller",
+    "retailer",
+    "partner",
+    "client",
+)
 
 
 class DependencyFinding(BaseModel):
@@ -62,18 +84,18 @@ class DependencyFinding(BaseModel):
 
 
 class DependencyFindings(BaseModel):
-    findings: list[DependencyFinding] = Field(default_factory=list, max_length=25)
+    findings: list[DependencyFinding] = Field(default_factory=list)
 
 
 class Verdict(BaseModel):
     index: int = Field(description="The number of the candidate in the prompt.")
     approve: bool
     confidence: float = Field(ge=0, le=1)
-    reason: str = Field(max_length=300, description="One sentence citing the passage.")
+    reason: str = Field(description="One sentence citing the passage.")
 
 
 class Verdicts(BaseModel):
-    verdicts: list[Verdict] = Field(default_factory=list, max_length=25)
+    verdicts: list[Verdict] = Field(default_factory=list)
 
 
 DEPENDENCY_SYSTEM = """\
@@ -160,19 +182,21 @@ async def extract_dependencies(
     filing: FilingText,
     usage: Usage,
     system: str = DEPENDENCY_SYSTEM,
-) -> list[DependencyFinding]:
+) -> tuple[list[DependencyFinding], dict[str, str]]:
+    """(findings, the sections that were read); no sections means nothing was asked."""
     sections = sections_for(filing, DEPENDENCY_WORDS)
     if not sections:
-        return []
+        return [], sections
     response = await client.messages.parse(
         model=model,
         system=system,
         messages=[{"role": "user", "content": findings_prompt(filing, sections)}],
         output_format=DependencyFindings,
-        **effort_kwargs(model, effort, 6000),
+        **effort_kwargs(model, effort, 12000),
     )
     usage.add(response.usage)
-    return response.parsed_output.findings if response.parsed_output else []
+    parsed = response.parsed_output
+    return (parsed.findings[:MAX_FINDINGS] if parsed else []), sections
 
 
 async def judge_dependencies(
@@ -192,11 +216,15 @@ async def judge_dependencies(
         system=system,
         messages=[{"role": "user", "content": candidates_prompt(filing, items, notes)}],
         output_format=Verdicts,
-        **effort_kwargs(model, effort, 3000),
+        **effort_kwargs(model, effort, 6000),
     )
     usage.add(response.usage)
     parsed = response.parsed_output
-    return {v.index: v for v in parsed.verdicts} if parsed else {}
+    verdicts = {v.index: v for v in parsed.verdicts} if parsed else {}
+    return {
+        i: v.model_copy(update={"reason": " ".join(v.reason.split())[:300]})
+        for i, v in verdicts.items()
+    }
 
 
 @dataclass
@@ -220,6 +248,15 @@ def check_findings(
             problems.append("the counterparty is the company itself")
         if f.share is not None and not BASIS_WORDS[f.relationship].search(f.quote):
             problems.append(f"the quote does not tie the share to {BASIS[f.relationship]}")
+        if (
+            f.share is not None
+            and OTHER_PARTY_BASIS.search(f.quote)
+            and not OWN_BASIS.search(f.quote)
+        ):
+            problems.append("the share looks like a part of the counterparty's own figure")
+        if name is None and f.share is not None and not problems:
+            if not percent_bound(f.share, ROLE_WORDS, f.quote):
+                problems.append("the percentage is not next to a customer or supplier")
         if name is None and f.share is None:
             problems.append("neither a name nor a share")
         key = (f.relationship, normalize_object_key(name) if name else f.quote[:60], f.period or "")
@@ -233,6 +270,50 @@ def check_findings(
     return out
 
 
+def year_start(period_end: dt.date) -> dt.date:
+    """The first day of the fiscal year that ends on `period_end` (a 52/53-week year is within
+    a few days of this)."""
+    try:
+        return period_end.replace(year=period_end.year - 1) + dt.timedelta(days=1)
+    except ValueError:  # 29 February
+        return period_end.replace(year=period_end.year - 1, day=28) + dt.timedelta(days=1)
+
+
+def fiscal_label(period: str | None, period_end: dt.date) -> str:
+    """FY<year> from the model's own label when it prints a year, else the year of the period
+    end; free-text labels ("fiscal 2025") would otherwise split one fiscal year in two."""
+    found = re.search(r"\b(20\d{2})\b", period or "")
+    return f"FY{found.group(1) if found else period_end.year}"
+
+
+async def reported_in_xbrl(
+    pool: asyncpg.Pool,
+    ticker: str,
+    f: DependencyFinding,
+    key: str | None,
+    period_end: dt.date,
+) -> bool:
+    """Is this finding already stored from the XBRL concentration facts of the same year? The
+    same customer would otherwise count twice toward concentration."""
+    return bool(
+        await pool.fetchval(
+            """select exists(select 1 from public.relationship_disclosure
+               where ticker = $1 and relationship = $2 and origin = 'xbrl_fact'
+                 and status <> 'rejected'
+                 and valid_to between $3::date - 45 and $3::date + 45
+                 and (($4::text is not null and counterparty_key_norm = $4::text)
+                      or ($4::text is null and anonymous_counterparty
+                          and $5::numeric is not null and reported_share is not null
+                          and abs(reported_share - $5::numeric) < 0.0051)))""",
+            ticker,
+            f.relationship,
+            period_end,
+            key,
+            None if f.share is None else Decimal(str(f.share)),
+        )
+    )
+
+
 async def store_and_approve(
     pool: asyncpg.Pool,
     filing: FilingText,
@@ -242,12 +323,24 @@ async def store_and_approve(
 ) -> dict[str, Any]:
     """Store each finding as a suggested disclosure; confirm those the reviewer approved, unless
     the owner already decided the row."""
-    counts: dict[str, int] = {"stored": 0, "confirmed": 0, "left_suggested": 0, "owner_decided": 0}
+    counts: dict[str, int] = {
+        "stored": 0,
+        "confirmed": 0,
+        "left_suggested": 0,
+        "already_decided": 0,
+        "duplicate_of_xbrl": 0,
+    }
     if filing.period_end is None:
         return {**counts, "skipped": "the filing has no period end"}
+    annual = filing.form != "document"
+    valid_from = year_start(filing.period_end) if annual else filing.period_end
+    valid_to = filing.period_end if annual else None
     for i, f in enumerate(items):
-        period = f.period or f"FY{filing.period_end.year}"
+        period = fiscal_label(f.period, filing.period_end)
         key = normalize_object_key(f.counterparty) if f.counterparty else None
+        if annual and await reported_in_xbrl(pool, filing.ticker, f, key, filing.period_end):
+            counts["duplicate_of_xbrl"] += 1
+            continue
         row_id = await upsert_disclosure(
             pool,
             ticker=filing.ticker,
@@ -262,7 +355,8 @@ async def store_and_approve(
             reported_share=None if f.share is None else Decimal(str(f.share)),
             share_basis=BASIS[f.relationship] if f.share is not None else None,
             fiscal_period=period,
-            valid_from=filing.period_end,
+            valid_from=valid_from,
+            valid_to=valid_to,
             origin=ORIGIN,
         )
         counts["stored"] += 1
@@ -271,7 +365,7 @@ async def store_and_approve(
         )
         verdict = verdicts.get(i)
         if status != "suggested":
-            counts["owner_decided"] += 1
+            counts["already_decided"] += 1
         elif verdict and verdict.approve and verdict.confidence >= MIN_CONFIDENCE:
             try:
                 await decide_disclosure(
@@ -340,9 +434,11 @@ async def corroboration_notes(
 # ---------------------------------------------------------------------- XBRL concentration
 
 ANONYMOUS_MEMBER = re.compile(
-    r"(?i)^(top|major|largest|significant|customer|vendor|supplier|one|two|three|four|five|"
-    r"a|b|c|d|\d+)( |$)"
+    r"(?i)^(top|major|largest|significant|customer|client|vendor|supplier|distributor|reseller|"
+    r"retailer|partner|one|two|three|four|five|a|b|c|d|\d+)( |$)"
 )
+CONCENTRATION_AXES = ("MajorCustomersAxis", "ConcentrationRiskByBenchmarkAxis")
+TYPE_AXIS = "ConcentrationRiskByTypeAxis"
 GROUP_WORDS = re.compile(
     r"(?i)carriers|distributors|resellers|retailers|customers|suppliers|vendors|channel|"
     r"others|government|segment"
@@ -388,9 +484,16 @@ def reported_concentrations(rows: list[asyncpg.Record]) -> list[ReportedConcentr
         kind = " ".join(members.values())
         supplier = bool(re.search(r"(?i)vendor|supplier", words + kind))
         relationship: Literal["customer", "supplier"] = "supplier" if supplier else "customer"
-        if REVENUE_BENCHMARK.search(benchmark) and not supplier:
+        # A fact cut by anything else (a segment, a product) is a share of that part of the
+        # business, not of the issuer's total.
+        extra = [
+            a.rsplit(":", 1)[-1]
+            for a in members
+            if not a.endswith((*CONCENTRATION_AXES, TYPE_AXIS))
+        ]
+        if REVENUE_BENCHMARK.search(benchmark) and not supplier and not extra:
             basis = "issuer_revenue"
-        elif PURCHASE_BENCHMARK.search(benchmark) and supplier:
+        elif PURCHASE_BENCHMARK.search(benchmark) and supplier and not extra:
             basis = "issuer_purchases"
         else:
             basis = "other"
@@ -399,6 +502,8 @@ def reported_concentrations(rows: list[asyncpg.Record]) -> list[ReportedConcentr
         if not Decimal(0) <= share <= Decimal(1):
             continue
         what = member_words(benchmark) or "unspecified benchmark"
+        if extra:
+            what += f"; also cut by {', '.join(extra)}"
         out.append(
             ReportedConcentration(
                 relationship,
@@ -431,9 +536,21 @@ async def store_reported(pool: asyncpg.Pool, ticker: str) -> dict[str, int]:
                                  and period_end - period_start between 350 and 380)""",
         ticker,
     )
-    counts = {"stored": 0, "confirmed": 0, "owner_decided": 0}
+    counts = {"stored": 0, "confirmed": 0, "already_decided": 0, "already_stored": 0}
     for c in reported_concentrations(rows):
         key = normalize_object_key(c.counterparty) if c.counterparty else None
+        label = f"FY{c.period_end.year}"
+        # The same fact is printed again in the next filing's comparatives (another accession):
+        # one disclosure per fact and year, whichever filing it came from first.
+        if await pool.fetchval(
+            "select exists(select 1 from public.relationship_disclosure where ticker = $1"
+            " and origin = 'xbrl_fact' and passage = $2 and fiscal_period = $3)",
+            ticker,
+            c.passage,
+            label,
+        ):
+            counts["already_stored"] += 1
+            continue
         row_id = await upsert_disclosure(
             pool,
             ticker=ticker,
@@ -447,7 +564,7 @@ async def store_reported(pool: asyncpg.Pool, ticker: str) -> dict[str, int]:
             anonymous_counterparty=c.counterparty is None,
             reported_share=c.share,
             share_basis=c.basis,
-            fiscal_period=f"FY{c.period_end.year}",
+            fiscal_period=label,
             valid_from=c.period_start,
             valid_to=c.period_end,
             origin="xbrl_fact",
@@ -457,7 +574,7 @@ async def store_reported(pool: asyncpg.Pool, ticker: str) -> dict[str, int]:
             "select status from public.relationship_disclosure where id = $1", row_id
         )
         if status != "suggested":
-            counts["owner_decided"] += 1
+            counts["already_decided"] += 1
             continue
         try:
             await decide_disclosure(

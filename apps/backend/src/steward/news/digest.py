@@ -559,7 +559,8 @@ async def thesis_changes(
 async def macro_figures(pool: asyncpg.Pool, start: dt.datetime) -> list[MacroFigure]:
     rows = await pool.fetch(
         "select distinct on (series_id) series_id, label, value, unit, period, release_date, url"
-        " from public.macro_series order by series_id, period desc"
+        " from public.macro_series where series_id not like 'commodity\\_%'"
+        " order by series_id, period desc"
     )
     return [
         MacroFigure(

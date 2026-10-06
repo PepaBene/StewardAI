@@ -188,7 +188,10 @@ Series linking: commodity inputs link to the FRED commodity series added to the 
 defaults (`macro/commodity_series.py`: copper, aluminum, nickel, zinc, tin, iron ore, uranium,
 WTI, Brent, natural gas, wheat, maize, cotton, rubber, coffee); revenue currencies link to the
 stored ČNB / ECB fixings. An exposure with no stored series is listed as unlinked. The
-`macro_collect` job must be enabled with `FRED_API_KEY`.
+`macro_collect` job must be enabled with `FRED_API_KEY`. Commodity series are world prices: they
+carry geography `WLD` (not `US`) and are kept out of the news digest's macro figures. Shown series
+use a three-year window thinned to at most 48 points. A row the owner overturns is recorded as a
+tombstone in the extraction detail, so it stays gone through later filings.
 
 OECD: the OECD feeds stay behind their access gate and are **not** opened for this purpose.
 Country context comes from Eurostat (EU and the euro area), FRED (US) and, once its gate is

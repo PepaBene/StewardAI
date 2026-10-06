@@ -25,9 +25,9 @@ ITEMS: dict[str, dict[str, str]] = {
 }
 _ITEM = re.compile(r"(?im)^\s*item\s+(\d{1,2}[a-d]?)\s*[.:—–-]")  # noqa: RUF001
 EXPOSURE_WORDS = re.compile(
-    r"(?i)currenc|foreign exchange|exchange rate|hedg|commodit|raw material|steel|aluminum|"
-    r"aluminium|copper|silicon|wafer|helium|lithium|oil|gas|energy|freight|component|"
-    r"manufactur|supply"
+    r"(?i)\b(?:currenc\w*|foreign exchange|exchange rates?|hedg\w*|commodit\w*|raw materials?|"
+    r"steel|alumin(?:um|ium)|copper|silicon|wafers?|helium|lithium|oil|gas|energy|freight|"
+    r"components?|manufactur\w*|suppl\w+)\b"
 )
 DEPENDENCY_WORDS = re.compile(
     r"(?i)customer|supplier|vendor|distributor|reseller|sole source|single source|"
@@ -68,7 +68,8 @@ def relevant(section: str, pattern: re.Pattern[str], cap: int = SECTION_CAP) -> 
     kept: list[str] = []
     size = 0
     for paragraph in section.split("\n"):
-        if len(paragraph) > 40 and pattern.search(paragraph):
+        # A short line with a percentage is a table row ("Customer A | 22%"): keep it.
+        if (len(paragraph) > 40 or "%" in paragraph) and pattern.search(paragraph):
             if size + len(paragraph) > cap:
                 break
             kept.append(paragraph)
@@ -133,17 +134,17 @@ _PERCENT = re.compile(r"(\d{1,3}(?:\.\d+)?)\s?(?:%|percent|per cent)", re.IGNORE
 CURRENCY_NAMES: dict[str, tuple[str, ...]] = {
     "USD": ("u.s. dollar", "us dollar", "united states dollar", "usd"),
     "EUR": ("euro", "eur"),
-    "GBP": ("pound", "sterling", "gbp"),
+    "GBP": ("pound sterling", "pounds sterling", "british pound", "sterling", "gbp"),
     "JPY": ("yen", "jpy"),
-    "CNY": ("renminbi", "rmb", "yuan", "cny", "chinese"),
+    "CNY": ("renminbi", "rmb", "yuan", "cny"),
     "CHF": ("swiss franc", "chf"),
     "CAD": ("canadian dollar", "cad"),
     "AUD": ("australian dollar", "aud"),
-    "KRW": ("won", "krw"),
+    "KRW": ("korean won", "south korean won", "krw"),
     "TWD": ("new taiwan dollar", "taiwan dollar", "twd"),
     "INR": ("rupee", "inr"),
-    "MXN": ("peso", "mxn"),
-    "BRL": ("real", "reais", "brl"),
+    "MXN": ("mexican peso", "mxn"),
+    "BRL": ("brazilian real", "brazilian reais", "reais", "brl"),
     "CZK": ("koruna", "czk"),
     "SEK": ("krona", "sek"),
     "SGD": ("singapore dollar", "sgd"),
@@ -153,6 +154,21 @@ CURRENCY_NAMES: dict[str, tuple[str, ...]] = {
 def percent_in_quote(share: float, quote: str) -> bool:
     """Is `share` (a fraction) printed in the quote as a percentage?"""
     return any(abs(float(m) - share * 100) <= 0.051 for m in _PERCENT.findall(quote))
+
+
+def percent_bound(share: float, terms: tuple[str, ...], quote: str, window: int = 120) -> bool:
+    """Is the printed percentage within `window` characters of one of the terms? A quote that
+    prints several figures ("22% in euros and 30% in yen") then supports only the right one."""
+    q = " ".join(quote.lower().split())
+    marks = [
+        m.start() for m in _PERCENT.finditer(q) if abs(float(m.group(1)) - share * 100) <= 0.051
+    ]
+    spots = [
+        m.start()
+        for t in terms
+        for m in re.finditer(rf"(?<!\w){re.escape(' '.join(t.lower().split()))}(?:s|es)?(?!\w)", q)
+    ]
+    return any(abs(a - b) <= window for a in marks for b in spots)
 
 
 def word_in_quote(name: str, quote: str) -> bool:
@@ -176,4 +192,6 @@ def verified(quote: str, text: str, share: float | None, names: tuple[str, ...])
     for name in names:
         if not word_in_quote(name, quote):
             problems.append(f"the quote does not mention {name}")
+    if share is not None and names and not problems and not percent_bound(share, names, quote):
+        problems.append(f"the percentage is not next to {' / '.join(names)}")
     return problems

@@ -12,8 +12,19 @@ import asyncpg
 from steward.config.holding_profiles import Exposure
 from steward.macro.commodity_series import COMMODITY_FRED, series_keys_for
 
-POINTS = 36
+YEARS = 3
+MAX_POINTS = 48
 LABELS = {key: (label, unit) for key, label, _id, unit, _words in COMMODITY_FRED}
+FX_SOURCES = ("ecb", "cnb")  # ECB first; ČNB is the only source of EUR itself
+
+
+def thinned(points: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """At most MAX_POINTS evenly spread points, always keeping the newest, so a daily and a
+    monthly series cover the same window."""
+    if len(points) <= MAX_POINTS:
+        return points
+    step = -(-len(points) // MAX_POINTS)
+    return points[::-1][::step][::-1]
 
 
 async def commodity_points(pool: asyncpg.Pool, key: str) -> list[dict[str, Any]]:
@@ -22,35 +33,42 @@ async def commodity_points(pool: asyncpg.Pool, key: str) -> list[dict[str, Any]]
              select distinct on (period) period, value, source_url
              from public.macro_observation
              where source = 'fred' and series_id = $1 and value is not null
+               and period >= current_date - make_interval(years => $2::int)
              order by period desc, known_at desc, revision desc
-           ) t order by period desc limit $2""",
+           ) t order by period""",
         key,
-        POINTS,
+        YEARS,
     )
-    return [
-        {"date": r["period"], "value": float(r["value"]), "source_url": r["source_url"]}
-        for r in reversed(rows)
-    ]
+    return thinned(
+        [
+            {"date": r["period"], "value": float(r["value"]), "source_url": r["source_url"]}
+            for r in rows
+        ]
+    )
 
 
 async def currency_points(
     pool: asyncpg.Pool, code: str
 ) -> tuple[str, str, list[dict[str, Any]]] | None:
-    """(source, home currency, points) of the stored fixings of one currency."""
-    rows = await pool.fetch(
-        """select source, home_currency, rate_date, rate from public.fx_rate
-           where currency = $1 order by rate_date desc limit $2""",
-        code,
-        POINTS * 3,
-    )
-    if not rows:
-        return None
-    source, home = rows[0]["source"], rows[0]["home_currency"]
-    points = [
-        {"date": r["rate_date"], "value": float(r["rate"]), "source_url": None}
-        for r in reversed([r for r in rows if r["source"] == source])
-    ]
-    return str(source), str(home), points
+    """(source, home currency, points) of the stored fixings of one currency, from the first
+    source in FX_SOURCES that has any, so the series never flips between sources."""
+    for source in FX_SOURCES:
+        rows = await pool.fetch(
+            """select home_currency, rate_date, rate from public.fx_rate
+               where currency = $1 and source = $2
+                 and rate_date >= current_date - make_interval(years => $3::int)
+               order by rate_date""",
+            code,
+            source,
+            YEARS,
+        )
+        if rows:
+            points = [
+                {"date": r["rate_date"], "value": float(r["rate"]), "source_url": None}
+                for r in rows
+            ]
+            return source, str(rows[0]["home_currency"]), thinned(points)
+    return None
 
 
 async def linked_series(
