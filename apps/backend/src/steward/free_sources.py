@@ -73,8 +73,8 @@ async def collect_finnhub_research(
                             """insert into public.peer_set
                                (ticker,peer_ticker,basis,status,source,detail,status_history)
                                values($1,$2,'Finnhub peer candidate','suggested','finnhub',
-                                      '{"identity":"provider symbol; issuer mapping "'
-                                      '"unverified"}'::jsonb,
+                                      '{"identity":"provider symbol; issuer mapping unverified"}'
+                                      ::jsonb,
                                       jsonb_build_array(jsonb_build_object(
                                         'status','suggested','at',now())))
                                on conflict(ticker,peer_ticker,basis,source) do update set
