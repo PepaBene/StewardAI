@@ -25,6 +25,8 @@ from steward.config.prompts import load_prompts
 from steward.config.store import load_active
 from steward.exposures.ai_steps import run_dependencies, run_inputs, run_products
 from steward.jobs.runner import JobContext
+from steward.llm.client import create_llm
+from steward.llm.routing import routing_client
 from steward.settings import get_settings
 from steward.sources.edgar import EdgarClient
 from steward.storage import SupabaseStorage
@@ -305,7 +307,8 @@ async def _ai_steps(ctx: JobContext, rows: list[dict[str, Any]]) -> None:
     if not (cfg.map_products or cfg.extract_inputs or cfg.extract_dependencies):
         return
     try:
-        client = create_client(settings)
+        anthropic_client = create_client(settings)
+        client = routing_client(anthropic_client, create_llm(settings, anthropic_client))
     except AINotConfigured as exc:
         async with ctx.step("ai") as step:
             step.detail["skipped"] = str(exc)

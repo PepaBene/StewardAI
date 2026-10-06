@@ -40,6 +40,8 @@ from steward.documents.text import contains
 from steward.earnings.check import load_config, local_today
 from steward.jobs import queue
 from steward.jobs.runner import JobContext, create_job
+from steward.llm.client import create_llm
+from steward.llm.routing import routing_client
 from steward.settings import get_settings
 from steward.sources.finnhub import FinnhubError, next_earnings_date
 
@@ -260,7 +262,8 @@ async def refresh_calendar(ctx: JobContext, *, full: bool) -> None:
     end = today + dt.timedelta(days=cal_settings.lookahead_days)
     client: anthropic.AsyncAnthropic | None
     try:
-        client = create_client(settings)
+        anthropic_client = create_client(settings)
+        client = routing_client(anthropic_client, create_llm(settings, anthropic_client))
     except AINotConfigured:
         client = None
     finnhub_key = settings.finnhub_api_key.get_secret_value() if settings.finnhub_api_key else None

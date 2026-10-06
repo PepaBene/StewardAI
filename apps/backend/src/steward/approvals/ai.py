@@ -33,6 +33,8 @@ from steward.config.prompts import load_prompts
 from steward.config.store import load_active
 from steward.free_sources import collect_finnhub_research, set_peer_status
 from steward.jobs.runner import JobContext, JobFailed
+from steward.llm.client import create_llm
+from steward.llm.routing import routing_client
 from steward.reference.listings import ListingDecisionError, confirm_listing
 from steward.settings import get_settings
 from steward.sources.free_market import FreeSourceError
@@ -459,7 +461,8 @@ async def ai_approvals_handler(ctx: JobContext) -> None:
         if not (cfg.listings or cfg.peers):
             return
         try:
-            client = create_client(settings)
+            anthropic_client = create_client(settings)
+            client = routing_client(anthropic_client, create_llm(settings, anthropic_client))
         except AINotConfigured as exc:
             raise JobFailed(str(exc)) from exc
         if cfg.listings:
