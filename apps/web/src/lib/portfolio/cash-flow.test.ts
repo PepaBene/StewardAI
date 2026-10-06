@@ -46,6 +46,13 @@ describe("cash-flow graph", () => {
     total("cash", "DEPOSIT", 5, "EUR"),
   ];
 
+  it("reads Trading212's unsigned buy amounts as money going out, not in", () => {
+    const g = cashFlowGraph([total("cash", "DEPOSIT", 400), total("order", "BUY", 300)], "CZK");
+    expect(g.inflow).toBe(400);
+    expect(g.bought).toBe(300);
+    expect(g.links.find((l) => l.target === "out:kept")?.value).toBe(100);
+  });
+
   it("balances sources against uses with cash kept", () => {
     const g = cashFlowGraph(totals, "CZK");
     expect(g.inflow).toBe(538);

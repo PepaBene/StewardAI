@@ -130,14 +130,16 @@ export function cashFlowGraph(
   for (const t of totals) {
     if (t.currency !== currency || t.amount === 0) continue;
     if (fees && t.type === "cash" && t.subtype === "FEE") continue;
+    // Trading212 reports an order's netValue unsigned (a buy is positive): the side decides the direction.
+    const amount = t.type === "order" && (t.subtype === "BUY" || t.subtype === "SELL") ? (t.subtype === "BUY" ? -1 : 1) * Math.abs(t.amount) : t.amount;
     if (t.type === "dividend") {
-      if (t.amount > 0) add(sources, "dividend", "Dividends", t.amount);
-      else add(uses, "dividend", "Dividend adjustments", -t.amount);
+      if (amount > 0) add(sources, "dividend", "Dividends", amount);
+      else add(uses, "dividend", "Dividend adjustments", -amount);
       continue;
     }
     const key = `${t.type}:${t.subtype ?? ""}`;
-    if (t.amount > 0) add(sources, key, SOURCE_LABEL[key] ?? humanizeSubtype(t.subtype), t.amount);
-    else add(uses, key, USE_LABEL[key] ?? humanizeSubtype(t.subtype), -t.amount);
+    if (amount > 0) add(sources, key, SOURCE_LABEL[key] ?? humanizeSubtype(t.subtype), amount);
+    else add(uses, key, USE_LABEL[key] ?? humanizeSubtype(t.subtype), -amount);
   }
 
   const booked = uses.get("order:BUY")?.value ?? 0;
@@ -204,7 +206,7 @@ export function splitBuys(
   for (const r of rows) {
     if (r.type !== "order" || r.subtype !== "BUY" || r.currency !== currency) continue;
     const cls = r.ticker ? types.get(r.ticker) ?? null : null;
-    const v = -r.amount;
+    const v = Math.abs(r.amount);
     if (cls === "etf") out.etfs += v;
     else if (cls === "stock") out.stocks += v;
     else out.other += v;
