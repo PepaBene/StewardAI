@@ -32,6 +32,7 @@ from steward.documents.fetch import FetchError, default_headers, fetch_document
 from steward.earnings import metrics as metric_names
 from steward.earnings.extract import SYSTEM_PROMPT as EXTRACTION_SYSTEM
 from steward.earnings.extract import ClaudeExtractor, ExtractionError, ExtractionRequest, Extractor
+from steward.earnings.ir_scan import locate_on_pages
 from steward.earnings.locate import (
     SEARCH_SYSTEM,
     ClaudeSearchLocator,
@@ -207,7 +208,15 @@ async def resolve_cik(
     pool: asyncpg.Pool, edgar: EdgarClient | None, profile: HoldingProfile, instrument: Any
 ) -> str | None:
     if profile.sec_cik:
-        return profile.sec_cik.zfill(10)
+        from_profile = profile.sec_cik.zfill(10)
+        if instrument is not None and not instrument["cik"]:
+            # Insider and filing collection read the instrument's CIK, not the profile's.
+            await pool.execute(
+                "update public.instrument set cik = $2 where t212_ticker = $1 and cik is null",
+                profile.ticker,
+                from_profile,
+            )
+        return from_profile
     if instrument is not None and instrument["cik"]:
         return str(instrument["cik"])
     if edgar is None:
@@ -448,6 +457,14 @@ async def _locate(
         attempts.append("edgar: no CIK")
 
     domains = profile.allowed_domains()
+    pages = [str(u) for u in profile.results_urls]
+    if pages:
+        found_on_page, notes = await locate_on_pages(
+            deps.http, pages, expected[0], expected[1], report_date, domains
+        )
+        if found_on_page is not None:
+            return found_on_page
+        attempts.extend(f"ir page {n}" for n in notes)
     if deps.locator is not None and domains:
         budget.spend("the search call")
         try:

@@ -181,6 +181,15 @@ class EdgarClient:
             name = pick_press_release(documents)
             if name is not None:
                 return filing, filing.url(name)
+        # Foreign filers often put the whole release in the 6-K's main document.
+        for filing in candidates:
+            if filing.form.startswith("6-K") and filing.primary_document.lower().endswith(
+                (".htm", ".html")
+            ):
+                url = filing.url(filing.primary_document)
+                text = html_to_text((await self.document(url)).decode("utf-8", "replace"))
+                if looks_like_results(text):
+                    return filing, url
         return None
 
 
@@ -355,6 +364,18 @@ def xbrl_documents(filing: Filing, files: list[str]) -> tuple[str | None, str | 
         (n for n in files if n.endswith(".xsd")), None
     )
     return instance, label
+
+
+RESULTS_HEADLINE = re.compile(
+    r"\b(results|first half|half[- ]year|[1-4]q\d\d|q[1-4]\b|quarter|fiscal year)", re.I
+)
+RESULTS_FIGURES = re.compile(r"\b(revenue|net (income|profit)|operating (profit|income))", re.I)
+
+
+def looks_like_results(text: str) -> bool:
+    """A results release, not a notice (director dealing, bond issue): results wording in the
+    opening and income-statement wording somewhere in the text."""
+    return bool(RESULTS_HEADLINE.search(text[:1500])) and len(RESULTS_FIGURES.findall(text)) >= 3
 
 
 def pick_press_release(documents: list[tuple[str, str]]) -> str | None:
