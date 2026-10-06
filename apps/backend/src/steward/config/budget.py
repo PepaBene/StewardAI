@@ -85,6 +85,17 @@ class ModelPrice(ConfigModel):
     model: ModelId
     input_per_mtok: float = Field(ge=0, description="USD per million input tokens.")
     output_per_mtok: float = Field(ge=0, description="USD per million output tokens.")
+    # Providers differ in what a cached token costs and what a search costs, so each model can
+    # override the global values below (null: use the global one).
+    cache_write_multiplier: float | None = Field(
+        default=None, ge=0, description="Overrides the global cache-write multiplier."
+    )
+    cache_read_multiplier: float | None = Field(
+        default=None, ge=0, description="Overrides the global cache-read multiplier."
+    )
+    web_search_per_1000: float | None = Field(
+        default=None, ge=0, description="Overrides the global price of 1,000 web searches."
+    )
 
 
 def _default_prices() -> list[ModelPrice]:
@@ -97,7 +108,39 @@ def _default_prices() -> list[ModelPrice]:
         "claude-opus-5": (5, 25),
         "claude-opus-5-5": (4, 20),
     }
-    return [ModelPrice(model=m, input_per_mtok=i, output_per_mtok=o) for m, (i, o) in table.items()]
+    prices = [
+        ModelPrice(model=m, input_per_mtok=i, output_per_mtok=o) for m, (i, o) in table.items()
+    ]
+    # OpenAI and Google list prices of 2026-10-06 (docs/plans/multi_provider_model_routing_plan.md).
+    # Cached input is read at 5 % (sol) or 10 % (luna, flash) of input with no write premium.
+    # Gemini 3.x prices double on 2027-01-01: re-price flash then.
+    prices += [
+        ModelPrice(
+            model="gpt-6.1-sol",
+            input_per_mtok=2,
+            output_per_mtok=10,
+            cache_write_multiplier=1,
+            cache_read_multiplier=0.05,
+            web_search_per_1000=10,
+        ),
+        ModelPrice(
+            model="gpt-6-luna",
+            input_per_mtok=0.1,
+            output_per_mtok=0.5,
+            cache_write_multiplier=1,
+            cache_read_multiplier=0.1,
+            web_search_per_1000=10,
+        ),
+        ModelPrice(
+            model="gemini-3.8-flash",
+            input_per_mtok=0.75,
+            output_per_mtok=3.75,
+            cache_write_multiplier=1,
+            cache_read_multiplier=0.1,
+            web_search_per_1000=14,
+        ),
+    ]
+    return prices
 
 
 class BudgetConfig(ConfigModel):

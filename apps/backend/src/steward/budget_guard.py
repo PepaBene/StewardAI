@@ -35,6 +35,7 @@ from steward.config.notifications import NotificationsConfig
 from steward.config.store import load_active
 from steward.costs import PriceTable
 from steward.jobs.runner import JobContext, JobFailed
+from steward.llm.types import provider_of
 from steward.notify.alerts import create_alerts
 from steward.notify.route import AlertRequest
 
@@ -108,7 +109,13 @@ def _usd(value: Decimal | float) -> str:
     return f"${Decimal(str(value)).quantize(Decimal('0.01'))}"
 
 
-async def before_request(ctx: JobContext, model: str, *, now: dt.datetime | None = None) -> str:
+async def before_request(
+    ctx: JobContext,
+    model: str,
+    *,
+    now: dt.datetime | None = None,
+    can_switch_provider: bool = False,
+) -> str:
     """The model to send a request of `ctx`'s job with (`model`, or the downgrade model at
     the monthly cap); raises `BudgetExceeded` when the request must not be sent."""
     state = await _state(ctx)
@@ -149,6 +156,13 @@ async def before_request(ctx: JobContext, model: str, *, now: dt.datetime | None
     if cfg.at_cap == "pause_noncritical":
         raise BudgetExceeded(
             f"monthly AI budget reached ({_usd(total)} of {_usd(cap)}); non-critical jobs paused"
+        )
+    if provider_of(cfg.downgrade_model) != provider_of(model) and not can_switch_provider:
+        # A raw Anthropic request cannot be re-sent to another provider's model; calls made
+        # through `steward.llm` can, so only those survive a cross-provider downgrade.
+        raise BudgetExceeded(
+            f"monthly AI budget reached ({_usd(total)} of {_usd(cap)}); this call cannot move to"
+            f" {cfg.downgrade_model} and is paused"
         )
     if model != cfg.downgrade_model:
         state.downgraded[model] = cfg.downgrade_model

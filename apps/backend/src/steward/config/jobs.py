@@ -82,7 +82,13 @@ def cron_trigger(expression: str, tz: ZoneInfo) -> CronTrigger:
     )
 
 
-ModelId = Annotated[str, Field(pattern=r"^claude-[a-z0-9.-]{1,64}$", examples=["claude-sonnet-5"])]
+ModelId = Annotated[
+    str,
+    Field(
+        pattern=r"^(claude|gpt|gemini)-[a-z0-9.-]{1,64}$",
+        examples=["claude-sonnet-5", "gpt-6-luna"],
+    ),
+]
 
 Effort = Literal["low", "medium", "high", "xhigh", "max"]
 EFFORT_HELP = (

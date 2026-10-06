@@ -59,6 +59,9 @@ class Settings(BaseSettings):
     # is sent with this workspace's id, otherwise the API refuses with "This API key is not
     # scoped to a workspace" (visible in the Console next to the workspace's name).
     anthropic_workspace_id: str | None = None
+    # OpenAI (gpt-6.1-sol, gpt-6-luna) and Google (gemini-3.8-flash): see steward.llm.
+    openai_api_key: SecretStr | None = None
+    google_api_key: SecretStr | None = None
     # Supabase Storage writes to the `evidence` bucket (secret or legacy service_role key).
     supabase_secret_key: SecretStr | None = None
     # SEC EDGAR asks for a descriptive User-Agent with a contact address.
@@ -135,6 +138,8 @@ class Settings(BaseSettings):
             self.t212_api_key,
             self.t212_api_secret,
             self.anthropic_api_key,
+            self.openai_api_key,
+            self.google_api_key,
             self.supabase_secret_key,
             self.finnhub_api_key,
             self.alpha_vantage_api_key,

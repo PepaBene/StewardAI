@@ -1,6 +1,12 @@
 # Multi-provider model routing plan
 
-Move AI work off Anthropic-only onto three tiers. Plan only; no code changed yet.
+Move AI work off Anthropic-only onto three tiers.
+
+## Status (2026-10-06, local commit, not pushed)
+
+Built: the provider interface `steward/llm` (`LLM.complete`, request/result types, OpenAI Responses and Google generateContent wire code, an Anthropic adapter with the `pause_turn` loop), usage normalised to Anthropic's shape (cached tokens billed once), the guard and per-step recording for every provider (`budget_guard.before_request` can move a call to a downgrade model of another provider only through `LLM`; a raw Anthropic call at the cap is paused instead), per-model cache and search prices with the three new models priced, `ModelId` accepting `gpt-`/`gemini-`, the `OPENAI_API_KEY` and `GOOGLE_API_KEY` settings, and news classification as the pilot call site (it uses the interface whenever its model is not a Claude model; the default is still Haiku).
+
+Not built, and why: switching any job's model (every switch is gated on the accuracy, golden-case or side-by-side checks below, which need live keys and API spend); the other 21 call sites (each uses Anthropic-only features such as `cache_control`, citations blocks or batches and moves one at a time with its gate); OpenAI and Google batch (digests and the monthly review stay on Anthropic batches, so their models must stay Claude); the `ai_result_cache` table; the rule-based replacements in "Do it in code"; the verification calls in "Verify before building" (they need the keys). The stored budget config has no prices for the new models yet: save a new version (defaults now include them) before a job uses one, or its cost is null.
 
 | Tier | Model | List price (in / out per 1M) | Cached input | Web search |
 |---|---|---|---|---|

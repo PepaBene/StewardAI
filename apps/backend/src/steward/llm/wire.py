@@ -1,0 +1,246 @@
+"""Request bodies and response parsing for the OpenAI Responses API and Google's
+generateContent. Pure functions (no network), so they are tested against recorded shapes."""
+
+import copy
+import json
+from typing import Any
+from urllib.parse import urlparse
+
+from pydantic import BaseModel, ValidationError
+
+from steward.llm.types import (
+    Citation,
+    Completion,
+    LLMError,
+    Request,
+    StopReason,
+    normalized_usage,
+)
+
+
+def strict_schema(schema: dict[str, Any]) -> dict[str, Any]:
+    """`schema` in the form OpenAI's strict structured output accepts: every object lists all
+    its properties as required and forbids extra ones. Optional fields must be nullable in the
+    model itself (`X | None`), which pydantic already writes as `anyOf` with null."""
+    out = copy.deepcopy(schema)
+
+    def walk(node: Any) -> None:
+        """`node` is a schema; its `properties` and `$defs` are maps of schemas (a property
+        may itself be called "title" or "default", so the maps are never stripped)."""
+        if isinstance(node, list):
+            for value in node:
+                walk(value)
+            return
+        if not isinstance(node, dict):
+            return
+        for key in ("default", "title", "examples"):
+            node.pop(key, None)
+        if node.get("type") == "object" or "properties" in node:
+            node["required"] = list(node.get("properties", {}))
+            node["additionalProperties"] = False
+        for key, value in node.items():
+            if key in ("properties", "$defs") and isinstance(value, dict):
+                for sub in value.values():
+                    walk(sub)
+            else:
+                walk(value)
+
+    walk(out)
+    return out
+
+
+def _parse(schema: type[BaseModel] | None, text: str, provider: str) -> BaseModel | None:
+    if schema is None or not text.strip():
+        return None
+    try:
+        return schema.model_validate_json(text)
+    except ValidationError as exc:
+        raise LLMError(
+            f"{provider} answer does not match the schema: {exc}", provider=provider
+        ) from exc
+
+
+# --------------------------------------------------------------------------- OpenAI
+
+
+def openai_body(req: Request) -> dict[str, Any]:
+    body: dict[str, Any] = {
+        "model": req.model,
+        "instructions": req.system,
+        "input": [{"role": m.role, "content": m.text} for m in req.messages],
+        "max_output_tokens": req.max_tokens,
+        "store": False,
+    }
+    if req.effort:
+        body["reasoning"] = {"effort": req.effort}
+    if req.cache_key:
+        body["prompt_cache_key"] = req.cache_key
+    if req.schema is not None:
+        body["text"] = {
+            "format": {
+                "type": "json_schema",
+                "name": req.schema.__name__,
+                "schema": strict_schema(req.schema.model_json_schema()),
+                "strict": True,
+            }
+        }
+    if req.search is not None:
+        tool: dict[str, Any] = {"type": "web_search"}
+        if req.search.allowed_domains:
+            tool["filters"] = {"allowed_domains": list(req.search.allowed_domains[:100])}
+        body["tools"] = [tool]
+        body["max_tool_calls"] = req.search.max_uses
+    return body
+
+
+def openai_completion(req: Request, data: dict[str, Any]) -> Completion:
+    text_parts: list[str] = []
+    citations: list[Citation] = []
+    searches = 0
+    refused = False
+    for item in data.get("output") or []:
+        kind = item.get("type")
+        if kind == "web_search_call":
+            searches += 1
+        elif kind == "message":
+            for part in item.get("content") or []:
+                if part.get("type") == "output_text":
+                    text_parts.append(part.get("text") or "")
+                    for note in part.get("annotations") or []:
+                        if note.get("type") == "url_citation" and note.get("url"):
+                            citations.append(Citation(note["url"], note.get("title") or ""))
+                elif part.get("type") == "refusal":
+                    refused = True
+    usage = data.get("usage") or {}
+    cached = (usage.get("input_tokens_details") or {}).get("cached_tokens") or 0
+    prompt = usage.get("input_tokens") or 0
+    stop: StopReason = "end"
+    if refused:
+        stop = "refusal"
+    elif data.get("status") == "incomplete":
+        reason = (data.get("incomplete_details") or {}).get("reason")
+        stop = "max_tokens" if reason == "max_output_tokens" else "other"
+    elif data.get("status") not in (None, "completed"):
+        raise LLMError(
+            f"openai response {data.get('status')}: {data.get('error')}", provider="openai"
+        )
+    text = "".join(text_parts)
+    parsed = _parse(req.schema, text, "openai") if stop == "end" else None
+    return Completion(
+        model=req.model,
+        provider="openai",
+        text=text,
+        parsed=parsed,
+        stop_reason=stop,
+        # Cached tokens are a subset of the prompt tokens: bill them once, at the cache price.
+        usage=normalized_usage(
+            input_tokens=prompt - cached,
+            output_tokens=usage.get("output_tokens") or 0,
+            cache_read_tokens=cached,
+            searches=searches,
+        ),
+        citations=_dedupe(citations),
+    )
+
+
+# --------------------------------------------------------------------------- Google
+
+_GOOGLE_LEVEL = {"low": "low", "medium": "medium", "high": "high", "xhigh": "high", "max": "high"}
+
+
+def google_body(req: Request) -> dict[str, Any]:
+    config: dict[str, Any] = {"maxOutputTokens": req.max_tokens}
+    if req.schema is not None:
+        config["responseMimeType"] = "application/json"
+        config["responseJsonSchema"] = req.schema.model_json_schema()
+    if req.effort:
+        config["thinkingConfig"] = {"thinkingLevel": _GOOGLE_LEVEL.get(req.effort, "medium")}
+    body: dict[str, Any] = {
+        "systemInstruction": {"parts": [{"text": req.system}]},
+        "contents": [
+            {"role": "model" if m.role == "assistant" else "user", "parts": [{"text": m.text}]}
+            for m in req.messages
+        ],
+        "generationConfig": config,
+    }
+    if req.search is not None:
+        body["tools"] = [{"googleSearch": {}}]
+    return body
+
+
+def _host(url: str) -> str:
+    return (urlparse(url).hostname or "").lower()
+
+
+def allowed(url: str, domains: tuple[str, ...]) -> bool:
+    """Is `url` on one of `domains` (or a subdomain of one)? An empty list allows everything."""
+    host = _host(url)
+    return not domains or any(host == d or host.endswith("." + d) for d in domains)
+
+
+def google_completion(req: Request, data: dict[str, Any]) -> Completion:
+    candidates = data.get("candidates") or []
+    if not candidates:
+        block = (data.get("promptFeedback") or {}).get("blockReason")
+        raise LLMError(f"google returned no candidate (blocked: {block})", provider="google")
+    cand = candidates[0]
+    text = "".join(
+        p.get("text") or ""
+        for p in (cand.get("content") or {}).get("parts") or []
+        if not p.get("thought")
+    )
+    finish = cand.get("finishReason")
+    stops: dict[str, StopReason] = {"STOP": "end", "MAX_TOKENS": "max_tokens"}
+    stop = stops.get(str(finish), "other")
+    if finish in ("SAFETY", "PROHIBITED_CONTENT", "RECITATION", "BLOCKLIST"):
+        stop = "refusal"
+    grounding = cand.get("groundingMetadata") or {}
+    found = [
+        Citation((c.get("web") or {}).get("uri") or "", (c.get("web") or {}).get("title") or "")
+        for c in grounding.get("groundingChunks") or []
+    ]
+    found = [c for c in found if c.url]
+    domains = req.search.allowed_domains if req.search else ()
+    kept = [c for c in found if allowed(c.url, domains)]
+    off = [c for c in found if not allowed(c.url, domains)]
+    meta = data.get("usageMetadata") or {}
+    cached = meta.get("cachedContentTokenCount") or 0
+    searches = len(grounding.get("webSearchQueries") or [])
+    parsed = _parse(req.schema, text, "google") if stop == "end" else None
+    return Completion(
+        model=req.model,
+        provider="google",
+        text=text,
+        parsed=parsed,
+        stop_reason=stop,
+        # promptTokenCount includes the cached tokens; thinking tokens are billed as output.
+        usage=normalized_usage(
+            input_tokens=(meta.get("promptTokenCount") or 0) - cached,
+            output_tokens=(meta.get("candidatesTokenCount") or 0)
+            + (meta.get("thoughtsTokenCount") or 0),
+            cache_read_tokens=cached,
+            searches=searches,
+        ),
+        citations=_dedupe(kept),
+        off_list_citations=_dedupe(off),
+    )
+
+
+def _dedupe(citations: list[Citation]) -> list[Citation]:
+    seen: set[str] = set()
+    out = []
+    for c in citations:
+        if c.url not in seen:
+            seen.add(c.url)
+            out.append(c)
+    return out
+
+
+def error_message(body: Any) -> str:
+    """A short reason from a provider's error body."""
+    try:
+        data = body if isinstance(body, dict) else json.loads(body)
+        err = data.get("error")
+        return str(err.get("message") if isinstance(err, dict) else err)[:300]
+    except (ValueError, AttributeError):
+        return str(body)[:300]

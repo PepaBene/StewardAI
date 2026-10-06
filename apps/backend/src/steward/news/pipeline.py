@@ -45,6 +45,7 @@ from steward.config.verification import TrustSettings, VerificationConfig
 from steward.documents.fetch import FetchError
 from steward.jobs import queue
 from steward.jobs.runner import JobContext, create_job
+from steward.llm.client import create_llm
 from steward.news.classify import SYSTEM_PROMPT as CLASSIFICATION_PROMPT
 from steward.news.classify import (
     Candidate,
@@ -1265,14 +1266,17 @@ async def news_ingest_handler(ctx: JobContext) -> None:
         client = create_client(settings)
     except AINotConfigured:
         client = None
-    if client is not None:
-        prompts = await load_prompts(ctx.pool)
+    llm = create_llm(settings, client)
+    prompts = await load_prompts(ctx.pool)
+    if llm.configured(news.classification_model):
         classifier = ClaudeClassifier(
             client,
             news.classification_model,
             prompts.text("news_classification", CLASSIFICATION_PROMPT),
             effort=news.classification_effort,
+            llm=llm,
         )
+    if client is not None:
         corroborator = ClaudeCorroborator(
             client,
             news.corroboration_model,

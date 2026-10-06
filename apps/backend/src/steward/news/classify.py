@@ -27,6 +27,8 @@ from steward.config.event_rules import (
     EVENT_DESCRIPTIONS,
 )
 from steward.config.jobs import effort_kwargs
+from steward.llm.client import LLM
+from steward.llm.types import LLMError, Message, Request, provider_of
 
 
 class ClassificationError(Exception):
@@ -271,15 +273,19 @@ REQUEST_MAX_RETRIES = 1
 class ClaudeClassifier:
     def __init__(
         self,
-        client: anthropic.AsyncAnthropic,
+        client: anthropic.AsyncAnthropic | None,
         model: str,
         instructions: str = SYSTEM_PROMPT,
         effort: str | None = None,
+        llm: LLM | None = None,
     ) -> None:
         self._client = client
         self._model = model
         self._effort = effort
         self._system = system_prompt(instructions)
+        # Set when `model` belongs to another provider (gpt-/gemini-): the call then goes
+        # through the provider-neutral interface instead of the Anthropic client.
+        self._llm = llm if provider_of(model) != "anthropic" else None
 
     async def classify(
         self,
@@ -295,6 +301,9 @@ class ClaudeClassifier:
             f"Today is {today.isoformat()}. Label these {len(items)} items; return exactly one "
             f"label per index.\n\n{items_block(items)}"
         )
+        if self._llm is not None:
+            return await self._classify_other(items, holdings, user, usage, result)
+        assert self._client is not None, "an Anthropic model needs the Anthropic client"
         try:
             response = await self._client.with_options(
                 max_retries=REQUEST_MAX_RETRIES
@@ -323,6 +332,47 @@ class ClaudeClassifier:
         parsed = response.parsed_output
         if parsed is None:
             raise ClassificationError("classification returned no parseable JSON", usage)
+        return self._label(parsed, items, holdings, result), usage
+
+    async def _classify_other(
+        self,
+        items: Sequence[ClassifyItem],
+        holdings: Sequence[HoldingContext],
+        user: str,
+        usage: Usage,
+        result: ClassifyResult,
+    ) -> tuple[ClassifyResult, Usage]:
+        """The same call on an OpenAI or Google model. The static instructions come first and
+        the holdings block (which differs between batches) after them, then the items."""
+        assert self._llm is not None
+        request = Request(
+            model=self._model,
+            system=f"{self._system}\n\n{holdings_block(holdings)}",
+            messages=(Message("user", user),),
+            schema=ClassificationOutput,
+            effort=self._effort,
+            max_tokens=12000,
+            timeout=REQUEST_TIMEOUT,
+            cache_key="news_classification",
+        )
+        try:
+            done = await self._llm.complete(request)
+        except LLMError as exc:
+            raise ClassificationError(f"classification call failed: {exc}") from exc
+        usage.add(done.usage)
+        if done.stop_reason in ("refusal", "max_tokens"):
+            raise ClassificationError(f"classification stopped early ({done.stop_reason})", usage)
+        if not isinstance(done.parsed, ClassificationOutput):
+            raise ClassificationError("classification returned no parseable JSON", usage)
+        return self._label(done.parsed, items, holdings, result), usage
+
+    @staticmethod
+    def _label(
+        parsed: "ClassificationOutput",
+        items: Sequence[ClassifyItem],
+        holdings: Sequence[HoldingContext],
+        result: ClassifyResult,
+    ) -> ClassifyResult:
         by_index = {item.index: item for item in items}
         context = {h.ticker: h for h in holdings}
         for raw in parsed.items:
@@ -330,4 +380,4 @@ class ClaudeClassifier:
             if item is not None and raw.index not in result.labels:
                 result.labels[raw.index] = check_label(raw, item, context)
         result.missing = [i for i in by_index if i not in result.labels]
-        return result, usage
+        return result

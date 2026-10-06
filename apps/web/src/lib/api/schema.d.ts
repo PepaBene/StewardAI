@@ -4713,6 +4713,7 @@ export interface components {
              * @description Judges each suggestion from the evidence given.
              * @default claude-sonnet-5
              * @example claude-sonnet-5
+             * @example gpt-6-luna
              */
             model: string;
             /**
@@ -5170,6 +5171,7 @@ export interface components {
              * @description The model non-critical requests use at the cap (`downgrade_noncritical`).
              * @default claude-haiku-4-5
              * @example claude-sonnet-5
+             * @example gpt-6-luna
              */
             downgrade_model: string;
             /**
@@ -5463,6 +5465,7 @@ export interface components {
              * Model
              * @default claude-sonnet-5
              * @example claude-sonnet-5
+             * @example gpt-6-luna
              */
             model: string;
             /**
@@ -5621,6 +5624,7 @@ export interface components {
              * Model
              * @default claude-haiku-4-5
              * @example claude-sonnet-5
+             * @example gpt-6-luna
              */
             model: string;
             /**
@@ -6938,6 +6942,7 @@ export interface components {
              * Model
              * @default claude-sonnet-5
              * @example claude-sonnet-5
+             * @example gpt-6-luna
              */
             model: string;
             /**
@@ -7243,6 +7248,7 @@ export interface components {
              * @description Reads report dates off IR calendar pages.
              * @default claude-haiku-4-5
              * @example claude-sonnet-5
+             * @example gpt-6-luna
              */
             model: string;
             /**
@@ -7289,6 +7295,7 @@ export interface components {
              * Extraction Model
              * @default claude-sonnet-5
              * @example claude-sonnet-5
+             * @example gpt-6-luna
              */
             extraction_model: string;
             /**
@@ -7296,6 +7303,7 @@ export interface components {
              * @description Searches for the release when EDGAR has none (non-US issuers).
              * @default claude-sonnet-5
              * @example claude-sonnet-5
+             * @example gpt-6-luna
              */
             locate_model: string;
             /**
@@ -7503,6 +7511,7 @@ export interface components {
              * Model
              * @default claude-sonnet-5
              * @example claude-sonnet-5
+             * @example gpt-6-luna
              */
             model: string;
             /**
@@ -8091,6 +8100,7 @@ export interface components {
              * @description Reads annual reports for currencies and inputs.
              * @default claude-sonnet-5
              * @example claude-sonnet-5
+             * @example gpt-6-luna
              */
             model: string;
             /**
@@ -9596,6 +9606,7 @@ export interface components {
              * @description Searches for facts and approves them.
              * @default claude-sonnet-5
              * @example claude-sonnet-5
+             * @example gpt-6-luna
              */
             model: string;
             /**
@@ -11078,6 +11089,7 @@ export interface components {
              * @description Searches for the pages and approves them.
              * @default claude-sonnet-5
              * @example claude-sonnet-5
+             * @example gpt-6-luna
              */
             model: string;
             /**
@@ -12611,6 +12623,7 @@ export interface components {
             /**
              * Model
              * @example claude-sonnet-5
+             * @example gpt-6-luna
              */
             model: string;
             /**
@@ -12623,6 +12636,21 @@ export interface components {
              * @description USD per million output tokens.
              */
             output_per_mtok: number;
+            /**
+             * Cache Write Multiplier
+             * @description Overrides the global cache-write multiplier.
+             */
+            cache_write_multiplier?: number | null;
+            /**
+             * Cache Read Multiplier
+             * @description Overrides the global cache-read multiplier.
+             */
+            cache_read_multiplier?: number | null;
+            /**
+             * Web Search Per 1000
+             * @description Overrides the global price of 1,000 web searches.
+             */
+            web_search_per_1000?: number | null;
         };
         /**
          * MonitorSettings
@@ -12812,6 +12840,7 @@ export interface components {
              * Classification Model
              * @default claude-haiku-4-5
              * @example claude-sonnet-5
+             * @example gpt-6-luna
              */
             classification_model: string;
             /**
@@ -12829,6 +12858,7 @@ export interface components {
              * Corroboration Model
              * @default claude-haiku-4-5
              * @example claude-sonnet-5
+             * @example gpt-6-luna
              */
             corroboration_model: string;
             /**
@@ -15065,6 +15095,7 @@ export interface components {
              * Model
              * @default claude-opus-5-5
              * @example claude-sonnet-5
+             * @example gpt-6-luna
              */
             model: string;
             /**
@@ -15336,6 +15367,7 @@ export interface components {
              * Model
              * @default claude-opus-5-5
              * @example claude-sonnet-5
+             * @example gpt-6-luna
              */
             model: string;
             /**

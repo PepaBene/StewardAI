@@ -200,7 +200,8 @@ def test_jobs_config_saved_before_phase_2_still_loads() -> None:
     assert old.earnings_check.extraction_model == "claude-sonnet-5"
     assert old.earnings_check.check_days_after_report == [1, 2, 4]
     with pytest.raises(ValidationError):
-        JobsConfig.model_validate({"earnings_check": {"extraction_model": "gpt-5"}})
+        JobsConfig.model_validate({"earnings_check": {"extraction_model": "llama-4"}})
+    assert JobsConfig.model_validate({"earnings_check": {"extraction_model": "gpt-6.1-sol"}})
 
 
 def test_holding_profiles_validate_and_expose_allowed_domains() -> None:

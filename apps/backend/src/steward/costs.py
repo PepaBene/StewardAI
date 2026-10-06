@@ -17,6 +17,10 @@ def _d(value: float) -> Decimal:
     return Decimal(str(value))
 
 
+def _first(override: float | None, default: float) -> float:
+    return default if override is None else override
+
+
 @dataclass(frozen=True)
 class PriceTable:
     config: BudgetConfig
@@ -31,10 +35,16 @@ class PriceTable:
             "model": model,
             "input_per_mtok": price.input_per_mtok,
             "output_per_mtok": price.output_per_mtok,
-            "cache_write_multiplier": self.config.cache_write_multiplier,
-            "cache_read_multiplier": self.config.cache_read_multiplier,
+            "cache_write_multiplier": _first(
+                price.cache_write_multiplier, self.config.cache_write_multiplier
+            ),
+            "cache_read_multiplier": _first(
+                price.cache_read_multiplier, self.config.cache_read_multiplier
+            ),
             "batch_multiplier": self.config.batch_multiplier,
-            "web_search_per_1000": self.config.web_search_per_1000,
+            "web_search_per_1000": _first(
+                price.web_search_per_1000, self.config.web_search_per_1000
+            ),
         }
 
     def cost(

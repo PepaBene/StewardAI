@@ -14510,12 +14510,13 @@
         "properties": {
           "model": {
             "type": "string",
-            "pattern": "^claude-[a-z0-9.-]{1,64}$",
+            "pattern": "^(claude|gpt|gemini)-[a-z0-9.-]{1,64}$",
             "title": "Model",
             "description": "Judges each suggestion from the evidence given.",
             "default": "claude-sonnet-5",
             "examples": [
-              "claude-sonnet-5"
+              "claude-sonnet-5",
+              "gpt-6-luna"
             ]
           },
           "effort": {
@@ -15665,12 +15666,13 @@
           },
           "downgrade_model": {
             "type": "string",
-            "pattern": "^claude-[a-z0-9.-]{1,64}$",
+            "pattern": "^(claude|gpt|gemini)-[a-z0-9.-]{1,64}$",
             "title": "Downgrade Model",
             "description": "The model non-critical requests use at the cap (`downgrade_noncritical`).",
             "default": "claude-haiku-4-5",
             "examples": [
-              "claude-sonnet-5"
+              "claude-sonnet-5",
+              "gpt-6-luna"
             ]
           },
           "critical_job_types": {
@@ -16454,11 +16456,12 @@
         "properties": {
           "model": {
             "type": "string",
-            "pattern": "^claude-[a-z0-9.-]{1,64}$",
+            "pattern": "^(claude|gpt|gemini)-[a-z0-9.-]{1,64}$",
             "title": "Model",
             "default": "claude-sonnet-5",
             "examples": [
-              "claude-sonnet-5"
+              "claude-sonnet-5",
+              "gpt-6-luna"
             ]
           },
           "effort": {
@@ -16856,11 +16859,12 @@
           },
           "model": {
             "type": "string",
-            "pattern": "^claude-[a-z0-9.-]{1,64}$",
+            "pattern": "^(claude|gpt|gemini)-[a-z0-9.-]{1,64}$",
             "title": "Model",
             "default": "claude-haiku-4-5",
             "examples": [
-              "claude-sonnet-5"
+              "claude-sonnet-5",
+              "gpt-6-luna"
             ]
           },
           "effort": {
@@ -20493,11 +20497,12 @@
         "properties": {
           "model": {
             "type": "string",
-            "pattern": "^claude-[a-z0-9.-]{1,64}$",
+            "pattern": "^(claude|gpt|gemini)-[a-z0-9.-]{1,64}$",
             "title": "Model",
             "default": "claude-sonnet-5",
             "examples": [
-              "claude-sonnet-5"
+              "claude-sonnet-5",
+              "gpt-6-luna"
             ]
           },
           "effort": {
@@ -21319,12 +21324,13 @@
         "properties": {
           "model": {
             "type": "string",
-            "pattern": "^claude-[a-z0-9.-]{1,64}$",
+            "pattern": "^(claude|gpt|gemini)-[a-z0-9.-]{1,64}$",
             "title": "Model",
             "description": "Reads report dates off IR calendar pages.",
             "default": "claude-haiku-4-5",
             "examples": [
-              "claude-sonnet-5"
+              "claude-sonnet-5",
+              "gpt-6-luna"
             ]
           },
           "effort": {
@@ -21415,21 +21421,23 @@
         "properties": {
           "extraction_model": {
             "type": "string",
-            "pattern": "^claude-[a-z0-9.-]{1,64}$",
+            "pattern": "^(claude|gpt|gemini)-[a-z0-9.-]{1,64}$",
             "title": "Extraction Model",
             "default": "claude-sonnet-5",
             "examples": [
-              "claude-sonnet-5"
+              "claude-sonnet-5",
+              "gpt-6-luna"
             ]
           },
           "locate_model": {
             "type": "string",
-            "pattern": "^claude-[a-z0-9.-]{1,64}$",
+            "pattern": "^(claude|gpt|gemini)-[a-z0-9.-]{1,64}$",
             "title": "Locate Model",
             "description": "Searches for the release when EDGAR has none (non-US issuers).",
             "default": "claude-sonnet-5",
             "examples": [
-              "claude-sonnet-5"
+              "claude-sonnet-5",
+              "gpt-6-luna"
             ]
           },
           "effort": {
@@ -21895,11 +21903,12 @@
           },
           "model": {
             "type": "string",
-            "pattern": "^claude-[a-z0-9.-]{1,64}$",
+            "pattern": "^(claude|gpt|gemini)-[a-z0-9.-]{1,64}$",
             "title": "Model",
             "default": "claude-sonnet-5",
             "examples": [
-              "claude-sonnet-5"
+              "claude-sonnet-5",
+              "gpt-6-luna"
             ]
           },
           "effort": {
@@ -23273,12 +23282,13 @@
         "properties": {
           "model": {
             "type": "string",
-            "pattern": "^claude-[a-z0-9.-]{1,64}$",
+            "pattern": "^(claude|gpt|gemini)-[a-z0-9.-]{1,64}$",
             "title": "Model",
             "description": "Reads annual reports for currencies and inputs.",
             "default": "claude-sonnet-5",
             "examples": [
-              "claude-sonnet-5"
+              "claude-sonnet-5",
+              "gpt-6-luna"
             ]
           },
           "effort": {
@@ -27528,12 +27538,13 @@
         "properties": {
           "model": {
             "type": "string",
-            "pattern": "^claude-[a-z0-9.-]{1,64}$",
+            "pattern": "^(claude|gpt|gemini)-[a-z0-9.-]{1,64}$",
             "title": "Model",
             "description": "Searches for facts and approves them.",
             "default": "claude-sonnet-5",
             "examples": [
-              "claude-sonnet-5"
+              "claude-sonnet-5",
+              "gpt-6-luna"
             ]
           },
           "effort": {
@@ -32082,12 +32093,13 @@
         "properties": {
           "model": {
             "type": "string",
-            "pattern": "^claude-[a-z0-9.-]{1,64}$",
+            "pattern": "^(claude|gpt|gemini)-[a-z0-9.-]{1,64}$",
             "title": "Model",
             "description": "Searches for the pages and approves them.",
             "default": "claude-sonnet-5",
             "examples": [
-              "claude-sonnet-5"
+              "claude-sonnet-5",
+              "gpt-6-luna"
             ]
           },
           "effort": {
@@ -36257,10 +36269,11 @@
         "properties": {
           "model": {
             "type": "string",
-            "pattern": "^claude-[a-z0-9.-]{1,64}$",
+            "pattern": "^(claude|gpt|gemini)-[a-z0-9.-]{1,64}$",
             "title": "Model",
             "examples": [
-              "claude-sonnet-5"
+              "claude-sonnet-5",
+              "gpt-6-luna"
             ]
           },
           "input_per_mtok": {
@@ -36274,6 +36287,45 @@
             "minimum": 0.0,
             "title": "Output Per Mtok",
             "description": "USD per million output tokens."
+          },
+          "cache_write_multiplier": {
+            "anyOf": [
+              {
+                "type": "number",
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cache Write Multiplier",
+            "description": "Overrides the global cache-write multiplier."
+          },
+          "cache_read_multiplier": {
+            "anyOf": [
+              {
+                "type": "number",
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cache Read Multiplier",
+            "description": "Overrides the global cache-read multiplier."
+          },
+          "web_search_per_1000": {
+            "anyOf": [
+              {
+                "type": "number",
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Web Search Per 1000",
+            "description": "Overrides the global price of 1,000 web searches."
           }
         },
         "additionalProperties": false,
@@ -36835,11 +36887,12 @@
         "properties": {
           "classification_model": {
             "type": "string",
-            "pattern": "^claude-[a-z0-9.-]{1,64}$",
+            "pattern": "^(claude|gpt|gemini)-[a-z0-9.-]{1,64}$",
             "title": "Classification Model",
             "default": "claude-haiku-4-5",
             "examples": [
-              "claude-sonnet-5"
+              "claude-sonnet-5",
+              "gpt-6-luna"
             ]
           },
           "classification_effort": {
@@ -36871,11 +36924,12 @@
           },
           "corroboration_model": {
             "type": "string",
-            "pattern": "^claude-[a-z0-9.-]{1,64}$",
+            "pattern": "^(claude|gpt|gemini)-[a-z0-9.-]{1,64}$",
             "title": "Corroboration Model",
             "default": "claude-haiku-4-5",
             "examples": [
-              "claude-sonnet-5"
+              "claude-sonnet-5",
+              "gpt-6-luna"
             ]
           },
           "corroboration_effort": {
@@ -43057,11 +43111,12 @@
           },
           "model": {
             "type": "string",
-            "pattern": "^claude-[a-z0-9.-]{1,64}$",
+            "pattern": "^(claude|gpt|gemini)-[a-z0-9.-]{1,64}$",
             "title": "Model",
             "default": "claude-opus-5-5",
             "examples": [
-              "claude-sonnet-5"
+              "claude-sonnet-5",
+              "gpt-6-luna"
             ]
           },
           "effort": {
@@ -43785,11 +43840,12 @@
         "properties": {
           "model": {
             "type": "string",
-            "pattern": "^claude-[a-z0-9.-]{1,64}$",
+            "pattern": "^(claude|gpt|gemini)-[a-z0-9.-]{1,64}$",
             "title": "Model",
             "default": "claude-opus-5-5",
             "examples": [
-              "claude-sonnet-5"
+              "claude-sonnet-5",
+              "gpt-6-luna"
             ]
           },
           "effort": {
