@@ -140,7 +140,7 @@ def _default_sources() -> list[NewsSource]:
         central_bank(
             "cnb-press",
             "ČNB press releases",
-            "https://www.cnb.cz/en/.content/rss-feeds/press-releases.xml",
+            "https://www.cnb.cz/en/.content/rss-feed/rss-feed_tz.xml",
         ),
     ]
 

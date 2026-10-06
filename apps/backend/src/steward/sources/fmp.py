@@ -188,14 +188,15 @@ async def _fetch_governed(
     try:
         body = await _get(http, url, params, api_key)
     except _HttpFailure as exc:
-        if exc.status_code == 402:
-            # The free plan excludes this symbol; the endpoint itself stays usable.
+        if exc.status_code in (400, 402):
+            # The free plan excludes this symbol (402), or FMP does not know it (400); the
+            # endpoint itself stays usable.
             await record_access(
                 pool,
                 "fmp",
                 endpoint,
-                AccessResult(AccessState.AVAILABLE, "symbol excluded by the free plan"),
-                status_code=402,
+                AccessResult(AccessState.AVAILABLE, "symbol not served on the free plan"),
+                status_code=exc.status_code,
                 credits=1,
             )
             return None
@@ -282,6 +283,10 @@ async def collect_fmp_company(
             ),
         )
     if not include_estimates:
+        return counts
+    if not await provider_gate.gate_usable(pool, "fmp", "analyst_estimates"):
+        # A closed estimates gate must not stop the profiles of the other holdings.
+        counts["estimates_skipped"] = 1
         return counts
 
     body = await _fetch_governed(

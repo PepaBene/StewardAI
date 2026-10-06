@@ -51,10 +51,11 @@ _DOMAIN_RE = re.compile(r"^[a-z0-9]([a-z0-9.-]{0,251}[a-z0-9])?$")
 
 
 async def _gate(pool: asyncpg.Pool, provider: str, endpoint: str) -> None:
-    """Collectors run only on an endpoint verified free and available, not hard-blocked and
-    past any Retry-After / auth-failure cooldown."""
-    if not await provider_gate.gate_open(pool, provider, endpoint):
-        raise RuntimeError(f"{provider} {endpoint} endpoint is not verified as free and available")
+    """Collectors run on an endpoint that is available or not yet verified (the first call is
+    the probe, as in `governed_http`), not hard-blocked, paid-only or in a Retry-After /
+    auth-failure cooldown."""
+    if not await provider_gate.gate_usable(pool, provider, endpoint):
+        raise RuntimeError(f"{provider} {endpoint} endpoint is blocked, paid-only or cooling down")
 
 
 async def _record_http_failure(

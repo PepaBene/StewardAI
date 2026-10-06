@@ -31,6 +31,20 @@ async def gate_open(pool: asyncpg.Pool, provider: str, endpoint: str) -> bool:
     return bool(row is not None and row["open"] and row["state"] == AccessState.AVAILABLE.value)
 
 
+async def gate_usable(pool: asyncpg.Pool, provider: str, endpoint: str) -> bool:
+    """Open for a call: available, or never verified (the call is the probe), and neither
+    hard-blocked, paid-only nor in a retry window. Without this, an endpoint seeded as
+    unverified is never tried and so never becomes available."""
+    row = await pool.fetchrow(
+        "select state, public.provider_gate_open(provider, endpoint) as open"
+        " from public.provider_access where provider=$1 and endpoint=$2",
+        provider,
+        endpoint,
+    )
+    usable = (AccessState.AVAILABLE.value, AccessState.ACCESS_UNVERIFIED.value)
+    return bool(row is not None and row["open"] and row["state"] in usable)
+
+
 async def note_auth_failure(
     pool: asyncpg.Pool,
     provider: str,

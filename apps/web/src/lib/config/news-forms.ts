@@ -239,7 +239,7 @@ export const DEFAULT_SOURCES: NewsSourcesConfig = {
     { id: "eqs-news", name: "EQS News", tier: 1, type: "eqs", url: null, enabled: false, tickers: [], macro: false },
     { id: "fed-press", name: "Federal Reserve press releases", tier: 1, type: "rss", url: "https://www.federalreserve.gov/feeds/press_monetary.xml", enabled: true, tickers: [], macro: true },
     { id: "ecb-press", name: "ECB press releases", tier: 1, type: "rss", url: "https://www.ecb.europa.eu/rss/press.html", enabled: true, tickers: [], macro: true },
-    { id: "cnb-press", name: "ČNB press releases", tier: 1, type: "rss", url: "https://www.cnb.cz/en/.content/rss-feeds/press-releases.xml", enabled: true, tickers: [], macro: true },
+    { id: "cnb-press", name: "ČNB press releases", tier: 1, type: "rss", url: "https://www.cnb.cz/en/.content/rss-feed/rss-feed_tz.xml", enabled: true, tickers: [], macro: true },
   ],
   domain_tiers: [
     ...["sec.gov", "globenewswire.com", "prnewswire.com", "businesswire.com", "federalreserve.gov", "ecb.europa.eu", "cnb.cz"].map((domain) => ({ domain, tier: 1 as const })),
