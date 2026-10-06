@@ -1,5 +1,27 @@
 # Macro, trade, input costs, currency and customer / supplier dependencies — plan
 
+## Status (2026-10-06)
+
+Built: geography exposures from XBRL (`exposures/build.py`); currency and commodity inputs from the
+annual report (`exposures/inputs.py`), with each row carrying origin, quote, period and filing URL;
+product lines to HS headings, always `estimated` (`exposures/hs.py`); customer and supplier
+disclosures from XBRL concentration facts and from filing text with a second AI approver
+(`graph/dependencies.py`); counterparty resolution to holdings and mirror-relationship
+corroboration; archived results documents as the source for issuers without an EDGAR report
+(`exposures/archived.py`); FRED commodity series in the macro defaults and series linking on
+`/holdings/{ticker}/exposure-context` (`macro/exposure_series.py`); `POST
+/holdings/{ticker}/exposures/remove` and the holding panels show who decided, the citation and a
+one-click overturn.
+
+Differences from the plan: the dependency extractor is a step of `exposure_build` (one schedule,
+one settings block) instead of a separate `dependency_extract` job, and the approver lives in
+`graph/dependencies.py` instead of `approvals/ai.py`; an XBRL share benchmarked to receivables is
+stored with basis `other`, not as a revenue share; the OECD feeds stay closed (see
+`docs/data/provider-access.md`).
+
+Not yet run against live data: the AI steps, the archived-document path (CSG, Chugai, Daiichi) and
+the commodity collection (needs `macro_collect` and `FRED_API_KEY`).
+
 Goal: fill the holding-page sections "macro", "trade", "input costs and currency", "country
 and industry context" and "dependencies" without the owner typing anything, from reported
 company data first, with AI extraction and AI approval second, and every figure traceable to

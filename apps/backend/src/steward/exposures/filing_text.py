@@ -78,6 +78,9 @@ def relevant(section: str, pattern: re.Pattern[str], cap: int = SECTION_CAP) -> 
 
 def sections_for(filing: FilingText, pattern: re.Pattern[str]) -> dict[str, str]:
     """The relevant paragraphs of each logical section of this filing."""
+    if filing.form == "document":  # a results release or report with no numbered items
+        text = relevant(filing.text, pattern)
+        return {"document": text} if text else {}
     items = split_items(filing.text)
     wanted = ITEMS[form_family(filing.form)]
     out = {name: relevant(items.get(label, ""), pattern) for name, label in wanted.items()}

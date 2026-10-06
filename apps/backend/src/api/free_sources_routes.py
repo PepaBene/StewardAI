@@ -34,7 +34,7 @@ from api.response_models import (
 )
 from steward.config.holding_profiles import HoldingProfile, HoldingProfilesConfig
 from steward.config.jobs import JobsConfig
-from steward.config.store import StoredConfig, load_active
+from steward.config.store import ConfigConflictError, StoredConfig, load_active, save_config
 from steward.db_json import decode_rows, decode_structured_rows
 from steward.free_source_reads import (
     business_network_payload,
@@ -61,6 +61,7 @@ from steward.graph.edges import upsert_event
 from steward.graph.kpi import validate_thesis_kpi
 from steward.graph.patents import store_patent_family as _store_patent
 from steward.graph.relationships import concentration, detect_contradictions, upsert_disclosure
+from steward.macro.exposure_series import linked_series
 from steward.market_analysis import financial_peer_metrics
 from steward.peer_metrics import FORMULA_DETAIL, FORMULAS, peer_comparison
 from steward.reference.calendar import expected_sessions
@@ -514,18 +515,72 @@ async def exposure_context(
            order by metric,period_end desc,known_at desc""",
         ticker,
     )
+    linked, unlinked = await linked_series(pool, profile.exposures if profile else [])
     payload: dict[str, Any] = {
         "ticker": ticker,
         "exposure_assumptions": [e.model_dump(mode="json") for e in profile.exposures]
         if profile
         else [],
         "observations": decode_structured_rows(observations, ("raw",)),
+        "linked_series": linked,
+        "unlinked": unlinked,
         "limitations": [
             "Price series are contextual inputs, not estimates of issuer margin sensitivity.",
             "Exposure shares are shown only when entered in the holding profile.",
         ],
     }
     return cast(ExposureContextResponse, payload)
+
+
+class RemoveExposureRequest(BaseModel):
+    kind: str
+    name: str
+
+
+class RemoveExposureResponse(BaseModel):
+    ticker: str
+    removed: int
+
+
+@router.post(
+    "/holdings/{ticker}/exposures/remove",
+    tags=["holdings"],
+    response_model=RemoveExposureResponse,
+)
+async def remove_exposure(
+    ticker: TickerPath, body: RemoveExposureRequest, pool: Pool, owner: Owner
+) -> RemoveExposureResponse:
+    """Overturn an exposure the AI added (or remove one of your own). The builder never adds a
+    removed row back: it remembers what it wrote and sees that the row is gone."""
+    stored = await load_active(pool, "holding_profiles", HoldingProfilesConfig)
+    profile = _holding_research_profile(stored, ticker)
+    if stored is None or profile is None:
+        raise HTTPException(404, "no holding profile")
+    key = (body.kind, body.name.casefold())
+    kept = [e for e in profile.exposures if (e.kind, e.name.casefold()) != key]
+    removed = len(profile.exposures) - len(kept)
+    if removed:
+        updated = stored.body.model_copy(
+            update={
+                "profiles": [
+                    p.model_copy(update={"exposures": kept}) if p.ticker == ticker else p
+                    for p in stored.body.profiles
+                ]
+            }
+        )
+        try:
+            async with pool.acquire() as conn:
+                await save_config(
+                    conn,
+                    "holding_profiles",
+                    updated,
+                    created_by=owner.user_id,
+                    note=f"Removed exposure {body.kind}:{body.name} from {ticker}",
+                    expected_active_id=stored.id,
+                )
+        except ConfigConflictError as exc:
+            raise HTTPException(409, "the profiles changed; reload and try again") from exc
+    return RemoveExposureResponse(ticker=ticker, removed=removed)
 
 
 @router.post(

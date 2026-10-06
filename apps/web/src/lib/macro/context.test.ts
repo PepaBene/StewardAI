@@ -70,6 +70,8 @@ describe("commodity and FX inputs", () => {
       { ...obs, metric: "COPPER", period_end: "2026-08-01", value: 8100, known_at: "2026-08-05" },
       { ...obs, metric: "EURUSD", period_end: "2026-09-01", value: null, known_at: "2026-09-02" },
     ],
+    linked_series: [],
+    unlinked: [],
     limitations: ["Price series are contextual inputs."],
   };
 

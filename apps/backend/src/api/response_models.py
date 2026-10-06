@@ -71,13 +71,34 @@ class ExposureObservation(_Model):
     raw: Any = None
 
 
+class ExposureSeriesPoint(_Model):
+    date: dt.date
+    value: float
+
+
+class ExposureSeries(_Model):
+    """A stored series linked to one exposure (a commodity price or a currency fixing)."""
+
+    exposure_kind: str
+    exposure_name: str
+    series: str
+    label: str
+    unit: str | None = None
+    currency: str | None = None
+    source_url: str | None = None
+    points: list[ExposureSeriesPoint]
+
+
 class ExposureContextResponse(_Model):
     """`GET /holdings/{ticker}/exposure-context`. Assumptions are the holding-profile
-    exposures dumped as JSON (a config shape, free-form here)."""
+    exposures dumped as JSON (a config shape, free-form here). `linked_series` are the stored
+    series that belong to those exposures; `unlinked` names exposures with no series."""
 
     ticker: str
     exposure_assumptions: list[dict[str, Any]]
     observations: list[ExposureObservation]
+    linked_series: list[ExposureSeries] = []
+    unlinked: list[str] = []
     limitations: list[str]
 
 

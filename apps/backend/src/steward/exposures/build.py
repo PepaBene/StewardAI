@@ -27,6 +27,7 @@ from steward.exposures.ai_steps import run_dependencies, run_inputs, run_product
 from steward.jobs.runner import JobContext
 from steward.settings import get_settings
 from steward.sources.edgar import EdgarClient
+from steward.storage import SupabaseStorage
 
 ANNUAL_FORMS = ("10-K", "20-F", "40-F")
 TOLERANCE = Decimal("1.005")
@@ -299,6 +300,13 @@ async def _ai_steps(ctx: JobContext, rows: list[asyncpg.Record]) -> None:
             follow_redirects=True,
         ) as http:
             edgar = EdgarClient(http, settings.sec_user_agent)
+            storage = (
+                SupabaseStorage(
+                    http, settings.supabase_url, settings.supabase_secret_key.get_secret_value()
+                )
+                if settings.supabase_url and settings.supabase_secret_key
+                else None
+            )
             if cfg.extract_inputs:
                 step.detail["inputs"] = await run_inputs(
                     ctx,
@@ -310,9 +318,10 @@ async def _ai_steps(ctx: JobContext, rows: list[asyncpg.Record]) -> None:
                     profiles_stored.body,
                     usage,
                     prompts,
+                    storage,
                 )
             if cfg.extract_dependencies:
                 step.detail["dependencies"] = await run_dependencies(
-                    ctx, client, cfg, edgar, rows, profiles_stored.body, usage, prompts
+                    ctx, client, cfg, edgar, rows, profiles_stored.body, usage, prompts, storage
                 )
         step.usage = usage.step_usage()

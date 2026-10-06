@@ -167,6 +167,34 @@ look-through, coverage-ledger, characteristics-audit}`, `GET|PUT /funds/{isin}/f
 sec-xbrl, valuation-refresh, insider-trades, control-stakes, nport-holdings, etf-look-through,
 free-source-alerts}`.
 
+## Exposure builder (`exposure_build`)
+
+Weekly. Reads only public filings and the app's own archive; no extra key beyond
+`SEC_USER_AGENT`, `ANTHROPIC_API_KEY` and the Supabase storage secret.
+
+| Step | Source | Written |
+|---|---|---|
+| `geography` | SEC XBRL revenue by country (`segment_revenue`) | `exposure_mapping`, basis `reported`, origin `built` |
+| `products` | newest annual product-line revenue + AI mapping to HS headings | `exposure_mapping`, basis `estimated` (never mixed with reported weights) |
+| `filings` / inputs | newest 10-K / 20-F / 40-F text, or for issuers without an EDGAR report the newest archived results document (`evidence`) | `exposures` in the holding profile, `origin: ai`, with the verbatim quote and filing URL |
+| `filings` / dependencies | XBRL concentration facts (annual), then filing text + AI approval | `relationship_disclosure` (`origin` `xbrl_fact` or `ai_extraction`); confirmed by "AI approval" or left `suggested` |
+
+Every figure needs a quote that is in the document and prints the figure; a share is accepted
+only on the issuer's own revenue or purchases (a receivables share is stored with basis `other`
+and never counts toward concentration). Each document is read once (`filing_extraction`). An owner
+row or decision is never overwritten, and a row the owner removed is never added back.
+
+Series linking: commodity inputs link to the FRED commodity series added to the macro series
+defaults (`macro/commodity_series.py`: copper, aluminum, nickel, zinc, tin, iron ore, uranium,
+WTI, Brent, natural gas, wheat, maize, cotton, rubber, coffee); revenue currencies link to the
+stored ČNB / ECB fixings. An exposure with no stored series is listed as unlinked. The
+`macro_collect` job must be enabled with `FRED_API_KEY`.
+
+OECD: the OECD feeds stay behind their access gate and are **not** opened for this purpose.
+Country context comes from Eurostat (EU and the euro area), FRED (US) and, once its gate is
+opened by an audit, the World Bank; a country with none shows as a gap with the provider's reason
+on the macro panel.
+
 ## Free-source alert rules (D7.5)
 
 Configured under `free_source_alerts` in the **Event rules** config (`/config/event-rules`);

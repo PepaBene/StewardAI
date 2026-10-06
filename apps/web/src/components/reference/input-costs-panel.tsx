@@ -20,7 +20,7 @@ export function InputCostsPanel({ ticker }: { ticker: string }) {
     () => getBrowserApiClient().GET("/holdings/{ticker}/exposure-context", { params: { path: { ticker } } }),
     [ticker],
   );
-  const { state } = useApiResource(fetcher);
+  const { state, reload } = useApiResource(fetcher);
   const raw = state.kind === "ok" ? state.data : state.kind === "error" ? state.previous : null;
   const view = useMemo(() => (raw ? parseExposureInputs(raw) : null), [raw]);
 
@@ -43,20 +43,63 @@ export function InputCostsPanel({ ticker }: { ticker: string }) {
       ) : null}
 
       {view && view.assumptions.length > 0 ? (
-        <ul className="flex flex-wrap gap-x-5 gap-y-1 text-sm">
+        <ul className="flex flex-col gap-1.5 text-sm">
           {view.assumptions.map((a) => (
-            <li key={`${a.kind}|${a.name}`}>
+            <li key={`${a.kind}|${a.name}`} className="flex flex-wrap items-baseline gap-x-2">
               <span className="text-text-muted">{ASSUMPTION_LABEL[a.kind] ?? a.kind}:</span> {a.name}{" "}
-              <span className="num text-text-muted">{a.share === null ? "(share not entered)" : `(${formatPct(a.share, 0)}, your estimate)`}</span>
+              <span className="num text-text-muted">
+                {a.share === null
+                  ? "(share not disclosed)"
+                  : `(${formatPct(a.share, 0)}, ${a.origin === "ai" ? "reported in the filing" : "your estimate"})`}
+              </span>
+              {a.origin === "ai" ? (
+                <>
+                  <span className="text-xs text-text-muted">
+                    Added by the AI{a.period ? ` from ${a.period}` : ""}
+                    {a.sourceUrl ? (
+                      <>
+                        {" "}
+                        ·{" "}
+                        <a href={a.sourceUrl} target="_blank" rel="noreferrer" className="text-accent-ink hover:underline">
+                          source
+                        </a>
+                      </>
+                    ) : null}
+                  </span>
+                  {a.quote ? <q className="w-full text-xs text-text-muted">{a.quote}</q> : null}
+                </>
+              ) : (
+                <span className="text-xs text-text-muted">Entered by you</span>
+              )}
+              <button
+                type="button"
+                className="text-xs text-accent-ink hover:underline"
+                onClick={async () => {
+                  const result = await getBrowserApiClient().POST("/holdings/{ticker}/exposures/remove", {
+                    params: { path: { ticker } },
+                    body: { kind: a.kind, name: a.name },
+                  });
+                  if (!result.error) reload();
+                }}
+              >
+                {a.origin === "ai" ? "Overturn" : "Remove"}
+              </button>
             </li>
           ))}
         </ul>
       ) : null}
 
+      {view && view.unlinked.length > 0 ? (
+        <p className="max-w-[68ch] text-xs text-text-muted">
+          No stored price series for: {view.unlinked.map((u) => u.split(":")[1]).join(", ")}. They stay listed without a
+          chart rather than being given a stand-in.
+        </p>
+      ) : null}
+
       {view && view.assumptions.length > 0 && view.series.length === 0 ? (
         <p className="max-w-[68ch] text-sm text-text-muted">
-          No price series has been fetched for these exposures yet. The Alpha Vantage free allowance is shared, so this
-          fills only when you request it.
+          No price series is stored for these exposures yet. Commodity prices and currency fixings arrive with the macro
+          collection; other series come from Alpha Vantage, whose free allowance is shared, only when you request them.
         </p>
       ) : null}
 

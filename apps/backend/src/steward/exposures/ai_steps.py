@@ -8,11 +8,12 @@ import anthropic
 import asyncpg
 
 from steward.ai import Usage
-from steward.config.holding_profiles import HoldingProfilesConfig
+from steward.config.holding_profiles import HoldingProfile, HoldingProfilesConfig
 from steward.config.jobs import ExposureBuildSettings
 from steward.config.prompts import PromptsConfig
 from steward.config.store import ConfigConflictError, save_config
-from steward.exposures.filing_text import filing_text, latest_annual_filing
+from steward.exposures.archived import archived_text
+from steward.exposures.filing_text import FilingText, filing_text, latest_annual_filing
 from steward.exposures.hs import HS_SYSTEM, ask_hs, hs_weights, product_lines, write_hs
 from steward.exposures.inputs import (
     INPUTS_SYSTEM,
@@ -25,12 +26,16 @@ from steward.graph.dependencies import (
     APPROVE_SYSTEM,
     DEPENDENCY_SYSTEM,
     check_findings,
+    corroboration_notes,
     extract_dependencies,
     judge_dependencies,
     store_and_approve,
+    store_reported,
 )
+from steward.graph.jobs import load_graph_holdings
 from steward.jobs.runner import JobContext
 from steward.sources.edgar import EdgarClient, EdgarError
+from steward.storage import EvidenceStore
 
 
 async def _extracted(pool: asyncpg.Pool, ticker: str, accession: str, kind: str) -> bool:
@@ -58,6 +63,36 @@ async def _record(
         url,
         json.dumps(detail, default=str),
     )
+
+
+async def _source(
+    ctx: JobContext,
+    edgar: EdgarClient,
+    storage: EvidenceStore | None,
+    ticker: str,
+    profile: HoldingProfile | None,
+    kind: str,
+) -> FilingText | str | None:
+    """The text still to be read for this holding and extraction kind: its newest annual report,
+    or for an issuer with none on EDGAR its newest archived results document. A string is the
+    reason it cannot be read; None means nothing is left to read."""
+    try:
+        annual = await latest_annual_filing(ctx.pool, edgar, ticker, profile)
+        if annual is not None:
+            if await _extracted(ctx.pool, ticker, annual.accession, kind):
+                return None
+            found = await filing_text(edgar, ticker, annual)
+            return found or "annual report text too short to read"
+    except EdgarError as exc:
+        return f"filing not readable: {str(exc)[:80]}"
+    if storage is None:
+        return None
+    archived = await archived_text(ctx.pool, storage, ticker)
+    if isinstance(archived, FilingText) and await _extracted(
+        ctx.pool, ticker, archived.accession, kind
+    ):
+        return None
+    return archived
 
 
 async def run_products(
@@ -118,8 +153,10 @@ async def run_inputs(
     profiles: HoldingProfilesConfig,
     usage: Usage,
     prompts: PromptsConfig,
+    storage: EvidenceStore | None = None,
 ) -> dict[str, Any]:
-    """Currency and commodity rows from each holding's newest annual report."""
+    """Currency and commodity rows from each holding's newest annual report (or archived
+    results document)."""
     results: dict[str, Any] = {}
     done = 0
     for row in holdings:
@@ -129,18 +166,11 @@ async def run_inputs(
         profile = profiles.for_ticker(ticker)
         if profile is None:
             continue
-        try:
-            annual = await latest_annual_filing(ctx.pool, edgar, ticker, profile)
-            if annual is None:
-                continue
-            if await _extracted(ctx.pool, ticker, annual.accession, "exposure"):
-                continue
-            filing = await filing_text(edgar, ticker, annual)
-        except EdgarError as exc:
-            results[ticker] = f"filing not readable: {str(exc)[:80]}"
+        filing = await _source(ctx, edgar, storage, ticker, profile, "exposure")
+        if isinstance(filing, str):
+            results[ticker] = filing
             continue
         if filing is None:
-            results[ticker] = "annual report text too short to read"
             continue
         findings, _sections = await extract_inputs(
             client,
@@ -199,26 +229,28 @@ async def run_dependencies(
     profiles: HoldingProfilesConfig,
     usage: Usage,
     prompts: PromptsConfig,
+    storage: EvidenceStore | None = None,
 ) -> dict[str, Any]:
-    """Customer and supplier disclosures from each holding's newest annual report: stored as
-    suggested, confirmed when the reviewer approves, never over an owner decision."""
+    """Customer and supplier disclosures from each holding's newest annual report (or archived
+    results document): stored as suggested, confirmed when the reviewer approves, never over an
+    owner decision."""
     results: dict[str, Any] = {}
     done = 0
+    graph_holdings = await load_graph_holdings(ctx.pool)
+    for row in holdings:  # reported XBRL concentration needs no AI and no filing download
+        reported = await store_reported(ctx.pool, row["ticker"])
+        if reported["stored"]:
+            results[f"{row['ticker']} (xbrl)"] = reported
     for row in holdings:
         if done >= cfg.filings_per_run:
             break
         ticker = row["ticker"]
         profile = profiles.for_ticker(ticker)
-        try:
-            annual = await latest_annual_filing(ctx.pool, edgar, ticker, profile)
-            if annual is None or await _extracted(ctx.pool, ticker, annual.accession, "dependency"):
-                continue
-            filing = await filing_text(edgar, ticker, annual)
-        except EdgarError as exc:
-            results[ticker] = f"filing not readable: {str(exc)[:80]}"
+        filing = await _source(ctx, edgar, storage, ticker, profile, "dependency")
+        if isinstance(filing, str):
+            results[ticker] = filing
             continue
         if filing is None:
-            results[ticker] = "annual report text too short to read"
             continue
         name = await ctx.pool.fetchval(
             "select name from public.instrument where t212_ticker = $1", ticker
@@ -231,7 +263,11 @@ async def run_dependencies(
             usage,
             prompts.text("dependency_extract", DEPENDENCY_SYSTEM),
         )
-        checked = check_findings(found, filing, (str(name),) if name else ())
+        own_names = tuple(
+            next((h["names"] for h in graph_holdings if h["ticker"] == ticker), [str(name)])
+        )
+        checked = check_findings(found, filing, own_names)
+        notes = await corroboration_notes(ctx.pool, ticker, own_names, checked.kept, graph_holdings)
         verdicts = await judge_dependencies(
             client,
             cfg.model,
@@ -240,6 +276,7 @@ async def run_dependencies(
             checked.kept,
             usage,
             prompts.text("dependency_approve", APPROVE_SYSTEM),
+            notes,
         )
         counts = await store_and_approve(ctx.pool, filing, checked.kept, verdicts, cfg.model)
         results[ticker] = {**counts, "rejected": len(checked.rejected)}

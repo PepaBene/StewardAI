@@ -55,7 +55,11 @@ export function DisclosureCard({ d, onChanged }: { d: Disclosure; onChanged: () 
       <p className="text-xs text-text-muted">
         <SourceLink href={link} /> {d.source ? `· ${d.source}` : ""} {d.origin ? `· found by ${d.origin.replaceAll("_", " ")}` : ""}
       </p>
-      {d.decisionReason ? <p className="text-xs text-text-muted">Last decision: {d.decisionReason}</p> : null}
+      {d.decisionReason ? (
+        <p className="text-xs text-text-muted">
+          Decided by {d.decisionReason.startsWith("AI approval") ? "the AI" : "you"}: {d.decisionReason}
+        </p>
+      ) : null}
       <DecisionHistory kind="suggestion" id={d.id} />
       {d.ticker ? (
         <DecisionForm

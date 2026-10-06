@@ -8314,6 +8314,65 @@
         }
       }
     },
+    "/holdings/{ticker}/exposures/remove": {
+      "post": {
+        "tags": [
+          "holdings"
+        ],
+        "summary": "Remove Exposure",
+        "description": "Overturn an exposure the AI added (or remove one of your own). The builder never adds a\nremoved row back: it remembers what it wrote and sees that the row is gone.",
+        "operationId": "remove_exposure",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "ticker",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9._-]{1,32}$",
+              "title": "Ticker"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RemoveExposureRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RemoveExposureResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/holdings/{ticker}/company-research/diffbot": {
       "post": {
         "tags": [
@@ -23294,6 +23353,22 @@
             "type": "array",
             "title": "Observations"
           },
+          "linked_series": {
+            "items": {
+              "$ref": "#/components/schemas/ExposureSeries"
+            },
+            "type": "array",
+            "title": "Linked Series",
+            "default": []
+          },
+          "unlinked": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Unlinked",
+            "default": []
+          },
           "limitations": {
             "items": {
               "type": "string"
@@ -23311,7 +23386,7 @@
           "limitations"
         ],
         "title": "ExposureContextResponse",
-        "description": "`GET /holdings/{ticker}/exposure-context`. Assumptions are the holding-profile\nexposures dumped as JSON (a config shape, free-form here)."
+        "description": "`GET /holdings/{ticker}/exposure-context`. Assumptions are the holding-profile\nexposures dumped as JSON (a config shape, free-form here). `linked_series` are the stored\nseries that belong to those exposures; `unlinked` names exposures with no series."
       },
       "ExposureDimension": {
         "properties": {
@@ -23726,6 +23801,97 @@
           "holdings"
         ],
         "title": "ExposureRow"
+      },
+      "ExposureSeries": {
+        "properties": {
+          "exposure_kind": {
+            "type": "string",
+            "title": "Exposure Kind"
+          },
+          "exposure_name": {
+            "type": "string",
+            "title": "Exposure Name"
+          },
+          "series": {
+            "type": "string",
+            "title": "Series"
+          },
+          "label": {
+            "type": "string",
+            "title": "Label"
+          },
+          "unit": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Unit"
+          },
+          "currency": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Currency"
+          },
+          "source_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Url"
+          },
+          "points": {
+            "items": {
+              "$ref": "#/components/schemas/ExposureSeriesPoint"
+            },
+            "type": "array",
+            "title": "Points"
+          }
+        },
+        "additionalProperties": true,
+        "type": "object",
+        "required": [
+          "exposure_kind",
+          "exposure_name",
+          "series",
+          "label",
+          "points"
+        ],
+        "title": "ExposureSeries",
+        "description": "A stored series linked to one exposure (a commodity price or a currency fixing)."
+      },
+      "ExposureSeriesPoint": {
+        "properties": {
+          "date": {
+            "type": "string",
+            "format": "date",
+            "title": "Date"
+          },
+          "value": {
+            "type": "number",
+            "title": "Value"
+          }
+        },
+        "additionalProperties": true,
+        "type": "object",
+        "required": [
+          "date",
+          "value"
+        ],
+        "title": "ExposureSeriesPoint"
       },
       "ExposureView": {
         "properties": {
@@ -42142,6 +42308,42 @@
           "source"
         ],
         "title": "RelationshipReview"
+      },
+      "RemoveExposureRequest": {
+        "properties": {
+          "kind": {
+            "type": "string",
+            "title": "Kind"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          }
+        },
+        "type": "object",
+        "required": [
+          "kind",
+          "name"
+        ],
+        "title": "RemoveExposureRequest"
+      },
+      "RemoveExposureResponse": {
+        "properties": {
+          "ticker": {
+            "type": "string",
+            "title": "Ticker"
+          },
+          "removed": {
+            "type": "integer",
+            "title": "Removed"
+          }
+        },
+        "type": "object",
+        "required": [
+          "ticker",
+          "removed"
+        ],
+        "title": "RemoveExposureResponse"
       },
       "ReplayChange": {
         "properties": {

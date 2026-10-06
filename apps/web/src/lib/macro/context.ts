@@ -127,9 +127,25 @@ export type InputSeries = {
   knownAt: string | null;
 };
 
-export type InputAssumption = { kind: string; name: string; share: number | null };
+export type InputAssumption = {
+  kind: string;
+  name: string;
+  share: number | null;
+  /** Who decided: "ai" until you edit or remove the row; "owner" otherwise. */
+  origin: "ai" | "owner";
+  sourceUrl: string | null;
+  period: string | null;
+  quote: string | null;
+};
 
-export type ExposureInputs = { series: InputSeries[]; assumptions: InputAssumption[]; limitations: string[] };
+export type ExposureInputs = {
+  /** Series fetched on request (Alpha Vantage) and the stored series linked to an exposure. */
+  series: InputSeries[];
+  assumptions: InputAssumption[];
+  /** "kind:name" of exposures with no stored series. */
+  unlinked: string[];
+  limitations: string[];
+};
 
 const str = (v: unknown): string | null => (typeof v === "string" && v ? v : null);
 
@@ -150,8 +166,27 @@ export function parseExposureInputs(payload: components["schemas"]["ExposureCont
   }
   const series = [...byMetric.values()].map((s) => ({ ...s, points: dedupe(s.points) })).sort((a, b) => a.metric.localeCompare(b.metric));
   // `exposure_assumptions` rows are still free-form on the wire (the model leaves them open).
-  const assumptions: InputAssumption[] = payload.exposure_assumptions.map((e) => ({ kind: str(e.kind) ?? "other", name: str(e.name) ?? "Unnamed", share: toNumber(e.share) }));
-  return { series, assumptions, limitations: payload.limitations };
+  const assumptions: InputAssumption[] = payload.exposure_assumptions.map((e) => ({
+    kind: str(e.kind) ?? "other",
+    name: str(e.name) ?? "Unnamed",
+    share: toNumber(e.share),
+    origin: e.origin === "ai" ? "ai" : "owner",
+    sourceUrl: str(e.source_url),
+    period: str(e.period),
+    quote: str(e.quote),
+  }));
+  for (const s of payload.linked_series ?? []) {
+    if (s.points.length === 0) continue;
+    series.push({
+      metric: `${s.label} (for ${s.exposure_name})`,
+      unit: s.unit ?? null,
+      currency: s.currency ?? null,
+      points: s.points.map((p) => ({ date: p.date, value: p.value })),
+      sourceUrl: s.source_url ?? null,
+      knownAt: null,
+    });
+  }
+  return { series, assumptions, unlinked: payload.unlinked ?? [], limitations: payload.limitations };
 }
 
 /** One value per date (the last one wins), oldest first. */

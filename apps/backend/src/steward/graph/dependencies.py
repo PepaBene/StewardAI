@@ -8,6 +8,8 @@ purchases). A second model call then judges the survivors; only an approved row 
 only while it is still `suggested`: a row the owner decided is never touched.
 """
 
+import datetime as dt
+import json
 import re
 from dataclasses import dataclass, field
 from decimal import Decimal
@@ -114,17 +116,23 @@ Approve only when the quote itself says that the company sells to (customer) or 
 (supplier) that counterparty, the share is a part of the company's own revenue or purchases, and \
 the period matches the quote. Do not approve a relationship that is only possible ("we may \
 depend on"), a quote about a different company, or a figure whose basis is the counterparty's \
-revenue. When unsure, do not approve. Give confidence as your probability that the candidate is \
-right: above 0.9 only for a quote that states all of it plainly. Return one verdict per \
+revenue. A corroboration attribute means the counterparty's own filing states the mirror \
+relationship; it raises confidence but never replaces the quote. \
+When unsure, do not approve. Give confidence as your probability that the candidate is right: \
+ above 0.9 only for a quote that states all of it plainly. Return one verdict per \
 candidate, by its number, with a one-sentence reason that cites the passage.
 """
 
 
-def candidates_prompt(filing: FilingText, items: list[DependencyFinding]) -> str:
+def candidates_prompt(
+    filing: FilingText, items: list[DependencyFinding], notes: dict[int, str] | None = None
+) -> str:
+    notes = notes or {}
     body = "\n".join(
         f'<candidate index="{i}" relationship="{f.relationship}" '
         f'counterparty="{f.counterparty or "not named"}" '
-        f'share="{"" if f.share is None else f"{f.share:.4f}"}" period="{f.period or ""}">\n'
+        f'share="{"" if f.share is None else f"{f.share:.4f}"}" period="{f.period or ""}"'
+        f"{f' corroboration={chr(34)}{notes[i]}{chr(34)}' if i in notes else ''}>\n"
         f"{f.quote}\n</candidate>"
         for i, f in enumerate(items)
     )
@@ -175,13 +183,14 @@ async def judge_dependencies(
     items: list[DependencyFinding],
     usage: Usage,
     system: str = APPROVE_SYSTEM,
+    notes: dict[int, str] | None = None,
 ) -> dict[int, Verdict]:
     if not items:
         return {}
     response = await client.messages.parse(
         model=model,
         system=system,
-        messages=[{"role": "user", "content": candidates_prompt(filing, items)}],
+        messages=[{"role": "user", "content": candidates_prompt(filing, items, notes)}],
         output_format=Verdicts,
         **effort_kwargs(model, effort, 3000),
     )
@@ -279,3 +288,187 @@ async def store_and_approve(
             counts["left_suggested"] += 1
         await detect_contradictions(pool, row_id)
     return dict(counts)
+
+
+# ------------------------------------------------------------------ counterparty resolution
+
+MIRROR = {"customer": "supplier", "supplier": "customer"}
+
+
+def holding_for(name: str | None, holdings: list[dict[str, Any]], own: str) -> str | None:
+    """The ticker of the holding this counterparty name belongs to, if it is one."""
+    if not name:
+        return None
+    key = normalize_object_key(name)
+    for h in holdings:
+        if h["ticker"] != own and any(normalize_object_key(n) == key for n in h["names"]):
+            return str(h["ticker"])
+    return None
+
+
+async def corroboration_notes(
+    pool: asyncpg.Pool,
+    ticker: str,
+    issuer_names: tuple[str, ...],
+    items: list[DependencyFinding],
+    holdings: list[dict[str, Any]],
+) -> dict[int, str]:
+    """For a counterparty that is itself a holding: does its own filing state the mirror
+    relationship about this issuer (A sells to B <-> B buys from A)?"""
+    keys = [normalize_object_key(n) for n in issuer_names]
+    notes: dict[int, str] = {}
+    for i, f in enumerate(items):
+        other = holding_for(f.counterparty, holdings, ticker)
+        if other is None:
+            continue
+        found = await pool.fetchval(
+            "select exists(select 1 from public.relationship_disclosure where ticker = $1"
+            " and relationship = $2 and counterparty_key_norm = any($3::text[])"
+            " and status <> 'rejected')",
+            other,
+            MIRROR[f.relationship],
+            keys,
+        )
+        notes[i] = (
+            f"{other} is a holding and its own filing states the mirror relationship"
+            if found
+            else f"{other} is a holding; its filing states no mirror relationship yet"
+        )
+    return notes
+
+
+# ---------------------------------------------------------------------- XBRL concentration
+
+ANONYMOUS_MEMBER = re.compile(
+    r"(?i)^(top|major|largest|significant|customer|vendor|supplier|one|two|three|four|five|"
+    r"a|b|c|d|\d+)( |$)"
+)
+GROUP_WORDS = re.compile(
+    r"(?i)carriers|distributors|resellers|retailers|customers|suppliers|vendors|channel|"
+    r"others|government|segment"
+)
+REVENUE_BENCHMARK = re.compile(r"(?i)revenue|sales")
+PURCHASE_BENCHMARK = re.compile(r"(?i)purchase|costofgoods|costofrevenue|costofsales")
+
+
+def member_words(member: str) -> str:
+    local = member.rsplit(":", 1)[-1].removesuffix("Member")
+    return " ".join(re.sub(r"([a-z])([A-Z])", r"\1 \2", local).split())
+
+
+@dataclass(frozen=True)
+class ReportedConcentration:
+    relationship: Literal["customer", "supplier"]
+    counterparty: str | None
+    share: Decimal
+    basis: str
+    period_start: dt.date
+    period_end: dt.date
+    passage: str
+    source_url: str
+    accession: str
+
+
+def reported_concentrations(rows: list[asyncpg.Record]) -> list[ReportedConcentration]:
+    """Disclosures from XBRL concentration facts of annual periods. A named counterparty must
+    be one entity (a group such as "carriers" is skipped); a share is on the issuer's revenue or
+    purchases only when the benchmark says so, otherwise (receivables, say) its basis is
+    `other` and it never counts toward concentration."""
+    out: list[ReportedConcentration] = []
+    for r in rows:
+        raw = r["members"]
+        members = dict(json.loads(raw) if isinstance(raw, str) else (raw or []))
+        who = next((m for a, m in members.items() if a.endswith("MajorCustomersAxis")), None)
+        if who is None:
+            continue
+        words = member_words(who)
+        if GROUP_WORDS.search(words) and not ANONYMOUS_MEMBER.match(words):
+            continue
+        benchmark = next((m for a, m in members.items() if "BenchmarkAxis" in a), "")
+        kind = " ".join(members.values())
+        supplier = bool(re.search(r"(?i)vendor|supplier", words + kind))
+        relationship: Literal["customer", "supplier"] = "supplier" if supplier else "customer"
+        if REVENUE_BENCHMARK.search(benchmark) and not supplier:
+            basis = "issuer_revenue"
+        elif PURCHASE_BENCHMARK.search(benchmark) and supplier:
+            basis = "issuer_purchases"
+        else:
+            basis = "other"
+        anonymous = bool(ANONYMOUS_MEMBER.match(words))
+        share = Decimal(str(r["value"]))
+        if not Decimal(0) <= share <= Decimal(1):
+            continue
+        what = member_words(benchmark) or "unspecified benchmark"
+        out.append(
+            ReportedConcentration(
+                relationship,
+                None if anonymous else words,
+                share,
+                basis,
+                r["period_start"],
+                r["period_end"],
+                f"XBRL fact {r['concept']}: {share:.0%} for {words} ({what}) "
+                f"over {r['period_start']} to {r['period_end']}.",
+                r["source_url"],
+                r["accession"],
+            )
+        )
+    return out
+
+
+async def store_reported(pool: asyncpg.Pool, ticker: str) -> dict[str, int]:
+    """Annual XBRL concentration facts of the newest fiscal year as disclosures. They are
+    reported figures, so a dated, directed one is confirmed at once (the policy is recorded in
+    the decision reason); the owner can still overturn it."""
+    rows = await pool.fetch(
+        """select concept, value, period_start, period_end, dimensions->'members' as members,
+                  accession, source_url
+           from public.financial_statement_fact
+           where ticker = $1 and line_item = 'customer_concentration'
+             and period_end - period_start between 350 and 380
+             and period_end = (select max(period_end) from public.financial_statement_fact
+                               where ticker = $1 and line_item = 'customer_concentration'
+                                 and period_end - period_start between 350 and 380)""",
+        ticker,
+    )
+    counts = {"stored": 0, "confirmed": 0, "owner_decided": 0}
+    for c in reported_concentrations(rows):
+        key = normalize_object_key(c.counterparty) if c.counterparty else None
+        row_id = await upsert_disclosure(
+            pool,
+            ticker=ticker,
+            relationship=c.relationship,
+            direction=DIRECTION[c.relationship],  # type: ignore[arg-type]
+            passage=c.passage,
+            source_url=c.source_url,
+            source=f"XBRL {c.accession}",
+            counterparty_key=key,
+            counterparty_name=c.counterparty,
+            anonymous_counterparty=c.counterparty is None,
+            reported_share=c.share,
+            share_basis=c.basis,
+            fiscal_period=f"FY{c.period_end.year}",
+            valid_from=c.period_start,
+            valid_to=c.period_end,
+            origin="xbrl_fact",
+        )
+        counts["stored"] += 1
+        status = await pool.fetchval(
+            "select status from public.relationship_disclosure where id = $1", row_id
+        )
+        if status != "suggested":
+            counts["owner_decided"] += 1
+            continue
+        try:
+            await decide_disclosure(
+                pool,
+                row_id,
+                "confirm",
+                reason="AI approval (policy: reported XBRL fact with a dated period and a "
+                "known direction is confirmed; basis stored as tagged)",
+            )
+            counts["confirmed"] += 1
+        except GraphDecisionError:
+            pass
+        await detect_contradictions(pool, row_id)
+    return counts

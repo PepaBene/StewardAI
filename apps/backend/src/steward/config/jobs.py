@@ -9,6 +9,7 @@ from pydantic import AnyHttpUrl, Field, field_validator, model_validator
 
 from steward.config.common import ConfigModel, Ticker, require_unique
 from steward.config.holding_profiles import Domain
+from steward.macro.commodity_series import COMMODITY_FRED
 
 
 class JobSchedule(ConfigModel):
@@ -793,6 +794,10 @@ class MacroSettings(ConfigModel):
             FredSeries(key="us_unemployment", label="US unemployment rate", series_id="UNRATE"),
             FredSeries(
                 key="fed_funds", label="Fed funds effective rate", series_id="DFF", policy_rate=True
+            ),
+            *(
+                FredSeries(key=key, label=label, series_id=series_id, unit=unit)
+                for key, label, series_id, unit, _words in COMMODITY_FRED
             ),
         ]
     )

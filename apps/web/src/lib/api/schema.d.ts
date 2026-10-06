@@ -2794,6 +2794,27 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/holdings/{ticker}/exposures/remove": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Remove Exposure
+         * @description Overturn an exposure the AI added (or remove one of your own). The builder never adds a
+         *     removed row back: it remembers what it wrote and sees that the row is gone.
+         */
+        post: operations["remove_exposure"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/holdings/{ticker}/company-research/diffbot": {
         parameters: {
             query?: never;
@@ -8105,7 +8126,8 @@ export interface components {
         /**
          * ExposureContextResponse
          * @description `GET /holdings/{ticker}/exposure-context`. Assumptions are the holding-profile
-         *     exposures dumped as JSON (a config shape, free-form here).
+         *     exposures dumped as JSON (a config shape, free-form here). `linked_series` are the stored
+         *     series that belong to those exposures; `unlinked` names exposures with no series.
          */
         ExposureContextResponse: {
             /** Ticker */
@@ -8116,6 +8138,16 @@ export interface components {
             }[];
             /** Observations */
             observations: components["schemas"]["ExposureObservation"][];
+            /**
+             * Linked Series
+             * @default []
+             */
+            linked_series: components["schemas"]["ExposureSeries"][];
+            /**
+             * Unlinked
+             * @default []
+             */
+            unlinked: string[];
             /** Limitations */
             limitations: string[];
         } & {
@@ -8246,6 +8278,42 @@ export interface components {
             };
             /** Holdings */
             holdings: number;
+        };
+        /**
+         * ExposureSeries
+         * @description A stored series linked to one exposure (a commodity price or a currency fixing).
+         */
+        ExposureSeries: {
+            /** Exposure Kind */
+            exposure_kind: string;
+            /** Exposure Name */
+            exposure_name: string;
+            /** Series */
+            series: string;
+            /** Label */
+            label: string;
+            /** Unit */
+            unit?: string | null;
+            /** Currency */
+            currency?: string | null;
+            /** Source Url */
+            source_url?: string | null;
+            /** Points */
+            points: components["schemas"]["ExposureSeriesPoint"][];
+        } & {
+            [key: string]: unknown;
+        };
+        /** ExposureSeriesPoint */
+        ExposureSeriesPoint: {
+            /**
+             * Date
+             * Format: date
+             */
+            date: string;
+            /** Value */
+            value: number;
+        } & {
+            [key: string]: unknown;
         };
         /** ExposureView */
         ExposureView: {
@@ -14696,6 +14764,20 @@ export interface components {
             status: "suggested" | "confirmed" | "rejected" | "disputed";
             /** Decision Reason */
             decision_reason?: string | null;
+        };
+        /** RemoveExposureRequest */
+        RemoveExposureRequest: {
+            /** Kind */
+            kind: string;
+            /** Name */
+            name: string;
+        };
+        /** RemoveExposureResponse */
+        RemoveExposureResponse: {
+            /** Ticker */
+            ticker: string;
+            /** Removed */
+            removed: number;
         };
         /** ReplayChange */
         ReplayChange: {
@@ -22147,6 +22229,41 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ExposureContextResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    remove_exposure: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                ticker: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RemoveExposureRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RemoveExposureResponse"];
                 };
             };
             /** @description Validation Error */
