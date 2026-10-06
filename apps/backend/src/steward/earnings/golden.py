@@ -249,16 +249,21 @@ def _save(directory: Path, case_id: str, model: str, result: ExtractionResult) -
 
 
 async def evaluate(
-    cases: list[GoldenCase], extractor: Extractor, record: Path | None = None
+    cases: list[GoldenCase],
+    extractor: Extractor,
+    record: Path | None = None,
+    concurrency: int = 4,
 ) -> list[CaseScore]:
-    scores = []
-    for case in cases:
+    """Scores in case order; the cases run `concurrency` at a time (the calls are independent)."""
+    gate = asyncio.Semaphore(concurrency)
+
+    async def one(case: GoldenCase) -> CaseScore:
         text = case.document.text()
         try:
-            result, usage = await extractor.extract(case.document, text, case.request())
+            async with gate:
+                result, usage = await extractor.extract(case.document, text, case.request())
         except Exception as exc:  # one bad case must not end the run
-            scores.append(CaseScore(case.id, expected=len(case.figures), error=str(exc)))
-            continue
+            return CaseScore(case.id, expected=len(case.figures), error=str(exc))
         if record is not None:
             _save(record, case.id, usage.model, result)
         validated = validate(
@@ -275,8 +280,9 @@ async def evaluate(
         score.verdicts = {
             f"{d.kpi_id} {d.period or '-'}": d.status for d in verdicts_for(case, validated)
         }
-        scores.append(score)
-    return scores
+        return score
+
+    return list(await asyncio.gather(*(one(case) for case in cases)))
 
 
 def summarise(scores: list[CaseScore]) -> dict[str, Any]:

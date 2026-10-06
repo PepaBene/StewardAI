@@ -1,0 +1,21 @@
+{
+  "description": "Live eval results per model-facing component; see steward/verify/evals_gate.py. Written by --write-baseline, only when every changed component passed.",
+  "recorded_at": "2026-10-06T07:52:14+00:00",
+  "components": {
+    "claims": {
+      "fingerprint": "a361d6b0e12987ca5cb96ed6765af2d17ec7dc99b2f219483bac092496eecb3c",
+      "score": 1.0,
+      "model": "claude-haiku-4-5"
+    },
+    "classification": {
+      "fingerprint": "0147620666dc0c1e29aa5c980a5d6cce588794ac25acec7029becdb9e2603f0e",
+      "score": 0.97,
+      "model": "claude-haiku-4-5"
+    },
+    "earnings": {
+      "fingerprint": "5bfea154430d9924e0bc6e9e906f3732a05ea0f647844c737c408735ad3e1a7a",
+      "score": 1.0,
+      "model": "claude-sonnet-5"
+    }
+  }
+}

@@ -82,8 +82,8 @@
       "id": "clm-12",
       "kind": "numeric",
       "evidence": ["The Czech National Bank left its two-week repo rate unchanged at 3.50%."],
-      "supported": "The Czech National Bank held its main rate at 3.50%.",
-      "injected": "The Czech National Bank held its main rate at 3.75%."
+      "supported": "The Czech National Bank held its two-week repo rate at 3.50%.",
+      "injected": "The Czech National Bank held its two-week repo rate at 3.75%."
     },
     {
       "id": "clm-13",

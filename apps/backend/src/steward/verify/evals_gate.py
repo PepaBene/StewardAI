@@ -61,10 +61,20 @@ class Component:
     extra: Callable[[], str] = lambda: ""
 
 
+# The gate scores a small, fixed sample of the golden set (one case per company with a short
+# document, different layouts) to keep a live run to a few minutes and a few cents; `--full`
+# scores all of it (about $2-3). Both modes use the same fingerprint rule: only the cases
+# that are scored are hashed, so a baseline written in one mode is re-run in the other.
+GATE_EARNINGS_CASES = ("aapl-fy2026-q1", "nvda-fy2027-q1", "sap-fy2026-q1")
+FULL_EARNINGS = False
+
+
 def _golden_files() -> tuple[Path, ...]:
-    """Each golden case's labels and the source document it references."""
+    """Each scored golden case's labels and the source document it references."""
     files: list[Path] = []
     for case in sorted((BACKEND / "tests" / "golden" / "earnings").glob("*/case.json")):
+        if not FULL_EARNINGS and case.parent.name not in GATE_EARNINGS_CASES:
+            continue
         files.append(case)
         document = json.loads(case.read_text(encoding="utf-8")).get("document")
         if document:
@@ -133,7 +143,7 @@ async def live_score(name: str) -> float:
         from steward.earnings.golden import evaluate, load_cases, summarise
 
         settings = EarningsCheckSettings()
-        cases = load_cases()
+        cases = [c for c in load_cases() if FULL_EARNINGS or c.id in GATE_EARNINGS_CASES]
         extractor = ClaudeExtractor(client, settings.extraction_model, settings.effort)
         return float(summarise(await evaluate(cases, extractor))["accuracy"])
     if name == "classification":
@@ -236,7 +246,12 @@ def write_baseline(result: GateResult, path: Path = BASELINE) -> None:
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
     parser.add_argument("--write-baseline", action="store_true")
+    parser.add_argument(
+        "--full", action="store_true", help="score every golden earnings case (about $2-3)"
+    )
     args = parser.parse_args(argv)
+    global FULL_EARNINGS
+    FULL_EARNINGS = args.full
     have_key = bool(os.environ.get("ANTHROPIC_API_KEY"))
     if args.write_baseline and not have_key:
         print("--write-baseline needs ANTHROPIC_API_KEY: it records live results")
