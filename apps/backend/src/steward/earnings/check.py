@@ -45,6 +45,7 @@ from steward.earnings.schema import ExtractedFigure
 from steward.earnings.store import archive, load_known, load_owner_rejected, store_facts
 from steward.earnings.validate import ValidationContext, validate
 from steward.earnings.verdicts import run_verdicts
+from steward.earnings.xbrl_figures import figures_from_facts, filing_of
 from steward.jobs.runner import JobContext, JobFailed
 from steward.llm.client import create_llm
 from steward.llm.routing import routing_client
@@ -319,28 +320,32 @@ async def earnings_check(ctx: JobContext, deps: EarningsDeps) -> None:
 
     async with ctx.step("extract") as step:
         budget.spend("the extraction call")
+        from_xbrl = await _filing_figures(deps, settings, located.url, ticker, text, set(wanted))
+        remaining = [m for m in wanted if m not in {f.metric for f in from_xbrl}]
         request = ExtractionRequest(
             ticker=ticker,
             company_name=company,
             report_date=report_date,
             fye_month=profile.fiscal_year_end_month,
             expected_period=expected,
-            metrics=[(m, metric_names.describe(m, kpi_descriptions)) for m in wanted],
+            metrics=[(m, metric_names.describe(m, kpi_descriptions)) for m in remaining],
             reporting_currency=profile.reporting_currency,
         )
-        try:
-            result, usage = await deps.extractor.extract(document, text, request)
-        except ExtractionError as exc:
-            _record_failed_usage(step, exc.usage)
-            raise JobFailed(str(exc)) from exc
-        step.usage = usage.step_usage()
-        figures, dropped = _usable(result.figures, set(wanted))
+        extracted: list[ExtractedFigure] = list(from_xbrl)
+        if remaining:
+            try:
+                result, usage = await deps.extractor.extract(document, text, request)
+            except ExtractionError as exc:
+                _record_failed_usage(step, exc.usage)
+                raise JobFailed(str(exc)) from exc
+            step.usage = usage.step_usage()
+            extracted += result.figures
+            step.detail.update(
+                model=usage.model, document_kind=result.document_kind, not_found=result.not_found
+            )
+        figures, dropped = _usable(extracted, set(wanted))
         step.detail.update(
-            model=usage.model,
-            document_kind=result.document_kind,
-            figures=len(result.figures),
-            dropped_unrequested=dropped,
-            not_found=result.not_found,
+            figures=len(extracted), from_xbrl=len(from_xbrl), dropped_unrequested=dropped
         )
 
     async with ctx.step("validate_and_store") as step:
@@ -388,6 +393,27 @@ async def earnings_check(ctx: JobContext, deps: EarningsDeps) -> None:
                 ticker,
                 report_date,
             )
+
+
+async def _filing_figures(
+    deps: EarningsDeps,
+    settings: EarningsCheckSettings,
+    url: str,
+    ticker: str,
+    text: str,
+    wanted: set[str],
+) -> list[ExtractedFigure]:
+    """The standard figures of a 10-Q / 10-K document, from its XBRL (setting-gated); empty
+    for anything else, so the model extraction runs as before."""
+    filing = filing_of(url)
+    if not settings.xbrl_for_filings or deps.edgar is None or filing is None:
+        return []
+    cik, accession = filing
+    try:
+        facts = await deps.edgar.company_facts(cik)
+    except (EdgarError, httpx.HTTPError):
+        return []
+    return figures_from_facts(facts, accession, text, wanted)
 
 
 async def _locate(

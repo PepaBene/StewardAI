@@ -182,6 +182,12 @@ class EarningsCheckSettings(ConfigModel):
         "release (the spec's +1, retry at +2 and +4).",
     )
     max_document_mb: int = Field(default=20, ge=1, le=32)
+    xbrl_for_filings: bool = Field(
+        default=True,
+        description="When the document is a 10-Q or 10-K already on EDGAR, take the standard"
+        " figures from its XBRL (each still validated against the document text) and call the"
+        " model only for the rest. Not measured against a golden set yet.",
+    )
     kpi_history_periods: int = Field(
         default=8,
         ge=1,
@@ -211,7 +217,7 @@ class EarningsCalendarSettings(ConfigModel):
         "those with no date); the quarterly run refreshes every holding.",
     )
     use_batch: bool = Field(
-        default=False,
+        default=True,
         description="Read the IR pages in one provider batch (about half the price, results "
         "within hours). Only for OpenAI and Google models.",
     )
@@ -261,7 +267,7 @@ class AiApprovalSettings(ConfigModel):
         "the rest. Each decision records whether a rule or the model made it.",
     )
     use_batch: bool = Field(
-        default=False,
+        default=True,
         description="Judge the suggestions side by side and send them as one provider batch, "
         "about half the price. Only for OpenAI and Google models.",
     )
@@ -312,7 +318,7 @@ class IrDiscoverySettings(ConfigModel):
     )
     holdings_per_run: int = Field(default=6, ge=1, le=40)
     use_batch: bool = Field(
-        default=False,
+        default=True,
         description="Run the holdings side by side and send each round of calls (all the "
         "searches, then all the judgements) as one provider batch, about half the price. Only "
         "for OpenAI and Google models; the run waits for the batch.",
@@ -396,7 +402,7 @@ class GapResearchSettings(ConfigModel):
     max_searches: int = Field(default=3, ge=1, le=10, description="Web searches per slot.")
     slots_per_run: int = Field(default=8, ge=1, le=60, description="Cost guard per run.")
     use_batch: bool = Field(
-        default=False,
+        default=True,
         description="Run the slots side by side and send each round of calls as one provider "
         "batch, about half the price. Only for OpenAI and Google models.",
     )
@@ -485,7 +491,7 @@ class NewsSettings(ConfigModel):
         default=50, ge=5, le=100, description="Items per classification call."
     )
     classification_use_batch: bool = Field(
-        default=False,
+        default=True,
         description="Send a run's classification calls through the provider's batch API (half"
         " price, answers within minutes to hours) when the model is an OpenAI or Google one."
         " A group the batch does not answer is classified directly. Off: every call is direct,"

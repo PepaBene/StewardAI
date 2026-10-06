@@ -38,7 +38,7 @@ def test_no_answer_is_reported() -> None:
 
 def test_batch_is_off_by_default_and_request_carries_the_page() -> None:
     settings = EarningsCalendarSettings()
-    assert settings.use_batch is False
+    assert settings.use_batch is True
     request = calendar_request(settings, "system", URL, TEXT, TODAY)
     assert request.schema is CalendarPage
     assert TEXT in request.messages[0].text

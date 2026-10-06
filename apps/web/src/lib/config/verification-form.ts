@@ -44,6 +44,8 @@ export const DEFAULT_VERIFICATION: VerificationConfig = {
     effort: null,
     mode: "strip",
     numeric_check: true,
+    date_check: true,
+    quote_check: true,
     applies_to: [...CLAIM_TARGETS],
   },
 };

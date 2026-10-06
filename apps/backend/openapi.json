@@ -14592,6 +14592,12 @@
             "title": "Max Calls Per Run",
             "default": 40
           },
+          "use_sic": {
+            "type": "boolean",
+            "title": "Use Sic",
+            "description": "Look up each peer candidate's SEC industry code (SIC). A candidate with the holding's four-digit code that the owner also names as a competitor is confirmed in code; the model sees every code as extra evidence and decides the rest.",
+            "default": true
+          },
           "rules_first": {
             "type": "boolean",
             "title": "Rules First",
@@ -14602,7 +14608,7 @@
             "type": "boolean",
             "title": "Use Batch",
             "description": "Judge the suggestions side by side and send them as one provider batch, about half the price. Only for OpenAI and Google models.",
-            "default": false
+            "default": true
           },
           "batch_wait_minutes": {
             "type": "integer",
@@ -21408,7 +21414,7 @@
             "type": "boolean",
             "title": "Use Batch",
             "description": "Read the IR pages in one provider batch (about half the price, results within hours). Only for OpenAI and Google models.",
-            "default": false
+            "default": true
           },
           "batch_wait_minutes": {
             "type": "integer",
@@ -21553,6 +21559,12 @@
             "minimum": 1.0,
             "title": "Max Document Mb",
             "default": 20
+          },
+          "xbrl_for_filings": {
+            "type": "boolean",
+            "title": "Xbrl For Filings",
+            "description": "When the document is a 10-Q or 10-K already on EDGAR, take the standard figures from its XBRL (each still validated against the document text) and call the model only for the rest. Not measured against a golden set yet.",
+            "default": true
           },
           "kpi_history_periods": {
             "type": "integer",
@@ -27652,7 +27664,7 @@
             "type": "boolean",
             "title": "Use Batch",
             "description": "Run the slots side by side and send each round of calls as one provider batch, about half the price. Only for OpenAI and Google models.",
-            "default": false
+            "default": true
           },
           "batch_wait_minutes": {
             "type": "integer",
@@ -32203,7 +32215,7 @@
             "type": "boolean",
             "title": "Use Batch",
             "description": "Run the holdings side by side and send each round of calls (all the searches, then all the judgements) as one provider batch, about half the price. Only for OpenAI and Google models; the run waits for the batch.",
-            "default": false
+            "default": true
           },
           "batch_wait_minutes": {
             "type": "integer",
@@ -37026,7 +37038,7 @@
             "type": "boolean",
             "title": "Classification Use Batch",
             "description": "Send a run's classification calls through the provider's batch API (half price, answers within minutes to hours) when the model is an OpenAI or Google one. A group the batch does not answer is classified directly. Off: every call is direct, so a severe item is labelled at once.",
-            "default": false
+            "default": true
           },
           "classification_batch_wait_minutes": {
             "type": "number",

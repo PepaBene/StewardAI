@@ -4766,6 +4766,12 @@ export interface components {
              */
             max_calls_per_run: number;
             /**
+             * Use Sic
+             * @description Look up each peer candidate's SEC industry code (SIC). A candidate with the holding's four-digit code that the owner also names as a competitor is confirmed in code; the model sees every code as extra evidence and decides the rest.
+             * @default true
+             */
+            use_sic: boolean;
+            /**
              * Rules First
              * @description Settle a listing in code when the market suffix, ISIN country and symbol all agree (confirm) or the suffix and symbol both fail (reject); the AI only judges the rest. Each decision records whether a rule or the model made it.
              * @default true
@@ -4774,7 +4780,7 @@ export interface components {
             /**
              * Use Batch
              * @description Judge the suggestions side by side and send them as one provider batch, about half the price. Only for OpenAI and Google models.
-             * @default false
+             * @default true
              */
             use_batch: boolean;
             /**
@@ -7305,7 +7311,7 @@ export interface components {
             /**
              * Use Batch
              * @description Read the IR pages in one provider batch (about half the price, results within hours). Only for OpenAI and Google models.
-             * @default false
+             * @default true
              */
             use_batch: boolean;
             /**
@@ -7385,6 +7391,12 @@ export interface components {
              * @default 20
              */
             max_document_mb: number;
+            /**
+             * Xbrl For Filings
+             * @description When the document is a 10-Q or 10-K already on EDGAR, take the standard figures from its XBRL (each still validated against the document text) and call the model only for the rest. Not measured against a golden set yet.
+             * @default true
+             */
+            xbrl_for_filings: boolean;
             /**
              * Kpi History Periods
              * @description Past periods (quarters or years) judged for each KPI's history.
@@ -9680,7 +9692,7 @@ export interface components {
             /**
              * Use Batch
              * @description Run the slots side by side and send each round of calls as one provider batch, about half the price. Only for OpenAI and Google models.
-             * @default false
+             * @default true
              */
             use_batch: boolean;
             /**
@@ -11168,7 +11180,7 @@ export interface components {
             /**
              * Use Batch
              * @description Run the holdings side by side and send each round of calls (all the searches, then all the judgements) as one provider batch, about half the price. Only for OpenAI and Google models; the run waits for the batch.
-             * @default false
+             * @default true
              */
             use_batch: boolean;
             /**
@@ -12942,7 +12954,7 @@ export interface components {
             /**
              * Classification Use Batch
              * @description Send a run's classification calls through the provider's batch API (half price, answers within minutes to hours) when the model is an OpenAI or Google one. A group the batch does not answer is classified directly. Off: every call is direct, so a severe item is labelled at once.
-             * @default false
+             * @default true
              */
             classification_use_batch: boolean;
             /**

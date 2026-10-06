@@ -21,7 +21,7 @@ const FULL = {
   max_report_lag_days: 120,
   corroboration: { tier1_confirms_alone: false, independent_sources_to_confirm: 3 },
   trust: { wrong_penalty: 0.25, useful_reward: 0.1, demote_below: 0.5 },
-  claim_verifier: { enabled: false, model: "claude-sonnet-5", effort: "low", mode: "mark", numeric_check: false, applies_to: ["weekly_digest", "escalation"] },
+  claim_verifier: { enabled: false, model: "claude-sonnet-5", effort: "low", mode: "mark", numeric_check: false, date_check: true, quote_check: true, applies_to: ["weekly_digest", "escalation"] },
   future_field: { kept: true },
 } as unknown as VerificationConfig;
 
