@@ -4,6 +4,7 @@ generateContent. Pure functions (no network), so they are tested against recorde
 import copy
 import json
 import logging
+import re
 from collections.abc import Sequence
 from typing import Any
 from urllib.parse import urlparse
@@ -447,6 +448,16 @@ GROUNDING_HOST = "vertexaisearch.cloud.google.com"
 def is_grounding_redirect(url: str) -> bool:
     """A Google Search grounding link (it redirects to the cited page)."""
     return _host(url) == GROUNDING_HOST
+
+
+_REDIRECT_IN_TEXT = re.compile(
+    r"https://vertexaisearch\.cloud\.google\.com/grounding-api-redirect/[A-Za-z0-9_\-=%]+"
+)
+
+
+def grounding_redirects_in(text: str) -> list[str]:
+    """Grounding redirect links quoted in an answer's text, in order."""
+    return _REDIRECT_IN_TEXT.findall(text)
 
 
 def dedupe(citations: list[Citation]) -> list[Citation]:

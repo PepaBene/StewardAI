@@ -210,6 +210,30 @@ async def test_google_answer_urls_quoting_a_redirect_are_rewritten_to_the_real_p
     assert done.parsed == Link(url="https://www.sec.gov/real")
 
 
+async def test_redirects_quoted_without_grounding_metadata_become_citations() -> None:
+    redirect = "https://vertexaisearch.cloud.google.com/grounding-api-redirect/BBB-c_d="
+    dead = "https://vertexaisearch.cloud.google.com/grounding-api-redirect/DEAD"
+    answer = {
+        "candidates": [
+            {
+                "finishReason": "STOP",
+                "content": {"parts": [{"text": f"IR site: {redirect} and also {dead}."}]},
+            }
+        ]
+    }
+
+    def handler(request_: httpx.Request) -> httpx.Response:
+        if request_.url.path.endswith("/DEAD"):
+            return httpx.Response(404)
+        return httpx.Response(302, headers={"location": "https://www.example.com/investors"})
+
+    llm = LLM(http=httpx.AsyncClient(transport=httpx.MockTransport(handler)))
+    req = request(model="gemini-3.8-flash", schema=None, search=SearchSpec(allowed_domains=()))
+    done = await llm._resolve_google(req, wire.google_completion(req, answer))
+    assert [c.url for c in done.citations] == ["https://www.example.com/investors"]
+    assert "https://www.example.com/investors" in done.text and "BBB" not in done.text
+
+
 def _google_search_then_schema_handler(calls: list[dict[str, Any]]) -> Any:
     def handler(request_: httpx.Request) -> httpx.Response:
         import json

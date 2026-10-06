@@ -188,21 +188,35 @@ class LLM:
         fall back to the domain in the title), then split kept from off-list citations again
         by the request's allowed domains, which could not be done on the redirect host."""
         every = [*done.citations, *done.off_list_citations]
+        # Gemini sometimes searches and quotes the redirect links in its answer but returns no
+        # grounding metadata: those links are the sources, so they are resolved the same way.
+        listed = {c.url for c in every}
+        quoted = [
+            Citation(url, "")
+            for url in dict.fromkeys(wire.grounding_redirects_in(done.text))
+            if url not in listed
+        ]
+        every += quoted
         if not any(wire.is_grounding_redirect(c.url) for c in every):
             return done
         resolved = [await self._real_url(c) for c in every]
         # The model quotes the redirect links it was shown in its answer: write the real
-        # URLs there too, so a job that checks its answer against the citations matches them.
+        # URLs there too, so a job that checks its answer against the citations matches them
+        # (and a follow-up call that is handed this answer sees real addresses).
         swaps = {
             old.url: new.url for old, new in zip(every, resolved, strict=True) if old.url != new.url
         }
-        if swaps and done.parsed is not None:
-            text = done.text
-            for old_url, new_url in swaps.items():
-                text = text.replace(old_url, new_url)
-            if text != done.text:
-                done.text = text
+        text = done.text
+        for old_url, new_url in swaps.items():
+            text = text.replace(old_url, new_url)
+        if text != done.text:
+            done.text = text
+            if done.parsed is not None:
                 done.parsed = type(done.parsed).model_validate_json(text)
+        # A quoted link that could not be resolved names no page: drop it.
+        resolved = [c for c in resolved if not wire.is_grounding_redirect(c.url)] + [
+            c for c in resolved if wire.is_grounding_redirect(c.url) and c.title
+        ]
         domains = req.search.allowed_domains if req.search else ()
         done.citations = wire.dedupe([c for c in resolved if wire.allowed(c.url, domains)])
         done.off_list_citations = wire.dedupe(
@@ -488,9 +502,12 @@ def _finish_request(req: Request, found: Completion) -> Request:
     # The shape is stated here too: Gemini's batch mode does not always apply the schema.
     shape = json.dumps(req.schema.model_json_schema()) if req.schema is not None else "{}"
     if sources:
+        # Same-site pages are allowed too: a search often cites a site's results page but
+        # not its home page, which the answer above may still name.
         listed = (
             "Sources the search returned (any URL in your answer must be one of these, "
-            f"written exactly as here):\n{sources}"
+            "written exactly as here, or a page on the same website as one of them that "
+            f"your answer above names):\n{sources}"
         )
     else:
         # Gemini answers well-known companies from memory without searching. Its URLs are then
