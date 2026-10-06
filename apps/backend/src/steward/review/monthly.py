@@ -122,6 +122,47 @@ KPI statuses, theses due for review, and flags. Propose at most eight concrete a
 Every action must cite the strategy rule ids or thesis KPIs (TICKER:kpi_id, exactly as \
 listed) it rests on; an action you cannot tie to one is not an action to propose. Do not \
 state figures that are not in the material. If nothing needs doing, return no actions.
+
+How to choose and write actions:
+- Rank by consequence: confirmed rule breaches and KPI breaches first, then theses due \
+for review, then unknown or stale items, and only then optional improvements. Do not \
+propose an action for a rule that passes.
+- Respect the strategy's own logic: a breach of a risk limit, or a price fall on its \
+own, forces a review of the thesis, not a sale; propose a sale only when the material \
+shows a broken thesis (an exit condition or KPI breach) or a rule that calls for one. \
+Prefer the least drastic action that resolves the item (review, hold, trim before \
+sell), and name the holding or rule the action concerns.
+- One action per underlying cause: several breaches that share a cause (one oversized \
+position breaching both the position and the sector limit) are one action that cites \
+all the rule ids.
+- Each action says what to do, why in one sentence tied to the cited rule or KPI, and \
+what would resolve it. Treat "unknown" as missing data to fix (refresh, review), not as \
+a breach or a pass.
+- Do not propose purchases of specific new securities: the material does not support \
+choosing them.
+
+Apply the owner's strategy as the material states it (its notes outrank this list): a \
+core-satellite portfolio whose individual stocks must beat the core ETFs after costs \
+and taxes, rotated on fundamentals and events.
+- Risk-limit and tier breaches (volatility, drawdown, pair correlation, look-through \
+weight, a position above its cap, tier caps) force a thesis review, never an automatic \
+sale. A position above the cap is judged on its outlook: hold and let deposits dilute \
+it while its thesis still projects growth, trim when that growth is exhausted or the \
+thesis weakens.
+- A loss of 25% or more from cost needs a review; it becomes a sale only with a \
+fundamental miss (a KPI breach, a guidance cut or a profit warning) and no written \
+re-underwriting. A price fall alone is never a reason to sell.
+- Rotation from a holding to another idea needs the expected-return gap to clear the \
+switching hurdle (tax on the lots sold, trading and FX costs, plus the safety margin); \
+if the material has no such comparison, propose gathering it instead of a switch.
+- Mind tax and the time test when the material shows lot ages or realized gains: lots \
+near the three-year mark, the annual proceeds exemption, and losses that can offset \
+gains in the same year. Prefer actions that wait for the time test when a thesis is \
+intact.
+- Check the satellites against the core over the rolling window when the material \
+shows it, cash that has stayed above its target, and theses past their review date or \
+reviewed less often than their tier requires (speculative monthly, others quarterly).
+- Money is in CZK; note when a return is mostly currency effect.
 """
 
 

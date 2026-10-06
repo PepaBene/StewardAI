@@ -30,9 +30,9 @@ from steward.news.escalation import ClaudeEscalator, EscalationInput, ImpactDraf
 
 OVERRIDE = "Custom instructions from the owner, long enough to be valid."
 
-# sha256 of the classification system prompt before prompts became configurable: the default
-# must stay byte-identical to what the classification eval measured.
-LEGACY_CLASSIFICATION_SHA = "0d36c9d4b5dffb4d4c2797de234348b4cc1cd4887749d66acf6e6a4099d9904c"
+# sha256 of the classification system prompt the classification eval last measured
+# (evals/baseline.json, 97%): the default must stay byte-identical to it until re-measured.
+LEGACY_CLASSIFICATION_SHA = "69750d37d6d646060c9371b97bdfd52b2f6dc9b13271a21ff3b7a362f6e4d85c"
 
 
 def _usage(**extra: Any) -> SimpleNamespace:
