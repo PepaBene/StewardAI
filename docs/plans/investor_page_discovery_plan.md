@@ -9,10 +9,17 @@ list and overturn facts (`api/web_fact_routes.py`); results pages registered in
 `issuer_ir_source`; job settings on the jobs form.
 
 Slots implemented: `next_report_date` (applied to the earnings calendar with source
-`web:<host>`), `shares_outstanding`, `company_description`; `analyst_estimates` is recorded as
-unavailable. Not built yet: the web-source badge on holding panels, the prompts registered in
-the prompts config (the prompts are constants in the modules), the AI promoting an unlisted
-domain to a tier (unlisted domains are rejected), statement and segment slots, Playwright.
+`web:<host>`), `shares_outstanding`, `company_description`, `annual_revenue` (statement figure:
+needs an ISO currency, may be printed scaled, e.g. "1,234.5 million", never accepted from the
+press alone; off by default, enable it in the gap research slots); `analyst_estimates` is
+recorded as unavailable. Also built: robots.txt and rate-limited fetching (`research/polite.py`),
+approver prompts in the prompts config, the web-facts panel on the holding page, and the
+`/ai-decisions` page (what the AI approvers decided in the last 7/14/30 days, each with a
+one-click reject), plus safety tests (hostile page text, concurrent owner edit).
+
+Not built, by decision: Playwright (no holding is recorded as blocked), a multi-valued segment
+slot (a `web_fact` holds one value; segment revenue comes from XBRL), and the AI promoting an
+unlisted domain to a tier (unlisted domains are rejected).
 
 Goal: find what the structured sources do not provide, starting with each holding's
 investor-relations (IR) pages, and fill it from reliable web pages. Web search is the LAST

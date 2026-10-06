@@ -22,6 +22,7 @@ class Slot:
     t2_alone: bool = False  # a tier-2 source may confirm it without a second source
     allow_t3: bool = False  # reference sites (Wikipedia) may fill it
     unavailable: str | None = None  # why the web cannot fill it
+    money: bool = False  # an amount: needs a currency code, and the quote may scale it
 
 
 SLOTS: dict[str, Slot] = {
@@ -45,6 +46,15 @@ SLOTS: dict[str, Slot] = {
         "one or two plain sentences, copied verbatim from the page, saying what the company does",
         t2_alone=True,
         allow_t3=True,
+    ),
+    "annual_revenue": Slot(
+        "annual_revenue",
+        "number",
+        "the company's total revenue (net sales) for its latest completed fiscal year, as stated "
+        "in its annual results or annual report. Give the value as a plain integer in whole "
+        "currency units (1.2 billion is 1200000000), the ISO currency code as the unit, and "
+        "the fiscal year as the period",
+        money=True,
     ),
     "analyst_estimates": Slot(
         "analyst_estimates",
@@ -70,6 +80,19 @@ async def is_filled(pool: asyncpg.Pool, ticker: str, slot: str, today: dt.date) 
         return bool(
             await pool.fetchval(
                 "select exists (select 1 from public.shares_outstanding where ticker = $1)",
+                ticker,
+            )
+        )
+    if slot == "annual_revenue":
+        return bool(
+            await pool.fetchval(
+                """select exists (select 1 from public.segment_revenue sr
+                                  join public.xbrl_filing f on f.id = sr.filing_id
+                                  where f.ticker = $1 and sr.kind = 'total'
+                                    and sr.period_end - sr.period_start >= 350)
+                       or exists (select 1 from public.financial_statement_fact
+                                  where ticker = $1 and statement = 'income'
+                                    and concept ilike '%revenue%')""",
                 ticker,
             )
         )

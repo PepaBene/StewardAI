@@ -18,7 +18,8 @@ import anthropic
 import httpx2
 
 from steward import budget_guard
-from steward.jobs.runner import StepUsage, current_job
+from steward.costs import DEFAULT_PRICES
+from steward.jobs.runner import StepUsage, current_job, record_response
 from steward.settings import Settings
 
 logger = logging.getLogger(__name__)
@@ -111,7 +112,10 @@ class BudgetedAnthropic(anthropic.AsyncAnthropic):
         ctx = current_job.get()
         route = path.split("?", 1)[0]
         if ctx is None or not isinstance(body, dict) or route not in (_MESSAGES, _BATCHES):
-            return await self._guarded_post(path, body=body, **kwargs)
+            result = await self._guarded_post(path, body=body, **kwargs)
+            if ctx is None and route == _MESSAGES:
+                _log_unrecorded(body, result)
+            return result
         if route == _BATCHES:
             requests = body.get("requests") or []
             first = requests[0].get("params", {}).get("model") if requests else None
@@ -135,8 +139,41 @@ class BudgetedAnthropic(anthropic.AsyncAnthropic):
         result = await self._guarded_post(path, body=body, **kwargs)
         # A streamed response has no usage block yet; its cost counts when its step ends.
         if getattr(result, "type", None) == "message":
-            budget_guard.after_response(ctx, model, getattr(result, "usage", None))
+            usage = getattr(result, "usage", None)
+            budget_guard.after_response(ctx, model, usage)
+            # Counted against the step now, so a step that fails or is killed, or a response
+            # that fails to parse, still has its cost.
+            await record_response(model, usage)
         return result
+
+
+def _log_unrecorded(body: Any, result: Any) -> None:
+    """A request made outside a job (an eval or script run) has no `job_step` to hold its
+    cost, so log it: the app's spend figures do not include these."""
+    usage = getattr(result, "usage", None)
+    if getattr(result, "type", None) != "message" or usage is None:
+        return
+    counts = Usage(model=str(body.get("model") if isinstance(body, dict) else ""))
+    counts.add(usage)
+    cost = DEFAULT_PRICES.cost(
+        counts.model,
+        input_tokens=counts.input_tokens,
+        output_tokens=counts.output_tokens,
+        cache_write_tokens=counts.cache_write_tokens,
+        cache_read_tokens=counts.cache_read_tokens,
+        searches=counts.searches,
+    )
+    logger.info(
+        "AI request outside a job, not counted in the app's spend: model=%s in=%d out=%d"
+        " cache_write=%d cache_read=%d searches=%d cost=%s",
+        counts.model,
+        counts.input_tokens,
+        counts.output_tokens,
+        counts.cache_write_tokens,
+        counts.cache_read_tokens,
+        counts.searches,
+        f"~${cost}" if cost is not None else "unknown (no price)",
+    )
 
 
 def create_client(settings: Settings) -> anthropic.AsyncAnthropic:

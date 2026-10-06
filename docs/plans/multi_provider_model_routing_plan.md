@@ -59,8 +59,8 @@ Today's model in brackets. "Search" = uses a web search tool, the risky part of 
 
 ## Verify before building (could change the routing)
 
-- Gemini: can Google Search grounding be combined with structured JSON output in one request on 3.8 Flash? Is there any domain allowlist? `research` relies on `allowed_domains` and `source_tiers`. If not, enforce tiers by rejecting citations after the fact, or keep search jobs on sol.
-- OpenAI: does `gpt-6-luna` support the web search tool and structured output? Is it billed as a reasoning model (search content tokens then count)?
+- Gemini (checked 2026-10-06 against the docs): Google Search grounding plus structured output in one request IS supported, but only on Gemini 3 series and marked Preview; the docs' example uses 3.1 Pro, so test 3.8 Flash itself. Gemini 3 bills per search query the model runs. No domain allowlist is documented, so treat it as absent: enforce `source_tiers` by rejecting citations from other outlets after the fact, or keep source-tiered jobs on sol. Citations come back as `url_citation` annotations (start/end index, URL, title), not Claude's result blocks.
+- OpenAI (checked 2026-10-06): `gpt-6-luna` lists web_search, structured_outputs, prompt_caching and function calling; 1.05M context. The web search tool supports `allowed_domains` (up to 100), so source tiers can be kept on sol and luna. Still unconfirmed: web search and structured output together in one request (the search docs are silent), so test it. Luna is a reasoning model (effort none to max), so search content tokens are billed at model rates; set effort low for luna jobs. In Chat Completions, luna function calling only works with reasoning effort none; use the Responses API.
 - Gemini 3.x prices double on 2027-01-01: re-cost flash then; at the doubled price it is still below sol on input but the gap to Sonnet narrows.
 - Data retention and training-use terms of each API for portfolio data.
 
@@ -73,6 +73,95 @@ Today's model in brackets. "Search" = uses a web search tool, the risky part of 
 5. Flash: digests, then approvals, locate, ir_discovery, gap_research, research quick.
 6. Sol: earnings extraction (gate: golden cases in `tests/golden/earnings/`), escalation, monthly review, research standard (gate: side-by-side on 3 to 5 holdings you know).
 7. Keep Claude as the fallback per job until each gate passes; flip one job at a time in config.
+
+## Caching
+
+Today only Anthropic's explicit `cache_control` is used: chat history (`chat/assistant.py`), earnings system prompt (`earnings/extract.py`), corroboration (`news/corroborate.py`), research material and system prompt (`research/writer.py`). The other providers need their own handling, and there is a second layer worth adding.
+
+### 1. Provider prefix caching
+
+| Provider | How it works | Cached price | Verify |
+|---|---|---|---|
+| OpenAI (sol, luna) | Automatic on a repeated prompt prefix; no code needed, no write premium. Send a stable `prompt_cache_key` per job type so related requests land on the same cache. | sol $0.10 (5% of input), luna $0.01 (10%) | Minimum prefix length, cache lifetime, whether luna caches |
+| Google (flash) | Implicit caching is automatic on repeated prefixes; explicit caches give a guaranteed discount but may carry a storage fee per hour. | $0.075 (10% of input) | Minimum tokens, explicit cache fee and lifetime, whether implicit caching reports hits in usage |
+
+Rules for every call site:
+- Static content first: system prompt, tool list, shared material. Per-request content last. The research writer and extractor already follow this; keep it in the new interface.
+- No timestamps, request ids or varying order inside the cached prefix. "Today is ..." goes after the shared material, as `section_prompt` already does.
+- Keep one model per job. A cache belongs to one model, so a fallback or downgrade mid-run loses it.
+
+Where it pays most, in order:
+1. Research (sol): up to 10 sections per run re-send the same company material.
+2. Chat (luna): the whole history is re-sent every round, up to 30 rounds.
+3. Earnings extraction (sol): the long system prompt and the report repeat across retries.
+4. News classification (luna): the instructions repeat across 50-item calls.
+
+### 2. Accounting (easy to get wrong)
+
+- Anthropic reports cache reads separately from `input_tokens`. OpenAI reports cached tokens as a subset of the prompt tokens. Map them differently in `Usage.add`, or cached tokens get billed twice.
+- `BudgetConfig` has one global `cache_write_multiplier` and `cache_read_multiplier`. Make both per model (OpenAI write 1.0, Gemini write 1.0 plus any explicit-cache storage, Anthropic 1.25 and 0.1).
+- Record cache hit rate per job type next to cost so a silent drop shows up in `/config/budget`.
+- Check that batch and caching discounts stack on each provider before assuming both.
+
+### 3. Application-level caching (skip the call entirely)
+
+Provider caching only discounts input tokens. Skipping a call whose answer cannot have changed saves all of it:
+- News classification and corroboration: key on item content hash, prompt version and model; reuse the stored label.
+- `ai_approvals`, `ir_discovery`, `gap_research`: do not re-judge a suggestion whose evidence is unchanged.
+- Web search results: short TTL cache per query and allowed domains, so a re-run of research does not pay for the same searches.
+- Research and review reports: reuse a section when its input material hash is unchanged since the last run.
+Needs a small table (`ai_result_cache`: key, job type, model, prompt version, result, created_at) and a rule that a prompt or model change invalidates it.
+
+### Order
+
+Add caching after the provider interface (step 2) and budget changes (step 3), then per tier as each job migrates: turn on prefix caching, measure hit rate for a week, then add result caching for news and approvals first.
+
+## Reducing cost
+
+Ordered by saving versus effort. Judge each by cost per finished job from `job_step`, not per request: a cheaper call that needs retries is not cheaper. Items 1 to 4 need no migration and can be done now.
+
+1. **Turn on the limits that already exist.** `BudgetConfig` has `monthly_cap_usd`, `per_job_cap_usd` and `default_job_cap_usd`, all null by default, so nothing is capped. Set a monthly cap, `at_cap: downgrade_noncritical` with luna as `downgrade_model`, and a per-run cap on `research`, `monthly_review` and `chat`. Keep `warn_at_fraction` at 0.8 for the early alert.
+2. **Set effort explicitly.** Most jobs leave `effort` unset, so the model default (often high) applies. Use low on luna jobs, medium on flash jobs, medium on sol for escalation and chat-like work, and high only for earnings extraction, monthly review and research standard. On luna, reasoning tokens are billed as output, so low effort matters most there.
+3. **Batch everything that can wait (50% off on all three providers).** Digests and review already do. Add `ai_approvals`, `ir_discovery`, `gap_research`, `earnings_calendar` and overnight news classification. Keep escalation, chat and earnings checks synchronous.
+4. **Cap web search, the cost model changes do not touch.** Search is $10 to $14 per 1,000 calls on top of tokens. Research allows 40 searches and 60 steps per run, corroboration 10 per call. Lower those caps, use free data sources first and search only for gaps, and cache search results for a few days. Send search-heavy jobs to OpenAI ($10) rather than Gemini ($14).
+5. **Shrink what is sent.** Send the relevant filing sections, not whole filings; keep `max_content_tokens` on fetches; summarise older chat turns instead of resending them and lower chat `max_steps` from 30; send a company's research material once per run.
+6. **Shrink what is returned.** Lower `max_tokens` (16000 per research section is far above need), use "standard" depth (6 sentences) instead of "deep" (12) unless a holding needs it, and keep structured fields short.
+7. **Do less work.** Skip news items already seen; add a keyword or source filter before classification; skip IR discovery and gap research for holdings that have not changed; reduce schedule frequency for jobs whose inputs change rarely.
+8. **Cascade instead of one model.** Run luna first and escalate to flash or sol only when the answer has low confidence (classification, approvals, corroboration). Measure first: the larger model at lower effort sometimes beats a cascade because it keeps one cache.
+9. **Result and prefix caching** (section above): news, approvals, search results, research sections.
+10. **Watch the numbers.** Track cost per job type per week, cache hit rate, parse-failure and retry rates, and spend per provider; set spend limits in each provider's console as a second backstop.
+11. **Re-price in January 2027.** Gemini 3.x prices roughly double on 2027-01-01; recheck whether flash is still the right middle tier or whether luna (with more care) or sol is cheaper per finished job.
+
+Expected order of impact (verify with real spend from `/config/budget` before committing): search volume, research and earnings runs on sol, chat history, then news volume.
+
+## Do it in code, not with AI
+
+Rule: if a result can be computed or checked reliably by code, code decides and AI is only the fallback for what the code cannot settle. This is cheaper, repeatable and auditable, and it needs no provider. Several pieces already work this way (thesis verdicts, `numeric_check` in claim verification, insider-trade classification, 8-K deal extraction, the `data_context` report sentences); extend the same pattern.
+
+| Job | Do in code | Leave to AI |
+|---|---|---|
+| News classification | Event type and severity from rule tables: EDGAR form type and 8-K item number, central-bank and regulator feed (ECB, Fed, CNB press), Form 4 via the existing insider classifier. Ticker linking by alias match. Duplicate and near-duplicate removal by URL, title hash and similarity. | Only items no rule claims (luna) |
+| Earnings calendar | Dates from structured sources first (EDGAR 8-K Item 2.02, vendor calendars you already pay for, exchange calendars); keep `date_in_text` as the check on any AI-read date. | Reading IR pages when no structured date exists |
+| Earnings extraction | Figures from XBRL or `sec_xbrl`/FSDS data for US filers, ESEF for EU filers; verdicts stay code. | Reports with no structured data (non-US, PDF only) |
+| Locating the release | EDGAR submissions API for the 8-K and its exhibit; IR RSS feeds; sitemaps and known URL patterns. | Web search only when all of those fail |
+| AI approvals, listings | Exact match on ISIN, or ticker plus exchange (MIC) plus currency, auto-approves; clear mismatches auto-reject. | Ambiguous matches |
+| AI approvals, peers | Same industry code (SIC or similar), market-cap band, overlap with vendor peer lists. | Conflicts between those signals |
+| IR page discovery | Probe common paths (`/investors`, `/investor-relations`, `ir.<domain>`), robots and sitemap, HTTP status and title keywords. | Choosing between several candidate pages |
+| Corroboration | Match the same story across feeds by entity, time window and title similarity before any web search. | Stories that appear in one source only |
+| Claim verification | Extend `numeric_check` with entity, date and period matching and quote matching against the cited snippet. | Sentences code cannot settle |
+| Research report | Sections built from stored data by code: financial trend, valuation (computed from the valuation methods), ownership, liquidity, relationships, risk figures. Roughly half of the ten sections. | Business, moat and risks, strategy fit, open questions |
+| Digests | Template the low-severity items (headline, ticker, source, link); the tuned `min_severity_summarised` already limits summaries. | Narrative for items at or above the severity threshold |
+| Chat | Questions about positions, prices, exposure, dates and cost answered from read models and templates. | Synthesis, explanation, comparison, anything open-ended |
+| Gap research | Skip when a free source or earlier run has the fact (see free-source jobs); skip when inputs are unchanged since the last attempt. | Genuinely missing facts |
+
+How to do it safely:
+1. Build the rule next to the current AI path, not instead of it. Run both on the labelled and golden sets (`tests/news/news_classification.json`, `tests/golden/earnings/`) and compare.
+2. Replace the AI step only for the slice where the rule agrees with the current labels at an agreed rate and is wrong in no costly direction (a missed severe event is worse than a wasted call).
+3. Store who decided (`decided_by: rule` or `model`) and the rule id on each result, so a wrong rule is found and fixed, and the share still reaching AI is visible.
+4. Send to AI only on explicit "cannot settle" outcomes (no rule matched, signals conflict, source missing), never because code raised an error.
+5. Re-measure cost per job type after each replacement; the saving is the AI calls that no longer happen, so count them.
+
+Order by saving and risk: news classification rules and dedupe, earnings figures from XBRL, locating the release, listing and peer approvals, research sections built from data, chat read-model answers, then IR discovery and corroboration.
 
 ## Gates
 

@@ -9425,9 +9425,9 @@ export interface components {
             effort?: ("low" | "medium" | "high" | "xhigh" | "max") | null;
             /**
              * Slots
-             * @description Which gaps to research. `analyst_estimates` is recorded as unavailable (a paid vendor product) and is never searched.
+             * @description Which gaps to research. `annual_revenue` is off by default: enable it to fill the latest fiscal-year revenue of holdings with no filing data. `analyst_estimates` is recorded as unavailable (a paid vendor product) and is never searched.
              */
-            slots?: ("next_report_date" | "company_description" | "shares_outstanding" | "analyst_estimates")[];
+            slots?: ("next_report_date" | "company_description" | "shares_outstanding" | "annual_revenue" | "analyst_estimates")[];
             /**
              * Max Searches
              * @description Web searches per slot.

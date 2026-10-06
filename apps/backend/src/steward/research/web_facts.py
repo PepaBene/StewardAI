@@ -27,6 +27,7 @@ import json
 import logging
 import re
 from dataclasses import dataclass
+from decimal import Decimal
 from typing import Any, Literal, cast
 from urllib.parse import urlsplit
 
@@ -162,6 +163,34 @@ def number_in_text(number: int, text: str) -> bool:
     return False
 
 
+SCALE_WORDS: dict[str, int] = {
+    "thousand": 10**3,
+    "million": 10**6,
+    "billion": 10**9,
+    "trillion": 10**12,
+    "mn": 10**6,
+    "bn": 10**9,
+    "tn": 10**12,
+    "m": 10**6,
+    "百万円": 10**6,
+    "億円": 10**8,
+    "兆円": 10**12,
+}
+_SCALED = re.compile(
+    r"(\d[\d,]*(?:\.\d+)?)\s*(thousand|million|billion|trillion|mn|bn|tn|m(?![a-z])|百万円|億円|兆円)",
+    re.IGNORECASE,
+)
+
+
+def scaled_in_text(number: int, text: str) -> bool:
+    """Is `number` printed as an amount with a scale word, e.g. 1,234.5 million?"""
+    for digits, word in _SCALED.findall(text):
+        scale = SCALE_WORDS.get(word.lower())
+        if scale is not None and Decimal(digits.replace(",", "")) * scale == number:
+            return True
+    return False
+
+
 @dataclass(frozen=True)
 class Checked:
     value_text: str
@@ -185,7 +214,12 @@ def check_value(slot: Slot, cand: Candidate, today: dt.date) -> tuple[Checked | 
         count = parse_count(cand.value)
         if count is None or count <= 0:
             return None, ["the value is not a plain integer count"]
-        if not number_in_text(count, cand.quote):
+        if slot.money:
+            if not re.fullmatch(r"[A-Z]{3}", (cand.unit or "").strip()):
+                return None, ["the unit must be an ISO currency code"]
+            if not (number_in_text(count, cand.quote) or scaled_in_text(count, cand.quote)):
+                return None, ["the quote does not print that amount"]
+        elif not number_in_text(count, cand.quote):
             return None, ["the quote does not print that number"]
         return Checked(str(count), float(count)), []
     text = re.sub(r"\s+", " ", cand.value).strip()

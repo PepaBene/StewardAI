@@ -4,6 +4,7 @@ export const SLOT_LABELS: Record<string, string> = {
   next_report_date: "Next report date",
   shares_outstanding: "Shares outstanding",
   company_description: "Description",
+  annual_revenue: "Revenue, latest fiscal year",
 };
 
 export const TIER_LABELS: Record<string, string> = {

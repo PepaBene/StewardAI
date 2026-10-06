@@ -61,6 +61,7 @@ const PRIMARY_PAGES = [
   { href: "/reports", label: "Reports", keywords: "digest archive monthly reviews impact notes full text" },
   { href: "/activity", label: "Activity", keywords: "job log coverage gaps cost budget" },
   { href: "/data-sources", label: "Data sources", keywords: "providers coverage quota access free api keys paid denied" },
+  { href: "/ai-decisions", label: "AI decisions", keywords: "ai approved decisions listings peers investor pages web facts overturn reject summary" },
   { href: "/verification", label: "Source gates", keywords: "source gates signals coverage shadow report zero cost domain reconciliation publish audit precision" },
   { href: "/relationships", label: "Relationship review", keywords: "customer supplier suppliers contradictions disputed disclosures company graph edges corporate actions split dividend events reconciliation confirm reject dispute" },
   { href: "/funds", label: "Funds", keywords: "overlap look-through factsheet etf aggregate issuer exposure unknown weight expense ratio" },

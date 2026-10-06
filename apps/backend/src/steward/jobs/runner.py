@@ -58,10 +58,30 @@ class StepUsage:
     batch: bool = False
 
 
+def _volume(usage: StepUsage) -> int:
+    """How much a usage covers, to tell which of two counts of one step saw more."""
+    return (
+        usage.input_tokens
+        + usage.output_tokens
+        + usage.cache_write_tokens
+        + usage.cache_read_tokens
+        + usage.searches
+    )
+
+
 @dataclass
 class StepHandle:
     detail: dict[str, Any] = field(default_factory=dict)
+    # What the call site counted from the responses it handled. A response it never got to
+    # count (the step failed, was interrupted, or the response failed to parse) is missing.
     usage: StepUsage | None = None
+    step_id: int | None = None
+    # What the client saw come back, by model, counted per response and saved to the step
+    # row as it arrives, so nothing the API billed is lost to a failed or killed step.
+    observed: dict[str, StepUsage] = field(default_factory=dict)
+
+    def best_observed(self) -> StepUsage | None:
+        return max(self.observed.values(), key=_volume, default=None)
 
 
 @dataclass
@@ -125,13 +145,61 @@ class JobContext:
             index,
             name,
         )
-        handle = StepHandle()
+        handle = StepHandle(step_id=step_id)
+        token = current_step.set((self, handle))
         try:
-            yield handle
+            try:
+                yield handle
+            finally:
+                try:
+                    current_step.reset(token)
+                except ValueError:  # closed from another context (a cancelled task)
+                    pass
         except BaseException as exc:
             await self._finish_step(step_id, "failed", handle, _error_text(exc))
             raise
         await self._finish_step(step_id, "succeeded", handle, None)
+
+    async def record_response(self, handle: StepHandle, model: str, usage: Any) -> None:
+        """Count one Messages response against the step now, and save the running total to
+        the step row: a step that later fails or is killed keeps what it cost. Never raises."""
+        seen = handle.observed.setdefault(model, StepUsage(model=model))
+        seen.input_tokens += getattr(usage, "input_tokens", 0) or 0
+        seen.output_tokens += getattr(usage, "output_tokens", 0) or 0
+        seen.cache_write_tokens += getattr(usage, "cache_creation_input_tokens", 0) or 0
+        seen.cache_read_tokens += getattr(usage, "cache_read_input_tokens", 0) or 0
+        server = getattr(usage, "server_tool_use", None)
+        seen.searches += (getattr(server, "web_search_requests", 0) or 0) if server else 0
+        best = handle.best_observed()
+        if handle.step_id is None or best is None:
+            return
+        try:
+            table = await self.price_table()
+            cost = table.cost(
+                best.model,
+                input_tokens=best.input_tokens,
+                output_tokens=best.output_tokens,
+                cache_write_tokens=best.cache_write_tokens,
+                cache_read_tokens=best.cache_read_tokens,
+                searches=best.searches,
+            )
+            prices = table.prices_for(best.model)
+            await self.pool.execute(
+                "update public.job_step set model = $2, input_tokens = $3, output_tokens = $4,"
+                " searches = $5, cost_usd = $6, cache_write_tokens = $7, cache_read_tokens = $8,"
+                " batch = false, prices = $9::jsonb where id = $1 and status = 'running'",
+                handle.step_id,
+                best.model,
+                best.input_tokens,
+                best.output_tokens,
+                best.searches,
+                cost,
+                best.cache_write_tokens,
+                best.cache_read_tokens,
+                json.dumps(prices) if prices else None,
+            )
+        except Exception:
+            logger.exception("could not save the running usage of step %s", handle.step_id)
 
     async def price_table(self) -> PriceTable:
         """The Budget config's prices, read once per run (its version is recorded)."""
@@ -153,6 +221,12 @@ class JobContext:
             # (monthly cap reached): the step is recorded and priced as that model.
             handle.detail["budget_downgrade"] = {"from": usage.model, "to": downgraded[usage.model]}
             usage = replace(usage, model=downgraded[usage.model])
+        observed = handle.best_observed()
+        if observed is not None and (usage is None or _volume(observed) > _volume(usage)):
+            # The call site counted less than the API sent back (a failed or interrupted
+            # step, or a response that did not parse): price what was actually billed.
+            handle.detail["usage_from_requests"] = True
+            usage = observed
         if usage is not None:
             table = await self.price_table()
             prices = table.prices_for(usage.model)
@@ -201,6 +275,18 @@ JobHandler = Callable[[JobContext], Awaitable[None]]
 # The job whose handler is running in this task (and the tasks it starts): the Anthropic
 # client in steward.ai reads it to apply the Budget config's caps to every request of a job.
 current_job: ContextVar[JobContext | None] = ContextVar("current_job", default=None)
+# The step being run in this task, with its job: the client counts every response against it.
+current_step: ContextVar[tuple[JobContext, StepHandle] | None] = ContextVar(
+    "current_step", default=None
+)
+
+
+async def record_response(model: str, usage: Any) -> None:
+    """Count a Messages response against the step running in this task, if any."""
+    current = current_step.get()
+    if current is not None and usage is not None:
+        ctx, handle = current
+        await ctx.record_response(handle, model, usage)
 
 
 async def create_job(

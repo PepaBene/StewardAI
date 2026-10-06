@@ -277,6 +277,121 @@ async def test_the_client_applies_the_guard_inside_a_job(backend_pool: asyncpg.P
     assert error.startswith("monthly AI budget reached ($2.00 of $1.00)")
 
 
+@pytest.mark.db
+async def test_a_failed_step_still_records_what_its_requests_cost(
+    backend_pool: asyncpg.Pool,
+) -> None:
+    """The API bills a response whether or not the call site gets to count it: a step that
+    raises after a response, and one whose call site counts less than came back, keep it."""
+
+    def handler(request: httpx2.Request) -> httpx2.Response:
+        body = json.loads(request.content)
+        return httpx2.Response(
+            200,
+            json={
+                "id": "msg_1",
+                "type": "message",
+                "role": "assistant",
+                "model": body["model"],
+                "content": [{"type": "text", "text": "ok"}],
+                "stop_reason": "end_turn",
+                "stop_sequence": None,
+                "usage": {"input_tokens": 1_000_000, "output_tokens": 100_000},
+            },
+        )
+
+    client = BudgetedAnthropic(
+        api_key="test", http_client=httpx2.AsyncClient(transport=httpx2.MockTransport(handler))
+    )
+    params: dict[str, Any] = {
+        "model": "claude-sonnet-5",
+        "max_tokens": 10,
+        "messages": [{"role": "user", "content": "hi"}],
+    }
+
+    async def job(ctx: JobContext) -> None:
+        async with ctx.step("fails_after_response"):
+            await client.messages.create(**params)
+            raise RuntimeError("the process stopped before the call site counted it")
+
+    assert await run_job(backend_pool, "daily_digest", job, trigger="manual") == "failed"
+    row = await backend_pool.fetchrow(
+        "select s.status, s.model, s.input_tokens, s.output_tokens, s.cost_usd, s.detail"
+        " from public.job_step s join public.job j on j.id = s.job_id"
+        " where j.job_type = 'daily_digest' and s.name = 'fails_after_response'"
+        " order by s.id desc limit 1"
+    )
+    assert row["status"] == "failed"
+    assert row["model"] == "claude-sonnet-5"
+    assert (row["input_tokens"], row["output_tokens"]) == (1_000_000, 100_000)
+    # 1M input at $2 plus 100k output at $10 per million.
+    assert row["cost_usd"] == Decimal("3.000000")
+    assert json.loads(row["detail"])["usage_from_requests"] is True
+
+    async def undercounted(ctx: JobContext) -> None:
+        async with ctx.step("undercounted") as step:
+            await client.messages.create(**params)
+            step.usage = StepUsage(model="claude-sonnet-5", input_tokens=10, output_tokens=5)
+
+    assert await run_job(backend_pool, "daily_digest", undercounted, trigger="manual") == (
+        "succeeded"
+    )
+    cost = await backend_pool.fetchval(
+        "select s.cost_usd from public.job_step s join public.job j on j.id = s.job_id"
+        " where j.job_type = 'daily_digest' and s.name = 'undercounted'"
+        " order by s.id desc limit 1"
+    )
+    assert cost == Decimal("3.000000")
+
+
+class _RecordingPool:
+    """Stands in for the pool: hands out step ids and keeps the last write of each step."""
+
+    def __init__(self) -> None:
+        self.rows: dict[int, dict[str, Any]] = {}
+
+    async def fetchval(self, query: str, *args: Any) -> int:
+        self.rows[1] = {}
+        return 1
+
+    async def execute(self, query: str, step_id: int, *args: Any) -> None:
+        if "cost_usd" in query:
+            # (model, input, output, searches, cost) are the leading columns of both writes
+            # that carry a cost: the running total and the step's close.
+            self.rows[step_id] = {"query": query, "args": args}
+
+
+async def test_a_failed_step_records_the_cost_of_its_requests_without_a_database() -> None:
+    from steward.costs import PriceTable
+    from steward.jobs.runner import record_response
+
+    pool = _RecordingPool()
+    ctx = JobContext(
+        pool=pool,  # type: ignore[arg-type]
+        job_id=1,
+        job_type="daily_digest",
+        trigger="manual",
+        _prices=PriceTable(BudgetConfig()),
+    )
+
+    class Usage:
+        input_tokens = 1_000_000
+        output_tokens = 100_000
+        cache_creation_input_tokens = 0
+        cache_read_input_tokens = 0
+        server_tool_use = None
+
+    with pytest.raises(RuntimeError):
+        async with ctx.step("ask"):
+            await record_response("claude-sonnet-5", Usage())
+            raise RuntimeError("stopped before the call site counted it")
+
+    args = pool.rows[1]["args"]
+    # status, detail, error, model, input, output, searches, cost
+    assert args[3:8] == ("claude-sonnet-5", 1_000_000, 100_000, 0, Decimal("3.000000"))
+    assert "usage_from_requests" in args[1]
+
+
 # ---------------------------------------------------------------------------
 # Cost summary
 # ---------------------------------------------------------------------------

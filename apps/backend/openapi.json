@@ -27174,12 +27174,13 @@
                 "next_report_date",
                 "company_description",
                 "shares_outstanding",
+                "annual_revenue",
                 "analyst_estimates"
               ]
             },
             "type": "array",
             "title": "Slots",
-            "description": "Which gaps to research. `analyst_estimates` is recorded as unavailable (a paid vendor product) and is never searched."
+            "description": "Which gaps to research. `annual_revenue` is off by default: enable it to fill the latest fiscal-year revenue of holdings with no filing data. `analyst_estimates` is recorded as unavailable (a paid vendor product) and is never searched."
           },
           "max_searches": {
             "type": "integer",

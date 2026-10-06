@@ -288,7 +288,11 @@ class IrDiscoverySettings(ConfigModel):
 
 
 GapSlotKey = Literal[
-    "next_report_date", "company_description", "shares_outstanding", "analyst_estimates"
+    "next_report_date",
+    "company_description",
+    "shares_outstanding",
+    "annual_revenue",
+    "analyst_estimates",
 ]
 
 
@@ -307,8 +311,10 @@ class GapResearchSettings(ConfigModel):
     effort: Effort | None = Field(default=None, description=EFFORT_HELP)
     slots: list[GapSlotKey] = Field(
         default_factory=_default_gap_slots,
-        description="Which gaps to research. `analyst_estimates` is recorded as unavailable "
-        "(a paid vendor product) and is never searched.",
+        description="Which gaps to research. `annual_revenue` is off by default: enable it to "
+        "fill the latest fiscal-year revenue of holdings with no filing data. "
+        "`analyst_estimates` is recorded as unavailable (a paid vendor product) and is never "
+        "searched.",
     )
     max_searches: int = Field(default=3, ge=1, le=10, description="Web searches per slot.")
     slots_per_run: int = Field(default=8, ge=1, le=60, description="Cost guard per run.")
