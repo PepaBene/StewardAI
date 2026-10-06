@@ -210,6 +210,100 @@ async def test_google_answer_urls_quoting_a_redirect_are_rewritten_to_the_real_p
     assert done.parsed == Link(url="https://www.sec.gov/real")
 
 
+def _google_search_then_schema_handler(calls: list[dict[str, Any]]) -> Any:
+    def handler(request_: httpx.Request) -> httpx.Response:
+        import json
+
+        body = json.loads(request_.content)
+        calls.append(body)
+        if "responseJsonSchema" not in body.get("generationConfig", {}):
+            return httpx.Response(
+                200,
+                json={
+                    "candidates": [
+                        {
+                            "finishReason": "STOP",
+                            "content": {"parts": [{"text": "Found it on sec.gov."}]},
+                            "groundingMetadata": {
+                                "webSearchQueries": ["q"],
+                                "groundingChunks": [
+                                    {"web": {"uri": "https://www.sec.gov/real", "title": "sec.gov"}}
+                                ],
+                            },
+                        }
+                    ],
+                    "usageMetadata": {"promptTokenCount": 10, "candidatesTokenCount": 5},
+                },
+            )
+        return httpx.Response(
+            200,
+            json={
+                "candidates": [
+                    {
+                        "finishReason": "STOP",
+                        "content": {"parts": [{"text": '{"url": "https://www.sec.gov/real"}'}]},
+                    }
+                ],
+                "usageMetadata": {"promptTokenCount": 20, "candidatesTokenCount": 7},
+            },
+        )
+
+    return handler
+
+
+async def test_google_search_and_schema_run_as_a_search_then_a_structured_call() -> None:
+    calls: list[dict[str, Any]] = []
+    http = httpx.AsyncClient(
+        transport=httpx.MockTransport(_google_search_then_schema_handler(calls))
+    )
+    llm = LLM(google_key="k", http=http)
+    req = request(model="gemini-3.8-flash", schema=Link, search=SearchSpec(allowed_domains=()))
+    done = await llm.complete(req)
+    assert len(calls) == 2
+    assert "googleSearch" in str(calls[0].get("tools")) and "tools" not in calls[1]
+    assert done.parsed == Link(url="https://www.sec.gov/real")
+    assert [c.url for c in done.citations] == ["https://www.sec.gov/real"]
+    assert done.usage.input_tokens == 30 and done.usage.server_tool_use.web_search_requests == 1
+
+
+async def test_google_batch_with_search_and_schema_runs_two_rounds() -> None:
+    llm = LLM(google_key="k")
+    rounds: list[list[Request]] = []
+
+    async def fake_batch(requests: Any, poll_seconds: float, wait_minutes: float) -> Any:
+        rounds.append(list(requests))
+        out = []
+        for r in requests:
+            first = r.schema is None  # a search-only request; the structured ones carry a schema
+            data = {
+                "candidates": [
+                    {
+                        "finishReason": "STOP",
+                        "content": {
+                            "parts": [{"text": "found" if first else '{"url": "https://a.com/x"}'}]
+                        },
+                        "groundingMetadata": {
+                            "groundingChunks": [{"web": {"uri": "https://a.com/x", "title": "a"}}]
+                        }
+                        if first
+                        else {},
+                    }
+                ],
+                "usageMetadata": {"promptTokenCount": 1, "candidatesTokenCount": 1},
+            }
+            out.append(wire.google_completion(r, data))
+        return out
+
+    llm._batch_once = fake_batch  # type: ignore[method-assign]
+    req = request(model="gemini-3.8-flash", schema=Link, search=SearchSpec(allowed_domains=()))
+    plain = request(model="gemini-3.8-flash", schema=Link)
+    done = await llm.complete_batch([req, plain])
+    assert len(rounds) == 2 and rounds[0][0].schema is None and rounds[1][0].search is None
+    assert len(rounds[1]) == 1  # the plain request was answered in round one
+    assert done[0] is not None and done[0].parsed == Link(url="https://a.com/x")
+    assert [c.url for c in done[0].citations] == ["https://a.com/x"]
+
+
 def test_google_blocked_prompt_is_an_error() -> None:
     with pytest.raises(LLMError):
         wire.google_completion(request(), {"promptFeedback": {"blockReason": "SAFETY"}})

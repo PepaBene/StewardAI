@@ -8,6 +8,7 @@ another provider: the provider is chosen after the guard has had its say.
 """
 
 import asyncio
+import dataclasses
 import logging
 from collections.abc import Sequence
 from typing import Any, cast
@@ -23,6 +24,7 @@ from steward.llm.types import (
     Citation,
     Completion,
     LLMError,
+    Message,
     Provider,
     Request,
     StopReason,
@@ -164,6 +166,12 @@ class LLM:
         return wire.openai_completion(req, data)
 
     async def _google(self, req: Request) -> Completion:
+        if not _search_with_schema(req):
+            return await self._google_once(req)
+        found = await self._google_once(dataclasses.replace(req, schema=None))
+        return _merge_search(found, await self._google_once(_finish_request(req, found)))
+
+    async def _google_once(self, req: Request) -> Completion:
         data = await self._post(
             "google",
             GOOGLE_URL.format(model=req.model),
@@ -280,6 +288,32 @@ class LLM:
         was not finished within `wait_minutes` (it is cancelled) or could not run, so the caller
         asks again directly. The cost is counted by the caller's step (`Usage(batch=True)`)
         and by the budget guard; the batch id is saved on the step when it is submitted."""
+        split = {i for i, r in enumerate(requests) if _search_with_schema(r)}
+        if not split:
+            return await self._batch_once(requests, poll_seconds, wait_minutes)
+        # Gemini returns no grounding citations when a search and a schema share a call: the
+        # search runs as one batch, then the structured answers as a second one.
+        first = [
+            dataclasses.replace(r, schema=None) if i in split else r for i, r in enumerate(requests)
+        ]
+        answers = await self._batch_once(first, poll_seconds, wait_minutes)
+        pending = [i for i in sorted(split) if answers[i] is not None]
+        finished = await self._batch_once(
+            [_finish_request(requests[i], cast(Completion, answers[i])) for i in pending],
+            poll_seconds,
+            wait_minutes,
+        )
+        done_final = dict(zip(pending, finished, strict=True))
+        for i in split:
+            final = done_final.get(i)
+            answers[i] = (
+                _merge_search(cast(Completion, answers[i]), final) if final is not None else None
+            )
+        return answers
+
+    async def _batch_once(
+        self, requests: Sequence[Request], poll_seconds: float, wait_minutes: float
+    ) -> list[Completion | None]:
         if not requests:
             return []
         none: list[Completion | None] = [None] * len(requests)
@@ -438,6 +472,39 @@ def _downgraded(req: Request, model: str) -> Request:
     return replace(
         req, model=model, effort=None, search=req.search if same else None, cache_key=None
     )
+
+
+def _search_with_schema(req: Request) -> bool:
+    return provider_of(req.model) == "google" and req.schema is not None and req.search is not None
+
+
+def _finish_request(req: Request, found: Completion) -> Request:
+    """The structured half of a Google search request: the search answer and the sources it
+    returned (real URLs), then the schema, with no search tool."""
+    sources = "\n".join(
+        f"- {c.url} ({c.title})" if c.title else f"- {c.url}" for c in found.citations
+    )
+    ask = (
+        "Sources the search returned (any URL in your answer must be one of these, written "
+        f"exactly as here):\n{sources or '- none'}\n\nNow give your answer in the required "
+        "JSON format."
+    )
+    return dataclasses.replace(
+        req,
+        search=None,
+        messages=(*req.messages, Message("assistant", found.text), Message("user", ask)),
+    )
+
+
+def _merge_search(found: Completion, final: Completion) -> Completion:
+    """`final` (the structured answer) carrying the search's citations and both calls' cost."""
+    usage = normalized_usage()
+    _accumulate(usage, found.usage)
+    _accumulate(usage, final.usage)
+    final.usage = usage
+    final.citations = found.citations
+    final.off_list_citations = found.off_list_citations
+    return final
 
 
 def _accumulate(total: Any, usage: Any) -> None:
