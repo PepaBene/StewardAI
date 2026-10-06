@@ -17,8 +17,9 @@ from typing import Any, cast
 
 import anthropic
 
+from steward.llm.cache import ResultCache, request_key
 from steward.llm.client import LLM
-from steward.llm.types import Message, Request, SearchSpec, provider_of
+from steward.llm.types import Message, Request, SearchSpec, normalized_usage, provider_of
 
 _STOP = {"end": "end_turn", "max_tokens": "max_tokens", "refusal": "refusal", "other": "end_turn"}
 
@@ -64,6 +65,37 @@ class _Messages:
         self._owner = owner
 
     async def parse(self, **kwargs: Any) -> Any:
+        cache = self._owner.cache
+        schema = kwargs.get("output_format")
+        if cache is None or schema is None or kwargs.get("tools"):
+            return await self._send(kwargs)
+        key = request_key(
+            str(kwargs.get("model", "")),
+            kwargs.get("system"),
+            kwargs.get("messages"),
+            schema,
+            _effort(kwargs),
+        )
+        hit = await cache.get(key)
+        if hit is not None:
+            try:
+                return SimpleNamespace(
+                    type="message",
+                    parsed_output=schema.model_validate(hit),
+                    usage=normalized_usage(),
+                    stop_reason="end_turn",
+                    content=[],
+                    cached=True,
+                )
+            except ValueError:
+                pass  # the schema changed shape: ask again
+        response = await self._send(kwargs)
+        parsed = getattr(response, "parsed_output", None)
+        if parsed is not None and getattr(response, "stop_reason", None) == "end_turn":
+            await cache.put(key, str(kwargs.get("model", "")), parsed.model_dump(mode="json"))
+        return response
+
+    async def _send(self, kwargs: dict[str, Any]) -> Any:
         model = str(kwargs.get("model", ""))
         anthropic_client = self._owner.anthropic
         if provider_of(model) == "anthropic":
@@ -95,9 +127,15 @@ class _Messages:
 
 
 class RoutingClient:
-    def __init__(self, anthropic_client: anthropic.AsyncAnthropic | None, llm: LLM) -> None:
+    def __init__(
+        self,
+        anthropic_client: anthropic.AsyncAnthropic | None,
+        llm: LLM,
+        cache: ResultCache | None = None,
+    ) -> None:
         self.anthropic = anthropic_client
         self.llm = llm
+        self.cache = cache
         self.messages = _Messages(self)
 
     def __getattr__(self, name: str) -> Any:
@@ -107,7 +145,10 @@ class RoutingClient:
 
 
 def routing_client(
-    anthropic_client: anthropic.AsyncAnthropic | None, llm: LLM
+    anthropic_client: anthropic.AsyncAnthropic | None,
+    llm: LLM,
+    cache: ResultCache | None = None,
 ) -> anthropic.AsyncAnthropic:
-    """The routing client, typed as the Anthropic client the call sites expect."""
-    return cast(anthropic.AsyncAnthropic, RoutingClient(anthropic_client, llm))
+    """The routing client, typed as the Anthropic client the call sites expect. With a
+    `cache`, a structured call (no tools) whose request repeats exactly is answered from it."""
+    return cast(anthropic.AsyncAnthropic, RoutingClient(anthropic_client, llm, cache))

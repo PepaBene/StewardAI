@@ -18,6 +18,7 @@ from api.db import Pool
 from steward.budget_guard import month_bounds, month_of
 from steward.config.budget import AtCap, BudgetConfig
 from steward.config.store import load_active
+from steward.llm.types import provider_of
 
 router = APIRouter()
 
@@ -37,12 +38,20 @@ class JobTypeCost(BaseModel):
     cost_usd: float
     job_cap_usd: float | None = Field(description="The cap of one run of this type, if any.")
     critical: bool = Field(description="Keeps running at the monthly cap.")
+    cache_hit_rate: float | None = Field(
+        default=None,
+        description="Cache-read tokens / all input tokens of the month's steps; a silent drop"
+        " means a prompt prefix stopped being stable. Null: no input tokens.",
+    )
 
 
 class ModelCost(BaseModel):
     model: str
     steps: int
     cost_usd: float
+    provider: str = Field(
+        default="unknown", description="anthropic, openai or google, from the model id."
+    )
 
 
 class CostSummary(BaseModel):
@@ -66,6 +75,13 @@ def _f(value: Decimal) -> float:
     return float(value)
 
 
+def _provider(model: str) -> str:
+    try:
+        return provider_of(model)
+    except ValueError:
+        return "unknown"
+
+
 @router.get("/costs/summary", tags=["costs"])
 async def cost_summary(pool: Pool, _owner: Owner, month: MonthParam = None) -> CostSummary:
     """A month's AI spend against the Budget config's monthly cap, by job type and by
@@ -82,7 +98,10 @@ async def cost_summary(pool: Pool, _owner: Owner, month: MonthParam = None) -> C
         f"select coalesce(sum(s.cost_usd), 0) {in_month}", start, end
     )
     by_type = await pool.fetch(
-        f"select j.job_type, count(distinct s.job_id) as runs, sum(s.cost_usd) as cost {in_month}"
+        "select j.job_type, count(distinct s.job_id) as runs, sum(s.cost_usd) as cost,"
+        " sum(s.cache_read_tokens) as cache_read,"
+        " sum(coalesce(s.input_tokens, 0) + coalesce(s.cache_read_tokens, 0)"
+        f" + coalesce(s.cache_write_tokens, 0)) as all_input {in_month}"
         " group by j.job_type order by cost desc, j.job_type",
         start,
         end,
@@ -110,10 +129,19 @@ async def cost_summary(pool: Pool, _owner: Owner, month: MonthParam = None) -> C
                 cost_usd=_f(r["cost"]),
                 job_cap_usd=cfg.job_cap(r["job_type"]),
                 critical=r["job_type"] in cfg.critical_job_types,
+                cache_hit_rate=(
+                    float(r["cache_read"] or 0) / float(r["all_input"]) if r["all_input"] else None
+                ),
             )
             for r in by_type
         ],
         by_model=[
-            ModelCost(model=r["model"], steps=r["steps"], cost_usd=_f(r["cost"])) for r in by_model
+            ModelCost(
+                model=r["model"],
+                steps=r["steps"],
+                cost_usd=_f(r["cost"]),
+                provider=_provider(r["model"]),
+            )
+            for r in by_model
         ],
     )

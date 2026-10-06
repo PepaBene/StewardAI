@@ -33,6 +33,7 @@ from steward.config.prompts import load_prompts
 from steward.config.store import load_active
 from steward.free_sources import collect_finnhub_research, set_peer_status
 from steward.jobs.runner import JobContext, JobFailed
+from steward.llm.cache import ResultCache
 from steward.llm.client import create_llm
 from steward.llm.routing import routing_client
 from steward.reference.listings import ListingDecisionError, confirm_listing
@@ -462,7 +463,12 @@ async def ai_approvals_handler(ctx: JobContext) -> None:
             return
         try:
             anthropic_client = create_client(settings)
-            client = routing_client(anthropic_client, create_llm(settings, anthropic_client))
+            client = routing_client(
+                anthropic_client,
+                create_llm(settings, anthropic_client),
+                # A suggestion judged on identical evidence is not judged again.
+                ResultCache(ctx.pool, "ai_approvals"),
+            )
         except AINotConfigured as exc:
             raise JobFailed(str(exc)) from exc
         if cfg.listings:

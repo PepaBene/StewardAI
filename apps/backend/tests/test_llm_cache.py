@@ -1,0 +1,85 @@
+import json
+from types import SimpleNamespace
+from typing import Any
+
+from pydantic import BaseModel
+
+from steward.llm.cache import ResultCache, request_key
+from steward.llm.client import LLM
+from steward.llm.routing import RoutingClient
+
+
+class Out(BaseModel):
+    label: str
+
+
+class FakePool:
+    def __init__(self) -> None:
+        self.rows: dict[str, str] = {}
+
+    async def fetchval(self, _sql: str, key: str, _days: int) -> str | None:
+        return self.rows.get(key)
+
+    async def execute(self, _sql: str, key: str, _job: str, _model: str, result: str) -> None:
+        self.rows[key] = result
+
+
+class FakeAnthropic:
+    def __init__(self) -> None:
+        self.calls = 0
+        self.messages = SimpleNamespace(parse=self.parse)
+
+    async def parse(self, **_kwargs: Any) -> Any:
+        self.calls += 1
+        return SimpleNamespace(
+            type="message", parsed_output=Out(label="yes"), stop_reason="end_turn", usage=None
+        )
+
+
+def test_the_key_changes_with_prompt_model_and_effort() -> None:
+    base = request_key("claude-sonnet-5", "sys", [{"role": "user", "content": "a"}], Out, None)
+    assert base == request_key(
+        "claude-sonnet-5", "sys", [{"role": "user", "content": "a"}], Out, None
+    )
+    assert base != request_key(
+        "claude-sonnet-5", "sys2", [{"role": "user", "content": "a"}], Out, None
+    )
+    assert base != request_key(
+        "claude-haiku-4-5", "sys", [{"role": "user", "content": "a"}], Out, None
+    )
+    assert base != request_key(
+        "claude-sonnet-5", "sys", [{"role": "user", "content": "b"}], Out, None
+    )
+    assert base != request_key(
+        "claude-sonnet-5", "sys", [{"role": "user", "content": "a"}], Out, "low"
+    )
+
+
+async def test_a_repeated_request_is_answered_from_the_cache() -> None:
+    pool = FakePool()
+    cache = ResultCache(pool, "ai_approvals")  # type: ignore[arg-type]
+    fake = FakeAnthropic()
+    client = RoutingClient(fake, LLM(), cache)  # type: ignore[arg-type]
+    args: dict[str, Any] = {
+        "model": "claude-sonnet-5",
+        "system": "s",
+        "messages": [{"role": "user", "content": "same"}],
+        "output_format": Out,
+    }
+    first = await client.messages.parse(**args)
+    second = await client.messages.parse(**args)
+    assert first.parsed_output == second.parsed_output == Out(label="yes")
+    assert fake.calls == 1 and (cache.hits, cache.misses) == (1, 1)
+    assert json.loads(next(iter(pool.rows.values()))) == {"label": "yes"}
+    await client.messages.parse(**{**args, "messages": [{"role": "user", "content": "other"}]})
+    assert fake.calls == 2
+
+
+async def test_a_call_with_tools_or_without_a_schema_is_never_cached() -> None:
+    pool = FakePool()
+    fake = FakeAnthropic()
+    client = RoutingClient(fake, LLM(), ResultCache(pool, "x"))  # type: ignore[arg-type]
+    args: dict[str, Any] = {"model": "claude-sonnet-5", "system": "s", "messages": []}
+    await client.messages.parse(**args, tools=[{"type": "web_search_20260209"}], output_format=Out)
+    await client.messages.parse(**args)
+    assert fake.calls == 2 and not pool.rows
