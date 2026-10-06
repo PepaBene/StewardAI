@@ -31,6 +31,31 @@ def calendar_period_end(fiscal_year: int, fiscal_period: str, fye_month: int) ->
     return dt.date(year, month, calendar.monthrange(year, month)[1])
 
 
+def label_year_for_end(
+    fiscal_year: int,
+    fiscal_period: str,
+    fye_month: int,
+    stated_end: dt.date | None,
+    tolerance_days: int,
+) -> int:
+    """The fiscal year in this module's convention (the year it ends in) for a period the
+    document labels `fiscal_year`. Companies that name the year by its start (Daiichi Sankyo's
+    FY2026 runs April 2026 to March 2027) print an end date a year off the expected one; the
+    printed date is trusted when it fits exactly one neighbouring year, else the label stays."""
+    if stated_end is None:
+        return fiscal_year
+
+    def near(year: int) -> bool:
+        end = calendar_period_end(year, fiscal_period, fye_month)
+        start = end.replace(day=1)
+        return min(abs((stated_end - end).days), abs((stated_end - start).days)) <= tolerance_days
+
+    if near(fiscal_year):
+        return fiscal_year
+    fits = [y for y in (fiscal_year + 1, fiscal_year - 1) if near(y)]
+    return fits[0] if len(fits) == 1 else fiscal_year
+
+
 def previous_quarter(fiscal_year: int, fiscal_period: str) -> tuple[int, str]:
     q = _END_QUARTER[fiscal_period]
     return (fiscal_year - 1, "Q4") if q == 1 else (fiscal_year, f"Q{q - 1}")

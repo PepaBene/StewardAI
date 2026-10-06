@@ -48,6 +48,16 @@ CURRENCY_MARKERS: dict[str, tuple[str, ...]] = {
     "SEK": ("sek", "kr", "krona"),
     "NOK": ("nok", "kr", "krone"),
     "PLN": ("pln", "zł", "zloty"),
+    "TWD": ("nt$", "twd", "ntd", "nt dollar", "taiwan dollar"),
+    "KRW": ("₩", "krw", "korean won"),
+    "BRL": ("r$", "brl", "reais", "brazilian real"),
+    "MXN": ("mxn", "mex$", "peso"),
+    "INR": ("₹", "inr", "rupee"),
+    "ZAR": ("zar", "rand"),
+    "ILS": ("₪", "ils", "nis", "shekel"),
+    "HUF": ("huf", "ft", "forint"),
+    "RON": ("ron", "lei"),
+    "TRY": ("₺", "try", "lira"),
 }
 
 

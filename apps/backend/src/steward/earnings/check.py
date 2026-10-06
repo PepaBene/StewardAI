@@ -41,7 +41,7 @@ from steward.earnings.locate import (
     Locator,
     SearchRequest,
 )
-from steward.earnings.periods import likely_reported_period
+from steward.earnings.periods import label_year_for_end, likely_reported_period
 from steward.earnings.schema import ExtractedFigure
 from steward.earnings.store import archive, load_known, load_owner_rejected, store_facts
 from steward.earnings.validate import ValidationContext, validate
@@ -353,6 +353,14 @@ async def earnings_check(ctx: JobContext, deps: EarningsDeps) -> None:
                 model=usage.model, document_kind=result.document_kind, not_found=result.not_found
             )
         figures, dropped = _usable(extracted, set(wanted))
+        figures = [
+            _in_year_of_end(
+                fig,
+                profile.fiscal_year_end_month,
+                config.verification.period_end_tolerance_days,
+            )
+            for fig in figures
+        ]
         step.detail.update(
             figures=len(extracted), from_xbrl=len(from_xbrl), dropped_unrequested=dropped
         )
@@ -402,6 +410,16 @@ async def earnings_check(ctx: JobContext, deps: EarningsDeps) -> None:
                 ticker,
                 report_date,
             )
+
+
+def _in_year_of_end(fig: ExtractedFigure, fye_month: int, tolerance_days: int) -> ExtractedFigure:
+    """The figure with its fiscal year in the year-it-ends-in convention (see `periods`)."""
+    try:
+        stated = dt.date.fromisoformat((fig.period_end or "")[:10])
+    except ValueError:
+        return fig
+    year = label_year_for_end(fig.fiscal_year, fig.fiscal_period, fye_month, stated, tolerance_days)
+    return fig if year == fig.fiscal_year else fig.model_copy(update={"fiscal_year": year})
 
 
 async def _filing_figures(
