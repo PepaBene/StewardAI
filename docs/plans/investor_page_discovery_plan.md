@@ -110,6 +110,26 @@ loading.
   off-cooldown slots; the approval call is small. Each job has its own cap in the budget
   config, inside the monthly $25 cap, and a hard per-run limit on searches.
 
+## Approval policy for the whole app (AI decides, the owner can overturn)
+
+No decision in the app waits for a human click. Everything that is currently "suggested" or
+"needs the owner" is decided by an AI approver, recorded, and reversible:
+
+- Applies to: web facts and IR pages (above), listing confirmation (currently
+  `instrument_security_link.status = suggested`), peer suggestions (`peer_set.status =
+  suggested`), contradiction/deal/relationship suggestions in the graph, and similar queues.
+- A decision stores: who decided (`ai:<model>` or the owner), the evidence consulted, the
+  reasons, confidence, and the policy version. Hard mechanical checks (identifier agreement,
+  currency, host match, quote present) come first; the AI only approves what passes them, and
+  anything it is unsure about stays `suggested`, not applied.
+- The owner can overturn any decision in the app (one click: reject or re-confirm). An owner
+  decision is final: no job or AI run ever overwrites it, and the AI never re-suggests what the
+  owner rejected.
+- Thresholds (confidence, tiers) and the list of auto-approved queues are config, so the owner
+  can switch a queue back to manual.
+- Rollout: AI approval is added queue by queue; each queue gets a weekly summary of what was
+  auto-approved so overturning is easy.
+
 ## Blocked pages and Playwright
 
 Checked 2026-10-06 with a plain request and a descriptive User-Agent: CSG

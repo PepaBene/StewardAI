@@ -4576,6 +4576,69 @@ export interface components {
             /** Notes */
             notes: string[];
         };
+        /**
+         * AiApprovalSettings
+         * @description AI approval of suggested listings and peers. Nothing waits for a click; every decision
+         *     is recorded with its reasons and the owner can overturn it (an owner decision is final).
+         */
+        AiApprovalSettings: {
+            /**
+             * Model
+             * @description Judges each suggestion from the evidence given.
+             * @default claude-sonnet-5
+             * @example claude-sonnet-5
+             */
+            model: string;
+            /**
+             * Effort
+             * @description Unset: effort is not sent and the model's default applies. On Haiku 4 models the level sets an extended-thinking budget instead (low 2k to max 32k tokens).
+             */
+            effort?: ("low" | "medium" | "high" | "xhigh" | "max") | null;
+            /**
+             * Listings
+             * @description Approve suggested listing matches.
+             * @default true
+             */
+            listings: boolean;
+            /**
+             * Peers
+             * @description Approve or reject suggested peers.
+             * @default true
+             */
+            peers: boolean;
+            /**
+             * Refresh Peers
+             * @description Fetch Finnhub peer candidates and EPS estimates for holdings that have none or whose are older than `peer_refresh_days`.
+             * @default true
+             */
+            refresh_peers: boolean;
+            /**
+             * Peer Refresh Days
+             * @default 30
+             */
+            peer_refresh_days: number;
+            /**
+             * Peer Refresh Per Run
+             * @default 8
+             */
+            peer_refresh_per_run: number;
+            /**
+             * Min Confidence
+             * @description Below this the suggestion is left as it is, for the next run or the owner.
+             * @default 0.8
+             */
+            min_confidence: number;
+            /**
+             * Max Confirmed Peers
+             * @default 8
+             */
+            max_confirmed_peers: number;
+            /**
+             * Max Calls Per Run
+             * @default 40
+             */
+            max_calls_per_run: number;
+        };
         /** AlertOut */
         AlertOut: {
             /** Id */
@@ -4987,7 +5050,7 @@ export interface components {
              * Critical Job Types
              * @description Job types that run normally at the monthly cap.
              */
-            critical_job_types?: ("portfolio_sync" | "earnings_check" | "thesis_verdicts" | "earnings_calendar" | "earnings_calendar_full" | "earnings_due" | "fact_reconcile" | "reference_data" | "price_history" | "intraday_prices" | "holiday_refresh" | "macro_collect" | "public_data_collect" | "source_audit" | "event_escalation" | "monitor" | "news_ingest" | "daily_digest" | "weekly_digest" | "research" | "ownership_13f" | "insider_trades" | "etf_look_through" | "monthly_review" | "chat" | "sec_xbrl" | "valuation_refresh" | "control_stakes" | "nport_holdings" | "fund_probes" | "fund_characteristics_audit" | "free_source_alerts" | "shadow_snapshot" | "shadow_report" | "raw_retention" | "zero_cost_gate" | "returns_refresh" | "exchange_probes" | "ir_releases" | "sec_fsds_backfill" | "pdmr_uk" | "graph_review" | "fmp_company" | "alpha_vantage_statements" | "epo_patents" | "companies_house_filings" | "edinet_filings" | "twelve_data_corporate_actions")[];
+            critical_job_types?: ("portfolio_sync" | "earnings_check" | "thesis_verdicts" | "earnings_calendar" | "earnings_calendar_full" | "earnings_due" | "fact_reconcile" | "reference_data" | "price_history" | "intraday_prices" | "holiday_refresh" | "macro_collect" | "public_data_collect" | "source_audit" | "event_escalation" | "monitor" | "news_ingest" | "daily_digest" | "weekly_digest" | "research" | "ownership_13f" | "insider_trades" | "etf_look_through" | "monthly_review" | "chat" | "sec_xbrl" | "valuation_refresh" | "control_stakes" | "nport_holdings" | "fund_probes" | "fund_characteristics_audit" | "free_source_alerts" | "shadow_snapshot" | "shadow_report" | "raw_retention" | "zero_cost_gate" | "returns_refresh" | "exchange_probes" | "ir_releases" | "sec_fsds_backfill" | "pdmr_uk" | "graph_review" | "fmp_company" | "alpha_vantage_statements" | "epo_patents" | "companies_house_filings" | "edinet_filings" | "twelve_data_corporate_actions" | "ai_approvals")[];
             /**
              * Per Job Cap Usd
              * @description Most AI spend of one run of a job type, in USD. A run over it fails.
@@ -11170,7 +11233,10 @@ export interface components {
             etf_look_through?: components["schemas"]["JobSchedule"];
             /** @description Shares outstanding and revenue by region / segment from the holdings' latest SEC XBRL filings; only filings not parsed yet are downloaded. Default: Tuesdays 05:40. */
             sec_xbrl?: components["schemas"]["JobSchedule"];
+            /** @description AI approval of suggested listings and peers (and the Finnhub peer refresh that feeds it). The owner can overturn any decision. Default: daily 07:10. */
+            ai_approvals?: components["schemas"]["JobSchedule"];
             earnings_check?: components["schemas"]["EarningsCheckSettings"];
+            ai_approval?: components["schemas"]["AiApprovalSettings"];
             earnings_calendar_settings?: components["schemas"]["EarningsCalendarSettings"];
             news?: components["schemas"]["NewsSettings"];
             digest?: components["schemas"]["DigestSettings"];
@@ -12188,6 +12254,12 @@ export interface components {
              * @description Job types whose failed runs alert (once per run).
              */
             alert_failed_jobs?: string[];
+            /**
+             * Stuck Run Minutes
+             * @description A run still going after this long alerts once (0: off). The largest jobs (13F loads, backfills) take an hour or more, so keep it above that.
+             * @default 240
+             */
+            stuck_run_minutes: number;
             /**
              * Missed Run Grace Minutes
              * @description A scheduled run that has not succeeded this long after its slot is missed.

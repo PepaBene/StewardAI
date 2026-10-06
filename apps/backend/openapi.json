@@ -14212,6 +14212,97 @@
         ],
         "title": "AggregateReport"
       },
+      "AiApprovalSettings": {
+        "properties": {
+          "model": {
+            "type": "string",
+            "pattern": "^claude-[a-z0-9.-]{1,64}$",
+            "title": "Model",
+            "description": "Judges each suggestion from the evidence given.",
+            "default": "claude-sonnet-5",
+            "examples": [
+              "claude-sonnet-5"
+            ]
+          },
+          "effort": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "low",
+                  "medium",
+                  "high",
+                  "xhigh",
+                  "max"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Effort",
+            "description": "Unset: effort is not sent and the model's default applies. On Haiku 4 models the level sets an extended-thinking budget instead (low 2k to max 32k tokens)."
+          },
+          "listings": {
+            "type": "boolean",
+            "title": "Listings",
+            "description": "Approve suggested listing matches.",
+            "default": true
+          },
+          "peers": {
+            "type": "boolean",
+            "title": "Peers",
+            "description": "Approve or reject suggested peers.",
+            "default": true
+          },
+          "refresh_peers": {
+            "type": "boolean",
+            "title": "Refresh Peers",
+            "description": "Fetch Finnhub peer candidates and EPS estimates for holdings that have none or whose are older than `peer_refresh_days`.",
+            "default": true
+          },
+          "peer_refresh_days": {
+            "type": "integer",
+            "maximum": 365.0,
+            "minimum": 1.0,
+            "title": "Peer Refresh Days",
+            "default": 30
+          },
+          "peer_refresh_per_run": {
+            "type": "integer",
+            "maximum": 40.0,
+            "minimum": 1.0,
+            "title": "Peer Refresh Per Run",
+            "default": 8
+          },
+          "min_confidence": {
+            "type": "number",
+            "maximum": 1.0,
+            "minimum": 0.5,
+            "title": "Min Confidence",
+            "description": "Below this the suggestion is left as it is, for the next run or the owner.",
+            "default": 0.8
+          },
+          "max_confirmed_peers": {
+            "type": "integer",
+            "maximum": 20.0,
+            "minimum": 1.0,
+            "title": "Max Confirmed Peers",
+            "default": 8
+          },
+          "max_calls_per_run": {
+            "type": "integer",
+            "maximum": 200.0,
+            "minimum": 1.0,
+            "title": "Max Calls Per Run",
+            "default": 40
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "AiApprovalSettings",
+        "description": "AI approval of suggested listings and peers. Nothing waits for a click; every decision\nis recorded with its reasons and the owner can overturn it (an owner decision is final)."
+      },
       "AlertOut": {
         "properties": {
           "id": {
@@ -15339,7 +15430,8 @@
                 "epo_patents",
                 "companies_house_filings",
                 "edinet_filings",
-                "twelve_data_corporate_actions"
+                "twelve_data_corporate_actions",
+                "ai_approvals"
               ]
             },
             "type": "array",
@@ -15399,7 +15491,8 @@
                 "epo_patents",
                 "companies_house_filings",
                 "edinet_filings",
-                "twelve_data_corporate_actions"
+                "twelve_data_corporate_actions",
+                "ai_approvals"
               ]
             },
             "type": "object",
@@ -32519,8 +32612,15 @@
             "$ref": "#/components/schemas/JobSchedule",
             "description": "Shares outstanding and revenue by region / segment from the holdings' latest SEC XBRL filings; only filings not parsed yet are downloaded. Default: Tuesdays 05:40."
           },
+          "ai_approvals": {
+            "$ref": "#/components/schemas/JobSchedule",
+            "description": "AI approval of suggested listings and peers (and the Finnhub peer refresh that feeds it). The owner can overturn any decision. Default: daily 07:10."
+          },
           "earnings_check": {
             "$ref": "#/components/schemas/EarningsCheckSettings"
+          },
+          "ai_approval": {
+            "$ref": "#/components/schemas/AiApprovalSettings"
           },
           "earnings_calendar_settings": {
             "$ref": "#/components/schemas/EarningsCalendarSettings"
@@ -35396,6 +35496,14 @@
             "type": "array",
             "title": "Alert Failed Jobs",
             "description": "Job types whose failed runs alert (once per run)."
+          },
+          "stuck_run_minutes": {
+            "type": "integer",
+            "maximum": 2880.0,
+            "minimum": 0.0,
+            "title": "Stuck Run Minutes",
+            "description": "A run still going after this long alerts once (0: off). The largest jobs (13F loads, backfills) take an hour or more, so keep it above that.",
+            "default": 240
           },
           "missed_run_grace_minutes": {
             "type": "integer",

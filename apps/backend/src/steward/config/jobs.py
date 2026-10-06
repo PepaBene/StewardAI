@@ -209,6 +209,38 @@ class EarningsCalendarSettings(ConfigModel):
         return self
 
 
+class AiApprovalSettings(ConfigModel):
+    """AI approval of suggested listings and peers. Nothing waits for a click; every decision
+    is recorded with its reasons and the owner can overturn it (an owner decision is final)."""
+
+    model: ModelId = Field(
+        default="claude-sonnet-5", description="Judges each suggestion from the evidence given."
+    )
+    effort: Effort | None = Field(default=None, description=EFFORT_HELP)
+    listings: bool = Field(default=True, description="Approve suggested listing matches.")
+    peers: bool = Field(default=True, description="Approve or reject suggested peers.")
+    refresh_peers: bool = Field(
+        default=True,
+        description="Fetch Finnhub peer candidates and EPS estimates for holdings that have "
+        "none or whose are older than `peer_refresh_days`.",
+    )
+    peer_refresh_days: int = Field(default=30, ge=1, le=365)
+    peer_refresh_per_run: int = Field(default=8, ge=1, le=40)
+    min_confidence: float = Field(
+        default=0.8,
+        ge=0.5,
+        le=1.0,
+        description="Below this the suggestion is left as it is, for the next run or the owner.",
+    )
+    max_confirmed_peers: int = Field(default=8, ge=1, le=20)
+    max_calls_per_run: int = Field(default=40, ge=1, le=200)
+
+    @model_validator(mode="after")
+    def _effort_supported(self) -> Self:
+        check_effort(self.model, self.effort, "effort")
+        return self
+
+
 class NewsSettings(ConfigModel):
     """The news pipeline after ingest: classification, corroboration."""
 
@@ -931,6 +963,13 @@ class MonitorSettings(ConfigModel):
         ],
         description="Job types whose failed runs alert (once per run).",
     )
+    stuck_run_minutes: int = Field(
+        default=240,
+        ge=0,
+        le=2880,
+        description="A run still going after this long alerts once (0: off). The largest "
+        "jobs (13F loads, backfills) take an hour or more, so keep it above that.",
+    )
     missed_run_grace_minutes: int = Field(
         default=90,
         ge=5,
@@ -1565,7 +1604,13 @@ class JobsConfig(ConfigModel):
         "latest SEC XBRL filings; only filings not parsed yet are downloaded. Default: "
         "Tuesdays 05:40.",
     )
+    ai_approvals: JobSchedule = Field(
+        default_factory=lambda: JobSchedule(cron="10 7 * * *"),
+        description="AI approval of suggested listings and peers (and the Finnhub peer "
+        "refresh that feeds it). The owner can overturn any decision. Default: daily 07:10.",
+    )
     earnings_check: EarningsCheckSettings = Field(default_factory=EarningsCheckSettings)
+    ai_approval: AiApprovalSettings = Field(default_factory=AiApprovalSettings)
     earnings_calendar_settings: EarningsCalendarSettings = Field(
         default_factory=EarningsCalendarSettings
     )
@@ -1625,6 +1670,7 @@ class JobsConfig(ConfigModel):
             "epo_patents": self.epo_patents,
             "companies_house_filings": self.companies_house_filings,
             "edinet_filings": self.edinet_filings,
+            "ai_approvals": self.ai_approvals,
             "twelve_data_corporate_actions": self.twelve_data_corporate_actions,
             "etf_look_through": self.etf_look_through,
             "sec_xbrl": self.sec_xbrl,

@@ -17,6 +17,7 @@ export type ScheduleKey = {
 export type SettingsKey =
   | "earnings_check"
   | "earnings_calendar_settings"
+  | "ai_approval"
   | "news"
   | "digest"
   | "escalation"
@@ -270,6 +271,12 @@ export const SCHEDULES: Record<ScheduleKey, { label: string; description: string
       "Dividends and splits of holdings with a confirmed listing, stored as suggestions for you to confirm. Off by default; also needs the Twelve Data provider enabled.",
     cron: "50 10 * * 6",
   },
+  ai_approvals: {
+    label: "AI approvals",
+    description:
+      "Approves suggested listings and peers with AI (and refreshes Finnhub peer candidates first). Every decision is recorded and you can overturn it.",
+    cron: "10 7 * * *",
+  },
 };
 export const SCHEDULE_KEYS = Object.keys(SCHEDULES) as ScheduleKey[];
 
@@ -296,6 +303,18 @@ export const DEFAULT_JOBS: JobsConfig = {
     kpi_history_periods: 8,
   },
   earnings_calendar_settings: { model: "claude-haiku-4-5", effort: null, lookahead_days: 120, refresh_within_days: 14 },
+  ai_approval: {
+    model: "claude-sonnet-5",
+    effort: null,
+    listings: true,
+    peers: true,
+    refresh_peers: true,
+    peer_refresh_days: 30,
+    peer_refresh_per_run: 8,
+    min_confidence: 0.8,
+    max_confirmed_peers: 8,
+    max_calls_per_run: 40,
+  },
   news: {
     classification_model: "claude-haiku-4-5",
     classification_effort: null,
@@ -369,6 +388,7 @@ export const DEFAULT_JOBS: JobsConfig = {
       "price_history",
       "macro_collect",
     ],
+    stuck_run_minutes: 240,
     missed_run_grace_minutes: 90,
     news_coverage_hours: 48,
   },
@@ -512,6 +532,22 @@ export const SETTINGS: { [S in SettingsKey]: { title: string; description: strin
       { key: "refresh_within_days", label: "Weekly run: holdings reporting within (days)", kind: "int", min: 1, max: 120, hint: "The quarterly run refreshes every holding." },
     ],
   },
+  ai_approval: {
+    title: "AI approvals",
+    description: "Suggested listings and peers are approved by AI; you can overturn any decision, and your decision is final.",
+    fields: [
+      { key: "model", label: "Model", kind: "model", hint: "Judges each suggestion from the evidence given." },
+      { key: "effort", label: "Effort", kind: "effort-optional", hint: EFFORT_OPTIONAL_HINT },
+      { key: "listings", label: "Approve suggested listings", kind: "bool" },
+      { key: "peers", label: "Approve or reject suggested peers", kind: "bool" },
+      { key: "refresh_peers", label: "Refresh Finnhub peer candidates first", kind: "bool" },
+      { key: "peer_refresh_days", label: "Refresh peers older than (days)", kind: "int", min: 1, max: 365 },
+      { key: "peer_refresh_per_run", label: "Holdings refreshed per run", kind: "int", min: 1, max: 40 },
+      { key: "min_confidence", label: "Minimum confidence", kind: "number", hint: "Below this a suggestion stays as it is, for the next run or for you. 0.5 to 1." },
+      { key: "max_confirmed_peers", label: "Peers confirmed per holding", kind: "int", min: 1, max: 20 },
+      { key: "max_calls_per_run", label: "AI calls per run", kind: "int", min: 1, max: 200, hint: "Cost guard." },
+    ],
+  },
   news: {
     title: "News pipeline",
     description: "Classification and corroboration after each news check.",
@@ -570,6 +606,7 @@ export const SETTINGS: { [S in SettingsKey]: { title: string; description: strin
     description: "Failed jobs, missed scheduled runs and holdings without news coverage raise a system alert (its severity is set in Config: Notifications).",
     fields: [
       { key: "alert_failed_jobs", label: "Alert when these jobs fail", kind: "words", hint: "Job types separated by commas, e.g. portfolio_sync, news_ingest, earnings_check, macro_collect. One alert per failed run." },
+      { key: "stuck_run_minutes", label: "Alert when a run is still going after (minutes)", kind: "int", min: 0, max: 2880, hint: "0 turns it off. Keep it above the longest job (13F loads take an hour or more)." },
       { key: "missed_run_grace_minutes", label: "A scheduled run is missed after (minutes)", kind: "int", min: 5, max: 1440 },
       { key: "news_coverage_hours", label: "Coverage alert after no news run for (hours)", kind: "int", min: 6, max: 336 },
     ],

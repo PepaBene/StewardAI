@@ -213,6 +213,7 @@ export const ALERT_KIND_LABELS: Record<AlertKind, string> = {
 export const SYSTEM_EVENT_LABELS: Record<string, string> = {
   job_failed: "Failed job",
   missed_run: "Missed run",
+  job_stuck: "Job taking very long",
   coverage_gap: "Coverage gap",
 };
 

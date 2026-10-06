@@ -214,6 +214,7 @@ async def test_schedule_follows_the_jobs_config() -> None:
         return None
 
     assert apply_jobs_config(scheduler, JobsConfig(), run) == [
+        "ai_approvals",
         "alpha_vantage_statements",
         "companies_house_filings",
         "control_stakes",

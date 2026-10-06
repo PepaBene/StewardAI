@@ -63,6 +63,7 @@ const FULL: JobsConfig = {
   companies_house_filings: { enabled: false, cron: "10 10 * * 6", timezone: "UTC" },
   edinet_filings: { enabled: false, cron: "30 10 * * *", timezone: "UTC" },
   twelve_data_corporate_actions: { enabled: false, cron: "50 10 * * 6", timezone: "UTC" },
+  ai_approvals: { enabled: true, cron: "10 7 * * *", timezone: "UTC" },
   earnings_check: {
     extraction_model: "claude-opus-5-5",
     locate_model: "claude-sonnet-5",
@@ -75,6 +76,7 @@ const FULL: JobsConfig = {
     kpi_history_periods: 12,
   },
   earnings_calendar_settings: { model: "claude-haiku-4-5", effort: null, lookahead_days: 90, refresh_within_days: 21 },
+  ai_approval: { model: "claude-sonnet-5", effort: null, listings: true, peers: true, refresh_peers: true, peer_refresh_days: 30, peer_refresh_per_run: 8, min_confidence: 0.8, max_confirmed_peers: 8, max_calls_per_run: 40 },
   news: {
     classification_model: "claude-haiku-4-5",
     classification_effort: null,
@@ -116,7 +118,7 @@ const FULL: JobsConfig = {
     ecb: [{ key: "ecb_deposit_rate", label: "ECB deposit rate", flow_key: "FM/D.U2.EUR.4F.KR.DFR.LEV", unit: "%", policy_rate: false }],
     cnb: [{ key: "czeonia", label: "CZEONIA", series: "czeonia", unit: "%", policy_rate: false }],
   },
-  monitoring: { alert_failed_jobs: ["portfolio_sync", "macro_collect"], missed_run_grace_minutes: 120, news_coverage_hours: 72 },
+  monitoring: { alert_failed_jobs: ["portfolio_sync", "macro_collect"], stuck_run_minutes: 240, missed_run_grace_minutes: 120, news_coverage_hours: 72 },
   reference: {
     openfigi_refresh_days: 14,
     wikidata_enabled: false,

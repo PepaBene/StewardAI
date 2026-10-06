@@ -130,9 +130,14 @@ async def run_monitor(ctx: JobContext, now: dt.datetime) -> None:
 
     async with ctx.step("failed_jobs") as step:
         outcomes = []
+        # A run a deploy interrupted is not a failure when a later run of the same job has
+        # since succeeded (the worker's catch-up does that on start).
         rows = await pool.fetch(
-            "select id, job_type, trigger, error, finished_at from public.job"
+            "select id, job_type, trigger, error, finished_at from public.job j"
             " where status = 'failed' and job_type = any($1::text[]) and finished_at >= $2"
+            " and not (coalesce(error, '') like 'interrupted%' and exists ("
+            "   select 1 from public.job later where later.job_type = j.job_type"
+            "   and later.id > j.id and later.status = 'succeeded'))"
             " order by id",
             settings.alert_failed_jobs,
             now - dt.timedelta(hours=24),
@@ -159,6 +164,42 @@ async def run_monitor(ctx: JobContext, now: dt.datetime) -> None:
             )
             if outcome:
                 outcomes.append(outcome)
+        step.detail["alerts"] = outcomes
+
+    async with ctx.step("stuck_jobs") as step:
+        outcomes = []
+        if settings.stuck_run_minutes:
+            limit = dt.timedelta(minutes=settings.stuck_run_minutes)
+            rows = await pool.fetch(
+                "select id, job_type, trigger, started_at from public.job"
+                " where status = 'running' and started_at < $1 and job_type <> 'monitor'"
+                " order by id",
+                now - limit,
+            )
+            for r in rows:
+                running = now - r["started_at"]
+                lines = [
+                    f"job {r['job_type']} is taking very long",
+                    f"Job {r['id']} ({r['trigger']}) has been running for "
+                    f"{int(running.total_seconds() // 60)} minutes (alert after "
+                    f"{settings.stuck_run_minutes}); it may be stuck or its worker may have died.",
+                ]
+                if app_url:
+                    lines.append(f"{app_url.rstrip('/')}/status")
+                outcome = await _alert(
+                    pool,
+                    notify,
+                    version,
+                    severity,
+                    "job_stuck",
+                    None,
+                    lines,
+                    f"stuck:{r['id']}",
+                    now,
+                    ctx.job_id,
+                )
+                if outcome:
+                    outcomes.append(outcome)
         step.detail["alerts"] = outcomes
 
     async with ctx.step("missed_runs") as step:
