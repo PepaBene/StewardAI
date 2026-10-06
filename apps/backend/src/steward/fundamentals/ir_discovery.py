@@ -15,6 +15,7 @@ by editing the profile or rolling the `holding_profiles` config back.
 """
 
 import html
+import json
 import logging
 import re
 from dataclasses import dataclass, field
@@ -30,10 +31,12 @@ from steward import __version__
 from steward.ai import AINotConfigured, Usage, create_client
 from steward.config.holding_profiles import HoldingProfile, HoldingProfilesConfig
 from steward.config.jobs import IrDiscoverySettings, JobsConfig, effort_kwargs
+from steward.config.prompts import PromptsConfig, load_prompts
 from steward.config.store import ConfigConflictError, load_active, save_config
 from steward.earnings.locate import _result_urls
-from steward.fundamentals.ir import IrError, assert_fetchable, fetch_document
+from steward.fundamentals.ir import IrError, assert_fetchable
 from steward.jobs.runner import JobContext, JobFailed
+from steward.research.polite import PoliteFetcher
 from steward.settings import get_settings
 
 logger = logging.getLogger("steward.ir_discovery")
@@ -149,12 +152,10 @@ def check_url_shape(url: str, ir_host: str | None, seen: set[str], denied: list[
     return problems
 
 
-async def inspect_page(
-    http: httpx.AsyncClient, url: str, names: list[str], denied: list[str]
-) -> Fetched:
+async def inspect_page(fetcher: PoliteFetcher, url: str, names: list[str]) -> Fetched:
     out = Fetched(url)
     try:
-        doc = await fetch_document(http, url, max_bytes=2_000_000)
+        doc = await fetcher.get(url, max_bytes=2_000_000)
     except (IrError, httpx.HTTPError) as exc:
         out.problems.append(f"does not load: {str(exc)[:120]}")
         return out
@@ -175,6 +176,7 @@ async def search_pages(
     cfg: IrDiscoverySettings,
     prompt: str,
     usage: Usage,
+    system: str = SEARCH_SYSTEM,
 ) -> tuple[IrPages | None, set[str]]:
     tool = {
         "type": "web_search_20250305"
@@ -190,7 +192,7 @@ async def search_pages(
     for _ in range(3):  # pause_turn continuations
         response = await client.messages.parse(
             model=cfg.model,
-            system=SEARCH_SYSTEM,
+            system=system,
             messages=cast(Any, messages),
             tools=cast(Any, [tool]),
             output_format=IrPages,
@@ -212,6 +214,7 @@ async def judge_pages(
     aliases: list[str],
     pages: list[Fetched],
     usage: Usage,
+    system: str = APPROVE_SYSTEM,
 ) -> dict[str, PageVerdict]:
     listing = "\n\n".join(
         f"URL: {p.url}\nTitle: {p.title}\nText: {p.text[:PAGE_TEXT_CHARS]}" for p in pages
@@ -222,7 +225,7 @@ async def judge_pages(
     )
     response = await client.messages.parse(
         model=cfg.model,
-        system=APPROVE_SYSTEM,
+        system=system,
         messages=[{"role": "user", "content": prompt}],
         output_format=PageVerdicts,
         **effort_kwargs(cfg.model, cfg.effort, 3000),
@@ -259,12 +262,13 @@ def merge_pages(
 async def discover_holding(
     ctx: JobContext,
     client: anthropic.AsyncAnthropic,
-    http: httpx.AsyncClient,
+    fetcher: PoliteFetcher,
     cfg: IrDiscoverySettings,
     profile: HoldingProfile,
     name: str,
     isin: str | None,
     usage: Usage,
+    prompts: PromptsConfig | None = None,
 ) -> tuple[str, dict[str, Any], dict[str, Any]]:
     """(outcome, detail, fields to apply) for one holding."""
     names = [n for n in [name, profile.company_name, *profile.aliases] if n]
@@ -273,7 +277,10 @@ async def discover_holding(
         f"Known names: {', '.join(profile.aliases) or 'none'}\n"
         "Find its investor-relations website."
     )
-    pages, seen = await search_pages(client, cfg, prompt, usage)
+    prompts = prompts or PromptsConfig()
+    pages, seen = await search_pages(
+        client, cfg, prompt, usage, prompts.text("ir_discovery_search", SEARCH_SYSTEM)
+    )
     detail: dict[str, Any] = {"searched": True}
     if pages is None or not pages.ir_url:
         detail["reason"] = pages.reason if pages else "no answer"
@@ -292,7 +299,7 @@ async def discover_holding(
         if problems:
             rejected[url] = problems
             continue
-        page = await inspect_page(http, url, names, cfg.denied_domains)
+        page = await inspect_page(fetcher, url, names)
         if page.usable:
             fetched.append(page)
         else:
@@ -301,15 +308,23 @@ async def discover_holding(
     if not fetched:
         return "left", detail, {}
     verdicts = await judge_pages(
-        client, cfg, name or profile.ticker, isin, profile.aliases, fetched, usage
+        client,
+        cfg,
+        name or profile.ticker,
+        isin,
+        profile.aliases,
+        fetched,
+        usage,
+        prompts.text("ir_discovery_approve", APPROVE_SYSTEM),
     )
+    checked_urls = {p.url for p in fetched}  # a verdict on a page nobody fetched is ignored
     detail["verdicts"] = {
         u: f"{v.role} {v.confidence:.2f}: {v.reason}" for u, v in verdicts.items()
     }
     ok = {
         u: v
         for u, v in verdicts.items()
-        if v.role != "reject" and v.confidence >= cfg.min_confidence
+        if u in checked_urls and v.role != "reject" and v.confidence >= cfg.min_confidence
     }
     ir_home = next((u for u, v in ok.items() if v.role == "ir_home"), None)
     if ir_home is None:
@@ -342,6 +357,99 @@ async def register_results_pages(
             if row_id is not None:
                 added.setdefault(profile.ticker, []).append(url)
     return added
+
+
+def drop_url(profile: HoldingProfile, url: str) -> HoldingProfile | None:
+    """The profile without `url` in the fields discovery fills, or None when it is not there
+    (the owner changed it meanwhile: leave it alone)."""
+    body = profile.model_dump(mode="json")
+    url = str(pydantic.TypeAdapter(pydantic.AnyHttpUrl).validate_python(url))  # as stored
+    changed = False
+    for key in ("ir_url", "financial_calendar_url"):
+        if body.get(key) == url:
+            body[key] = None
+            changed = True
+    kept = [u for u in body.get("results_urls") or [] if u != url]
+    if len(kept) != len(body.get("results_urls") or []):
+        body["results_urls"] = kept
+        changed = True
+    return HoldingProfile.model_validate(body) if changed else None
+
+
+async def recheck_found_pages(
+    ctx: JobContext,
+    fetcher: PoliteFetcher,
+    body: HoldingProfilesConfig,
+    config_id: int,
+) -> tuple[HoldingProfilesConfig, int, dict[str, Any]]:
+    """Weekly: reload every page discovery applied. A page that fails twice in a row is
+    dropped from the profile (only if it is still the value discovery set) and its poll is
+    switched off. Returns the (possibly new) profiles, their config id and a summary."""
+    summary: dict[str, Any] = {"checked": 0, "failed": [], "dropped": []}
+    rows = await ctx.pool.fetch(
+        "select distinct on (ticker) ticker, detail from public.ir_discovery_decision"
+        " where outcome = 'applied' order by ticker, id desc"
+    )
+    for row in rows:
+        ticker = row["ticker"]
+        applied = json.loads(row["detail"]) if isinstance(row["detail"], str) else row["detail"]
+        found = applied.get("applied") or {}
+        urls = [
+            *([found["ir_url"]] if found.get("ir_url") else []),
+            *([found["financial_calendar_url"]] if found.get("financial_calendar_url") else []),
+            *(found.get("results_urls") or []),
+        ]
+        if not urls:
+            continue
+        previous = await ctx.pool.fetchval(
+            "select detail from public.ir_discovery_decision where ticker = $1"
+            " and detail ? 'recheck' order by id desc limit 1",
+            ticker,
+        )
+        before: set[str] = set()
+        if previous:
+            parsed = json.loads(previous) if isinstance(previous, str) else previous
+            before = set(parsed["recheck"].get("failed", []))
+        failed: list[str] = []
+        for url in urls:
+            summary["checked"] += 1
+            try:
+                await fetcher.get(url, max_bytes=2_000_000)
+            except (IrError, httpx.HTTPError):
+                failed.append(url)
+        if not failed and not before:
+            continue
+        await _log(ctx, ticker, "left", config_id, {"recheck": {"failed": failed}})
+        summary["failed"].extend(failed)
+        for url in [u for u in failed if u in before]:
+            profile = body.for_ticker(ticker)
+            trimmed = drop_url(profile, url) if profile else None
+            if trimmed is None:
+                continue
+            updated = body.model_copy(
+                update={"profiles": [trimmed if p.ticker == ticker else p for p in body.profiles]}
+            )
+            try:
+                async with ctx.pool.acquire() as conn:
+                    saved = await save_config(
+                        conn,
+                        "holding_profiles",
+                        updated,
+                        created_by=None,
+                        note=f"Dropped {url} for {ticker}: it failed two weekly re-checks",
+                        expected_active_id=config_id,
+                    )
+            except ConfigConflictError:
+                summary["conflict"] = True
+                return body, config_id, summary
+            config_id, body = saved.id, saved.body
+            await ctx.pool.execute(
+                "update public.issuer_ir_source set active = false where ticker = $1 and url = $2",
+                ticker,
+                url,
+            )
+            summary["dropped"].append(url)
+    return body, config_id, summary
 
 
 async def ir_discovery_handler(ctx: JobContext) -> None:
@@ -381,13 +489,25 @@ async def ir_discovery_handler(ctx: JobContext) -> None:
     results: dict[str, Any] = {}
     config_id = profiles_stored.id
     body = profiles_stored.body
-    async with ctx.step("discover") as step:
-        async with httpx.AsyncClient(
+    prompts = await load_prompts(ctx.pool)
+
+    def new_client() -> httpx.AsyncClient:
+        return httpx.AsyncClient(
             timeout=30.0,
             headers={
                 "User-Agent": f"{settings.sec_user_agent or 'StewardAI'} StewardAI/{__version__}"
             },
-        ) as http:
+        )
+
+    async with ctx.step("recheck") as step, new_client() as http:
+        body, config_id, summary = await recheck_found_pages(
+            ctx, PoliteFetcher(http), body, config_id
+        )
+        step.detail.update(summary)
+    due = [(seen, p) for seen, p in due if (body.for_ticker(p.ticker) or p).ir_url is None]
+    async with ctx.step("discover") as step:
+        async with new_client() as http:
+            fetcher = PoliteFetcher(http)
             for _seen_at, profile in due:
                 row = await ctx.pool.fetchrow(
                     "select name, isin from public.instrument where t212_ticker = $1",
@@ -396,7 +516,15 @@ async def ir_discovery_handler(ctx: JobContext) -> None:
                 name = (row["name"] if row else None) or profile.company_name
                 try:
                     outcome, detail, fields = await discover_holding(
-                        ctx, client, http, cfg, profile, name, row["isin"] if row else None, usage
+                        ctx,
+                        client,
+                        fetcher,
+                        cfg,
+                        profile,
+                        name,
+                        row["isin"] if row else None,
+                        usage,
+                        prompts,
                     )
                 except (anthropic.APIError, pydantic.ValidationError, ValueError) as exc:
                     outcome, detail, fields = "error", {"error": str(exc)[:200]}, {}
@@ -447,8 +575,6 @@ async def ir_discovery_handler(ctx: JobContext) -> None:
 async def _log(
     ctx: JobContext, ticker: str, outcome: str, config_id: int, detail: dict[str, Any]
 ) -> None:
-    import json
-
     await ctx.pool.execute(
         "insert into public.ir_discovery_decision (ticker, outcome, config_id, detail)"
         " values ($1, $2, $3, $4::jsonb)",

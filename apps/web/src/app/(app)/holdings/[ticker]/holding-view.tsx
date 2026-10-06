@@ -42,6 +42,7 @@ import { OwnershipSection, useHoldingOwnership } from "@/components/reference/ow
 import { PriceRiskSection } from "@/components/reference/price-risk-section";
 import { ValuationPanel } from "@/components/reference/valuation-panel";
 import { SegmentsPanel } from "@/components/reference/segments-panel";
+import { WebFactsPanel } from "@/components/reference/web-facts-panel";
 import { HoldingResearch } from "@/components/research/holding-research";
 import { Blueprint, PanelHeading } from "@/components/ui/blueprint";
 import { Button } from "@/components/ui/button";
@@ -291,6 +292,8 @@ export function HoldingContent({
       <CashDebtPanel ticker={ticker} />
 
       <PeerPanel ticker={ticker} />
+
+      <WebFactsPanel ticker={ticker} />
 
       <EstimatesPanel ticker={ticker} />
 

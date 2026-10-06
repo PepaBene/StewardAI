@@ -40,13 +40,15 @@ from steward import __version__
 from steward.ai import AINotConfigured, Usage, create_client
 from steward.config.holding_profiles import HoldingProfilesConfig
 from steward.config.jobs import GapResearchSettings, JobsConfig, effort_kwargs
+from steward.config.prompts import PromptsConfig, load_prompts
 from steward.config.store import load_active
 from steward.earnings.calendar import _holding_tickers, date_in_text, set_report_date
 from steward.earnings.locate import _result_urls
-from steward.fundamentals.ir import IrError, document_lines, fetch_document
+from steward.fundamentals.ir import IrError, document_lines
 from steward.fundamentals.ir_discovery import host_denied, is_blocked_page, registrable
 from steward.jobs.runner import JobContext, JobFailed
 from steward.research.gaps import SLOTS, Slot, find_gaps
+from steward.research.polite import PoliteFetcher
 from steward.settings import get_settings
 
 logger = logging.getLogger("steward.web_facts")
@@ -194,10 +196,10 @@ def check_value(slot: Slot, cand: Candidate, today: dt.date) -> tuple[Checked | 
     return Checked(text), []
 
 
-async def load_page_text(http: httpx.AsyncClient, url: str) -> tuple[str | None, str | None]:
+async def load_page_text(fetcher: PoliteFetcher, url: str) -> tuple[str | None, str | None]:
     """(text, problem). HTML, PDF and xlsx are read; error and bot-check pages are refused."""
     try:
-        doc = await fetch_document(http, url, max_bytes=MAX_PAGE_BYTES)
+        doc = await fetcher.get(url, max_bytes=MAX_PAGE_BYTES)
         lines = document_lines(doc.body, doc.content_type)
     except (IrError, httpx.HTTPError, ValueError) as exc:
         return None, f"does not load: {str(exc)[:120]}"
@@ -217,6 +219,7 @@ async def search_candidates(
     company: str,
     isin: str | None,
     usage: Usage,
+    system: str = SEARCH_SYSTEM,
 ) -> tuple[Candidates | None, set[str]]:
     tool = {
         "type": "web_search_20250305"
@@ -236,7 +239,7 @@ async def search_candidates(
     for _ in range(3):  # pause_turn continuations
         response = await client.messages.parse(
             model=cfg.model,
-            system=SEARCH_SYSTEM,
+            system=system,
             messages=cast(Any, messages),
             tools=cast(Any, [tool]),
             output_format=Candidates,
@@ -260,6 +263,7 @@ async def judge_candidate(
     checked: Checked,
     host: str,
     usage: Usage,
+    system: str = APPROVE_SYSTEM,
 ) -> FactVerdict | None:
     prompt = (
         f"Company: {company}\nISIN: {isin or 'unknown'}\nFact: {slot.ask}\n"
@@ -268,7 +272,7 @@ async def judge_candidate(
     )
     response = await client.messages.parse(
         model=cfg.model,
-        system=APPROVE_SYSTEM,
+        system=system,
         messages=[{"role": "user", "content": prompt}],
         output_format=FactVerdict,
         **effort_kwargs(cfg.model, cfg.effort, 2000),
@@ -405,13 +409,14 @@ async def promote(pool: asyncpg.Pool, ids: list[int], reason: str, model: str) -
 async def research_slot(
     ctx: JobContext,
     client: anthropic.AsyncAnthropic,
-    http: httpx.AsyncClient,
+    fetcher: PoliteFetcher,
     cfg: GapResearchSettings,
     profiles: HoldingProfilesConfig,
     ticker: str,
     slot: Slot,
     usage: Usage,
     today: dt.date,
+    prompts: PromptsConfig | None = None,
 ) -> tuple[str, dict[str, Any]]:
     row = await ctx.pool.fetchrow(
         "select name, isin from public.instrument where t212_ticker = $1", ticker
@@ -419,7 +424,10 @@ async def research_slot(
     profile = profiles.for_ticker(ticker)
     company = (row["name"] if row else None) or (profile.company_name if profile else "") or ticker
     isin = row["isin"] if row else None
-    found, seen = await search_candidates(client, cfg, slot, company, isin, usage)
+    prompts = prompts or PromptsConfig()
+    found, seen = await search_candidates(
+        client, cfg, slot, company, isin, usage, prompts.text("web_gap_search", SEARCH_SYSTEM)
+    )
     detail: dict[str, Any] = {"candidates": []}
     if found is None or not found.candidates:
         return "none", detail
@@ -439,7 +447,9 @@ async def research_slot(
         tier = classify(cand.url, issuer_hosts, cfg)
         entry["tier"] = tier
         checked, problems = check_value(slot, cand, today)
-        text, page_problem = await load_page_text(http, cand.url)
+        text, page_problem = (
+            await load_page_text(fetcher, cand.url) if tier_allowed(tier, slot) else (None, None)
+        )
         if page_problem:
             problems.append(page_problem)
         elif text is not None and not quote_in_text(cand.quote, text):
@@ -455,7 +465,16 @@ async def research_slot(
             verdict = None
         else:
             verdict = await judge_candidate(
-                client, cfg, slot, company, isin, cand, checked, host, usage
+                client,
+                cfg,
+                slot,
+                company,
+                isin,
+                cand,
+                checked,
+                host,
+                usage,
+                prompts.text("web_fact_approve", APPROVE_SYSTEM),
             )
             others = (
                 await _agrees(ctx.pool, ticker, slot.key, checked.value_text, host)
@@ -558,10 +577,21 @@ async def gap_research_handler(ctx: JobContext) -> None:
                 "User-Agent": f"{settings.sec_user_agent or 'StewardAI'} StewardAI/{__version__}"
             },
         ) as http:
+            fetcher = PoliteFetcher(http)
+            prompts = await load_prompts(ctx.pool)
             for ticker, key in due:
                 try:
                     outcome, detail = await research_slot(
-                        ctx, client, http, cfg, profiles, ticker, SLOTS[key], usage, today
+                        ctx,
+                        client,
+                        fetcher,
+                        cfg,
+                        profiles,
+                        ticker,
+                        SLOTS[key],
+                        usage,
+                        today,
+                        prompts,
                     )
                 except (anthropic.APIError, pydantic.ValidationError, ValueError) as exc:
                     outcome, detail = "error", {"error": str(exc)[:200]}

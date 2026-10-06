@@ -31,6 +31,12 @@ PromptKey = Literal[
     "monthly_review",
     "chat_assistant",
     "claim_verifier",
+    "ir_discovery_search",
+    "ir_discovery_approve",
+    "web_gap_search",
+    "web_fact_approve",
+    "listing_approval",
+    "peer_approval",
 ]
 
 PromptText = Annotated[str, Field(min_length=20, max_length=50_000)]
@@ -100,6 +106,36 @@ PROMPTS: dict[PromptKey, PromptInfo] = {
         "Claim verifier",
         "Checks each written sentence against the snippets it cites.",
         "steward.verify.claims:SYSTEM",
+    ),
+    "ir_discovery_search": PromptInfo(
+        "Investor page search",
+        "Searches the web for a holding's investor-relations, results and calendar pages.",
+        "steward.fundamentals.ir_discovery:SEARCH_SYSTEM",
+    ),
+    "ir_discovery_approve": PromptInfo(
+        "Investor page approval",
+        "Judges whether the fetched pages are the company's own investor pages.",
+        "steward.fundamentals.ir_discovery:APPROVE_SYSTEM",
+    ),
+    "web_gap_search": PromptInfo(
+        "Gap research search",
+        "Searches reliable web pages for a fact the data sources left empty.",
+        "steward.research.web_facts:SEARCH_SYSTEM",
+    ),
+    "web_fact_approve": PromptInfo(
+        "Web fact approval",
+        "Judges whether a quoted passage supports the proposed fact for this company.",
+        "steward.research.web_facts:APPROVE_SYSTEM",
+    ),
+    "listing_approval": PromptInfo(
+        "Listing approval",
+        "Decides whether a derived exchange listing is the right one for a held security.",
+        "steward.approvals.ai:LISTING_SYSTEM",
+    ),
+    "peer_approval": PromptInfo(
+        "Peer approval",
+        "Decides which vendor-suggested peers belong in a holding's peer set.",
+        "steward.approvals.ai:PEER_SYSTEM",
     ),
 }
 

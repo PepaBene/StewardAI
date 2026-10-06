@@ -29,6 +29,7 @@ from steward import __version__
 from steward.ai import AINotConfigured, Usage, create_client
 from steward.config.holding_profiles import HoldingProfile, HoldingProfilesConfig
 from steward.config.jobs import AiApprovalSettings, JobsConfig, effort_kwargs
+from steward.config.prompts import load_prompts
 from steward.config.store import load_active
 from steward.free_sources import collect_finnhub_research, set_peer_status
 from steward.jobs.runner import JobContext, JobFailed
@@ -132,6 +133,7 @@ async def approve_listings(
     cfg: AiApprovalSettings,
     profiles: HoldingProfilesConfig,
     budget: dict[str, int],
+    system: str = LISTING_SYSTEM,
 ) -> dict[str, Any]:
     rows = await ctx.pool.fetch(
         "select l.ticker, i.name, i.isin, sl.mic, sl.ticker as symbol, sl.currency"
@@ -163,7 +165,7 @@ async def approve_listings(
         try:
             response = await client.messages.parse(
                 model=cfg.model,
-                system=LISTING_SYSTEM,
+                system=system,
                 messages=[{"role": "user", "content": prompt}],
                 output_format=ListingVerdict,
                 **effort_kwargs(cfg.model, cfg.effort, 1500),
@@ -254,6 +256,7 @@ async def approve_peers(
     profiles: HoldingProfilesConfig,
     http: httpx.AsyncClient,
     budget: dict[str, int],
+    system: str = PEER_SYSTEM,
 ) -> dict[str, Any]:
     rows = await ctx.pool.fetch(
         "select id, ticker, peer_ticker from public.peer_set"
@@ -312,7 +315,7 @@ async def approve_peers(
         try:
             response = await client.messages.parse(
                 model=cfg.model,
-                system=PEER_SYSTEM,
+                system=system,
                 messages=[{"role": "user", "content": prompt}],
                 output_format=PeerVerdicts,
                 **effort_kwargs(cfg.model, cfg.effort, 3000),
@@ -424,6 +427,7 @@ async def ai_approvals_handler(ctx: JobContext) -> None:
     profiles_stored = await load_active(ctx.pool, "holding_profiles", HoldingProfilesConfig)
     profiles = profiles_stored.body if profiles_stored else HoldingProfilesConfig()
     budget = {"calls": cfg.max_calls_per_run}
+    prompts = await load_prompts(ctx.pool)
     async with httpx.AsyncClient(
         timeout=30.0,
         headers={"User-Agent": f"{settings.sec_user_agent or 'StewardAI'} StewardAI/{__version__}"},
@@ -439,12 +443,27 @@ async def ai_approvals_handler(ctx: JobContext) -> None:
             raise JobFailed(str(exc)) from exc
         if cfg.listings:
             async with ctx.step("listings") as step:
-                done = await approve_listings(ctx, client, cfg, profiles, budget)
+                done = await approve_listings(
+                    ctx,
+                    client,
+                    cfg,
+                    profiles,
+                    budget,
+                    prompts.text("listing_approval", LISTING_SYSTEM),
+                )
                 step.usage = done.pop("usage").step_usage()
                 step.detail.update(done)
         if cfg.peers:
             async with ctx.step("peers") as step:
-                done = await approve_peers(ctx, client, cfg, profiles, http, budget)
+                done = await approve_peers(
+                    ctx,
+                    client,
+                    cfg,
+                    profiles,
+                    http,
+                    budget,
+                    prompts.text("peer_approval", PEER_SYSTEM),
+                )
                 usage = done.pop("usage", None)
                 if usage is not None:
                     step.usage = usage.step_usage()

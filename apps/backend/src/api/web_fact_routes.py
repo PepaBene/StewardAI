@@ -1,8 +1,10 @@
-"""Facts found by web research (`gap_research`) and the owner's power to overturn them."""
+"""Facts found by web research (`gap_research`), the owner's power to overturn them, and the
+summary of everything the AI approvers decided on the owner's behalf."""
 
+import datetime as dt
 from typing import Annotated, Any, Literal
 
-from fastapi import APIRouter, HTTPException, Path
+from fastapi import APIRouter, HTTPException, Path, Query
 from pydantic import BaseModel, Field
 
 from api.auth import Owner
@@ -52,3 +54,48 @@ async def decide_web_fact(
     if row is None:
         raise HTTPException(404, f"No web fact {fact_id}")
     return dict(row)
+
+
+@router.get("/approvals/ai-summary", tags=["approvals"], response_model=None)
+async def ai_approval_summary(
+    pool: Pool, _owner: Owner, days: Annotated[int, Query(ge=1, le=90)] = 7
+) -> dict[str, Any]:
+    """What the AI approvers decided in the last `days` days, per queue, so any decision is
+    easy to find and overturn: suggested listings, peers, investor pages and web facts."""
+    interval = dt.timedelta(days=days)
+    listings = await pool.fetch(
+        """select ticker, status, decided_at, evidence ->> 'owner_reason' as reason
+           from public.instrument_security_link
+           where decided_by is null and evidence ->> 'owner_reason' like 'AI approval%'
+             and decided_at >= now() - $1::interval order by decided_at desc""",
+        interval,
+    )
+    peers = await pool.fetch(
+        """select p.id, p.ticker, p.peer_ticker, p.status, e ->> 'reason' as reason,
+                  (e ->> 'at')::timestamptz as at
+           from public.peer_set p, jsonb_array_elements(p.status_history) e
+           where e ->> 'reason' like 'AI approval%'
+             and (e ->> 'at')::timestamptz >= now() - $1::interval order by at desc""",
+        interval,
+    )
+    pages = await pool.fetch(
+        """select ticker, attempted_at, detail -> 'applied' as applied
+           from public.ir_discovery_decision
+           where outcome = 'applied' and attempted_at >= now() - $1::interval
+           order by attempted_at desc""",
+        interval,
+    )
+    facts = await pool.fetch(
+        """select id, ticker, slot, value_text, tier, status, confidence, source_url, retrieved_at
+           from public.web_fact
+           where decided_by like 'ai:%' and retrieved_at >= now() - $1::interval
+           order by retrieved_at desc""",
+        interval,
+    )
+    return {
+        "days": days,
+        "listings": [dict(r) for r in listings],
+        "peers": [dict(r) for r in peers],
+        "investor_pages": [dict(r) for r in pages],
+        "web_facts": [dict(r) for r in facts],
+    }

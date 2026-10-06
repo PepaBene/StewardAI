@@ -7241,6 +7241,55 @@
         }
       }
     },
+    "/approvals/ai-summary": {
+      "get": {
+        "tags": [
+          "approvals"
+        ],
+        "summary": "Ai Approval Summary",
+        "description": "What the AI approvers decided in the last `days` days, per queue, so any decision is\neasy to find and overturn: suggested listings, peers, investor pages and web facts.",
+        "operationId": "ai_approval_summary",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "days",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 90,
+              "minimum": 1,
+              "default": 7,
+              "title": "Days"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/feedback": {
       "post": {
         "tags": [
@@ -40087,7 +40136,13 @@
               "research_writer",
               "monthly_review",
               "chat_assistant",
-              "claim_verifier"
+              "claim_verifier",
+              "ir_discovery_search",
+              "ir_discovery_approve",
+              "web_gap_search",
+              "web_fact_approve",
+              "listing_approval",
+              "peer_approval"
             ],
             "title": "Key"
           },
@@ -40140,7 +40195,13 @@
                 "research_writer",
                 "monthly_review",
                 "chat_assistant",
-                "claim_verifier"
+                "claim_verifier",
+                "ir_discovery_search",
+                "ir_discovery_approve",
+                "web_gap_search",
+                "web_fact_approve",
+                "listing_approval",
+                "peer_approval"
               ]
             },
             "type": "object",

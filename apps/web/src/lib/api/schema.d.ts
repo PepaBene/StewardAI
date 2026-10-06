@@ -2412,6 +2412,27 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/approvals/ai-summary": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Ai Approval Summary
+         * @description What the AI approvers decided in the last `days` days, per queue, so any decision is
+         *     easy to find and overturn: suggested listings, peers, investor pages and web facts.
+         */
+        get: operations["ai_approval_summary"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/feedback": {
         parameters: {
             query?: never;
@@ -13951,7 +13972,7 @@ export interface components {
              * Key
              * @enum {string}
              */
-            key: "earnings_extraction" | "earnings_locate" | "earnings_calendar" | "news_classification" | "news_corroboration" | "news_escalation" | "news_digest" | "research_writer" | "monthly_review" | "chat_assistant" | "claim_verifier";
+            key: "earnings_extraction" | "earnings_locate" | "earnings_calendar" | "news_classification" | "news_corroboration" | "news_escalation" | "news_digest" | "research_writer" | "monthly_review" | "chat_assistant" | "claim_verifier" | "ir_discovery_search" | "ir_discovery_approve" | "web_gap_search" | "web_fact_approve" | "listing_approval" | "peer_approval";
             /** Title */
             title: string;
             /** Description */
@@ -21353,6 +21374,37 @@ export interface operations {
                 "application/json": components["schemas"]["WebFactDecision"];
             };
         };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    ai_approval_summary: {
+        parameters: {
+            query?: {
+                days?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
         responses: {
             /** @description Successful Response */
             200: {
