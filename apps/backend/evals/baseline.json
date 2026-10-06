@@ -3,17 +3,17 @@
   "recorded_at": "2026-10-06T07:52:14+00:00",
   "components": {
     "claims": {
-      "fingerprint": "a361d6b0e12987ca5cb96ed6765af2d17ec7dc99b2f219483bac092496eecb3c",
+      "fingerprint": "63383e925b93de8f0b6c651a8a7a57cc036ca56346145095d919f46796764434",
       "score": 1.0,
       "model": "claude-haiku-4-5"
     },
     "classification": {
-      "fingerprint": "0147620666dc0c1e29aa5c980a5d6cce588794ac25acec7029becdb9e2603f0e",
+      "fingerprint": "2c627bda9f9e920ffb45689e538e4c9e52c52a1f2370e41f9a89c938070d1528",
       "score": 0.97,
       "model": "claude-haiku-4-5"
     },
     "earnings": {
-      "fingerprint": "5bfea154430d9924e0bc6e9e906f3732a05ea0f647844c737c408735ad3e1a7a",
+      "fingerprint": "3dff6c29696c7aa51cd8249d88b675deaed48db1e31c36c4c2cf8bd24cf153e8",
       "score": 1.0,
       "model": "claude-sonnet-5"
     }

@@ -122,7 +122,8 @@ def fingerprint(component: Component) -> str:
         name = path.relative_to(BACKEND) if path.is_relative_to(BACKEND) else Path(path.name)
         digest.update(name.as_posix().encode())
         digest.update(b"\0")
-        digest.update(path.read_bytes())
+        # Line endings differ between a Windows checkout (CRLF) and CI (LF): hash LF.
+        digest.update(path.read_bytes().replace(b"\r\n", b"\n"))
         digest.update(b"\0")
     digest.update(component.model().encode())
     extra = component.extra()
