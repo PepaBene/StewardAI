@@ -26,8 +26,9 @@ class FakePool:
 class FakeLLM:
     """Stands in for `LLM`: counts the provider calls."""
 
-    def __init__(self) -> None:
+    def __init__(self, citations: list[Any] | None = None) -> None:
         self.calls = 0
+        self.citations = citations or []
 
     async def complete(self, _request: Any) -> Any:
         self.calls += 1
@@ -36,7 +37,7 @@ class FakeLLM:
             parsed=Out(label="yes"),
             usage=None,
             stop_reason="end",
-            citations=[],
+            citations=self.citations,
         )
 
 
@@ -87,3 +88,28 @@ async def test_a_call_with_tools_or_without_a_schema_is_never_cached() -> None:
     await client.messages.parse(**args, tools=[{"type": "web_search_20260209"}], output_format=Out)
     await client.messages.parse(**args)
     assert fake.calls == 2 and not pool.rows
+
+
+async def test_a_search_answer_is_cached_only_when_it_has_sources() -> None:
+    from steward.llm.types import Citation
+
+    args: dict[str, Any] = {
+        "model": "gemini-3.8-flash",
+        "system": "s",
+        "messages": [{"role": "user", "content": "find the IR site"}],
+        "tools": [{"type": "web_search_20260209"}],
+        "output_format": Out,
+    }
+    pool = FakePool()
+    unsourced = FakeLLM()  # answered from memory: no sources
+    cache = ResultCache(pool, "x", search_ttl_days=3)  # type: ignore[arg-type]
+    client = RoutingClient(None, unsourced, cache)  # type: ignore[arg-type]
+    await client.messages.parse(**args)
+    await client.messages.parse(**args)
+    assert unsourced.calls == 2 and not pool.rows
+
+    sourced = FakeLLM([Citation("https://ir.example.com/", "IR")])
+    client = RoutingClient(None, sourced, cache)  # type: ignore[arg-type]
+    await client.messages.parse(**args)
+    await client.messages.parse(**args)
+    assert sourced.calls == 1 and len(pool.rows) == 1

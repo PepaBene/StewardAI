@@ -153,9 +153,13 @@ class _Messages:
         parsed = getattr(response, "parsed_output", None)
         if parsed is not None and getattr(response, "stop_reason", None) == "end_turn":
             result = parsed.model_dump(mode="json")
+            urls = _result_urls(response.content) if searching else []
             if searching:
-                result = {"parsed": result, "urls": _result_urls(response.content)}
-            await cache.put(key, str(kwargs.get("model", "")), result)
+                result = {"parsed": result, "urls": urls}
+            # A search that returned no sources failed (or answered from memory): asking again
+            # later may find them, so it is not kept.
+            if urls or not searching:
+                await cache.put(key, str(kwargs.get("model", "")), result)
         return response
 
     async def _send(self, kwargs: dict[str, Any]) -> Any:
