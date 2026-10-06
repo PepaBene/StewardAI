@@ -3,6 +3,7 @@ generateContent. Pure functions (no network), so they are tested against recorde
 
 import copy
 import json
+import logging
 from collections.abc import Sequence
 from typing import Any
 from urllib.parse import urlparse
@@ -19,6 +20,8 @@ from steward.llm.types import (
     ToolCall,
     normalized_usage,
 )
+
+logger = logging.getLogger(__name__)
 
 
 def strict_schema(schema: dict[str, Any]) -> dict[str, Any]:
@@ -425,11 +428,15 @@ def google_batch_results(
         key = str((item.get("metadata") or {}).get("key") or custom_id(position))
         index = int(key[1:]) if key[1:].isdigit() and key.startswith("r") else -1
         if item.get("error") or not item.get("response") or not 0 <= index < len(requests):
+            logger.warning(
+                "google batch item %s has no answer: %s", key, str(item.get("error"))[:200]
+            )
             found.append((key, None))
             continue
         try:
             found.append((key, google_completion(requests[index], item["response"])))
-        except LLMError:
+        except LLMError as exc:
+            logger.warning("google batch item %s dropped: %s", key, str(exc)[:200])
             found.append((key, None))
     return _by_index(found, len(requests))
 

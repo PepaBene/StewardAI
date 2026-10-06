@@ -9,6 +9,7 @@ another provider: the provider is chosen after the guard has had its say.
 
 import asyncio
 import dataclasses
+import json
 import logging
 from collections.abc import Sequence
 from typing import Any, cast
@@ -484,10 +485,12 @@ def _finish_request(req: Request, found: Completion) -> Request:
     sources = "\n".join(
         f"- {c.url} ({c.title})" if c.title else f"- {c.url}" for c in found.citations
     )
+    # The shape is stated here too: Gemini's batch mode does not always apply the schema.
+    shape = json.dumps(req.schema.model_json_schema()) if req.schema is not None else "{}"
     ask = (
         "Sources the search returned (any URL in your answer must be one of these, written "
-        f"exactly as here):\n{sources or '- none'}\n\nNow give your answer in the required "
-        "JSON format."
+        f"exactly as here):\n{sources or '- none'}\n\nNow give your answer as one JSON object "
+        f"that matches this JSON schema, with nothing else:\n{shape}"
     )
     return dataclasses.replace(
         req,
