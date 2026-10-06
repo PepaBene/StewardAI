@@ -7137,6 +7137,110 @@
         }
       }
     },
+    "/holdings/{ticker}/web-facts": {
+      "get": {
+        "tags": [
+          "holdings"
+        ],
+        "summary": "Web Facts",
+        "description": "Facts found on reliable web pages for slots the structured sources leave empty, with\ntheir tier, verbatim quote, source and who decided. Shown as a labelled fallback only.",
+        "operationId": "web_facts",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "ticker",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9_.\\-]{1,32}$",
+              "title": "Ticker"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/web-facts/{fact_id}/decision": {
+      "post": {
+        "tags": [
+          "holdings"
+        ],
+        "summary": "Decide Web Fact",
+        "description": "Approve or reject a web fact. The owner's decision is final: gap research never\noverwrites it.",
+        "operationId": "decide_web_fact",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "fact_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "title": "Fact Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/WebFactDecision"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/feedback": {
       "post": {
         "tags": [
@@ -15432,7 +15536,8 @@
                 "edinet_filings",
                 "twelve_data_corporate_actions",
                 "ai_approvals",
-                "ir_discovery"
+                "ir_discovery",
+                "gap_research"
               ]
             },
             "type": "array",
@@ -15494,7 +15599,8 @@
                 "edinet_filings",
                 "twelve_data_corporate_actions",
                 "ai_approvals",
-                "ir_discovery"
+                "ir_discovery",
+                "gap_research"
               ]
             },
             "type": "object",
@@ -26979,6 +27085,141 @@
         ],
         "title": "Gap"
       },
+      "GapResearchSettings": {
+        "properties": {
+          "model": {
+            "type": "string",
+            "pattern": "^claude-[a-z0-9.-]{1,64}$",
+            "title": "Model",
+            "description": "Searches for facts and approves them.",
+            "default": "claude-sonnet-5",
+            "examples": [
+              "claude-sonnet-5"
+            ]
+          },
+          "effort": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "low",
+                  "medium",
+                  "high",
+                  "xhigh",
+                  "max"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Effort",
+            "description": "Unset: effort is not sent and the model's default applies. On Haiku 4 models the level sets an extended-thinking budget instead (low 2k to max 32k tokens)."
+          },
+          "slots": {
+            "items": {
+              "type": "string",
+              "enum": [
+                "next_report_date",
+                "company_description",
+                "shares_outstanding",
+                "analyst_estimates"
+              ]
+            },
+            "type": "array",
+            "title": "Slots",
+            "description": "Which gaps to research. `analyst_estimates` is recorded as unavailable (a paid vendor product) and is never searched."
+          },
+          "max_searches": {
+            "type": "integer",
+            "maximum": 10.0,
+            "minimum": 1.0,
+            "title": "Max Searches",
+            "description": "Web searches per slot.",
+            "default": 3
+          },
+          "slots_per_run": {
+            "type": "integer",
+            "maximum": 60.0,
+            "minimum": 1.0,
+            "title": "Slots Per Run",
+            "description": "Cost guard per run.",
+            "default": 8
+          },
+          "cooldown_days": {
+            "type": "integer",
+            "maximum": 365.0,
+            "minimum": 1.0,
+            "title": "Cooldown Days",
+            "description": "Days before an unfilled slot is searched again.",
+            "default": 30
+          },
+          "min_confidence": {
+            "type": "number",
+            "maximum": 1.0,
+            "minimum": 0.5,
+            "title": "Min Confidence",
+            "description": "Below this a fact is stored for review, not approved.",
+            "default": 0.8
+          },
+          "t1_domains": {
+            "items": {
+              "type": "string",
+              "maxLength": 253,
+              "pattern": "^([a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?\\.)+[a-z]{2,63}$",
+              "examples": [
+                "investor.apple.com"
+              ]
+            },
+            "type": "array",
+            "title": "T1 Domains",
+            "description": "Regulators, registers and exchanges: accepted on their own. The company's own domains are always tier 1."
+          },
+          "t2_domains": {
+            "items": {
+              "type": "string",
+              "maxLength": 253,
+              "pattern": "^([a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?\\.)+[a-z]{2,63}$",
+              "examples": [
+                "investor.apple.com"
+              ]
+            },
+            "type": "array",
+            "title": "T2 Domains",
+            "description": "Established press and wire services: dates are accepted alone, numbers need a second agreeing source."
+          },
+          "t3_domains": {
+            "items": {
+              "type": "string",
+              "maxLength": 253,
+              "pattern": "^([a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?\\.)+[a-z]{2,63}$",
+              "examples": [
+                "investor.apple.com"
+              ]
+            },
+            "type": "array",
+            "title": "T3 Domains",
+            "description": "Reference sites: names and descriptions only, never a figure."
+          },
+          "denied_domains": {
+            "items": {
+              "type": "string",
+              "maxLength": 253,
+              "pattern": "^([a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?\\.)+[a-z]{2,63}$",
+              "examples": [
+                "investor.apple.com"
+              ]
+            },
+            "type": "array",
+            "title": "Denied Domains",
+            "description": "Never used. Domains in no list are treated as rejected."
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "GapResearchSettings",
+        "description": "Filling what the structured sources left empty from reliable web pages, last resort.\nOnly empty, fillable slots off their cooldown are searched. Facts are kept apart from the\nstructured data and are approved by AI against the source tiers below."
+      },
       "GoldenAccuracy": {
         "properties": {
           "value": {
@@ -32703,11 +32944,18 @@
             "$ref": "#/components/schemas/JobSchedule",
             "description": "Finds investor-relations pages for holdings that have none (web search, checked and approved by AI). Default: Mondays 07:30."
           },
+          "gap_research": {
+            "$ref": "#/components/schemas/JobSchedule",
+            "description": "Searches reliable web pages for facts the structured sources left empty (next report date, shares outstanding, description); AI approves them. Default: Wednesdays 08:00."
+          },
           "earnings_check": {
             "$ref": "#/components/schemas/EarningsCheckSettings"
           },
           "ir_discovery_settings": {
             "$ref": "#/components/schemas/IrDiscoverySettings"
+          },
+          "gap_research_settings": {
+            "$ref": "#/components/schemas/GapResearchSettings"
           },
           "ai_approval": {
             "$ref": "#/components/schemas/AiApprovalSettings"
@@ -49138,6 +49386,35 @@
         "additionalProperties": false,
         "type": "object",
         "title": "WatchlistUpdate"
+      },
+      "WebFactDecision": {
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "approved",
+              "rejected"
+            ],
+            "title": "Status"
+          },
+          "note": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 300
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note"
+          }
+        },
+        "type": "object",
+        "required": [
+          "status"
+        ],
+        "title": "WebFactDecision"
       },
       "WikidataSummary": {
         "properties": {

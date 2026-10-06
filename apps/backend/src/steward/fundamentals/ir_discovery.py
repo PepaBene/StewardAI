@@ -32,7 +32,7 @@ from steward.config.holding_profiles import HoldingProfile, HoldingProfilesConfi
 from steward.config.jobs import IrDiscoverySettings, JobsConfig, effort_kwargs
 from steward.config.store import ConfigConflictError, load_active, save_config
 from steward.earnings.locate import _result_urls
-from steward.fundamentals.ir import IrError, fetch_document
+from steward.fundamentals.ir import IrError, assert_fetchable, fetch_document
 from steward.jobs.runner import JobContext, JobFailed
 from steward.settings import get_settings
 
@@ -319,6 +319,31 @@ async def discover_holding(
     return "applied", detail, {"ir_url": ir_home, "results": results, "calendar": calendar}
 
 
+async def register_results_pages(
+    ctx: JobContext, profiles: HoldingProfilesConfig
+) -> dict[str, list[str]]:
+    """Put every results page of every profile (set by the owner or found here) into
+    `issuer_ir_source`, so `ir_releases` versions it and reads guidance tables off it. A page
+    already registered, with whatever type the owner gave it, is left as it is."""
+    added: dict[str, list[str]] = {}
+    for profile in profiles.profiles:
+        for url in (str(u) for u in profile.results_urls):
+            try:
+                assert_fetchable(url)
+            except IrError:
+                continue
+            row_id = await ctx.pool.fetchval(
+                "insert into public.issuer_ir_source (ticker, url, release_type, label)"
+                " values ($1, $2, 'guidance', 'results page (holding profile)')"
+                " on conflict (ticker, url) do nothing returning id",
+                profile.ticker,
+                url,
+            )
+            if row_id is not None:
+                added.setdefault(profile.ticker, []).append(url)
+    return added
+
+
 async def ir_discovery_handler(ctx: JobContext) -> None:
     settings = get_settings()
     stored = await load_active(ctx.pool, "jobs", JobsConfig)
@@ -327,6 +352,8 @@ async def ir_discovery_handler(ctx: JobContext) -> None:
     profiles_stored = await load_active(ctx.pool, "holding_profiles", HoldingProfilesConfig)
     if profiles_stored is None:
         return
+    async with ctx.step("register_pages") as step:
+        step.detail["registered"] = await register_results_pages(ctx, profiles_stored.body)
     try:
         client = create_client(settings)
     except AINotConfigured as exc:
@@ -400,6 +427,7 @@ async def ir_discovery_handler(ctx: JobContext) -> None:
                                 )
                             config_id, body = saved.id, saved.body
                             detail["applied"] = added
+                            detail["registered"] = await register_results_pages(ctx, body)
                         except ConfigConflictError as exc:
                             outcome = "error"  # no cooldown: retried next run
                             detail["not_applied"] = str(exc)

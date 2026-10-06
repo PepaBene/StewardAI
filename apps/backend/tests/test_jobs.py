@@ -231,6 +231,7 @@ async def test_schedule_follows_the_jobs_config() -> None:
         "free_source_alerts",
         "fund_characteristics_audit",
         "fund_probes",
+        "gap_research",
         "graph_review",
         "holiday_refresh",
         "insider_trades",

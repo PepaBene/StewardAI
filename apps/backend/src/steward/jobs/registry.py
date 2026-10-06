@@ -42,6 +42,7 @@ from steward.reference.intraday import intraday_prices_handler
 from steward.reference.prices import holiday_refresh_handler, price_history_handler
 from steward.reference.returns import returns_refresh_handler
 from steward.research.run import research_handler
+from steward.research.web_facts import gap_research_handler
 from steward.review.monthly import monthly_review_handler
 from steward.sources.audit import source_audit_handler
 from steward.sources.fund_probes import fund_probes_handler
@@ -112,6 +113,7 @@ JobType = Literal[
     "twelve_data_corporate_actions",
     "ai_approvals",
     "ir_discovery",
+    "gap_research",
 ]
 
 JOB_HANDLERS: dict[str, JobHandler] = {
@@ -165,4 +167,5 @@ JOB_HANDLERS: dict[str, JobHandler] = {
     "twelve_data_corporate_actions": twelve_data_corporate_actions_handler,
     "ai_approvals": ai_approvals_handler,
     "ir_discovery": ir_discovery_handler,
+    "gap_research": gap_research_handler,
 }

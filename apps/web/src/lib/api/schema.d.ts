@@ -2370,6 +2370,48 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/holdings/{ticker}/web-facts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Web Facts
+         * @description Facts found on reliable web pages for slots the structured sources leave empty, with
+         *     their tier, verbatim quote, source and who decided. Shown as a labelled fallback only.
+         */
+        get: operations["web_facts"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/web-facts/{fact_id}/decision": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Decide Web Fact
+         * @description Approve or reject a web fact. The owner's decision is final: gap research never
+         *     overwrites it.
+         */
+        post: operations["decide_web_fact"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/feedback": {
         parameters: {
             query?: never;
@@ -5050,7 +5092,7 @@ export interface components {
              * Critical Job Types
              * @description Job types that run normally at the monthly cap.
              */
-            critical_job_types?: ("portfolio_sync" | "earnings_check" | "thesis_verdicts" | "earnings_calendar" | "earnings_calendar_full" | "earnings_due" | "fact_reconcile" | "reference_data" | "price_history" | "intraday_prices" | "holiday_refresh" | "macro_collect" | "public_data_collect" | "source_audit" | "event_escalation" | "monitor" | "news_ingest" | "daily_digest" | "weekly_digest" | "research" | "ownership_13f" | "insider_trades" | "etf_look_through" | "monthly_review" | "chat" | "sec_xbrl" | "valuation_refresh" | "control_stakes" | "nport_holdings" | "fund_probes" | "fund_characteristics_audit" | "free_source_alerts" | "shadow_snapshot" | "shadow_report" | "raw_retention" | "zero_cost_gate" | "returns_refresh" | "exchange_probes" | "ir_releases" | "sec_fsds_backfill" | "pdmr_uk" | "graph_review" | "fmp_company" | "alpha_vantage_statements" | "epo_patents" | "companies_house_filings" | "edinet_filings" | "twelve_data_corporate_actions" | "ai_approvals" | "ir_discovery")[];
+            critical_job_types?: ("portfolio_sync" | "earnings_check" | "thesis_verdicts" | "earnings_calendar" | "earnings_calendar_full" | "earnings_due" | "fact_reconcile" | "reference_data" | "price_history" | "intraday_prices" | "holiday_refresh" | "macro_collect" | "public_data_collect" | "source_audit" | "event_escalation" | "monitor" | "news_ingest" | "daily_digest" | "weekly_digest" | "research" | "ownership_13f" | "insider_trades" | "etf_look_through" | "monthly_review" | "chat" | "sec_xbrl" | "valuation_refresh" | "control_stakes" | "nport_holdings" | "fund_probes" | "fund_characteristics_audit" | "free_source_alerts" | "shadow_snapshot" | "shadow_report" | "raw_retention" | "zero_cost_gate" | "returns_refresh" | "exchange_probes" | "ir_releases" | "sec_fsds_backfill" | "pdmr_uk" | "graph_review" | "fmp_company" | "alpha_vantage_statements" | "epo_patents" | "companies_house_filings" | "edinet_filings" | "twelve_data_corporate_actions" | "ai_approvals" | "ir_discovery" | "gap_research")[];
             /**
              * Per Job Cap Usd
              * @description Most AI spend of one run of a job type, in USD. A run over it fails.
@@ -9341,6 +9383,75 @@ export interface components {
             /** Reason */
             reason: string;
         };
+        /**
+         * GapResearchSettings
+         * @description Filling what the structured sources left empty from reliable web pages, last resort.
+         *     Only empty, fillable slots off their cooldown are searched. Facts are kept apart from the
+         *     structured data and are approved by AI against the source tiers below.
+         */
+        GapResearchSettings: {
+            /**
+             * Model
+             * @description Searches for facts and approves them.
+             * @default claude-sonnet-5
+             * @example claude-sonnet-5
+             */
+            model: string;
+            /**
+             * Effort
+             * @description Unset: effort is not sent and the model's default applies. On Haiku 4 models the level sets an extended-thinking budget instead (low 2k to max 32k tokens).
+             */
+            effort?: ("low" | "medium" | "high" | "xhigh" | "max") | null;
+            /**
+             * Slots
+             * @description Which gaps to research. `analyst_estimates` is recorded as unavailable (a paid vendor product) and is never searched.
+             */
+            slots?: ("next_report_date" | "company_description" | "shares_outstanding" | "analyst_estimates")[];
+            /**
+             * Max Searches
+             * @description Web searches per slot.
+             * @default 3
+             */
+            max_searches: number;
+            /**
+             * Slots Per Run
+             * @description Cost guard per run.
+             * @default 8
+             */
+            slots_per_run: number;
+            /**
+             * Cooldown Days
+             * @description Days before an unfilled slot is searched again.
+             * @default 30
+             */
+            cooldown_days: number;
+            /**
+             * Min Confidence
+             * @description Below this a fact is stored for review, not approved.
+             * @default 0.8
+             */
+            min_confidence: number;
+            /**
+             * T1 Domains
+             * @description Regulators, registers and exchanges: accepted on their own. The company's own domains are always tier 1.
+             */
+            t1_domains?: string[];
+            /**
+             * T2 Domains
+             * @description Established press and wire services: dates are accepted alone, numbers need a second agreeing source.
+             */
+            t2_domains?: string[];
+            /**
+             * T3 Domains
+             * @description Reference sites: names and descriptions only, never a figure.
+             */
+            t3_domains?: string[];
+            /**
+             * Denied Domains
+             * @description Never used. Domains in no list are treated as rejected.
+             */
+            denied_domains?: string[];
+        };
         /** GoldenAccuracy */
         GoldenAccuracy: {
             /**
@@ -11284,8 +11395,11 @@ export interface components {
             ai_approvals?: components["schemas"]["JobSchedule"];
             /** @description Finds investor-relations pages for holdings that have none (web search, checked and approved by AI). Default: Mondays 07:30. */
             ir_discovery?: components["schemas"]["JobSchedule"];
+            /** @description Searches reliable web pages for facts the structured sources left empty (next report date, shares outstanding, description); AI approves them. Default: Wednesdays 08:00. */
+            gap_research?: components["schemas"]["JobSchedule"];
             earnings_check?: components["schemas"]["EarningsCheckSettings"];
             ir_discovery_settings?: components["schemas"]["IrDiscoverySettings"];
+            gap_research_settings?: components["schemas"]["GapResearchSettings"];
             ai_approval?: components["schemas"]["AiApprovalSettings"];
             earnings_calendar_settings?: components["schemas"]["EarningsCalendarSettings"];
             news?: components["schemas"]["NewsSettings"];
@@ -17243,6 +17357,16 @@ export interface components {
             /** Note */
             note?: string | null;
         };
+        /** WebFactDecision */
+        WebFactDecision: {
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "approved" | "rejected";
+            /** Note */
+            note?: string | null;
+        };
         /** WikidataSummary */
         WikidataSummary: {
             /** Qid */
@@ -21171,6 +21295,72 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["IssuerAsOf"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    web_facts: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                ticker: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    decide_web_fact: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                fact_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["WebFactDecision"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
                 };
             };
             /** @description Validation Error */

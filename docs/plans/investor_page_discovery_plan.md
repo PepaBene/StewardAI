@@ -1,5 +1,19 @@
 # Gap-filling research (investor pages and other missing data) — plan
 
+## Status (2026-10-06)
+
+Built: `ir_discovery` job (`fundamentals/ir_discovery.py`, table `ir_discovery_decision`);
+`gap_research` job with the gap registry (`research/gaps.py`), source tiers, mechanical checks,
+AI approval and `web_fact` / `web_fact_attempt` storage (`research/web_facts.py`); owner API to
+list and overturn facts (`api/web_fact_routes.py`); results pages registered in
+`issuer_ir_source`; job settings on the jobs form.
+
+Slots implemented: `next_report_date` (applied to the earnings calendar with source
+`web:<host>`), `shares_outstanding`, `company_description`; `analyst_estimates` is recorded as
+unavailable. Not built yet: the web-source badge on holding panels, the prompts registered in
+the prompts config (the prompts are constants in the modules), the AI promoting an unlisted
+domain to a tier (unlisted domains are rejected), statement and segment slots, Playwright.
+
 Goal: find what the structured sources do not provide, starting with each holding's
 investor-relations (IR) pages, and fill it from reliable web pages. Web search is the LAST
 resort, used only for slots the structured sources have left empty. Everything found is

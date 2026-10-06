@@ -11,3 +11,9 @@ create table public.ir_discovery_decision (
 );
 create index ir_discovery_decision_ticker on public.ir_discovery_decision (ticker, attempted_at desc);
 alter table public.ir_discovery_decision enable row level security;
+grant select, insert, update, delete on public.ir_discovery_decision to app_backend;
+grant select on public.ir_discovery_decision to authenticated;
+create policy backend_all on public.ir_discovery_decision for all to app_backend
+  using (true) with check (true);
+create policy owner_read on public.ir_discovery_decision for select to authenticated
+  using ((select private.is_owner()));

@@ -19,6 +19,7 @@ export type SettingsKey =
   | "earnings_calendar_settings"
   | "ai_approval"
   | "ir_discovery_settings"
+  | "gap_research_settings"
   | "news"
   | "digest"
   | "escalation"
@@ -284,6 +285,12 @@ export const SCHEDULES: Record<ScheduleKey, { label: string; description: string
       "Finds investor-relations pages for holdings that have none, by web search; checks them and has AI approve them. Pages you set yourself are never changed.",
     cron: "30 7 * * 1",
   },
+  gap_research: {
+    label: "Gap research",
+    description:
+      "Last resort for what the data sources left empty: searches reliable web pages for the next report date, shares outstanding and a description. AI approves each fact against source tiers; you can overturn it.",
+    cron: "0 8 * * 3",
+  },
 };
 export const SCHEDULE_KEYS = Object.keys(SCHEDULES) as ScheduleKey[];
 
@@ -342,6 +349,54 @@ export const DEFAULT_JOBS: JobsConfig = {
       "marketwatch.com",
       "investing.com",
       "stocktwits.com",
+    ],
+  },
+  gap_research_settings: {
+    model: "claude-sonnet-5",
+    effort: null,
+    slots: ["next_report_date", "shares_outstanding", "company_description"],
+    max_searches: 3,
+    slots_per_run: 8,
+    cooldown_days: 30,
+    min_confidence: 0.8,
+    t1_domains: [
+      "sec.gov",
+      "edinet-fsa.go.jp",
+      "esma.europa.eu",
+      "londonstockexchange.com",
+      "jpx.co.jp",
+      "nasdaq.com",
+      "nyse.com",
+      "euronext.com",
+      "deutsche-boerse.com",
+      "pse.cz",
+      "ecb.europa.eu",
+      "federalreserve.gov",
+    ],
+    t2_domains: [
+      "reuters.com",
+      "bloomberg.com",
+      "ft.com",
+      "wsj.com",
+      "barrons.com",
+      "morningstar.com",
+      "marketscreener.com",
+      "globenewswire.com",
+      "prnewswire.com",
+      "businesswire.com",
+    ],
+    t3_domains: ["wikipedia.org", "wikidata.org"],
+    denied_domains: [
+      "linkedin.com",
+      "facebook.com",
+      "x.com",
+      "twitter.com",
+      "youtube.com",
+      "reddit.com",
+      "stocktwits.com",
+      "seekingalpha.com",
+      "fool.com",
+      "investing.com",
     ],
   },
   news: {
@@ -587,6 +642,18 @@ export const SETTINGS: { [S in SettingsKey]: { title: string; description: strin
       { key: "holdings_per_run", label: "Holdings per run", kind: "int", min: 1, max: 40 },
       { key: "cooldown_days", label: "Retry a holding after (days)", kind: "int", min: 1, max: 365 },
       { key: "min_confidence", label: "Minimum confidence", kind: "number", hint: "Below this a page is not applied. 0.5 to 1." },
+    ],
+  },
+  gap_research_settings: {
+    title: "Gap research",
+    description: "Web research for empty slots only; the domain tiers (company site and regulators, press, reference, denied) are edited in the config JSON.",
+    fields: [
+      { key: "model", label: "Model", kind: "model", hint: "Searches for facts and approves them." },
+      { key: "effort", label: "Effort", kind: "effort-optional", hint: EFFORT_OPTIONAL_HINT },
+      { key: "max_searches", label: "Web searches per slot", kind: "int", min: 1, max: 10, hint: "The expensive part." },
+      { key: "slots_per_run", label: "Slots per run", kind: "int", min: 1, max: 60, hint: "Cost guard." },
+      { key: "cooldown_days", label: "Retry an unfilled slot after (days)", kind: "int", min: 1, max: 365 },
+      { key: "min_confidence", label: "Minimum confidence", kind: "number", hint: "Below this a fact waits for review. 0.5 to 1." },
     ],
   },
   news: {

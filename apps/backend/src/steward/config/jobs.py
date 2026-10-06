@@ -287,6 +287,100 @@ class IrDiscoverySettings(ConfigModel):
         return self
 
 
+GapSlotKey = Literal[
+    "next_report_date", "company_description", "shares_outstanding", "analyst_estimates"
+]
+
+
+def _default_gap_slots() -> list[GapSlotKey]:
+    return ["next_report_date", "shares_outstanding", "company_description"]
+
+
+class GapResearchSettings(ConfigModel):
+    """Filling what the structured sources left empty from reliable web pages, last resort.
+    Only empty, fillable slots off their cooldown are searched. Facts are kept apart from the
+    structured data and are approved by AI against the source tiers below."""
+
+    model: ModelId = Field(
+        default="claude-sonnet-5", description="Searches for facts and approves them."
+    )
+    effort: Effort | None = Field(default=None, description=EFFORT_HELP)
+    slots: list[GapSlotKey] = Field(
+        default_factory=_default_gap_slots,
+        description="Which gaps to research. `analyst_estimates` is recorded as unavailable "
+        "(a paid vendor product) and is never searched.",
+    )
+    max_searches: int = Field(default=3, ge=1, le=10, description="Web searches per slot.")
+    slots_per_run: int = Field(default=8, ge=1, le=60, description="Cost guard per run.")
+    cooldown_days: int = Field(
+        default=30, ge=1, le=365, description="Days before an unfilled slot is searched again."
+    )
+    min_confidence: float = Field(
+        default=0.8,
+        ge=0.5,
+        le=1.0,
+        description="Below this a fact is stored for review, not approved.",
+    )
+    t1_domains: list[Domain] = Field(
+        default_factory=lambda: [
+            "sec.gov",
+            "edinet-fsa.go.jp",
+            "esma.europa.eu",
+            "londonstockexchange.com",
+            "jpx.co.jp",
+            "nasdaq.com",
+            "nyse.com",
+            "euronext.com",
+            "deutsche-boerse.com",
+            "pse.cz",
+            "ecb.europa.eu",
+            "federalreserve.gov",
+        ],
+        description="Regulators, registers and exchanges: accepted on their own. The company's "
+        "own domains are always tier 1.",
+    )
+    t2_domains: list[Domain] = Field(
+        default_factory=lambda: [
+            "reuters.com",
+            "bloomberg.com",
+            "ft.com",
+            "wsj.com",
+            "barrons.com",
+            "morningstar.com",
+            "marketscreener.com",
+            "globenewswire.com",
+            "prnewswire.com",
+            "businesswire.com",
+        ],
+        description="Established press and wire services: dates are accepted alone, numbers "
+        "need a second agreeing source.",
+    )
+    t3_domains: list[Domain] = Field(
+        default_factory=lambda: ["wikipedia.org", "wikidata.org"],
+        description="Reference sites: names and descriptions only, never a figure.",
+    )
+    denied_domains: list[Domain] = Field(
+        default_factory=lambda: [
+            "linkedin.com",
+            "facebook.com",
+            "x.com",
+            "twitter.com",
+            "youtube.com",
+            "reddit.com",
+            "stocktwits.com",
+            "seekingalpha.com",
+            "fool.com",
+            "investing.com",
+        ],
+        description="Never used. Domains in no list are treated as rejected.",
+    )
+
+    @model_validator(mode="after")
+    def _effort_supported(self) -> Self:
+        check_effort(self.model, self.effort, "effort")
+        return self
+
+
 class NewsSettings(ConfigModel):
     """The news pipeline after ingest: classification, corroboration."""
 
@@ -1660,8 +1754,15 @@ class JobsConfig(ConfigModel):
         description="Finds investor-relations pages for holdings that have none (web search, "
         "checked and approved by AI). Default: Mondays 07:30.",
     )
+    gap_research: JobSchedule = Field(
+        default_factory=lambda: JobSchedule(cron="0 8 * * 3"),
+        description="Searches reliable web pages for facts the structured sources left empty "
+        "(next report date, shares outstanding, description); AI approves them. Default: "
+        "Wednesdays 08:00.",
+    )
     earnings_check: EarningsCheckSettings = Field(default_factory=EarningsCheckSettings)
     ir_discovery_settings: IrDiscoverySettings = Field(default_factory=IrDiscoverySettings)
+    gap_research_settings: GapResearchSettings = Field(default_factory=GapResearchSettings)
     ai_approval: AiApprovalSettings = Field(default_factory=AiApprovalSettings)
     earnings_calendar_settings: EarningsCalendarSettings = Field(
         default_factory=EarningsCalendarSettings
@@ -1724,6 +1825,7 @@ class JobsConfig(ConfigModel):
             "edinet_filings": self.edinet_filings,
             "ai_approvals": self.ai_approvals,
             "ir_discovery": self.ir_discovery,
+            "gap_research": self.gap_research,
             "twelve_data_corporate_actions": self.twelve_data_corporate_actions,
             "etf_look_through": self.etf_look_through,
             "sec_xbrl": self.sec_xbrl,
