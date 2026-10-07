@@ -69,6 +69,8 @@ CACHE_SECONDS = 60.0
 
 class FactsTimeout(Exception):
     """Reading issuer statements took too long; the X-Ray is built without them."""
+
+
 REVENUE_ISSUERS = 40  # reported geography is read for the largest 40 equity issuers only
 REVENUE_CONTEXTS = {
     "country": "revenue_country",
@@ -146,7 +148,10 @@ async def _profiles(pool: asyncpg.Pool, isins: list[str]) -> dict[str, Profile]:
 
 
 async def _facts(
-    pool: asyncpg.Pool, ranked: list[tuple[str, str]], day: dt.date
+    pool: asyncpg.Pool,
+    ranked: list[tuple[str, str]],
+    day: dt.date,
+    cutoff: dt.datetime | None = None,
 ) -> dict[str, IssuerFacts]:
     """Size and valuation inputs for the largest issuers: (issuer key, first ISIN) in rank order."""
     isins = sorted({isin for _, isin in ranked})
@@ -167,7 +172,7 @@ async def _facts(
                 pool,
                 members,
                 day,
-                cutoff=None,
+                cutoff=cutoff,
                 reconciled_only=False,
                 access=await provider_states(pool),
             ),
@@ -294,14 +299,36 @@ async def _revenue(
     return out
 
 
-async def load(pool: asyncpg.Pool, owner_id: str, *, today: dt.date | None = None) -> Loaded:
+class NoHoldingsThen(Exception):
+    """No daily snapshot exists on or before the requested date."""
+
+
+async def load(
+    pool: asyncpg.Pool,
+    owner_id: str,
+    *,
+    today: dt.date | None = None,
+    as_of: dt.date | None = None,
+) -> Loaded:
+    """The X-Ray inputs. With `as_of`, the holdings of the latest snapshot on or before that date,
+    fund holdings fetched by the end of it, and statements known by then. Issuer identity, sector
+    labels and fund charges are the current ones, and the result says so."""
     stored = await load_active(pool, "jobs", JobsConfig)
     config = stored.body if stored else JobsConfig()
     settings = config.look_through
     day = today or dt.datetime.now(dt.UTC).date()
-    portfolio = await load_portfolio(pool)
+    known_by = (
+        dt.datetime.combine(as_of + dt.timedelta(days=1), dt.time.min, tzinfo=dt.UTC)
+        if as_of
+        else None
+    )
+    portfolio = await load_portfolio(pool, as_of=as_of)
+    if as_of is not None:
+        if portfolio is None:
+            raise NoHoldingsThen
+        day = portfolio.snapshot_date
     isins = {f.isin for f in settings.funds} | {p.fund_isin for p in settings.benchmark_proxies}
-    snapshots = await load_snapshots(pool, sorted(isins))
+    snapshots = await load_snapshots(pool, sorted(isins), known_by=known_by)
     all_isins = _isins(portfolio, snapshots)
     register = await load_issuer_register(pool, all_isins)
     ratios = await latest_expense_ratios(pool, [f.isin for f in settings.funds])
@@ -332,7 +359,7 @@ async def load(pool: asyncpg.Pool, owner_id: str, *, today: dt.date | None = Non
     ranked_scored = ranked[:SCORED_ISSUERS]
     notes: list[str] = []
     try:
-        facts = await _facts(pool, ranked_scored, day)
+        facts = await _facts(pool, ranked_scored, day, known_by)
     except FactsTimeout:
         facts = {}
         log.warning("xray: issuer statements timed out after %ss", FACTS_TIMEOUT_SECONDS)
@@ -350,6 +377,12 @@ async def load(pool: asyncpg.Pool, owner_id: str, *, today: dt.date | None = Non
         )
     }
     data.revenue = await _revenue(pool, owner_id, ranked, {**ticker_of, **t212})
+    if as_of is not None:
+        notes.append(
+            f"Holdings as of {day.isoformat()}. Fund holdings and statements are those known by "
+            "the end of that day; issuer identity, sector labels, fund charges and the revenue "
+            "split are today's."
+        )
     analysis = analyse(data, facts)
     if len(ranked) > SCORED_ISSUERS:
         notes.append(
@@ -572,7 +605,9 @@ async def propose(
         facts = {**loaded.facts, **await _facts(pool, fresh, loaded.day)}
     except FactsTimeout:
         facts = dict(loaded.facts)
-        notes.append("Statements for the added securities took too long to read; they are unscored.")
+        notes.append(
+            "Statements for the added securities took too long to read; they are unscored."
+        )
     after = analyse(data, facts)
     looked: dict[str, bool] = {}
     for p in [*portfolio.positions, *new_portfolio.positions]:

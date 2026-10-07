@@ -18,6 +18,36 @@ import { Formula, Money, PlainReturn, Points, ReturnCell, TD, TH, TH_LEFT } from
 
 const fetchPerformance = () => getBrowserApiClient().GET("/portfolio/performance");
 
+function age(days: number | null | undefined): string {
+  if (days === null || days === undefined) return "unknown date";
+  if (days <= 0) return "today";
+  return days === 1 ? "1 day old" : `${days} days old`;
+}
+
+/** How old the prices, exchange rates and benchmark under a chart are; it turns to a warning when
+ * either is past the limit, so an old figure is never read as current. */
+function FreshnessBadge({ data }: { data: PerformanceData }) {
+  const f = data.freshness;
+  if (!f) return null;
+  return (
+    <p
+      className={`mt-2 inline-flex flex-wrap gap-x-4 gap-y-1 border px-2 py-1 text-xs ${
+        f.stale ? "border-warning-signal bg-warning-signal-subtle text-text" : "border-border text-text-muted"
+      }`}
+    >
+      <span>
+        Prices and rates: {f.prices_as_of ? formatDate(f.prices_as_of) : "unknown date"} ({age(f.prices_age_days)})
+      </span>
+      {data.benchmark_label ? (
+        <span>
+          Benchmark: {f.benchmark_as_of ? formatDate(f.benchmark_as_of) : "no close stored"} ({age(f.benchmark_age_days)})
+        </span>
+      ) : null}
+      {f.stale ? <span className="font-medium">Older than {f.stale_after_days} days: figures may lag the market.</span> : null}
+    </p>
+  );
+}
+
 function LedgerStrip({ data }: { data: PerformanceData }) {
   const sentence = ledgerSentence(data.ledger);
   if (data.ledger.status === "clean") {
@@ -218,6 +248,7 @@ function ReportBody({ data }: { data: PerformanceData }) {
                   format={(n) => n.toFixed(0)}
                 />
               </div>
+              <FreshnessBadge data={data} />
               {data.freshness_note ? <p className="mt-2 text-xs text-text-muted">{data.freshness_note}</p> : null}
             </Blueprint>
             <Blueprint className="px-[22px] py-4">

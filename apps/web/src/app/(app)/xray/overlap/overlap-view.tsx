@@ -1,20 +1,25 @@
 "use client";
 
-import { useState } from "react";
+import { useSearchParams } from "next/navigation";
+import { useMemo, useState } from "react";
 
 import { ResourceGate } from "@/components/company/primitives";
 import { Blueprint, PanelHeading } from "@/components/ui/blueprint";
 import { getBrowserApiClient } from "@/lib/api/client";
 import { formatPercent } from "@/lib/format";
 import { useApiResource } from "@/lib/hooks/use-api-resource";
+import { asOfQuery, parseAsOf } from "@/lib/xray/as-of";
 import { pointsLabel, type IntersectionData } from "@/lib/xray/xray";
 
 import { Fact, Notes, Pct, TD, TH, TH_LEFT } from "../shared";
 
-const fetchOverlap = () => getBrowserApiClient().GET("/portfolio/xray/overlap");
-
 export function OverlapView() {
-  const { state } = useApiResource(fetchOverlap);
+  const asOf = parseAsOf(useSearchParams().get("as_of"));
+  const fetcher = useMemo(
+    () => () => getBrowserApiClient().GET("/portfolio/xray/overlap", { params: { query: asOfQuery(asOf) } }),
+    [asOf],
+  );
+  const { state } = useApiResource(fetcher);
   return (
     <ResourceGate state={state} label="overlap">
       {(data) => <Overlap data={data} />}

@@ -1,16 +1,18 @@
 "use client";
 
+import { useSearchParams } from "next/navigation";
+import { useMemo } from "react";
+
 import { AlertMessage } from "@/components/alert-message";
 import { ResourceGate } from "@/components/company/primitives";
 import { Blueprint, PanelHeading } from "@/components/ui/blueprint";
 import { getBrowserApiClient } from "@/lib/api/client";
 import { formatDate, formatPercent } from "@/lib/format";
 import { useApiResource } from "@/lib/hooks/use-api-resource";
+import { asOfQuery, parseAsOf } from "@/lib/xray/as-of";
 import { activeBar, pointsLabel, type BenchmarkData, type BenchmarkDim } from "@/lib/xray/xray";
 
 import { Fact, Notes, Pct, TD, TH, TH_LEFT, Toned } from "../shared";
-
-const fetchBenchmark = () => getBrowserApiClient().GET("/portfolio/xray/benchmark");
 
 const DIM_TITLE: Record<string, string> = {
   sector: "Sector",
@@ -20,7 +22,12 @@ const DIM_TITLE: Record<string, string> = {
 };
 
 export function BenchmarkView() {
-  const { state } = useApiResource(fetchBenchmark);
+  const asOf = parseAsOf(useSearchParams().get("as_of"));
+  const fetcher = useMemo(
+    () => () => getBrowserApiClient().GET("/portfolio/xray/benchmark", { params: { query: asOfQuery(asOf) } }),
+    [asOf],
+  );
+  const { state } = useApiResource(fetcher);
   return (
     <ResourceGate state={state} label="benchmark comparison">
       {(data) => <Benchmark data={data} />}

@@ -1,21 +1,26 @@
 "use client";
 
-import { useState } from "react";
+import { useSearchParams } from "next/navigation";
+import { useMemo, useState } from "react";
 
 import { ResourceGate } from "@/components/company/primitives";
 import { Blueprint, PanelHeading } from "@/components/ui/blueprint";
 import { getBrowserApiClient } from "@/lib/api/client";
 import { formatPercent } from "@/lib/format";
 import { useApiResource } from "@/lib/hooks/use-api-resource";
+import { asOfQuery, parseAsOf } from "@/lib/xray/as-of";
 import { pointsLabel, type ConcentrationData, type ConcentrationLevel } from "@/lib/xray/xray";
 import { cn } from "@/lib/utils";
 
 import { Fact, Notes, Pct, TD, TH, TH_LEFT, Toned } from "../shared";
 
-const fetchConcentration = () => getBrowserApiClient().GET("/portfolio/xray/concentration");
-
 export function ConcentrationView() {
-  const { state } = useApiResource(fetchConcentration);
+  const asOf = parseAsOf(useSearchParams().get("as_of"));
+  const fetcher = useMemo(
+    () => () => getBrowserApiClient().GET("/portfolio/xray/concentration", { params: { query: asOfQuery(asOf) } }),
+    [asOf],
+  );
+  const { state } = useApiResource(fetcher);
   return (
     <ResourceGate state={state} label="concentration">
       {(data) => <Concentration data={data} />}

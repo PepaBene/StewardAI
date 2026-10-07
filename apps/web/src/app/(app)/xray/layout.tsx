@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import type { ReactNode } from "react";
+import { Suspense, type ReactNode } from "react";
 
 import { PageHeader } from "@/components/page-header";
 import { XrayTabs } from "@/components/xray/xray-tabs";
@@ -14,7 +14,9 @@ export default function XrayLayout({ children }: { children: ReactNode }) {
         title="X-Ray"
         description="What you really own once funds are opened up: the same holdings seen by sector, country, issuer, fee and more, with what is unknown kept visible."
       />
-      <XrayTabs />
+      <Suspense>
+        <XrayTabs />
+      </Suspense>
       {children}
     </div>
   );

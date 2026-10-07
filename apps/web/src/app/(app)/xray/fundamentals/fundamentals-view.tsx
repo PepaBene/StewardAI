@@ -1,18 +1,25 @@
 "use client";
 
+import { useSearchParams } from "next/navigation";
+import { useMemo } from "react";
+
 import { ResourceGate } from "@/components/company/primitives";
 import { Blueprint, PanelHeading } from "@/components/ui/blueprint";
 import { getBrowserApiClient } from "@/lib/api/client";
 import { formatPercent } from "@/lib/format";
 import { useApiResource } from "@/lib/hooks/use-api-resource";
+import { asOfQuery, parseAsOf } from "@/lib/xray/as-of";
 import { coverageLabel, METRIC_ORDER, type FundamentalsData, type MetricData } from "@/lib/xray/xray";
 
 import { Fact, Notes, Pct, TD, TH, TH_LEFT } from "../shared";
 
-const fetchFundamentals = () => getBrowserApiClient().GET("/portfolio/xray/fundamentals");
-
 export function FundamentalsView() {
-  const { state } = useApiResource(fetchFundamentals);
+  const asOf = parseAsOf(useSearchParams().get("as_of"));
+  const fetcher = useMemo(
+    () => () => getBrowserApiClient().GET("/portfolio/xray/fundamentals", { params: { query: asOfQuery(asOf) } }),
+    [asOf],
+  );
+  const { state } = useApiResource(fetcher);
   return (
     <ResourceGate state={state} label="fundamentals">
       {(data) => <Fundamentals data={data} />}

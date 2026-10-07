@@ -3,6 +3,7 @@
 import { TriangleAlertIcon } from "lucide-react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
+import { useMemo } from "react";
 
 import { ResourceGate } from "@/components/company/primitives";
 import { Blueprint, PanelHeading } from "@/components/ui/blueprint";
@@ -12,6 +13,7 @@ import { getBrowserApiClient } from "@/lib/api/client";
 import { formatDate, formatMoney, formatPercent } from "@/lib/format";
 import { useApiResource } from "@/lib/hooks/use-api-resource";
 import { cn } from "@/lib/utils";
+import { asOfQuery, parseAsOf } from "@/lib/xray/as-of";
 import {
   COUNTRY_KIND_LABEL,
   compositionSegments,
@@ -24,13 +26,16 @@ import {
 
 import { BasisChips, Fact, Notes, Pct, TD, TH, TH_LEFT, Warnings, WeightBar } from "./shared";
 
-const fetchXray = () => getBrowserApiClient().GET("/portfolio/xray");
-
 export function ExposureView() {
-  const { state } = useApiResource(fetchXray);
+  const asOf = parseAsOf(useSearchParams().get("as_of")) ?? "";
+  const fetcher = useMemo(
+    () => () => getBrowserApiClient().GET("/portfolio/xray", { params: { query: asOfQuery(asOf || undefined) } }),
+    [asOf],
+  );
+  const { state } = useApiResource(fetcher);
   return (
     <ResourceGate state={state} label="X-Ray">
-      {(data) => <Exposure data={data} />}
+      {(data) => <Exposure data={data} asOf={asOf} />}
     </ResourceGate>
   );
 }
@@ -267,7 +272,7 @@ function FeesBlock({ data }: { data: XrayData }) {
   );
 }
 
-function Lens({ data, view }: { data: XrayData; view: XrayView }) {
+function Lens({ data, view, asOf }: { data: XrayData; view: XrayView; asOf: string }) {
   const currency = data.base_currency ?? "";
   return (
     <Blueprint className="px-[22px] py-4">
@@ -281,7 +286,7 @@ function Lens({ data, view }: { data: XrayData; view: XrayView }) {
               label="Buckets CSV"
               filename={`xray-${view.dimension}.csv`}
               fetchCsv={() =>
-                getBrowserApiClient().GET("/portfolio/xray/export", { params: { query: { lens: view.dimension } }, parseAs: "text" })
+                getBrowserApiClient().GET("/portfolio/xray/export", { params: { query: asOf ? { lens: view.dimension, as_of: asOf } : { lens: view.dimension } }, parseAs: "text" })
               }
             />
           </span>
@@ -309,7 +314,7 @@ function Lens({ data, view }: { data: XrayData; view: XrayView }) {
   );
 }
 
-function Exposure({ data }: { data: XrayData }) {
+function Exposure({ data, asOf }: { data: XrayData; asOf: string }) {
   const params = useSearchParams();
   const lens = params.get("lens") ?? "sector";
   const view = data.views.find((v) => v.dimension === lens) ?? data.views.find((v) => v.dimension === "sector") ?? data.views[0];
@@ -326,7 +331,7 @@ function Exposure({ data }: { data: XrayData }) {
       <div className="grid gap-5 lg:grid-cols-[13rem_minmax(0,1fr)]">
         <LensRail views={data.views} active={view.dimension} />
         <div className="min-w-0 space-y-5">
-          <Lens data={data} view={view} />
+          <Lens data={data} view={view} asOf={asOf} />
           <Notes notes={[data.method, ...data.notes]} title="How this is built" />
         </div>
       </div>

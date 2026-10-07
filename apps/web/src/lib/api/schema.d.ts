@@ -11967,6 +11967,33 @@ export interface components {
             /** Job Id */
             job_id: number;
         };
+        /**
+         * FreshnessOut
+         * @description How old the data under the charts is, so a stale price or rate is visible, not implied.
+         */
+        FreshnessOut: {
+            /**
+             * Prices As Of
+             * @description Day of the latest position snapshot: the prices and exchange rates used.
+             */
+            prices_as_of: string | null;
+            /** Prices Age Days */
+            prices_age_days: number | null;
+            /**
+             * Benchmark As Of
+             * @description Date of the benchmark's latest close.
+             */
+            benchmark_as_of: string | null;
+            /** Benchmark Age Days */
+            benchmark_age_days: number | null;
+            /**
+             * Stale
+             * @description Prices or the benchmark are older than the stale limit.
+             */
+            stale: boolean;
+            /** Stale After Days */
+            stale_after_days: number;
+        };
         /** FundAsOf */
         FundAsOf: {
             /** Isin */
@@ -17591,6 +17618,7 @@ export interface components {
             timeline: components["schemas"]["TimelineMonth"][];
             /** Freshness Note */
             freshness_note: string | null;
+            freshness?: components["schemas"]["FreshnessOut"] | null;
             explain: components["schemas"]["PerformanceExplain"];
         };
         /** PerformanceSavedReport */
@@ -32675,7 +32703,10 @@ export interface operations {
     };
     get_xray: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description Show the holdings as they were on this date (the latest snapshot before). */
+                as_of?: string | null;
+            };
             header?: never;
             path?: never;
             cookie?: never;
@@ -32691,12 +32722,23 @@ export interface operations {
                     "application/json": components["schemas"]["XrayResponse"];
                 };
             };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
         };
     };
     export_xray: {
         parameters: {
             query?: {
                 lens?: string | null;
+                /** @description Show the holdings as they were on this date (the latest snapshot before). */
+                as_of?: string | null;
             };
             header?: never;
             path?: never;
@@ -32726,7 +32768,10 @@ export interface operations {
     };
     get_overlap: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description Show the holdings as they were on this date (the latest snapshot before). */
+                as_of?: string | null;
+            };
             header?: never;
             path?: never;
             cookie?: never;
@@ -32742,11 +32787,23 @@ export interface operations {
                     "application/json": components["schemas"]["XrayIntersection"];
                 };
             };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
         };
     };
     get_concentration: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description Show the holdings as they were on this date (the latest snapshot before). */
+                as_of?: string | null;
+            };
             header?: never;
             path?: never;
             cookie?: never;
@@ -32762,11 +32819,23 @@ export interface operations {
                     "application/json": components["schemas"]["XrayConcentrationResponse"];
                 };
             };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
         };
     };
     get_fundamentals: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description Show the holdings as they were on this date (the latest snapshot before). */
+                as_of?: string | null;
+            };
             header?: never;
             path?: never;
             cookie?: never;
@@ -32782,11 +32851,23 @@ export interface operations {
                     "application/json": components["schemas"]["XrayFundamentals"];
                 };
             };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
         };
     };
     get_benchmark: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description Show the holdings as they were on this date (the latest snapshot before). */
+                as_of?: string | null;
+            };
             header?: never;
             path?: never;
             cookie?: never;
@@ -32800,6 +32881,15 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["XrayBenchmark"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };

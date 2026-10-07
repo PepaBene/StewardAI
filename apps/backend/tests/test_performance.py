@@ -165,6 +165,17 @@ def test_position_breaks_report_what_fills_cannot_explain():
     assert both["BBB"].ledger_quantity == 0 and "no fills" in both["BBB"].reason
 
 
+def test_freshness_flags_old_prices_and_an_old_benchmark_close():
+    from steward.performance.service import freshness
+
+    bench = [(day(2026, 3, 1), D("100")), (day(2026, 3, 6), D("101"))]
+    fresh = freshness(day(2026, 3, 9), bench, day(2026, 3, 10))
+    assert (fresh.prices_age_days, fresh.benchmark_age_days, fresh.stale) == (1, 4, False)
+    old = freshness(day(2026, 3, 2), bench, day(2026, 3, 10))
+    assert old.prices_age_days == 8 and old.stale
+    assert freshness(day(2026, 3, 9), [], day(2026, 3, 10)).benchmark_as_of is None
+
+
 def test_benchmark_relative_contribution_is_the_gain_less_the_benchmark_on_opening_money():
     from steward.performance.attribution import HoldingContribution, benchmark_relative
 

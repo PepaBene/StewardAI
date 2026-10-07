@@ -107,6 +107,25 @@ async def _ledger(
     return apply_splits(entries, [Split(s.ticker, s.day, s.ratio) for s in settings.splits])
 
 
+STALE_AFTER_DAYS = 5  # covers a weekend plus a market holiday
+
+
+def freshness(
+    prices_as_of: dt.date | None,
+    benchmark: list[tuple[dt.date, Decimal]],
+    today: dt.date,
+) -> r.FreshnessOut:
+    """Ages of the position snapshot (prices and exchange rates) and the benchmark's last close."""
+    bench_day = max((d for d, _ in benchmark), default=None)
+    prices_age = (today - prices_as_of).days if prices_as_of else None
+    bench_age = (today - bench_day).days if bench_day else None
+    stale = any(a is not None and a > STALE_AFTER_DAYS for a in (prices_age, bench_age))
+    return r.FreshnessOut(
+        prices_as_of=prices_as_of, prices_age_days=prices_age, benchmark_as_of=bench_day,
+        benchmark_age_days=bench_age, stale=stale, stale_after_days=STALE_AFTER_DAYS,
+    )  # fmt: skip
+
+
 def _float(value: Decimal | None) -> float | None:
     return None if value is None else float(value)
 
@@ -416,6 +435,7 @@ async def performance_report(
         costs=_costs(ledger, account_currency, average_account, year_ago),
         timeline=_timeline(ledger),
         freshness_note=" ".join(bench_notes) or None,
+        freshness=freshness(days[-1].date, bench_series, dt.date.today()),
         explain=explain.model_copy(update={"gaps": [*bench_notes]}),
     )  # fmt: skip
 

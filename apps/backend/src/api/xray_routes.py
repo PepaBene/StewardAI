@@ -1,5 +1,6 @@
 """Authenticated read-only routes for the Portfolio X-Ray (plan Phase 5)."""
 
+import datetime as dt
 from typing import Annotated
 
 from fastapi import APIRouter, HTTPException, Query
@@ -27,22 +28,43 @@ from steward.xray.scenario import ProposalError, ProposedRequest, XrayProposal
 router = APIRouter(prefix="/portfolio/xray", tags=["portfolio"])
 
 
+AsOf = Annotated[
+    dt.date | None,
+    Query(description="Show the holdings as they were on this date (the latest snapshot before)."),
+]
+
+
+async def _loaded(pool: Pool, owner: Owner, as_of: dt.date | None) -> service.Loaded:
+    """Today's X-Ray inputs (cached for a minute), or those of a past date."""
+    if as_of is None:
+        return await service.load_cached(pool, owner.user_id)
+    if as_of > dt.datetime.now(dt.UTC).date():
+        raise HTTPException(422, "The date is in the future.")
+    try:
+        return await service.load(pool, owner.user_id, as_of=as_of)
+    except service.NoHoldingsThen as err:
+        raise HTTPException(404, "No holdings were stored on or before that date.") from err
+
+
 @router.get("")
-async def get_xray(pool: Pool, owner: Owner) -> XrayResponse:
+async def get_xray(pool: Pool, owner: Owner, as_of: AsOf = None) -> XrayResponse:
     """Selectable look-through views of the whole portfolio (asset class, sector, industry,
     country, region, currency, issuer, fund, style proxy, market-cap band, fees, and country of
     revenue, commodity and trade product where data exist). Each view adds up to the whole
     portfolio with cash and unknown weight as their own buckets; each bucket names its
     contributors and how it was classified."""
-    return xray_response(await service.load_cached(pool, owner.user_id))
+    return xray_response(await _loaded(pool, owner, as_of))
 
 
 @router.get("/export", response_class=PlainTextResponse)
 async def export_xray(
-    pool: Pool, owner: Owner, lens: Annotated[str | None, Query(max_length=30)] = None
+    pool: Pool,
+    owner: Owner,
+    lens: Annotated[str | None, Query(max_length=30)] = None,
+    as_of: AsOf = None,
 ) -> PlainTextResponse:
     """The X-Ray buckets as CSV, one lens or all of them."""
-    response = xray_response(await service.load_cached(pool, owner.user_id))
+    response = xray_response(await _loaded(pool, owner, as_of))
     name = lens or "all"
     return PlainTextResponse(
         xray_csv(response.views, lens),
@@ -52,31 +74,33 @@ async def export_xray(
 
 
 @router.get("/overlap")
-async def get_overlap(pool: Pool, owner: Owner) -> XrayIntersection:
+async def get_overlap(pool: Pool, owner: Owner, as_of: AsOf = None) -> XrayIntersection:
     """Stock intersection: issuers reached through more than one channel, each fund's
     contribution and the trail to the securities, and the concentration if a fund were removed."""
-    return intersection_response(await service.load_cached(pool, owner.user_id))
+    return intersection_response(await _loaded(pool, owner, as_of))
 
 
 @router.get("/concentration")
-async def get_concentration(pool: Pool, owner: Owner) -> XrayConcentrationResponse:
+async def get_concentration(
+    pool: Pool, owner: Owner, as_of: AsOf = None
+) -> XrayConcentrationResponse:
     """Top-10, HHI and effective holdings at security, issuer, sector, country and fund level,
     with benchmark-relative over- and underweights where the classification is like-for-like."""
-    return concentration_response(await service.load_cached(pool, owner.user_id))
+    return concentration_response(await _loaded(pool, owner, as_of))
 
 
 @router.get("/fundamentals")
-async def get_fundamentals(pool: Pool, owner: Owner) -> XrayFundamentals:
+async def get_fundamentals(pool: Pool, owner: Owner, as_of: AsOf = None) -> XrayFundamentals:
     """Weighted earnings yield and P/E, price to book, dividend yield, profitability, leverage
     and fee drag, each with its coverage; meaningless aggregates are withheld with the reason."""
-    return (await service.load_cached(pool, owner.user_id)).analysis.fundamentals
+    return (await _loaded(pool, owner, as_of)).analysis.fundamentals
 
 
 @router.get("/benchmark")
-async def get_benchmark(pool: Pool, owner: Owner) -> XrayBenchmark:
+async def get_benchmark(pool: Pool, owner: Owner, as_of: AsOf = None) -> XrayBenchmark:
     """Equity X-Ray against the configured benchmark proxy (an ETF's holdings today, not the
     index's historical membership); only like-for-like classifications are compared."""
-    result, _ = service.benchmark_result(await service.load_cached(pool, owner.user_id))
+    result, _ = service.benchmark_result(await _loaded(pool, owner, as_of))
     return result
 
 

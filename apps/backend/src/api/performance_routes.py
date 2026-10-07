@@ -124,7 +124,9 @@ async def save_performance_report(
 
 
 @router.get("/portfolio/performance/saved/{report_id}", tags=["portfolio"])
-async def open_saved_performance_report(pool: Pool, owner: Owner, report_id: int) -> PerformanceSavedReport:
+async def open_saved_performance_report(
+    pool: Pool, owner: Owner, report_id: int
+) -> PerformanceSavedReport:
     found = await saved.load_saved(pool, owner.user_id, "performance_report", report_id)
     if found is None:
         raise HTTPException(404, "No such saved report.")

@@ -16259,6 +16259,32 @@
         "summary": "Get Xray",
         "description": "Selectable look-through views of the whole portfolio (asset class, sector, industry,\ncountry, region, currency, issuer, fund, style proxy, market-cap band, fees, and country of\nrevenue, commodity and trade product where data exist). Each view adds up to the whole\nportfolio with cash and unknown weight as their own buckets; each bucket names its\ncontributors and how it was classified.",
         "operationId": "get_xray",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "as_of",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Show the holdings as they were on this date (the latest snapshot before).",
+              "title": "As Of"
+            },
+            "description": "Show the holdings as they were on this date (the latest snapshot before)."
+          }
+        ],
         "responses": {
           "200": {
             "description": "Successful Response",
@@ -16269,13 +16295,18 @@
                 }
               }
             }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
           }
-        },
-        "security": [
-          {
-            "HTTPBearer": []
-          }
-        ]
+        }
       }
     },
     "/portfolio/xray/export": {
@@ -16308,6 +16339,25 @@
               ],
               "title": "Lens"
             }
+          },
+          {
+            "name": "as_of",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Show the holdings as they were on this date (the latest snapshot before).",
+              "title": "As Of"
+            },
+            "description": "Show the holdings as they were on this date (the latest snapshot before)."
           }
         ],
         "responses": {
@@ -16342,6 +16392,32 @@
         "summary": "Get Overlap",
         "description": "Stock intersection: issuers reached through more than one channel, each fund's\ncontribution and the trail to the securities, and the concentration if a fund were removed.",
         "operationId": "get_overlap",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "as_of",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Show the holdings as they were on this date (the latest snapshot before).",
+              "title": "As Of"
+            },
+            "description": "Show the holdings as they were on this date (the latest snapshot before)."
+          }
+        ],
         "responses": {
           "200": {
             "description": "Successful Response",
@@ -16352,13 +16428,18 @@
                 }
               }
             }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
           }
-        },
-        "security": [
-          {
-            "HTTPBearer": []
-          }
-        ]
+        }
       }
     },
     "/portfolio/xray/concentration": {
@@ -16369,6 +16450,32 @@
         "summary": "Get Concentration",
         "description": "Top-10, HHI and effective holdings at security, issuer, sector, country and fund level,\nwith benchmark-relative over- and underweights where the classification is like-for-like.",
         "operationId": "get_concentration",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "as_of",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Show the holdings as they were on this date (the latest snapshot before).",
+              "title": "As Of"
+            },
+            "description": "Show the holdings as they were on this date (the latest snapshot before)."
+          }
+        ],
         "responses": {
           "200": {
             "description": "Successful Response",
@@ -16379,13 +16486,18 @@
                 }
               }
             }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
           }
-        },
-        "security": [
-          {
-            "HTTPBearer": []
-          }
-        ]
+        }
       }
     },
     "/portfolio/xray/fundamentals": {
@@ -16396,6 +16508,32 @@
         "summary": "Get Fundamentals",
         "description": "Weighted earnings yield and P/E, price to book, dividend yield, profitability, leverage\nand fee drag, each with its coverage; meaningless aggregates are withheld with the reason.",
         "operationId": "get_fundamentals",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "as_of",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Show the holdings as they were on this date (the latest snapshot before).",
+              "title": "As Of"
+            },
+            "description": "Show the holdings as they were on this date (the latest snapshot before)."
+          }
+        ],
         "responses": {
           "200": {
             "description": "Successful Response",
@@ -16406,13 +16544,18 @@
                 }
               }
             }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
           }
-        },
-        "security": [
-          {
-            "HTTPBearer": []
-          }
-        ]
+        }
       }
     },
     "/portfolio/xray/benchmark": {
@@ -16423,6 +16566,32 @@
         "summary": "Get Benchmark",
         "description": "Equity X-Ray against the configured benchmark proxy (an ETF's holdings today, not the\nindex's historical membership); only like-for-like classifications are compared.",
         "operationId": "get_benchmark",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "as_of",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Show the holdings as they were on this date (the latest snapshot before).",
+              "title": "As Of"
+            },
+            "description": "Show the holdings as they were on this date (the latest snapshot before)."
+          }
+        ],
         "responses": {
           "200": {
             "description": "Successful Response",
@@ -16433,13 +16602,18 @@
                 }
               }
             }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
           }
-        },
-        "security": [
-          {
-            "HTTPBearer": []
-          }
-        ]
+        }
       }
     },
     "/portfolio/xray/candidates": {
@@ -35834,6 +36008,78 @@
         ],
         "title": "Freshness"
       },
+      "FreshnessOut": {
+        "properties": {
+          "prices_as_of": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Prices As Of",
+            "description": "Day of the latest position snapshot: the prices and exchange rates used."
+          },
+          "prices_age_days": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Prices Age Days"
+          },
+          "benchmark_as_of": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Benchmark As Of",
+            "description": "Date of the benchmark's latest close."
+          },
+          "benchmark_age_days": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Benchmark Age Days"
+          },
+          "stale": {
+            "type": "boolean",
+            "title": "Stale",
+            "description": "Prices or the benchmark are older than the stale limit."
+          },
+          "stale_after_days": {
+            "type": "integer",
+            "title": "Stale After Days"
+          }
+        },
+        "type": "object",
+        "required": [
+          "prices_as_of",
+          "prices_age_days",
+          "benchmark_as_of",
+          "benchmark_age_days",
+          "stale",
+          "stale_after_days"
+        ],
+        "title": "FreshnessOut",
+        "description": "How old the data under the charts is, so a stale price or rate is visible, not implied."
+      },
       "FundAsOf": {
         "properties": {
           "isin": {
@@ -52432,6 +52678,16 @@
               }
             ],
             "title": "Freshness Note"
+          },
+          "freshness": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/FreshnessOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
           },
           "explain": {
             "$ref": "#/components/schemas/PerformanceExplain"

@@ -133,6 +133,19 @@ class TimelineMonth(BaseModel):
     fees: float
 
 
+class FreshnessOut(BaseModel):
+    """How old the data under the charts is, so a stale price or rate is visible, not implied."""
+
+    prices_as_of: dt.date | None = Field(
+        description="Day of the latest position snapshot: the prices and exchange rates used."
+    )
+    prices_age_days: int | None
+    benchmark_as_of: dt.date | None = Field(description="Date of the benchmark's latest close.")
+    benchmark_age_days: int | None
+    stale: bool = Field(description="Prices or the benchmark are older than the stale limit.")
+    stale_after_days: int
+
+
 class PerformanceResponse(BaseModel):
     status: ReportStatus
     as_of: dt.date | None
@@ -153,6 +166,7 @@ class PerformanceResponse(BaseModel):
     costs: CostsOut
     timeline: list[TimelineMonth]
     freshness_note: str | None
+    freshness: FreshnessOut | None = None
     explain: PerformanceExplain
 
 

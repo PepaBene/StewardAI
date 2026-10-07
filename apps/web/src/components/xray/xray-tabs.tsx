@@ -1,9 +1,11 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useSearchParams } from "next/navigation";
 
+import { AsOfPicker } from "@/components/xray/as-of-picker";
 import { cn } from "@/lib/utils";
+import { parseAsOf, withAsOf } from "@/lib/xray/as-of";
 
 const TABS = [
   { href: "/xray", label: "Exposure" },
@@ -16,8 +18,11 @@ const TABS = [
 
 export function XrayTabs() {
   const pathname = usePathname();
+  const asOf = parseAsOf(useSearchParams().get("as_of"));
   return (
-    <div className="border-b border-border">
+    <div>
+      {pathname.startsWith("/xray/proposed") ? null : <AsOfPicker />}
+      <div className="border-b border-border">
       <nav aria-label="X-Ray views" className="-mb-px overflow-x-auto">
         <ul className="flex">
           {TABS.map((tab) => {
@@ -25,7 +30,7 @@ export function XrayTabs() {
             return (
               <li key={tab.href}>
                 <Link
-                  href={tab.href}
+                  href={tab.href === "/xray/proposed" ? tab.href : withAsOf(tab.href, asOf)}
                   aria-current={active ? "page" : undefined}
                   className={cn(
                     "inline-flex h-10 items-center border-b-2 px-3.5 text-sm whitespace-nowrap transition-colors",
@@ -39,6 +44,7 @@ export function XrayTabs() {
           })}
         </ul>
       </nav>
+      </div>
     </div>
   );
 }
