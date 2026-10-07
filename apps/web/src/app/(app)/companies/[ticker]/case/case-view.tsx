@@ -142,6 +142,23 @@ export function CaseTab({ ticker }: { ticker: string }) {
               )}
             </Blueprint>
 
+            <Blueprint aria-labelledby="case-obs" className="space-y-3 px-[22px] py-5">
+              <PanelHeading kicker="Computed by the app, not your assessments" title={<span id="case-obs">Observed in filings</span>} />
+              <p className="max-w-[70ch] text-xs text-text-muted">{v.observed_note}</p>
+              <ul className="divide-y divide-border-soft">
+                {(v.observed ?? []).map((o) => (
+                  <li key={o.id} className="grid gap-x-4 py-2 text-sm sm:grid-cols-[minmax(10rem,16rem)_8rem_1fr]">
+                    <span className="font-medium">{o.label}</span>
+                    <span className="num font-semibold">{o.value === null || o.value === undefined ? <Absent reason={o.reason ?? "missing: not computable"} /> : o.unit === "multiple" ? `${Number(o.value).toFixed(1)}×` : formatFigure(o.value, o.unit)}</span>
+                    <span className="text-xs text-text-muted">
+                      {o.detail}
+                      {o.period ? ` ${o.period}.` : ""} Source: {o.source.startsWith("http") ? <SourceLink href={o.source}>filing</SourceLink> : o.source}.
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            </Blueprint>
+
             <Blueprint aria-labelledby="case-conc" className="space-y-3 px-[22px] py-5">
               <PanelHeading kicker="Confirmed disclosures, largest first" title={<span id="case-conc">Concentration</span>} />
               {v.concentration.length === 0 ? (

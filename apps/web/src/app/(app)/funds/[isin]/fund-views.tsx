@@ -298,6 +298,17 @@ export function StyleTab({ isin }: { isin: string }) {
               <p className="text-sm text-text-muted">No identified equity holdings, so concentration is unknown.</p>
             )}
           </Blueprint>
+          <Blueprint aria-labelledby="fs-vg" className="space-y-3 px-[22px] py-5">
+            <PanelHeading kicker="Rule-based, from holdings the app can value" title={<span id="fs-vg">Value or growth tilt</span>} />
+            {(v.value_growth ?? []).length === 0 ? (
+              <p className="text-sm text-text-muted">Not available without identified equity holdings.</p>
+            ) : (
+              <>
+                <WeightBars items={(v.value_growth ?? []).map((s) => ({ label: s.label, weight: s.weight, kind: s.kind === "no_earnings" || s.kind === "not_covered" ? "unclassified" : "known" }))} label="Value or growth tilt" />
+                <p className="max-w-[72ch] text-xs text-text-muted">{v.value_growth_rule}</p>
+              </>
+            )}
+          </Blueprint>
           <div className="grid gap-5 lg:grid-cols-2">
             <Blueprint aria-labelledby="fs-size" className="space-y-3 px-[22px] py-5">
               <PanelHeading kicker="Market capitalisation in EUR, ECB rates" title={<span id="fs-size">Size mix</span>} />

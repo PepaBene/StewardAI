@@ -3756,7 +3756,8 @@ export interface paths {
         /**
          * Get Overview
          * @description Issuer facts, the other listings of the same issuer, provider profile, latest segments,
-         *     confirmed competitors and peers, upcoming events and a coverage score that says what is missing.
+         *     what the company sells and where (as it reports them), legal group, confirmed competitors and
+         *     peers, upcoming events and a coverage score that says what is missing.
          */
         get: operations["get_overview"];
         put?: never;
@@ -4156,7 +4157,11 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Get Case */
+        /**
+         * Get Case
+         * @description Your cited items, plus concentration and capital-allocation figures the app computed from
+         *     filings (kept apart from your items).
+         */
         get: operations["get_case"];
         put?: never;
         /** Add Case Item */
@@ -6691,8 +6696,8 @@ export interface components {
              */
             status: string;
         };
-        /** CaseView */
-        CaseView: {
+        /** CaseWithObserved */
+        CaseWithObserved: {
             /** Ticker */
             ticker: string;
             /** Items */
@@ -6703,6 +6708,16 @@ export interface components {
             }[];
             /** Note */
             note: string;
+            /**
+             * Observed
+             * @description Figures the app computed from filings and disclosures, kept apart from your items.
+             */
+            observed?: components["schemas"]["Observed"][];
+            /**
+             * Observed Note
+             * @default Observed figures are computed by the app from filed statements and confirmed disclosures. They are evidence to cite, not a verdict; an empty one says what is missing.
+             */
+            observed_note: string;
         };
         /** CashDrift */
         CashDrift: {
@@ -7665,6 +7680,8 @@ export interface components {
             portfolio_id: string | null;
             /** Duplicate Of */
             duplicate_of: string | null;
+            /** Duplicate Basis */
+            duplicate_basis?: ("portfolio_id" | "identical_holdings") | null;
             /** Equity Weight */
             equity_weight: number | string | null;
             /** Residual Weight */
@@ -14526,6 +14543,27 @@ export interface components {
             /** Source Url */
             source_url: string;
         };
+        /** LegalLink */
+        LegalLink: {
+            /**
+             * Relation
+             * @enum {string}
+             */
+            relation: "parent" | "ultimate_parent" | "subsidiary";
+            /** Name */
+            name: string;
+            /** Lei */
+            lei: string | null;
+            /**
+             * Status
+             * @description confirmed, or suggested until you confirm it
+             */
+            status: string;
+            /** Source */
+            source: string;
+            /** As Of */
+            as_of: string | null;
+        };
         /** Line */
         Line: {
             /** Key */
@@ -16167,6 +16205,60 @@ export interface components {
              */
             scope: string;
         };
+        /** Observed */
+        Observed: {
+            /**
+             * Kind
+             * @description concentration or capital_allocation
+             */
+            kind: string;
+            /** Id */
+            id: string;
+            /** Label */
+            label: string;
+            /** Value */
+            value: number | string | null;
+            /** Unit */
+            unit: string;
+            /** Period */
+            period?: string | null;
+            /**
+             * Detail
+             * @description How it was computed and from what.
+             */
+            detail: string;
+            /** Reason */
+            reason?: string | null;
+            /** Source */
+            source: string;
+        };
+        /** OperationBreakdown */
+        OperationBreakdown: {
+            /**
+             * Kind
+             * @description geographic, product or segment, as the company reports it
+             */
+            kind: string;
+            /** Label */
+            label: string;
+            /** Period */
+            period: string | null;
+            /** Currency */
+            currency: string | null;
+            /** Lines */
+            lines: components["schemas"]["OperationLine"][];
+            /** Note */
+            note?: string | null;
+        };
+        /** OperationLine */
+        OperationLine: {
+            /** Label */
+            label: string;
+            /** Revenue */
+            revenue: number | string | null;
+            /** Share */
+            share: number | string | null;
+        };
         /** Overview */
         Overview: {
             /** Ticker */
@@ -16199,6 +16291,15 @@ export interface components {
             profile: components["schemas"]["ProfileFact"][];
             /** Segments */
             segments: components["schemas"]["SegmentLine"][];
+            /** Operations */
+            operations?: components["schemas"]["OperationBreakdown"][];
+            /** Legal Group */
+            legal_group?: components["schemas"]["LegalLink"][];
+            /**
+             * Legal Group Note
+             * @default
+             */
+            legal_group_note: string;
             /** Competitors */
             competitors: string[];
             /** Peers Confirmed */
@@ -20636,6 +20737,21 @@ export interface components {
             note: string | null;
             body: components["schemas"]["StrategyConfig"];
         };
+        /** StyleBand */
+        StyleBand: {
+            /** Label */
+            label: string;
+            /**
+             * Weight
+             * @description Share of the fund's identified equity weight.
+             */
+            weight: number | string;
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "value" | "blend" | "growth" | "no_earnings" | "not_covered";
+        };
         /** StyleMetric */
         StyleMetric: {
             /** Id */
@@ -20668,6 +20784,13 @@ export interface components {
             size: components["schemas"]["SizeBand"][];
             /** Size Coverage */
             size_coverage: number | string | null;
+            /** Value Growth */
+            value_growth?: components["schemas"]["StyleBand"][];
+            /**
+             * Value Growth Rule
+             * @default Each covered holding votes: earnings yield of 6% or more and price to book of 1.5 or less each vote value; earnings yield of 3% or less and price to book of 4 or more each vote growth. More value votes make it value-leaning, more growth votes growth-leaning, otherwise blend. A holding with negative earnings is its own band, and one the app has no statements for is not classified. These thresholds are StewardAI's own and are not Morningstar's Style Box.
+             */
+            value_growth_rule: string;
             /** Metrics */
             metrics: components["schemas"]["StyleMetric"][];
             /** Note */
@@ -29185,7 +29308,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["CaseView"];
+                    "application/json": components["schemas"]["CaseWithObserved"];
                 };
             };
             /** @description Validation Error */

@@ -140,6 +140,65 @@ function Segments({ o, ticker }: { o: Overview; ticker: string }) {
   );
 }
 
+function Operations({ o }: { o: Overview }) {
+  const groups = o.operations ?? [];
+  if (groups.length === 0) return null;
+  return (
+    <Blueprint aria-labelledby="ops-heading" className="space-y-4 px-[22px] py-5">
+      <PanelHeading kicker="As the company reports it" title={<span id="ops-heading">Where the revenue comes from</span>} />
+      <div className="grid gap-x-8 gap-y-5 md:grid-cols-2">
+        {groups.map((g) => (
+          <div key={g.kind} className="space-y-1.5">
+            <p className="text-sm font-semibold">
+              {g.label}
+              <span className="ml-2 text-xs font-normal text-text-muted">{[g.period, g.currency].filter(Boolean).join(" ")}</span>
+            </p>
+            <ul className="space-y-1 text-sm">
+              {g.lines.map((l) => (
+                <li key={l.label} className="flex items-baseline justify-between gap-3 border-b border-border-soft pb-1">
+                  <span className="min-w-0 truncate" title={l.label}>{l.label}</span>
+                  <span className="num shrink-0 text-xs text-text-muted">
+                    {l.share !== null && l.share !== undefined ? `${(Number(l.share) * 100).toFixed(1)}%` : <Absent reason="share not computable" />}
+                  </span>
+                </li>
+              ))}
+            </ul>
+            {g.note ? <p className="text-xs text-text-muted">{g.note}</p> : null}
+          </div>
+        ))}
+      </div>
+    </Blueprint>
+  );
+}
+
+function LegalGroup({ o }: { o: Overview }) {
+  const links = o.legal_group ?? [];
+  return (
+    <Blueprint aria-labelledby="legal-heading" className="space-y-3 px-[22px] py-5">
+      <PanelHeading kicker="Parents and subsidiaries" title={<span id="legal-heading">Legal group</span>} />
+      {links.length === 0 ? (
+        <p className="text-sm text-text-muted">{o.legal_group_note ?? "No parent or subsidiary is stored for this company."}</p>
+      ) : (
+        <>
+          <ul className="space-y-1.5 text-sm">
+            {links.map((l) => (
+              <li key={`${l.relation}-${l.name}`} className="flex flex-wrap items-baseline gap-x-3 border-b border-border-soft pb-1">
+                <span className="w-32 shrink-0 text-text-muted">{l.relation === "ultimate_parent" ? "Ultimate parent" : l.relation === "parent" ? "Parent" : "Subsidiary"}</span>
+                <span className="min-w-0">{l.name}</span>
+                <span className={l.status === "confirmed" ? "text-xs text-gain" : "text-xs text-unconfirmed"}>
+                  {l.status === "confirmed" ? "Confirmed" : "Suggested, not yet confirmed"}
+                </span>
+                <span className="text-xs text-text-muted">{l.source}{l.as_of ? `, ${formatDate(l.as_of)}` : ""}</span>
+              </li>
+            ))}
+          </ul>
+          {o.legal_group_note ? <p className="text-xs text-text-muted">{o.legal_group_note}</p> : null}
+        </>
+      )}
+    </Blueprint>
+  );
+}
+
 function Context({ o }: { o: Overview }) {
   return (
     <div className="grid gap-5 lg:grid-cols-2">
@@ -215,6 +274,8 @@ export function OverviewView({ ticker }: { ticker: string }) {
               <Profile o={o} />
               <Segments o={o} ticker={ticker} />
             </div>
+            <Operations o={o} />
+            <LegalGroup o={o} />
             <Context o={o} />
           </>
         )}
