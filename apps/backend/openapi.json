@@ -13228,6 +13228,873 @@
         }
       }
     },
+    "/disclosures/issuers": {
+      "get": {
+        "tags": [
+          "disclosures"
+        ],
+        "summary": "Issuers",
+        "description": "Issuers that have at least one disclosure document, with how many and the newest one.",
+        "operationId": "issuers",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/IssuerRow"
+                  },
+                  "type": "array",
+                  "title": "Response Issuers"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/disclosures/issuers/{issuer_id}/snapshot": {
+      "get": {
+        "tags": [
+          "disclosures"
+        ],
+        "summary": "Issuer Snapshot",
+        "description": "Everything known about the issuer at `as_of` (default now): documents, observations,\nclaims and coverage. Nothing known later is included.",
+        "operationId": "issuer_snapshot",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "issuer_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "maximum": 9223372036854775807,
+              "minimum": 1,
+              "title": "Issuer Id"
+            }
+          },
+          {
+            "name": "as_of",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date-time"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Show only what was known by this time.",
+              "title": "As Of"
+            },
+            "description": "Show only what was known by this time."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Snapshot"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/disclosures/issuers/{issuer_id}/timeline": {
+      "get": {
+        "tags": [
+          "disclosures"
+        ],
+        "summary": "Issuer Timeline",
+        "operationId": "issuer_timeline",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "issuer_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "maximum": 9223372036854775807,
+              "minimum": 1,
+              "title": "Issuer Id"
+            }
+          },
+          {
+            "name": "as_of",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date-time"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Show only what was known by this time.",
+              "title": "As Of"
+            },
+            "description": "Show only what was known by this time."
+          },
+          {
+            "name": "form",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "maxLength": 20
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Form"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 500,
+              "minimum": 1,
+              "default": 200,
+              "title": "Limit"
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 100000,
+              "minimum": 0,
+              "default": 0,
+              "title": "Offset"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/DocumentVersionRow"
+                  },
+                  "title": "Response Issuer Timeline"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/disclosures/issuers/{issuer_id}/observations": {
+      "get": {
+        "tags": [
+          "disclosures"
+        ],
+        "summary": "Issuer Observations",
+        "operationId": "issuer_observations",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "issuer_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "maximum": 9223372036854775807,
+              "minimum": 1,
+              "title": "Issuer Id"
+            }
+          },
+          {
+            "name": "as_of",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date-time"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Show only what was known by this time.",
+              "title": "As Of"
+            },
+            "description": "Show only what was known by this time."
+          },
+          {
+            "name": "metric",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "maxLength": 120
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Metric"
+            }
+          },
+          {
+            "name": "verified_only",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "default": false,
+              "title": "Verified Only"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 500,
+              "minimum": 1,
+              "default": 200,
+              "title": "Limit"
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 100000,
+              "minimum": 0,
+              "default": 0,
+              "title": "Offset"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/ObservationRow"
+                  },
+                  "title": "Response Issuer Observations"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/disclosures/issuers/{issuer_id}/claims": {
+      "get": {
+        "tags": [
+          "disclosures"
+        ],
+        "summary": "Issuer Claims",
+        "operationId": "issuer_claims",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "issuer_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "maximum": 9223372036854775807,
+              "minimum": 1,
+              "title": "Issuer Id"
+            }
+          },
+          {
+            "name": "as_of",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date-time"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Show only what was known by this time.",
+              "title": "As Of"
+            },
+            "description": "Show only what was known by this time."
+          },
+          {
+            "name": "claim_type",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "maxLength": 80
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Claim Type"
+            }
+          },
+          {
+            "name": "verified_only",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "default": false,
+              "title": "Verified Only"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 500,
+              "minimum": 1,
+              "default": 200,
+              "title": "Limit"
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 100000,
+              "minimum": 0,
+              "default": 0,
+              "title": "Offset"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/ClaimRow"
+                  },
+                  "title": "Response Issuer Claims"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/disclosures/issuers/{issuer_id}/coverage": {
+      "get": {
+        "tags": [
+          "disclosures"
+        ],
+        "summary": "Issuer Coverage",
+        "operationId": "issuer_coverage",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "issuer_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "maximum": 9223372036854775807,
+              "minimum": 1,
+              "title": "Issuer Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/CoverageRow"
+                  },
+                  "title": "Response Issuer Coverage"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/disclosures/provenance/{kind}/{row_id}": {
+      "get": {
+        "tags": [
+          "disclosures"
+        ],
+        "summary": "Provenance",
+        "description": "The source version, evidence span and version chain behind one value, as known at\n`as_of`. 404 if the row does not exist or was not yet known then.",
+        "operationId": "provenance",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "kind",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "enum": [
+                "observation",
+                "claim"
+              ],
+              "type": "string",
+              "title": "Kind"
+            }
+          },
+          {
+            "name": "row_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "maximum": 9223372036854775807,
+              "minimum": 1,
+              "title": "Row Id"
+            }
+          },
+          {
+            "name": "as_of",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date-time"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Show only what was known by this time.",
+              "title": "As Of"
+            },
+            "description": "Show only what was known by this time."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Provenance"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/disclosures/versions/{version_id}/span": {
+      "get": {
+        "tags": [
+          "disclosures"
+        ],
+        "summary": "Version Span",
+        "description": "The archived document text around a cited span. The archived bytes are re-parsed with the\nparser version that produced the offsets; `stale_parser` flags a version mismatch.",
+        "operationId": "version_span",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "version_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "maximum": 9223372036854775807,
+              "minimum": 1,
+              "title": "Version Id"
+            }
+          },
+          {
+            "name": "start",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "title": "Start"
+            }
+          },
+          {
+            "name": "end",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "title": "End"
+            }
+          },
+          {
+            "name": "context",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 2000,
+              "minimum": 0,
+              "default": 400,
+              "title": "Context"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SpanText"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/disclosures/sources": {
+      "get": {
+        "tags": [
+          "disclosures"
+        ],
+        "summary": "Sources",
+        "description": "The source registry: access method, tested state and the stop condition per source.",
+        "operationId": "sources",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/SourceRow"
+                  },
+                  "type": "array",
+                  "title": "Response Sources"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/disclosures/review": {
+      "get": {
+        "tags": [
+          "disclosures"
+        ],
+        "summary": "Review Queue",
+        "operationId": "review_queue",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "status",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "enum": [
+                "open",
+                "deferred",
+                "approved",
+                "rejected",
+                "superseded"
+              ],
+              "type": "string",
+              "default": "open",
+              "title": "Status"
+            }
+          },
+          {
+            "name": "reason",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "maxLength": 40
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Reason"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 500,
+              "minimum": 1,
+              "default": 50,
+              "title": "Limit"
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 100000,
+              "minimum": 0,
+              "default": 0,
+              "title": "Offset"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/ReviewRow"
+                  },
+                  "title": "Response Review Queue"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/disclosures/review/{review_id}/decision": {
+      "post": {
+        "tags": [
+          "disclosures"
+        ],
+        "summary": "Decide Review",
+        "description": "Approve, reject, supersede or defer a review item. The reason is mandatory and the\noriginal candidate is preserved.",
+        "operationId": "decide_review",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "review_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "maximum": 9223372036854775807,
+              "minimum": 1,
+              "title": "Review Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReviewDecision"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReviewRow"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/holdings/{ticker}/data-context": {
       "get": {
         "tags": [
@@ -16817,6 +17684,199 @@
         "title": "ClaimCheckSummary",
         "description": "What the claim verifier did to a report, stored with it."
       },
+      "ClaimRow": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "claim_type": {
+            "type": "string",
+            "title": "Claim Type"
+          },
+          "subject_issuer_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Subject Issuer Id"
+          },
+          "subject_label": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Subject Label"
+          },
+          "object_issuer_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Object Issuer Id"
+          },
+          "object_label": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Object Label"
+          },
+          "object_anonymous": {
+            "type": "boolean",
+            "title": "Object Anonymous"
+          },
+          "direction": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Direction"
+          },
+          "polarity": {
+            "type": "string",
+            "enum": [
+              "asserted",
+              "denied",
+              "superseded"
+            ],
+            "title": "Polarity"
+          },
+          "payload": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Payload"
+          },
+          "review_state": {
+            "type": "string",
+            "enum": [
+              "machine_suggested",
+              "under_review",
+              "verified",
+              "rejected",
+              "superseded"
+            ],
+            "title": "Review State"
+          },
+          "confidence": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Confidence"
+          },
+          "valid_from": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Valid From"
+          },
+          "valid_to": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Valid To"
+          },
+          "known_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Known At"
+          },
+          "event_effective_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Event Effective At"
+          },
+          "supersedes_claim_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Supersedes Claim Id"
+          },
+          "document_version_id": {
+            "type": "integer",
+            "title": "Document Version Id"
+          },
+          "evidence": {
+            "$ref": "#/components/schemas/EvidenceSpan"
+          },
+          "envelope": {
+            "$ref": "#/components/schemas/Envelope"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "claim_type",
+          "subject_issuer_id",
+          "subject_label",
+          "object_issuer_id",
+          "object_label",
+          "object_anonymous",
+          "direction",
+          "polarity",
+          "payload",
+          "review_state",
+          "confidence",
+          "valid_from",
+          "valid_to",
+          "known_at",
+          "event_effective_at",
+          "supersedes_claim_id",
+          "document_version_id",
+          "evidence",
+          "envelope"
+        ],
+        "title": "ClaimRow"
+      },
       "ClaimSource": {
         "properties": {
           "url": {
@@ -19354,6 +20414,76 @@
         ],
         "title": "CoverageLedger"
       },
+      "CoverageRow": {
+        "properties": {
+          "dataset": {
+            "type": "string",
+            "title": "Dataset"
+          },
+          "source_key": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Key"
+          },
+          "jurisdiction": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Jurisdiction"
+          },
+          "metric": {
+            "type": "string",
+            "title": "Metric"
+          },
+          "period": {
+            "type": "string",
+            "title": "Period"
+          },
+          "state": {
+            "type": "string",
+            "title": "State"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
+          },
+          "checked_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Checked At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "dataset",
+          "source_key",
+          "jurisdiction",
+          "metric",
+          "period",
+          "state",
+          "reason",
+          "checked_at"
+        ],
+        "title": "CoverageRow"
+      },
       "CoverageSummary": {
         "properties": {
           "group_by": {
@@ -21257,6 +22387,227 @@
         ],
         "title": "DocumentVersionOut"
       },
+      "DocumentVersionRow": {
+        "properties": {
+          "document_id": {
+            "type": "integer",
+            "title": "Document Id"
+          },
+          "version_id": {
+            "type": "integer",
+            "title": "Version Id"
+          },
+          "regulator": {
+            "type": "string",
+            "title": "Regulator"
+          },
+          "external_id": {
+            "type": "string",
+            "title": "External Id"
+          },
+          "stable_url": {
+            "type": "string",
+            "title": "Stable Url"
+          },
+          "form": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Form"
+          },
+          "fiscal_period": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fiscal Period"
+          },
+          "language": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Language"
+          },
+          "source_key": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Key"
+          },
+          "content_hash": {
+            "type": "string",
+            "title": "Content Hash"
+          },
+          "filed_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Filed At"
+          },
+          "accepted_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Accepted At"
+          },
+          "published_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Published At"
+          },
+          "first_seen_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "First Seen At"
+          },
+          "retrieved_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Retrieved At"
+          },
+          "known_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Known At"
+          },
+          "date_notes": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "type": "object",
+            "title": "Date Notes"
+          },
+          "quarantined": {
+            "type": "boolean",
+            "title": "Quarantined"
+          },
+          "quarantine_reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Quarantine Reason"
+          },
+          "byte_length": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Byte Length"
+          },
+          "parser_version": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Parser Version"
+          },
+          "amends_version_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Amends Version Id"
+          },
+          "superseded_by_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Superseded By Id"
+          },
+          "is_current": {
+            "type": "boolean",
+            "title": "Is Current"
+          }
+        },
+        "type": "object",
+        "required": [
+          "document_id",
+          "version_id",
+          "regulator",
+          "external_id",
+          "stable_url",
+          "form",
+          "fiscal_period",
+          "language",
+          "source_key",
+          "content_hash",
+          "filed_at",
+          "accepted_at",
+          "published_at",
+          "first_seen_at",
+          "retrieved_at",
+          "known_at",
+          "date_notes",
+          "quarantined",
+          "quarantine_reason",
+          "byte_length",
+          "parser_version",
+          "amends_version_id",
+          "superseded_by_id",
+          "is_current"
+        ],
+        "title": "DocumentVersionRow"
+      },
       "DomainTier": {
         "properties": {
           "domain": {
@@ -21619,6 +22970,68 @@
           "flow_key"
         ],
         "title": "EcbSeries"
+      },
+      "Envelope": {
+        "properties": {
+          "source": {
+            "type": "string",
+            "title": "Source"
+          },
+          "published_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Published At"
+          },
+          "known_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Known At"
+          },
+          "as_of": {
+            "type": "string",
+            "format": "date-time",
+            "title": "As Of"
+          },
+          "method_version": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Method Version"
+          },
+          "document_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Document Url"
+          }
+        },
+        "type": "object",
+        "required": [
+          "source",
+          "published_at",
+          "known_at",
+          "as_of",
+          "method_version",
+          "document_url"
+        ],
+        "title": "Envelope"
       },
       "EpoRefreshResponse": {
         "properties": {
@@ -22735,6 +24148,67 @@
           "context"
         ],
         "title": "EvidenceLink"
+      },
+      "EvidenceSpan": {
+        "properties": {
+          "evidence_id": {
+            "type": "integer",
+            "title": "Evidence Id"
+          },
+          "quote": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Quote"
+          },
+          "span_start": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Span Start"
+          },
+          "span_end": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Span End"
+          },
+          "section": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Section"
+          }
+        },
+        "type": "object",
+        "required": [
+          "evidence_id",
+          "quote",
+          "span_start",
+          "span_end",
+          "section"
+        ],
+        "title": "EvidenceSpan"
       },
       "EvidenceSummary": {
         "properties": {
@@ -32748,6 +34222,59 @@
         ],
         "title": "IssuerRelationshipOut"
       },
+      "IssuerRow": {
+        "properties": {
+          "issuer_id": {
+            "type": "integer",
+            "title": "Issuer Id"
+          },
+          "legal_name": {
+            "type": "string",
+            "title": "Legal Name"
+          },
+          "cik": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cik"
+          },
+          "document_count": {
+            "type": "integer",
+            "title": "Document Count"
+          },
+          "latest_known_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Latest Known At"
+          },
+          "open_reviews": {
+            "type": "integer",
+            "title": "Open Reviews"
+          }
+        },
+        "type": "object",
+        "required": [
+          "issuer_id",
+          "legal_name",
+          "cik",
+          "document_count",
+          "latest_known_at",
+          "open_reviews"
+        ],
+        "title": "IssuerRow"
+      },
       "IssuerSecurity": {
         "properties": {
           "isin": {
@@ -37717,6 +39244,202 @@
         ],
         "title": "NportCoverage"
       },
+      "ObservationRow": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "metric": {
+            "type": "string",
+            "title": "Metric"
+          },
+          "segment": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Segment"
+          },
+          "period_start": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Period Start"
+          },
+          "period_end": {
+            "type": "string",
+            "format": "date",
+            "title": "Period End"
+          },
+          "is_instant": {
+            "type": "boolean",
+            "title": "Is Instant"
+          },
+          "value_state": {
+            "type": "string",
+            "enum": [
+              "reported",
+              "not_disclosed",
+              "null"
+            ],
+            "title": "Value State"
+          },
+          "value": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Value"
+          },
+          "text_value": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Text Value"
+          },
+          "original_string": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Original String"
+          },
+          "unit": {
+            "type": "string",
+            "title": "Unit"
+          },
+          "scale": {
+            "type": "integer",
+            "title": "Scale"
+          },
+          "currency": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Currency"
+          },
+          "basis": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Basis"
+          },
+          "dimensions": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Dimensions"
+          },
+          "review_state": {
+            "type": "string",
+            "enum": [
+              "machine",
+              "under_review",
+              "verified",
+              "rejected",
+              "superseded"
+            ],
+            "title": "Review State"
+          },
+          "known_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Known At"
+          },
+          "event_effective_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Event Effective At"
+          },
+          "supersedes_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Supersedes Id"
+          },
+          "document_version_id": {
+            "type": "integer",
+            "title": "Document Version Id"
+          },
+          "evidence": {
+            "$ref": "#/components/schemas/EvidenceSpan"
+          },
+          "envelope": {
+            "$ref": "#/components/schemas/Envelope"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "metric",
+          "segment",
+          "period_start",
+          "period_end",
+          "is_instant",
+          "value_state",
+          "value",
+          "text_value",
+          "original_string",
+          "unit",
+          "scale",
+          "currency",
+          "basis",
+          "dimensions",
+          "review_state",
+          "known_at",
+          "event_effective_at",
+          "supersedes_id",
+          "document_version_id",
+          "evidence",
+          "envelope"
+        ],
+        "title": "ObservationRow"
+      },
       "OwnershipPeriod": {
         "properties": {
           "period": {
@@ -40953,6 +42676,158 @@
         ],
         "title": "ProposedAction"
       },
+      "Provenance": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "observation",
+              "claim"
+            ],
+            "title": "Kind"
+          },
+          "review_state": {
+            "type": "string",
+            "title": "Review State"
+          },
+          "document_version_id": {
+            "type": "integer",
+            "title": "Document Version Id"
+          },
+          "regulator": {
+            "type": "string",
+            "title": "Regulator"
+          },
+          "external_id": {
+            "type": "string",
+            "title": "External Id"
+          },
+          "stable_url": {
+            "type": "string",
+            "title": "Stable Url"
+          },
+          "form": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Form"
+          },
+          "fiscal_period": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fiscal Period"
+          },
+          "content_hash": {
+            "type": "string",
+            "title": "Content Hash"
+          },
+          "evidence": {
+            "$ref": "#/components/schemas/EvidenceSpan"
+          },
+          "table_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Table Name"
+          },
+          "row_ref": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Row Ref"
+          },
+          "extraction_method": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Extraction Method"
+          },
+          "span_parser_version": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Span Parser Version"
+          },
+          "confidence": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Confidence"
+          },
+          "version_chain": {
+            "items": {
+              "$ref": "#/components/schemas/VersionRef"
+            },
+            "type": "array",
+            "title": "Version Chain"
+          },
+          "envelope": {
+            "$ref": "#/components/schemas/Envelope"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "kind",
+          "review_state",
+          "document_version_id",
+          "regulator",
+          "external_id",
+          "stable_url",
+          "form",
+          "fiscal_period",
+          "content_hash",
+          "evidence",
+          "table_name",
+          "row_ref",
+          "extraction_method",
+          "span_parser_version",
+          "confidence",
+          "version_chain",
+          "envelope"
+        ],
+        "title": "Provenance"
+      },
       "ProviderJobSettings": {
         "properties": {
           "refresh_hours": {
@@ -43857,6 +45732,32 @@
         ],
         "title": "ReviewBody"
       },
+      "ReviewDecision": {
+        "properties": {
+          "decision": {
+            "type": "string",
+            "enum": [
+              "approved",
+              "rejected",
+              "superseded",
+              "deferred"
+            ],
+            "title": "Decision"
+          },
+          "reason": {
+            "type": "string",
+            "maxLength": 500,
+            "minLength": 3,
+            "title": "Reason"
+          }
+        },
+        "type": "object",
+        "required": [
+          "decision",
+          "reason"
+        ],
+        "title": "ReviewDecision"
+      },
       "ReviewDue": {
         "properties": {
           "ticker": {
@@ -44016,6 +45917,100 @@
           "body_md"
         ],
         "title": "ReviewReportOut"
+      },
+      "ReviewRow": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "subject_type": {
+            "type": "string",
+            "title": "Subject Type"
+          },
+          "subject_id": {
+            "type": "integer",
+            "title": "Subject Id"
+          },
+          "reason": {
+            "type": "string",
+            "title": "Reason"
+          },
+          "status": {
+            "type": "string",
+            "title": "Status"
+          },
+          "candidate": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Candidate"
+          },
+          "assignee": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Assignee"
+          },
+          "decision_reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Decision Reason"
+          },
+          "decided_by": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Decided By"
+          },
+          "decided_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Decided At"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "subject_type",
+          "subject_id",
+          "reason",
+          "status",
+          "candidate",
+          "assignee",
+          "decision_reason",
+          "decided_by",
+          "decided_at",
+          "created_at"
+        ],
+        "title": "ReviewRow"
       },
       "ReviewSettings": {
         "properties": {
@@ -45873,6 +47868,57 @@
         ],
         "title": "SharpeStats"
       },
+      "Snapshot": {
+        "properties": {
+          "issuer_id": {
+            "type": "integer",
+            "title": "Issuer Id"
+          },
+          "as_of": {
+            "type": "string",
+            "format": "date-time",
+            "title": "As Of"
+          },
+          "documents": {
+            "items": {
+              "$ref": "#/components/schemas/DocumentVersionRow"
+            },
+            "type": "array",
+            "title": "Documents"
+          },
+          "observations": {
+            "items": {
+              "$ref": "#/components/schemas/ObservationRow"
+            },
+            "type": "array",
+            "title": "Observations"
+          },
+          "claims": {
+            "items": {
+              "$ref": "#/components/schemas/ClaimRow"
+            },
+            "type": "array",
+            "title": "Claims"
+          },
+          "coverage": {
+            "items": {
+              "$ref": "#/components/schemas/CoverageRow"
+            },
+            "type": "array",
+            "title": "Coverage"
+          }
+        },
+        "type": "object",
+        "required": [
+          "issuer_id",
+          "as_of",
+          "documents",
+          "observations",
+          "claims",
+          "coverage"
+        ],
+        "title": "Snapshot"
+      },
       "SnapshotValues": {
         "properties": {
           "date": {
@@ -46404,6 +48450,105 @@
         ],
         "title": "SourceHealth"
       },
+      "SourceRow": {
+        "properties": {
+          "source_key": {
+            "type": "string",
+            "title": "Source Key"
+          },
+          "provider": {
+            "type": "string",
+            "title": "Provider"
+          },
+          "endpoint": {
+            "type": "string",
+            "title": "Endpoint"
+          },
+          "jurisdiction": {
+            "type": "string",
+            "title": "Jurisdiction"
+          },
+          "regulator": {
+            "type": "string",
+            "title": "Regulator"
+          },
+          "access_method": {
+            "type": "string",
+            "title": "Access Method"
+          },
+          "access_state": {
+            "type": "string",
+            "title": "Access State"
+          },
+          "enabled": {
+            "type": "boolean",
+            "title": "Enabled"
+          },
+          "tested_on": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tested On"
+          },
+          "access_detail": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Access Detail"
+          },
+          "stop_condition": {
+            "type": "string",
+            "title": "Stop Condition"
+          },
+          "document_formats": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Document Formats"
+          },
+          "last_checked_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Checked At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "source_key",
+          "provider",
+          "endpoint",
+          "jurisdiction",
+          "regulator",
+          "access_method",
+          "access_state",
+          "enabled",
+          "tested_on",
+          "access_detail",
+          "stop_condition",
+          "document_formats",
+          "last_checked_at"
+        ],
+        "title": "SourceRow"
+      },
       "SourceTrustOut": {
         "properties": {
           "host": {
@@ -46524,6 +48669,56 @@
           "sources"
         ],
         "title": "SourcesHealth"
+      },
+      "SpanText": {
+        "properties": {
+          "version_id": {
+            "type": "integer",
+            "title": "Version Id"
+          },
+          "parser_version": {
+            "type": "string",
+            "title": "Parser Version"
+          },
+          "stale_parser": {
+            "type": "boolean",
+            "title": "Stale Parser"
+          },
+          "before": {
+            "type": "string",
+            "title": "Before"
+          },
+          "span": {
+            "type": "string",
+            "title": "Span"
+          },
+          "after": {
+            "type": "string",
+            "title": "After"
+          },
+          "signed_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Signed Url"
+          }
+        },
+        "type": "object",
+        "required": [
+          "version_id",
+          "parser_version",
+          "stale_parser",
+          "before",
+          "span",
+          "after",
+          "signed_url"
+        ],
+        "title": "SpanText"
       },
       "StakeChangeOut": {
         "properties": {
@@ -49863,6 +52058,73 @@
           "body"
         ],
         "title": "VerificationConfigVersion"
+      },
+      "VersionRef": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "content_hash": {
+            "type": "string",
+            "title": "Content Hash"
+          },
+          "accepted_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Accepted At"
+          },
+          "filed_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Filed At"
+          },
+          "known_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Known At"
+          },
+          "superseded_by_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Superseded By Id"
+          },
+          "is_current": {
+            "type": "boolean",
+            "title": "Is Current"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "content_hash",
+          "accepted_at",
+          "filed_at",
+          "known_at",
+          "superseded_by_id",
+          "is_current"
+        ],
+        "title": "VersionRef"
       },
       "Via": {
         "properties": {

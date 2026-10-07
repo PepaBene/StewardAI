@@ -1,0 +1,31 @@
+<html xmlns:ix="http://www.xbrl.org/2013/inlineXBRL" xmlns:xbrli="http://www.xbrl.org/2003/instance" xmlns:xbrldi="http://xbrl.org/2006/xbrldi">
+<head><title>Acme Corp 10-K</title><style>body{font:12px serif}</style></head>
+<body>
+<div style="display:none"><ix:header>
+  <ix:hidden><ix:nonNumeric name="dei:EntityRegistrantName" contextRef="c-dur">Acme Corp</ix:nonNumeric></ix:hidden>
+  <ix:resources>
+    <xbrli:context id="c-dur"><xbrli:entity><xbrli:identifier scheme="http://www.sec.gov/CIK">0000001234</xbrli:identifier></xbrli:entity><xbrli:period><xbrli:startDate>2025-01-01</xbrli:startDate><xbrli:endDate>2025-12-31</xbrli:endDate></xbrli:period></xbrli:context>
+    <xbrli:context id="c-inst"><xbrli:entity><xbrli:identifier scheme="http://www.sec.gov/CIK">0000001234</xbrli:identifier></xbrli:entity><xbrli:period><xbrli:instant>2025-12-31</xbrli:instant></xbrli:period></xbrli:context>
+    <xbrli:context id="c-seg"><xbrli:entity><xbrli:identifier scheme="http://www.sec.gov/CIK">0000001234</xbrli:identifier><xbrli:segment><xbrldi:explicitMember dimension="us-gaap:StatementBusinessSegmentsAxis">acme:WidgetsMember</xbrldi:explicitMember></xbrli:segment></xbrli:entity><xbrli:period><xbrli:startDate>2025-01-01</xbrli:startDate><xbrli:endDate>2025-12-31</xbrli:endDate></xbrli:period></xbrli:context>
+    <xbrli:unit id="usd"><xbrli:measure>iso4217:USD</xbrli:measure></xbrli:unit>
+    <ix:footnote id="fn1">Includes a one-time licensing gain.</ix:footnote>
+    <ix:relationship fromRefs="f-rev" toRefs="fn1"/>
+  </ix:resources>
+</ix:header></div>
+<h1>ACME CORP ANNUAL REPORT</h1>
+<p>PART I</p>
+<p>Item 1. Business</p>
+<p>Acme makes widgets and sells them to distributors. One customer, Globex Corporation, accounted for 23% of revenue in fiscal 2025.</p>
+<p>Item 7. Management's Discussion</p>
+<p>Revenue for the year was <ix:nonFraction id="f-rev" name="us-gaap:Revenues" contextRef="c-dur" unitRef="usd" decimals="-6" scale="6" format="ixt:numdotdecimal">1,250.5</ix:nonFraction> million.</p>
+<table>
+  <tr><td>Metric</td><td>FY2025</td></tr>
+  <tr><td>Widgets revenue</td><td>$</td><td><ix:nonFraction name="us-gaap:Revenues" contextRef="c-seg" unitRef="usd" decimals="-6" scale="6">900</ix:nonFraction></td></tr>
+  <tr><td>Net loss</td><td>(<ix:nonFraction name="us-gaap:NetIncomeLoss" contextRef="c-dur" unitRef="usd" decimals="-6" scale="6" sign="-">12.4</ix:nonFraction>)</td></tr>
+  <tr><td>Debt repaid</td><td><ix:nonFraction name="acme:DebtRepaid" contextRef="c-dur" unitRef="usd" format="ixt:zerodash">-</ix:nonFraction></td></tr>
+  <tr><td>Odd</td><td><ix:nonFraction name="acme:Odd" contextRef="c-dur" unitRef="usd" format="ixt:numwordsen">twelve</ix:nonFraction></td></tr>
+</table>
+<p>Item 8. Notes</p>
+<ix:nonNumeric name="us-gaap:SegmentReportingDisclosureTextBlock" contextRef="c-dur"><p>Acme reports one segment.</p></ix:nonNumeric>
+<script>var x = "<table>not a table</table>";</script>
+</body></html>

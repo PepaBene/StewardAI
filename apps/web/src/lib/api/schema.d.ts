@@ -4250,6 +4250,215 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/disclosures/issuers": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Issuers
+         * @description Issuers that have at least one disclosure document, with how many and the newest one.
+         */
+        get: operations["issuers"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/disclosures/issuers/{issuer_id}/snapshot": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Issuer Snapshot
+         * @description Everything known about the issuer at `as_of` (default now): documents, observations,
+         *     claims and coverage. Nothing known later is included.
+         */
+        get: operations["issuer_snapshot"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/disclosures/issuers/{issuer_id}/timeline": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Issuer Timeline */
+        get: operations["issuer_timeline"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/disclosures/issuers/{issuer_id}/observations": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Issuer Observations */
+        get: operations["issuer_observations"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/disclosures/issuers/{issuer_id}/claims": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Issuer Claims */
+        get: operations["issuer_claims"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/disclosures/issuers/{issuer_id}/coverage": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Issuer Coverage */
+        get: operations["issuer_coverage"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/disclosures/provenance/{kind}/{row_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Provenance
+         * @description The source version, evidence span and version chain behind one value, as known at
+         *     `as_of`. 404 if the row does not exist or was not yet known then.
+         */
+        get: operations["provenance"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/disclosures/versions/{version_id}/span": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Version Span
+         * @description The archived document text around a cited span. The archived bytes are re-parsed with the
+         *     parser version that produced the offsets; `stale_parser` flags a version mismatch.
+         */
+        get: operations["version_span"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/disclosures/sources": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Sources
+         * @description The source registry: access method, tested state and the stop condition per source.
+         */
+        get: operations["sources"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/disclosures/review": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Review Queue */
+        get: operations["review_queue"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/disclosures/review/{review_id}/decision": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Decide Review
+         * @description Approve, reject, supersede or defer a review item. The reason is mandatory and the
+         *     original candidate is preserved.
+         */
+        post: operations["decide_review"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/holdings/{ticker}/data-context": {
         parameters: {
             query?: never;
@@ -5623,6 +5832,58 @@ export interface components {
             /** Note */
             note?: string | null;
         };
+        /** ClaimRow */
+        ClaimRow: {
+            /** Id */
+            id: number;
+            /** Claim Type */
+            claim_type: string;
+            /** Subject Issuer Id */
+            subject_issuer_id: number | null;
+            /** Subject Label */
+            subject_label: string | null;
+            /** Object Issuer Id */
+            object_issuer_id: number | null;
+            /** Object Label */
+            object_label: string | null;
+            /** Object Anonymous */
+            object_anonymous: boolean;
+            /** Direction */
+            direction: string | null;
+            /**
+             * Polarity
+             * @enum {string}
+             */
+            polarity: "asserted" | "denied" | "superseded";
+            /** Payload */
+            payload: {
+                [key: string]: unknown;
+            };
+            /**
+             * Review State
+             * @enum {string}
+             */
+            review_state: "machine_suggested" | "under_review" | "verified" | "rejected" | "superseded";
+            /** Confidence */
+            confidence: number | null;
+            /** Valid From */
+            valid_from: string | null;
+            /** Valid To */
+            valid_to: string | null;
+            /**
+             * Known At
+             * Format: date-time
+             */
+            known_at: string;
+            /** Event Effective At */
+            event_effective_at: string | null;
+            /** Supersedes Claim Id */
+            supersedes_claim_id: number | null;
+            /** Document Version Id */
+            document_version_id: number;
+            evidence: components["schemas"]["EvidenceSpan"];
+            envelope: components["schemas"]["Envelope"];
+        };
         /** ClaimSource */
         ClaimSource: {
             /** Url */
@@ -6533,6 +6794,28 @@ export interface components {
             /** Flagged Benchmarks */
             flagged_benchmarks: string[];
         };
+        /** CoverageRow */
+        CoverageRow: {
+            /** Dataset */
+            dataset: string;
+            /** Source Key */
+            source_key: string | null;
+            /** Jurisdiction */
+            jurisdiction: string | null;
+            /** Metric */
+            metric: string;
+            /** Period */
+            period: string;
+            /** State */
+            state: string;
+            /** Reason */
+            reason: string | null;
+            /**
+             * Checked At
+             * Format: date-time
+             */
+            checked_at: string;
+        };
         /** CoverageSummary */
         CoverageSummary: {
             /** Group By */
@@ -7239,6 +7522,68 @@ export interface components {
             /** Raw Location */
             raw_location: string | null;
         };
+        /** DocumentVersionRow */
+        DocumentVersionRow: {
+            /** Document Id */
+            document_id: number;
+            /** Version Id */
+            version_id: number;
+            /** Regulator */
+            regulator: string;
+            /** External Id */
+            external_id: string;
+            /** Stable Url */
+            stable_url: string;
+            /** Form */
+            form: string | null;
+            /** Fiscal Period */
+            fiscal_period: string | null;
+            /** Language */
+            language: string | null;
+            /** Source Key */
+            source_key: string | null;
+            /** Content Hash */
+            content_hash: string;
+            /** Filed At */
+            filed_at: string | null;
+            /** Accepted At */
+            accepted_at: string | null;
+            /** Published At */
+            published_at: string | null;
+            /**
+             * First Seen At
+             * Format: date-time
+             */
+            first_seen_at: string;
+            /**
+             * Retrieved At
+             * Format: date-time
+             */
+            retrieved_at: string;
+            /**
+             * Known At
+             * Format: date-time
+             */
+            known_at: string;
+            /** Date Notes */
+            date_notes: {
+                [key: string]: string;
+            };
+            /** Quarantined */
+            quarantined: boolean;
+            /** Quarantine Reason */
+            quarantine_reason: string | null;
+            /** Byte Length */
+            byte_length: number | null;
+            /** Parser Version */
+            parser_version: string | null;
+            /** Amends Version Id */
+            amends_version_id: number | null;
+            /** Superseded By Id */
+            superseded_by_id: number | null;
+            /** Is Current */
+            is_current: boolean;
+        };
         /** DomainTier */
         DomainTier: {
             /**
@@ -7425,6 +7770,27 @@ export interface components {
              * @default false
              */
             policy_rate: boolean;
+        };
+        /** Envelope */
+        Envelope: {
+            /** Source */
+            source: string;
+            /** Published At */
+            published_at: string | null;
+            /**
+             * Known At
+             * Format: date-time
+             */
+            known_at: string;
+            /**
+             * As Of
+             * Format: date-time
+             */
+            as_of: string;
+            /** Method Version */
+            method_version: string | null;
+            /** Document Url */
+            document_url: string | null;
         };
         /** EpoRefreshResponse */
         EpoRefreshResponse: {
@@ -7894,6 +8260,19 @@ export interface components {
              * @description The archived text around the snippet.
              */
             context: string | null;
+        };
+        /** EvidenceSpan */
+        EvidenceSpan: {
+            /** Evidence Id */
+            evidence_id: number;
+            /** Quote */
+            quote: string | null;
+            /** Span Start */
+            span_start: number | null;
+            /** Span End */
+            span_end: number | null;
+            /** Section */
+            section: string | null;
         };
         /** EvidenceSummary */
         EvidenceSummary: {
@@ -11388,6 +11767,21 @@ export interface components {
              */
             known_at: string;
         };
+        /** IssuerRow */
+        IssuerRow: {
+            /** Issuer Id */
+            issuer_id: number;
+            /** Legal Name */
+            legal_name: string;
+            /** Cik */
+            cik: string | null;
+            /** Document Count */
+            document_count: number;
+            /** Latest Known At */
+            latest_known_at: string | null;
+            /** Open Reviews */
+            open_reviews: number;
+        };
         /** IssuerSecurity */
         IssuerSecurity: {
             /** Isin */
@@ -13275,6 +13669,65 @@ export interface components {
              */
             scope: string;
         };
+        /** ObservationRow */
+        ObservationRow: {
+            /** Id */
+            id: number;
+            /** Metric */
+            metric: string;
+            /** Segment */
+            segment: string | null;
+            /** Period Start */
+            period_start: string | null;
+            /**
+             * Period End
+             * Format: date
+             */
+            period_end: string;
+            /** Is Instant */
+            is_instant: boolean;
+            /**
+             * Value State
+             * @enum {string}
+             */
+            value_state: "reported" | "not_disclosed" | "null";
+            /** Value */
+            value: string | null;
+            /** Text Value */
+            text_value: string | null;
+            /** Original String */
+            original_string: string | null;
+            /** Unit */
+            unit: string;
+            /** Scale */
+            scale: number;
+            /** Currency */
+            currency: string | null;
+            /** Basis */
+            basis: string | null;
+            /** Dimensions */
+            dimensions: {
+                [key: string]: unknown;
+            };
+            /**
+             * Review State
+             * @enum {string}
+             */
+            review_state: "machine" | "under_review" | "verified" | "rejected" | "superseded";
+            /**
+             * Known At
+             * Format: date-time
+             */
+            known_at: string;
+            /** Event Effective At */
+            event_effective_at: string | null;
+            /** Supersedes Id */
+            supersedes_id: number | null;
+            /** Document Version Id */
+            document_version_id: number;
+            evidence: components["schemas"]["EvidenceSpan"];
+            envelope: components["schemas"]["Envelope"];
+        };
         /** OwnershipPeriod */
         OwnershipPeriod: {
             /**
@@ -14380,6 +14833,46 @@ export interface components {
              */
             kpis: string[];
         };
+        /** Provenance */
+        Provenance: {
+            /** Id */
+            id: number;
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "observation" | "claim";
+            /** Review State */
+            review_state: string;
+            /** Document Version Id */
+            document_version_id: number;
+            /** Regulator */
+            regulator: string;
+            /** External Id */
+            external_id: string;
+            /** Stable Url */
+            stable_url: string;
+            /** Form */
+            form: string | null;
+            /** Fiscal Period */
+            fiscal_period: string | null;
+            /** Content Hash */
+            content_hash: string;
+            evidence: components["schemas"]["EvidenceSpan"];
+            /** Table Name */
+            table_name: string | null;
+            /** Row Ref */
+            row_ref: string | null;
+            /** Extraction Method */
+            extraction_method: string | null;
+            /** Span Parser Version */
+            span_parser_version: string | null;
+            /** Confidence */
+            confidence: number | null;
+            /** Version Chain */
+            version_chain: components["schemas"]["VersionRef"][];
+            envelope: components["schemas"]["Envelope"];
+        };
         /**
          * ProviderJobSettings
          * @description Limits for a free provider. There is no on/off switch: a provider is used as soon as it is
@@ -15421,6 +15914,16 @@ export interface components {
             /** Notes */
             notes?: string[];
         };
+        /** ReviewDecision */
+        ReviewDecision: {
+            /**
+             * Decision
+             * @enum {string}
+             */
+            decision: "approved" | "rejected" | "superseded" | "deferred";
+            /** Reason */
+            reason: string;
+        };
         /** ReviewDue */
         ReviewDue: {
             /** Ticker */
@@ -15478,6 +15981,36 @@ export interface components {
             body: components["schemas"]["ReviewBody"];
             /** Body Md */
             body_md: string;
+        };
+        /** ReviewRow */
+        ReviewRow: {
+            /** Id */
+            id: number;
+            /** Subject Type */
+            subject_type: string;
+            /** Subject Id */
+            subject_id: number;
+            /** Reason */
+            reason: string;
+            /** Status */
+            status: string;
+            /** Candidate */
+            candidate: {
+                [key: string]: unknown;
+            };
+            /** Assignee */
+            assignee: string | null;
+            /** Decision Reason */
+            decision_reason: string | null;
+            /** Decided By */
+            decided_by: string | null;
+            /** Decided At */
+            decided_at: string | null;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
         };
         /**
          * ReviewSettings
@@ -16223,6 +16756,24 @@ export interface components {
              */
             reason: string | null;
         };
+        /** Snapshot */
+        Snapshot: {
+            /** Issuer Id */
+            issuer_id: number;
+            /**
+             * As Of
+             * Format: date-time
+             */
+            as_of: string;
+            /** Documents */
+            documents: components["schemas"]["DocumentVersionRow"][];
+            /** Observations */
+            observations: components["schemas"]["ObservationRow"][];
+            /** Claims */
+            claims: components["schemas"]["ClaimRow"][];
+            /** Coverage */
+            coverage: components["schemas"]["CoverageRow"][];
+        };
         /** SnapshotValues */
         SnapshotValues: {
             /**
@@ -16405,6 +16956,35 @@ export interface components {
              */
             healthy: boolean;
         };
+        /** SourceRow */
+        SourceRow: {
+            /** Source Key */
+            source_key: string;
+            /** Provider */
+            provider: string;
+            /** Endpoint */
+            endpoint: string;
+            /** Jurisdiction */
+            jurisdiction: string;
+            /** Regulator */
+            regulator: string;
+            /** Access Method */
+            access_method: string;
+            /** Access State */
+            access_state: string;
+            /** Enabled */
+            enabled: boolean;
+            /** Tested On */
+            tested_on: string | null;
+            /** Access Detail */
+            access_detail: string | null;
+            /** Stop Condition */
+            stop_condition: string;
+            /** Document Formats */
+            document_formats: string[];
+            /** Last Checked At */
+            last_checked_at: string | null;
+        };
         /** SourceTrustOut */
         SourceTrustOut: {
             /** Host */
@@ -16464,6 +17044,23 @@ export interface components {
              * @description Every configured source, in config order.
              */
             sources: components["schemas"]["SourceHealth"][];
+        };
+        /** SpanText */
+        SpanText: {
+            /** Version Id */
+            version_id: number;
+            /** Parser Version */
+            parser_version: string;
+            /** Stale Parser */
+            stale_parser: boolean;
+            /** Before */
+            before: string;
+            /** Span */
+            span: string;
+            /** After */
+            after: string;
+            /** Signed Url */
+            signed_url: string | null;
         };
         /** StakeChangeOut */
         StakeChangeOut: {
@@ -17671,6 +18268,26 @@ export interface components {
             /** Note */
             note: string | null;
             body: components["schemas"]["VerificationConfig"];
+        };
+        /** VersionRef */
+        VersionRef: {
+            /** Id */
+            id: number;
+            /** Content Hash */
+            content_hash: string;
+            /** Accepted At */
+            accepted_at: string | null;
+            /** Filed At */
+            filed_at: string | null;
+            /**
+             * Known At
+             * Format: date-time
+             */
+            known_at: string;
+            /** Superseded By Id */
+            superseded_by_id: number | null;
+            /** Is Current */
+            is_current: boolean;
         };
         /** Via */
         Via: {
@@ -25086,6 +25703,363 @@ export interface operations {
                 };
                 content: {
                     "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    issuers: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IssuerRow"][];
+                };
+            };
+        };
+    };
+    issuer_snapshot: {
+        parameters: {
+            query?: {
+                /** @description Show only what was known by this time. */
+                as_of?: string | null;
+            };
+            header?: never;
+            path: {
+                issuer_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Snapshot"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    issuer_timeline: {
+        parameters: {
+            query?: {
+                /** @description Show only what was known by this time. */
+                as_of?: string | null;
+                form?: string | null;
+                limit?: number;
+                offset?: number;
+            };
+            header?: never;
+            path: {
+                issuer_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DocumentVersionRow"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    issuer_observations: {
+        parameters: {
+            query?: {
+                /** @description Show only what was known by this time. */
+                as_of?: string | null;
+                metric?: string | null;
+                verified_only?: boolean;
+                limit?: number;
+                offset?: number;
+            };
+            header?: never;
+            path: {
+                issuer_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ObservationRow"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    issuer_claims: {
+        parameters: {
+            query?: {
+                /** @description Show only what was known by this time. */
+                as_of?: string | null;
+                claim_type?: string | null;
+                verified_only?: boolean;
+                limit?: number;
+                offset?: number;
+            };
+            header?: never;
+            path: {
+                issuer_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ClaimRow"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    issuer_coverage: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                issuer_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CoverageRow"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    provenance: {
+        parameters: {
+            query?: {
+                /** @description Show only what was known by this time. */
+                as_of?: string | null;
+            };
+            header?: never;
+            path: {
+                kind: "observation" | "claim";
+                row_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Provenance"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    version_span: {
+        parameters: {
+            query: {
+                start: number;
+                end: number;
+                context?: number;
+            };
+            header?: never;
+            path: {
+                version_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SpanText"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    sources: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SourceRow"][];
+                };
+            };
+        };
+    };
+    review_queue: {
+        parameters: {
+            query?: {
+                status?: "open" | "deferred" | "approved" | "rejected" | "superseded";
+                reason?: string | null;
+                limit?: number;
+                offset?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReviewRow"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    decide_review: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                review_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ReviewDecision"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReviewRow"];
                 };
             };
             /** @description Validation Error */

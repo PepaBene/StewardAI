@@ -1,0 +1,22 @@
+{
+  "version": 1,
+  "purpose": "P0.3 capture protocol: ten samples for each of ten disclosure types, each with manual ground truth. Slots are named `<category>-01` to `<category>-10` and are ALL `pending_capture` today: nothing has been captured yet. A slot becomes `captured` only when the original bytes are archived (sha256) and a person has recorded the expected parsed fields. No slot is pre-filled with invented values.",
+  "captured": 0,
+  "slot_fields": ["slot", "status", "issuer_key", "source_url", "sha256", "published_at", "known_at", "expected", "captured_by", "captured_on"],
+  "status_values": ["pending_capture", "captured", "rejected_unavailable"],
+  "categories": {
+    "13f_amendment": {"expected_fields": ["manager", "period", "amends_accession", "holdings_replaced", "shares_total"], "channel": "sec"},
+    "13dg_group": {"expected_fields": ["filer_group_members", "class", "shares", "percent", "voting_power", "purpose", "filing_time"], "channel": "sec"},
+    "form4_purchase_sale": {"expected_fields": ["insider", "role", "code", "shares", "price", "post_holdings", "plan_flag"], "channel": "sec"},
+    "form4_non_discretionary": {"expected_fields": ["insider", "code", "shares", "footnote_reason", "plan_flag"], "channel": "sec"},
+    "nport": {"expected_fields": ["fund", "report_date", "filing_date", "holding_id", "value", "derivative_flag"], "channel": "sec"},
+    "8k_deal_exhibit": {"expected_fields": ["parties", "announced_date", "consideration", "conditions", "state"], "channel": "sec"},
+    "xbrl_note": {"expected_fields": ["concept", "context", "value", "unit", "scale", "period"], "channel": "sec"},
+    "esef_block_note": {"expected_fields": ["issuer_lei", "block_concept", "text_offsets", "extension_taxonomy"], "channel": "esef"},
+    "sedarplus_filing": {"expected_fields": ["issuer", "document_id", "form", "filed_time", "stable_url"], "channel": "sedarplus"},
+    "issuer_consensus_version": {"expected_fields": ["issuer", "publisher", "file_version", "metric", "period", "mean", "median", "panel_size", "basis"], "channel": "issuer_ir"},
+    "relationship_disclosure": {"expected_fields": ["reporter", "counterparty_or_anonymous_label", "direction", "percentage", "denominator", "period", "passage_offsets"], "channel": "sec"}
+  },
+  "samples_per_category": 10,
+  "adjudication": "Every captured slot is read by a person before it becomes ground truth; disagreements are kept in `expected_notes`."
+}

@@ -20,6 +20,7 @@ from api.chat_routes import router as chat_router
 from api.config_history_routes import router as config_history_router
 from api.control_stake_routes import router as control_stake_router
 from api.data_context_routes import router as data_context_router
+from api.disclosure_routes import router as disclosure_router
 from api.db import close_pool, get_pool_or_error
 from api.escalation_routes import router as escalation_router
 from api.free_sources_routes import router as free_sources_router
@@ -260,6 +261,7 @@ def create_app() -> FastAPI:
     app.include_router(fund_router)
     app.include_router(pdmr_router)
     app.include_router(graph_router)
+    app.include_router(disclosure_router)
     app.include_router(data_context_router)
     app.include_router(research_context_router)
     app.include_router(alert_trail_router)
