@@ -147,8 +147,13 @@ def _validation(value: Any) -> dict[str, Any]:
 
 
 def _members(dims: dict[str, Any]) -> dict[str, str]:
+    """Axis -> member. The XBRL writers store a list of [axis, member] pairs; a dict is also read."""
     raw = dims.get("members") or dims.get("typed") or {}
-    return {str(k): str(v) for k, v in raw.items()} if isinstance(raw, dict) else {}
+    if isinstance(raw, dict):
+        return {str(k): str(v) for k, v in raw.items()}
+    if isinstance(raw, list):
+        return {str(p[0]): str(p[1]) for p in raw if isinstance(p, (list, tuple)) and len(p) == 2}
+    return {}
 
 
 async def load_rows(

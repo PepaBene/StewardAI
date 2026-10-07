@@ -191,6 +191,10 @@ async def overview(pool: asyncpg.Pool, ticker: str) -> Overview | None:
     for r in seg_rows:
         dims = _json(r["dimensions"])
         members = dims.get("members") or dims.get("typed") or {}
+        if isinstance(members, list):
+            members = {
+                str(p[0]): p[1] for p in members if isinstance(p, (list, tuple)) and len(p) == 2
+            }
         label = (
             ", ".join(str(v).split(":")[-1] for v in members.values())
             if isinstance(members, dict) and members

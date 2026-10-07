@@ -190,3 +190,12 @@ def test_reported_view_keeps_the_issuers_concepts() -> None:
     income = next(t for t in v.statements if t.statement == "income")
     assert {ln.key for ln in income.lines} >= {"us-gaap:revenue", "us-gaap:net_income"}
     assert v.checks == []
+
+
+def test_dimensions_stored_as_axis_member_pairs_are_read_as_dimensional():
+    from steward.company.statements import _members
+
+    pairs = {"members": [["srt:StatementGeographicalAxis", "country:US"], ["a:Axis", "a:Member"]]}
+    assert _members(pairs) == {"srt:StatementGeographicalAxis": "country:US", "a:Axis": "a:Member"}
+    assert _members({"members": {"a:Axis": "a:Member"}}) == {"a:Axis": "a:Member"}
+    assert _members({"members": []}) == {}

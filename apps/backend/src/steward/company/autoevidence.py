@@ -208,7 +208,9 @@ def capital_observations(years: Sequence[AllocationYear]) -> list[Observed]:
             unit="money",
             period=span,
             detail=f"Cash paid for businesses less cash received from divestitures, summed over {len(deals)} of {len(win)} years that file either line; positive means net buying.",
-            reason=None if deals else "no acquisition or divestiture cash flow is filed for these years",
+            reason=None
+            if deals
+            else "no acquisition or divestiture cash flow is filed for these years",
             source="filed cash-flow statements",
         )
     )
