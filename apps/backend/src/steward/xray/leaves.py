@@ -140,6 +140,7 @@ class IssuerFacts:
     profitability: Decimal | None = None
     dividend_yield: Decimal | None = None
     net_debt_to_equity: Decimal | None = None
+    net_debt_to_ebitda: Decimal | None = None
     covered: bool = False  # the app holds statements and prices for this issuer
 
 

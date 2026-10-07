@@ -15902,8 +15902,33 @@
           "portfolio"
         ],
         "summary": "Get Sleeves",
-        "description": "Stocks against the core ETFs, each as a rolling time-weighted return after fees.",
+        "description": "Stocks against the core ETFs, each as a rolling time-weighted return after fees, over\n`years` (default: your saved comparison window).",
         "operationId": "get_sleeves",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "years",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer",
+                  "maximum": 10,
+                  "minimum": 1
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Years"
+            }
+          }
+        ],
         "responses": {
           "200": {
             "description": "Successful Response",
@@ -15914,13 +15939,18 @@
                 }
               }
             }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
           }
-        },
-        "security": [
-          {
-            "HTTPBearer": []
-          }
-        ]
+        }
       }
     },
     "/portfolio/performance/export": {
@@ -59349,6 +59379,34 @@
             ],
             "title": "Max Look Through Weight",
             "description": "Ceiling on the effective weight of one underlying company reached through funds/ETFs (plus any direct holding of it): the overlap limit."
+          },
+          "max_sector_weight": {
+            "anyOf": [
+              {
+                "type": "number",
+                "maximum": 1.0,
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Max Sector Weight",
+            "description": "Ceiling on one sector's share of the whole portfolio, counting funds' holdings (X-Ray). Weight with no sector is left out, not counted as a sector."
+          },
+          "max_country_weight": {
+            "anyOf": [
+              {
+                "type": "number",
+                "maximum": 1.0,
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Max Country Weight",
+            "description": "Ceiling on one country's share of the whole portfolio, counting funds' holdings (X-Ray). Weight with no country is left out, not counted as a country."
           },
           "max_drawdown": {
             "anyOf": [

@@ -206,7 +206,7 @@ export function cashRemainder(rows: readonly EditRow[], additions: readonly AddR
 }
 
 /** The metric ids in the order the fundamentals page lists them. */
-export const METRIC_ORDER = ["earnings_yield", "pe", "price_to_book", "dividend_yield", "profitability", "leverage"] as const;
+export const METRIC_ORDER = ["earnings_yield", "pe", "price_to_book", "dividend_yield", "profitability", "leverage", "net_debt_to_ebitda"] as const;
 
 export function coverageLabel(coverage: number | null | undefined): string {
   if (coverage === null || coverage === undefined) return "—";

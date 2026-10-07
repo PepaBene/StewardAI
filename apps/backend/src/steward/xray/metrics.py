@@ -514,6 +514,13 @@ def build_fundamentals(leafset: LeafSet, facts: dict[str, IssuerFacts]) -> XrayF
             "net_debt_to_equity",
             "sum(weight x net debt / equity) / sum(weight), financial companies excluded",
         ),
+        (
+            "net_debt_to_ebitda",
+            "Net debt to EBITDA",
+            "net_debt_to_ebitda",
+            "sum(weight x net debt / EBITDA) / sum(weight), financial companies and companies "
+            "with non-positive EBITDA excluded",
+        ),
     ):
         acc = cov = ZERO
         excluded = list(uncovered)

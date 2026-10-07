@@ -201,6 +201,7 @@ async def _facts(
             profitability=val("gross_profit_to_assets"),
             dividend_yield=val("dividend_yield"),
             net_debt_to_equity=val("net_debt_to_equity"),
+            net_debt_to_ebitda=val("net_debt_to_ebitda"),
             covered=True,
         )
         # Being in the universe is not coverage: an issuer counts only when a stored statement or
@@ -214,6 +215,7 @@ async def _facts(
                 facts.profitability,
                 facts.dividend_yield,
                 facts.net_debt_to_equity,
+                facts.net_debt_to_ebitda,
             )
         ):
             out[key] = facts

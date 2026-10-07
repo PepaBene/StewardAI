@@ -706,7 +706,11 @@ def _sleeve_out(s: Any, tickers: list[str]) -> r.SleeveOut:
     )  # fmt: skip
 
 
-async def sleeves_report(pool: asyncpg.Pool, settings: PerformanceSettings) -> r.SleevesResponse:
+async def sleeves_report(
+    pool: asyncpg.Pool, settings: PerformanceSettings, years: int | None = None
+) -> r.SleevesResponse:
+    """`years` overrides the saved comparison window for this request only."""
+    lookback_years = years if years is not None else settings.sleeve_lookback_years
     explain = r.PerformanceExplain(formula_version="sleeves 1.0.0", formula=SLEEVES_FORMULA)
     limit = float(settings.sleeve_gap_points)
 
@@ -762,7 +766,7 @@ async def sleeves_report(pool: asyncpg.Pool, settings: PerformanceSettings) -> r
         stocks, valuation_days, positions, trades, income, costs, fx_for_trades, fallback
     )
     outcome = compare_sleeves(
-        core_series, stock_series, lookback_years=settings.sleeve_lookback_years,
+        core_series, stock_series, lookback_years=lookback_years,
         gap_points=settings.sleeve_gap_points,
     )  # fmt: skip
     status: r.ReportStatus = "partial" if outcome.too_early else "complete"

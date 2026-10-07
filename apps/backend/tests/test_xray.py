@@ -436,6 +436,7 @@ def covered(ey: str | None, pb: str | None = None, dy: str | None = None, **kw: 
         dividend_yield=d(dy),
         profitability=d(kw.get("prof")),
         net_debt_to_equity=d(kw.get("nde")),
+        net_debt_to_ebitda=d(kw.get("nde_ebitda")),
         covered=True,
     )
 
@@ -489,13 +490,19 @@ def test_financial_companies_stay_out_of_profitability_and_leverage() -> None:
     )
     d = data(portfolio=portfolio(direct=False, vwce=False, cash=0.0), snapshots={CSPX_ISIN: bank})
     facts = {
-        "isin:US0000000001": covered("0.10", "1", "0.04", prof="0.05", nde="9"),
-        "isin:US0000000002": covered("0.05", "3", "0.02", prof="0.30", nde="1.5"),
+        "isin:US0000000001": covered(
+            "0.10", "1", "0.04", prof="0.05", nde="9", nde_ebitda="7"
+        ),
+        "isin:US0000000002": covered(
+            "0.05", "3", "0.02", prof="0.30", nde="1.5", nde_ebitda="2.5"
+        ),
     }
     out = build_fundamentals(build_leaves(d), facts)
     m = {x.id: x for x in out.metrics}
     assert m["profitability"].value == pytest.approx(0.30)
     assert m["leverage"].value == pytest.approx(1.5)
+    assert m["net_debt_to_ebitda"].value == pytest.approx(2.5)
+    assert [e.label for e in m["net_debt_to_ebitda"].excluded] == ["Bank"]
     assert m["earnings_yield"].value == pytest.approx(0.075)  # the bank stays in the yield
     assert out.financials_weight == pytest.approx(0.5)
     assert [e.label for e in m["leverage"].excluded] == ["Bank"]

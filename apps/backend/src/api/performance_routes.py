@@ -56,10 +56,13 @@ async def get_attribution(
 
 
 @router.get("/portfolio/performance/sleeves", tags=["portfolio"])
-async def get_sleeves(pool: Pool, owner: Owner) -> SleevesResponse:
-    """Stocks against the core ETFs, each as a rolling time-weighted return after fees."""
+async def get_sleeves(
+    pool: Pool, owner: Owner, years: Annotated[int | None, Query(ge=1, le=10)] = None
+) -> SleevesResponse:
+    """Stocks against the core ETFs, each as a rolling time-weighted return after fees, over
+    `years` (default: your saved comparison window)."""
     settings, _ = await load_settings(pool, owner.user_id)
-    return await service.sleeves_report(pool, settings)
+    return await service.sleeves_report(pool, settings, years)
 
 
 ExportKind = Literal["ledger", "lots", "realized", "attribution"]

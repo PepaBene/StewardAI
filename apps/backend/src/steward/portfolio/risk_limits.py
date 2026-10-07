@@ -15,6 +15,7 @@ import asyncpg
 from steward.config.strategy import RiskLimits, StrategyConfig
 from steward.portfolio.breaches import Finding
 from steward.portfolio.snapshot import PositionRow
+from steward.settings import get_settings
 
 log = logging.getLogger(__name__)
 
@@ -37,6 +38,13 @@ class Underlying:
 
 
 @dataclass(frozen=True)
+class Exposure:
+    dimension: str  # "sector" or "country"
+    name: str
+    weight: float  # share of total portfolio value, funds looked through
+
+
+@dataclass(frozen=True)
 class PairCorrelation:
     a: str
     b: str
@@ -52,6 +60,7 @@ class RiskInputs:
     correlations: list[PairCorrelation] = field(default_factory=list)
     positions: list[PositionLoss] = field(default_factory=list)
     underlyings: list[Underlying] = field(default_factory=list)
+    exposures: list[Exposure] = field(default_factory=list)
     # Measurements that could not be taken, by limit name (reported, never a breach).
     unavailable: dict[str, str] = field(default_factory=dict)
 
@@ -166,6 +175,26 @@ def evaluate_risk(inputs: RiskInputs, limits: RiskLimits) -> list[Finding]:
                         limits.max_look_through_weight,
                     )
                 )
+    for dimension, ceiling in (
+        ("sector", limits.max_sector_weight),
+        ("country", limits.max_country_weight),
+    ):
+        if ceiling is None:
+            continue
+        for e in inputs.exposures:
+            if e.dimension == dimension and e.weight > ceiling:
+                findings.append(
+                    Finding(
+                        f"risk:{dimension}:{e.name}",
+                        "rule",
+                        None,
+                        severity,
+                        f"Risk limit: {e.name} is {_pct(e.weight)} of the portfolio counting "
+                        f"funds' holdings; the {dimension} limit is {_pct(ceiling)}",
+                        e.weight,
+                        ceiling,
+                    )
+                )
     return findings
 
 
@@ -212,7 +241,21 @@ async def gather_risk_inputs(
         except Exception as exc:
             log.warning("correlation failed: %s", exc)
             inputs.unavailable["correlation"] = str(exc)
-    if limits.max_look_through_weight is not None:
+    wants_xray = (
+        limits.max_look_through_weight is not None
+        or limits.max_sector_weight is not None
+        or limits.max_country_weight is not None
+    )
+    xray_done = False
+    if wants_xray and (owner := get_settings().owner_user_id):
+        try:
+            await _xray_inputs(pool, owner, limits, inputs)
+            xray_done = True
+        except Exception as exc:
+            log.warning("x-ray measurement failed: %s", exc)
+            inputs.unavailable["xray"] = str(exc)
+    if limits.max_look_through_weight is not None and not xray_done:
+        # No owner configured or the X-Ray failed: the older look-through still answers overlap.
         try:
             report = await portfolio_look_through(pool)
             inputs.underlyings = [
@@ -223,6 +266,30 @@ async def gather_risk_inputs(
             log.warning("look-through failed: %s", exc)
             inputs.unavailable["overlap"] = str(exc)
     return inputs
+
+
+async def _xray_inputs(
+    pool: asyncpg.Pool, owner_id: str, limits: RiskLimits, inputs: RiskInputs
+) -> None:
+    """Concentration from the X-Ray, the same figures the pages show: one company's weight is
+    summed over every fund that holds it, and a bucket with no real label is never a breach."""
+    from steward.xray import service as xray_service
+    from steward.xray.views import Dimension, XrayBucket, build_view
+
+    loaded = await xray_service.load(pool, owner_id)
+    ctx = xray_service.view_context(loaded)
+
+    def classified(dimension: Dimension) -> list[XrayBucket]:
+        return [b for b in build_view(dimension, ctx).buckets if b.kind == "classified"]
+
+    if limits.max_look_through_weight is not None:
+        inputs.underlyings = [
+            Underlying(b.label, b.weight, b.fund_weight > 0) for b in classified("issuer")
+        ]
+    if limits.max_sector_weight is not None:
+        inputs.exposures += [Exposure("sector", b.label, b.weight) for b in classified("sector")]
+    if limits.max_country_weight is not None:
+        inputs.exposures += [Exposure("country", b.label, b.weight) for b in classified("country")]
 
 
 async def pair_correlations(

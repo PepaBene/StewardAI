@@ -1,18 +1,18 @@
 "use client";
 
 import Link from "next/link";
+import { useMemo, useState } from "react";
 
 import { AlertMessage } from "@/components/alert-message";
 import { Absent, ResourceGate } from "@/components/company/primitives";
+import { RangeButtons } from "@/components/portfolio/range-buttons";
 import { Blueprint, PanelHeading } from "@/components/ui/blueprint";
 import { getBrowserApiClient } from "@/lib/api/client";
 import { formatDate } from "@/lib/format";
-import { useApiResource } from "@/lib/hooks/use-api-resource";
+import { useApiResource, type ResourceState } from "@/lib/hooks/use-api-resource";
 import type { SleevesData } from "@/lib/performance/performance";
 
 import { Formula, PlainReturn, Points } from "./shared";
-
-const fetchSleeves = () => getBrowserApiClient().GET("/portfolio/performance/sleeves");
 
 type SleeveCardData = NonNullable<SleevesData["core"]>;
 
@@ -44,8 +44,36 @@ function Sleeve({ title, sleeve }: { title: string; sleeve: SleeveCardData }) {
   );
 }
 
+const WINDOWS = [
+  { id: "saved", label: "Your setting" },
+  { id: "1", label: "1Y" },
+  { id: "2", label: "2Y" },
+  { id: "3", label: "3Y" },
+  { id: "5", label: "5Y" },
+] as const;
+type WindowId = (typeof WINDOWS)[number]["id"];
+
 export function SleevesView() {
-  const { state } = useApiResource(fetchSleeves);
+  const [span, setSpan] = useState<WindowId>("saved");
+  const fetcher = useMemo(
+    () => () =>
+      getBrowserApiClient().GET("/portfolio/performance/sleeves", {
+        params: { query: span === "saved" ? {} : { years: Number(span) } },
+      }),
+    [span],
+  );
+  const { state } = useApiResource(fetcher);
+  return (
+    <div className="flex flex-col gap-5">
+      <div className="flex justify-end">
+        <RangeButtons options={WINDOWS} value={span} onChange={setSpan} label="Comparison window" />
+      </div>
+      <SleevesBody state={state} />
+    </div>
+  );
+}
+
+function SleevesBody({ state }: { state: ResourceState<SleevesData> }) {
   return (
     <ResourceGate state={state} label="core and stocks">
       {(data: SleevesData) =>

@@ -123,6 +123,16 @@ class RiskLimits(ConfigModel):
         description="Ceiling on the effective weight of one underlying company reached "
         "through funds/ETFs (plus any direct holding of it): the overlap limit.",
     )
+    max_sector_weight: Weight | None = Field(
+        default=None,
+        description="Ceiling on one sector's share of the whole portfolio, counting funds' "
+        "holdings (X-Ray). Weight with no sector is left out, not counted as a sector.",
+    )
+    max_country_weight: Weight | None = Field(
+        default=None,
+        description="Ceiling on one country's share of the whole portfolio, counting funds' "
+        "holdings (X-Ray). Weight with no country is left out, not counted as a country.",
+    )
     max_drawdown: Weight | None = Field(
         default=None,
         description="Ceiling on the portfolio's current drawdown: its fall from the highest "

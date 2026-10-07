@@ -181,6 +181,7 @@ async def test_fundamentals_are_withheld_with_reasons_when_no_statements_are_sto
         "dividend_yield",
         "profitability",
         "leverage",
+        "net_debt_to_ebitda",
     }
     assert all(m["value"] is None and m["reason"] for m in metrics.values())
     assert body["covered_weight"] == 0 and body["equity_weight"] == pytest.approx(

@@ -55,6 +55,8 @@ const FULL: StrategyConfig = {
     max_beta: 1.2,
     position_loss_review: 0.25,
     max_look_through_weight: null,
+    max_sector_weight: 0.4,
+    max_country_weight: null,
     max_drawdown: 0.2,
     max_pair_correlation: 0.85,
     correlation_min_combined_weight: 0.1,

@@ -4903,7 +4903,8 @@ export interface paths {
         };
         /**
          * Get Sleeves
-         * @description Stocks against the core ETFs, each as a rolling time-weighted return after fees.
+         * @description Stocks against the core ETFs, each as a rolling time-weighted return after fees, over
+         *     `years` (default: your saved comparison window).
          */
         get: operations["get_sleeves"];
         put?: never;
@@ -20042,6 +20043,16 @@ export interface components {
              */
             max_look_through_weight?: number | null;
             /**
+             * Max Sector Weight
+             * @description Ceiling on one sector's share of the whole portfolio, counting funds' holdings (X-Ray). Weight with no sector is left out, not counted as a sector.
+             */
+            max_sector_weight?: number | null;
+            /**
+             * Max Country Weight
+             * @description Ceiling on one country's share of the whole portfolio, counting funds' holdings (X-Ray). Weight with no country is left out, not counted as a country.
+             */
+            max_country_weight?: number | null;
+            /**
              * Max Drawdown
              * @description Ceiling on the portfolio's current drawdown: its fall from the highest level of the last year (0.20 = 20 % below the peak), on the deposit- and withdrawal-adjusted value.
              */
@@ -32229,7 +32240,9 @@ export interface operations {
     };
     get_sleeves: {
         parameters: {
-            query?: never;
+            query?: {
+                years?: number | null;
+            };
             header?: never;
             path?: never;
             cookie?: never;
@@ -32243,6 +32256,15 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["SleevesResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };
