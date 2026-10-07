@@ -40,6 +40,7 @@ def test_capital_observations_are_computed_over_the_window_with_stated_inputs():
     assert obs["cash_returned"].value == D("0.5")
     assert obs["share_count_change"].value == D("-0.1")  # 900 / 1000 - 1
     assert obs["net_debt_issued"].value == D(5) and "2 of 3" in obs["net_debt_issued"].detail
+    assert obs["net_acquisitions"].value is None  # not filed is unknown, never zero
     cagr = obs["fcf_per_share_growth"].value
     assert cagr is not None and abs(cagr - D("0.8166")) < D("0.001")  # (0.33/0.10) ** 0.5 - 1
 
@@ -54,6 +55,7 @@ def test_missing_inputs_leave_an_empty_figure_with_its_reason_never_zero():
         "cash_returned",
         "share_count_change",
         "net_debt_issued",
+        "net_acquisitions",
         "fcf_per_share_growth",
     }
 

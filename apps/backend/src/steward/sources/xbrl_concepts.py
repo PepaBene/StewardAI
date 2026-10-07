@@ -500,6 +500,27 @@ _ENTRIES: tuple[tuple[str, Statement, str, tuple[str, ...]], ...] = (
     (
         "cash_flow",
         "cash_flow",
+        "acquisitions_paid",
+        (
+            "us-gaap:PaymentsToAcquireBusinessesNetOfCashAcquired",
+            "us-gaap:PaymentsToAcquireBusinessesGross",
+            "ifrs-full:CashFlowsUsedInObtainingControlOfSubsidiariesOrOtherBusinessesClassifiedAsInvestingActivities",
+        ),
+    ),
+    (
+        "cash_flow",
+        "cash_flow",
+        "divestiture_proceeds",
+        (
+            "us-gaap:ProceedsFromDivestitureOfBusinessesNetOfCashDivested",
+            "us-gaap:ProceedsFromDivestitureOfBusinesses",
+            "us-gaap:ProceedsFromSaleOfBusinessAssetsAndInterest",
+            "ifrs-full:CashFlowsFromLosingControlOfSubsidiariesOrOtherBusinessesClassifiedAsInvestingActivities",
+        ),
+    ),
+    (
+        "cash_flow",
+        "cash_flow",
         "depreciation_amortization",
         (
             "us-gaap:DepreciationDepletionAndAmortization",
@@ -583,6 +604,37 @@ _ENTRIES: tuple[tuple[str, Statement, str, tuple[str, ...]], ...] = (
             "us-gaap:StockRepurchaseProgramAuthorizedAmount",
             "us-gaap:StockRepurchaseProgramRemainingAuthorizedRepurchaseAmount",
         ),
+    ),
+    # ------------------------------------------------------- related-party totals (no dims)
+    (
+        "related_party",
+        "note",
+        "related_party_transactions",
+        ("us-gaap:RelatedPartyTransactionAmountsOfTransaction",),
+    ),
+    (
+        "related_party",
+        "note",
+        "related_party_revenue",
+        ("us-gaap:RevenueFromRelatedParties",),
+    ),
+    (
+        "related_party",
+        "note",
+        "related_party_costs",
+        ("us-gaap:CostsAndExpensesRelatedParty", "us-gaap:RelatedPartyTransactionExpensesFromTransactionsWithRelatedParty"),
+    ),
+    (
+        "related_party",
+        "note",
+        "related_party_receivable",
+        ("us-gaap:DueFromRelatedParties", "us-gaap:AccountsReceivableRelatedParties"),
+    ),
+    (
+        "related_party",
+        "note",
+        "related_party_payable",
+        ("us-gaap:DueToRelatedParties", "us-gaap:AccountsPayableRelatedParties"),
     ),
     # ------------------------------------------------------------------------ pensions
     (

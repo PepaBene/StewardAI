@@ -276,6 +276,29 @@ async def test_peer_groups_and_evidence_tabs_run(
     assert row["fiscal_year"] == 2025 and Decimal(row["total"]) == Decimal(6500000)
     assert set(row["components"]) == {"salary", "stock_award"}
     assert row["source_url"].startswith("https://www.sec.gov") and "proxy statement" in gov["compensation_note"]
+    for concept, item, statement, start, value in (
+        ("us-gaap:PaymentsToAcquireBusinessesNetOfCashAcquired", "acquisitions_paid", "cash_flow", dt.date(2025, 1, 1), "80"),
+        ("us-gaap:ProceedsFromDivestitureOfBusinessesNetOfCashDivested", "divestiture_proceeds", "cash_flow", dt.date(2025, 1, 1), "10"),
+        ("us-gaap:DueFromRelatedParties", "related_party_receivable", "note", None, "12"),
+        ("us-gaap:StockRepurchasedDuringPeriodValue", "share_repurchase_value", "note", dt.date(2025, 1, 1), "60"),
+    ):
+        await backend_pool.execute(
+            "insert into public.financial_statement_fact (ticker, concept, line_item, statement, period_start, period_end, basis, value, unit, currency,"
+            " source, source_url, filing_url, accession, form, known_at, validation) values ($1,$2,$3,$4,$5,'2025-12-31','US_GAAP',$6,'USD','USD','sec','https://sec.test/x',"
+            "'https://sec.test/filing','0000000001-26-000001','10-K', now(), '{\"reconciled\": true}'::jsonb)",
+            TICKER, concept, item, statement, start, Decimal(value),
+        )
+    alloc = (await api.get(f"/companies/{TICKER}/capital-allocation")).json()
+    last, first = alloc["years"][-1], alloc["years"][0]
+    assert Decimal(last["acquisitions"]) == 80 and Decimal(last["divestitures"]) == 10
+    assert first["acquisitions"] is None  # not filed is unknown, never zero
+    gov = (await api.get(f"/companies/{TICKER}/governance")).json()
+    assert [(f["label"], Decimal(f["value"])) for f in gov["related_party_figures"]] == [("Due from related parties", 12)]
+    case = (await api.get(f"/companies/{TICKER}/case")).json()
+    deals = next(o for o in case["observed"] if o["id"] == "net_acquisitions")
+    assert Decimal(deals["value"]) == 70
+    overview = (await api.get(f"/companies/{TICKER}/overview")).json()
+    assert overview["legal_group"] == [] and overview["legal_group_note"]
     assert (await api.get("/companies/NOPE_US_EQ/overview")).status_code == 404
     assert (await api.get("/companies/NOPE_US_EQ/statements")).json()["columns"] == []
 

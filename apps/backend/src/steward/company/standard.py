@@ -90,10 +90,23 @@ def _other_investing(get: Get) -> tuple[Decimal | None, str]:
     total = get("cash_from_investing")
     if total is None:
         return None, ""
-    capex = get("capex")
-    if capex is None:
-        return total, "cash from investing"
-    return total + abs(capex), "cash from investing + capital expenditure"
+    rest, used = total, ["cash from investing"]
+    for key, sign, label in (
+        ("capex", 1, "capital expenditure"),
+        ("acquisitions_paid", 1, "acquisitions"),
+        ("divestiture_proceeds", -1, "divestiture proceeds"),
+    ):
+        v = get(key)
+        if v is not None:
+            rest += Decimal(sign) * abs(v)
+            used.append(label)
+    if len(used) == 1:
+        return total, used[0]
+    if "capital expenditure" in used and len(used) == 2:
+        return rest, "cash from investing + capital expenditure"
+    return rest, used[0] + "".join(
+        f" {'−' if label == 'divestiture proceeds' else '+'} {label}" for label in used[1:]
+    )
 
 
 def _other_financing(get: Get) -> tuple[Decimal | None, str]:
@@ -220,6 +233,8 @@ CASH_FLOW: tuple[Row, ...] = (
     Row("share_based_compensation", "Share-based compensation"),
     Row("cash_from_operations", "Cash from operations", "total"),
     Row("capex", "Capital expenditure"),
+    Row("acquisitions_paid", "Acquisitions of businesses"),
+    Row("divestiture_proceeds", "Proceeds from divestitures"),
     Row("other_investing", "Other investing (not itemized)", "other", derive=_other_investing),
     Row("cash_from_investing", "Cash from investing", "total"),
     Row("debt_issued", "Debt issued"),

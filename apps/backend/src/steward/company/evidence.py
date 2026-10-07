@@ -676,6 +676,8 @@ class AllocationYear(BaseModel):
     debt_issued: Decimal | None
     debt_repaid: Decimal | None
     net_debt_change: Decimal | None
+    acquisitions: Decimal | None = None
+    divestitures: Decimal | None = None
     returned_share_of_fcf: Decimal | None
     share_count: Decimal | None
     share_change: Decimal | None
@@ -743,6 +745,7 @@ async def capital_allocation(
         fcf = None if cfo is None or capex is None else cfo - abs(capex)
         div, buy = f.get("dividends_paid"), f.get("share_repurchases_paid")
         issued, repaid = f.get("debt_issued"), f.get("debt_repaid")
+        acq, divest = f.get("acquisitions_paid"), f.get("divestiture_proceeds")
         net_debt = None if issued is None or repaid is None else abs(issued) - abs(repaid)
         shares = f.get("weighted_shares_diluted") or f.get("weighted_shares_basic")
         returned = None
@@ -771,6 +774,8 @@ async def capital_allocation(
                 debt_issued=None if issued is None else abs(issued),
                 debt_repaid=None if repaid is None else abs(repaid),
                 net_debt_change=net_debt,
+                acquisitions=None if acq is None else abs(acq),
+                divestitures=None if divest is None else abs(divest),
                 returned_share_of_fcf=returned,
                 share_count=shares,
                 share_change=_growth(shares, prev.share_count)
@@ -829,7 +834,7 @@ async def capital_allocation(
         ticker=ticker,
         years=years,
         stated=stated,
-        observed_note="Observed results are computed from the filed cash-flow statement and share counts; the stated policy and announced actions are the company's own words and are listed separately. Acquisitions and divestitures are shown only where a confirmed deal event exists.",
+        observed_note="Observed results are computed from the filed cash-flow statement and share counts; the stated policy and announced actions are the company's own words and are listed separately. Acquisitions and divestitures are the cash the filed statement reports for them; a year with no figure had no such line filed (or was collected before these lines were kept), which is unknown rather than none. Deal events are listed separately where one is confirmed.",
         method_version=version("capital_allocation"),
         warnings=warnings,
     )
@@ -861,10 +866,31 @@ class Compensation(BaseModel):
     provider: str
 
 
+class RelatedPartyFigure(BaseModel):
+    label: str
+    value: Decimal
+    currency: str | None
+    period_end: dt.date
+    concept: str = Field(description="The filed XBRL element, so the figure can be checked.")
+
+
+RELATED_PARTY_LABEL = {
+    "us-gaap:RelatedPartyTransactionAmountsOfTransaction": "Related-party transactions, total",
+    "us-gaap:RevenueFromRelatedParties": "Revenue from related parties",
+    "us-gaap:CostsAndExpensesRelatedParty": "Costs and expenses with related parties",
+    "us-gaap:RelatedPartyTransactionExpensesFromTransactionsWithRelatedParty": "Costs and expenses with related parties",
+    "us-gaap:DueFromRelatedParties": "Due from related parties",
+    "us-gaap:AccountsReceivableRelatedParties": "Due from related parties",
+    "us-gaap:DueToRelatedParties": "Due to related parties",
+    "us-gaap:AccountsPayableRelatedParties": "Due to related parties",
+}
+
+
 class Governance(BaseModel):
     ticker: str
     roles: list[Role]
     related_party: list[dict[str, Any]]
+    related_party_figures: list[RelatedPartyFigure] = Field(default_factory=list)
     compensation: list[Compensation] = Field(default_factory=list)
     compensation_note: str
     caveats: list[str]
@@ -884,6 +910,15 @@ async def governance(pool: asyncpg.Pool, ticker: str) -> Governance:
            from public.relationship_disclosure where ticker=$1 and status='confirmed' and relationship in ('customer','supplier')
            order by known_at desc limit 20""",
         ticker,
+    )
+    rp_facts = await pool.fetch(
+        """select distinct on (concept) concept, value, currency, period_end
+           from public.financial_statement_fact
+           where ticker=$1 and statement='note' and value is not null and dimensions = '{}'::jsonb
+             and concept = any($2::text[])
+           order by concept, period_end desc, known_at desc""",
+        ticker,
+        list(RELATED_PARTY_LABEL),
     )
     comp = await pool.fetch(
         """select distinct on (text_value, metric) text_value as person, metric, value as total, currency,
@@ -916,6 +951,16 @@ async def governance(pool: asyncpg.Pool, ticker: str) -> Governance:
         ticker=ticker,
         roles=[Role(**dict(r)) for r in rows],
         related_party=[dict(r) for r in rp],
+        related_party_figures=[
+            RelatedPartyFigure(
+                label=RELATED_PARTY_LABEL[r["concept"]],
+                value=r["value"],
+                currency=r["currency"],
+                period_end=r["period_end"],
+                concept=r["concept"],
+            )
+            for r in rp_facts
+        ],
         compensation=compensation,
         compensation_note=(
             "Summary compensation as reported in the proxy statement, from Financial Modeling Prep; "
@@ -927,7 +972,7 @@ async def governance(pool: asyncpg.Pool, ticker: str) -> Governance:
         caveats=[
             "Roles are dated from filings and confirmed graph relationships; an undated role is shown as undated.",
             "An institutional manager's 13F position is a reported holding, not beneficial ownership or an endorsement.",
-            "Related-party transaction detail is not collected: only customer and supplier disclosures appear above.",
+            "Related-party figures are the company-wide totals tagged in the filing's notes; counterparty-by-counterparty detail is not collected, and an absent total means none was tagged, not that none exists.",
         ],
         method_version=version("peer_compare"),
     )

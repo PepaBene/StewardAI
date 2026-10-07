@@ -18807,6 +18807,36 @@
             ],
             "title": "Net Debt Change"
           },
+          "acquisitions": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Acquisitions"
+          },
+          "divestitures": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Divestitures"
+          },
           "returned_share_of_fcf": {
             "anyOf": [
               {
@@ -36577,6 +36607,13 @@
             },
             "type": "array",
             "title": "Related Party"
+          },
+          "related_party_figures": {
+            "items": {
+              "$ref": "#/components/schemas/RelatedPartyFigure"
+            },
+            "type": "array",
+            "title": "Related Party Figures"
           },
           "compensation": {
             "items": {
@@ -54860,6 +54897,56 @@
           "high"
         ],
         "title": "ReferenceValue"
+      },
+      "RelatedPartyFigure": {
+        "properties": {
+          "label": {
+            "type": "string",
+            "title": "Label"
+          },
+          "value": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              }
+            ],
+            "title": "Value"
+          },
+          "currency": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Currency"
+          },
+          "period_end": {
+            "type": "string",
+            "format": "date",
+            "title": "Period End"
+          },
+          "concept": {
+            "type": "string",
+            "title": "Concept",
+            "description": "The filed XBRL element, so the figure can be checked."
+          }
+        },
+        "type": "object",
+        "required": [
+          "label",
+          "value",
+          "currency",
+          "period_end",
+          "concept"
+        ],
+        "title": "RelatedPartyFigure"
       },
       "RelationshipDecision": {
         "properties": {

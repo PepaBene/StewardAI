@@ -197,6 +197,22 @@ def capital_observations(years: Sequence[AllocationYear]) -> list[Observed]:
         )
     )
 
+    deals = [y for y in win if y.acquisitions is not None or y.divestitures is not None]
+    net_deals = sum(((y.acquisitions or ZERO) - (y.divestitures or ZERO) for y in deals), ZERO)
+    out.append(
+        Observed(
+            kind="capital_allocation",
+            id="net_acquisitions",
+            label="Net spent on acquisitions",
+            value=net_deals if deals else None,
+            unit="money",
+            period=span,
+            detail=f"Cash paid for businesses less cash received from divestitures, summed over {len(deals)} of {len(win)} years that file either line; positive means net buying.",
+            reason=None if deals else "no acquisition or divestiture cash flow is filed for these years",
+            source="filed cash-flow statements",
+        )
+    )
+
     fps = [y for y in win if y.fcf_per_share is not None and y.fcf_per_share > 0]
     growth = None
     if len(fps) >= 2:
