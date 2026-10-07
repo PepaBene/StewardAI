@@ -754,6 +754,24 @@ async def store_statement_facts(
         accession,
         source,
     )
+    # Later amendments point at this filing's rows; detach them so the rows can be replaced and
+    # point them at the new rows afterwards (matched on the fact's identity).
+    referenced = await conn.fetch(
+        """select a.id as ref_id, o.concept, o.period_start, o.period_end,
+                  o.dimensions::text dims, o.unit
+           from public.financial_statement_fact a
+           join public.financial_statement_fact o on a.amends_fact_id = o.id
+           where o.ticker=$1 and o.accession=$2 and o.source=$3""",
+        ticker,
+        accession,
+        source,
+    )
+    if referenced:
+        await conn.execute(
+            "update public.financial_statement_fact set amends_fact_id = null"
+            " where id = any($1::bigint[])",
+            [r["ref_id"] for r in referenced],
+        )
     await conn.execute(
         "delete from public.financial_statement_fact where ticker=$1 and accession=$2"
         " and source=$3",
@@ -825,4 +843,38 @@ async def store_statement_facts(
         )
     if records:
         await conn.executemany(_INSERT, records)
+    if referenced:
+        fresh = {
+            (
+                r["concept"],
+                r["period_start"],
+                r["period_end"],
+                json.dumps(json.loads(r["dims"]), sort_keys=True),
+                r["unit"],
+            ): r["id"]
+            for r in await conn.fetch(
+                """select id,concept,period_start,period_end,dimensions::text dims,unit
+                   from public.financial_statement_fact
+                   where ticker=$1 and accession=$2 and source=$3 order by id""",
+                ticker,
+                accession,
+                source,
+            )
+        }
+        for r in referenced:
+            new_id = fresh.get(
+                (
+                    r["concept"],
+                    r["period_start"],
+                    r["period_end"],
+                    json.dumps(json.loads(r["dims"]), sort_keys=True),
+                    r["unit"],
+                )
+            )
+            if new_id is not None:
+                await conn.execute(
+                    "update public.financial_statement_fact set amends_fact_id=$2 where id=$1",
+                    r["ref_id"],
+                    new_id,
+                )
     return {"rows": len(records), "linked_to_original": linked}
