@@ -11901,7 +11901,7 @@
           "companies"
         ],
         "summary": "Get Overview",
-        "description": "Issuer facts, the other listings of the same issuer, provider profile, latest segments,\nconfirmed competitors and peers, upcoming events and a coverage score that says what is missing.",
+        "description": "Issuer facts, the other listings of the same issuer, provider profile, latest segments,\nwhat the company sells and where (as it reports them), legal group, confirmed competitors and\npeers, upcoming events and a coverage score that says what is missing.",
         "operationId": "get_overview",
         "security": [
           {
@@ -13531,6 +13531,7 @@
           "companies"
         ],
         "summary": "Get Case",
+        "description": "Your cited items, plus concentration and capital-allocation figures the app computed from\nfilings (kept apart from your items).",
         "operationId": "get_case",
         "security": [
           {
@@ -13555,7 +13556,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/CaseView"
+                  "$ref": "#/components/schemas/CaseWithObserved"
                 }
               }
             }
@@ -21502,7 +21503,7 @@
         ],
         "title": "CaseItemIn"
       },
-      "CaseView": {
+      "CaseWithObserved": {
         "properties": {
           "ticker": {
             "type": "string",
@@ -21526,6 +21527,19 @@
           "note": {
             "type": "string",
             "title": "Note"
+          },
+          "observed": {
+            "items": {
+              "$ref": "#/components/schemas/Observed"
+            },
+            "type": "array",
+            "title": "Observed",
+            "description": "Figures the app computed from filings and disclosures, kept apart from your items."
+          },
+          "observed_note": {
+            "type": "string",
+            "title": "Observed Note",
+            "default": "Observed figures are computed by the app from filed statements and confirmed disclosures. They are evidence to cite, not a verdict; an empty one says what is missing."
           }
         },
         "type": "object",
@@ -21535,7 +21549,7 @@
           "concentration",
           "note"
         ],
-        "title": "CaseView"
+        "title": "CaseWithObserved"
       },
       "CashDrift": {
         "properties": {
@@ -24288,6 +24302,21 @@
               }
             ],
             "title": "Duplicate Of"
+          },
+          "duplicate_basis": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "portfolio_id",
+                  "identical_holdings"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Duplicate Basis"
           },
           "equity_weight": {
             "anyOf": [
@@ -43836,6 +43865,65 @@
         ],
         "title": "LegalEntitySnapshot"
       },
+      "LegalLink": {
+        "properties": {
+          "relation": {
+            "type": "string",
+            "enum": [
+              "parent",
+              "ultimate_parent",
+              "subsidiary"
+            ],
+            "title": "Relation"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "lei": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Lei"
+          },
+          "status": {
+            "type": "string",
+            "title": "Status",
+            "description": "confirmed, or suggested until you confirm it"
+          },
+          "source": {
+            "type": "string",
+            "title": "Source"
+          },
+          "as_of": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "As Of"
+          }
+        },
+        "type": "object",
+        "required": [
+          "relation",
+          "name",
+          "lei",
+          "status",
+          "source",
+          "as_of"
+        ],
+        "title": "LegalLink"
+      },
       "Line": {
         "properties": {
           "key": {
@@ -48287,6 +48375,191 @@
         ],
         "title": "NportCoverage"
       },
+      "Observed": {
+        "properties": {
+          "kind": {
+            "type": "string",
+            "title": "Kind",
+            "description": "concentration or capital_allocation"
+          },
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "label": {
+            "type": "string",
+            "title": "Label"
+          },
+          "value": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Value"
+          },
+          "unit": {
+            "type": "string",
+            "title": "Unit"
+          },
+          "period": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Period"
+          },
+          "detail": {
+            "type": "string",
+            "title": "Detail",
+            "description": "How it was computed and from what."
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
+          },
+          "source": {
+            "type": "string",
+            "title": "Source"
+          }
+        },
+        "type": "object",
+        "required": [
+          "kind",
+          "id",
+          "label",
+          "value",
+          "unit",
+          "detail",
+          "source"
+        ],
+        "title": "Observed"
+      },
+      "OperationBreakdown": {
+        "properties": {
+          "kind": {
+            "type": "string",
+            "title": "Kind",
+            "description": "geographic, product or segment, as the company reports it"
+          },
+          "label": {
+            "type": "string",
+            "title": "Label"
+          },
+          "period": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Period"
+          },
+          "currency": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Currency"
+          },
+          "lines": {
+            "items": {
+              "$ref": "#/components/schemas/OperationLine"
+            },
+            "type": "array",
+            "title": "Lines"
+          },
+          "note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note"
+          }
+        },
+        "type": "object",
+        "required": [
+          "kind",
+          "label",
+          "period",
+          "currency",
+          "lines"
+        ],
+        "title": "OperationBreakdown"
+      },
+      "OperationLine": {
+        "properties": {
+          "label": {
+            "type": "string",
+            "title": "Label"
+          },
+          "revenue": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Revenue"
+          },
+          "share": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Share"
+          }
+        },
+        "type": "object",
+        "required": [
+          "label",
+          "revenue",
+          "share"
+        ],
+        "title": "OperationLine"
+      },
       "Overview": {
         "properties": {
           "ticker": {
@@ -48434,6 +48707,25 @@
             },
             "type": "array",
             "title": "Segments"
+          },
+          "operations": {
+            "items": {
+              "$ref": "#/components/schemas/OperationBreakdown"
+            },
+            "type": "array",
+            "title": "Operations"
+          },
+          "legal_group": {
+            "items": {
+              "$ref": "#/components/schemas/LegalLink"
+            },
+            "type": "array",
+            "title": "Legal Group"
+          },
+          "legal_group_note": {
+            "type": "string",
+            "title": "Legal Group Note",
+            "default": ""
           },
           "competitors": {
             "items": {
@@ -61438,6 +61730,45 @@
         ],
         "title": "StrategyConfigVersion"
       },
+      "StyleBand": {
+        "properties": {
+          "label": {
+            "type": "string",
+            "title": "Label"
+          },
+          "weight": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              }
+            ],
+            "title": "Weight",
+            "description": "Share of the fund's identified equity weight."
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "value",
+              "blend",
+              "growth",
+              "no_earnings",
+              "not_covered"
+            ],
+            "title": "Kind"
+          }
+        },
+        "type": "object",
+        "required": [
+          "label",
+          "weight",
+          "kind"
+        ],
+        "title": "StyleBand"
+      },
       "StyleMetric": {
         "properties": {
           "id": {
@@ -61573,6 +61904,18 @@
               }
             ],
             "title": "Size Coverage"
+          },
+          "value_growth": {
+            "items": {
+              "$ref": "#/components/schemas/StyleBand"
+            },
+            "type": "array",
+            "title": "Value Growth"
+          },
+          "value_growth_rule": {
+            "type": "string",
+            "title": "Value Growth Rule",
+            "default": "Each covered holding votes: earnings yield of 6% or more and price to book of 1.5 or less each vote value; earnings yield of 3% or less and price to book of 4 or more each vote growth. More value votes make it value-leaning, more growth votes growth-leaning, otherwise blend. A holding with negative earnings is its own band, and one the app has no statements for is not classified. These thresholds are StewardAI's own and are not Morningstar's Style Box."
           },
           "metrics": {
             "items": {

@@ -660,12 +660,45 @@ class SizeBand(BaseModel):
     kind: Literal["known", "no_market_cap"] = "known"
 
 
+class StyleBand(BaseModel):
+    label: str
+    weight: Decimal = Field(description="Share of the fund's identified equity weight.")
+    kind: Literal["value", "blend", "growth", "no_earnings", "not_covered"]
+
+
+VALUE_GROWTH_RULE = (
+    "Each covered holding votes: earnings yield of 6% or more and price to book of 1.5 or less each "
+    "vote value; earnings yield of 3% or less and price to book of 4 or more each vote growth. More "
+    "value votes make it value-leaning, more growth votes growth-leaning, otherwise blend. A holding "
+    "with negative earnings is its own band, and one the app has no statements for is not classified. "
+    "These thresholds are StewardAI's own and are not Morningstar's Style Box."
+)
+
+
+def classify_style(line: StyleLine) -> str:
+    if not line.covered:
+        return "not_covered"
+    ey, pb = line.earnings_yield, line.price_to_book
+    if ey is not None and ey < 0:
+        return "no_earnings"
+    if ey is None and (pb is None or pb <= 0):
+        return "not_covered"
+    votes = 0
+    if ey is not None:
+        votes += 1 if ey >= Decimal("0.06") else -1 if ey <= Decimal("0.03") else 0
+    if pb is not None and pb > 0:
+        votes += 1 if pb <= Decimal("1.5") else -1 if pb >= Decimal(4) else 0
+    return "value" if votes > 0 else "growth" if votes < 0 else "blend"
+
+
 class StyleView(BaseModel):
     isin: str
     as_of: dt.date | None
     concentration: FundConcentration | None
     size: list[SizeBand]
     size_coverage: Decimal | None
+    value_growth: list[StyleBand] = Field(default_factory=list)
+    value_growth_rule: str = VALUE_GROWTH_RULE
     metrics: list[StyleMetric]
     note: str
     warnings: list[str]
@@ -739,6 +772,22 @@ def build_style(
                 SizeBand(label="No market cap available", weight=none, kind="no_market_cap")
             )
         size_cov = (equity - none) / equity
+    value_growth: list[StyleBand] = []
+    if equity > 0:
+        vg = {k: ZERO for k in ("value", "blend", "growth", "no_earnings", "not_covered")}
+        for x in lines:
+            vg[classify_style(x)] += x.weight
+        names = {
+            "value": "Value-leaning",
+            "blend": "Blend",
+            "growth": "Growth-leaning",
+            "no_earnings": "Negative earnings",
+            "not_covered": "Not classified (no statements)",
+        }
+        value_growth = [
+            StyleBand(label=names[k], weight=vg[k] / equity, kind=k)
+            for k in names
+        ]
     metrics: list[StyleMetric] = []
     if equity > 0:
         ey = portfolio_earnings_yield(
@@ -830,6 +879,7 @@ def build_style(
         concentration=conc,
         size=size,
         size_coverage=size_cov,
+        value_growth=value_growth,
         metrics=metrics,
         note=STYLE_NOTE,
         warnings=warnings,

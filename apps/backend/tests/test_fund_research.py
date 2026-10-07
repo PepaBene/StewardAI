@@ -212,6 +212,32 @@ def test_checklist_abstains_when_critical_inputs_missing():
     assert cl.summary_available is False and "Replication method" in (cl.abstain_reason or "")
 
 
+def test_value_growth_bands_vote_on_yield_and_book_and_keep_unknown_apart():
+    def line(key, weight, ey, pb, covered=True):
+        return analysis.StyleLine(
+            key, key, D(weight), "Technology", None, ey, pb, None, covered=covered
+        )
+
+    lines = [
+        line("cheap", "0.2", D("0.08"), D("1.2")),  # two value votes
+        line("rich", "0.3", D("0.02"), D("6")),  # two growth votes
+        line("middle", "0.1", D("0.045"), D("2.5")),  # no votes: blend
+        line("mixed", "0.1", D("0.07"), D("5")),  # one each: blend
+        line("loss", "0.1", D("-0.01"), D("3")),  # negative earnings
+        line("unknown", "0.2", None, None, covered=False),
+    ]
+    view = analysis.build_style("IE00AAAAAAA1", DAY, lines, D(0))
+    by = {b.kind: b.weight for b in view.value_growth}
+    assert by == {
+        "value": D("0.2"),
+        "growth": D("0.3"),
+        "blend": D("0.2"),
+        "no_earnings": D("0.1"),
+        "not_covered": D("0.2"),
+    }
+    assert sum(by.values()) == D(1) and "not Morningstar" in view.value_growth_rule
+
+
 def test_checklist_summarises_without_a_score_when_inputs_complete():
     fact = Fact(
         key="replication_method",
@@ -431,6 +457,20 @@ def test_two_share_classes_of_one_portfolio_are_not_compared():
     skipped = [p for p in out.pairs if p.skipped]
     assert len(skipped) == 1 and skipped[0].overlap.value is None
     assert any("share class" in w for w in out.warnings)
+
+
+def test_identical_holdings_without_a_portfolio_id_are_inferred_as_one_portfolio():
+    rows = [row("A", "US0000000001", 0.6), row("B", "US0000000002", 0.4)]
+    a = prepared("IE00AAAAAAA1", rows, portfolio=None)
+    b = prepared("LU00BBBBBBB2", rows, portfolio=None)
+    other = [row("A", "US0000000001", 0.6), row("B", "US0000000002", 0.3)]
+    c = prepared("IE00CCCCCCC3", other, portfolio=None)
+    out = compare.build_comparison([a, b, c])
+    by = {f.isin: f for f in out.funds}
+    assert by["LU00BBBBBBB2"].duplicate_of == "IE00AAAAAAA1"
+    assert by["LU00BBBBBBB2"].duplicate_basis == "identical_holdings"
+    assert by["IE00CCCCCCC3"].duplicate_of is None  # a different weight is a different portfolio
+    assert any("inferred from the holdings" in w for w in out.warnings)
 
 
 def test_issuer_register_groups_two_isins_into_one_issuer():

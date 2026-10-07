@@ -13,6 +13,7 @@ import datetime as dt
 from collections.abc import Sequence
 from dataclasses import dataclass
 from decimal import Decimal
+from typing import Literal
 
 from pydantic import BaseModel
 
@@ -29,6 +30,7 @@ from steward.fundresearch.analysis import (
 ZERO = Decimal(0)
 TOP_SHARED = 25
 STALE_DAYS = 45
+IDENTICAL_OVERLAP = Decimal("0.995")  # same issuers, weights within half a percent of the total
 
 
 class ReturnCell(BaseModel):
@@ -51,6 +53,7 @@ class CompareFund(BaseModel):
     stale: bool
     portfolio_id: str | None
     duplicate_of: str | None
+    duplicate_basis: Literal["portfolio_id", "identical_holdings"] | None = None
     equity_weight: Decimal | None
     residual_weight: Decimal | None
     unidentified_equity_weight: Decimal | None
@@ -150,13 +153,36 @@ def build_comparison(prepared: Sequence[Prepared]) -> FundComparison:
         f = p.fund
         key = (f.provider, f.portfolio_id) if f.portfolio_id else None
         if key and key in seen:
-            f = f.model_copy(update={"duplicate_of": seen[key]})
+            f = f.model_copy(update={"duplicate_of": seen[key], "duplicate_basis": "portfolio_id"})
             warnings.append(
                 f"{f.isin} is another share class of the same portfolio as {seen[key]}; it is shown but not compared with it or added to it."
             )
         elif key:
             seen[key] = f.isin
         funds.append(f)
+    # Classes the issuer gave no shared portfolio id (or from different issuers) are still one
+    # portfolio when their holdings are the same issuers at the same weights.
+    weights = {p.fund.isin: (_issuer_weights(p.rows)[0] if p.view.row_count else {}) for p in prepared}
+    for i, f in enumerate(funds):
+        if f.duplicate_of is not None or not weights[f.isin]:
+            continue
+        for earlier in funds[:i]:
+            if earlier.duplicate_of is not None or not weights[earlier.isin]:
+                continue
+            if set(weights[f.isin]) != set(weights[earlier.isin]):
+                continue
+            common = sum(
+                (min(w, weights[earlier.isin][k]) for k, w in weights[f.isin].items()), ZERO
+            )
+            total = max(sum(weights[f.isin].values(), ZERO), sum(weights[earlier.isin].values(), ZERO))
+            if total > 0 and common / total >= IDENTICAL_OVERLAP:
+                funds[i] = f.model_copy(
+                    update={"duplicate_of": earlier.isin, "duplicate_basis": "identical_holdings"}
+                )
+                warnings.append(
+                    f"{f.isin} holds the same issuers at the same weights as {earlier.isin}, so it is treated as another share class of one portfolio (inferred from the holdings, not from an issuer portfolio id); it is not compared with it."
+                )
+                break
     funds_by_isin = {f.isin: f for f in funds}
     for f in funds:
         if f.holdings_as_of is None:

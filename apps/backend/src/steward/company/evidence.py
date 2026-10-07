@@ -82,6 +82,30 @@ class CoverageItem(BaseModel):
     detail: str
 
 
+class LegalLink(BaseModel):
+    relation: Literal["parent", "ultimate_parent", "subsidiary"]
+    name: str
+    lei: str | None
+    status: str = Field(description="confirmed, or suggested until you confirm it")
+    source: str
+    as_of: dt.date | None
+
+
+class OperationLine(BaseModel):
+    label: str
+    revenue: Decimal | None
+    share: Decimal | None
+
+
+class OperationBreakdown(BaseModel):
+    kind: str = Field(description="geographic, product or segment, as the company reports it")
+    label: str
+    period: str | None
+    currency: str | None
+    lines: list[OperationLine]
+    note: str | None = None
+
+
 class Overview(BaseModel):
     ticker: str
     name: str | None
@@ -98,6 +122,9 @@ class Overview(BaseModel):
     listings: list[Listing]
     profile: list[ProfileFact]
     segments: list[SegmentLine]
+    operations: list[OperationBreakdown] = Field(default_factory=list)
+    legal_group: list[LegalLink] = Field(default_factory=list)
+    legal_group_note: str = ""
     competitors: list[str]
     peers_confirmed: list[str]
     upcoming: list[UpcomingEvent]
@@ -282,7 +309,41 @@ async def overview(pool: asyncpg.Pool, ticker: str) -> Overview | None:
         ),
     ]
     got = sum(1 for c in coverage if c.present)
+    legal = await pool.fetch(
+        """select type, object_name, object_lei, status, source, as_of from public.entity_relationship
+           where ticker=$1 and type in ('parent','ultimate_parent','subsidiary') and status in ('confirmed','suggested')
+           order by case type when 'ultimate_parent' then 0 when 'parent' then 1 else 2 end,
+                    (status='confirmed') desc, object_name limit 40""",
+        ticker,
+    )
+    exception = await pool.fetchval(
+        """select e.reason from public.entity_reporting_exception e
+           join public.issuer i on i.lei = e.lei where i.id=$1 limit 1""",
+        u["issuer_id"],
+    )
+    legal_note = (
+        "Parents are accounting-consolidation parents, not shareholders. Suggested links come from "
+        "Wikidata or filings and stay suggested until you confirm them."
+        if legal
+        else (
+            f"GLEIF reports no parent: {exception}."
+            if exception
+            else "No parent or subsidiary relationship is stored for this company."
+        )
+    )
     return Overview(
+        legal_group=[
+            LegalLink(
+                relation=r["type"],
+                name=r["object_name"],
+                lei=r["object_lei"],
+                status=r["status"],
+                source=r["source"],
+                as_of=r["as_of"],
+            )
+            for r in legal
+        ],
+        legal_group_note=legal_note,
         ticker=ticker,
         name=u["name"],
         legal_name=u["legal_name"],
@@ -663,6 +724,17 @@ async def capital_allocation(
         paid_per_share[r["ex_date"].year] = (
             paid_per_share.get(r["ex_date"].year, Decimal(0)) + r["cash_amount"]
         )
+    # Repurchases the equity note reports as made in the year, to set beside the cash paid.
+    note_repurchased: dict[dt.date, Decimal] = {}
+    for r in await pool.fetch(
+        """select distinct on (period_end) period_end, value from public.financial_statement_fact
+           where ticker=$1 and statement='note' and value is not null and dimensions = '{}'::jsonb
+             and concept in ('us-gaap:StockRepurchasedAndRetiredDuringPeriodValue','us-gaap:StockRepurchasedDuringPeriodValue')
+             and period_start is not null and period_end - period_start between 330 and 380
+           order by period_end, known_at desc""",
+        ticker,
+    ):
+        note_repurchased[r["period_end"]] = abs(r["value"])
     years: list[AllocationYear] = []
     prev: AllocationYear | None = None
     for c in cols:
@@ -683,6 +755,11 @@ async def capital_allocation(
             paid = abs(div) / shares
             gap = abs(paid - announced) / announced if announced else None
             recon = f"announced {announced:.4f} per share vs paid {paid:.4f}: {'consistent' if gap is not None and gap <= Decimal('0.15') else 'differs by more than 15%, check timing or the share count'}"
+        noted = note_repurchased.get(c.end)
+        if noted is not None and buy is not None and abs(buy) > 0:
+            gap_b = abs(abs(buy) - noted) / abs(buy)
+            line = f"repurchases per the equity note {noted:,.0f} vs cash paid {abs(buy):,.0f}: {'consistent' if gap_b <= Decimal('0.15') else 'differ by more than 15%, usually timing of settlement or excise tax'}"
+            recon = f"{recon}; {line}" if recon else line
         years.append(
             AllocationYear(
                 column=c.id,
@@ -726,11 +803,19 @@ async def capital_allocation(
         "select source_url, published_at, metadata from public.issuer_ir_release where ticker=$1 and release_type='capital_return' order by published_at desc nulls last limit 10",
         ticker,
     ):
+        meta = r["metadata"]
+        meta = json.loads(meta) if isinstance(meta, str) else (meta or {})
+        said = [
+            f"{x.get('type', 'return')} {x.get('amount')} {x.get('currency') or ''}".strip()
+            for x in (meta.get("capital_return") or [])
+            if isinstance(x, dict) and x.get("amount")
+        ][:3]
         stated.append(
             StatedAction(
                 kind="capital_return",
                 date=r["published_at"].date() if r["published_at"] else None,
-                detail="Stated capital-return policy or programme (company release)",
+                detail="Stated capital-return policy or programme (company release)"
+                + (f": {'; '.join(said)}" if said else ""),
                 state=None,
                 source_url=r["source_url"],
             )

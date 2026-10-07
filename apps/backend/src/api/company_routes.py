@@ -13,8 +13,17 @@ from pydantic import BaseModel, Field
 
 from api.auth import Owner
 from api.db import Pool
+from steward.company import (
+    autoevidence,
+    evidence,
+    ratios,
+    report,
+    rubric,
+    segments,
+    service,
+    valuation,
+)
 from steward.company import currency as fxview
-from steward.company import evidence, ratios, report, rubric, segments, service, valuation
 from steward.company.statements import (
     StatementsView,
     build_view,
@@ -37,12 +46,31 @@ async def _company(pool: Pool, ticker: str) -> service.Company:
 
 
 @router.get("/{ticker}/overview", response_model=evidence.Overview)
-async def get_overview(ticker: TickerPath, pool: Pool, _owner: Owner) -> evidence.Overview:
+async def get_overview(ticker: TickerPath, pool: Pool, owner: Owner) -> evidence.Overview:
     """Issuer facts, the other listings of the same issuer, provider profile, latest segments,
-    confirmed competitors and peers, upcoming events and a coverage score that says what is missing."""
+    what the company sells and where (as it reports them), legal group, confirmed competitors and
+    peers, upcoming events and a coverage score that says what is missing."""
     out = await evidence.overview(pool, ticker)
     if out is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, f"{ticker} is not in the covered universe")
+    analysis = await segments.analysis(pool, owner.user_id, ticker, "annual")
+    for b in analysis.breakdowns:
+        lines = [
+            evidence.OperationLine(label=m.label, revenue=m.latest_value, share=m.latest_share)
+            for m in b.members
+            if m.role == "operating" and m.latest_value is not None
+        ]
+        if lines:
+            out.operations.append(
+                evidence.OperationBreakdown(
+                    kind=b.kind,
+                    label=b.label,
+                    period=b.latest_period,
+                    currency=analysis.currency,
+                    lines=sorted(lines, key=lambda x: -(x.revenue or 0))[:12],
+                    note="; ".join(b.notes) or None,
+                )
+            )
     return out
 
 
@@ -486,9 +514,23 @@ async def get_governance(ticker: TickerPath, pool: Pool, _owner: Owner) -> evide
     return await evidence.governance(pool, ticker)
 
 
-@router.get("/{ticker}/case", response_model=evidence.CaseView)
-async def get_case(ticker: TickerPath, pool: Pool, owner: Owner) -> evidence.CaseView:
-    return await evidence.case_view(pool, owner.user_id, ticker)
+@router.get("/{ticker}/case", response_model=autoevidence.CaseWithObserved)
+async def get_case(
+    ticker: TickerPath, pool: Pool, owner: Owner
+) -> autoevidence.CaseWithObserved:
+    """Your cited items, plus concentration and capital-allocation figures the app computed from
+    filings (kept apart from your items)."""
+    company = await _company(pool, ticker)
+    case = await evidence.case_view(pool, owner.user_id, ticker)
+    allocation = await evidence.capital_allocation(pool, ticker, company.annual)
+    seg = await segments.analysis(pool, owner.user_id, ticker, "annual")
+    return autoevidence.CaseWithObserved(
+        **case.model_dump(),
+        observed=[
+            *autoevidence.concentration_observations(seg, case.concentration),
+            *autoevidence.capital_observations(allocation.years),
+        ],
+    )
 
 
 @router.post(
