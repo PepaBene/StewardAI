@@ -763,10 +763,25 @@ class Role(BaseModel):
     passage: str | None
 
 
+class Compensation(BaseModel):
+    person: str = Field(description="Name and position as the proxy statement gives them.")
+    fiscal_year: int
+    total: Decimal
+    currency: str = "USD"
+    components: dict[str, Decimal] = Field(
+        description="Only the components the provider sent; an absent one is not zero."
+    )
+    filed: dt.date | None
+    source_url: str
+    provider: str
+
+
 class Governance(BaseModel):
     ticker: str
     roles: list[Role]
     related_party: list[dict[str, Any]]
+    compensation: list[Compensation] = Field(default_factory=list)
+    compensation_note: str
     caveats: list[str]
     method_version: str
 
@@ -785,14 +800,49 @@ async def governance(pool: asyncpg.Pool, ticker: str) -> Governance:
            order by known_at desc limit 20""",
         ticker,
     )
+    comp = await pool.fetch(
+        """select distinct on (text_value, metric) text_value as person, metric, value as total, currency,
+                  published_at, source_url, provider, raw
+           from public.company_research_observation
+           where ticker=$1 and dataset='executive_compensation' and value is not null and text_value is not null
+           order by text_value, metric, known_at desc""",
+        ticker,
+    )
+    compensation: list[Compensation] = []
+    for r in comp:
+        raw = json.loads(r["raw"]) if isinstance(r["raw"], str) else (r["raw"] or {})
+        year = raw.get("fiscal_year")
+        if not isinstance(year, int):
+            continue
+        compensation.append(
+            Compensation(
+                person=r["person"],
+                fiscal_year=year,
+                total=r["total"],
+                currency=r["currency"] or "USD",
+                components={k: Decimal(v) for k, v in (raw.get("components") or {}).items()},
+                filed=r["published_at"].date() if r["published_at"] else None,
+                source_url=r["source_url"],
+                provider=r["provider"],
+            )
+        )
+    compensation.sort(key=lambda c: (-c.fiscal_year, -c.total))
     return Governance(
         ticker=ticker,
         roles=[Role(**dict(r)) for r in rows],
         related_party=[dict(r) for r in rp],
+        compensation=compensation,
+        compensation_note=(
+            "Summary compensation as reported in the proxy statement, from Financial Modeling Prep; "
+            "the filing link on each row is the primary source. Grant-date values, not what was realised."
+            if compensation
+            else "No executive compensation is stored for this company. It is collected for holdings "
+            "mapped to a US listing, and only when the FMP key is set; absence is not a finding."
+        ),
         caveats=[
             "Roles are dated from filings and confirmed graph relationships; an undated role is shown as undated.",
             "An institutional manager's 13F position is a reported holding, not beneficial ownership or an endorsement.",
-            "Compensation and related-party items appear only when a filing supplies them; absence here is not a finding.",
+            "Related-party transaction detail is not collected: only customer and supplier disclosures appear above.",
         ],
         method_version=version("peer_compare"),
     )

@@ -261,7 +261,21 @@ async def test_peer_groups_and_evidence_tabs_run(
     assert picked["since_basis"] == "chosen"
     alloc = (await api.get(f"/companies/{TICKER}/capital-allocation")).json()
     assert len(alloc["years"]) == 3 and alloc["years"][-1]["fcf"] is not None
-    assert (await api.get(f"/companies/{TICKER}/governance")).status_code == 200
+    gov = (await api.get(f"/companies/{TICKER}/governance")).json()
+    assert gov["compensation"] == [] and "absence is not a finding" in gov["compensation_note"]
+    await backend_pool.execute(
+        "insert into public.company_research_observation"
+        " (ticker, provider, dataset, metric, value, text_value, unit, currency, source_url, published_at, raw)"
+        " values ($1,'fmp','executive_compensation','total_2025',6500000,'Jane Doe Chief Financial Officer',"
+        " 'USD','USD','https://www.sec.gov/Archives/x', now(), $2::jsonb)",
+        TICKER,
+        '{"fiscal_year": 2025, "components": {"salary": "1000000", "stock_award": "5000000"}}',
+    )
+    gov = (await api.get(f"/companies/{TICKER}/governance")).json()
+    row = gov["compensation"][0]
+    assert row["fiscal_year"] == 2025 and Decimal(row["total"]) == Decimal(6500000)
+    assert set(row["components"]) == {"salary", "stock_award"}
+    assert row["source_url"].startswith("https://www.sec.gov") and "proxy statement" in gov["compensation_note"]
     assert (await api.get("/companies/NOPE_US_EQ/overview")).status_code == 404
     assert (await api.get("/companies/NOPE_US_EQ/statements")).json()["columns"] == []
 

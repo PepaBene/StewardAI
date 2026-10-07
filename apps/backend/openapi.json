@@ -24530,6 +24530,83 @@
         ],
         "title": "CompareRow"
       },
+      "Compensation": {
+        "properties": {
+          "person": {
+            "type": "string",
+            "title": "Person",
+            "description": "Name and position as the proxy statement gives them."
+          },
+          "fiscal_year": {
+            "type": "integer",
+            "title": "Fiscal Year"
+          },
+          "total": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              }
+            ],
+            "title": "Total"
+          },
+          "currency": {
+            "type": "string",
+            "title": "Currency",
+            "default": "USD"
+          },
+          "components": {
+            "additionalProperties": {
+              "anyOf": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "string",
+                  "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+                }
+              ]
+            },
+            "type": "object",
+            "title": "Components",
+            "description": "Only the components the provider sent; an absent one is not zero."
+          },
+          "filed": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Filed"
+          },
+          "source_url": {
+            "type": "string",
+            "title": "Source Url"
+          },
+          "provider": {
+            "type": "string",
+            "title": "Provider"
+          }
+        },
+        "type": "object",
+        "required": [
+          "person",
+          "fiscal_year",
+          "total",
+          "components",
+          "filed",
+          "source_url",
+          "provider"
+        ],
+        "title": "Compensation"
+      },
       "ComplianceRow": {
         "properties": {
           "id": {
@@ -36472,6 +36549,17 @@
             "type": "array",
             "title": "Related Party"
           },
+          "compensation": {
+            "items": {
+              "$ref": "#/components/schemas/Compensation"
+            },
+            "type": "array",
+            "title": "Compensation"
+          },
+          "compensation_note": {
+            "type": "string",
+            "title": "Compensation Note"
+          },
           "caveats": {
             "items": {
               "type": "string"
@@ -36489,6 +36577,7 @@
           "ticker",
           "roles",
           "related_party",
+          "compensation_note",
           "caveats",
           "method_version"
         ],

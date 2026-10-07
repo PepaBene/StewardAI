@@ -210,6 +210,14 @@ def probes(settings: Settings) -> list[Probe]:
         ),
         Probe(
             "fmp",
+            "executive_compensation",
+            "https://financialmodelingprep.com/stable/governance-executive-compensation",
+            {"symbol": "AAPL"},
+            secret(settings.fmp_api_key),
+            "apikey",
+        ),
+        Probe(
+            "fmp",
             "sector_snapshot",
             "https://financialmodelingprep.com/stable/sector-performance-snapshot",
             {},
