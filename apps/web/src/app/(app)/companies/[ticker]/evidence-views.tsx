@@ -39,7 +39,7 @@ export function AllocationView({ ticker }: { ticker: string }) {
                   <thead>
                     <tr className="bg-surface-sunken text-right">
                       <th scope="col" className="px-2 py-1.5 text-left font-medium">Year</th>
-                      {["Free cash flow", "Capex", "Dividends", "Buybacks", "Debt issued", "Debt repaid", "Net debt change", "Returned / FCF", "Shares", "FCF per share growth"].map((h) => (
+                      {["Free cash flow", "Capex", "Dividends", "Buybacks", "Debt issued", "Debt repaid", "Net debt change", "Acquisitions", "Divestitures", "Returned / FCF", "Shares", "FCF per share growth"].map((h) => (
                         <th key={h} scope="col" className="px-2 py-1.5 font-medium">{h}</th>
                       ))}
                     </tr>
@@ -55,6 +55,8 @@ export function AllocationView({ ticker }: { ticker: string }) {
                         <Cell text={fig(y.debt_issued)} />
                         <Cell text={fig(y.debt_repaid)} />
                         <Cell text={fig(y.net_debt_change)} />
+                        <Cell text={fig(y.acquisitions)} reason="not filed" />
+                        <Cell text={fig(y.divestitures)} reason="not filed" />
                         <Cell text={pct(y.returned_share_of_fcf)} reason="n/m: free cash flow is not positive" />
                         <Cell text={fig(y.share_count)} />
                         <Cell text={pct(y.fcf_per_share_growth)} reason="n/m: needs positive free cash flow in both years" />
@@ -351,6 +353,22 @@ export function GovernanceView({ ticker }: { ticker: string }) {
                   ))}
                 </ul>
               )}
+              <div className="space-y-1.5 border-t border-border-soft pt-3">
+                <p className="text-sm font-semibold">Related-party totals in the filing notes</p>
+                {(d.related_party_figures ?? []).length === 0 ? (
+                  <p className="text-sm text-text-muted">No company-wide related-party total is tagged in the stored filings.</p>
+                ) : (
+                  <ul className="space-y-1 text-sm">
+                    {(d.related_party_figures ?? []).map((f) => (
+                      <li key={f.concept} className="flex flex-wrap items-baseline gap-x-3">
+                        <span className="min-w-0 flex-1">{f.label}</span>
+                        <span className="num font-semibold">{fig(f.value)} {f.currency ?? ""}</span>
+                        <span className="text-xs text-text-muted">at {formatDate(f.period_end)}, {f.concept}</span>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
               {d.caveats.map((c) => (
                 <p key={c} className="text-xs text-text-muted">{c}</p>
               ))}

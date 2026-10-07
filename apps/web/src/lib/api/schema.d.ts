@@ -5851,6 +5851,10 @@ export interface components {
             debt_repaid: number | string | null;
             /** Net Debt Change */
             net_debt_change: number | string | null;
+            /** Acquisitions */
+            acquisitions?: number | string | null;
+            /** Divestitures */
+            divestitures?: number | string | null;
             /** Returned Share Of Fcf */
             returned_share_of_fcf: number | string | null;
             /** Share Count */
@@ -12155,6 +12159,8 @@ export interface components {
             related_party: {
                 [key: string]: unknown;
             }[];
+            /** Related Party Figures */
+            related_party_figures?: components["schemas"]["RelatedPartyFigure"][];
             /** Compensation */
             compensation?: components["schemas"]["Compensation"][];
             /** Compensation Note */
@@ -18263,6 +18269,25 @@ export interface components {
             high: number | string | null;
             /** Reason */
             reason?: string | null;
+        };
+        /** RelatedPartyFigure */
+        RelatedPartyFigure: {
+            /** Label */
+            label: string;
+            /** Value */
+            value: number | string;
+            /** Currency */
+            currency: string | null;
+            /**
+             * Period End
+             * Format: date
+             */
+            period_end: string;
+            /**
+             * Concept
+             * @description The filed XBRL element, so the figure can be checked.
+             */
+            concept: string;
         };
         /** RelationshipDecision */
         RelationshipDecision: {
