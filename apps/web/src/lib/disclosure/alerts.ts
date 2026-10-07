@@ -14,6 +14,10 @@ export const ALERT_KIND_LABEL: Record<AlertKind, string> = {
   major_holder: "Large holder filing",
   relationship_change: "Customer or supplier change",
   deal_state: "Deal moved to a new stage",
+  controlling_stake: "Controlling stake reported",
+  insider_buy_cluster: "Cluster of insider purchases",
+  estimate_revision: "Consensus estimate revised",
+  debt_maturity_change: "Debt maturity profile changed",
 };
 
 /** Where to read more about an alert, by kind. */
@@ -22,7 +26,33 @@ export const ALERT_HREF: Record<AlertKind, string> = {
   major_holder: "/disclosures/ownership",
   relationship_change: "/disclosures/network",
   deal_state: "/disclosures/deals",
+  controlling_stake: "/disclosures/ownership",
+  insider_buy_cluster: "/disclosures/insiders",
+  estimate_revision: "/disclosures/estimates",
+  debt_maturity_change: "/disclosures",
 };
+
+export type AlertWhy = S["AlertWhyOut"];
+
+/** The rule behind an alert as readable lines: rule, threshold, then each input it saw. An alert
+ * stored before rules were recorded has none, and says so rather than inventing one. */
+export function whyLines(why: AlertWhy | null | undefined): string[] {
+  if (why == null) return ["No rule was recorded for this alert."];
+  const inputs = Object.entries(why.inputs ?? {}).map(([k, v]) => `${k.replaceAll("_", " ")}: ${v == null ? "not stated" : String(v)}`);
+  return [`Rule: ${why.rule.replaceAll("_", " ")}`, `Threshold: ${why.threshold}`, ...inputs];
+}
+
+export type AlertScan = S["AlertScanOut"];
+
+/** New alerts raised by one scan: the sum of every alert kind. Review tasks and failed checks are
+ * not alerts and are reported separately. */
+export const scanTotal = (d: AlertScan): number =>
+  d.insider_trade + d.major_holder + d.relationship_change + d.deal_state + d.controlling_stake + d.insider_buy_cluster + d.estimate_revision + d.debt_maturity_change;
+
+/** Every known kind with its count, zeros included, so the total never hides a kind. */
+export function countByKind(alerts: readonly DisclosureAlert[]): { kind: AlertKind; count: number }[] {
+  return (Object.keys(ALERT_KIND_LABEL) as AlertKind[]).map((kind) => ({ kind, count: alerts.filter((a) => a.kind === kind).length }));
+}
 
 export function splitByState(alerts: readonly DisclosureAlert[]): { open: DisclosureAlert[]; done: DisclosureAlert[] } {
   const open = alerts.filter((a) => a.acknowledged_at == null);

@@ -1141,12 +1141,30 @@ async def retire_owner_weight(
         raise HTTPException(404, "no active weight with that id for this holding")
 
 
+class AlertWhyOut(BaseModel):
+    """Why an alert fired: the rule, its threshold and the inputs it saw."""
+
+    rule: str
+    threshold: str
+    inputs: dict[str, Any]
+
+
 class DisclosureAlertOut(BaseModel):
     id: int
-    kind: Literal["insider_trade", "major_holder", "relationship_change", "deal_state"]
+    kind: Literal[
+        "insider_trade",
+        "major_holder",
+        "relationship_change",
+        "deal_state",
+        "controlling_stake",
+        "insider_buy_cluster",
+        "estimate_revision",
+        "debt_maturity_change",
+    ]
     ticker: str
     headline: str
     detail: dict[str, Any]
+    why_fired: AlertWhyOut | None = None
     source_url: str | None
     known_at: dt.datetime
     created_at: dt.datetime
@@ -1158,6 +1176,11 @@ class AlertScanOut(BaseModel):
     major_holder: int
     relationship_change: int
     deal_state: int
+    controlling_stake: int
+    insider_buy_cluster: int
+    estimate_revision: int
+    debt_maturity_change: int
+    review_tasks: int
     failed: int
 
 

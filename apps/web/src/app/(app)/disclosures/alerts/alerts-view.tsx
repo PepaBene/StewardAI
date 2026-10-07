@@ -8,13 +8,13 @@ import { PageHeader } from "@/components/page-header";
 import { Button } from "@/components/ui/button";
 import { callApi } from "@/app/(app)/relationships/decision-form";
 import { getBrowserApiClient } from "@/lib/api/client";
-import { ALERT_HREF, ALERT_KIND_LABEL, byKnown, digestKindLabel, digestOrder, forTicker, splitByState, type DigestGroup, type DisclosureAlert } from "@/lib/disclosure/alerts";
+import { ALERT_HREF, ALERT_KIND_LABEL, byKnown, digestKindLabel, digestOrder, forTicker, scanTotal, splitByState, whyLines, type DigestGroup, type DisclosureAlert } from "@/lib/disclosure/alerts";
 import { formatDay } from "@/lib/disclosure/model";
 
 /**
  * What the disclosure collectors found that you may want to read: a verified insider trade, a large
  * holder’s filing on a holding, a change in a customer or supplier claim. Each says what was filed
- * and when it became known, not why. Acknowledging one only moves it out of the open list.
+ * and when it became known, and which rule fired (never a motive). Acknowledging one only moves it out of the open list.
  */
 export function AlertsPageView() {
   const [alerts, setAlerts] = useState<DisclosureAlert[] | null>(null);
@@ -65,8 +65,9 @@ export function AlertsPageView() {
       const r = await getBrowserApiClient().POST("/disclosures/alerts/scan");
       if (r.data) {
         const d = r.data;
-        const total = d.insider_trade + d.major_holder + d.relationship_change + d.deal_state;
-        setMessage({ ok: d.failed === 0, text: `${total} new ${total === 1 ? "alert" : "alerts"}${d.failed ? `, and ${d.failed} ${d.failed === 1 ? "check" : "checks"} could not run` : ""}.` });
+        const total = scanTotal(d);
+        const tasks = d.review_tasks ? `, ${d.review_tasks} ${d.review_tasks === 1 ? "item" : "items"} sent to review instead of alerting` : "";
+        setMessage({ ok: d.failed === 0, text: `${total} new ${total === 1 ? "alert" : "alerts"}${tasks}${d.failed ? `, and ${d.failed} ${d.failed === 1 ? "check" : "checks"} could not run` : ""}.` });
         await Promise.all([load(), loadDigest()]);
       } else setMessage({ ok: false, text: `The check failed (HTTP ${r.response.status}).` });
     } catch (e) {
@@ -192,6 +193,14 @@ function AlertList({ alerts, onAcknowledge }: { alerts: readonly DisclosureAlert
                 </>
               ) : null}
             </p>
+            <details className="text-xs">
+              <summary className="cursor-pointer text-accent-ink hover:underline focus-visible:ring-2 focus-visible:ring-focus/30 focus-visible:outline-none">Why this fired</summary>
+              <ul className="mt-1 list-disc pl-4 text-text-muted">
+                {whyLines(a.why_fired).map((line) => (
+                  <li key={line}>{line}</li>
+                ))}
+              </ul>
+            </details>
           </div>
           {onAcknowledge ? (
             <Button type="button" size="sm" variant="outline" onClick={() => onAcknowledge(a.id)}>

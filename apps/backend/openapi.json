@@ -15950,6 +15950,500 @@
         }
       }
     },
+    "/disclosures/data/coverage": {
+      "get": {
+        "tags": [
+          "disclosures"
+        ],
+        "summary": "Data Coverage",
+        "description": "Coverage by dataset and jurisdiction over held tickers, with blind spots, collection\nfailures, sampled error rates, the free-tier cost ledger and the release order.",
+        "operationId": "data_coverage",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "as_of",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date-time"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Show only what was known by this time.",
+              "title": "As Of"
+            },
+            "description": "Show only what was known by this time."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AnalyticsCoverageOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/disclosures/company/{ticker}/evidence": {
+      "get": {
+        "tags": [
+          "disclosures"
+        ],
+        "summary": "Company Evidence",
+        "description": "One call per holding: each dataset's count, newest known date and coverage state.",
+        "operationId": "company_evidence",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "ticker",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9._-]{1,32}$",
+              "title": "Ticker"
+            }
+          },
+          {
+            "name": "as_of",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date-time"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Show only what was known by this time.",
+              "title": "As Of"
+            },
+            "description": "Show only what was known by this time."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AnalyticsCompanyEvidenceOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/disclosures/portfolio/look-through": {
+      "get": {
+        "tags": [
+          "disclosures"
+        ],
+        "summary": "Portfolio Look Through",
+        "description": "Direct and fund exposure to confirmed relationships, deals and concentrated customers.\n\nTotals are shares of the whole portfolio market value; unknown weights stay unknown.",
+        "operationId": "portfolio_look_through",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "as_of",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date-time"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Show only what was known by this time.",
+              "title": "As Of"
+            },
+            "description": "Show only what was known by this time."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AnalyticsLookThroughOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/disclosures/screen": {
+      "get": {
+        "tags": [
+          "disclosures"
+        ],
+        "summary": "Screen Holdings",
+        "description": "Screen the held universe on verified fields. A holding missing a chosen field is excluded\nwith that reason, never scored zero.",
+        "operationId": "screen_holdings",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "as_of",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date-time"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Show only what was known by this time.",
+              "title": "As Of"
+            },
+            "description": "Show only what was known by this time."
+          },
+          {
+            "name": "min_cash_conversion",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "string",
+                  "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Operating cash flow / net income.",
+              "title": "Min Cash Conversion"
+            },
+            "description": "Operating cash flow / net income."
+          },
+          {
+            "name": "min_debt_maturity_coverage",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "number",
+                  "minimum": 0.0
+                },
+                {
+                  "type": "string",
+                  "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Cash / debt due in year 1.",
+              "title": "Min Debt Maturity Coverage"
+            },
+            "description": "Cash / debt due in year 1."
+          },
+          {
+            "name": "min_discretionary_buys",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer",
+                  "minimum": 1
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Min Discretionary Buys"
+            }
+          },
+          {
+            "name": "insider_window_days",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 365,
+              "minimum": 1,
+              "default": 90,
+              "title": "Insider Window Days"
+            }
+          },
+          {
+            "name": "min_stake_change_pct",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "number",
+                  "minimum": 0.0
+                },
+                {
+                  "type": "string",
+                  "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Absolute points.",
+              "title": "Min Stake Change Pct"
+            },
+            "description": "Absolute points."
+          },
+          {
+            "name": "min_customer_concentration",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "number",
+                  "maximum": 1.0,
+                  "minimum": 0.0
+                },
+                {
+                  "type": "string",
+                  "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Min Customer Concentration"
+            }
+          },
+          {
+            "name": "min_segment_surprise_pct",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "number",
+                  "minimum": 0.0
+                },
+                {
+                  "type": "string",
+                  "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Absolute fraction.",
+              "title": "Min Segment Surprise Pct"
+            },
+            "description": "Absolute fraction."
+          },
+          {
+            "name": "deal_exposure",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "description": "Only holdings with an active deal.",
+              "default": false,
+              "title": "Deal Exposure"
+            },
+            "description": "Only holdings with an active deal."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AnalyticsScreenOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/disclosures/replay": {
+      "get": {
+        "tags": [
+          "disclosures"
+        ],
+        "summary": "Disclosure Replay",
+        "description": "Holdings and the filings, estimates, deals, owners and insider trades known at `as_of`;\nwhat became known afterwards is listed apart under `since`.",
+        "operationId": "disclosure_replay",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "as_of",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "date-time",
+              "description": "Reconstruct what was known by this time.",
+              "title": "As Of"
+            },
+            "description": "Reconstruct what was known by this time."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReplayOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/disclosures/answer": {
+      "post": {
+        "tags": [
+          "disclosures"
+        ],
+        "summary": "Disclosure Answer",
+        "description": "Answer from verified stored evidence only, as known at `as_of` (default now).",
+        "operationId": "disclosure_answer",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AnswerRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AnswerOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
     "/holdings/{ticker}/data-context": {
       "get": {
         "tags": [
@@ -17703,6 +18197,26 @@
             "type": "integer",
             "title": "Deal State"
           },
+          "controlling_stake": {
+            "type": "integer",
+            "title": "Controlling Stake"
+          },
+          "insider_buy_cluster": {
+            "type": "integer",
+            "title": "Insider Buy Cluster"
+          },
+          "estimate_revision": {
+            "type": "integer",
+            "title": "Estimate Revision"
+          },
+          "debt_maturity_change": {
+            "type": "integer",
+            "title": "Debt Maturity Change"
+          },
+          "review_tasks": {
+            "type": "integer",
+            "title": "Review Tasks"
+          },
           "failed": {
             "type": "integer",
             "title": "Failed"
@@ -17714,9 +18228,39 @@
           "major_holder",
           "relationship_change",
           "deal_state",
+          "controlling_stake",
+          "insider_buy_cluster",
+          "estimate_revision",
+          "debt_maturity_change",
+          "review_tasks",
           "failed"
         ],
         "title": "AlertScanOut"
+      },
+      "AlertWhyOut": {
+        "properties": {
+          "rule": {
+            "type": "string",
+            "title": "Rule"
+          },
+          "threshold": {
+            "type": "string",
+            "title": "Threshold"
+          },
+          "inputs": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Inputs"
+          }
+        },
+        "type": "object",
+        "required": [
+          "rule",
+          "threshold",
+          "inputs"
+        ],
+        "title": "AlertWhyOut",
+        "description": "Why an alert fired: the rule, its threshold and the inputs it saw."
       },
       "AliasOut": {
         "properties": {
@@ -17857,6 +18401,1623 @@
         ],
         "title": "AlphaExposureRequest"
       },
+      "AnalyticsAsOfDatesOut": {
+        "properties": {
+          "kind": {
+            "type": "string",
+            "title": "Kind"
+          },
+          "dates": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Dates"
+          }
+        },
+        "type": "object",
+        "required": [
+          "kind",
+          "dates"
+        ],
+        "title": "AnalyticsAsOfDatesOut"
+      },
+      "AnalyticsCompanyEvidenceOut": {
+        "properties": {
+          "ticker": {
+            "type": "string",
+            "title": "Ticker"
+          },
+          "held": {
+            "type": "boolean",
+            "title": "Held"
+          },
+          "issuer_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Issuer Id"
+          },
+          "jurisdiction": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Jurisdiction"
+          },
+          "weight": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Weight"
+          },
+          "as_of": {
+            "type": "string",
+            "format": "date-time",
+            "title": "As Of"
+          },
+          "datasets": {
+            "items": {
+              "$ref": "#/components/schemas/AnalyticsEvidenceDatasetOut"
+            },
+            "type": "array",
+            "title": "Datasets"
+          },
+          "covered_datasets": {
+            "type": "integer",
+            "title": "Covered Datasets"
+          },
+          "dataset_total": {
+            "type": "integer",
+            "title": "Dataset Total"
+          },
+          "notes": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Notes"
+          }
+        },
+        "type": "object",
+        "required": [
+          "ticker",
+          "held",
+          "issuer_id",
+          "jurisdiction",
+          "weight",
+          "as_of",
+          "datasets",
+          "covered_datasets",
+          "dataset_total",
+          "notes"
+        ],
+        "title": "AnalyticsCompanyEvidenceOut"
+      },
+      "AnalyticsCostLedgerOut": {
+        "properties": {
+          "total_usd": {
+            "type": "string",
+            "title": "Total Usd"
+          },
+          "basis": {
+            "type": "string",
+            "title": "Basis"
+          },
+          "registered_sources": {
+            "type": "integer",
+            "title": "Registered Sources"
+          },
+          "paid_sources": {
+            "type": "integer",
+            "title": "Paid Sources"
+          },
+          "sources": {
+            "items": {
+              "$ref": "#/components/schemas/AnalyticsCostSourceOut"
+            },
+            "type": "array",
+            "title": "Sources"
+          }
+        },
+        "type": "object",
+        "required": [
+          "total_usd",
+          "basis",
+          "registered_sources",
+          "paid_sources",
+          "sources"
+        ],
+        "title": "AnalyticsCostLedgerOut"
+      },
+      "AnalyticsCostSourceOut": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "reference": {
+            "type": "string",
+            "title": "Reference"
+          },
+          "cost_usd": {
+            "type": "string",
+            "title": "Cost Usd"
+          }
+        },
+        "type": "object",
+        "required": [
+          "name",
+          "reference",
+          "cost_usd"
+        ],
+        "title": "AnalyticsCostSourceOut"
+      },
+      "AnalyticsCoverageCellOut": {
+        "properties": {
+          "dataset": {
+            "type": "string",
+            "title": "Dataset"
+          },
+          "label": {
+            "type": "string",
+            "title": "Label"
+          },
+          "jurisdiction": {
+            "type": "string",
+            "title": "Jurisdiction"
+          },
+          "tickers": {
+            "type": "integer",
+            "title": "Tickers"
+          },
+          "covered": {
+            "type": "integer",
+            "title": "Covered"
+          },
+          "uncovered": {
+            "type": "integer",
+            "title": "Uncovered"
+          },
+          "stale": {
+            "type": "integer",
+            "title": "Stale"
+          },
+          "denominator_value": {
+            "type": "string",
+            "title": "Denominator Value",
+            "description": "Held market value of this jurisdiction."
+          },
+          "covered_value": {
+            "type": "string",
+            "title": "Covered Value"
+          },
+          "uncovered_value": {
+            "type": "string",
+            "title": "Uncovered Value"
+          },
+          "covered_share": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Covered Share",
+            "description": "Null when the denominator is zero."
+          },
+          "first_known_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "First Known At"
+          },
+          "last_known_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Known At"
+          },
+          "states": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "type": "object",
+            "title": "States"
+          },
+          "blind_spots": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Blind Spots"
+          },
+          "unit": {
+            "type": "string",
+            "title": "Unit"
+          },
+          "source": {
+            "type": "string",
+            "title": "Source"
+          },
+          "method": {
+            "type": "string",
+            "title": "Method"
+          }
+        },
+        "type": "object",
+        "required": [
+          "dataset",
+          "label",
+          "jurisdiction",
+          "tickers",
+          "covered",
+          "uncovered",
+          "stale",
+          "denominator_value",
+          "covered_value",
+          "uncovered_value",
+          "covered_share",
+          "first_known_at",
+          "last_known_at",
+          "states",
+          "blind_spots",
+          "unit",
+          "source",
+          "method"
+        ],
+        "title": "AnalyticsCoverageCellOut"
+      },
+      "AnalyticsCoverageOut": {
+        "properties": {
+          "as_of": {
+            "type": "string",
+            "format": "date-time",
+            "title": "As Of"
+          },
+          "snapshot_date": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Snapshot Date"
+          },
+          "holdings": {
+            "type": "integer",
+            "title": "Holdings"
+          },
+          "denominator_value": {
+            "type": "string",
+            "title": "Denominator Value"
+          },
+          "cells": {
+            "items": {
+              "$ref": "#/components/schemas/AnalyticsCoverageCellOut"
+            },
+            "type": "array",
+            "title": "Cells"
+          },
+          "by_period": {
+            "items": {
+              "$ref": "#/components/schemas/AnalyticsPeriodOut"
+            },
+            "type": "array",
+            "title": "By Period"
+          },
+          "failures": {
+            "items": {
+              "$ref": "#/components/schemas/AnalyticsFailureOut"
+            },
+            "type": "array",
+            "title": "Failures"
+          },
+          "quality": {
+            "items": {
+              "$ref": "#/components/schemas/AnalyticsQualityOut"
+            },
+            "type": "array",
+            "title": "Quality"
+          },
+          "cost_ledger": {
+            "$ref": "#/components/schemas/AnalyticsCostLedgerOut"
+          },
+          "release_order": {
+            "items": {
+              "$ref": "#/components/schemas/AnalyticsReleaseStageOut"
+            },
+            "type": "array",
+            "title": "Release Order"
+          },
+          "first_known_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "First Known At"
+          },
+          "last_known_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Known At"
+          },
+          "method_version": {
+            "type": "string",
+            "title": "Method Version"
+          },
+          "notes": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Notes"
+          }
+        },
+        "type": "object",
+        "required": [
+          "as_of",
+          "snapshot_date",
+          "holdings",
+          "denominator_value",
+          "cells",
+          "by_period",
+          "failures",
+          "quality",
+          "cost_ledger",
+          "release_order",
+          "first_known_at",
+          "last_known_at",
+          "method_version",
+          "notes"
+        ],
+        "title": "AnalyticsCoverageOut"
+      },
+      "AnalyticsEvidenceDatasetOut": {
+        "properties": {
+          "dataset": {
+            "type": "string",
+            "title": "Dataset"
+          },
+          "label": {
+            "type": "string",
+            "title": "Label"
+          },
+          "count": {
+            "type": "integer",
+            "title": "Count"
+          },
+          "unit": {
+            "type": "string",
+            "title": "Unit"
+          },
+          "first_known_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "First Known At"
+          },
+          "latest_known_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Latest Known At"
+          },
+          "first_period": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "First Period"
+          },
+          "last_period": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Period"
+          },
+          "coverage_state": {
+            "type": "string",
+            "enum": [
+              "available",
+              "stale",
+              "unresolved_identity",
+              "not_disclosed",
+              "not_covered",
+              "paid_only",
+              "authentication_failed",
+              "retrieval_failed",
+              "parse_failed",
+              "under_review",
+              "none_known"
+            ],
+            "title": "Coverage State"
+          },
+          "stale": {
+            "type": "boolean",
+            "title": "Stale"
+          },
+          "source": {
+            "type": "string",
+            "title": "Source"
+          },
+          "method": {
+            "type": "string",
+            "title": "Method"
+          },
+          "method_version": {
+            "type": "string",
+            "title": "Method Version"
+          },
+          "api_path": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Api Path",
+            "description": "The existing dataset route; null if no identity."
+          },
+          "page_path": {
+            "type": "string",
+            "title": "Page Path"
+          }
+        },
+        "type": "object",
+        "required": [
+          "dataset",
+          "label",
+          "count",
+          "unit",
+          "first_known_at",
+          "latest_known_at",
+          "first_period",
+          "last_period",
+          "coverage_state",
+          "stale",
+          "source",
+          "method",
+          "method_version",
+          "api_path",
+          "page_path"
+        ],
+        "title": "AnalyticsEvidenceDatasetOut"
+      },
+      "AnalyticsExposureOut": {
+        "properties": {
+          "ticker": {
+            "type": "string",
+            "title": "Ticker"
+          },
+          "direct_weight": {
+            "type": "string",
+            "title": "Direct Weight"
+          },
+          "held_directly": {
+            "type": "boolean",
+            "title": "Held Directly"
+          },
+          "fund_weight": {
+            "type": "string",
+            "title": "Fund Weight"
+          },
+          "total_weight": {
+            "type": "string",
+            "title": "Total Weight"
+          },
+          "funds": {
+            "items": {
+              "$ref": "#/components/schemas/AnalyticsFundReachOut"
+            },
+            "type": "array",
+            "title": "Funds"
+          }
+        },
+        "type": "object",
+        "required": [
+          "ticker",
+          "direct_weight",
+          "held_directly",
+          "fund_weight",
+          "total_weight",
+          "funds"
+        ],
+        "title": "AnalyticsExposureOut"
+      },
+      "AnalyticsFailureOut": {
+        "properties": {
+          "kind": {
+            "type": "string",
+            "enum": [
+              "coverage",
+              "source"
+            ],
+            "title": "Kind"
+          },
+          "dataset": {
+            "type": "string",
+            "title": "Dataset"
+          },
+          "jurisdiction": {
+            "type": "string",
+            "title": "Jurisdiction"
+          },
+          "state": {
+            "type": "string",
+            "title": "State"
+          },
+          "count": {
+            "type": "integer",
+            "title": "Count"
+          },
+          "last_checked_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Checked At"
+          },
+          "detail": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Detail"
+          }
+        },
+        "type": "object",
+        "required": [
+          "kind",
+          "dataset",
+          "jurisdiction",
+          "state",
+          "count",
+          "last_checked_at",
+          "detail"
+        ],
+        "title": "AnalyticsFailureOut"
+      },
+      "AnalyticsFundLagOut": {
+        "properties": {
+          "fund_ticker": {
+            "type": "string",
+            "title": "Fund Ticker"
+          },
+          "weight": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Weight"
+          },
+          "report_period_end": {
+            "type": "string",
+            "format": "date",
+            "title": "Report Period End"
+          },
+          "known_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Known At"
+          },
+          "lag_days": {
+            "type": "integer",
+            "title": "Lag Days"
+          },
+          "mapped_pct": {
+            "type": "string",
+            "title": "Mapped Pct"
+          },
+          "unmapped_pct": {
+            "type": "string",
+            "title": "Unmapped Pct"
+          },
+          "unknown_lines": {
+            "type": "integer",
+            "title": "Unknown Lines"
+          }
+        },
+        "type": "object",
+        "required": [
+          "fund_ticker",
+          "weight",
+          "report_period_end",
+          "known_at",
+          "lag_days",
+          "mapped_pct",
+          "unmapped_pct",
+          "unknown_lines"
+        ],
+        "title": "AnalyticsFundLagOut"
+      },
+      "AnalyticsFundReachOut": {
+        "properties": {
+          "fund_ticker": {
+            "type": "string",
+            "title": "Fund Ticker"
+          },
+          "fund_weight": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fund Weight"
+          },
+          "fund_pct": {
+            "type": "string",
+            "title": "Fund Pct"
+          },
+          "contribution": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Contribution"
+          },
+          "report_period_end": {
+            "type": "string",
+            "format": "date",
+            "title": "Report Period End"
+          },
+          "lag_days": {
+            "type": "integer",
+            "title": "Lag Days"
+          }
+        },
+        "type": "object",
+        "required": [
+          "fund_ticker",
+          "fund_weight",
+          "fund_pct",
+          "contribution",
+          "report_period_end",
+          "lag_days"
+        ],
+        "title": "AnalyticsFundReachOut"
+      },
+      "AnalyticsLookDealOut": {
+        "properties": {
+          "ticker": {
+            "type": "string",
+            "title": "Ticker"
+          },
+          "deal_id": {
+            "type": "integer",
+            "title": "Deal Id"
+          },
+          "title": {
+            "type": "string",
+            "title": "Title"
+          },
+          "deal_type": {
+            "type": "string",
+            "title": "Deal Type"
+          },
+          "state": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "State"
+          },
+          "direct_weight": {
+            "type": "string",
+            "title": "Direct Weight"
+          },
+          "holding_weight": {
+            "type": "string",
+            "title": "Holding Weight"
+          }
+        },
+        "type": "object",
+        "required": [
+          "ticker",
+          "deal_id",
+          "title",
+          "deal_type",
+          "state",
+          "direct_weight",
+          "holding_weight"
+        ],
+        "title": "AnalyticsLookDealOut"
+      },
+      "AnalyticsLookThroughOut": {
+        "properties": {
+          "as_of": {
+            "type": "string",
+            "format": "date-time",
+            "title": "As Of"
+          },
+          "snapshot_date": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Snapshot Date"
+          },
+          "denominator_value": {
+            "type": "string",
+            "title": "Denominator Value"
+          },
+          "holdings": {
+            "type": "integer",
+            "title": "Holdings"
+          },
+          "exposures": {
+            "items": {
+              "$ref": "#/components/schemas/AnalyticsExposureOut"
+            },
+            "type": "array",
+            "title": "Exposures"
+          },
+          "relationships": {
+            "items": {
+              "$ref": "#/components/schemas/AnalyticsRelationshipOut"
+            },
+            "type": "array",
+            "title": "Relationships"
+          },
+          "deals": {
+            "items": {
+              "$ref": "#/components/schemas/AnalyticsLookDealOut"
+            },
+            "type": "array",
+            "title": "Deals"
+          },
+          "funds": {
+            "items": {
+              "$ref": "#/components/schemas/AnalyticsFundLagOut"
+            },
+            "type": "array",
+            "title": "Funds"
+          },
+          "totals": {
+            "$ref": "#/components/schemas/AnalyticsLookTotalsOut"
+          },
+          "as_of_dates": {
+            "items": {
+              "$ref": "#/components/schemas/AnalyticsAsOfDatesOut"
+            },
+            "type": "array",
+            "title": "As Of Dates"
+          },
+          "mixed_as_of": {
+            "type": "boolean",
+            "title": "Mixed As Of"
+          },
+          "max_fund_lag_days": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Max Fund Lag Days"
+          },
+          "concentration_share": {
+            "type": "string",
+            "title": "Concentration Share"
+          },
+          "method_version": {
+            "type": "string",
+            "title": "Method Version"
+          },
+          "notes": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Notes"
+          }
+        },
+        "type": "object",
+        "required": [
+          "as_of",
+          "snapshot_date",
+          "denominator_value",
+          "holdings",
+          "exposures",
+          "relationships",
+          "deals",
+          "funds",
+          "totals",
+          "as_of_dates",
+          "mixed_as_of",
+          "max_fund_lag_days",
+          "concentration_share",
+          "method_version",
+          "notes"
+        ],
+        "title": "AnalyticsLookThroughOut"
+      },
+      "AnalyticsLookTotalsOut": {
+        "properties": {
+          "denominator_weight": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Denominator Weight"
+          },
+          "relationship_covered_weight": {
+            "type": "string",
+            "title": "Relationship Covered Weight"
+          },
+          "relationship_covered_holdings": {
+            "type": "integer",
+            "title": "Relationship Covered Holdings"
+          },
+          "unknown_weight_holdings": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Unknown Weight Holdings"
+          },
+          "unknown_weight": {
+            "type": "string",
+            "title": "Unknown Weight"
+          },
+          "customer_known_weight": {
+            "type": "string",
+            "title": "Customer Known Weight"
+          },
+          "concentrated_customer_weight": {
+            "type": "string",
+            "title": "Concentrated Customer Weight"
+          },
+          "concentrated_customer_holdings": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Concentrated Customer Holdings"
+          },
+          "largest_customer_weighted": {
+            "type": "string",
+            "title": "Largest Customer Weighted"
+          },
+          "deal_exposed_weight": {
+            "type": "string",
+            "title": "Deal Exposed Weight"
+          },
+          "deal_exposed_holdings": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Deal Exposed Holdings"
+          },
+          "fund_look_through_weight": {
+            "type": "string",
+            "title": "Fund Look Through Weight"
+          },
+          "unmapped_fund_weight": {
+            "type": "string",
+            "title": "Unmapped Fund Weight"
+          }
+        },
+        "type": "object",
+        "required": [
+          "denominator_weight",
+          "relationship_covered_weight",
+          "relationship_covered_holdings",
+          "unknown_weight_holdings",
+          "unknown_weight",
+          "customer_known_weight",
+          "concentrated_customer_weight",
+          "concentrated_customer_holdings",
+          "largest_customer_weighted",
+          "deal_exposed_weight",
+          "deal_exposed_holdings",
+          "fund_look_through_weight",
+          "unmapped_fund_weight"
+        ],
+        "title": "AnalyticsLookTotalsOut"
+      },
+      "AnalyticsPeriodOut": {
+        "properties": {
+          "dataset": {
+            "type": "string",
+            "title": "Dataset"
+          },
+          "period": {
+            "type": "string",
+            "title": "Period"
+          },
+          "issuers_covered": {
+            "type": "integer",
+            "title": "Issuers Covered"
+          },
+          "issuers_total": {
+            "type": "integer",
+            "title": "Issuers Total"
+          },
+          "covered_value": {
+            "type": "string",
+            "title": "Covered Value"
+          },
+          "denominator_value": {
+            "type": "string",
+            "title": "Denominator Value"
+          }
+        },
+        "type": "object",
+        "required": [
+          "dataset",
+          "period",
+          "issuers_covered",
+          "issuers_total",
+          "covered_value",
+          "denominator_value"
+        ],
+        "title": "AnalyticsPeriodOut"
+      },
+      "AnalyticsQualityOut": {
+        "properties": {
+          "dataset": {
+            "type": "string",
+            "title": "Dataset"
+          },
+          "labelled": {
+            "type": "integer",
+            "title": "Labelled",
+            "description": "Denominator: items a person labelled."
+          },
+          "errors": {
+            "type": "integer",
+            "title": "Errors",
+            "description": "Numerator: labels that disagreed with the machine value."
+          },
+          "error_rate": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error Rate",
+            "description": "Null when nothing was sampled."
+          },
+          "needed": {
+            "type": "integer",
+            "title": "Needed"
+          },
+          "bar": {
+            "type": "string",
+            "title": "Bar"
+          },
+          "state": {
+            "type": "string",
+            "enum": [
+              "not_sampled",
+              "sample_too_small",
+              "meets_bar",
+              "below_bar"
+            ],
+            "title": "State"
+          }
+        },
+        "type": "object",
+        "required": [
+          "dataset",
+          "labelled",
+          "errors",
+          "error_rate",
+          "needed",
+          "bar",
+          "state"
+        ],
+        "title": "AnalyticsQualityOut"
+      },
+      "AnalyticsRelationshipOut": {
+        "properties": {
+          "ticker": {
+            "type": "string",
+            "title": "Ticker"
+          },
+          "relationship": {
+            "type": "string",
+            "enum": [
+              "customer",
+              "supplier"
+            ],
+            "title": "Relationship"
+          },
+          "counterparty_key": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Counterparty Key"
+          },
+          "counterparty_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Counterparty Name"
+          },
+          "anonymous": {
+            "type": "boolean",
+            "title": "Anonymous"
+          },
+          "share": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Share"
+          },
+          "share_basis": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Share Basis"
+          },
+          "fiscal_period": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fiscal Period"
+          },
+          "known_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Known At"
+          },
+          "source_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Url"
+          },
+          "holding_weight": {
+            "type": "string",
+            "title": "Holding Weight"
+          },
+          "weighted_share": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Weighted Share",
+            "description": "Null when the share is unknown."
+          },
+          "weight_state": {
+            "type": "string",
+            "enum": [
+              "reported",
+              "unknown"
+            ],
+            "title": "Weight State"
+          },
+          "concentrated_customer": {
+            "type": "boolean",
+            "title": "Concentrated Customer"
+          }
+        },
+        "type": "object",
+        "required": [
+          "ticker",
+          "relationship",
+          "counterparty_key",
+          "counterparty_name",
+          "anonymous",
+          "share",
+          "share_basis",
+          "fiscal_period",
+          "known_at",
+          "source_url",
+          "holding_weight",
+          "weighted_share",
+          "weight_state",
+          "concentrated_customer"
+        ],
+        "title": "AnalyticsRelationshipOut"
+      },
+      "AnalyticsReleaseStageOut": {
+        "properties": {
+          "order": {
+            "type": "integer",
+            "title": "Order"
+          },
+          "stage": {
+            "type": "string",
+            "title": "Stage"
+          },
+          "datasets": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Datasets"
+          },
+          "gates": {
+            "additionalProperties": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "type": "object",
+            "title": "Gates"
+          },
+          "state": {
+            "type": "string",
+            "enum": [
+              "gates_met",
+              "gates_open",
+              "not_started"
+            ],
+            "title": "State"
+          }
+        },
+        "type": "object",
+        "required": [
+          "order",
+          "stage",
+          "datasets",
+          "gates",
+          "state"
+        ],
+        "title": "AnalyticsReleaseStageOut"
+      },
+      "AnalyticsScreenExcludedOut": {
+        "properties": {
+          "ticker": {
+            "type": "string",
+            "title": "Ticker"
+          },
+          "weight": {
+            "type": "string",
+            "title": "Weight"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "missing",
+              "failed"
+            ],
+            "title": "Kind"
+          },
+          "reasons": {
+            "items": {
+              "$ref": "#/components/schemas/AnalyticsScreenReasonOut"
+            },
+            "type": "array",
+            "title": "Reasons"
+          }
+        },
+        "type": "object",
+        "required": [
+          "ticker",
+          "weight",
+          "kind",
+          "reasons"
+        ],
+        "title": "AnalyticsScreenExcludedOut"
+      },
+      "AnalyticsScreenFieldCoverageOut": {
+        "properties": {
+          "criterion": {
+            "type": "string",
+            "title": "Criterion"
+          },
+          "label": {
+            "type": "string",
+            "title": "Label"
+          },
+          "with_data": {
+            "type": "integer",
+            "title": "With Data"
+          },
+          "without_data": {
+            "type": "integer",
+            "title": "Without Data"
+          }
+        },
+        "type": "object",
+        "required": [
+          "criterion",
+          "label",
+          "with_data",
+          "without_data"
+        ],
+        "title": "AnalyticsScreenFieldCoverageOut"
+      },
+      "AnalyticsScreenMatchOut": {
+        "properties": {
+          "ticker": {
+            "type": "string",
+            "title": "Ticker"
+          },
+          "weight": {
+            "type": "string",
+            "title": "Weight"
+          },
+          "values": {
+            "items": {
+              "$ref": "#/components/schemas/AnalyticsScreenValueOut"
+            },
+            "type": "array",
+            "title": "Values"
+          }
+        },
+        "type": "object",
+        "required": [
+          "ticker",
+          "weight",
+          "values"
+        ],
+        "title": "AnalyticsScreenMatchOut"
+      },
+      "AnalyticsScreenOut": {
+        "properties": {
+          "as_of": {
+            "type": "string",
+            "format": "date-time",
+            "title": "As Of"
+          },
+          "snapshot_date": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Snapshot Date"
+          },
+          "universe_basis": {
+            "type": "string",
+            "title": "Universe Basis"
+          },
+          "universe_size": {
+            "type": "integer",
+            "title": "Universe Size"
+          },
+          "denominator_value": {
+            "type": "string",
+            "title": "Denominator Value"
+          },
+          "active_criteria": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Active Criteria"
+          },
+          "matched": {
+            "items": {
+              "$ref": "#/components/schemas/AnalyticsScreenMatchOut"
+            },
+            "type": "array",
+            "title": "Matched"
+          },
+          "excluded": {
+            "items": {
+              "$ref": "#/components/schemas/AnalyticsScreenExcludedOut"
+            },
+            "type": "array",
+            "title": "Excluded"
+          },
+          "matched_count": {
+            "type": "integer",
+            "title": "Matched Count"
+          },
+          "excluded_missing": {
+            "type": "integer",
+            "title": "Excluded Missing"
+          },
+          "excluded_failed": {
+            "type": "integer",
+            "title": "Excluded Failed"
+          },
+          "matched_value": {
+            "type": "string",
+            "title": "Matched Value"
+          },
+          "matched_weight": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Matched Weight"
+          },
+          "field_coverage": {
+            "items": {
+              "$ref": "#/components/schemas/AnalyticsScreenFieldCoverageOut"
+            },
+            "type": "array",
+            "title": "Field Coverage"
+          },
+          "insider_window_days": {
+            "type": "integer",
+            "title": "Insider Window Days"
+          },
+          "method_version": {
+            "type": "string",
+            "title": "Method Version"
+          },
+          "notes": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Notes"
+          }
+        },
+        "type": "object",
+        "required": [
+          "as_of",
+          "snapshot_date",
+          "universe_basis",
+          "universe_size",
+          "denominator_value",
+          "active_criteria",
+          "matched",
+          "excluded",
+          "matched_count",
+          "excluded_missing",
+          "excluded_failed",
+          "matched_value",
+          "matched_weight",
+          "field_coverage",
+          "insider_window_days",
+          "method_version",
+          "notes"
+        ],
+        "title": "AnalyticsScreenOut"
+      },
+      "AnalyticsScreenReasonOut": {
+        "properties": {
+          "criterion": {
+            "type": "string",
+            "title": "Criterion"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "missing",
+              "failed"
+            ],
+            "title": "Kind"
+          },
+          "reason": {
+            "type": "string",
+            "title": "Reason"
+          },
+          "value": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Value"
+          },
+          "threshold": {
+            "type": "string",
+            "title": "Threshold"
+          }
+        },
+        "type": "object",
+        "required": [
+          "criterion",
+          "kind",
+          "reason",
+          "value",
+          "threshold"
+        ],
+        "title": "AnalyticsScreenReasonOut"
+      },
+      "AnalyticsScreenValueOut": {
+        "properties": {
+          "criterion": {
+            "type": "string",
+            "title": "Criterion"
+          },
+          "label": {
+            "type": "string",
+            "title": "Label"
+          },
+          "value": {
+            "type": "string",
+            "title": "Value"
+          },
+          "unit": {
+            "type": "string",
+            "title": "Unit"
+          },
+          "period": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Period"
+          },
+          "known_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Known At"
+          },
+          "source": {
+            "type": "string",
+            "title": "Source"
+          }
+        },
+        "type": "object",
+        "required": [
+          "criterion",
+          "label",
+          "value",
+          "unit",
+          "period",
+          "known_at",
+          "source"
+        ],
+        "title": "AnalyticsScreenValueOut"
+      },
       "AnnouncementRule": {
         "properties": {
           "service": {
@@ -17920,6 +20081,226 @@
         ],
         "title": "AnnouncementRule",
         "description": "Maps a regulatory announcement's type (the RNS headline or the EQS category) to an\nevent type. First match wins; `classify` leaves the item to the classifier."
+      },
+      "AnswerEvidenceOut": {
+        "properties": {
+          "kind": {
+            "type": "string",
+            "title": "Kind"
+          },
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "label": {
+            "type": "string",
+            "title": "Label"
+          },
+          "counterparty": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Counterparty"
+          },
+          "value": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Value"
+          },
+          "period_end": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Period End"
+          },
+          "quote": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Quote"
+          },
+          "section": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Section"
+          },
+          "known_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Known At"
+          },
+          "source": {
+            "type": "string",
+            "title": "Source"
+          },
+          "document_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Document Url"
+          },
+          "anonymous": {
+            "type": "boolean",
+            "title": "Anonymous"
+          }
+        },
+        "type": "object",
+        "required": [
+          "kind",
+          "id",
+          "label",
+          "counterparty",
+          "value",
+          "period_end",
+          "quote",
+          "section",
+          "known_at",
+          "source",
+          "document_url",
+          "anonymous"
+        ],
+        "title": "AnswerEvidenceOut"
+      },
+      "AnswerOut": {
+        "properties": {
+          "ticker": {
+            "type": "string",
+            "title": "Ticker"
+          },
+          "as_of": {
+            "type": "string",
+            "format": "date-time",
+            "title": "As Of"
+          },
+          "text": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Text"
+          },
+          "grounded": {
+            "type": "boolean",
+            "title": "Grounded"
+          },
+          "phrased_by": {
+            "type": "string",
+            "title": "Phrased By"
+          },
+          "limits": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Limits"
+          },
+          "evidence": {
+            "items": {
+              "$ref": "#/components/schemas/AnswerEvidenceOut"
+            },
+            "type": "array",
+            "title": "Evidence"
+          },
+          "retrieved": {
+            "type": "integer",
+            "title": "Retrieved"
+          },
+          "note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note"
+          }
+        },
+        "type": "object",
+        "required": [
+          "ticker",
+          "as_of",
+          "text",
+          "grounded",
+          "phrased_by",
+          "limits",
+          "evidence",
+          "retrieved",
+          "note"
+        ],
+        "title": "AnswerOut"
+      },
+      "AnswerRequest": {
+        "properties": {
+          "ticker": {
+            "type": "string",
+            "maxLength": 30,
+            "minLength": 1,
+            "title": "Ticker"
+          },
+          "question": {
+            "type": "string",
+            "maxLength": 500,
+            "minLength": 3,
+            "title": "Question"
+          },
+          "as_of": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "As Of"
+          }
+        },
+        "type": "object",
+        "required": [
+          "ticker",
+          "question"
+        ],
+        "title": "AnswerRequest"
       },
       "AwardDetailOut": {
         "properties": {
@@ -26255,7 +28636,11 @@
               "insider_trade",
               "major_holder",
               "relationship_change",
-              "deal_state"
+              "deal_state",
+              "controlling_stake",
+              "insider_buy_cluster",
+              "estimate_revision",
+              "debt_maturity_change"
             ],
             "title": "Kind"
           },
@@ -26271,6 +28656,16 @@
             "additionalProperties": true,
             "type": "object",
             "title": "Detail"
+          },
+          "why_fired": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AlertWhyOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
           },
           "source_url": {
             "anyOf": [
@@ -52009,6 +54404,187 @@
           "after"
         ],
         "title": "ReplayChange"
+      },
+      "ReplayDatasetOut": {
+        "properties": {
+          "known": {
+            "items": {
+              "$ref": "#/components/schemas/ReplayItemOut"
+            },
+            "type": "array",
+            "title": "Known"
+          },
+          "since": {
+            "items": {
+              "$ref": "#/components/schemas/ReplayItemOut"
+            },
+            "type": "array",
+            "title": "Since"
+          },
+          "leaked_dropped": {
+            "type": "integer",
+            "title": "Leaked Dropped"
+          },
+          "error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error"
+          }
+        },
+        "type": "object",
+        "required": [
+          "known",
+          "since",
+          "leaked_dropped",
+          "error"
+        ],
+        "title": "ReplayDatasetOut"
+      },
+      "ReplayHoldingOut": {
+        "properties": {
+          "ticker": {
+            "type": "string",
+            "title": "Ticker"
+          },
+          "quantity": {
+            "type": "string",
+            "title": "Quantity"
+          },
+          "value": {
+            "type": "string",
+            "title": "Value"
+          },
+          "currency": {
+            "type": "string",
+            "title": "Currency"
+          },
+          "issuer_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Issuer Id"
+          },
+          "datasets": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/ReplayDatasetOut"
+            },
+            "type": "object",
+            "title": "Datasets"
+          }
+        },
+        "type": "object",
+        "required": [
+          "ticker",
+          "quantity",
+          "value",
+          "currency",
+          "issuer_id",
+          "datasets"
+        ],
+        "title": "ReplayHoldingOut"
+      },
+      "ReplayItemOut": {
+        "properties": {
+          "label": {
+            "type": "string",
+            "title": "Label"
+          },
+          "known_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Known At"
+          },
+          "detail": {
+            "type": "string",
+            "title": "Detail"
+          },
+          "ref": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ref"
+          }
+        },
+        "type": "object",
+        "required": [
+          "label",
+          "known_at",
+          "detail",
+          "ref"
+        ],
+        "title": "ReplayItemOut"
+      },
+      "ReplayOut": {
+        "properties": {
+          "as_of": {
+            "type": "string",
+            "format": "date-time",
+            "title": "As Of"
+          },
+          "read_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Read At"
+          },
+          "snapshot_date": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Snapshot Date"
+          },
+          "holdings": {
+            "items": {
+              "$ref": "#/components/schemas/ReplayHoldingOut"
+            },
+            "type": "array",
+            "title": "Holdings"
+          },
+          "notes": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Notes"
+          }
+        },
+        "type": "object",
+        "required": [
+          "as_of",
+          "read_at",
+          "snapshot_date",
+          "holdings",
+          "notes"
+        ],
+        "title": "ReplayOut"
       },
       "ReplayOutcome": {
         "properties": {

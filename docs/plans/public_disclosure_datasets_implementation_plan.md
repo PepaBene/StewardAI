@@ -422,7 +422,7 @@ The gap tables above were written before this round. Where a row below is marked
 | New pages not viewed in a browser | P6, P7 frontend | Sign-in needs MFA; logic and types are tested, layout is unseen. Screenshot pass at desktop and phone width; keyboard pass on timeline, filters and lanes |
 | Python and TypeScript copies of the same rules | P6, P7 | Keep both suites in step; remove the copies once live data exists |
 
-### Consolidated open-gap register, P0–P7 (updated 2026-10-07)
+### Consolidated open-gap register, P0–P9 (updated 2026-10-07)
 
 One place to read what is not done. The per-phase status sections above hold the detail; where they disagree with this register, trust this register (it was written last). Each row says what kind of work closes it.
 
@@ -437,7 +437,10 @@ One place to read what is not done. The per-phase status sections above hold the
 | Every accuracy gate coded but not run: 100 relationship claims, 50 ownership matches, 50 insider classes, 30 deal states, 20 revision pairs, 30 note values | P3.7, P4.3, P5.1, P5.6, P6.8, P7.8, P9.3 | Human labelling through `/disclosures/adjudication`; record numerator and denominator |
 | Insider aggregation never run on production tickers | P4.5 | Compare a handful of tickers to the filings |
 | No migration (14 files since `20261007100000`) or rollback ever rehearsed on a database with data | P1.1 to P7 | Rehearse the full up/down chain on a copy |
-| **No new page has been viewed in a browser**: `/disclosures`, `/ownership`, `/insiders`, `/network`, `/alerts`, `/adjudication`, `/deals`, `/estimates` | all frontend | Sign in with MFA, one screenshot at desktop and phone width per page, keyboard pass on each date control, toggle, form, timeline and lane |
+| **No new page has been viewed in a browser**: `/disclosures`, `/ownership`, `/insiders`, `/network`, `/alerts`, `/adjudication`, `/deals`, `/estimates`, `/screen`, `/coverage`, `/replay` | all frontend | Sign in with MFA, one screenshot at desktop and phone width per page, keyboard pass on each date control, toggle, form, timeline and lane |
+| P9.2 30-day shadow collection not started; incremental coverage, request volume, parse failures and match precision unmeasured | P9.2 | Run the scheduled jobs for 30 days on held and watchlist issuers, then read the coverage report |
+| P9.6 backup/restore, retention and deletion by source, reviewer audit, RLS audit, secret handling, provider shutdown and rollback never exercised | P9.6 | Run each drill on a copy of the database and record the result |
+| Release order (SEC/PIT, ownership/insiders, relationships/deals, estimates, other jurisdictions) is listed in the coverage report but nothing enforces it | P9.7 | Gate each page on its dataset's adjudication gate and the coverage report |
 
 **B. Written but never executed here**
 
@@ -447,7 +450,10 @@ One place to read what is not done. The per-phase status sections above hold the
 | The `deal_state` alert scan (`alerts.scan_deals`) and its migration have no test of their own; the alert-kind constraint name `disclosure_alert_kind_check` is the Postgres default and was not confirmed | P6.7 | Add a DB test: a documented transition raises one alert, a rumour none, a rerun none; confirm the constraint name on a real database |
 | `pyright` was not run on any P6 or P7 module | P6, P7 | Run it in `apps/backend` |
 | eslint warning: unused `versionSummary` in `components/disclosure/deals.tsx` | P6 frontend | Remove it or use it |
-| Passing as of this update: `tsc --noEmit`, `lint:colors`, ruff on `steward/disclosure`, `api` and the disclosure tests, and 316 offline backend tests (`-k "disclosure and not db"`). Not run after the `deal_state` alert change: the web test suite outside `lib/disclosure`, and any test for `alerts.scan_all` totals | P6, P7 | Re-run the full web and backend suites before merging |
+| Also skipping without a database: `test_disclosure_analytics_db.py`. None of the SQL in the P8 modules (`coverage_report`, `look_through`, `screening`, `replay`, the four new alert scans) has run | P8 | Run them in CI against a disposable Postgres |
+| Assumed names never checked against a database: `quality_review_subject_type_check`, debt-maturity bucket keys `year_N` and `thereafter`, replay deal summary keys `id`/`title`/`state`, metric names `operating_cash_flow`/`net_income`/`cash`/`debt_due_year_1` against `formulas.py`, `disclosure_coverage.dataset` values against the coverage keys, N-PORT `pct_value` in percent | P8 | Run each query on real data and fix what differs |
+| The new alert scans for controlling stake, insider buy cluster, estimate revision and debt maturity have no database test; throttling (5 per ticker, kind and day) is untested end to end | P8.5 | Add DB tests: one alert per event, a rerun raises none, a collection failure raises none |
+| Passing as of this update: `tsc --noEmit`, `lint:colors`, ruff on `steward/disclosure`, `api` and the new tests, 346 offline backend tests (`-k "disclosure and not db"`) and 122 web tests in `lib/disclosure`. Not run: web tests outside `lib/disclosure`, `pyright`, any DB test | P6 to P9 | Re-run the full web and backend suites before merging |
 
 **C. Buildable but not built**
 
@@ -462,8 +468,15 @@ One place to read what is not done. The per-phase status sections above hold the
 | Financials | ESEF not reconciled to 20-F; valuation, screener and ROIC consumers do not yet read the valuation gate; statement checks cover gross profit and free cash flow only | P2.5, P2.7, P2.8 |
 | Deals | Dilution, debt/EV and segment-mix impacts are null in live mode (share counts, enterprise value and segment revenue not read from observations); extractor is English and US-format only; page filters by type and state only (size and currency are API-only) | P6.3, P6.6, P6.7 |
 | Estimates | No pilot with two issuers' historical files; no UI to record the 20 pair reviews, so revision alerts and screens stay off; segment bridge shows the first period only; actuals come only from `disclosure_observation` | P7.1, P7.5, P7.7, P7.8 |
-| Alerts | Alerts are stored and shown but not pushed; revision alerts deliberately not registered | P4.6, P7.8 |
-| Coverage | No documented coverage report by dataset, jurisdiction and period; coverage states are shown per page only | P9.7 |
+| Alerts | Alerts are stored and shown but not fed into the thesis, monitor or news flow; revision alerts stay off until the 20-pair gate passes | P4.6, P7.8, P8.5 |
+| Coverage | The report exists (`/disclosures/data/coverage`) but its ownership count is 13D/G plus N-PORT only (no 13F), jurisdiction comes from the ISIN prefix then issuer country, and it covers held tickers only, not the watchlist | P9.7 |
+| Product API | No `company/{id}/…` path family (reads stay under `/holdings/{ticker}/…`); date, source, verified-only and pagination filters exist only where earlier phases added them | P8.1 |
+| Look-through and screen | Insider buys count only trades with plan status explicitly false; the sample-mode screen leaves matched holdings' values empty; the look-through is a panel, not its own page | P8.3, P8.4 |
+| Research answer | The answer is templated from stored evidence with a numbers-appear-in-evidence guard; no model phrases it because the repo has no LLM helper | P8.6 |
+| Replay | Replay covers the datasets the read modules expose with `as_of`; revised macro observations are not part of it; no UI test of the date picker | P8.7 |
+| Point-in-time tests | Only consensus correction and replay separation are tested; document amendment, deal reversal, insider amendment, issuer rename and restatement through the SQL reads, and split/FX/share-class portfolio-math cases, are not written | P9.4, P9.5 |
+| Adapter tests | No sweep of malformed XML/XBRL, HTML table shifts, PDF layout variation, rate limits, authentication denial and delayed publication per adapter | P9.1 |
+| UI process | The three P8 pages were built without loading the frontend-design skill, copying existing components instead | P8 frontend |
 
 **D. Structural risks to carry forward**
 
