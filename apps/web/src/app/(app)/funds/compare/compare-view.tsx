@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import { useCallback } from "react";
+import { useCallback, useState, type FormEvent } from "react";
 
 import { AlertMessage } from "@/components/alert-message";
 import { Absent, ResourceGate } from "@/components/company/primitives";
@@ -59,11 +59,58 @@ export function CompareView() {
           Pick the funds on the <Link href="/funds/research" className="text-accent-ink underline">fund research</Link> page.
         </AlertMessage>
       ) : (
-        <ResourceGate state={state} label="the comparison">
-          {(c: FundComparison) => <Comparison c={c} />}
-        </ResourceGate>
+        <>
+          <SaveComparison isins={isins} />
+          <ResourceGate state={state} label="the comparison">
+            {(c: FundComparison) => <Comparison c={c} />}
+          </ResourceGate>
+        </>
       )}
     </div>
+  );
+}
+
+function SaveComparison({ isins }: { isins: readonly string[] }) {
+  const [name, setName] = useState("");
+  const [note, setNote] = useState("");
+  const [error, setError] = useState<string | null>(null);
+  const [saved, setSaved] = useState(false);
+  const [busy, setBusy] = useState(false);
+
+  async function submit(e: FormEvent) {
+    e.preventDefault();
+    setSaved(false);
+    if (!name.trim()) return setError("Give the comparison a name.");
+    setError(null);
+    setBusy(true);
+    const { error: err } = await getBrowserApiClient().POST("/fund-comparisons", { body: { name: name.trim(), isins: [...isins], note: note.trim() || null } });
+    setBusy(false);
+    if (err) return setError("The comparison could not be saved.");
+    setSaved(true);
+    setName("");
+    setNote("");
+  }
+
+  return (
+    <Blueprint className="px-[22px] py-4">
+      <form onSubmit={submit} className="flex flex-wrap items-end gap-x-4 gap-y-3">
+        <label className="text-sm">
+          <span className="mb-1 block text-xs text-text-muted">Name</span>
+          <input value={name} onChange={(e) => setName(e.target.value)} className="w-64 border border-border bg-surface px-2 py-1.5" />
+        </label>
+        <label className="text-sm">
+          <span className="mb-1 block text-xs text-text-muted">Note (optional)</span>
+          <input value={note} onChange={(e) => setNote(e.target.value)} className="w-72 border border-border bg-surface px-2 py-1.5" />
+        </label>
+        <button type="submit" disabled={busy} className="border border-accent px-4 py-1.5 text-sm font-semibold hover:bg-surface-sunken disabled:opacity-50">Save this comparison</button>
+        {error ? <p role="alert" className="text-sm text-loss">{error}</p> : null}
+        {saved ? (
+          <p role="status" className="text-sm text-text-muted">
+            Saved. It is listed on the <Link href="/funds/research" className="text-accent-ink hover:underline">fund research</Link> page; the figures are recomputed each time you open it.
+          </p>
+        ) : null}
+      </form>
+    </Blueprint>
   );
 }
 

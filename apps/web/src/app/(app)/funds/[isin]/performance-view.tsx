@@ -1,16 +1,18 @@
 "use client";
 
-import { useCallback, useState } from "react";
+import { useCallback, useState, type FormEvent } from "react";
 
 import { AlertMessage } from "@/components/alert-message";
 import { useFundProfile } from "@/components/fund/fund-shell";
-import { Absent, ResourceGate } from "@/components/company/primitives";
+import { Absent, ResourceGate, SourceLink, Stat } from "@/components/company/primitives";
 import { Blueprint, PanelHeading } from "@/components/ui/blueprint";
 import { getBrowserApiClient } from "@/lib/api/client";
-import { toNumber } from "@/lib/company/company";
+import { formatFigure, toNumber } from "@/lib/company/company";
 import { formatDate } from "@/lib/format";
-import { pct, signedPct, type PerformanceView, type PeriodReturn } from "@/lib/fundresearch/fund-research";
+import { BENCHMARK_BASIS_OPTIONS, parseNavLines, pct, signedPct, type PerformanceView, type PeriodReturn } from "@/lib/fundresearch/fund-research";
 import { useApiResource } from "@/lib/hooks/use-api-resource";
+
+import { RecordFactsForm } from "./record-facts-form";
 
 function Chart({ v }: { v: PerformanceView }) {
   const pts = v.series;
@@ -80,6 +82,168 @@ function DifferenceCell({ p }: { p: PeriodReturn }) {
   return p.compared_on === null && !p.note ? <span className="text-text-muted">—</span> : <Absent reason={p.note ? `n/m: ${p.note}` : "n/m: no same-basis return"} />;
 }
 
+function NavForm({ isin, currency: defaultCurrency, onSaved }: { isin: string; currency: string | null; onSaved: () => void }) {
+  const [asOf, setAsOf] = useState("");
+  const [nav, setNav] = useState("");
+  const [pasted, setPasted] = useState("");
+  const [currency, setCurrency] = useState(defaultCurrency ?? "");
+  const [sourceUrl, setSourceUrl] = useState("");
+  const [error, setError] = useState<string | null>(null);
+  const [saved, setSaved] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+
+  async function submit(e: FormEvent) {
+    e.preventDefault();
+    setSaved(null);
+    const rows: { as_of: string; nav: string }[] = [];
+    if (asOf || nav.trim()) {
+      const one = parseNavLines(`${asOf},${nav.trim()}`);
+      if (one.bad.length > 0) return setError("Enter a date and a NAV above zero, for example 24.31.");
+      rows.push(...one.rows);
+    }
+    const many = parseNavLines(pasted);
+    if (many.bad.length > 0) return setError(`These lines are not in the form YYYY-MM-DD,value: ${many.bad.slice(0, 3).join("; ")}${many.bad.length > 3 ? "…" : ""}`);
+    rows.push(...many.rows);
+    if (rows.length === 0) return setError("Enter at least one date and NAV.");
+    const code = currency.trim().toUpperCase();
+    if (!/^[A-Z]{3}$/.test(code)) return setError("The NAV currency is a three-letter code such as EUR.");
+    if (!/^https?:\/\//.test(sourceUrl.trim())) return setError("A source is required: paste the web address of the issuer page that publishes the NAV.");
+    setError(null);
+    setBusy(true);
+    const { error: err } = await getBrowserApiClient().PUT("/funds/{isin}/nav", {
+      params: { path: { isin } },
+      body: rows.map((r) => ({ as_of: r.as_of, nav: r.nav, currency: code, source_url: sourceUrl.trim() })),
+    });
+    setBusy(false);
+    if (err) return setError("The NAV could not be saved. Check the dates, values and address.");
+    setSaved(`Saved ${rows.length} NAV ${rows.length === 1 ? "point" : "points"}.`);
+    setAsOf("");
+    setNav("");
+    setPasted("");
+    onSaved();
+  }
+
+  return (
+    <form onSubmit={submit} className="grid gap-3 sm:grid-cols-4">
+      <label className="text-sm">
+        <span className="mb-1 block text-xs text-text-muted">NAV date</span>
+        <input type="date" value={asOf} onChange={(e) => setAsOf(e.target.value)} className="w-full border border-border bg-surface px-2 py-1.5" />
+      </label>
+      <label className="text-sm">
+        <span className="mb-1 block text-xs text-text-muted">NAV per share</span>
+        <input value={nav} onChange={(e) => setNav(e.target.value)} inputMode="decimal" className="num w-full border border-border bg-surface px-2 py-1.5" />
+      </label>
+      <label className="text-sm">
+        <span className="mb-1 block text-xs text-text-muted">NAV currency</span>
+        <input value={currency} onChange={(e) => setCurrency(e.target.value.toUpperCase())} maxLength={3} className="w-full border border-border bg-surface px-2 py-1.5" />
+      </label>
+      <label className="text-sm sm:col-span-4">
+        <span className="mb-1 block text-xs text-text-muted">Source (web address of the issuer page that publishes the NAV)</span>
+        <input value={sourceUrl} onChange={(e) => setSourceUrl(e.target.value)} className="w-full border border-border bg-surface px-2 py-1.5 font-mono text-xs" />
+      </label>
+      <label className="text-sm sm:col-span-4">
+        <span className="mb-1 block text-xs text-text-muted">Or paste several points, one per line as YYYY-MM-DD,value (they share the currency and source above)</span>
+        <textarea value={pasted} onChange={(e) => setPasted(e.target.value)} rows={3} className="num w-full border border-border bg-surface px-2 py-1.5 font-mono text-xs" />
+      </label>
+      <div className="flex items-center gap-3 sm:col-span-4">
+        <button type="submit" disabled={busy} className="border border-accent px-4 py-1.5 text-sm font-semibold hover:bg-surface-sunken disabled:opacity-50">Save NAV</button>
+        {error ? <p role="alert" className="text-sm text-loss">{error}</p> : null}
+        {saved ? <p role="status" className="text-sm text-text-muted">{saved}</p> : null}
+      </div>
+    </form>
+  );
+}
+
+function NavPanel({ isin, v, onSaved }: { isin: string; v: PerformanceView; onSaved: () => void }) {
+  const nav = v.nav;
+  return (
+    <Blueprint aria-labelledby="fp-nav" className="space-y-4 px-[22px] py-5">
+      <PanelHeading
+        kicker={nav && nav.count > 0 ? `${nav.count} NAV ${nav.count === 1 ? "point" : "points"} you entered from the issuer` : "No NAV entered yet"}
+        title={<span id="fp-nav">Premium or discount to NAV</span>}
+      />
+      <p className="max-w-[72ch] text-xs text-text-muted">
+        Premium is the listing close divided by the NAV, minus 1; a positive figure means the listing traded above NAV. No data provider supplies NAV, so these points are only what you record from the issuer&apos;s own page.
+      </p>
+      {nav && nav.count > 0 ? (
+        <>
+          <dl className="grid grid-cols-2 gap-x-6 gap-y-4 sm:grid-cols-4">
+            <Stat label="Latest premium" note="listing close against NAV, same date">{signedPct(nav.latest_premium) ?? <Absent reason="missing: no entered date has a listing close" />}</Stat>
+            <Stat label="Average gap" note="mean of absolute premiums">{pct(nav.mean_abs_premium) ?? <Absent reason="missing: no premium could be computed" />}</Stat>
+            <Stat label="Largest gap" note="largest absolute premium">{pct(nav.max_abs_premium) ?? <Absent reason="missing: no premium could be computed" />}</Stat>
+            <Stat
+              label="NAV change"
+              note={nav.nav_change_start && nav.nav_change_end ? `${formatDate(nav.nav_change_start)} to ${formatDate(nav.nav_change_end)}, excludes distributions` : "excludes distributions"}
+            >
+              {signedPct(nav.nav_change) ?? <Absent reason="missing: needs NAV on two different dates" />}
+            </Stat>
+          </dl>
+          {nav.warnings.map((w) => (
+            <AlertMessage key={w} title="Note">{w}</AlertMessage>
+          ))}
+          <div className="overflow-x-auto border border-border">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="bg-surface-sunken text-right">
+                  <th scope="col" className="px-3 py-1.5 text-left font-medium">NAV date</th>
+                  <th scope="col" className="px-2 py-1.5 font-medium">NAV</th>
+                  <th scope="col" className="px-2 py-1.5 font-medium">Listing close</th>
+                  <th scope="col" className="px-2 py-1.5 font-medium">Premium</th>
+                  <th scope="col" className="px-2 py-1.5 text-left font-medium">Source</th>
+                </tr>
+              </thead>
+              <tbody>
+                {nav.points.map((p) => (
+                  <tr key={p.as_of} className="border-t border-border-soft align-top">
+                    <th scope="row" className="px-3 py-1.5 text-left font-normal">{formatDate(p.as_of)}</th>
+                    <td className="num px-2 py-1.5 text-right">{formatFigure(p.nav, "per_share")} {p.currency}</td>
+                    <td className="num px-2 py-1.5 text-right">
+                      {p.listing_close !== null && p.listing_close !== undefined ? (
+                        <>
+                          {formatFigure(p.listing_close, "per_share")}
+                          {p.listing_date && p.listing_date !== p.as_of ? <span className="block text-[11px] text-text-muted">on {formatDate(p.listing_date)}</span> : null}
+                        </>
+                      ) : (
+                        <span className="text-text-muted">—</span>
+                      )}
+                    </td>
+                    <td className="num px-2 py-1.5 text-right">{signedPct(p.premium) ?? <Absent reason={`missing: ${p.reason ?? "no listing close on or near this date"}`} />}</td>
+                    <td className="px-2 py-1.5 text-left"><SourceLink href={p.source_url}>issuer page</SourceLink></td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </>
+      ) : null}
+      <NavForm key={v.price_currency ?? "none"} isin={isin} currency={v.price_currency} onSaved={onSaved} />
+      <p className="text-xs text-text-muted">{v.nav_note}</p>
+    </Blueprint>
+  );
+}
+
+function BenchmarkPanel({ isin, v, onSaved }: { isin: string; v: PerformanceView; onSaved: () => void }) {
+  return (
+    <Blueprint aria-labelledby="fp-bench" className="space-y-3 px-[22px] py-5">
+      <PanelHeading kicker="Used for the tracking difference" title={<span id="fp-bench">Record the fund&apos;s benchmark</span>} />
+      <p className="max-w-[72ch] text-sm text-text-muted">
+        {v.benchmark ? `${v.benchmark.label}: ${v.benchmark.note}` : "No benchmark is recorded for this fund. The benchmark can come from the facts you record here, with a source, or from the factsheet."}
+      </p>
+      <RecordFactsForm
+        isin={isin}
+        submitLabel="Record benchmark"
+        onSaved={onSaved}
+        fields={[
+          { key: "benchmark_symbol", options: v.benchmark_options.map((o) => [o.symbol, `${o.label} (${o.symbol})`] as const) },
+          { key: "benchmark_basis", options: BENCHMARK_BASIS_OPTIONS },
+          { key: "benchmark_currency", hint: "Three letters, such as USD" },
+        ]}
+      />
+      <p className="text-xs text-text-muted">The basis matters: a difference is shown only when the fund and the index are on the same basis and in the same currency.</p>
+    </Blueprint>
+  );
+}
+
 export function PerformanceTab({ isin }: { isin: string }) {
   const profile = useFundProfile();
   const listings = profile.kind === "ok" ? profile.data.identity.listings.filter((l) => l.has_prices) : [];
@@ -90,7 +254,7 @@ export function PerformanceTab({ isin }: { isin: string }) {
     () => getBrowserApiClient().GET("/funds/{isin}/performance", { params: { path: { isin }, query: { ...(ticker ? { ticker } : {}), ...(benchmark ? { benchmark } : {}) } } }),
     [isin, ticker, benchmark],
   );
-  const { state } = useApiResource(fetcher);
+  const { state, reload } = useApiResource(fetcher);
 
   return (
     <ResourceGate state={state} label="performance">
@@ -200,6 +364,8 @@ export function PerformanceTab({ isin }: { isin: string }) {
               </Blueprint>
             </>
           )}
+          <NavPanel isin={isin} v={v} onSaved={reload} />
+          <BenchmarkPanel isin={isin} v={v} onSaved={reload} />
         </div>
       )}
     </ResourceGate>

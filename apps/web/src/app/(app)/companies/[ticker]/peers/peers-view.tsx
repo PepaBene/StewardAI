@@ -100,6 +100,54 @@ function IndexChart({ data }: { data: PeerCompare }) {
   );
 }
 
+const COMPACT = new Intl.NumberFormat("en-GB", { notation: "compact", maximumFractionDigits: 1 });
+const BASES = ["USD", "EUR", "GBP", "CHF", "CZK", "JPY"] as const;
+
+/** Size figures in one currency, so the companies can be read against each other. A missing rate leaves the cell empty with its reason. */
+function SizeTable({ data }: { data: PeerCompare }) {
+  const sizeRows = data.size_rows ?? [];
+  if (!data.base_currency || sizeRows.length === 0) return null;
+  return (
+    <div className="space-y-2">
+      <p className="text-sm font-medium">Size, latest fiscal year, in {data.base_currency}</p>
+      <div className="overflow-x-auto border border-border">
+        <table className="w-full border-collapse text-sm">
+          <thead>
+            <tr className="bg-surface-sunken">
+              <th scope="col" className="sticky left-0 min-w-48 bg-surface-sunken px-3 py-1.5 text-left font-medium">Figure</th>
+              {data.companies.map((c) => (
+                <th key={c.ticker} scope="col" className={cn("px-2 py-1.5 text-right font-medium", c.is_subject && "text-accent-ink")}>
+                  {c.ticker}
+                </th>
+              ))}
+              <th scope="col" className="px-2 py-1.5 text-right font-medium">Median</th>
+            </tr>
+          </thead>
+          <tbody>
+            {sizeRows.map((r) => (
+              <tr key={r.id} className="border-t border-border-soft">
+                <th scope="row" className="sticky left-0 bg-surface px-3 py-1 text-left font-normal">{r.label}</th>
+                {data.companies.map((c) => {
+                  const cell = r.cells[c.ticker];
+                  const n = cell ? toNumber(cell.value) : null;
+                  return (
+                    <td key={c.ticker} className={cn("num px-2 py-1 text-right", c.is_subject && "font-semibold")}>
+                      {n !== null ? COMPACT.format(n) : <Absent reason={cell?.reason ?? "missing: no data"} />}
+                    </td>
+                  );
+                })}
+                <td className="num px-2 py-1 text-right">
+                  {toNumber(r.median) !== null ? COMPACT.format(toNumber(r.median) as number) : <Absent reason={r.withheld_reason ?? "peer median withheld"} />}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
 function GroupForm({ ticker, onSaved }: { ticker: string; onSaved: () => void }) {
   const [name, setName] = useState("");
   const [peers, setPeers] = useState("");
@@ -151,6 +199,8 @@ export function PeersView({ ticker }: { ticker: string }) {
   const [scope, setScope] = useState<Scope>("confirmed");
   const [groupId, setGroupId] = useState<number | null>(null);
   const [indexMetric, setIndexMetric] = useState<IndexMetric>("revenue");
+  const [baseCurrency, setBaseCurrency] = useState("");
+  const [fxRates, setFxRates] = useState<"period_end" | "average">("period_end");
 
   const groupsFetcher = useCallback(() => getBrowserApiClient().GET("/companies/{ticker}/peer-groups", { params: { path: { ticker } } }), [ticker]);
   const { state: groups, reload: reloadGroups } = useApiResource(groupsFetcher);
@@ -159,9 +209,17 @@ export function PeersView({ ticker }: { ticker: string }) {
   const fetcher = useCallback(
     () =>
       getBrowserApiClient().GET("/companies/{ticker}/peers", {
-        params: { path: { ticker }, query: { scope, index_metric: indexMetric, ...(scope === "group" && groupId !== null ? { group_id: groupId } : {}) } },
+        params: {
+          path: { ticker },
+          query: {
+            scope,
+            index_metric: indexMetric,
+            ...(scope === "group" && groupId !== null ? { group_id: groupId } : {}),
+            ...(baseCurrency ? { base_currency: baseCurrency, fx_rates: fxRates } : {}),
+          },
+        },
       }),
-    [ticker, scope, groupId, indexMetric],
+    [ticker, scope, groupId, indexMetric, baseCurrency, fxRates],
   );
   const { state } = useApiResource(fetcher);
 
@@ -208,6 +266,26 @@ export function PeersView({ ticker }: { ticker: string }) {
               ))}
             </select>
           </label>
+          <label className="text-sm">
+            <span className="mb-1 block text-xs text-text-muted">Compare sizes in</span>
+            <select value={baseCurrency} onChange={(e) => setBaseCurrency(e.target.value)} className="border border-border bg-surface px-2 py-1.5">
+              <option value="">Each company&apos;s own currency</option>
+              {BASES.map((c) => (
+                <option key={c} value={c}>
+                  {c}
+                </option>
+              ))}
+            </select>
+          </label>
+          {baseCurrency ? (
+            <label className="text-sm">
+              <span className="mb-1 block text-xs text-text-muted">Exchange rate</span>
+              <select value={fxRates} onChange={(e) => setFxRates(e.target.value as "period_end" | "average")} className="border border-border bg-surface px-2 py-1.5">
+                <option value="period_end">Period end</option>
+                <option value="average">Period average</option>
+              </select>
+            </label>
+          ) : null}
         </div>
         <details className="text-sm">
           <summary className="cursor-pointer text-accent-ink">Save your own peer group{saved.length ? ` (${saved.length} saved)` : ""}</summary>
@@ -292,7 +370,11 @@ export function PeersView({ ticker }: { ticker: string }) {
                   </table>
                 </div>
               )}
-              <p className="text-xs text-text-muted">Method {data.method_version}. A median needs at least five comparable peers. Figures stay in each company&apos;s own currency; ratios are currency-free.</p>
+              <SizeTable data={data} />
+              <p className="text-xs text-text-muted">
+                Method {data.method_version}. A median needs at least five comparable peers. Ratios are currency-free.{" "}
+                {data.base_currency ? `Size figures and the growth chart are converted to ${data.base_currency}.` : "Size figures stay in each company's own currency."}
+              </p>
             </Blueprint>
             <Blueprint aria-labelledby="peers-index" className="space-y-3 px-[22px] py-5">
               <PanelHeading kicker="Each company's first year = 100" title={<span id="peers-index">Growth since the first comparable year</span>} />

@@ -6,7 +6,7 @@ import { ResourceGate, SourceLink } from "@/components/company/primitives";
 import { Blueprint, PanelHeading } from "@/components/ui/blueprint";
 import { getBrowserApiClient } from "@/lib/api/client";
 import { formatDate } from "@/lib/format";
-import { FACT_LABEL, REPLICATION_OPTIONS, STATUS_LABEL, STATUS_RANK, type Checklist, type Criterion, type FundFact } from "@/lib/fundresearch/fund-research";
+import { BENCHMARK_BASIS_OPTIONS, FACT_LABEL, REPLICATION_OPTIONS, checkFactValue, isNumericFact, STATUS_LABEL, STATUS_RANK, type Checklist, type Criterion, type FundFact } from "@/lib/fundresearch/fund-research";
 import { useApiResource } from "@/lib/hooks/use-api-resource";
 import { cn } from "@/lib/utils";
 
@@ -44,12 +44,13 @@ function FactForm({ isin, onSaved }: { isin: string; onSaved: () => void }) {
 
   async function submit(e: FormEvent) {
     e.preventDefault();
-    if (!value.trim()) return setError("Enter the value.");
+    const checked = checkFactValue(key, value);
+    if ("error" in checked) return setError(checked.error);
     if (!/^https?:\/\//.test(sourceUrl.trim())) return setError("A source is required: paste the web address of the document that states it.");
     setError(null);
     const { error: err } = await getBrowserApiClient().PUT("/funds/{isin}/facts", {
       params: { path: { isin } },
-      body: { key, value: value.trim(), source_url: sourceUrl.trim(), passage: passage.trim() || null, as_of: asOf || null },
+      body: { key, value: checked.value, source_url: sourceUrl.trim(), passage: passage.trim() || null, as_of: asOf || null },
     });
     if (err) return setError("The fact could not be saved. Check the value and the address.");
     setSourceUrl("");
@@ -65,7 +66,7 @@ function FactForm({ isin, onSaved }: { isin: string; onSaved: () => void }) {
           value={key}
           onChange={(e) => {
             setKey(e.target.value);
-            setValue(e.target.value === "replication_method" ? "physical_full" : "");
+            setValue(e.target.value === "replication_method" ? "physical_full" : e.target.value === "benchmark_basis" ? "price" : "");
           }}
           className="w-full border border-border bg-surface px-2 py-1.5"
         >
@@ -82,8 +83,20 @@ function FactForm({ isin, onSaved }: { isin: string; onSaved: () => void }) {
               <option key={v} value={v}>{t}</option>
             ))}
           </select>
+        ) : key === "benchmark_basis" ? (
+          <select value={value} onChange={(e) => setValue(e.target.value)} className="w-full border border-border bg-surface px-2 py-1.5">
+            {BENCHMARK_BASIS_OPTIONS.map(([v, t]) => (
+              <option key={v} value={v}>{t}</option>
+            ))}
+          </select>
         ) : (
-          <input value={value} onChange={(e) => setValue(e.target.value)} className="w-full border border-border bg-surface px-2 py-1.5" />
+          <input
+            value={value}
+            onChange={(e) => setValue(key === "benchmark_currency" ? e.target.value.toUpperCase() : e.target.value)}
+            inputMode={isNumericFact(key) ? "decimal" : undefined}
+            maxLength={key === "benchmark_currency" ? 3 : undefined}
+            className="w-full border border-border bg-surface px-2 py-1.5"
+          />
         )}
       </label>
       <label className="text-sm sm:col-span-2">

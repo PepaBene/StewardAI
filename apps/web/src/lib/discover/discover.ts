@@ -12,6 +12,9 @@ export type ApiFilter = Schemas["DiscoverFilter"];
 export type Baseline = Schemas["Baseline"];
 export type ScreenSummary = Schemas["ScreenSummary"];
 export type ColumnSet = Schemas["ColumnSet"];
+export type BacktestResponse = Schemas["BacktestResponse"];
+export type BacktestPeriod = Schemas["BacktestPeriod"];
+export type BacktestRequest = Schemas["BacktestRequest"];
 
 export type Kind = "stock" | "fund";
 export type UniverseId = StockRequest["universe"];

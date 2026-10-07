@@ -5,10 +5,10 @@ import { useCallback, useMemo, useState } from "react";
 
 import { Absent, ResourceGate } from "@/components/company/primitives";
 import { PageHeader } from "@/components/page-header";
-import { Blueprint } from "@/components/ui/blueprint";
+import { Blueprint, PanelHeading } from "@/components/ui/blueprint";
 import { getBrowserApiClient } from "@/lib/api/client";
 import { formatDate } from "@/lib/format";
-import { compareHref, fundHref, lagDays, money, pct, type CatalogRow } from "@/lib/fundresearch/fund-research";
+import { compareHref, fundHref, lagDays, money, pct, type CatalogRow, type SavedComparison } from "@/lib/fundresearch/fund-research";
 import { useApiResource } from "@/lib/hooks/use-api-resource";
 import { cn } from "@/lib/utils";
 
@@ -40,6 +40,7 @@ export function ResearchView() {
           )
         }
       />
+      <SavedComparisons />
       <Blueprint className="space-y-3 px-[22px] py-5">
         <label className="block max-w-sm text-sm">
           <span className="mb-1 block text-xs text-text-muted">Find a fund by name, ISIN or ticker</span>
@@ -50,6 +51,43 @@ export function ResearchView() {
         </ResourceGate>
       </Blueprint>
     </div>
+  );
+}
+
+function SavedComparisons() {
+  const fetcher = useCallback(() => getBrowserApiClient().GET("/fund-comparisons"), []);
+  const { state, reload } = useApiResource(fetcher);
+  const [error, setError] = useState<string | null>(null);
+
+  async function archive(id: number) {
+    setError(null);
+    const { error: err } = await getBrowserApiClient().DELETE("/fund-comparisons/{comparison_id}", { params: { path: { comparison_id: id } } });
+    if (err) return setError("The comparison could not be archived.");
+    reload();
+  }
+
+  return (
+    <ResourceGate state={state} label="saved comparisons">
+      {(rows: SavedComparison[]) =>
+        rows.length === 0 ? null : (
+          <Blueprint aria-labelledby="fr-saved" className="space-y-3 px-[22px] py-5">
+            <PanelHeading kicker="Reopen a set of funds; the figures are recomputed each time" title={<span id="fr-saved">Saved comparisons</span>} />
+            {error ? <p role="alert" className="text-sm text-loss">{error}</p> : null}
+            <ul className="divide-y divide-border-soft text-sm">
+              {rows.map((c) => (
+                <li key={c.id} className="flex flex-wrap items-baseline gap-x-4 gap-y-1 py-1.5">
+                  <Link href={compareHref(c.isins)} className="font-medium text-accent-ink hover:underline">{c.name}</Link>
+                  <span className="font-mono text-[11px] text-text-muted">{c.isins.join(", ")}</span>
+                  {c.note ? <span className="text-xs text-text-muted">{c.note}</span> : null}
+                  <span className="ml-auto text-xs text-text-muted">saved {formatDate(c.created_at)}</span>
+                  <button type="button" onClick={() => archive(c.id)} className="border border-border px-2 py-0.5 text-xs hover:border-accent">Archive</button>
+                </li>
+              ))}
+            </ul>
+          </Blueprint>
+        )
+      }
+    </ResourceGate>
   );
 }
 

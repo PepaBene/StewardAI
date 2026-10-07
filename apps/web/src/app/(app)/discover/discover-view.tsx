@@ -1,6 +1,7 @@
 "use client";
 
 import { LoaderCircleIcon, PlayIcon, SnowflakeIcon } from "lucide-react";
+import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
 
 import { AlertMessage } from "@/components/alert-message";
@@ -32,6 +33,7 @@ import { cn } from "@/lib/utils";
 
 import { CompareTray } from "./compare-tray";
 import { FilterBuilder, SELECT } from "./filter-builder";
+import { ProviderPanel } from "./provider-panel";
 import { ResultsPanel } from "./results-panel";
 import { SavedScreens } from "./saved-screens";
 
@@ -82,7 +84,19 @@ export function DiscoverView() {
   const [notice, setNotice] = useState<string | null>(null);
 
   const api = getBrowserApiClient();
-  const metrics = useMemo(() => catalogue?.metrics ?? [], [catalogue]);
+  const [basic, setBasic] = useState(false);
+  const allMetrics = useMemo(() => catalogue?.metrics ?? [], [catalogue]);
+  // The basic screen hides every metric that depends on an optional provider key.
+  const metrics = useMemo(() => (basic ? allMetrics.filter((m) => !m.needs_provider) : allMetrics), [basic, allMetrics]);
+  const chooseBasic = (next: boolean) => {
+    setBasic(next);
+    if (next) {
+      const keyFree = new Set(allMetrics.filter((m) => !m.needs_provider).map((m) => m.id));
+      setDrafts((cur) => cur.filter((d) => keyFree.has(d.metric)));
+      setColumns((cur) => cur.filter((c) => keyFree.has(c)));
+      setSortBy((cur) => (keyFree.has(cur) ? cur : ""));
+    }
+  };
 
   // Catalogue: definitions, enabled state and coverage, reloaded per kind and data date.
   useEffect(() => {
@@ -427,6 +441,8 @@ export function DiscoverView() {
           </p>
         ) : null}
 
+        {catalogue ? <ProviderPanel catalogue={catalogue} basic={basic} onBasic={chooseBasic} /> : null}
+
         {catalogue ? (
           <FilterBuilder catalogue={metrics} drafts={drafts} onChange={setDrafts} nextId={() => nextId.current++} />
         ) : null}
@@ -511,6 +527,15 @@ export function DiscoverView() {
           {run.kind === "running" ? <LoaderCircleIcon aria-hidden="true" className="animate-spin" /> : <PlayIcon aria-hidden="true" />}
           Run screen
         </Button>
+        {kind === "stock" ? (
+          <p className="text-xs text-text-muted">
+            Want to see how a rule would have done?{" "}
+            <Link href="/discover/backtest" className="text-accent-ink hover:underline">
+              Test a screen on the past
+            </Link>
+            .
+          </p>
+        ) : null}
 
         <details className="border-t border-border pt-3" open={screens.length > 0 || columnSets.length > 0}>
           <summary className="cursor-pointer text-sm font-medium text-accent-ink hover:underline">Saved screens and column sets</summary>

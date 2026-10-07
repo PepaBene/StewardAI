@@ -20,10 +20,13 @@ import {
   type FundProfile,
   type HoldingsView,
   type ProfileField,
+  type RateBucket,
   type StyleView,
 } from "@/lib/fundresearch/fund-research";
 import { useApiResource } from "@/lib/hooks/use-api-resource";
 import { cn } from "@/lib/utils";
+
+import { RecordFactsForm } from "./record-facts-form";
 
 export { ChecklistTab } from "./checklist-view";
 export { PerformanceTab } from "./performance-view";
@@ -342,9 +345,49 @@ export function StyleTab({ isin }: { isin: string }) {
   );
 }
 
+/** Where a maturity or duration figure came from, so a figure you recorded is never mistaken for a computed one. */
+function resultOrigin(r: BondView["duration"]): string | undefined {
+  if (r.value === null || r.value === undefined) return undefined;
+  if ((r.sources ?? []).some((s) => s.kind === "owner_input")) return "Recorded by you, from the source below";
+  if ((r.warnings ?? []).some((w) => w.startsWith("DV01-implied"))) return "Implied from the filing's DV01, not stated by the issuer";
+  return undefined;
+}
+
+function resultText(r: BondView["duration"]): string {
+  const n = toNumber(r.value);
+  if (n === null) return String(r.value);
+  const unit = r.unit && r.unit !== "number" ? ` ${r.unit}` : "";
+  return `${n.toFixed(2)}${unit}`;
+}
+
+function sensitivity(v: number | string | null | undefined): string | null {
+  const n = toNumber(v);
+  return n === null ? null : n.toLocaleString("en-GB", { maximumFractionDigits: 2 });
+}
+
+function RateBucketBars({ buckets }: { buckets: readonly RateBucket[] }) {
+  const max = Math.max(...buckets.map((b) => Math.abs(toNumber(b.years) ?? 0)), 0.0001);
+  return (
+    <ul aria-label="Duration by key rate" className="space-y-1.5 text-sm">
+      {buckets.map((b) => {
+        const y = toNumber(b.years);
+        return (
+          <li key={b.label} className="grid grid-cols-[minmax(4rem,7rem)_1fr_4.5rem] items-center gap-3">
+            <span>{b.label}</span>
+            <span className="h-2 bg-border-soft" aria-hidden="true">
+              <span className="block h-full bg-chart-line" style={{ width: `${y === null ? 0 : Math.max(1, (Math.abs(y) / max) * 100)}%` }} />
+            </span>
+            <span className="num text-right text-xs">{y === null ? <Absent reason="missing: not reported" /> : `${y.toFixed(2)} yr`}</span>
+          </li>
+        );
+      })}
+    </ul>
+  );
+}
+
 export function BondTab({ isin }: { isin: string }) {
   const fetcher = useCallback(() => getBrowserApiClient().GET("/funds/{isin}/bond", { params: { path: { isin } } }), [isin]);
-  const { state } = useApiResource(fetcher);
+  const { state, reload } = useApiResource(fetcher);
   return (
     <ResourceGate state={state} label="bond characteristics">
       {(v: BondView) => (
@@ -354,11 +397,22 @@ export function BondTab({ isin }: { isin: string }) {
             <p className="max-w-[72ch] text-sm text-text-muted">{v.applicability_reason}</p>
             <dl className="grid gap-4 sm:grid-cols-3">
               {([["Weighted maturity", v.weighted_maturity], ["Duration", v.duration], ["Credit quality", v.credit_quality]] as const).map(([label, r]) => (
-                <Stat key={label} label={label} note={r.warnings?.[0]}>
-                  {r.value === null || r.value === undefined ? <Absent reason="missing: the stored holdings do not carry it" /> : String(r.value)}
+                <Stat key={label} label={label} note={resultOrigin(r)}>
+                  {r.value === null || r.value === undefined ? <Absent reason="missing: neither the stored holdings nor a fact you recorded carry it" /> : resultText(r)}
                 </Stat>
               ))}
             </dl>
+            <ul className="space-y-1 text-xs text-text-muted">
+              {([["Weighted maturity", v.weighted_maturity], ["Duration", v.duration], ["Credit quality", v.credit_quality]] as const).flatMap(([label, r]) => [
+                ...(r.warnings ?? []).map((w) => <li key={`${label}-${w}`}>{label}: {w}</li>),
+                ...(r.sources ?? []).map((s) => (
+                  <li key={`${label}-${s.kind}-${s.ref}`}>
+                    {label} source: {s.kind === "owner_input" ? "recorded by you" : s.kind.replace(/_/g, " ")}, {s.ref}
+                    {s.url ? <> <SourceLink href={s.url}>document</SourceLink></> : null}
+                  </li>
+                )),
+              ])}
+            </ul>
           </Blueprint>
           <div className="grid gap-5 lg:grid-cols-2">
             <Blueprint aria-labelledby="fb-stated" className="space-y-3 px-[22px] py-5">
@@ -381,6 +435,63 @@ export function BondTab({ isin }: { isin: string }) {
               )}
             </Blueprint>
           </div>
+          {(v.rate_buckets ?? []).length > 0 || (v.credit_spread ?? []).length > 0 ? (
+            <div className="grid gap-5 lg:grid-cols-2">
+              {(v.rate_buckets ?? []).length > 0 ? (
+                <Blueprint aria-labelledby="fb-rate" className="space-y-3 px-[22px] py-5">
+                  <PanelHeading kicker="Duration contributed by each key rate, from the filing's DV01" title={<span id="fb-rate">Interest-rate sensitivity</span>} />
+                  <RateBucketBars buckets={v.rate_buckets ?? []} />
+                  <p className="text-xs text-text-muted">Each bar is the part of the duration, in years, that comes from that point on the yield curve. Together they make the DV01-implied duration.</p>
+                </Blueprint>
+              ) : null}
+              {(v.credit_spread ?? []).length > 0 ? (
+                <Blueprint aria-labelledby="fb-spread" className="space-y-3 px-[22px] py-5">
+                  <PanelHeading kicker="A sensitivity, not a share of holdings" title={<span id="fb-spread">Credit-spread sensitivity</span>} />
+                  <div className="overflow-x-auto border border-border">
+                    <table className="w-full text-sm">
+                      <thead>
+                        <tr className="bg-surface-sunken text-right">
+                          <th scope="col" className="px-3 py-1.5 text-left font-medium">Spread move</th>
+                          <th scope="col" className="px-2 py-1.5 font-medium">Investment grade</th>
+                          <th scope="col" className="px-2 py-1.5 font-medium">Below investment grade</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {(v.credit_spread ?? []).map((s) => (
+                          <tr key={s.label} className="border-t border-border-soft">
+                            <th scope="row" className="px-3 py-1 text-left font-normal">{s.label}</th>
+                            <td className="num px-2 py-1 text-right">{sensitivity(s.investment_grade) ?? <Absent reason="missing: not reported in the filing" />}</td>
+                            <td className="num px-2 py-1 text-right">{sensitivity(s.non_investment_grade) ?? <Absent reason="missing: not reported in the filing" />}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                  <p className="text-xs text-text-muted">These figures show how much value the filing says the portfolio moves for a change in credit spreads, in the filing&apos;s own units. They do not say how much of the fund is investment grade.</p>
+                </Blueprint>
+              ) : null}
+            </div>
+          ) : null}
+          {v.credit_note ? (
+            <Blueprint aria-labelledby="fb-note" className="space-y-2 px-[22px] py-5">
+              <PanelHeading kicker="Recorded by you, with its source" title={<span id="fb-note">Credit quality note</span>} />
+              <p className="max-w-[72ch] text-sm">{v.credit_note}</p>
+            </Blueprint>
+          ) : null}
+          <Blueprint aria-labelledby="fb-record" className="space-y-3 px-[22px] py-5">
+            <PanelHeading kicker="Not in the stored data; you record it with a source" title={<span id="fb-record">Record maturity, duration or credit quality</span>} />
+            <RecordFactsForm
+              isin={isin}
+              submitLabel="Record"
+              onSaved={reload}
+              fields={[
+                { key: "average_maturity_years", hint: "In years, zero or more" },
+                { key: "effective_duration_years", hint: "In years, zero or more" },
+                { key: "credit_quality_note" },
+              ]}
+            />
+            <p className="text-xs text-text-muted">A figure you record is shown with its source and replaces a DV01-implied duration. Fill in only what the document states.</p>
+          </Blueprint>
           {v.warnings.map((w) => (
             <p key={w} className="text-xs text-text-muted">{w}</p>
           ))}

@@ -56,6 +56,8 @@ const PRIMARY_PAGES = [
   { href: "/holdings", label: "Holdings", keywords: "positions ticker thesis verdicts news evidence" },
   { href: "/news", label: "News", keywords: "feed severity confidence source tier" },
   { href: "/screens", label: "Screens", keywords: "screener filter margin roic growth leverage cash conversion find issuers" },
+  { href: "/discover", label: "Discover", keywords: "screener screen stocks funds filters backtest universe saved screens providers" },
+  { href: "/funds/research", label: "Fund research", keywords: "etf fund compare saved comparison holdings style performance bond checklist nav premium benchmark" },
   { href: "/macro", label: "Macro series", keywords: "inflation gdp rates indicators revisions vintage country small multiples" },
   { href: "/research", label: "Research", keywords: "reports research this ticker" },
   { href: "/reports", label: "Reports", keywords: "digest archive monthly reviews impact notes full text" },

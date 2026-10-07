@@ -21,6 +21,17 @@ export type CaseView = Schemas["CaseView"];
 export type CaseItem = Schemas["CaseItem"];
 export type CaseItemIn = Schemas["CaseItemIn"];
 export type PeerGroup = Schemas["PeerGroup"];
+export type Rubric = Schemas["Rubric"];
+export type RubricComponent = Schemas["Component"];
+export type RubricIndicator = Schemas["Indicator"];
+export type SegmentAnalysis = Schemas["SegmentAnalysis"];
+export type SegmentBreakdown = Schemas["Breakdown"];
+export type SegmentMapIn = Schemas["MapIn"];
+/** The (label, share) pairs are typed as tuples in one response and arrays in another; accept both. */
+export type CompanyReport = Omit<Schemas["CompanyReport"], "segments"> & {
+  segments: { breakdown: string; period: string | null; lines: readonly (readonly (string | number | null)[])[]; note?: string | null }[];
+};
+export type ReportVersionSummary = Schemas["ReportVersionSummary"];
 
 export type Num = string | number | null | undefined;
 
@@ -36,12 +47,15 @@ export const TABS = [
   { slug: "financials", label: "Financials" },
   { slug: "ratios", label: "Ratios" },
   { slug: "peers", label: "Peers" },
+  { slug: "segments", label: "Segments" },
+  { slug: "assessment", label: "Assessment" },
   { slug: "valuation", label: "Valuation" },
   { slug: "allocation", label: "Capital allocation" },
   { slug: "estimates", label: "Estimates" },
   { slug: "network", label: "Network and patents" },
   { slug: "governance", label: "Governance" },
   { slug: "case", label: "Investment case" },
+  { slug: "report", label: "Report" },
 ] as const;
 
 export function companyHref(ticker: string, slug = ""): string {

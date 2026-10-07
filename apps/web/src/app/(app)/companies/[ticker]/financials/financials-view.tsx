@@ -27,9 +27,13 @@ type Query = {
   units: "1" | "1000" | "1000000";
   transform: "none" | "common_size" | "yoy";
   per_share: boolean;
+  currency?: string;
+  fx_rates: "period_end" | "average";
+  fx_source: "ecb" | "cnb";
 };
 
-const DEFAULTS: Query = { basis: "standardized", frequency: "annual", view: "restated", units: "1000000", transform: "none", per_share: false };
+const DEFAULTS: Query = { basis: "standardized", frequency: "annual", view: "restated", units: "1000000", transform: "none", per_share: false, fx_rates: "period_end", fx_source: "ecb" };
+const CURRENCIES = ["USD", "EUR", "GBP", "CHF", "CZK", "JPY", "CAD", "AUD"] as const;
 
 type Picked = { line: StatementLine; column: StatementColumn; cell: StatementCell };
 
@@ -245,6 +249,27 @@ export function FinancialsView({ ticker }: { ticker: string }) {
           <Choice label="Figures" value={q.view} onChange={(v) => set("view", v)} options={[["restated", "Restated"], ["original", "As first filed"]]} />
           <Choice label="Units" value={q.units} onChange={(v) => set("units", v)} options={[["1", "Units"], ["1000", "Thousands"], ["1000000", "Millions"]]} />
           <Choice label="Show as" value={q.transform} onChange={(v) => set("transform", v)} options={[["none", "Amounts"], ["common_size", "Common-size"], ["yoy", "Year on year"]]} />
+          <label className="text-sm">
+            <span className="mb-1 block text-xs text-text-muted">Currency</span>
+            <select
+              value={q.currency ?? ""}
+              onChange={(e) => set("currency", e.target.value === "" ? undefined : e.target.value)}
+              className="border border-border bg-surface px-2 py-1.5"
+            >
+              <option value="">As filed</option>
+              {CURRENCIES.map((c) => (
+                <option key={c} value={c}>
+                  {c}
+                </option>
+              ))}
+            </select>
+          </label>
+          {q.currency ? (
+            <>
+              <Choice label="Exchange rate" value={q.fx_rates} onChange={(v) => set("fx_rates", v)} options={[["period_end", "Period end"], ["average", "Period average"]]} />
+              <Choice label="Rate source" value={q.fx_source} onChange={(v) => set("fx_source", v)} options={[["ecb", "ECB"], ["cnb", "Czech National Bank"]]} />
+            </>
+          ) : null}
           <label className="flex items-center gap-2 pb-1 text-sm">
             <input type="checkbox" checked={q.per_share} onChange={(e) => set("per_share", e.target.checked)} />
             Per share
@@ -270,7 +295,9 @@ export function FinancialsView({ ticker }: { ticker: string }) {
           <div className={cn("grid items-start gap-5", picked && "xl:grid-cols-[1fr_20rem]")}>
             <Blueprint aria-labelledby="statements-heading" className="space-y-4 px-[22px] py-5">
               <PanelHeading
-                kicker={`${view.basis === "standardized" ? "Standardized" : "As reported"} · ${view.frequency}`}
+                kicker={`${view.basis === "standardized" ? "Standardized" : "As reported"} · ${view.frequency}${
+                  view.native_currency && view.currency && view.native_currency !== view.currency ? ` · filed in ${view.native_currency}, shown in ${view.currency}` : ""
+                }`}
                 title={<span id="statements-heading">Financial statements</span>}
               />
               <p className="text-xs text-text-muted">
