@@ -8,8 +8,9 @@ from __future__ import annotations
 
 import datetime as dt
 import json
-from typing import Annotated, Any
+from typing import Annotated, Any, Literal
 
+import asyncpg
 import httpx
 from fastapi import APIRouter, HTTPException, Query, status
 from pydantic import BaseModel
@@ -173,6 +174,136 @@ class IdentifierSuggestionOut(BaseModel):
     name_only: bool
     ambiguous: bool
     stored: bool
+
+
+class StoredSuggestionOut(BaseModel):
+    id: int
+    provider: str
+    identifier_type: str
+    identifier: str
+    issuer_id: int | None
+    issuer_name: str | None
+    security_id: int | None
+    score: float | None
+    name_only: bool
+    ambiguous: bool
+    match_status: Literal["suggested", "confirmed", "rejected"]
+    decision_note: str | None
+
+
+def _suggestion(row: Any) -> StoredSuggestionOut:
+    evidence = row["evidence"]
+    if isinstance(evidence, str):
+        evidence = json.loads(evidence)
+    evidence = evidence or {}
+    return StoredSuggestionOut(
+        id=row["id"],
+        provider=row["provider"],
+        identifier_type=row["identifier_type"],
+        identifier=row["identifier"],
+        issuer_id=row["issuer_id"],
+        issuer_name=row["legal_name"],
+        security_id=row["security_id"],
+        score=None if row["score"] is None else float(row["score"]),
+        name_only=bool(evidence.get("name_only")),
+        ambiguous=bool(evidence.get("ambiguous")),
+        match_status=row["match_status"],
+        decision_note=(evidence.get("decision") or {}).get("note"),
+    )
+
+
+@router.get("/identifiers/suggestions")
+async def list_identifier_suggestions(
+    pool: Pool,
+    _owner: Owner,
+    match_status: Literal["suggested", "confirmed", "rejected"] = "suggested",
+    limit: Annotated[int, Query(ge=1, le=500)] = 100,
+) -> list[StoredSuggestionOut]:
+    """Stored LEI and FIGI matches by status, best score first."""
+    rows = await pool.fetch(
+        """select p.id, p.provider, p.identifier_type, p.identifier, p.issuer_id, i.legal_name,
+                  p.security_id, p.score, p.match_status, p.evidence
+             from public.provider_identifier p
+             left join public.issuer i on i.id = p.issuer_id
+            where p.match_status = $1 and p.identifier_type in ('lei', 'figi')
+            order by p.score desc nulls last, p.id limit $2""",
+        match_status,
+        limit,
+    )
+    return [_suggestion(r) for r in rows]
+
+
+class IdentifierDecisionIn(BaseModel):
+    decision: Literal["confirmed", "rejected"]
+    note: str | None = None
+
+
+@router.post("/identifiers/suggestions/{suggestion_id}/decision")
+async def decide_identifier_suggestion(
+    suggestion_id: IdPath, body: IdentifierDecisionIn, pool: Pool, owner: Owner
+) -> StoredSuggestionOut:
+    """Confirm or reject one suggestion. A name-only or ambiguous match needs a note of at least
+    10 characters. Confirming a LEI or FIGI also fills the issuer's or security's empty
+    identifier; an identifier already set is never overwritten."""
+    note = (body.note or "").strip()
+    async with pool.acquire() as conn, conn.transaction():
+        row = await conn.fetchrow(
+            """select p.*, i.legal_name from public.provider_identifier p
+                 left join public.issuer i on i.id = p.issuer_id
+                where p.id = $1 for update of p""",
+            suggestion_id,
+        )
+        if row is None:
+            raise HTTPException(status.HTTP_404_NOT_FOUND, "No such suggestion")
+        if row["match_status"] != "suggested":
+            raise HTTPException(
+                status.HTTP_409_CONFLICT, f"Already {row['match_status']}; decisions are final"
+            )
+        evidence = row["evidence"]
+        evidence = json.loads(evidence) if isinstance(evidence, str) else dict(evidence or {})
+        flagged = bool(evidence.get("name_only") or evidence.get("ambiguous"))
+        if body.decision == "confirmed" and flagged and len(note) < 10:
+            raise HTTPException(
+                status.HTTP_422_UNPROCESSABLE_ENTITY,
+                "A name-only or ambiguous match needs a note of at least 10 characters",
+            )
+        evidence["decision"] = {
+            "by": f"owner:{owner.user_id}",
+            "at": dt.datetime.now(dt.UTC).isoformat(),
+            "note": note or None,
+        }
+        try:
+            if body.decision == "confirmed":
+                if row["identifier_type"] == "lei" and row["issuer_id"] is not None:
+                    await conn.execute(
+                        "update public.issuer set lei=$2 where id=$1 and lei is null",
+                        row["issuer_id"],
+                        row["identifier"],
+                    )
+                elif row["identifier_type"] == "figi" and row["security_id"] is not None:
+                    await conn.execute(
+                        "update public.security set figi=$2 where id=$1 and figi is null",
+                        row["security_id"],
+                        row["identifier"],
+                    )
+            await conn.execute(
+                "update public.provider_identifier set match_status=$2, evidence=$3::jsonb"
+                " where id=$1",
+                suggestion_id,
+                body.decision,
+                json.dumps(evidence),
+            )
+        except asyncpg.UniqueViolationError as exc:
+            raise HTTPException(
+                status.HTTP_409_CONFLICT, "That identifier already belongs to another record"
+            ) from exc
+        updated = await conn.fetchrow(
+            """select p.*, i.legal_name from public.provider_identifier p
+                 left join public.issuer i on i.id = p.issuer_id where p.id = $1""",
+            suggestion_id,
+        )
+    assert updated is not None
+    return _suggestion(updated)
 
 
 class IdentifierJobOut(BaseModel):

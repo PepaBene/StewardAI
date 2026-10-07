@@ -34,8 +34,20 @@ export function orderResults(results: readonly FilingResult[]): FilingResult[] {
 const IDENTIFIER_TYPE_LABEL: Record<string, string> = { lei: "LEI", figi: "FIGI", share_class_figi: "Share-class FIGI" };
 export const identifierTypeLabel = (t: string): string => IDENTIFIER_TYPE_LABEL[t.toLowerCase()] ?? t;
 
+export type StoredSuggestion = S["StoredSuggestionOut"];
+export type MatchStatus = StoredSuggestion["match_status"];
+
+export const MATCH_STATUS_LABEL: Record<MatchStatus, string> = { suggested: "Awaiting a decision", confirmed: "Confirmed", rejected: "Rejected" };
+export const NOTE_MIN = 10;
+
+/** A name-only or ambiguous match cannot be confirmed without a written reason. */
+export const confirmNeedsNote = (s: { name_only: boolean; ambiguous: boolean }): boolean => s.name_only || s.ambiguous;
+
+/** True when the note is long enough (trimmed) to confirm this row; rows without risk flags need none. */
+export const confirmAllowed = (s: { name_only: boolean; ambiguous: boolean }, note: string): boolean => !confirmNeedsNote(s) || note.trim().length >= NOTE_MIN;
+
 /** Flags a reviewer must see before trusting a suggestion, in the order of risk. */
-export function suggestionFlags(s: IdentifierSuggestion): string[] {
+export function suggestionFlags(s: { name_only: boolean; ambiguous: boolean }): string[] {
   const flags: string[] = [];
   if (s.ambiguous) flags.push("Ambiguous: more than one candidate fits");
   if (s.name_only) flags.push("Matched on name only");
@@ -43,8 +55,8 @@ export function suggestionFlags(s: IdentifierSuggestion): string[] {
 }
 
 /** Flagged suggestions first, then by score descending. */
-export function orderSuggestions(list: readonly IdentifierSuggestion[]): IdentifierSuggestion[] {
-  return [...list].sort((a, b) => suggestionFlags(b).length - suggestionFlags(a).length || b.score - a.score);
+export function orderSuggestions<T extends { name_only: boolean; ambiguous: boolean; score: number | null }>(list: readonly T[]): T[] {
+  return [...list].sort((a, b) => suggestionFlags(b).length - suggestionFlags(a).length || (b.score ?? -1) - (a.score ?? -1));
 }
 
-export const formatScore = (score: number): string => (score <= 1 ? `${Math.round(score * 100)}%` : score.toFixed(1));
+export const formatScore = (score: number | null): string => (score == null ? "not scored" : score <= 1 ? `${Math.round(score * 100)}%` : score.toFixed(1));

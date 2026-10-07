@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { digestKindLabel, digestOrder, forTicker } from "@/lib/disclosure/alerts";
-import { ingestSummary, orderResults, orderSuggestions, serverMessage, suggestionFlags, type FilingResult, type IdentifierSuggestion } from "@/lib/disclosure/operations";
+import { confirmAllowed, ingestSummary, orderResults, orderSuggestions, serverMessage, suggestionFlags, type FilingResult, type IdentifierSuggestion } from "@/lib/disclosure/operations";
 
 const f = (accession: string, o: Partial<FilingResult> = {}): FilingResult => ({ accession, status: "ingested", reason: null, quarantined: false, facts_mirrored: 1, note_rows: 0, gaps: [], ...o });
 const s = (o: Partial<IdentifierSuggestion>): IdentifierSuggestion => ({ provider: "gleif", identifier_type: "lei", identifier: "X", issuer_id: 1, security_id: null, score: 0.9, name_only: false, ambiguous: false, stored: true, ...o });
@@ -30,6 +30,15 @@ describe("ingest", () => {
   });
   it("summarises counts", () => {
     expect(ingestSummary({ discovered: 3, ingested: 1, unchanged: 1, failed: 1, results: [] })).toContain("1 failed");
+  });
+});
+
+describe("identifier decisions", () => {
+  it("requires a 10-character note only for risky rows", () => {
+    expect(confirmAllowed({ name_only: false, ambiguous: false }, "")).toBe(true);
+    expect(confirmAllowed({ name_only: true, ambiguous: false }, "too short")).toBe(false);
+    expect(confirmAllowed({ name_only: false, ambiguous: true }, "   short   ")).toBe(false);
+    expect(confirmAllowed({ name_only: true, ambiguous: true }, "checked the register")).toBe(true);
   });
 });
 

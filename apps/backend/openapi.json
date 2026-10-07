@@ -15433,6 +15433,136 @@
         }
       }
     },
+    "/disclosures/identifiers/suggestions": {
+      "get": {
+        "tags": [
+          "disclosures"
+        ],
+        "summary": "List Identifier Suggestions",
+        "description": "Stored LEI and FIGI matches by status, best score first.",
+        "operationId": "list_identifier_suggestions",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "match_status",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "enum": [
+                "suggested",
+                "confirmed",
+                "rejected"
+              ],
+              "type": "string",
+              "default": "suggested",
+              "title": "Match Status"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 500,
+              "minimum": 1,
+              "default": 100,
+              "title": "Limit"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/StoredSuggestionOut"
+                  },
+                  "title": "Response List Identifier Suggestions"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/disclosures/identifiers/suggestions/{suggestion_id}/decision": {
+      "post": {
+        "tags": [
+          "disclosures"
+        ],
+        "summary": "Decide Identifier Suggestion",
+        "description": "Confirm or reject one suggestion. A name-only or ambiguous match needs a note of at least\n10 characters. Confirming a LEI or FIGI also fills the issuer's or security's empty\nidentifier; an identifier already set is never overwritten.",
+        "operationId": "decide_identifier_suggestion",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "suggestion_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "maximum": 9223372036854775807,
+              "minimum": 1,
+              "title": "Suggestion Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/IdentifierDecisionIn"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StoredSuggestionOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/disclosures/identifiers/resolve": {
       "post": {
         "tags": [
@@ -35058,6 +35188,34 @@
         ],
         "title": "HoldingsResponse"
       },
+      "IdentifierDecisionIn": {
+        "properties": {
+          "decision": {
+            "type": "string",
+            "enum": [
+              "confirmed",
+              "rejected"
+            ],
+            "title": "Decision"
+          },
+          "note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note"
+          }
+        },
+        "type": "object",
+        "required": [
+          "decision"
+        ],
+        "title": "IdentifierDecisionIn"
+      },
       "IdentifierJobOut": {
         "properties": {
           "issuers_checked": {
@@ -54442,6 +54600,114 @@
           "unmapped_concepts"
         ],
         "title": "StatementsOut"
+      },
+      "StoredSuggestionOut": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "provider": {
+            "type": "string",
+            "title": "Provider"
+          },
+          "identifier_type": {
+            "type": "string",
+            "title": "Identifier Type"
+          },
+          "identifier": {
+            "type": "string",
+            "title": "Identifier"
+          },
+          "issuer_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Issuer Id"
+          },
+          "issuer_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Issuer Name"
+          },
+          "security_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Security Id"
+          },
+          "score": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Score"
+          },
+          "name_only": {
+            "type": "boolean",
+            "title": "Name Only"
+          },
+          "ambiguous": {
+            "type": "boolean",
+            "title": "Ambiguous"
+          },
+          "match_status": {
+            "type": "string",
+            "enum": [
+              "suggested",
+              "confirmed",
+              "rejected"
+            ],
+            "title": "Match Status"
+          },
+          "decision_note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Decision Note"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "provider",
+          "identifier_type",
+          "identifier",
+          "issuer_id",
+          "issuer_name",
+          "security_id",
+          "score",
+          "name_only",
+          "ambiguous",
+          "match_status",
+          "decision_note"
+        ],
+        "title": "StoredSuggestionOut"
       },
       "StoryOut": {
         "properties": {

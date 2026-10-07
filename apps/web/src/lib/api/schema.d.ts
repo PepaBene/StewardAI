@@ -4884,6 +4884,48 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/disclosures/identifiers/suggestions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Identifier Suggestions
+         * @description Stored LEI and FIGI matches by status, best score first.
+         */
+        get: operations["list_identifier_suggestions"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/disclosures/identifiers/suggestions/{suggestion_id}/decision": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Decide Identifier Suggestion
+         * @description Confirm or reject one suggestion. A name-only or ambiguous match needs a note of at least
+         *     10 characters. Confirming a LEI or FIGI also fills the issuer's or security's empty
+         *     identifier; an identifier already set is never overwritten.
+         */
+        post: operations["decide_identifier_suggestion"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/disclosures/identifiers/resolve": {
         parameters: {
             query?: never;
@@ -12065,6 +12107,16 @@ export interface components {
              */
             holdings: components["schemas"]["Holding"][];
         };
+        /** IdentifierDecisionIn */
+        IdentifierDecisionIn: {
+            /**
+             * Decision
+             * @enum {string}
+             */
+            decision: "confirmed" | "rejected";
+            /** Note */
+            note?: string | null;
+        };
         /** IdentifierJobOut */
         IdentifierJobOut: {
             /** Issuers Checked */
@@ -18938,6 +18990,36 @@ export interface components {
              * @description Facts with a concept the taxonomy does not map.
              */
             unmapped_concepts: number;
+        };
+        /** StoredSuggestionOut */
+        StoredSuggestionOut: {
+            /** Id */
+            id: number;
+            /** Provider */
+            provider: string;
+            /** Identifier Type */
+            identifier_type: string;
+            /** Identifier */
+            identifier: string;
+            /** Issuer Id */
+            issuer_id: number | null;
+            /** Issuer Name */
+            issuer_name: string | null;
+            /** Security Id */
+            security_id: number | null;
+            /** Score */
+            score: number | null;
+            /** Name Only */
+            name_only: boolean;
+            /** Ambiguous */
+            ambiguous: boolean;
+            /**
+             * Match Status
+             * @enum {string}
+             */
+            match_status: "suggested" | "confirmed" | "rejected";
+            /** Decision Note */
+            decision_note: string | null;
         };
         /** StoryOut */
         StoryOut: {
@@ -28594,6 +28676,73 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["MirrorOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_identifier_suggestions: {
+        parameters: {
+            query?: {
+                match_status?: "suggested" | "confirmed" | "rejected";
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StoredSuggestionOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    decide_identifier_suggestion: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                suggestion_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["IdentifierDecisionIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StoredSuggestionOut"];
                 };
             };
             /** @description Validation Error */
