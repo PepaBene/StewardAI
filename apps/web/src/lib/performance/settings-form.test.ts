@@ -13,6 +13,7 @@ const base: Settings = {
   sleeve_gap_points: "2",
   sleeve_lookback_years: 2,
   cash_tolerance: "1",
+  alert_severity: 2,
   benchmark: null,
   note: "",
 };
@@ -39,6 +40,15 @@ describe("settings form", () => {
         ["AGG", 0.4, "USD"],
       ]);
     }
+  });
+
+  it("keeps the alert severity between 0 (off) and 3", () => {
+    const form = settingsToForm({ ...base, alert_severity: 0 });
+    expect(formToSettings(form)).toEqual({ ok: true, body: { ...base, alert_severity: 0 } });
+    form.alert_severity = "4";
+    const result = formToSettings(form);
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.errors).toContain("Alert severity must be a whole number from 0 to 3.");
   });
 
   it("explains each mistake before anything is sent", () => {

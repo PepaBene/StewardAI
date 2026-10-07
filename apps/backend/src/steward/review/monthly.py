@@ -44,7 +44,9 @@ from steward.llm.client import LLM, create_llm
 from steward.llm.routing import routing_client
 from steward.llm.types import Message, Request, provider_of
 from steward.ownership.read import holding_ownership
+from steward.performance.alerts import PerformanceBreach, alert_performance
 from steward.performance.review import performance_review
+from steward.performance.settings import load_latest_settings
 from steward.portfolio.breaches import _holds, evaluate
 from steward.portfolio.drift import DriftReport
 from steward.portfolio.read import portfolio_overview
@@ -812,6 +814,26 @@ async def run_review(ctx: JobContext, deps: ReviewDeps) -> int | None:
             ctx.job_id,
         )
         step.detail["report_id"] = report_id
+    async with ctx.step("performance_alerts") as step:
+        # Alerts follow the stored review so a failure here never costs the report.
+        try:
+            breaches = [
+                PerformanceBreach(r.id, r.description, r.detail)
+                for r in body.compliance
+                if r.kind == "performance" and r.status == "breach"
+            ]
+            alerts = await alert_performance(
+                pool,
+                breaches,
+                severity=(await load_latest_settings(pool)).alert_severity,
+                now=deps.now,
+                job_id=ctx.job_id,
+                app_url=get_settings().app_url,
+            )
+            step.detail.update(breaches=len(breaches), alerts=alerts)
+        except Exception:
+            logger.exception("performance alerts failed")
+            step.detail["error"] = "performance alerts could not be raised"
     return report_id
 
 

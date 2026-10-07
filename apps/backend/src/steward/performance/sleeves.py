@@ -26,7 +26,7 @@ from decimal import Decimal
 from itertools import pairwise
 
 from steward.analytics.returns import DayValue, twr
-from steward.performance.attribution import Amount, PositionDay, Trade
+from steward.performance.attribution import Amount, FxLookup, PositionDay, Trade
 from steward.performance.windows import annualize
 
 ZERO = Decimal(0)
@@ -44,11 +44,15 @@ def sleeve_days(
     income: Iterable[Amount],
     fees: Iterable[Amount],
     fx_for_trades: dict[tuple[dt.date, str], Decimal],
+    fx_fallback: FxLookup | None = None,
 ) -> list[DayValue]:
     """Daily value and flow of the sleeve made of `tickers`, in the base currency.
 
     `fx_for_trades` gives the base-currency rate for a fill's (day, ticker): the end-of-interval
-    snapshot rate, the same convention the attribution uses.
+    snapshot rate, the same convention the attribution uses. A sale that closes a position has no
+    position row that day, so `fx_fallback` (that holding's rate on its nearest snapshot day)
+    stands in; a holding with no rate anywhere has its flow left out, which `SleeveReturn` cannot
+    see, so the service reports such tickers.
     """
     value: dict[dt.date, Decimal] = defaultdict(Decimal)
     for p in positions:
@@ -60,6 +64,8 @@ def sleeve_days(
         if t.ticker in tickers:
             nearest = next((d for d in days if d >= t.day), None)
             rate = fx_for_trades.get((t.day, t.ticker))
+            if rate is None and fx_fallback is not None:
+                rate = fx_fallback(t.ticker, t.day)
             if nearest is not None and rate is not None:
                 flow[nearest] += t.quantity * t.price * rate
     for amount in income:

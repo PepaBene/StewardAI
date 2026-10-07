@@ -16,6 +16,7 @@ from api.auth import AuthenticatedUser, require_owner
 from api.db import get_pool, get_pool_or_error
 from api.main import create_app
 from steward.config.jobs import CSPX_ISIN
+from steward.xray import service as xray_service
 from tests.conftest import MigratedDatabase
 
 OWNER = "7f0c3d4e-0000-4000-8000-0000000000cc"
@@ -85,6 +86,7 @@ async def api(
     migrated_db: MigratedDatabase, backend_pool: asyncpg.Pool
 ) -> AsyncIterator[httpx.AsyncClient]:
     await seed(backend_pool, migrated_db.admin_url)
+    xray_service.clear_cache()  # a cached load of an earlier test's database would leak in
     app = create_app()
 
     async def pool_override() -> asyncpg.Pool:
@@ -117,7 +119,7 @@ async def test_every_view_adds_up_to_the_whole_portfolio(api: httpx.AsyncClient)
     )
     assert holdings["CSPXl_EQ"]["is_fund"] and holdings["CSPXl_EQ"]["looked_through"] is True
     assert body["cash_weight"] == pytest.approx(0.10)
-    assert len(body["views"]) == 14
+    assert len(body["views"]) == 16
     for v in body["views"]:
         assert v["total_weight"] == pytest.approx(1.0), v["dimension"]
         assert v["reconciles"], v["dimension"]
@@ -243,3 +245,79 @@ async def test_a_proposal_never_changes_saved_holdings(
     )
     assert too_much.status_code == 422 and "cannot exceed 100%" in too_much.json()["detail"]
     assert await snapshot() == before
+
+
+async def seed_profile(pool: asyncpg.Pool) -> None:
+    for metric, text in (
+        ("sector", "Technology"),
+        ("industry", "Consumer Electronics"),
+        ("country", "US"),
+        ("exchange", "NASDAQ Global Select"),
+    ):
+        await pool.execute(
+            "insert into public.company_research_observation (ticker, provider, dataset, metric, text_value, source_url)"
+            " values ('AAPL_US_EQ', 'fmp', 'profile', $1, $2, 'https://example.test/profile')",
+            metric, text,
+        )  # fmt: skip
+
+
+async def test_stored_provider_profiles_fill_industry_domicile_and_listing(
+    api: httpx.AsyncClient, backend_pool: asyncpg.Pool
+) -> None:
+    await seed_profile(backend_pool)
+    body = (await api.get("/portfolio/xray")).json()
+    # the profile is found by ISIN for the direct holding and for the fund's row of the same stock
+    industry = view(body, "industry")
+    assert bucket(industry, "Consumer Electronics")["weight"] == pytest.approx(0.36)
+    assert bucket(industry, "Consumer Electronics")["basis"] == {"reported": pytest.approx(0.36)}
+    domicile = view(body, "domicile")
+    assert bucket(domicile, "US")["weight"] == pytest.approx(0.36 + 0.18)  # AAPL and MSFT by ISIN prefix
+    assert bucket(domicile, "CH")["basis"] == {"inferred": pytest.approx(0.30)}  # Nestle: ISIN prefix only
+    listing = view(body, "listing")
+    assert bucket(listing, "US")["weight"] == pytest.approx(0.36)
+    assert bucket(listing, "US")["basis"] == {"inferred": pytest.approx(0.36)}
+    assert view(body, "country")["mixed_basis"]  # the country view is untouched by the new lenses
+
+
+async def test_a_visit_loads_once_and_a_reload_after_the_cache_sees_new_data(
+    api: httpx.AsyncClient, backend_pool: asyncpg.Pool
+) -> None:
+    first = (await api.get("/portfolio/xray")).json()
+    assert all(b["key"] != "Consumer Electronics" for b in view(first, "industry")["buckets"])
+    await seed_profile(backend_pool)
+    again = (await api.get("/portfolio/xray")).json()  # within the cache window: the earlier load
+    assert all(b["key"] != "Consumer Electronics" for b in view(again, "industry")["buckets"])
+    xray_service.clear_cache()
+    fresh = (await api.get("/portfolio/xray")).json()
+    assert any(b["key"] == "Consumer Electronics" for b in view(fresh, "industry")["buckets"])
+
+
+async def test_a_slow_statement_read_is_reported_and_the_xray_still_loads(
+    api: httpx.AsyncClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    async def too_slow(*_args: object, **_kwargs: object) -> dict:  # type: ignore[type-arg]
+        raise xray_service.FactsTimeout
+
+    monkeypatch.setattr(xray_service, "_facts", too_slow)
+    body = (await api.get("/portfolio/xray")).json()
+    assert body["available"] and body["scored_issuers"] == 0
+    assert any("took too long" in n for n in body["notes"])
+    assert all(v["reconciles"] for v in body["views"])
+
+
+async def test_xray_csv_export_holds_one_lens_or_all(api: httpx.AsyncClient) -> None:
+    one = await api.get("/portfolio/xray/export", params={"lens": "sector"})
+    assert one.status_code == 200 and one.headers["content-type"].startswith("text/csv")
+    assert "xray-sector.csv" in one.headers["content-disposition"]
+    lines = one.text.strip().split("\n")
+    assert lines[0].startswith("lens,bucket,kind,weight") and all(
+        line.startswith("sector,") for line in lines[1:]
+    )
+    assert any("Information Technology" in line and "0.54" in line for line in lines[1:])
+    everything = (await api.get("/portfolio/xray/export")).text
+    assert {line.split(",")[0] for line in everything.strip().split("\n")[1:]} >= {
+        "sector",
+        "country",
+        "domicile",
+        "fund",
+    }

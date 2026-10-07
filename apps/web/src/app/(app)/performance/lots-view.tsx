@@ -6,9 +6,11 @@ import Link from "next/link";
 import { AlertMessage } from "@/components/alert-message";
 import { Absent, ResourceGate } from "@/components/company/primitives";
 import { Blueprint, PanelHeading } from "@/components/ui/blueprint";
+import { CsvDownload } from "@/components/ui/csv-download";
 import { getBrowserApiClient } from "@/lib/api/client";
 import { formatDate, formatMoney, formatQuantity } from "@/lib/format";
 import { useApiResource } from "@/lib/hooks/use-api-resource";
+import { fetchExport } from "@/lib/performance/export";
 import { holdingProgress, monthsRemainingLabel, type LotsData } from "@/lib/performance/performance";
 import { cn } from "@/lib/utils";
 
@@ -113,7 +115,11 @@ function LotsTable({ data }: { data: LotsData }) {
 function Realized({ data }: { data: LotsData }) {
   return (
     <Blueprint className="px-[22px] py-4">
-      <PanelHeading kicker={`${data.method === "fifo" ? "Oldest lot first" : "Average cost"}, account currency`} title="Sales and realized gain" />
+      <PanelHeading
+        kicker={`${data.method === "fifo" ? "Oldest lot first" : "Average cost"}, account currency`}
+        title="Sales and realized gain"
+        action={<CsvDownload label="Realized gains CSV" filename="performance-realized.csv" fetchCsv={() => fetchExport("realized")} />}
+      />
       <dl className="mt-3 grid grid-cols-2 gap-4 sm:grid-cols-3">
         <div><dt className="text-xs text-text-muted">Realized gain</dt><dd className="num text-lg font-semibold"><Money value={data.realized_gain} currency={data.currency} signed decimals={2} /></dd></div>
         <div><dt className="text-xs text-text-muted">Dividends received</dt><dd className="num text-lg font-semibold"><Money value={data.dividends} currency={data.currency} decimals={2} /></dd></div>
@@ -189,6 +195,7 @@ export function LotsView() {
               <PanelHeading
                 kicker={`${data.time_test_years}-year holding period, as of ${data.as_of ? formatDate(data.as_of) : "unknown"}`}
                 title="Open lots, soonest first"
+                action={<CsvDownload label="Lots CSV" filename="performance-lots.csv" fetchCsv={() => fetchExport("lots")} />}
               />
               <LotsTable data={data} />
             </Blueprint>

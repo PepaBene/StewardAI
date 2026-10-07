@@ -62,6 +62,12 @@ export function SettingsFormPanel({ initial, onSaved }: { initial: SettingsData;
           <Field label="Comparison window, years">
             <Input inputMode="numeric" value={form.sleeve_lookback_years} onChange={(e) => set("sleeve_lookback_years", e.target.value)} />
           </Field>
+          <Field
+            label="Alert severity"
+            hint="0 to 3, raised with the monthly review for a lagging stock sleeve or an early sell target. 0 turns it off. It is sent only if a notification rule matches that severity; the default rules send 3."
+          >
+            <Input inputMode="numeric" value={form.alert_severity} onChange={(e) => set("alert_severity", e.target.value)} />
+          </Field>
         </div>
       </fieldset>
 

@@ -15,6 +15,7 @@ from steward.performance.attribution import (
     Trade,
     attribute,
     group_contributions,
+    ticker_fx_lookup,
 )
 from steward.performance.benchmark import blended_index, compare_window, series_return
 from steward.performance.ledger import (
@@ -430,6 +431,58 @@ def test_attribution_residual_is_disclosed_and_unexplained_quantity_is_partial()
     assert report.bridge.coverage is not None and report.bridge.coverage.fraction == 0
 
 
+def test_a_pence_quoted_holding_attributes_in_pence_with_a_per_penny_rate():
+    # GBX: the stored rate is base units per penny (GBP/100), so pence prices and a per-penny
+    # rate multiply to the base value without any extra scaling.
+    rate = D("0.0115")  # EUR per penny, i.e. 1.15 EUR per pound
+    days = [AccountDay(day(2026, 1, 1), D("115.00")), AccountDay(day(2026, 1, 2), D("126.50"))]
+    positions = [
+        PositionDay(day(2026, 1, 1), "VOD", D(10), D(1000), rate, D("115.00")),
+        PositionDay(day(2026, 1, 2), "VOD", D(10), D(1100), rate, D("126.50")),
+    ]
+    report = attribute(days, positions, [], [], [])
+    assert report is not None
+    assert report.bridge.components["price"] == D("11.5000")  # 10 * 100 pence * 0.0115
+    assert report.bridge.components["fx"] == 0 and report.bridge.residual == 0
+
+
+def test_a_position_bought_and_sold_between_two_snapshots_still_counts_its_gain():
+    # Day 1 and day 3 hold nothing in AAA; on day 2 it was bought at 10 and sold at 12.
+    days = [AccountDay(day(2026, 1, 1), D("100")), AccountDay(day(2026, 1, 3), D("120"))]
+    trades = [
+        Trade(day(2026, 1, 3), "AAA", D(10), D(10)),
+        Trade(day(2026, 1, 3), "AAA", D(-10), D(12)),
+    ]
+    report = attribute(days, [], trades, [], [], lambda ticker, when: D(1))
+    assert report is not None
+    assert report.unattributed_tickers == []
+    (holding,) = report.holdings
+    assert holding.price == D(20)  # (0 - 0 - (10*10 - 10*12)) * 1
+    assert report.net_trading == D(-20)
+    # with no rate for the ticker anywhere the fills cannot be valued: left out, not valued at zero
+    unpriced = attribute(days, [], trades, [], [])
+    assert unpriced is not None and unpriced.unattributed_tickers == ["AAA"]
+    assert unpriced.holdings[0].attributed is False
+
+
+def test_ticker_rate_lookup_takes_the_nearest_snapshot_day_and_prefers_the_earlier():
+    rows = [
+        PositionDay(day(2026, 1, 1), "AAA", D(1), D(1), D("0.9"), D("0.9")),
+        PositionDay(day(2026, 1, 5), "AAA", D(1), D(1), D("0.8"), D("0.8")),
+    ]
+    look = ticker_fx_lookup(rows)
+    assert look("AAA", day(2026, 1, 2)) == D("0.9")
+    assert look("AAA", day(2026, 1, 4)) == D("0.8")
+    assert look("AAA", day(2026, 1, 3)) == D("0.9")  # equidistant: the earlier day
+    assert look("BBB", day(2026, 1, 3)) is None
+
+
+def test_a_fill_in_another_currency_than_the_account_is_left_out_not_guessed():
+    usd_fill = fill("1", "BUY", "1", "10", "-10", at(2026, 1, 2), currency="USD")
+    (entry,) = build_ledger([usd_fill], "EUR")
+    assert entry.needs_fx  # reports skip it rather than convert at an unknown rate
+
+
 def test_attribution_excludes_external_flows_from_the_gain():
     days = [AccountDay(day(2026, 1, 1), D("100")), AccountDay(day(2026, 1, 2), D("160"), D("50"))]
     positions = [
@@ -500,3 +553,16 @@ def test_sleeve_buys_are_flows_not_gains_and_short_history_is_too_early():
     cmp = compare_sleeves(core, stocks)
     assert cmp.stocks.total_return == 0  # the purchase added value but was no gain
     assert cmp.too_early and not cmp.review_item and "Too early to judge" in cmp.message
+
+
+def test_sale_that_closes_a_position_still_counts_as_a_flow_out_of_the_sleeve():
+    dates = [dt.date(2026, 1, 1), dt.date(2026, 1, 31)]
+    positions = [PositionDay(dates[0], "STK", D(10), D(10), D(1), D(100))]  # none on day 2
+    trades = [Trade(dates[1], "STK", D(-10), D(12))]  # sold all 10 at 12
+    # the closed position's own last rate stands in for the missing row of the sale day
+    stocks = sleeve_days(
+        {"STK"}, dates, positions, trades, [], [], {}, ticker_fx_lookup(positions)
+    )
+    assert stocks[1].value == 0 and stocks[1].flow == D(-120)
+    # (0 - (-120)) / 100 - 1: the sale proceeds are the sleeve's gain of 20%, not a total loss.
+    assert (stocks[1].value - stocks[1].flow) / stocks[0].value - 1 == D("0.2")

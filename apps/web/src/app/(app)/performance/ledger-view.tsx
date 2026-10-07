@@ -3,9 +3,11 @@
 import { AlertMessage } from "@/components/alert-message";
 import { ResourceGate } from "@/components/company/primitives";
 import { Blueprint, PanelHeading } from "@/components/ui/blueprint";
+import { CsvDownload } from "@/components/ui/csv-download";
 import { getBrowserApiClient } from "@/lib/api/client";
 import { formatDate, formatQuantity } from "@/lib/format";
 import { useApiResource } from "@/lib/hooks/use-api-resource";
+import { fetchExport } from "@/lib/performance/export";
 import { ledgerSentence, type PerformanceData, type SettingsData } from "@/lib/performance/performance";
 
 import { Money, TD, TH, TH_LEFT } from "./shared";
@@ -33,6 +35,7 @@ function Health({ data }: { data: PerformanceData }) {
         <PanelHeading
           kicker={l.first && l.last ? `${formatDate(l.first)} to ${formatDate(l.last)}` : undefined}
           title={l.status === "clean" ? "The ledger explains every cash change" : l.status === "empty" ? "No transactions stored" : "The ledger has gaps"}
+          action={l.entries > 0 ? <CsvDownload label="Ledger CSV" filename="performance-ledger.csv" fetchCsv={() => fetchExport("ledger")} /> : undefined}
         />
         <p className="mt-2 max-w-3xl text-sm text-text-muted">{ledgerSentence(l)}</p>
         <dl className="mt-3 grid grid-cols-2 gap-4 sm:grid-cols-4">

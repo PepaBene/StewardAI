@@ -4,8 +4,10 @@ pure modules."""
 # ruff: noqa: E501
 from __future__ import annotations
 
+import asyncio
 import datetime as dt
 import logging
+import time
 from collections import defaultdict
 from dataclasses import dataclass, field, replace
 from decimal import Decimal
@@ -61,6 +63,12 @@ from steward.xray.views import ViewContext
 log = logging.getLogger(__name__)
 
 SCORED_ISSUERS = 200  # issuers beyond the largest 200 are not scored; the coverage says so
+FACTS_TIMEOUT_SECONDS = 25.0  # reading stored statements for the scored issuers
+CACHE_SECONDS = 60.0
+
+
+class FactsTimeout(Exception):
+    """Reading issuer statements took too long; the X-Ray is built without them."""
 REVENUE_ISSUERS = 40  # reported geography is read for the largest 40 equity issuers only
 REVENUE_CONTEXTS = {
     "country": "revenue_country",
@@ -114,7 +122,7 @@ async def _profiles(pool: asyncpg.Pool, isins: list[str]) -> dict[str, Profile]:
     rows = await pool.fetch(
         """select distinct on (ticker, metric) ticker, metric, text_value
            from public.company_research_observation
-           where provider='fmp' and dataset='profile' and metric in ('sector','industry')
+           where provider='fmp' and dataset='profile' and metric in ('sector','industry','country','exchange')
              and ticker = any($1::text[]) and text_value is not null
            order by ticker, metric, known_at desc""",
         tickers,
@@ -126,7 +134,12 @@ async def _profiles(pool: asyncpg.Pool, isins: list[str]) -> dict[str, Profile]:
     for isin, ticker in ticker_by_isin.items():
         got = by_ticker.get(ticker)
         if got:
-            p = Profile(sector=got.get("sector"), industry=got.get("industry"))
+            p = Profile(
+                sector=got.get("sector"),
+                industry=got.get("industry"),
+                country=got.get("country"),
+                exchange=got.get("exchange"),
+            )
             out[isin.upper()] = p
             out.setdefault(ticker.upper(), p)
     return out
@@ -148,14 +161,20 @@ async def _facts(
     members = list(by_isin.values())
     if not members:
         return {}
-    records = await discovery_read.stock_records(
-        pool,
-        members,
-        day,
-        cutoff=None,
-        reconciled_only=False,
-        access=await provider_states(pool),
-    )
+    try:
+        records = await asyncio.wait_for(
+            discovery_read.stock_records(
+                pool,
+                members,
+                day,
+                cutoff=None,
+                reconciled_only=False,
+                access=await provider_states(pool),
+            ),
+            FACTS_TIMEOUT_SECONDS,
+        )
+    except TimeoutError as err:
+        raise FactsTimeout from err
     hit = {m.isin: (m, r) for m, r in zip(members, records, strict=True)}
     rates = await _eur_rates(pool)
     out: dict[str, IssuerFacts] = {}
@@ -309,7 +328,16 @@ async def load(pool: asyncpg.Pool, owner_id: str, *, today: dt.date | None = Non
         (k, first_isin[k]) for k in sorted(weight, key=lambda k: -weight[k]) if k in first_isin
     ]
     ranked_scored = ranked[:SCORED_ISSUERS]
-    facts = await _facts(pool, ranked_scored, day)
+    notes: list[str] = []
+    try:
+        facts = await _facts(pool, ranked_scored, day)
+    except FactsTimeout:
+        facts = {}
+        log.warning("xray: issuer statements timed out after %ss", FACTS_TIMEOUT_SECONDS)
+        notes.append(
+            "Reading stored statements took too long, so size, style and fundamentals are "
+            "missing from this view. Reload to try again."
+        )
     # tickers by ISIN from the instrument list, the reliable path to Trading212 tickers
     t212 = {
         r["isin"]: r["t212_ticker"]
@@ -321,7 +349,6 @@ async def load(pool: asyncpg.Pool, owner_id: str, *, today: dt.date | None = Non
     }
     data.revenue = await _revenue(pool, owner_id, ranked, {**ticker_of, **t212})
     analysis = analyse(data, facts)
-    notes: list[str] = []
     if len(ranked) > SCORED_ISSUERS:
         notes.append(
             f"Only the {SCORED_ISSUERS} largest of {len(ranked)} issuers are scored for size, "
@@ -337,6 +364,25 @@ async def load(pool: asyncpg.Pool, owner_id: str, *, today: dt.date | None = Non
         issuers_total=len(weight),
         notes=notes,
     )
+
+
+_cache: dict[str, tuple[float, Loaded]] = {}
+
+
+def clear_cache() -> None:
+    _cache.clear()
+
+
+async def load_cached(pool: asyncpg.Pool, owner_id: str) -> Loaded:
+    """`load`, reused for `CACHE_SECONDS` per owner: the six X-Ray tabs read the same data, so a
+    visit loads once, not once per tab. Holdings change at most daily; a minute is stale enough."""
+    now = time.monotonic()
+    hit = _cache.get(owner_id)
+    if hit is not None and now - hit[0] < CACHE_SECONDS:
+        return hit[1]
+    loaded = await load(pool, owner_id)
+    _cache[owner_id] = (now, loaded)
+    return loaded
 
 
 def aggregate(loaded: Loaded, *, top: int = 100_000) -> AggregateReport:
@@ -487,10 +533,16 @@ def view_context(loaded: Loaded) -> ViewContext:
 
 
 async def propose(
-    pool: asyncpg.Pool, owner_id: str, request: ProposedRequest, *, today: dt.date | None = None
+    pool: asyncpg.Pool,
+    owner_id: str,
+    request: ProposedRequest,
+    *,
+    today: dt.date | None = None,
+    loaded: Loaded | None = None,
 ) -> XrayProposal:
     """Before and after X-Ray of hypothetical weights. Reads only; the copy is discarded."""
-    loaded = await load(pool, owner_id, today=today)
+    if loaded is None:
+        loaded = await load(pool, owner_id, today=today)
     portfolio = loaded.data.portfolio
     if portfolio is None:
         raise ProposalError("There is no portfolio snapshot to propose changes to.")
@@ -514,7 +566,11 @@ async def propose(
         (k, first_isin[k]) for k in sorted(weight, key=lambda k: -weight[k]) if k in first_isin
     ]
     fresh = [(k, i) for k, i in ranked[:SCORED_ISSUERS] if k not in loaded.facts]
-    facts = {**loaded.facts, **await _facts(pool, fresh, loaded.day)}
+    try:
+        facts = {**loaded.facts, **await _facts(pool, fresh, loaded.day)}
+    except FactsTimeout:
+        facts = dict(loaded.facts)
+        notes.append("Statements for the added securities took too long to read; they are unscored.")
     after = analyse(data, facts)
     looked: dict[str, bool] = {}
     for p in [*portfolio.positions, *new_portfolio.positions]:

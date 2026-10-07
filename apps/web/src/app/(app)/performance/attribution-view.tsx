@@ -6,9 +6,11 @@ import { AlertMessage } from "@/components/alert-message";
 import { Absent, ResourceGate } from "@/components/company/primitives";
 import { RangeButtons } from "@/components/portfolio/range-buttons";
 import { Blueprint, PanelHeading } from "@/components/ui/blueprint";
+import { CsvDownload } from "@/components/ui/csv-download";
 import { getBrowserApiClient } from "@/lib/api/client";
 import { formatDate, formatPercent, gainLossTone } from "@/lib/format";
 import { useApiResource } from "@/lib/hooks/use-api-resource";
+import { fetchExport } from "@/lib/performance/export";
 import { barScale, type AttributionData } from "@/lib/performance/performance";
 import { cn } from "@/lib/utils";
 
@@ -132,7 +134,11 @@ function Body({ data }: { data: AttributionData }) {
       </Blueprint>
 
       <Blueprint className="px-[22px] py-4">
-        <PanelHeading kicker="Biggest movers first" title="By holding" />
+        <PanelHeading
+          kicker="Biggest movers first"
+          title="By holding"
+          action={<CsvDownload label="Contribution CSV" filename={`performance-attribution-${data.days}d.csv`} fetchCsv={() => fetchExport("attribution", data.days)} />}
+        />
         <div className="mt-3 overflow-x-auto border border-border">
           <table className="w-full text-sm">
             <caption className="sr-only">Contribution of each holding over the window</caption>

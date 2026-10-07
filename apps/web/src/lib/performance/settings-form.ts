@@ -12,6 +12,7 @@ export type SettingsForm = {
   sleeve_gap_points: string;
   sleeve_lookback_years: string;
   cash_tolerance: string;
+  alert_severity: string;
   benchmark: BenchmarkRow[];
   rebalance: "none" | "monthly" | "quarterly" | "annual";
   note: string;
@@ -28,6 +29,7 @@ export function settingsToForm(s: Settings): SettingsForm {
     sleeve_gap_points: String(s.sleeve_gap_points),
     sleeve_lookback_years: String(s.sleeve_lookback_years),
     cash_tolerance: String(s.cash_tolerance),
+    alert_severity: String(s.alert_severity ?? 2),
     benchmark: (s.benchmark?.components ?? []).map((c) => ({
       symbol: c.symbol,
       weight: String(Number(c.weight) * 100),
@@ -67,6 +69,7 @@ export function formToSettings(form: SettingsForm): FormResult {
   const limit = amount("Exemption limit", form.exemption_limit, 0, 1e12, errors);
   const gap = amount("Gap limit", form.sleeve_gap_points, 0, 50, errors);
   const tolerance = amount("Cash tolerance", form.cash_tolerance, 0, 1e9, errors);
+  const severity = wholeNumber("Alert severity", form.alert_severity, 0, 3, errors);
   const currency = form.exemption_currency.trim().toUpperCase();
   if (!/^[A-Z]{3}$/.test(currency)) errors.push("The exemption currency must be a three-letter code such as CZK.");
 
@@ -104,6 +107,7 @@ export function formToSettings(form: SettingsForm): FormResult {
       sleeve_gap_points: String(gap),
       sleeve_lookback_years: lookback,
       cash_tolerance: String(tolerance),
+      alert_severity: severity,
       benchmark,
       note: form.note.trim(),
     },

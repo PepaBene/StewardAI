@@ -30,6 +30,7 @@ from steward.performance.attribution import (
     Trade,
     attribute,
     group_contributions,
+    ticker_fx_lookup,
 )
 from steward.performance.benchmark import blended_index, compare_window
 from steward.performance.ledger import (
@@ -624,7 +625,9 @@ async def attribution_report(
         )
         for s in window
     ]
-    report = attribute(account_days, positions, trades, income, costs)
+    report = attribute(
+        account_days, positions, trades, income, costs, ticker_fx_lookup(positions)
+    )
     if report is None:
         return r.AttributionResponse(
             status="unavailable", start=None, end=None, base_currency=None, days=days,
@@ -689,6 +692,13 @@ SLEEVES_FORMULA = [
 ]
 
 
+async def ledger_entries(pool: asyncpg.Pool) -> list[LedgerEntry]:
+    """The dated ledger as built for every report, for export."""
+    snapshots = await _snapshots(pool)
+    account_currency = snapshots[-1]["account_currency"] if snapshots else None
+    return build_ledger(await _raw_transactions(pool), account_currency)
+
+
 def _sleeve_out(s: Any, tickers: list[str]) -> r.SleeveOut:
     return r.SleeveOut(
         name=s.name, start=s.start, end=s.end, days=s.days, total_return=r.num(s.total_return),
@@ -744,9 +754,12 @@ async def sleeves_report(pool: asyncpg.Pool, settings: PerformanceSettings) -> r
                 costs.append(Amount(nearest, e.fees * rate, e.ticker))
         elif e.kind is Kind.DIVIDEND:
             income.append(Amount(nearest, e.gross * rate, e.ticker))
-    core_series = sleeve_days(core, valuation_days, positions, trades, income, costs, fx_for_trades)
+    fallback = ticker_fx_lookup(positions)
+    core_series = sleeve_days(
+        core, valuation_days, positions, trades, income, costs, fx_for_trades, fallback
+    )
     stock_series = sleeve_days(
-        stocks, valuation_days, positions, trades, income, costs, fx_for_trades
+        stocks, valuation_days, positions, trades, income, costs, fx_for_trades, fallback
     )
     outcome = compare_sleeves(
         core_series, stock_series, lookback_years=settings.sleeve_lookback_years,

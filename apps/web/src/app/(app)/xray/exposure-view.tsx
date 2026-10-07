@@ -6,6 +6,7 @@ import { useSearchParams } from "next/navigation";
 
 import { ResourceGate } from "@/components/company/primitives";
 import { Blueprint, PanelHeading } from "@/components/ui/blueprint";
+import { CsvDownload } from "@/components/ui/csv-download";
 import { CompositionStrip } from "@/components/xray/composition-strip";
 import { getBrowserApiClient } from "@/lib/api/client";
 import { formatDate, formatMoney, formatPercent } from "@/lib/format";
@@ -273,7 +274,18 @@ function Lens({ data, view }: { data: XrayData; view: XrayView }) {
       <PanelHeading
         kicker={view.group === "owner data" ? "Needs your data" : view.group}
         title={view.label}
-        action={<span className="num text-sm text-text-muted">{formatPercent(view.total_weight, { decimals: 1 })} of the portfolio</span>}
+        action={
+          <span className="inline-flex flex-wrap items-center gap-3">
+            <span className="num text-sm text-text-muted">{formatPercent(view.total_weight, { decimals: 1 })} of the portfolio</span>
+            <CsvDownload
+              label="Buckets CSV"
+              filename={`xray-${view.dimension}.csv`}
+              fetchCsv={() =>
+                getBrowserApiClient().GET("/portfolio/xray/export", { params: { query: { lens: view.dimension } }, parseAs: "text" })
+              }
+            />
+          </span>
+        }
       />
       <p className="mt-1 max-w-3xl text-sm text-text-muted">{view.description}</p>
       <div className="mt-4 space-y-4">

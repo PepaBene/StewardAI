@@ -9,6 +9,7 @@ The portfolio is 1000 EUR:
 so through CSPX: AAPL .05, MSFT .15, NESN .25, the fund's own cash .025, unknown .025.
 """
 
+import dataclasses
 import datetime as dt
 from decimal import Decimal
 
@@ -16,11 +17,21 @@ import pytest
 
 from steward.company.segments import Breakdown, MemberLine, SegmentAnalysis
 from steward.config.jobs import CSPX_ISIN, VWCE_ISIN, LookThroughSettings
+from steward.export import to_csv
 from steward.funds.aggregate import aggregate_exposure
 from steward.lookthrough.read import PortfolioIn, PositionIn, RowIn, SnapshotIn
 from steward.xray.benchmark import benchmark_weights, compare
+from steward.xray.exports import xray_csv
 from steward.xray.intersection import intersection
-from steward.xray.leaves import IssuerFacts, RevenueSlice, XrayData, build_leaves
+from steward.xray.leaves import (
+    IssuerFacts,
+    Profile,
+    RevenueSlice,
+    XrayData,
+    build_leaves,
+    domicile_of,
+    listing_country,
+)
 from steward.xray.metrics import build_fundamentals, concentration_levels
 from steward.xray.scenario import (
     Candidate,
@@ -679,6 +690,145 @@ def test_proposal_cannot_exceed_the_whole_portfolio_or_name_unknown_securities()
             ProposedRequest(additions=[ProposedWeight(ticker="AAPL_US_EQ", weight=0.1)]),
             CANDIDATES,
         )
+
+
+# ------------------------------------------------------------------- domicile and listing country
+
+
+def test_domicile_prefers_the_provider_country_then_the_isin_prefix() -> None:
+    assert domicile_of(Profile(country="US"), AAPL) == ("US", "reported")
+    assert domicile_of(Profile(), NESN) == ("CH", "inferred")  # ISIN prefix, not stated by a feed
+    assert domicile_of(Profile(), "XS1234567890") == (None, "none")  # not a country
+    assert domicile_of(Profile(country="Switzerland"), AAPL) == ("CH", "reported")
+
+
+def test_listing_country_comes_only_from_a_known_exchange() -> None:
+    assert listing_country("NASDAQ Global Select") == "US"
+    assert listing_country("London Stock Exchange") == "GB"
+    assert listing_country("XETRA") == "DE"
+    assert listing_country("Some Unmapped Exchange") is None
+    assert listing_country(None) is None
+
+
+def test_domicile_and_listing_views_are_separate_from_the_country_view() -> None:
+    d = data(profiles={AAPL: Profile(country="US", exchange="NASDAQ Global Select")})
+    ctx = ctx_for(d)
+    dom = build_view("domicile", ctx)
+    assert dom.reconciles and dom.country_kinds is None
+    # AAPL (direct .20 + CSPX .05) and MSFT (.15) are US; Nestle (.25) is CH from its ISIN prefix
+    assert bucket(dom, "US").weight == pytest.approx(0.40)
+    assert bucket(dom, "CH").weight == pytest.approx(0.25)
+    assert bucket(dom, "CH").basis == {"inferred": pytest.approx(0.25)}
+    listing = build_view("listing", ctx)
+    # only AAPL has a stored exchange: everything else is unclassified, never guessed
+    assert bucket(listing, "US").weight == pytest.approx(0.25)
+    assert bucket(listing, "US").basis == {"inferred": pytest.approx(0.25)}
+    assert bucket(listing, "__unclassified__").weight == pytest.approx(0.40)
+
+
+# ----------------------------------------------------------- fixtures the first build lacked
+
+
+def test_two_looked_through_funds_overlap_on_the_same_issuer_and_all_views_reconcile() -> None:
+    vwce = snapshot(VWCE_ISIN, [row("Apple Inc.", AAPL, 0.50), row("Microsoft Corp", MSFT, 0.50)])
+    d = data(snapshots={CSPX_ISIN: cspx_snapshot(), VWCE_ISIN: vwce})
+    ctx = ctx_for(d)
+    assert sum(x.weight for x in ctx.leafset.leaves) == pytest.approx(1.0)
+    for view in build_views(ctx):
+        assert view.reconciles
+    agg = aggregate_exposure(d.portfolio, d.settings, d.snapshots, as_of=DAY, top=1000)
+    report = intersection(agg)
+    apple = next(i for i in report.issuers if i.key == f"isin:{AAPL}")
+    # direct .20, CSPX .05, VWCE .10: three channels, each kept on the trail
+    assert apple.weight == pytest.approx(0.35)
+    assert {c.kind for c in apple.channels} == {"direct", "fund"}
+    assert len(apple.channels) == 3
+    assert report.unknown is not None and report.unknown.not_looked_through_weight == 0
+
+
+def test_a_stale_fund_is_still_looked_through_and_flagged() -> None:
+    old = snapshot(CSPX_ISIN, [row("Apple Inc.", AAPL, 1.0)])
+    old = dataclasses.replace(old, as_of=DAY - dt.timedelta(days=200))
+    d = data(snapshots={CSPX_ISIN: old})
+    agg = aggregate_exposure(d.portfolio, d.settings, d.snapshots, as_of=DAY, top=1000)
+    assert agg.stale_funds  # named so the page can warn
+    ctx = ctx_for(d)
+    assert bucket(build_view("fund", ctx), CSPX_ISIN).weight == pytest.approx(0.50)
+    assert all(v.reconciles for v in build_views(ctx))
+
+
+def test_a_bond_row_is_other_assets_and_never_equity() -> None:
+    bonds = snapshot(
+        CSPX_ISIN,
+        [
+            row("Apple Inc.", AAPL, 0.60),
+            row(
+                "Treasury 2030", None, 0.40, asset_class="other", sector=None, country="US",
+                currency="USD",
+            ),
+        ],
+    )  # fmt: skip
+    ctx = ctx_for(data(snapshots={CSPX_ISIN: bonds}))
+    assets = build_view("asset_class", ctx)
+    assert bucket(assets, "other").weight == pytest.approx(0.50 * 0.40)  # 200 of 1000
+    sector = build_view("sector", ctx)
+    assert "Treasury 2030" not in {c.label for b in sector.buckets for c in b.contributors}
+    assert bucket(sector, "__fund_cash__").weight == pytest.approx(0.20)
+    assert all(v.reconciles for v in build_views(ctx))
+
+
+def test_a_pence_quoted_holding_is_sterling_in_the_currency_view() -> None:
+    pf = portfolio()
+    pf.positions.append(
+        dataclasses.replace(
+            position("VOD_EQ", "GB00BH4HKS39", 0.0), currency="GBX", value_base=100.0
+        )
+    )
+    ctx = ctx_for(data(portfolio=pf))
+    view = build_view("currency", ctx)
+    assert bucket(view, "GBP").weight == pytest.approx(100 / 1100)
+    assert not any(b.key == "GBX" for b in view.buckets)
+    assert view.reconciles
+
+
+# ------------------------------------------------------------------------------- csv export
+
+
+def test_csv_export_has_one_row_per_bucket_and_escapes_formulas() -> None:
+    ctx = ctx_for(data())
+    views = build_views(ctx)
+    text = xray_csv(views, "sector")
+    lines = text.strip().split("\n")
+    assert lines[0].startswith("lens,bucket,kind,weight")
+    sector = next(v for v in views if v.dimension == "sector")
+    assert len(lines) == 1 + len(sector.buckets)
+    assert all(line.startswith("sector,") for line in lines[1:])
+    assert "lens" in xray_csv(views).split("\n")[0]
+    # a lone empty cell is written as "" so the row is not mistaken for a blank line
+    written = to_csv(["a"], [["=SUM(A1)"], ["-3.5"], [None], [True]])
+    assert written == 'a\n\'=SUM(A1)\n-3.5\n""\ntrue\n'
+
+
+def test_widened_proposal_comparison_keeps_every_lens_with_data() -> None:
+    d = data()
+    pf = d.portfolio
+    assert pf is not None
+    new_pf, notes = apply_proposal(
+        pf, ProposedRequest(weights=[ProposedWeight(ticker="AAPL_US_EQ", weight=0.1)]), CANDIDATES
+    )
+    out = compare_proposal(
+        analyse(d, {}),
+        analyse(dataclasses.replace(d, portfolio=new_pf), {}),
+        pf,
+        new_pf,
+        as_of=DAY.isoformat(),
+        notes=notes,
+        held_funds_looked_through={},
+    )
+    shown = {v.dimension for v in out.views}
+    assert {"domicile", "issuer", "style", "size", "fees"} <= shown
+    # lenses that rest on data nobody has entered are left out, not shown as a lone unknown bar
+    assert not shown & {"industry", "listing", "revenue_country", "commodity", "trade_product"}
 
 
 def test_before_and_after_show_overlap_fees_and_coverage_differences() -> None:

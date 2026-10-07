@@ -23,7 +23,7 @@ from __future__ import annotations
 
 import datetime as dt
 from collections import defaultdict
-from collections.abc import Iterable, Mapping, Sequence
+from collections.abc import Callable, Iterable, Mapping, Sequence
 from dataclasses import dataclass, field
 from decimal import Decimal
 from itertools import pairwise
@@ -43,6 +43,25 @@ class PositionDay:
     price: Decimal  # listing currency, the unit fills use
     fx: Decimal  # base-currency units per one unit of the listing currency
     value_base: Decimal
+
+
+FxLookup = Callable[[str, dt.date], Decimal | None]
+
+
+def ticker_fx_lookup(positions: Iterable[PositionDay]) -> FxLookup:
+    """The base rate of a holding's own listing currency on the nearest snapshot day it appears,
+    earlier days first on a tie; None for a ticker that never appears."""
+    by_ticker: dict[str, list[tuple[dt.date, Decimal]]] = defaultdict(list)
+    for p in positions:
+        by_ticker[p.ticker].append((p.day, p.fx))
+
+    def lookup(ticker: str, day: dt.date) -> Decimal | None:
+        rows = by_ticker.get(ticker)
+        if not rows:
+            return None
+        return min(rows, key=lambda r: (abs((r[0] - day).days), r[0] > day))[1]
+
+    return lookup
 
 
 @dataclass(frozen=True)
@@ -103,8 +122,13 @@ def attribute(
     trades: Iterable[Trade],
     income: Iterable[Amount],
     costs: Iterable[Amount],
+    fx_fallback: FxLookup | None = None,
 ) -> AttributionReport | None:
-    """None with fewer than two valuation days."""
+    """None with fewer than two valuation days.
+
+    `fx_fallback` gives a holding's own base rate when it has no snapshot row at either end of an
+    interval (bought and sold in between). Without a rate the holding is left unattributed: its
+    fills cannot be valued, and a zero rate would silently lose its gain to the residual."""
     days = sorted(account_days, key=lambda d: d.day)
     if len(days) < 2:
         return None
@@ -137,8 +161,16 @@ def attribute(
                 unattributed.add(ticker)
                 holding(ticker).attributed = False
                 continue
-            fx0 = p0.fx if p0 else (p1.fx if p1 else ZERO)
-            fx1 = p1.fx if p1 else fx0
+            if p0 is None and p1 is None:
+                rate = fx_fallback(ticker, after.day) if fx_fallback else None
+                if rate is None:
+                    unattributed.add(ticker)
+                    holding(ticker).attributed = False
+                    continue
+                fx0 = fx1 = rate
+            else:
+                fx0 = p0.fx if p0 else (p1.fx if p1 else ZERO)
+                fx1 = p1.fx if p1 else fx0
             local_open = q0 * p0.price if p0 else ZERO
             local_close = q1 * p1.price if p1 else ZERO
             fill_local = sum((t.quantity * t.price for t in fills), ZERO)

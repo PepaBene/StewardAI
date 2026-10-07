@@ -32,7 +32,7 @@ from steward.funds.aggregate import (
     config_groups,
     issuer_for,
 )
-from steward.lookthrough.classify import COUNTRIES, region_of
+from steward.lookthrough.classify import COUNTRIES, country_code, region_of
 from steward.lookthrough.read import (
     CASH,
     FUND_CASH,
@@ -83,10 +83,51 @@ def gics_from_provider(label: str | None) -> str | None:
 
 @dataclass(frozen=True)
 class Profile:
-    """A data provider's sector and industry label for one ticker."""
+    """A data provider's sector, industry, country and exchange for one ticker."""
 
     sector: str | None = None
     industry: str | None = None
+    country: str | None = None
+    exchange: str | None = None
+
+
+# Where a provider's exchange name trades: matched as a lower-case fragment, first hit wins. An
+# exchange not listed here leaves the listing country unknown rather than guessed.
+EXCHANGE_COUNTRY: tuple[tuple[str, str], ...] = (
+    ("nasdaq", "US"), ("nyse", "US"), ("amex", "US"), ("cboe", "US"), ("bats", "US"),
+    ("london", "GB"), ("lse", "GB"), ("xetra", "DE"), ("frankfurt", "DE"), ("stuttgart", "DE"),
+    ("berlin", "DE"), ("hamburg", "DE"), ("munich", "DE"), ("dusseldorf", "DE"),
+    ("paris", "FR"), ("euronext paris", "FR"), ("amsterdam", "NL"), ("brussels", "BE"),
+    ("lisbon", "PT"), ("dublin", "IE"), ("milan", "IT"), ("borsa italiana", "IT"),
+    ("madrid", "ES"), ("swiss", "CH"), ("six ", "CH"), ("vienna", "AT"), ("copenhagen", "DK"),
+    ("stockholm", "SE"), ("helsinki", "FI"), ("oslo", "NO"), ("warsaw", "PL"),
+    ("prague", "CZ"), ("toronto", "CA"), ("tsx", "CA"), ("tokyo", "JP"), ("japan", "JP"),
+    ("hong kong", "HK"), ("shanghai", "CN"), ("shenzhen", "CN"), ("korea", "KR"),
+    ("taiwan", "TW"), ("australia", "AU"), ("asx", "AU"), ("nse", "IN"), ("bombay", "IN"),
+    ("singapore", "SG"), ("johannesburg", "ZA"), ("sao paulo", "BR"), ("mexic", "MX"),
+)  # fmt: skip
+
+
+def listing_country(exchange: str | None) -> str | None:
+    text = (exchange or "").strip().lower()
+    if not text:
+        return None
+    for fragment, code in EXCHANGE_COUNTRY:
+        if fragment in text:
+            return code
+    return None
+
+
+def domicile_of(profile: Profile, isin: str | None) -> tuple[str | None, str]:
+    """Where the company is based, with the basis: the provider's country when stored (reported),
+    else the ISIN's country prefix, which is where the security was registered (inferred)."""
+    code = country_code(profile.country)
+    if code:
+        return code, "reported"
+    prefix = (isin or "")[:2].upper()
+    if prefix in COUNTRIES:
+        return prefix, "inferred"
+    return None, "none"
 
 
 @dataclass(frozen=True)
@@ -133,6 +174,10 @@ class Leaf:
     country_kind: str = "unstated"
     currency: str | None = None
     currency_basis: Basis = "none"
+    domicile: str | None = None  # where the company is based, never mixed with `country`
+    domicile_basis: Basis = "none"
+    listing: str | None = None  # country of the exchange the provider names
+    listing_basis: Basis = "none"
 
     @property
     def is_equity(self) -> bool:
@@ -227,6 +272,8 @@ def _direct_leaf(
             sector, sector_basis = mapped, "inferred"
 
     currency = _currency(p.currency)
+    domicile, domicile_basis = domicile_of(prof, p.isin)
+    listed = listing_country(prof.exchange)
     return Leaf(
         channel_kind="direct",
         channel_key=DIRECT_CHANNEL,
@@ -247,6 +294,10 @@ def _direct_leaf(
         country_kind=country_kind if country else "unstated",
         currency=currency,
         currency_basis="reported" if currency else "none",
+        domicile=domicile,
+        domicile_basis=domicile_basis,  # type: ignore[arg-type]
+        listing=listed,
+        listing_basis="inferred" if listed else "none",
     )
 
 
@@ -267,6 +318,8 @@ def _fund_row_leaf(
             sector, sector_basis = mapped, "inferred"
     country = _country(r.country)
     currency = r.currency
+    domicile, domicile_basis = domicile_of(prof, r.isin)
+    listed = listing_country(prof.exchange)
     return Leaf(
         channel_kind="fund",
         channel_key=fund.key,
@@ -287,6 +340,10 @@ def _fund_row_leaf(
         country_kind=(snap.country_basis or "unstated") if country else "unstated",
         currency=currency,
         currency_basis=("inferred" if r.currency_derived else "reported") if currency else "none",
+        domicile=domicile,
+        domicile_basis=domicile_basis,  # type: ignore[arg-type]
+        listing=listed,
+        listing_basis="inferred" if listed else "none",
     )
 
 

@@ -3,14 +3,15 @@ health badge, lots and holding periods, attribution and the satellites-versus-co
 Read-only against the broker data; the only write is the owner's own settings. Wiring:
 `app.include_router` of `router` in api/main.py."""
 
-from typing import Annotated
+from typing import Annotated, Literal
 
 from fastapi import APIRouter, Query
+from fastapi.responses import PlainTextResponse
 from pydantic import BaseModel
 
 from api.auth import Owner
 from api.db import Pool
-from steward.performance import service
+from steward.performance import exports, service
 from steward.performance.reports import (
     AttributionResponse,
     LotsResponse,
@@ -59,6 +60,33 @@ async def get_sleeves(pool: Pool, owner: Owner) -> SleevesResponse:
     """Stocks against the core ETFs, each as a rolling time-weighted return after fees."""
     settings, _ = await load_settings(pool, owner.user_id)
     return await service.sleeves_report(pool, settings)
+
+
+ExportKind = Literal["ledger", "lots", "realized", "attribution"]
+
+
+@router.get("/portfolio/performance/export", tags=["portfolio"], response_class=PlainTextResponse)
+async def export_performance(
+    pool: Pool,
+    owner: Owner,
+    kind: ExportKind,
+    days: Annotated[int, Query(ge=7, le=3650)] = 365,
+) -> PlainTextResponse:
+    """One table as CSV: the dated ledger, open lots, realized gains or attribution (the last
+    over `days`). The same rows the pages show."""
+    settings, _ = await load_settings(pool, owner.user_id)
+    if kind == "ledger":
+        body = exports.ledger_csv(await service.ledger_entries(pool))
+    elif kind == "attribution":
+        body = exports.attribution_csv(await service.attribution_report(pool, settings, days))
+    else:
+        report = await service.lots_report(pool, settings)
+        body = exports.lots_csv(report) if kind == "lots" else exports.realized_csv(report)
+    return PlainTextResponse(
+        body,
+        media_type="text/csv",
+        headers={"Content-Disposition": f'attachment; filename="performance-{kind}.csv"'},
+    )
 
 
 @router.get("/portfolio/performance/settings", tags=["portfolio"])

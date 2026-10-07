@@ -34,6 +34,8 @@ Dimension = Literal[
     "sector",
     "industry",
     "country",
+    "domicile",
+    "listing",
     "region",
     "currency",
     "issuer",
@@ -50,6 +52,8 @@ DIMENSIONS: tuple[Dimension, ...] = (
     "sector",
     "industry",
     "country",
+    "domicile",
+    "listing",
     "region",
     "currency",
     "issuer",
@@ -90,6 +94,19 @@ DIMENSION_INFO: dict[str, tuple[str, str, str]] = {
         "One country per holding, but not one meaning: iShares publishes country of risk, "
         "Vanguard the listing country and a direct stock the instrument list's home market. The "
         "mix is shown, and the view says so when more than one is present.",
+    ),
+    "domicile": (
+        "Domicile",
+        "classification",
+        "Where the company is based: the data provider's country when stored, otherwise the "
+        "country prefix of the ISIN (where the security was registered). Always the same meaning "
+        "for every holding, unlike the country view.",
+    ),
+    "listing": (
+        "Listing country",
+        "classification",
+        "The country of the exchange the data provider names for the security. A stock that "
+        "trades on an exchange the app does not map, or has no stored profile, is unclassified.",
     ),
     "region": (
         "Region",
@@ -269,9 +286,7 @@ def label_for(dimension: str, key: str) -> str:
         return "All other issuers"
     if key == NO_MARKET_CAP:
         return "No market cap available"
-    if dimension == "country":
-        return country_name(key) or key
-    if dimension == "revenue_country":
+    if dimension in ("country", "domicile", "listing", "revenue_country"):
         return country_name(key) or key
     if dimension == "asset_class":
         return ASSET_CLASS_LABELS.get(key, key)
@@ -354,6 +369,10 @@ def pieces(leaf: Leaf, dimension: Dimension, ctx: ViewContext) -> list[Piece]:
                 leaf.country_kind if leaf.country else None,
             )
         ]
+    if dimension == "domicile":
+        return [Piece(leaf.domicile or UNCLASSIFIED, 1.0, leaf.domicile_basis)]
+    if dimension == "listing":
+        return [Piece(leaf.listing or UNCLASSIFIED, 1.0, leaf.listing_basis)]
     if dimension == "region":
         region = region_for(leaf.country)
         return [Piece(region or UNCLASSIFIED, 1.0, "inferred" if region else "none")]

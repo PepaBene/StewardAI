@@ -4914,6 +4914,27 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/portfolio/performance/export": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Export Performance
+         * @description One table as CSV: the dated ledger, open lots, realized gains or attribution (the last
+         *     over `days`). The same rows the pages show.
+         */
+        get: operations["export_performance"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/portfolio/performance/settings": {
         parameters: {
             query?: never;
@@ -4951,6 +4972,26 @@ export interface paths {
          *     contributors and how it was classified.
          */
         get: operations["get_xray"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/portfolio/xray/export": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Export Xray
+         * @description The X-Ray buckets as CSV, one lens or all of them.
+         */
+        get: operations["export_xray"];
         put?: never;
         post?: never;
         delete?: never;
@@ -17479,6 +17520,12 @@ export interface components {
              * @default 1
              */
             cash_tolerance: number | string;
+            /**
+             * Alert Severity
+             * @description Severity of the alert raised with the monthly review when stocks trail the core ETFs or a lot's sell target is reached early. It is sent when a notification rule matches that severity (the default rules send severity 3 only; otherwise it waits for the digest). 0 turns these alerts off.
+             * @default 2
+             */
+            alert_severity: number;
             benchmark?: components["schemas"]["BenchmarkSpec"] | null;
             /**
              * Note
@@ -23494,7 +23541,7 @@ export interface components {
              * Dimension
              * @enum {string}
              */
-            dimension: "asset_class" | "sector" | "industry" | "country" | "region" | "currency" | "issuer" | "fund" | "style" | "size" | "fees" | "revenue_country" | "commodity" | "trade_product";
+            dimension: "asset_class" | "sector" | "industry" | "country" | "domicile" | "listing" | "region" | "currency" | "issuer" | "fund" | "style" | "size" | "fees" | "revenue_country" | "commodity" | "trade_product";
             /** Label */
             label: string;
             /** Group */
@@ -23715,7 +23762,7 @@ export interface operations {
             header?: never;
             path: {
                 /** @description Config domain, as in /config/<domain>. */
-                domain: "strategy" | "theses" | "jobs" | "holding-profiles" | "verification" | "news-sources" | "event-rules" | "notifications" | "budget" | "research-profiles" | "prompts";
+                domain: "strategy" | "theses" | "jobs" | "holding-profiles" | "verification" | "news-sources" | "event-rules" | "notifications" | "budget" | "research-profiles" | "prompts" | "performance";
             };
             cookie?: never;
         };
@@ -23747,7 +23794,7 @@ export interface operations {
             header?: never;
             path: {
                 /** @description Config domain, as in /config/<domain>. */
-                domain: "strategy" | "theses" | "jobs" | "holding-profiles" | "verification" | "news-sources" | "event-rules" | "notifications" | "budget" | "research-profiles" | "prompts";
+                domain: "strategy" | "theses" | "jobs" | "holding-profiles" | "verification" | "news-sources" | "event-rules" | "notifications" | "budget" | "research-profiles" | "prompts" | "performance";
                 version_id: number;
             };
             cookie?: never;
@@ -23783,7 +23830,7 @@ export interface operations {
             header?: never;
             path: {
                 /** @description Config domain, as in /config/<domain>. */
-                domain: "strategy" | "theses" | "jobs" | "holding-profiles" | "verification" | "news-sources" | "event-rules" | "notifications" | "budget" | "research-profiles" | "prompts";
+                domain: "strategy" | "theses" | "jobs" | "holding-profiles" | "verification" | "news-sources" | "event-rules" | "notifications" | "budget" | "research-profiles" | "prompts" | "performance";
             };
             cookie?: never;
         };
@@ -23818,7 +23865,7 @@ export interface operations {
             header?: never;
             path: {
                 /** @description Config domain, as in /config/<domain>. */
-                domain: "strategy" | "theses" | "jobs" | "holding-profiles" | "verification" | "news-sources" | "event-rules" | "notifications" | "budget" | "research-profiles" | "prompts";
+                domain: "strategy" | "theses" | "jobs" | "holding-profiles" | "verification" | "news-sources" | "event-rules" | "notifications" | "budget" | "research-profiles" | "prompts" | "performance";
                 version_id: number;
             };
             cookie?: never;
@@ -32200,6 +32247,38 @@ export interface operations {
             };
         };
     };
+    export_performance: {
+        parameters: {
+            query: {
+                kind: "ledger" | "lots" | "realized" | "attribution";
+                days?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/plain": string;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     get_performance_settings: {
         parameters: {
             query?: never;
@@ -32269,6 +32348,37 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["XrayResponse"];
+                };
+            };
+        };
+    };
+    export_xray: {
+        parameters: {
+            query?: {
+                lens?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/plain": string;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };

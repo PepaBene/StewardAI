@@ -29,7 +29,13 @@ from steward.xray.metrics import (
 )
 from steward.xray.views import ViewContext, XrayView, build_view
 
-COMPARED: tuple[str, ...] = ("asset_class", "sector", "country", "region", "currency", "fund")
+COMPARED: tuple[str, ...] = (
+    "asset_class", "sector", "industry", "country", "domicile", "listing", "region", "currency",
+    "issuer", "fund", "style", "size", "fees", "revenue_country", "commodity", "trade_product",
+)  # fmt: skip
+OPTIONAL_LENSES = frozenset(
+    {"industry", "listing", "revenue_country", "commodity", "trade_product"}
+)
 LOW = 1e-9
 
 
@@ -355,9 +361,15 @@ def compare(
 
     views = []
     for d in COMPARED:
-        views.append(
-            _delta_view(build_view(d, before.ctx), build_view(d, after.ctx))  # type: ignore[arg-type]
+        delta = _delta_view(
+            build_view(d, before.ctx),  # type: ignore[arg-type]
+            build_view(d, after.ctx),  # type: ignore[arg-type]
         )
+        # A lens that rests on owner mappings or the provider profile says nothing when no
+        # holding carries a label either side; leave it out rather than show a lone unknown bar.
+        if d in OPTIONAL_LENSES and not any(r.kind == "classified" for r in delta.rows):
+            continue
+        views.append(delta)
 
     wb_i, _ = _issuer_totals(before)
     wa_i, _ = _issuer_totals(after)

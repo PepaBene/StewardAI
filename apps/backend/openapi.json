@@ -181,7 +181,8 @@
                 "notifications",
                 "budget",
                 "research-profiles",
-                "prompts"
+                "prompts",
+                "performance"
               ],
               "type": "string",
               "description": "Config domain, as in /config/<domain>.",
@@ -259,7 +260,8 @@
                 "notifications",
                 "budget",
                 "research-profiles",
-                "prompts"
+                "prompts",
+                "performance"
               ],
               "type": "string",
               "description": "Config domain, as in /config/<domain>.",
@@ -333,7 +335,8 @@
                 "notifications",
                 "budget",
                 "research-profiles",
-                "prompts"
+                "prompts",
+                "performance"
               ],
               "type": "string",
               "description": "Config domain, as in /config/<domain>.",
@@ -418,7 +421,8 @@
                 "notifications",
                 "budget",
                 "research-profiles",
-                "prompts"
+                "prompts",
+                "performance"
               ],
               "type": "string",
               "description": "Config domain, as in /config/<domain>.",
@@ -15919,6 +15923,72 @@
         ]
       }
     },
+    "/portfolio/performance/export": {
+      "get": {
+        "tags": [
+          "portfolio"
+        ],
+        "summary": "Export Performance",
+        "description": "One table as CSV: the dated ledger, open lots, realized gains or attribution (the last\nover `days`). The same rows the pages show.",
+        "operationId": "export_performance",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "kind",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "enum": [
+                "ledger",
+                "lots",
+                "realized",
+                "attribution"
+              ],
+              "type": "string",
+              "title": "Kind"
+            }
+          },
+          {
+            "name": "days",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 3650,
+              "minimum": 7,
+              "default": 365,
+              "title": "Days"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/portfolio/performance/settings": {
       "get": {
         "tags": [
@@ -16015,6 +16085,62 @@
             "HTTPBearer": []
           }
         ]
+      }
+    },
+    "/portfolio/xray/export": {
+      "get": {
+        "tags": [
+          "portfolio"
+        ],
+        "summary": "Export Xray",
+        "description": "The X-Ray buckets as CSV, one lens or all of them.",
+        "operationId": "export_xray",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "lens",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "maxLength": 30
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Lens"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
       }
     },
     "/portfolio/xray/overlap": {
@@ -51993,6 +52119,14 @@
             "description": "Largest unexplained daily cash change accepted, in the account currency.",
             "default": "1"
           },
+          "alert_severity": {
+            "type": "integer",
+            "maximum": 3.0,
+            "minimum": 0.0,
+            "title": "Alert Severity",
+            "description": "Severity of the alert raised with the monthly review when stocks trail the core ETFs or a lot's sell target is reached early. It is sent when a notification rule matches that severity (the default rules send severity 3 only; otherwise it waits for the digest). 0 turns these alerts off.",
+            "default": 2
+          },
           "benchmark": {
             "anyOf": [
               {
@@ -69417,6 +69551,8 @@
               "sector",
               "industry",
               "country",
+              "domicile",
+              "listing",
               "region",
               "currency",
               "issuer",
