@@ -6530,6 +6530,12 @@ export interface components {
             question: string;
             /** As Of */
             as_of?: string | null;
+            /**
+             * Phrase
+             * @description Reword the template with the chat model when that is an OpenAI or Google model. The rewrite is used only if every number in it is in the evidence.
+             * @default false
+             */
+            phrase: boolean;
         };
         /** AwardDetailOut */
         AwardDetailOut: {
@@ -6874,7 +6880,7 @@ export interface components {
              * Critical Job Types
              * @description Job types that run normally at the monthly cap.
              */
-            critical_job_types?: ("portfolio_sync" | "earnings_check" | "thesis_verdicts" | "earnings_calendar" | "earnings_calendar_full" | "earnings_due" | "fact_reconcile" | "reference_data" | "price_history" | "intraday_prices" | "holiday_refresh" | "macro_collect" | "public_data_collect" | "source_audit" | "event_escalation" | "monitor" | "news_ingest" | "daily_digest" | "weekly_digest" | "research" | "ownership_13f" | "insider_trades" | "etf_look_through" | "monthly_review" | "chat" | "sec_xbrl" | "valuation_refresh" | "control_stakes" | "nport_holdings" | "fund_probes" | "fund_characteristics_audit" | "free_source_alerts" | "shadow_snapshot" | "shadow_report" | "raw_retention" | "zero_cost_gate" | "returns_refresh" | "exchange_probes" | "ir_releases" | "sec_fsds_backfill" | "pdmr_uk" | "graph_review" | "fmp_company" | "alpha_vantage_statements" | "epo_patents" | "companies_house_filings" | "edinet_filings" | "twelve_data_corporate_actions" | "ai_approvals" | "ir_discovery" | "gap_research" | "exposure_build" | "disclosure_sources" | "disclosure_ingest" | "disclosure_identifiers" | "disclosure_estimates" | "disclosure_alerts")[];
+            critical_job_types?: ("portfolio_sync" | "earnings_check" | "thesis_verdicts" | "earnings_calendar" | "earnings_calendar_full" | "earnings_due" | "fact_reconcile" | "reference_data" | "price_history" | "intraday_prices" | "holiday_refresh" | "macro_collect" | "public_data_collect" | "source_audit" | "event_escalation" | "monitor" | "news_ingest" | "daily_digest" | "weekly_digest" | "research" | "ownership_13f" | "insider_trades" | "etf_look_through" | "monthly_review" | "chat" | "sec_xbrl" | "valuation_refresh" | "control_stakes" | "nport_holdings" | "fund_probes" | "fund_characteristics_audit" | "free_source_alerts" | "shadow_snapshot" | "shadow_report" | "raw_retention" | "zero_cost_gate" | "returns_refresh" | "exchange_probes" | "ir_releases" | "sec_fsds_backfill" | "pdmr_uk" | "graph_review" | "fmp_company" | "alpha_vantage_statements" | "epo_patents" | "companies_house_filings" | "edinet_filings" | "twelve_data_corporate_actions" | "ai_approvals" | "ir_discovery" | "gap_research" | "exposure_build" | "disclosure_sources" | "disclosure_ingest" | "disclosure_identifiers" | "disclosure_deals" | "disclosure_esef" | "disclosure_estimates" | "disclosure_alerts")[];
             /**
              * Per Job Cap Usd
              * @description Most AI spend of one run of a job type, in USD. A run over it fails.
@@ -14799,6 +14805,10 @@ export interface components {
             disclosure_ingest?: components["schemas"]["JobSchedule"];
             /** @description Suggest missing LEIs (GLEIF) and FIGIs (OpenFIGI); you confirm each. Default: Saturdays 06:20. */
             disclosure_identifiers?: components["schemas"]["JobSchedule"];
+            /** @description Read the recent 8-K, 6-K, S-4, proxy and tender-offer filings of held issuers and store the deals, states and terms they state. Default: weekdays 06:50. */
+            disclosure_deals?: components["schemas"]["JobSchedule"];
+            /** @description Read the filings.xbrl.org index for held issuers with a confirmed LEI and store each new ESEF report as a dated document version. Default: weekdays 07:00. */
+            disclosure_esef?: components["schemas"]["JobSchedule"];
             /** @description Fetch each enabled issuer consensus file once and store a new version only when its bytes changed. Default: weekdays 06:30. */
             disclosure_estimates?: components["schemas"]["JobSchedule"];
             /** @description Scan verified disclosures for new alerts and e-mail them, grouped by ticker, when e-mail is configured. Default: daily 13:15. */

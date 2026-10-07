@@ -117,10 +117,11 @@ def _group(rows: Sequence[Any]) -> dict[int, list[Any]]:
     return out
 
 
-FACT_METRICS = ("shares_outstanding", "total_debt", "cash")
+FACT_METRICS = ("shares_outstanding", "total_debt", "cash", "revenue")
 
 FACTS_SQL = """
-select x.deal_id, x.who, lower(o.metric) as metric, o.value, o.scale, o.known_at, o.id
+select x.deal_id, x.who, lower(o.metric) as metric, o.value, o.scale, o.known_at, o.id,
+       o.segment, o.period_end, o.currency
   from (
     select p.deal_id, p.role as who, p.issuer_id
       from public.deal_participant p
@@ -139,15 +140,66 @@ select x.deal_id, x.who, lower(o.metric) as metric, o.value, o.scale, o.known_at
 """
 
 
-def context_from_facts(rows: Sequence[Any], announced_on: dt.date | None) -> dl.DealContext:
-    """Share counts and net debt from stored observations known by the as-of date. The latest value
-    per participant and metric wins. A value that is not stored stays None, so the impact that needs
-    it says why it is missing instead of using zero. Enterprise value and segment revenue are not
-    read here: they need a market price and a segment mapping that are not stored."""
+# The held company's closing price on or before the announcement (never after the as-of date), in
+# the instrument's currency: the market side of "enterprise value before the deal".
+PRICES_SQL = """
+select e.id as deal_id, b.close, n.currency, b.date as price_date
+  from public.deal_event e
+  join public.instrument n on n.t212_ticker = e.ticker
+  join lateral (
+    select close, date from public.price_bar
+     where symbol = coalesce(n.price_symbol, n.t212_ticker)
+       and date <= least(coalesce(e.announced_at, $2)::date, $2::date)
+     order by date desc limit 1
+  ) b on true
+ where e.id = any($1::bigint[])
+"""
+
+ACQUIRER = ("acquirer", "bidder", "buyer")
+
+
+def _scaled(r: Any) -> Decimal:
+    return Decimal(r["value"]) * (Decimal(10) ** int(r["scale"] or 0))
+
+
+def _segments(rows: Sequence[Any], roles: Sequence[str]) -> dict[str, Decimal] | None:
+    """Revenue by segment for the latest period that has any, for the first role that has rows."""
+    for role in roles:
+        mine = [
+            r
+            for r in rows
+            if r["who"] == role
+            and r["metric"] == "revenue"
+            and r.get("segment")
+            and r.get("period_end")
+        ]
+        if not mine:
+            continue
+        newest = max(r["period_end"] for r in mine)
+        # rows arrive oldest-known first, so a later restatement of the same segment wins
+        return {r["segment"]: _scaled(r) for r in mine if r["period_end"] == newest}
+    return None
+
+
+def context_from_facts(
+    rows: Sequence[Any], announced_on: dt.date | None, price: Any = None
+) -> dl.DealContext:
+    """Share counts, net debt, enterprise value and segment revenue from stored observations known
+    by the as-of date. The latest value per participant and metric wins. A value that is not stored
+    stays None, so the impact that needs it says why it is missing instead of using zero.
+
+    Enterprise value is the held company's market value (closing price x shares) plus net debt. It
+    is built only when the price's currency equals the currency of both debt and cash; otherwise it
+    stays unknown rather than mixing currencies. `price` is a row with `close` and `currency`."""
     latest: dict[tuple[str, str], Decimal] = {}
+    currency: dict[tuple[str, str], str | None] = {}
     for r in rows:
-        value = Decimal(r["value"]) * (Decimal(10) ** int(r["scale"] or 0))
-        latest[(r["who"], r["metric"])] = value
+        if r["metric"] == "revenue" or r.get("segment"):
+            continue  # segment revenue is read below; a segment's own count is not the firm's
+        key = (r["who"], r["metric"])
+        latest[key] = _scaled(r)
+        cur = r.get("currency")
+        currency[key] = cur.upper() if cur else None
 
     def pick(roles: Sequence[str], metric: str) -> Decimal | None:
         for role in roles:
@@ -155,15 +207,25 @@ def context_from_facts(rows: Sequence[Any], announced_on: dt.date | None) -> dl.
                 return latest[(role, metric)]
         return None
 
-    acquirer = ("acquirer", "bidder", "buyer")
     debt = pick(("held",), "total_debt")
     cash = pick(("held",), "cash")
+    net_debt = None if debt is None or cash is None else debt - cash
+    held_shares = pick(("held",), "shares_outstanding")
+    ev: Decimal | None = None
+    if net_debt is not None and held_shares is not None and price is not None:
+        px_cur = (price["currency"] or "").upper()
+        same = {currency[("held", "total_debt")], currency[("held", "cash")]} == {px_cur}
+        if price["close"] is not None and px_cur and same:
+            ev = Decimal(price["close"]) * held_shares + net_debt
     return dl.DealContext(
         announced_on=announced_on,
-        acquirer_shares=pick(acquirer, "shares_outstanding"),
+        acquirer_shares=pick(ACQUIRER, "shares_outstanding"),
         target_shares=pick(("target",), "shares_outstanding"),
         parent_shares=pick(("issuer", "held"), "shares_outstanding"),
-        net_debt_before=None if debt is None or cash is None else debt - cash,
+        net_debt_before=net_debt,
+        enterprise_value_before=ev,
+        acquirer_segments=_segments(rows, (*ACQUIRER, "held")),
+        target_segments=_segments(rows, ("target",)),
     )
 
 
@@ -172,6 +234,7 @@ async def _children(
 ) -> dict[str, dict[int, list[Any]]]:
     return {
         "facts": _group(await pool.fetch(FACTS_SQL, ids, when, list(FACT_METRICS))),
+        "prices": _group(await pool.fetch(PRICES_SQL, ids, when)),
         "participants": await _rows(
             pool,
             """select deal_id, role, name, issuer_id, ticker, share_class from
@@ -236,8 +299,11 @@ def _deal_json(
     v_rows = kids["versions"].get(did, [])
     versions = [_term_version(r) for r in v_rows]
     announced = deal["announced_at"]
+    prices = kids.get("prices", {}).get(did, [])
     ctx = context_from_facts(
-        kids.get("facts", {}).get(did, []), announced.date() if announced else None
+        kids.get("facts", {}).get(did, []),
+        announced.date() if announced else None,
+        prices[0] if prices else None,
     )
     snap = dl.snapshot(
         deal["deal_type"],

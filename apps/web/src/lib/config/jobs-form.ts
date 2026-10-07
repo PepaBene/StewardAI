@@ -316,6 +316,18 @@ export const SCHEDULES: Record<ScheduleKey, { label: string; description: string
       "Looks up missing LEIs and FIGIs and stores them as suggestions. Nothing is confirmed until you decide it.",
     cron: "20 6 * * 6",
   },
+  disclosure_deals: {
+    label: "Deal filings",
+    description:
+      "Reads recent 8-K, S-4, proxy and tender-offer filings of your holdings and stores the deals, their state and the terms they state. A filing that does not name two parties and a deal type is counted, never guessed.",
+    cron: "50 6 * * 1-5",
+  },
+  disclosure_esef: {
+    label: "European annual reports",
+    description:
+      "Checks filings.xbrl.org for new ESEF reports of holdings with a confirmed LEI and stores each with the date it was published. It reads no values; statements come through the statement pipeline.",
+    cron: "0 7 * * 1-5",
+  },
   disclosure_estimates: {
     label: "Consensus files",
     description:

@@ -15,8 +15,12 @@ from pydantic import AwareDatetime, BaseModel, Field
 
 from api.auth import Owner
 from api.db import Pool
+from steward.config.jobs import ChatSettings, JobsConfig
+from steward.config.store import load_active
 from steward.disclosure import answer as answer_mod
 from steward.disclosure import estimate_read, replay
+from steward.llm.client import create_llm
+from steward.settings import get_settings
 
 router = APIRouter(prefix="/disclosures", tags=["disclosures"])
 
@@ -67,6 +71,11 @@ class AnswerRequest(BaseModel):
     ticker: str = Field(min_length=1, max_length=30)
     question: str = Field(min_length=3, max_length=500)
     as_of: AwareDatetime | None = None
+    phrase: bool = Field(
+        default=False,
+        description="Reword the template with the chat model when that is an OpenAI or Google "
+        "model. The rewrite is used only if every number in it is in the evidence.",
+    )
 
 
 class AnswerEvidenceOut(BaseModel):
@@ -105,4 +114,14 @@ async def disclosure_answer(body: AnswerRequest, pool: Pool, _owner: Owner) -> A
     out = await answer_mod.answer(
         pool, ticker, int(issuer["id"]) if issuer else None, body.question, when
     )
-    return AnswerOut(ticker=ticker, as_of=when, phrased_by="template", **out)
+    phrased_by = "template"
+    if body.phrase and out["grounded"]:
+        stored = await load_active(pool, "jobs", JobsConfig)
+        chat: ChatSettings = (stored.body if stored else JobsConfig()).chat
+        # Claude models are off, so a Claude chat model finds no key and the template stays.
+        reworded = await answer_mod.phrase(
+            create_llm(get_settings(), None), chat.model, out, out["evidence"]
+        )
+        if reworded:
+            out["text"], phrased_by = reworded, chat.model
+    return AnswerOut(ticker=ticker, as_of=when, phrased_by=phrased_by, **out)

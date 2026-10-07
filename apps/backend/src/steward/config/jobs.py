@@ -1909,6 +1909,16 @@ class JobsConfig(ConfigModel):
         description="Suggest missing LEIs (GLEIF) and FIGIs (OpenFIGI); you confirm each. "
         "Default: Saturdays 06:20.",
     )
+    disclosure_deals: JobSchedule = Field(
+        default_factory=lambda: JobSchedule(cron="50 6 * * 1-5"),
+        description="Read the recent 8-K, 6-K, S-4, proxy and tender-offer filings of held "
+        "issuers and store the deals, states and terms they state. Default: weekdays 06:50.",
+    )
+    disclosure_esef: JobSchedule = Field(
+        default_factory=lambda: JobSchedule(cron="0 7 * * 1-5"),
+        description="Read the filings.xbrl.org index for held issuers with a confirmed LEI and "
+        "store each new ESEF report as a dated document version. Default: weekdays 07:00.",
+    )
     disclosure_estimates: JobSchedule = Field(
         default_factory=lambda: JobSchedule(cron="30 6 * * 1-5"),
         description="Fetch each enabled issuer consensus file once and store a new version only "
@@ -1990,6 +2000,8 @@ class JobsConfig(ConfigModel):
             "disclosure_sources": self.disclosure_sources,
             "disclosure_ingest": self.disclosure_ingest,
             "disclosure_identifiers": self.disclosure_identifiers,
+            "disclosure_deals": self.disclosure_deals,
+            "disclosure_esef": self.disclosure_esef,
             "disclosure_estimates": self.disclosure_estimates,
             "disclosure_alerts": self.disclosure_alerts,
             "twelve_data_corporate_actions": self.twelve_data_corporate_actions,

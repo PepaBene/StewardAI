@@ -27,6 +27,7 @@ export function ReplayPageView() {
   const [answer, setAnswer] = useState<EvidenceAnswer | null>(null);
   const [answerError, setAnswerError] = useState<string | null>(null);
   const [asking, setAsking] = useState(false);
+  const [reword, setReword] = useState(false);
 
   const asOf = asOfFromDay(day);
 
@@ -49,7 +50,7 @@ export function ReplayPageView() {
     setAsking(true);
     setAnswerError(null);
     try {
-      const r = await getBrowserApiClient().POST("/disclosures/answer", { body: { ticker: ticker.trim(), question: question.trim(), as_of: asOf } });
+      const r = await getBrowserApiClient().POST("/disclosures/answer", { body: { ticker: ticker.trim(), question: question.trim(), as_of: asOf, phrase: reword } });
       if (r.data) setAnswer(r.data);
       else setAnswerError(failure(r.response.status));
     } catch (e) {
@@ -135,6 +136,10 @@ export function ReplayPageView() {
           <label className="flex min-w-64 flex-1 flex-col gap-1 text-sm">
             Question
             <input value={question} onChange={(e) => setQuestion(e.target.value)} maxLength={500} placeholder="Which customers does it name?" className="border border-border bg-surface-raised px-2 py-1.5 focus-visible:ring-2 focus-visible:ring-focus/30 focus-visible:outline-none" />
+          </label>
+          <label className="flex items-center gap-2 pb-2 text-sm" title="Uses the chat model when it is an OpenAI or Google model. The wording is kept only if every number is in the evidence.">
+            <input type="checkbox" checked={reword} onChange={(e) => setReword(e.target.checked)} />
+            Reword with the chat model
           </label>
           <Button type="submit" size="sm" disabled={!canAsk || asking}>
             {asking ? "Searching…" : "Ask"}

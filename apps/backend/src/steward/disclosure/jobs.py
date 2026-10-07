@@ -18,14 +18,16 @@ import httpx
 
 from steward import __version__
 from steward.disclosure import alerts
+from steward.disclosure.deal_job import collect_deals
 from steward.disclosure.estimate_store import collect_consensus
 from steward.disclosure.fetch import DisclosureFetcher, FetchFailure
+from steward.disclosure.foreign_job import collect_esef, held_lei_issuers
 from steward.disclosure.identifier_job import (
     gleif_lei_lookup,
     openfigi_figi_lookup,
     resolve_identifiers,
 )
-from steward.disclosure.ingest_job import ingest_filings, mirror_stored_facts
+from steward.disclosure.ingest_job import ingest_filings, mirror_stored_facts, require_source
 from steward.disclosure.note_job import extract_notes_for_document
 from steward.disclosure.parse import parse_html
 from steward.disclosure.probe import run_probes
@@ -268,6 +270,70 @@ async def mail_alert_digest(
         now,
     )
     return len(ids)
+
+
+DEAL_LOOKBACK = dt.timedelta(days=45)
+
+
+async def disclosure_deals_handler(ctx: JobContext) -> None:
+    settings = get_settings()
+    async with httpx.AsyncClient(timeout=httpx.Timeout(60.0, read=120.0)) as http:
+        async with ctx.step("deals") as step:
+            if not settings.sec_user_agent:
+                step.detail["skipped"] = "SEC_USER_AGENT is not set"
+                return
+            fetcher = DisclosureFetcher(
+                ctx.pool,
+                http,
+                user_agent=settings.sec_user_agent,
+                store=evidence_store(settings, http),
+            )
+
+            async def fetch_json(url: str) -> Any:
+                return await fetcher.fetch("sec.submissions", url)
+
+            async def fetch(url: str) -> Any:
+                return await fetcher.fetch("sec.archive", url)
+
+            try:
+                await require_source(ctx.pool, "sec.archive")
+                totals = await collect_deals(
+                    ctx.pool,
+                    await held_issuers(ctx.pool),
+                    fetch_json,
+                    fetch,
+                    submissions_url=SUBMISSIONS_URL,
+                    since=(dt.datetime.now(dt.UTC) - DEAL_LOOKBACK).date(),
+                )
+            except SourceNotEnabled as exc:
+                step.detail["skipped"] = str(exc)
+                return
+            step.detail.update(totals.as_detail())
+
+
+async def disclosure_esef_handler(ctx: JobContext) -> None:
+    settings = get_settings()
+    async with httpx.AsyncClient(timeout=httpx.Timeout(60.0, read=120.0)) as http:
+        async with ctx.step("esef") as step:
+            fetcher = DisclosureFetcher(
+                ctx.pool,
+                http,
+                user_agent=settings.sec_user_agent or "",
+                store=evidence_store(settings, http),
+            )
+
+            async def fetch(url: str) -> Any:
+                return await fetcher.fetch("esef.filings_xbrl_org", url)
+
+            try:
+                await require_source(ctx.pool, "esef.filings_xbrl_org")
+                totals = await collect_esef(
+                    ctx.pool, await held_lei_issuers(ctx.pool), fetch, fetch
+                )
+            except SourceNotEnabled as exc:
+                step.detail["skipped"] = str(exc)
+                return
+            step.detail.update(totals.as_detail())
 
 
 async def disclosure_estimates_handler(ctx: JobContext) -> None:

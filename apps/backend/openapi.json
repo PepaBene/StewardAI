@@ -20405,6 +20405,12 @@
               }
             ],
             "title": "As Of"
+          },
+          "phrase": {
+            "type": "boolean",
+            "title": "Phrase",
+            "description": "Reword the template with the chat model when that is an OpenAI or Google model. The rewrite is used only if every number in it is in the evidence.",
+            "default": false
           }
         },
         "type": "object",
@@ -21372,6 +21378,8 @@
                 "disclosure_sources",
                 "disclosure_ingest",
                 "disclosure_identifiers",
+                "disclosure_deals",
+                "disclosure_esef",
                 "disclosure_estimates",
                 "disclosure_alerts"
               ]
@@ -21441,6 +21449,8 @@
                 "disclosure_sources",
                 "disclosure_ingest",
                 "disclosure_identifiers",
+                "disclosure_deals",
+                "disclosure_esef",
                 "disclosure_estimates",
                 "disclosure_alerts"
               ]
@@ -43857,6 +43867,14 @@
           "disclosure_identifiers": {
             "$ref": "#/components/schemas/JobSchedule",
             "description": "Suggest missing LEIs (GLEIF) and FIGIs (OpenFIGI); you confirm each. Default: Saturdays 06:20."
+          },
+          "disclosure_deals": {
+            "$ref": "#/components/schemas/JobSchedule",
+            "description": "Read the recent 8-K, 6-K, S-4, proxy and tender-offer filings of held issuers and store the deals, states and terms they state. Default: weekdays 06:50."
+          },
+          "disclosure_esef": {
+            "$ref": "#/components/schemas/JobSchedule",
+            "description": "Read the filings.xbrl.org index for held issuers with a confirmed LEI and store each new ESEF report as a dated document version. Default: weekdays 07:00."
           },
           "disclosure_estimates": {
             "$ref": "#/components/schemas/JobSchedule",
