@@ -94,6 +94,7 @@ export const OTHER_PAGES = [
   { href: "/disclosures/ownership", label: "Ownership", keywords: "13F 13D 13G stakes holders managers funds N-PORT voting rights control remainder" },
   { href: "/disclosures/insiders", label: "Insider activity", keywords: "Form 4 insider buying selling officers directors 10b5-1 plan open market purchase sale exercise" },
   { href: "/disclosures/screen", label: "Evidence screen", keywords: "screen peers cash conversion debt maturity insider buys stake change customer concentration segment surprise deal exposure universe excluded" },
+  { href: "/disclosures/look-through", label: "Portfolio look-through", keywords: "look through exposure concentrated customer supplier funds N-PORT deal weight portfolio" },
   { href: "/disclosures/coverage", label: "Data coverage", keywords: "coverage quality report blind spots sources jurisdiction cost ledger error rates first last known" },
   { href: "/disclosures/replay", label: "Decision replay", keywords: "as of date replay what was known later changes point in time" },
   { href: "/disclosures/alerts", label: "Disclosure alerts", keywords: "alerts new insider trade large holder 13D 13G filing customer supplier change unread" },

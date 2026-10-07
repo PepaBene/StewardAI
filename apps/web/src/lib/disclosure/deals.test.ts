@@ -141,6 +141,10 @@ describe("filters and portfolio", () => {
     expect(filterDeals(all, { type: "buyback", state: "" }).map((d) => d.id)).toEqual([3]);
     expect(filterDeals(all, { type: "", state: "terminated" }).map((d) => d.id)).toEqual([4]);
     expect(filterDeals(all, { type: "", state: "" })).toHaveLength(all.length);
+    // A size filter never lets a deal with no stated size through, and a currency filter is exact.
+    const sized = filterDeals(all, { type: "", state: "", minSize: 1 });
+    expect(sized.every((d) => d.size != null && Number(d.size) >= 1)).toBe(true);
+    expect(filterDeals(all, { type: "", state: "", currency: "ZZZ" })).toEqual([]);
   });
 
   it("shows the denominator, covered weight and holdings with none known", () => {

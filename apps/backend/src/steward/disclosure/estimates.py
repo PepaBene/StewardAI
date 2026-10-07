@@ -641,7 +641,7 @@ def segment_bridge(
         if e is None:
             lines.append(
                 SegmentLine(
-                    a.segment,
+                    a.segment or key,
                     a.segment,
                     None,
                     a.observation_id,
@@ -689,7 +689,7 @@ def segment_bridge(
             inputs.append(f"actual:{a.observation_id}")
         lines.append(
             SegmentLine(
-                a.segment,
+                a.segment or key,
                 a.segment,
                 e.id,
                 a.observation_id,

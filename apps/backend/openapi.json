@@ -14034,7 +14034,143 @@
         }
       }
     },
+    "/disclosures/company/{ticker}/ownership": {
+      "get": {
+        "tags": [
+          "disclosures"
+        ],
+        "summary": "Holding Ownership",
+        "description": "Ownership as separate dated lanes known by `as_of`. The lanes overlap, so no combined\ntotal is returned; each carries its own remainder against the stated share denominator.",
+        "operationId": "holding_ownership",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "ticker",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9._-]{1,32}$",
+              "title": "Ticker"
+            }
+          },
+          {
+            "name": "as_of",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date-time"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Show only what was known by this time.",
+              "title": "As Of"
+            },
+            "description": "Show only what was known by this time."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OwnershipOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/disclosures/holdings/{ticker}/insiders": {
+      "get": {
+        "tags": [
+          "disclosures"
+        ],
+        "summary": "Holding Insiders",
+        "description": "Insider transactions as filed and known by `as_of`: discretionary net by role and window,\nwith plan trades, exercise-and-sell bundles and unknown plan status shown apart.",
+        "operationId": "holding_insiders",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "ticker",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9._-]{1,32}$",
+              "title": "Ticker"
+            }
+          },
+          {
+            "name": "as_of",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date-time"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Show only what was known by this time.",
+              "title": "As Of"
+            },
+            "description": "Show only what was known by this time."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DisclosureInsiderActivityOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/disclosures/company/{ticker}/insiders": {
       "get": {
         "tags": [
           "disclosures"
@@ -14170,6 +14306,74 @@
         }
       }
     },
+    "/disclosures/company/{ticker}/pdmr": {
+      "get": {
+        "tags": [
+          "disclosures"
+        ],
+        "summary": "Holding Pdmr",
+        "description": "UK PDMR notifications for a holding, kept apart from Form 4 and totalled per currency.",
+        "operationId": "holding_pdmr",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "ticker",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9._-]{1,32}$",
+              "title": "Ticker"
+            }
+          },
+          {
+            "name": "as_of",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date-time"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Show only what was known by this time.",
+              "title": "As Of"
+            },
+            "description": "Show only what was known by this time."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PdmrActivityOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/disclosures/insiders/override": {
       "post": {
         "tags": [
@@ -14218,6 +14422,94 @@
       }
     },
     "/disclosures/holdings/{ticker}/dependencies": {
+      "get": {
+        "tags": [
+          "disclosures"
+        ],
+        "summary": "Holding Dependencies",
+        "description": "Customer and supplier claims known by `as_of`, with concentration (unknown remainder shown),\nand a bounded one-to-two-hop scenario over confirmed numeric edges only.",
+        "operationId": "holding_dependencies",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "ticker",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9._-]{1,32}$",
+              "title": "Ticker"
+            }
+          },
+          {
+            "name": "as_of",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date-time"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Show only what was known by this time.",
+              "title": "As Of"
+            },
+            "description": "Show only what was known by this time."
+          },
+          {
+            "name": "shock",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "number",
+                  "maximum": 1.0,
+                  "minimum": 0.0
+                },
+                {
+                  "type": "string",
+                  "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+                }
+              ],
+              "default": "0.2",
+              "title": "Shock"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DependencyViewOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/disclosures/company/{ticker}/dependencies": {
       "get": {
         "tags": [
           "disclosures"
@@ -15824,6 +16116,211 @@
         }
       }
     },
+    "/disclosures/company/{ticker}/deals": {
+      "get": {
+        "tags": [
+          "disclosures"
+        ],
+        "summary": "Holding Public Deals",
+        "description": "Deals linked to a holding, as known at `as_of`: lifecycle, term versions, impacts, documents\nand missing fields. A size filter leaves out (and counts) deals whose size is not stated.",
+        "operationId": "holding_public_deals",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "ticker",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9._-]{1,32}$",
+              "title": "Ticker"
+            }
+          },
+          {
+            "name": "as_of",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date-time"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Show only what was known by this time.",
+              "title": "As Of"
+            },
+            "description": "Show only what was known by this time."
+          },
+          {
+            "name": "deal_type",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "enum": [
+                    "acquisition",
+                    "merger",
+                    "divestiture",
+                    "ipo",
+                    "follow_on",
+                    "debt_issuance",
+                    "spin_off",
+                    "joint_venture",
+                    "strategic_investment",
+                    "buyback",
+                    "tender_offer",
+                    "material_agreement"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Deal Type"
+            }
+          },
+          {
+            "name": "state",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "enum": [
+                    "rumored",
+                    "announced",
+                    "definitive",
+                    "approved",
+                    "closed",
+                    "terminated",
+                    "contested"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "State"
+            }
+          },
+          {
+            "name": "currency",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "pattern": "^[A-Z]{3}$"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Currency"
+            }
+          },
+          {
+            "name": "min_size",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "number",
+                  "minimum": 0.0
+                },
+                {
+                  "type": "string",
+                  "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Min Size"
+            }
+          },
+          {
+            "name": "max_size",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "number",
+                  "minimum": 0.0
+                },
+                {
+                  "type": "string",
+                  "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Max Size"
+            }
+          },
+          {
+            "name": "offer_price",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "number",
+                  "exclusiveMinimum": 0.0
+                },
+                {
+                  "type": "string",
+                  "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Your scenario: a per-share offer price, shown as your scenario.",
+              "title": "Offer Price"
+            },
+            "description": "Your scenario: a per-share offer price, shown as your scenario."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HoldingDealsOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/disclosures/portfolio/deals": {
       "get": {
         "tags": [
@@ -15933,6 +16430,169 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/EstimatesOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/disclosures/company/{ticker}/estimates": {
+      "get": {
+        "tags": [
+          "disclosures"
+        ],
+        "summary": "Holding Estimates",
+        "description": "Published estimates known by `as_of`, as five separate lanes. Guidance, consensus, named\nestimates, event-calendar estimates and owner scenarios are never merged or averaged; a\nrevision pair across a panel, basis, currency or period break carries its reason and no number;\na surprise uses only a snapshot known strictly before the release.",
+        "operationId": "holding_estimates",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "ticker",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9._-]{1,32}$",
+              "title": "Ticker"
+            }
+          },
+          {
+            "name": "as_of",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date-time"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Show only what was known by this time.",
+              "title": "As Of"
+            },
+            "description": "Show only what was known by this time."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EstimatesOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/disclosures/estimates/pair-reviews": {
+      "get": {
+        "tags": [
+          "disclosures"
+        ],
+        "summary": "Pair Reviews",
+        "description": "Snapshot pairs for one holding with the latest label each, plus the revision-alert gate.\nRevision alerts stay off until enough distinct pairs are labelled correct.",
+        "operationId": "pair_reviews",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "ticker",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 20,
+              "title": "Ticker"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PairReviewsOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "disclosures"
+        ],
+        "summary": "Record Pair Review",
+        "description": "Record whether the code treated a pair correctly (a number, or a refusal with its reason).",
+        "operationId": "record_pair_review",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PairReviewIn"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PairReviewCreatedOut"
                 }
               }
             }
@@ -30461,6 +31121,10 @@
             "type": "boolean",
             "title": "Non Additive"
           },
+          "restated_prior": {
+            "type": "boolean",
+            "title": "Restated Prior"
+          },
           "fiscal_period": {
             "type": "string",
             "title": "Fiscal Period"
@@ -30730,6 +31394,7 @@
           "segment",
           "segment_taxonomy",
           "non_additive",
+          "restated_prior",
           "fiscal_period",
           "fiscal_calendar",
           "period_start",
@@ -48924,6 +49589,321 @@
         "type": "object",
         "title": "OwnershipSettings",
         "description": "Form 13F institutional ownership from the SEC's quarterly data sets."
+      },
+      "PairReviewCreatedOut": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id"
+        ],
+        "title": "PairReviewCreatedOut"
+      },
+      "PairReviewIn": {
+        "properties": {
+          "earlier_value_id": {
+            "type": "integer",
+            "title": "Earlier Value Id"
+          },
+          "later_value_id": {
+            "type": "integer",
+            "title": "Later Value Id"
+          },
+          "correct": {
+            "type": "boolean",
+            "title": "Correct"
+          },
+          "note": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 1000
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note"
+          }
+        },
+        "type": "object",
+        "required": [
+          "earlier_value_id",
+          "later_value_id",
+          "correct"
+        ],
+        "title": "PairReviewIn"
+      },
+      "PairReviewItemOut": {
+        "properties": {
+          "earlier_id": {
+            "type": "integer",
+            "title": "Earlier Id"
+          },
+          "later_id": {
+            "type": "integer",
+            "title": "Later Id"
+          },
+          "series": {
+            "type": "string",
+            "title": "Series"
+          },
+          "metric": {
+            "type": "string",
+            "title": "Metric"
+          },
+          "segment": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Segment"
+          },
+          "fiscal_period": {
+            "type": "string",
+            "title": "Fiscal Period"
+          },
+          "earlier_known_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Earlier Known At"
+          },
+          "later_known_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Later Known At"
+          },
+          "comparable": {
+            "type": "boolean",
+            "title": "Comparable"
+          },
+          "break_reasons": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Break Reasons"
+          },
+          "statistic": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Statistic"
+          },
+          "earlier_value": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Earlier Value"
+          },
+          "later_value": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Later Value"
+          },
+          "change": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Change"
+          },
+          "change_pct": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Change Pct"
+          },
+          "pct_note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pct Note"
+          },
+          "elapsed_days": {
+            "type": "integer",
+            "title": "Elapsed Days"
+          },
+          "analyst_count_change": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Analyst Count Change"
+          },
+          "analyst_count_note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Analyst Count Note"
+          },
+          "direction": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Direction"
+          },
+          "note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note"
+          },
+          "formula_version": {
+            "type": "string",
+            "title": "Formula Version"
+          },
+          "reviewed": {
+            "type": "boolean",
+            "title": "Reviewed"
+          },
+          "correct": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Correct"
+          },
+          "review_note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Review Note"
+          },
+          "reviewed_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reviewed At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "earlier_id",
+          "later_id",
+          "series",
+          "metric",
+          "segment",
+          "fiscal_period",
+          "earlier_known_at",
+          "later_known_at",
+          "comparable",
+          "break_reasons",
+          "statistic",
+          "earlier_value",
+          "later_value",
+          "change",
+          "change_pct",
+          "pct_note",
+          "elapsed_days",
+          "analyst_count_change",
+          "analyst_count_note",
+          "direction",
+          "note",
+          "formula_version",
+          "reviewed",
+          "correct",
+          "review_note",
+          "reviewed_at"
+        ],
+        "title": "PairReviewItemOut"
+      },
+      "PairReviewsOut": {
+        "properties": {
+          "ticker": {
+            "type": "string",
+            "title": "Ticker"
+          },
+          "revision_gate": {
+            "$ref": "#/components/schemas/RevisionGateOut"
+          },
+          "pairs": {
+            "items": {
+              "$ref": "#/components/schemas/PairReviewItemOut"
+            },
+            "type": "array",
+            "title": "Pairs"
+          }
+        },
+        "type": "object",
+        "required": [
+          "ticker",
+          "revision_gate",
+          "pairs"
+        ],
+        "title": "PairReviewsOut"
       },
       "PatentFamilyInput": {
         "properties": {

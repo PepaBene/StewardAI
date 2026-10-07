@@ -184,6 +184,7 @@ class HoldingDealsOut(BaseModel):
     notes: list[str]
 
 
+@router.get("/company/{ticker}/deals")
 @router.get("/holdings/{ticker}/deals")
 async def holding_public_deals(
     ticker: TickerPath,

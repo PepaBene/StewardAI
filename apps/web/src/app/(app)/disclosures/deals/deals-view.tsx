@@ -93,6 +93,7 @@ export function DealsPageView() {
   const portfolioView = useMemo(() => (sample ? samplePortfolioDeals(cutoff) : portfolio), [sample, cutoff, portfolio]);
   const shown = useMemo(() => (view ? filterDeals(view.deals, filter) : []), [view, filter]);
   const current = shown.find((d) => d.id === selected) ?? shown[0] ?? null;
+  const currencies = useMemo(() => [...new Set((view?.deals ?? []).map((d) => d.currency).filter((c): c is string => c != null))].sort(), [view]);
   const types = useMemo(() => Object.keys(TYPE_LABEL).filter((t) => view?.deals.some((d) => d.deal_type === t)), [view]);
   const asOf = new Date(cutoff).toISOString();
 
@@ -175,8 +176,8 @@ export function DealsPageView() {
       <Panel id="deals" title="Deals" description="Every deal known at this date. Choose one to read its timeline and terms.">
         {view ? (
           <div className="space-y-3">
-            <DealFilters value={filter} onChange={(f) => { setFilter(f); setSelected(null); }} types={types} />
-            {shown.length === 0 && view.deals.length > 0 ? <p className="text-sm text-text-muted">No deal matches these filters. Clear the type or state to see all {view.deals.length}.</p> : null}
+            <DealFilters value={filter} onChange={(f) => { setFilter(f); setSelected(null); }} types={types} currencies={currencies} />
+            {shown.length === 0 && view.deals.length > 0 ? <p className="text-sm text-text-muted">No deal matches these filters. Clear the filters to see all {view.deals.length}.</p> : null}
             <DealTable deals={shown} selected={current?.id ?? null} onSelect={setSelected} asOf={asOf} />
           </div>
         ) : LOADING}

@@ -154,8 +154,12 @@ def parse_number(raw: str) -> tuple[Decimal | None, str | None]:
     if s.lower() in NOT_STATED:
         return None, None
     neg = s.startswith("(") and s.endswith(")")
-    s = re.sub(r"[\s$€£%,()]", "", s)
-    s = s.replace("−", "-")  # noqa: RUF001
+    s = re.sub(r"[\s$€£%()]", "", s).replace("−", "-")  # noqa: RUF001
+    # A comma is a thousands separator only between groups of three digits; "1,2,3" or "1,5" is a
+    # different convention, and reading it as 123 or 15 would invent a number.
+    if "," in s and not re.fullmatch(r"[-+]?\d{1,3}(,\d{3})+(\.\d+)?", s):
+        return None, f"unreadable number {raw.strip()!r}"
+    s = s.replace(",", "")
     try:
         v = Decimal(s)
     except InvalidOperation:

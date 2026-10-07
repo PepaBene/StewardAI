@@ -543,10 +543,11 @@ async def scan_deals(pool: Pool, ticker: str, since: dt.datetime, now: dt.dateti
     """One alert per documented state transition that became known in the window. A rumoured
     state is unverified and never alerts; the alert states the new state and its source, no more."""
     rows = await pool.fetch(
-        """select t.id, t.state, t.known_at, e.title, e.deal_type, v.source_url
+        """select t.id, t.state, t.known_at, e.title, e.deal_type, d.stable_url as source_url
              from public.deal_state_transition t
              join public.deal_event e on e.id = t.deal_id
              left join public.source_document_version v on v.id = t.document_version_id
+             left join public.source_document d on d.id = v.document_id
             where e.ticker = $1 and t.state <> 'rumored'
               and t.known_at > $2 and t.known_at <= $3
             order by t.known_at, t.id""",

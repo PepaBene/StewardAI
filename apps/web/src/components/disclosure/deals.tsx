@@ -22,7 +22,6 @@ import {
   STATE_LABEL,
   timelineLayout,
   TYPE_LABEL,
-  versionSummary,
   type Deal,
   type DealFilter,
   type DealTransition,
@@ -89,7 +88,7 @@ export function EncodingLegend() {
 const originKind = (o: Impact["origin"]): Kind => o;
 
 // ----------------------------------------------------------------------------- filters and list
-export function DealFilters({ value, onChange, types }: { value: DealFilter; onChange: (f: DealFilter) => void; types: readonly string[] }) {
+export function DealFilters({ value, onChange, types, currencies = [] }: { value: DealFilter; onChange: (f: DealFilter) => void; types: readonly string[]; currencies?: readonly string[] }) {
   return (
     <div className="flex flex-wrap items-end gap-3 text-sm">
       <label className="flex flex-col gap-1">
@@ -110,6 +109,28 @@ export function DealFilters({ value, onChange, types }: { value: DealFilter; onC
           ))}
           <option value="unknown">State not resolved</option>
         </select>
+      </label>
+      <label className="flex flex-col gap-1">
+        <span className="font-medium">Currency</span>
+        <select className={SELECT_CLASS} value={value.currency ?? ""} onChange={(e) => onChange({ ...value, currency: e.target.value })}>
+          <option value="">All currencies</option>
+          {currencies.map((c) => (
+            <option key={c} value={c}>{c}</option>
+          ))}
+        </select>
+      </label>
+      <label className="flex flex-col gap-1">
+        <span className="font-medium">Stated size at least</span>
+        <input
+          type="number"
+          min={0}
+          inputMode="decimal"
+          className={cn(SELECT_CLASS, "num w-40")}
+          value={value.minSize ?? ""}
+          onChange={(e) => onChange({ ...value, minSize: e.target.value === "" ? null : Math.max(0, Number(e.target.value)) })}
+          aria-describedby="deal-size-note"
+        />
+        <span id="deal-size-note" className="text-xs text-text-muted">In the deal’s own currency. Deals with no stated size are hidden while this is set.</span>
       </label>
     </div>
   );

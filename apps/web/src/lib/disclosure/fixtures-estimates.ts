@@ -17,7 +17,7 @@ const M2 = "vendor consensus";
 
 type Seed = Partial<EstimateLine> & Pick<EstimateLine, "id" | "snapshot_id" | "known_at">;
 const line = (s: Seed): EstimateLine => ({
-  series: "published_analyst_consensus", metric: "Revenue", segment: null, segment_taxonomy: null, non_additive: false, fiscal_period: "FY2026Q3", fiscal_calendar: "fiscal year ends 30 September",
+  series: "published_analyst_consensus", metric: "Revenue", segment: null, segment_taxonomy: null, non_additive: false, restated_prior: false, fiscal_period: "FY2026Q3", fiscal_calendar: "fiscal year ends 30 September",
   period_start: "2026-04-01", period_end: "2026-06-30", currency: "USD", unit: "amount", scale: 6, basis: "GAAP", basis_definition: null, mean: null, median: null, high: null, low: null,
   analyst_count: 14, panel_analyst_count: 14, panel_description: "Consensus compiled by Acme investor relations from analysts", panel_method: M1, source: "Acme investor relations", broker: null, analyst: null,
   published_at: s.known_at, supersedes_snapshot_id: null, corrected: false, document_url: IR_URL, evidence_id: null, original_string: null, problems: [], ...s,

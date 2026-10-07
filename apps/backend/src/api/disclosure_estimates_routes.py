@@ -10,8 +10,8 @@ from __future__ import annotations
 import datetime as dt
 from typing import Annotated
 
-from fastapi import APIRouter, Query
-from pydantic import AwareDatetime, BaseModel
+from fastapi import APIRouter, HTTPException, Query, status
+from pydantic import AwareDatetime, BaseModel, Field
 
 from api.auth import Owner
 from api.db import Pool
@@ -31,6 +31,7 @@ class EstimateLineOut(BaseModel):
     segment: str | None
     segment_taxonomy: str | None
     non_additive: bool
+    restated_prior: bool
     fiscal_period: str
     fiscal_calendar: str | None
     period_start: dt.date | None
@@ -202,6 +203,7 @@ class EstimatesOut(BaseModel):
     notes: list[str]
 
 
+@router.get("/company/{ticker}/estimates")
 @router.get("/holdings/{ticker}/estimates")
 async def holding_estimates(
     ticker: TickerPath, pool: Pool, _owner: Owner, as_of: AsOf = None
@@ -211,3 +213,53 @@ async def holding_estimates(
     revision pair across a panel, basis, currency or period break carries its reason and no number;
     a surprise uses only a snapshot known strictly before the release."""
     return EstimatesOut(**await estimate_read.estimate_view(pool, ticker.upper(), as_of))
+
+
+class PairReviewItemOut(RevisionPairOut):
+    reviewed: bool
+    correct: bool | None
+    review_note: str | None
+    reviewed_at: dt.datetime | None
+
+
+class PairReviewsOut(BaseModel):
+    ticker: str
+    revision_gate: RevisionGateOut
+    pairs: list[PairReviewItemOut]
+
+
+class PairReviewIn(BaseModel):
+    earlier_value_id: int
+    later_value_id: int
+    correct: bool
+    note: str | None = Field(default=None, max_length=1000)
+
+
+class PairReviewCreatedOut(BaseModel):
+    id: int
+
+
+@router.get("/estimates/pair-reviews")
+async def pair_reviews(
+    pool: Pool, _owner: Owner, ticker: Annotated[str, Query(min_length=1, max_length=20)]
+) -> PairReviewsOut:
+    """Snapshot pairs for one holding with the latest label each, plus the revision-alert gate.
+    Revision alerts stay off until enough distinct pairs are labelled correct."""
+    return PairReviewsOut(**await estimate_read.pair_review_view(pool, ticker.upper()))
+
+
+@router.post("/estimates/pair-reviews", status_code=status.HTTP_201_CREATED)
+async def record_pair_review(body: PairReviewIn, pool: Pool, owner: Owner) -> PairReviewCreatedOut:
+    """Record whether the code treated a pair correctly (a number, or a refusal with its reason)."""
+    try:
+        new_id = await estimate_read.record_pair_review(
+            pool,
+            earlier_value_id=body.earlier_value_id,
+            later_value_id=body.later_value_id,
+            correct=body.correct,
+            reviewer=f"owner:{owner.user_id}",
+            note=body.note,
+        )
+    except ValueError as exc:
+        raise HTTPException(422, str(exc)) from exc
+    return PairReviewCreatedOut(id=new_id)

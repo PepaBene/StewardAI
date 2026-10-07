@@ -4442,7 +4442,49 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/disclosures/company/{ticker}/ownership": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Holding Ownership
+         * @description Ownership as separate dated lanes known by `as_of`. The lanes overlap, so no combined
+         *     total is returned; each carries its own remainder against the stated share denominator.
+         */
+        get: operations["holding_ownership"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/disclosures/holdings/{ticker}/insiders": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Holding Insiders
+         * @description Insider transactions as filed and known by `as_of`: discretionary net by role and window,
+         *     with plan trades, exercise-and-sell bundles and unknown plan status shown apart.
+         */
+        get: operations["holding_insiders"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/disclosures/company/{ticker}/insiders": {
         parameters: {
             query?: never;
             header?: never;
@@ -4483,6 +4525,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/disclosures/company/{ticker}/pdmr": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Holding Pdmr
+         * @description UK PDMR notifications for a holding, kept apart from Form 4 and totalled per currency.
+         */
+        get: operations["holding_pdmr"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/disclosures/insiders/override": {
         parameters: {
             query?: never;
@@ -4504,6 +4566,27 @@ export interface paths {
         trace?: never;
     };
     "/disclosures/holdings/{ticker}/dependencies": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Holding Dependencies
+         * @description Customer and supplier claims known by `as_of`, with concentration (unknown remainder shown),
+         *     and a bounded one-to-two-hop scenario over confirmed numeric edges only.
+         */
+        get: operations["holding_dependencies"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/disclosures/company/{ticker}/dependencies": {
         parameters: {
             query?: never;
             header?: never;
@@ -4968,6 +5051,27 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/disclosures/company/{ticker}/deals": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Holding Public Deals
+         * @description Deals linked to a holding, as known at `as_of`: lifecycle, term versions, impacts, documents
+         *     and missing fields. A size filter leaves out (and counts) deals whose size is not stated.
+         */
+        get: operations["holding_public_deals"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/disclosures/portfolio/deals": {
         parameters: {
             query?: never;
@@ -5005,6 +5109,54 @@ export interface paths {
         get: operations["holding_estimates"];
         put?: never;
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/disclosures/company/{ticker}/estimates": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Holding Estimates
+         * @description Published estimates known by `as_of`, as five separate lanes. Guidance, consensus, named
+         *     estimates, event-calendar estimates and owner scenarios are never merged or averaged; a
+         *     revision pair across a panel, basis, currency or period break carries its reason and no number;
+         *     a surprise uses only a snapshot known strictly before the release.
+         */
+        get: operations["holding_estimates"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/disclosures/estimates/pair-reviews": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Pair Reviews
+         * @description Snapshot pairs for one holding with the latest label each, plus the revision-alert gate.
+         *     Revision alerts stay off until enough distinct pairs are labelled correct.
+         */
+        get: operations["pair_reviews"];
+        put?: never;
+        /**
+         * Record Pair Review
+         * @description Record whether the code treated a pair correctly (a number, or a refusal with its reason).
+         */
+        post: operations["record_pair_review"];
         delete?: never;
         options?: never;
         head?: never;
@@ -10157,6 +10309,8 @@ export interface components {
             segment_taxonomy: string | null;
             /** Non Additive */
             non_additive: boolean;
+            /** Restated Prior */
+            restated_prior: boolean;
             /** Fiscal Period */
             fiscal_period: string;
             /** Fiscal Calendar */
@@ -16655,6 +16809,91 @@ export interface components {
              * @default 10
              */
             top_holders: number;
+        };
+        /** PairReviewCreatedOut */
+        PairReviewCreatedOut: {
+            /** Id */
+            id: number;
+        };
+        /** PairReviewIn */
+        PairReviewIn: {
+            /** Earlier Value Id */
+            earlier_value_id: number;
+            /** Later Value Id */
+            later_value_id: number;
+            /** Correct */
+            correct: boolean;
+            /** Note */
+            note?: string | null;
+        };
+        /** PairReviewItemOut */
+        PairReviewItemOut: {
+            /** Earlier Id */
+            earlier_id: number;
+            /** Later Id */
+            later_id: number;
+            /** Series */
+            series: string;
+            /** Metric */
+            metric: string;
+            /** Segment */
+            segment: string | null;
+            /** Fiscal Period */
+            fiscal_period: string;
+            /**
+             * Earlier Known At
+             * Format: date-time
+             */
+            earlier_known_at: string;
+            /**
+             * Later Known At
+             * Format: date-time
+             */
+            later_known_at: string;
+            /** Comparable */
+            comparable: boolean;
+            /** Break Reasons */
+            break_reasons: string[];
+            /** Statistic */
+            statistic: string | null;
+            /** Earlier Value */
+            earlier_value: string | null;
+            /** Later Value */
+            later_value: string | null;
+            /** Change */
+            change: string | null;
+            /** Change Pct */
+            change_pct: string | null;
+            /** Pct Note */
+            pct_note: string | null;
+            /** Elapsed Days */
+            elapsed_days: number;
+            /** Analyst Count Change */
+            analyst_count_change: number | null;
+            /** Analyst Count Note */
+            analyst_count_note: string | null;
+            /** Direction */
+            direction: string | null;
+            /** Note */
+            note: string | null;
+            /** Formula Version */
+            formula_version: string;
+            /** Reviewed */
+            reviewed: boolean;
+            /** Correct */
+            correct: boolean | null;
+            /** Review Note */
+            review_note: string | null;
+            /** Reviewed At */
+            reviewed_at: string | null;
+        };
+        /** PairReviewsOut */
+        PairReviewsOut: {
+            /** Ticker */
+            ticker: string;
+            revision_gate: components["schemas"]["RevisionGateOut"];
+            /** Pairs */
+            pairs: components["schemas"]["PairReviewItemOut"][];
         };
         /** PatentFamilyInput */
         PatentFamilyInput: {
@@ -29593,6 +29832,74 @@ export interface operations {
             };
         };
     };
+    holding_ownership: {
+        parameters: {
+            query?: {
+                /** @description Show only what was known by this time. */
+                as_of?: string | null;
+            };
+            header?: never;
+            path: {
+                ticker: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OwnershipOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    holding_insiders: {
+        parameters: {
+            query?: {
+                /** @description Show only what was known by this time. */
+                as_of?: string | null;
+            };
+            header?: never;
+            path: {
+                ticker: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DisclosureInsiderActivityOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     holding_insiders: {
         parameters: {
             query?: {
@@ -29661,6 +29968,40 @@ export interface operations {
             };
         };
     };
+    holding_pdmr: {
+        parameters: {
+            query?: {
+                /** @description Show only what was known by this time. */
+                as_of?: string | null;
+            };
+            header?: never;
+            path: {
+                ticker: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PdmrActivityOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     override_insider_class: {
         parameters: {
             query?: never;
@@ -29681,6 +30022,41 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["InsiderOverrideOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    holding_dependencies: {
+        parameters: {
+            query?: {
+                /** @description Show only what was known by this time. */
+                as_of?: string | null;
+                shock?: number | string;
+            };
+            header?: never;
+            path: {
+                ticker: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DependencyViewOut"];
                 };
             };
             /** @description Validation Error */
@@ -30437,6 +30813,47 @@ export interface operations {
             };
         };
     };
+    holding_public_deals: {
+        parameters: {
+            query?: {
+                /** @description Show only what was known by this time. */
+                as_of?: string | null;
+                deal_type?: ("acquisition" | "merger" | "divestiture" | "ipo" | "follow_on" | "debt_issuance" | "spin_off" | "joint_venture" | "strategic_investment" | "buyback" | "tender_offer" | "material_agreement") | null;
+                state?: ("rumored" | "announced" | "definitive" | "approved" | "closed" | "terminated" | "contested") | null;
+                currency?: string | null;
+                min_size?: number | string | null;
+                max_size?: number | string | null;
+                /** @description Your scenario: a per-share offer price, shown as your scenario. */
+                offer_price?: number | string | null;
+            };
+            header?: never;
+            path: {
+                ticker: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HoldingDealsOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     portfolio_public_deals: {
         parameters: {
             query?: {
@@ -30490,6 +30907,104 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["EstimatesOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    holding_estimates: {
+        parameters: {
+            query?: {
+                /** @description Show only what was known by this time. */
+                as_of?: string | null;
+            };
+            header?: never;
+            path: {
+                ticker: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EstimatesOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    pair_reviews: {
+        parameters: {
+            query: {
+                ticker: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PairReviewsOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    record_pair_review: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PairReviewIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PairReviewCreatedOut"];
                 };
             };
             /** @description Validation Error */

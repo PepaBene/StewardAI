@@ -120,7 +120,7 @@ export const groupKey = (l: EstimateLine): string =>
 export function breakReasons(a: EstimateLine, b: EstimateLine): string[] {
   const out: string[] = [];
   if (a.period_start !== b.period_start || a.period_end !== b.period_end || a.fiscal_calendar !== b.fiscal_calendar) out.push("period_redefined");
-  if (a.segment_taxonomy != null && b.segment_taxonomy != null && a.segment_taxonomy !== b.segment_taxonomy) out.push("restated");
+  if (b.restated_prior || (a.segment_taxonomy != null && b.segment_taxonomy != null && a.segment_taxonomy !== b.segment_taxonomy)) out.push("restated");
   if (a.unit !== b.unit || a.scale !== b.scale) out.push("unit_changed");
   if (a.currency !== b.currency) out.push("currency_changed");
   if (a.basis !== b.basis || (a.basis_definition ?? "").trim().toLowerCase() !== (b.basis_definition ?? "").trim().toLowerCase()) out.push("basis_changed");

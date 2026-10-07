@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 
 import { BasisWarnings, CoverageList, FiveLanes, GateNote, PeriodRanges, RevisionSlopes, SegmentMultiples, SurpriseBridge } from "@/components/disclosure/estimates";
+import { PairReviewPanel } from "@/components/disclosure/pair-reviews";
 import { Panel, SectionNav } from "@/components/oversight/panel";
 import { PageHeader } from "@/components/page-header";
 import { Field, SELECT_CLASS } from "@/components/reference/form-bits";
@@ -20,6 +21,7 @@ const SECTIONS = [
   { id: "surprise", label: "Earnings surprise" },
   { id: "segments", label: "Segments" },
   { id: "warnings", label: "Basis and panel warnings" },
+  { id: "review", label: "Review pairs" },
   { id: "coverage", label: "Coverage" },
 ] as const;
 
@@ -41,6 +43,7 @@ export function EstimatesPageView() {
   const [live, setLive] = useState<EstimatesView | null>(null);
   const [failure, setFailure] = useState<string | null>(null);
   const [pick, setPick] = useState<string>("");
+  const [segPick, setSegPick] = useState(0);
 
   const sample = ticker === null;
 
@@ -68,6 +71,7 @@ export function EstimatesPageView() {
   const view = useMemo(() => (sample ? sampleEstimates(cutoff) : live), [sample, cutoff, live]);
   const lines = useMemo(() => (view ? allLines(view) : []), [view]);
   const options = useMemo(() => choices(lines), [lines]);
+  const segIndex = view && segPick < view.segment_bridges.length ? segPick : 0;
   const choice = options.find((o) => o.key === pick) ?? options.find((o) => o.metric === "Revenue" && o.period === "FY2026Q3") ?? options[0];
 
   function apply(e: React.FormEvent) {
@@ -75,6 +79,7 @@ export function EstimatesPageView() {
     const t = input.trim();
     setLive(null);
     setPick("");
+    setSegPick(0);
     if (t === "") {
       setError(undefined);
       setTicker(null);
@@ -164,11 +169,25 @@ export function EstimatesPageView() {
       </Panel>
 
       <Panel id="segments" title="Segments" description="Reported segment against the segment estimate the company published. A segment with no estimate is left blank.">
-        {view ? <SegmentMultiples bridge={view.segment_bridges[0]} /> : LOADING}
+        {view && view.segment_bridges.length > 1 ? (
+          <label className="mb-3 flex items-center gap-2 text-sm">
+            <span className="font-medium">Segment period</span>
+            <select className={SELECT_CLASS} value={segIndex} onChange={(e) => setSegPick(Number(e.target.value))}>
+              {view.segment_bridges.map((b, i) => (
+                <option key={`${b.metric}|${b.period_end}`} value={i}>{b.metric}, {b.fiscal_period ?? b.period_end}</option>
+              ))}
+            </select>
+          </label>
+        ) : null}
+        {view ? <SegmentMultiples bridge={view.segment_bridges[segIndex]} /> : LOADING}
       </Panel>
 
       <Panel id="warnings" title="Basis and panel warnings" description="Adjusted definitions, unstated panel sizes and corrected files for the lines shown.">
         {view ? <BasisWarnings lines={lines} /> : LOADING}
+      </Panel>
+
+      <Panel id="review" title="Review pairs" description="Say whether each comparison was handled correctly. Revision alerts and revision-based screens stay off until enough pairs are labelled correct.">
+        {ticker ? <PairReviewPanel ticker={ticker} onChanged={() => setCutoff((c) => c + 1)} /> : <p className="text-sm text-text-muted">Enter a ticker you hold to review its real consensus pairs. The sample company has none to label.</p>}
       </Panel>
 
       <Panel id="coverage" title="Coverage" description="What is not covered, and where the files come from.">

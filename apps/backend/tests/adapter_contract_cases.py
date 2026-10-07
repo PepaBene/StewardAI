@@ -21,6 +21,12 @@ from typing import Any
 
 import httpx
 
+from steward.disclosure.deal_extract import extract as extract_deal_terms
+from steward.disclosure.esef_discovery import discover_esef
+from steward.disclosure.estimate_extract import extract_html as extract_consensus_html
+from steward.disclosure.parse import ParseError
+from steward.disclosure.parse import parse_html as parse_filing_html
+from steward.disclosure.sec_discovery import discover_filings
 from steward.documents.text import html_to_text
 from steward.macro.providers import (
     parse_comtrade,
@@ -634,6 +640,78 @@ PARSER_CASES: list[ParserCase] = [
         empty="",
         drift=lambda t: t.replace("ex:name", "ex:person-name"),
         partial=half_text,
+    ),
+    # --- public disclosure datasets (P9.1) ----------------------------------------------
+    ParserCase(
+        "sec_submissions",
+        "steward.disclosure.sec_discovery",
+        lambda body: discover_filings("0000001234", body),
+        lambda: jfix("disclosure", "submissions.json"),
+        (ValueError,),
+        rows=lambda found: len(found),
+    ),
+    ParserCase(
+        "consensus_html",
+        "steward.disclosure.estimate_extract",
+        extract_consensus_html,
+        lambda: bfix("disclosure", "consensus_acme_2026q3.htm"),
+        (ValueError,),
+        empty=b"",
+        drift=lambda b: b.replace(b"<td>", b"<x-td>").replace(b"</td>", b"</x-td>"),
+        partial=half_bytes,
+        rows=lambda ex: len(ex.values),
+    ),
+    ParserCase(
+        "filing_html",
+        "steward.disclosure.parse",
+        parse_filing_html,
+        lambda: bfix("disclosure", "sample_10k.htm"),
+        (ParseError,),
+        empty=b"",
+        drift=lambda b: b.replace(b"<table", b"<x-table").replace(b"ix:non", b"ix:other"),
+        partial=half_bytes,
+        rows=lambda doc: len(doc.facts) + len(doc.tables),
+    ),
+    ParserCase(
+        "deal_terms_text",
+        "steward.disclosure.deal_extract",
+        extract_deal_terms,
+        lambda: (
+            "Acme Corp. announced on March 3, 2026 that it entered into a definitive agreement "
+            "to acquire Beta Inc. for $44.50 in cash per share. The agreement includes a "
+            "termination fee of $120 million."
+        ),
+        (ValueError,),
+        empty="",
+        drift=lambda t: t.replace("$", ""),
+        partial=lambda t: t[: max(1, len(t) // 3)],
+        rows=lambda ex: len(ex.values()),
+    ),
+    ParserCase(
+        "esef_filing_index",
+        "steward.disclosure.esef_discovery",
+        discover_esef,
+        lambda: {
+            "data": [
+                {
+                    "type": "filing",
+                    "id": "1",
+                    "attributes": {
+                        "period_end": "2025-12-31",
+                        "date_added": "2026-03-10 09:15:22",
+                        "processed": "2026-03-10 09:20:01",
+                        "package_url": "/pkg/a.zip",
+                        "country": "DK",
+                    },
+                    "relationships": {
+                        "entity": {"data": {"type": "entity", "id": "5493001KJTIIGC8Y1R12"}}
+                    },
+                }
+            ]
+        },
+        (ValueError,),
+        empty={},
+        rows=lambda out: len(out.discovered),
     ),
 ]
 

@@ -23,7 +23,7 @@ import datetime as dt
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
 from decimal import Decimal
-from typing import Literal
+from typing import Any, Literal
 
 ZERO = Decimal(0)
 ONE = Decimal(1)
@@ -958,7 +958,7 @@ def closing_view(
     derived from another; one that is not recorded is listed as missing for a closed deal."""
     ordered = sorted((x for x in links if x.known_at <= as_of), key=lambda x: (x.known_at, x.id))
 
-    def pick(name: str):
+    def pick(name: str) -> Any:
         for x in reversed(ordered):
             v = getattr(x, name)
             if v is not None:

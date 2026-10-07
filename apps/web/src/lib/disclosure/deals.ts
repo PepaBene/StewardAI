@@ -403,10 +403,20 @@ export function timelineLayout(deal: Pick<Deal, "transitions" | "term_versions">
 }
 
 // ----------------------------------------------------------------------- filters, portfolio
-export type DealFilter = { type: string; state: string };
+/** `minSize` is a number in the deal's own currency; a deal with no stated size never passes a size filter (missing is not zero). */
+export type DealFilter = { type: string; state: string; currency?: string; minSize?: number | null };
 
 export const filterDeals = (deals: readonly Deal[], f: DealFilter): Deal[] =>
-  deals.filter((d) => (f.type === "" || d.deal_type === f.type) && (f.state === "" || (f.state === "unknown" ? d.state == null : d.state === f.state)));
+  deals.filter((d) => {
+    if (f.type !== "" && d.deal_type !== f.type) return false;
+    if (f.state !== "" && (f.state === "unknown" ? d.state != null : d.state !== f.state)) return false;
+    if (f.currency && d.currency !== f.currency) return false;
+    if (f.minSize != null) {
+      const size = d.size == null ? null : Number(d.size);
+      if (size == null || !Number.isFinite(size) || size < f.minSize) return false;
+    }
+    return true;
+  });
 
 export type DealRef = { ticker: string; dealId: number; title: string; dealType: string; state: string | null };
 

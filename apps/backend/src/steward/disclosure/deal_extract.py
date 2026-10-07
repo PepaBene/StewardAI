@@ -188,7 +188,9 @@ def _date(m: re.Match[str]) -> dt.date | None:
 
 
 def _money_rules() -> list[tuple[str, re.Pattern[str]]]:
-    p = lambda s: re.compile(s, FLAGS)  # noqa: E731
+    def p(s: str) -> re.Pattern[str]:
+        return re.compile(s, FLAGS)
+
     return [
         ("price_per_share", p(rf"{MONEY}\s+(?:in\s+cash\s+)?per\s+(?:ordinary\s+)?share")),
         (

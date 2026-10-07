@@ -167,6 +167,7 @@ def _line(v: est.Value, r: Any) -> dict[str, Any]:
         "segment": v.segment,
         "segment_taxonomy": v.segment_taxonomy,
         "non_additive": v.non_additive,
+        "restated_prior": v.restated_prior,
         "fiscal_period": v.fiscal_period,
         "fiscal_calendar": v.fiscal_calendar,
         "period_start": v.period_start,
@@ -392,10 +393,7 @@ async def estimate_view(
         "ticker": ticker,
         "as_of": when,
         "issuer": {"id": issuer_id, "name": issuer["legal_name"]},
-        "lanes": {
-            s: [_line(v, raw[v.id]) for v in lane[s]]  # type: ignore[index]
-            for s in est.SERIES
-        },
+        "lanes": {s: [_line(v, raw[v.id]) for v in lane[s]] for s in est.SERIES},
         "pairs": [_pair(p) for p in est.revision_pairs(live)],
         "events": events,
         "segment_bridges": bridges,
@@ -420,3 +418,74 @@ async def estimate_view(
         "formula": {"surprise": est.SURPRISE_FORMULA, "version": est.SURPRISE_FORMULA_VERSION},
         "notes": notes,
     }
+
+
+async def pair_review_view(pool: Pool, ticker: str) -> dict[str, Any]:
+    """Every snapshot pair known now for one holding, each with the latest human label, so the
+    owner can work toward the revision-alert gate. A pair the code refuses to compare is listed too:
+    confirming the refusal is right counts as a correct label."""
+    view = await estimate_view(pool, ticker, None)
+    ids = {int(i) for p in view["pairs"] for i in (p["earlier_id"], p["later_id"])}
+    labels: dict[tuple[int, int], Any] = {}
+    if ids:
+        rows = await pool.fetch(
+            """select earlier_value_id, later_value_id, correct, note, reviewer, decided_at
+                 from public.estimate_pair_review
+                where earlier_value_id = any($1::bigint[]) and later_value_id = any($1::bigint[])
+                order by id""",
+            sorted(ids),
+        )
+        labels = {(int(r["earlier_value_id"]), int(r["later_value_id"])): r for r in rows}
+    pairs = []
+    for p in view["pairs"]:
+        r = labels.get((p["earlier_id"], p["later_id"]))
+        pairs.append(
+            {
+                **p,
+                "reviewed": r is not None,
+                "correct": None if r is None else bool(r["correct"]),
+                "review_note": None if r is None else r["note"],
+                "reviewed_at": None if r is None else r["decided_at"],
+            }
+        )
+    return {"ticker": ticker, "revision_gate": view["revision_gate"], "pairs": pairs}
+
+
+async def record_pair_review(
+    pool: Pool,
+    *,
+    earlier_value_id: int,
+    later_value_id: int,
+    correct: bool,
+    reviewer: str,
+    note: str | None,
+) -> int:
+    """Store one verdict; the latest verdict for a pair wins. Both values must exist, belong to the
+    same issuer and be ordered by when each snapshot became known."""
+    if earlier_value_id == later_value_id:
+        raise ValueError("a pair needs two different estimate values")
+    rows = await pool.fetch(
+        """select v.id, s.issuer_id, s.known_at from public.estimate_value v
+             join public.public_estimate_snapshot s on s.id = v.snapshot_id
+            where v.id = any($1::bigint[])""",
+        [earlier_value_id, later_value_id],
+    )
+    found = {int(r["id"]): r for r in rows}
+    if len(found) != 2:
+        raise ValueError("both estimate values must exist")
+    first, second = found[earlier_value_id], found[later_value_id]
+    if first["issuer_id"] != second["issuer_id"]:
+        raise ValueError("the two values belong to different issuers")
+    if first["known_at"] > second["known_at"]:
+        raise ValueError("the earlier value became known after the later one")
+    new_id = await pool.fetchval(
+        """insert into public.estimate_pair_review
+             (earlier_value_id, later_value_id, correct, reviewer, note)
+           values ($1, $2, $3, $4, $5) returning id""",
+        earlier_value_id,
+        later_value_id,
+        correct,
+        reviewer,
+        note,
+    )
+    return int(new_id)

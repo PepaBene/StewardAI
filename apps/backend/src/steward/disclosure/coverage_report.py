@@ -265,10 +265,11 @@ def company_evidence(
     for spec in DATASETS:
         ev = evidence.get(spec.key, NO_EVIDENCE)
         state = state_for(spec, held, ev, coverage.get(spec.key), as_of)
-        link: str | None = spec.api_path.replace("{ticker}", ticker)
-        if "{issuer_id}" in link:
+        path = spec.api_path.replace("{ticker}", ticker)
+        link: str | None = path
+        if "{issuer_id}" in path:
             link = (
-                None if held.issuer_id is None else link.replace("{issuer_id}", str(held.issuer_id))
+                None if held.issuer_id is None else path.replace("{issuer_id}", str(held.issuer_id))
             )
         rows.append(
             {
