@@ -13,6 +13,8 @@ key (the fact id). No schema change is needed; the writer reuses `store_span` an
 
 from __future__ import annotations
 
+import datetime as dt
+import re
 from collections.abc import Mapping
 from dataclasses import dataclass
 from decimal import Decimal
@@ -26,6 +28,7 @@ from steward.disclosure.parse import IxFact, ParsedDocument
 
 LEGACY_TABLE = "financial_statement_fact"
 EXTRACTION_METHOD = "ixbrl"
+_CURRENCY = re.compile(r"[A-Z]{3}")
 
 
 @dataclass(frozen=True)
@@ -116,6 +119,64 @@ def build_fact_evidence(row: Mapping[str, Any], ix: IxFact | None) -> FactEviden
         "row_ref": key,
     }
     return FactEvidence(LEGACY_TABLE, key, span, evidence, observation, tuple(gaps))
+
+
+async def mirror_document_facts(
+    pool: asyncpg.Pool | asyncpg.Connection,
+    version_id: int,
+    issuer_id: int,
+    known_at: dt.datetime,
+    doc: ParsedDocument,
+) -> int:
+    """Write evidence and observations straight from the filing's own inline facts, for the
+    metrics the taxonomy map knows. This covers filings whose facts were never copied into
+    `financial_statement_fact` (older filings). A fact with no number, no period, no unit or no
+    offsets is skipped, and a company-extension concept is never mapped by guess. Safe to repeat:
+    an existing observation, and an existing span, are reused. Returns the new observations."""
+    written = 0
+    for index, fact in enumerate(doc.facts):
+        if fact.nil or fact.value is None or fact.start is None or fact.end is None:
+            continue
+        metric = metric_for(fact.name)
+        ctx = doc.contexts.get(fact.context_ref or "")
+        unit = doc.units.get(fact.unit_ref or "")
+        if metric is None or ctx is None or unit is None:
+            continue
+        period_end = ctx.instant if ctx.instant is not None else ctx.end
+        if period_end is None:
+            continue
+        row = {
+            "id": fact.fact_id or f"ix-{index}",
+            "issuer_id": issuer_id,
+            "concept": fact.name,
+            "period_start": None if ctx.instant is not None else ctx.start,
+            "period_end": period_end,
+            "value": fact.value,
+            "value_text": None,
+            "unit": unit,
+            "currency": unit if _CURRENCY.fullmatch(unit) else None,
+            "basis": "as_filed",
+            "dimensions": {"members": [list(pair) for pair in ctx.dimensions]},
+            "known_at": known_at,
+        }
+        payload = build_fact_evidence(row, fact)
+        if payload.span is None:
+            continue
+        evidence_id = await store_span(
+            pool, version_id, doc, payload.span[0], payload.span[1], **payload.evidence
+        )
+        if (
+            await record_observation(
+                pool,
+                version_id=version_id,
+                evidence_id=evidence_id,
+                parser_version=doc.parser_version,
+                **payload.observation,
+            )
+            is not None
+        ):
+            written += 1
+    return written
 
 
 async def mirror_fact(

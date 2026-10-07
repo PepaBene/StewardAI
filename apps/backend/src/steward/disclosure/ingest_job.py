@@ -29,7 +29,7 @@ from typing import Any
 
 import asyncpg
 
-from steward.disclosure.fact_evidence import mirror_fact
+from steward.disclosure.fact_evidence import mirror_document_facts, mirror_fact
 from steward.disclosure.fetch import FetchFailure, FetchOutcome, extension_for
 from steward.disclosure.ingest import DocumentRecord, ingest_document_version, quarantine_review
 from steward.disclosure.note_job import extract_notes_for_document
@@ -151,7 +151,12 @@ async def mirror_stored_facts(
     for row in rows:
         if await mirror_fact(pool, version_id, doc, _fact_row(row)) is not None:
             mirrored += 1
-    return mirrored
+    known_at = await pool.fetchval(
+        "select known_at from public.source_document_version where id=$1", version_id
+    )
+    # The filing's own facts too, so older filings (never copied into the statement table) get
+    # evidence as well. Observations already written above are reused, never duplicated.
+    return mirrored + await mirror_document_facts(pool, version_id, issuer_id, known_at, doc)
 
 
 async def _fetch(fetch: Fetcher, url: str) -> FetchOutcome | str:
