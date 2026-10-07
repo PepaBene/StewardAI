@@ -15240,6 +15240,143 @@
         }
       }
     },
+    "/disclosures/issuers/{issuer_id}/ingest": {
+      "post": {
+        "tags": [
+          "disclosures"
+        ],
+        "summary": "Ingest Issuer Filings",
+        "description": "Fetch, store, parse and mirror the issuer's newest annual and quarterly filings. Identical\nbytes already stored are skipped; a filing that fails is reported and does not stop the rest.",
+        "operationId": "ingest_issuer_filings",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "issuer_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "maximum": 9223372036854775807,
+              "minimum": 1,
+              "title": "Issuer Id"
+            }
+          },
+          {
+            "name": "since",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Only filings filed on or after.",
+              "title": "Since"
+            },
+            "description": "Only filings filed on or after."
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 50,
+              "minimum": 1,
+              "default": 10,
+              "title": "Limit"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/IngestOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/disclosures/identifiers/resolve": {
+      "post": {
+        "tags": [
+          "disclosures"
+        ],
+        "summary": "Resolve Missing Identifiers",
+        "description": "Look up missing LEIs (GLEIF) and share-class FIGIs (OpenFIGI) and store them as\nsuggestions. Nothing is confirmed; a person decides each suggestion.",
+        "operationId": "resolve_missing_identifiers",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "issuer_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer",
+                  "minimum": 1
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Issuer Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/IdentifierJobOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/holdings/{ticker}/data-context": {
       "get": {
         "tags": [
@@ -29155,6 +29292,59 @@
         ],
         "title": "FiledNotes"
       },
+      "FilingResultOut": {
+        "properties": {
+          "accession": {
+            "type": "string",
+            "title": "Accession"
+          },
+          "status": {
+            "type": "string",
+            "title": "Status"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
+          },
+          "quarantined": {
+            "type": "boolean",
+            "title": "Quarantined"
+          },
+          "facts_mirrored": {
+            "type": "integer",
+            "title": "Facts Mirrored"
+          },
+          "note_rows": {
+            "type": "integer",
+            "title": "Note Rows"
+          },
+          "gaps": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Gaps"
+          }
+        },
+        "type": "object",
+        "required": [
+          "accession",
+          "status",
+          "reason",
+          "quarantined",
+          "facts_mirrored",
+          "note_rows",
+          "gaps"
+        ],
+        "title": "FilingResultOut"
+      },
       "FinancialFactOut": {
         "properties": {
           "id": {
@@ -34710,6 +34900,43 @@
         ],
         "title": "HoldingsResponse"
       },
+      "IdentifierJobOut": {
+        "properties": {
+          "issuers_checked": {
+            "type": "integer",
+            "title": "Issuers Checked"
+          },
+          "suggestions": {
+            "items": {
+              "$ref": "#/components/schemas/IdentifierSuggestionOut"
+            },
+            "type": "array",
+            "title": "Suggestions"
+          },
+          "skipped": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Skipped"
+          },
+          "failed": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Failed"
+          }
+        },
+        "type": "object",
+        "required": [
+          "issuers_checked",
+          "suggestions",
+          "skipped",
+          "failed"
+        ],
+        "title": "IdentifierJobOut"
+      },
       "IdentifierOut": {
         "properties": {
           "figi": {
@@ -34782,6 +35009,66 @@
           "name"
         ],
         "title": "IdentifierOut"
+      },
+      "IdentifierSuggestionOut": {
+        "properties": {
+          "provider": {
+            "type": "string",
+            "title": "Provider"
+          },
+          "identifier_type": {
+            "type": "string",
+            "title": "Identifier Type"
+          },
+          "identifier": {
+            "type": "string",
+            "title": "Identifier"
+          },
+          "issuer_id": {
+            "type": "integer",
+            "title": "Issuer Id"
+          },
+          "security_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Security Id"
+          },
+          "score": {
+            "type": "number",
+            "title": "Score"
+          },
+          "name_only": {
+            "type": "boolean",
+            "title": "Name Only"
+          },
+          "ambiguous": {
+            "type": "boolean",
+            "title": "Ambiguous"
+          },
+          "stored": {
+            "type": "boolean",
+            "title": "Stored"
+          }
+        },
+        "type": "object",
+        "required": [
+          "provider",
+          "identifier_type",
+          "identifier",
+          "issuer_id",
+          "security_id",
+          "score",
+          "name_only",
+          "ambiguous",
+          "stored"
+        ],
+        "title": "IdentifierSuggestionOut"
       },
       "IdentityGap": {
         "properties": {
@@ -35047,6 +35334,42 @@
           "change_pct"
         ],
         "title": "IndexQuote"
+      },
+      "IngestOut": {
+        "properties": {
+          "discovered": {
+            "type": "integer",
+            "title": "Discovered"
+          },
+          "ingested": {
+            "type": "integer",
+            "title": "Ingested"
+          },
+          "unchanged": {
+            "type": "integer",
+            "title": "Unchanged"
+          },
+          "failed": {
+            "type": "integer",
+            "title": "Failed"
+          },
+          "results": {
+            "items": {
+              "$ref": "#/components/schemas/FilingResultOut"
+            },
+            "type": "array",
+            "title": "Results"
+          }
+        },
+        "type": "object",
+        "required": [
+          "discovered",
+          "ingested",
+          "unchanged",
+          "failed",
+          "results"
+        ],
+        "title": "IngestOut"
       },
       "Insider": {
         "properties": {

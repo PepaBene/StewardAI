@@ -4821,6 +4821,48 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/disclosures/issuers/{issuer_id}/ingest": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Ingest Issuer Filings
+         * @description Fetch, store, parse and mirror the issuer's newest annual and quarterly filings. Identical
+         *     bytes already stored are skipped; a filing that fails is reported and does not stop the rest.
+         */
+        post: operations["ingest_issuer_filings"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/disclosures/identifiers/resolve": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Resolve Missing Identifiers
+         * @description Look up missing LEIs (GLEIF) and share-class FIGIs (OpenFIGI) and store them as
+         *     suggestions. Nothing is confirmed; a person decides each suggestion.
+         */
+        post: operations["resolve_missing_identifiers"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/holdings/{ticker}/data-context": {
         parameters: {
             query?: never;
@@ -10020,6 +10062,23 @@ export interface components {
             /** Notes */
             notes: components["schemas"]["FiledNote"][];
         };
+        /** FilingResultOut */
+        FilingResultOut: {
+            /** Accession */
+            accession: string;
+            /** Status */
+            status: string;
+            /** Reason */
+            reason: string | null;
+            /** Quarantined */
+            quarantined: boolean;
+            /** Facts Mirrored */
+            facts_mirrored: number;
+            /** Note Rows */
+            note_rows: number;
+            /** Gaps */
+            gaps: string[];
+        };
         /** FinancialFactOut */
         FinancialFactOut: {
             /** Id */
@@ -11948,6 +12007,17 @@ export interface components {
              */
             holdings: components["schemas"]["Holding"][];
         };
+        /** IdentifierJobOut */
+        IdentifierJobOut: {
+            /** Issuers Checked */
+            issuers_checked: number;
+            /** Suggestions */
+            suggestions: components["schemas"]["IdentifierSuggestionOut"][];
+            /** Skipped */
+            skipped: string[];
+            /** Failed */
+            failed: string[];
+        };
         /** IdentifierOut */
         IdentifierOut: {
             /** Figi */
@@ -11962,6 +12032,27 @@ export interface components {
             security_type: string | null;
             /** Name */
             name: string | null;
+        };
+        /** IdentifierSuggestionOut */
+        IdentifierSuggestionOut: {
+            /** Provider */
+            provider: string;
+            /** Identifier Type */
+            identifier_type: string;
+            /** Identifier */
+            identifier: string;
+            /** Issuer Id */
+            issuer_id: number;
+            /** Security Id */
+            security_id: number | null;
+            /** Score */
+            score: number;
+            /** Name Only */
+            name_only: boolean;
+            /** Ambiguous */
+            ambiguous: boolean;
+            /** Stored */
+            stored: boolean;
         };
         /** IdentityGap */
         IdentityGap: {
@@ -12047,6 +12138,19 @@ export interface components {
              * @description Fraction (0.012 = +1.2 %) of the latest against the previous value.
              */
             change_pct: number | null;
+        };
+        /** IngestOut */
+        IngestOut: {
+            /** Discovered */
+            discovered: number;
+            /** Ingested */
+            ingested: number;
+            /** Unchanged */
+            unchanged: number;
+            /** Failed */
+            failed: number;
+            /** Results */
+            results: components["schemas"]["FilingResultOut"][];
         };
         /** Insider */
         Insider: {
@@ -28321,6 +28425,72 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ReviewRow"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    ingest_issuer_filings: {
+        parameters: {
+            query?: {
+                /** @description Only filings filed on or after. */
+                since?: string | null;
+                limit?: number;
+            };
+            header?: never;
+            path: {
+                issuer_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IngestOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    resolve_missing_identifiers: {
+        parameters: {
+            query?: {
+                issuer_id?: number | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IdentifierJobOut"];
                 };
             };
             /** @description Validation Error */
