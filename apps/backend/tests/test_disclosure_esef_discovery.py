@@ -52,6 +52,17 @@ def test_clean_entry_is_known_when_processed_never_at_period_end() -> None:
     assert found.json_url == "https://filings.xbrl.org/pkg/a.json" and found.country == "DK"
 
 
+def test_the_live_index_names_the_entity_only_by_link_and_filing_id() -> None:
+    """Shape seen on filings.xbrl.org (2026-10-07): no `data` under the entity relationship."""
+    row = entry("4261", lei=None, fxo_id=f"{LEI_A}-2025-12-31-ESEF-DK-0")
+    row["relationships"] = {"entity": {"links": {"related": f"/api/entities/{LEI_A}"}}}
+    (found,) = discover_esef({"data": [row]}).discovered
+    assert found.lei == LEI_A
+    bare = entry("4262", lei=None, fxo_id=f"{LEI_B}-2025-12-31-ESEF-DK-0")
+    (found,) = discover_esef({"data": [bare]}).discovered
+    assert found.lei == LEI_B  # the filing id is the fallback
+
+
 def test_entries_with_processing_errors_are_skipped_and_reported() -> None:
     index = {
         "data": [

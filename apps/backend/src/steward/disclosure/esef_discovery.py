@@ -114,8 +114,21 @@ def discover_esef(index: object, since: dt.datetime | None = None) -> EsefDiscov
             continue
         rid = row.get("id")
         filing_id = str(rid) if rid not in (None, "") else None
-        entity = ((row.get("relationships") or {}).get("entity") or {}).get("data") or {}
+        entity_rel = (row.get("relationships") or {}).get("entity") or {}
+        entity = entity_rel.get("data") or {}
         lei = entity.get("id") if isinstance(entity.get("id"), str) else attrs.get("lei")
+        if not (isinstance(lei, str) and lei):
+            # The live index names the entity only by link ("/api/entities/<LEI>") and by the
+            # filing's own id ("<LEI>-<period>-ESEF-..."), checked against filings.xbrl.org.
+            related = (entity_rel.get("links") or {}).get("related")
+            fxo = attrs.get("fxo_id")
+            lei = (
+                related.rstrip("/").rsplit("/", 1)[-1]
+                if isinstance(related, str) and "/entities/" in related
+                else fxo.split("-", 1)[0]
+                if isinstance(fxo, str) and "-" in fxo
+                else None
+            )
         lei = lei if isinstance(lei, str) and lei else None
 
         def skip(

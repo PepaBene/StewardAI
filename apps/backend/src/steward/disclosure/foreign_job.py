@@ -127,7 +127,14 @@ async def collect_esef(
         try:
             got = await fetch_json(ENTITY_FILINGS_URL.format(lei=issuer["lei"]))
             found = discover_esef(json.loads(got.content or b"{}"), since)
-        except (FetchFailure, ValueError) as exc:
+        except FetchFailure as exc:
+            if exc.state == "not_covered":  # the registry has no ESEF entity: a coverage fact
+                totals.skipped["no_esef_entity"] = totals.skipped.get("no_esef_entity", 0) + 1
+                continue
+            totals.failed += 1
+            totals.errors.append(f"issuer {issuer['id']}: {type(exc).__name__}")
+            continue
+        except ValueError as exc:
             totals.failed += 1
             totals.errors.append(f"issuer {issuer['id']}: {type(exc).__name__}")
             continue
