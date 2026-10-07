@@ -345,6 +345,14 @@ The gap tables above were written before this round. Where a row below is marked
 | TED field names | P5.5 | `classification-cpv` and `identifier-lot` are not verified against the live TED API |
 | Alerts not sent to the digest | P4.6 | Alerts are stored and shown on a page; no push or digest line yet |
 
+**Live rollout, 2026-10-07 (the deployed database):** the six migrations `20261007100000` to `20261007150000` were applied to the StewardAI project (Supabase records them under timestamp versions, not the file names). Facts found on real data:
+
+- **Baseline taken (P0.5, read-only):** 53,354 source documents, 72,103 13F filings, 15,555 insider filings, 100 relationship disclosures (57 confirmed, 43 suggested), 24 of 30 instruments with a confirmed security link. The false-positive rate is still unmeasured: it needs a person's labels.
+- **Access tests recorded (P0.4):** SEC submissions, archive, company facts and N-PORT bulk, ESEF, Companies House, GLEIF and TED pass; `sec.submissions` and `sec.archive` are enabled. `fca.nsm` fails (HTTP 400 "Invalid index": the index name in the probe is no longer accepted), so UK TR-1 retrieval is not demonstrated and nothing was done to find another route. EDINET is untested (no key); SEDAR+ needs a browser session.
+- **Real-sample defect found and fixed (P0.3, P2.4):** real filings tag only a note's heading and carry the rest in `ix:continuation` elements chained by `continuedAt`; the reader saw only the heading and stored no note tables. After the fix 30 of 33 live filings have note tables (1,004 rows). The three without are two Boeing filings (the debt note is narrative) and one Meta filing (not diagnosed). This is a measured rate on real filings, not an accuracy figure.
+- **Older filings had no evidence links:** the stored-fact mirror only reaches filings whose facts were copied into `financial_statement_fact`. `fact_evidence.mirror_document_facts` now reads the filing's own inline facts. Of the 33 stored filings, 20 are linked; 13 wait for the daily backfill (a manual catch-up was twice stopped by low memory on the host). One AstraZeneca filing yields 0 observations and is undiagnosed.
+- **Automated now:** `disclosure_sources` (daily source tests, auto off on failure, SEC sources auto on), `disclosure_ingest` (weekdays, plus a five-filing backfill step), `disclosure_identifiers` (weekly), `disclosure_alerts` (daily scan and e-mail). Still human by design: confirming identifier suggestions, labelling samples, the national-lane enablement bar.
+
 **Still open — cannot be closed from code:** real sample capture (P0.3), measuring any threshold on production data (P0.6, P3.7, P4.3, P5.6), the deployed-database baseline (P0.5), live checks of the FCA, EDINET, SEDAR+ and TED routes (P0.4), running the aggregation against real tickers (P4.5), the human adjudication runs, rehearsing the rollbacks on a database with data, and the browser pass over every new page (sign-in needs MFA; layout is unseen).
 
 ## Phase P6 — Public deal, financing and corporate-action terms
@@ -504,6 +512,24 @@ One place to read what is not done. The per-phase status sections above hold the
 - [ ] `P9.6` Validate backup/restore, retention and deletion by source, reviewer audit, RLS, secret handling, provider shutdown and migration rollback. Keep SEDAR+ and broker-estimate adapters active as pilots under the owner's permission; classify only authentication, retrieval, paid-only and data-coverage failures as gaps.
 - [ ] `P9.7` Publish a coverage and quality report by dataset, jurisdiction, issuer and time period, including known blind spots, free-tier cost ledger ($0), sampled error rates and first/last known dates. Release screens in order: verified SEC/PIT foundation → ownership/insiders → relationships/deals → accessible estimates → additional jurisdictions.
 
+
+### Implementation status and open gaps after P8–P9
+
+Built (offline-tested only; nothing here has run against Postgres or been viewed in a browser):
+- P8.1/P8.2 partial: `GET /disclosures/data/coverage`, `/company/{ticker}/evidence`. The per-dataset reads already existed under `/holdings/{ticker}/…`; a unified `company/{id}/…` path family was not added. Pagination and verified-only filters exist only where earlier phases added them.
+- P8.3 `GET /disclosures/portfolio/look-through`; P8.4 `GET /disclosures/screen` (seven criteria, universe size, excluded with reason). The look-through is a panel on the screen page.
+- P8.5 alert kinds `controlling_stake`, `insider_buy_cluster`, `estimate_revision`, `debt_maturity_change`, each with `why_fired`, throttled at 5 per ticker/kind/day; suggested edges and non-comparable or ungated estimates go to review tasks. Estimate-revision alerts stay off until the 20-pair review gate passes. Migration `20261007190000`.
+- P8.6 `POST /disclosures/answer` is a templated answer over stored evidence with a numbers-must-appear-in-evidence guard. No LLM phrases it, because the repo has no model helper; the "model explains" half of P8.6 is not built.
+- P8.7 `GET /disclosures/replay?as_of=` returns what was known and later changes separately.
+- P9.4/P9.5 offline tests in `test_disclosure_pit.py` (consensus correction, replay separation, failure handling). P9.7 report fields inside the coverage route; pages `/disclosures/screen`, `/coverage`, `/replay`.
+
+Open gaps:
+- **Not built (needs real data or time):** P9.2 30-day shadow run, P9.3 manual adjudication samples, P9.6 backup/restore/retention/rollback drills and RLS audit, the P9.1 per-adapter malformed-input sweep, and the staged release order (a list is published in the coverage report, but nothing enforces it).
+- **Not written:** DB-bound P9.4 cases (document amendment, deal reversal, insider amendment, issuer rename, restatement through the SQL reads) and split/FX/share-class portfolio-math tests.
+- **Assumptions never checked against a database:** `quality_review_subject_type_check` and `disclosure_alert_kind_check` use Postgres default names; debt-maturity buckets are `year_N` and `thereafter`; the replay deals summary guesses `id`, `title`, `state`; metric names `operating_cash_flow`, `net_income`, `cash`, `debt_due_year_1` are assumed to match `formulas.py`; `disclosure_coverage.dataset` values are assumed to match the coverage keys.
+- **Known scope limits:** the ownership count is 13D/G plus N-PORT, not 13F; jurisdiction comes from the ISIN prefix then issuer country; the screen universe is held tickers only, not the watchlist; insider buys count only trades with plan status explicitly false; N-PORT `pct_value` is assumed to be in percent; the sample-mode screen leaves matched holdings' values empty.
+- **UI:** the three new pages follow existing components; the frontend-design skill was not loaded for them, and none was viewed in a browser.
+- **Not wired:** P8.5 alerts do not yet feed the thesis/monitor/news flow beyond the alerts list, and P8.1's stale/known-at filters are not on every route.
 
 ## Dependencies on the two companion plans
 
