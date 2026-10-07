@@ -209,7 +209,7 @@ export function ResultsPanel({
                       </td>
                       <th scope="row" className="px-3 py-2 text-left font-normal">
                         {kind === "stock" ? (
-                          <Link href={`/holdings/${encodeURIComponent(row.key)}`} className="font-medium hover:text-accent-ink hover:underline">
+                          <Link href={`/companies/${encodeURIComponent(row.key)}`} className="font-medium hover:text-accent-ink hover:underline">
                             {row.name ?? row.key}
                           </Link>
                         ) : (
