@@ -235,6 +235,25 @@ async def list_alerts(
     return out
 
 
+def digest(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Open alerts grouped by ticker, most alerts first, each group newest first. Counts are of
+    the alerts given; nothing is summarised beyond the headlines already stated."""
+    groups: dict[str, list[dict[str, Any]]] = {}
+    for row in sorted(rows, key=lambda r: (r["created_at"], r["id"]), reverse=True):
+        groups.setdefault(row["ticker"], []).append(row)
+    ordered = sorted(groups.items(), key=lambda kv: (-len(kv[1]), kv[0]))
+    return [
+        {
+            "ticker": ticker,
+            "count": len(items),
+            "kinds": sorted({i["kind"] for i in items}),
+            "headlines": [i["headline"] for i in items],
+            "latest_known_at": max(i["known_at"] for i in items),
+        }
+        for ticker, items in ordered
+    ]
+
+
 async def acknowledge(pool: Pool, alert_id: int, by: str) -> bool:
     updated = await pool.fetchval(
         """update public.disclosure_alert set acknowledged_at = now(), acknowledged_by = $2

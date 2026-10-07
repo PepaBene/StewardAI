@@ -1178,6 +1178,27 @@ async def list_disclosure_alerts(
     return [DisclosureAlertOut(**r) for r in rows]
 
 
+class AlertDigestGroupOut(BaseModel):
+    ticker: str
+    count: int
+    kinds: list[str]
+    headlines: list[str]
+    latest_known_at: dt.datetime
+
+
+@router.get("/alerts/digest")
+async def disclosure_alert_digest(
+    pool: Pool,
+    _owner: Owner,
+    since: Annotated[AwareDatetime | None, Query(description="Only alerts raised after.")] = None,
+) -> list[AlertDigestGroupOut]:
+    """Open (unacknowledged) alerts grouped by ticker: what to read first."""
+    rows = await alerts.list_alerts(pool, limit=500)
+    if since is not None:
+        rows = [r for r in rows if r["created_at"] > since]
+    return [AlertDigestGroupOut(**g) for g in alerts.digest(rows)]
+
+
 @router.post("/alerts/scan")
 async def scan_disclosure_alerts(pool: Pool, _owner: Owner) -> AlertScanOut:
     """Run the alert scans now for every held ticker (the insider job also runs them)."""

@@ -4605,6 +4605,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/disclosures/alerts/digest": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Disclosure Alert Digest
+         * @description Open (unacknowledged) alerts grouped by ticker: what to read first.
+         */
+        get: operations["disclosure_alert_digest"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/disclosures/alerts/scan": {
         parameters: {
             query?: never;
@@ -5452,6 +5472,22 @@ export interface components {
              * @default 60
              */
             batch_wait_minutes: number;
+        };
+        /** AlertDigestGroupOut */
+        AlertDigestGroupOut: {
+            /** Ticker */
+            ticker: string;
+            /** Count */
+            count: number;
+            /** Kinds */
+            kinds: string[];
+            /** Headlines */
+            headlines: string[];
+            /**
+             * Latest Known At
+             * Format: date-time
+             */
+            latest_known_at: string;
         };
         /** AlertOut */
         AlertOut: {
@@ -28084,6 +28120,38 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["DisclosureAlertOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    disclosure_alert_digest: {
+        parameters: {
+            query?: {
+                /** @description Only alerts raised after. */
+                since?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AlertDigestGroupOut"][];
                 };
             };
             /** @description Validation Error */

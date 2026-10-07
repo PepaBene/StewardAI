@@ -14558,6 +14558,68 @@
         }
       }
     },
+    "/disclosures/alerts/digest": {
+      "get": {
+        "tags": [
+          "disclosures"
+        ],
+        "summary": "Disclosure Alert Digest",
+        "description": "Open (unacknowledged) alerts grouped by ticker: what to read first.",
+        "operationId": "disclosure_alert_digest",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "since",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date-time"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Only alerts raised after.",
+              "title": "Since"
+            },
+            "description": "Only alerts raised after."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/AlertDigestGroupOut"
+                  },
+                  "title": "Response Disclosure Alert Digest"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/disclosures/alerts/scan": {
       "post": {
         "tags": [
@@ -16919,6 +16981,46 @@
         "type": "object",
         "title": "AiApprovalSettings",
         "description": "AI approval of suggested listings and peers. Nothing waits for a click; every decision\nis recorded with its reasons and the owner can overturn it (an owner decision is final)."
+      },
+      "AlertDigestGroupOut": {
+        "properties": {
+          "ticker": {
+            "type": "string",
+            "title": "Ticker"
+          },
+          "count": {
+            "type": "integer",
+            "title": "Count"
+          },
+          "kinds": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Kinds"
+          },
+          "headlines": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Headlines"
+          },
+          "latest_known_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Latest Known At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "ticker",
+          "count",
+          "kinds",
+          "headlines",
+          "latest_known_at"
+        ],
+        "title": "AlertDigestGroupOut"
       },
       "AlertOut": {
         "properties": {
