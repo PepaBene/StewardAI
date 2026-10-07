@@ -238,6 +238,28 @@ class ContributionOut(BaseModel):
     total: float
     pct_of_start: float | None
     attributed: bool
+    benchmark_equivalent: float | None = Field(
+        default=None,
+        description="What this holding's opening value would have gained in the benchmark.",
+    )
+    active: float | None = Field(
+        default=None, description="Total contribution minus the benchmark equivalent."
+    )
+    active_reason: str | None = Field(
+        default=None, description="Why there is no active figure for this holding."
+    )
+
+
+class BenchmarkRelativeOut(BaseModel):
+    label: str
+    benchmark_return: float = Field(description="Benchmark return over the same dates.")
+    basis: str = Field(description="total, price or unknown: whether dividends are included.")
+    currency: str | None
+    like_for_like: bool = Field(
+        description="The benchmark is quoted in the base currency and includes dividends."
+    )
+    active_total: float = Field(description="Sum of the holdings' active contributions.")
+    notes: list[str]
 
 
 class BridgeOut(BaseModel):
@@ -261,6 +283,7 @@ class AttributionResponse(BaseModel):
     bridge: BridgeOut | None
     holdings: list[ContributionOut]
     groups: dict[str, dict[str, float]]
+    benchmark: BenchmarkRelativeOut | None = None
     explain: PerformanceExplain
 
 

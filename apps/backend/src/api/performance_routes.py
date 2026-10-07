@@ -5,12 +5,13 @@ Read-only against the broker data; the only write is the owner's own settings. W
 
 from typing import Annotated, Literal
 
-from fastapi import APIRouter, Query
+from fastapi import APIRouter, HTTPException, Query
 from fastapi.responses import PlainTextResponse
 from pydantic import BaseModel
 
 from api.auth import Owner
 from api.db import Pool
+from steward import saved
 from steward.performance import exports, service
 from steward.performance.reports import (
     AttributionResponse,
@@ -90,6 +91,52 @@ async def export_performance(
         media_type="text/csv",
         headers={"Content-Disposition": f'attachment; filename="performance-{kind}.csv"'},
     )
+
+
+class PerformanceSavedReport(BaseModel):
+    item: saved.SavedAnalysisItem
+    report: PerformanceResponse
+
+
+@router.get("/portfolio/performance/saved", tags=["portfolio"])
+async def list_saved_performance_reports(pool: Pool, owner: Owner) -> list[saved.SavedAnalysisItem]:
+    """Performance reports you kept, newest first."""
+    return await saved.list_saved(pool, owner.user_id, "performance_report")
+
+
+@router.post("/portfolio/performance/saved", tags=["portfolio"], status_code=201)
+async def save_performance_report(
+    pool: Pool, owner: Owner, body: saved.SavedAnalysisRequest
+) -> saved.SavedAnalysisItem:
+    """Keep today's report as it is now (the server builds it, so a saved figure is never one the
+    browser supplied). Open it later to see the figures as they stood."""
+    settings, _ = await load_settings(pool, owner.user_id)
+    report = await service.performance_report(pool, settings)
+    return await saved.save(
+        pool,
+        owner.user_id,
+        "performance_report",
+        body,
+        report.model_dump(mode="json"),
+        method_version=report.explain.formula_version,
+        as_of=report.as_of,
+    )
+
+
+@router.get("/portfolio/performance/saved/{report_id}", tags=["portfolio"])
+async def open_saved_performance_report(pool: Pool, owner: Owner, report_id: int) -> PerformanceSavedReport:
+    found = await saved.load_saved(pool, owner.user_id, "performance_report", report_id)
+    if found is None:
+        raise HTTPException(404, "No such saved report.")
+    return PerformanceSavedReport(
+        item=found[0], report=PerformanceResponse.model_validate(found[1])
+    )
+
+
+@router.delete("/portfolio/performance/saved/{report_id}", tags=["portfolio"], status_code=204)
+async def archive_saved_performance_report(pool: Pool, owner: Owner, report_id: int) -> None:
+    if not await saved.archive(pool, owner.user_id, "performance_report", report_id):
+        raise HTTPException(404, "No such saved report.")
 
 
 @router.get("/portfolio/performance/settings", tags=["portfolio"])

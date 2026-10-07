@@ -27,12 +27,14 @@ from steward.performance.attribution import (
     AccountDay,
     Amount,
     PositionDay,
+    RelativeContribution,
     Trade,
     attribute,
+    benchmark_relative,
     group_contributions,
     ticker_fx_lookup,
 )
-from steward.performance.benchmark import blended_index, compare_window
+from steward.performance.benchmark import blended_index, compare_window, series_return
 from steward.performance.ledger import (
     EXTERNAL_KINDS,
     CashReconciliation,
@@ -103,6 +105,10 @@ async def _ledger(
     """The classified ledger with the owner's entered splits applied to earlier fills."""
     entries = build_ledger(await _raw_transactions(pool), account_currency)
     return apply_splits(entries, [Split(s.ticker, s.day, s.ratio) for s in settings.splits])
+
+
+def _float(value: Decimal | None) -> float | None:
+    return None if value is None else float(value)
 
 
 def _day_values(snapshots: list[asyncpg.Record], ledger: list[LedgerEntry]) -> list[DayValue]:
@@ -663,6 +669,30 @@ async def attribution_report(
         groups[dimension] = {
             k: float(v) for k, v in group_contributions(report.holdings, mapping).items()
         }
+    relative: dict[str, RelativeContribution] = {}
+    benchmark_out: r.BenchmarkRelativeOut | None = None
+    jobs_cfg = await load_active(pool, "jobs", JobsConfig)
+    label, bench_series, bench_ccy, bench_basis, bench_notes = await _benchmark_series(
+        pool,
+        settings.benchmark,
+        jobs_cfg.body if jobs_cfg else JobsConfig(),
+        report.start - dt.timedelta(days=10),
+    )
+    bench_return = series_return(bench_series, report.start, report.end) if label else None
+    if label is not None and bench_return is not None:
+        opening = {p.ticker: p.value_base for p in positions if p.day == report.start}
+        relative = {x.ticker: x for x in benchmark_relative(report.holdings, opening, bench_return)}
+        notes = list(bench_notes)
+        if bench_basis != "total":
+            notes.append("the benchmark may leave out dividends, which favours the holdings")
+        if bench_ccy != snapshots[-1]["base_currency"]:
+            notes.append("the benchmark is not quoted in your base currency")
+        benchmark_out = r.BenchmarkRelativeOut(
+            label=label, benchmark_return=float(bench_return), basis=bench_basis, currency=bench_ccy,
+            like_for_like=bench_basis == "total" and bench_ccy == snapshots[-1]["base_currency"],
+            active_total=float(sum((x.active or ZERO for x in relative.values()), ZERO)),
+            notes=notes,
+        )  # fmt: skip
     start_total = report.start_value
     bridge = report.bridge
     status: r.ReportStatus = "partial" if bridge.status is Status.PARTIAL else "complete"
@@ -683,10 +713,14 @@ async def attribution_report(
                 total=float(h.total),
                 pct_of_start=float(h.total / start_total) if start_total else None,
                 attributed=h.attributed,
+                benchmark_equivalent=_float(relative[h.ticker].benchmark_equivalent)
+                if h.ticker in relative else None,
+                active=_float(relative[h.ticker].active) if h.ticker in relative else None,
+                active_reason=relative[h.ticker].reason if h.ticker in relative else None,
             )
             for h in report.holdings
         ],
-        groups=groups, explain=explain,
+        groups=groups, benchmark=benchmark_out, explain=explain,
     )  # fmt: skip
 
 

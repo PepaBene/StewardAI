@@ -10,6 +10,7 @@ import { getBrowserApiClient } from "@/lib/api/client";
 import { formatMoney, formatPercent } from "@/lib/format";
 import { useApiResource } from "@/lib/hooks/use-api-resource";
 import {
+  applyScenario,
   buildProposal,
   cashRemainder,
   pointsLabel,
@@ -17,10 +18,12 @@ import {
   type CandidateData,
   type EditRow,
   type ProposalData,
+  type ProposedRequest,
   type XrayData,
 } from "@/lib/xray/xray";
 
 import { Notes, TD, TH, TH_LEFT, Toned } from "../shared";
+import { SavedScenarios } from "./saved-scenarios";
 
 const fetchXray = () => getBrowserApiClient().GET("/portfolio/xray");
 
@@ -57,8 +60,22 @@ function Builder({ data }: { data: XrayData }) {
     setError(null);
   }
 
+  const built = buildProposal(rows, added);
+  const currentRequest = built.ok ? built.request : null;
+
+  function openScenario(scenario: ProposedRequest, label: string) {
+    const loaded = applyScenario(data.holdings, scenario);
+    setTexts(loaded.texts);
+    setAdded(loaded.added.map((a) => ({ ...a, name: null, looked_through: null })));
+    setResult(null);
+    setError(
+      loaded.missing.length > 0
+        ? `"${label}" mentions ${loaded.missing.join(", ")}, which you no longer hold. Those weights were left out.`
+        : null,
+    );
+  }
+
   async function run() {
-    const built = buildProposal(rows, added);
     if (!built.ok) {
       setError(built.error);
       return;
@@ -185,6 +202,8 @@ function Builder({ data }: { data: XrayData }) {
           </div>
         ) : null}
       </Blueprint>
+
+      <SavedScenarios request={currentRequest} onOpen={openScenario} />
 
       {result ? <Result data={result} currency={currency} /> : null}
     </div>

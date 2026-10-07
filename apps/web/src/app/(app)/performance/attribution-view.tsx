@@ -151,6 +151,7 @@ function Body({ data }: { data: AttributionData }) {
                 <th scope="col" className={TH}>Fees</th>
                 <th scope="col" className={TH}>Total</th>
                 <th scope="col" className={TH}>Of starting value</th>
+                {data.benchmark ? <th scope="col" className={TH}>Against the benchmark</th> : null}
               </tr>
             </thead>
             <tbody>
@@ -168,15 +169,30 @@ function Body({ data }: { data: AttributionData }) {
                       <td className={TD}><Money value={h.fees} currency={currency} signed decimals={2} /></td>
                       <td className={cn(TD, "font-semibold")}><Money value={h.total} currency={currency} signed decimals={2} /></td>
                       <td className={TD}>{h.pct_of_start === null || h.pct_of_start === undefined ? "—" : <Toned value={h.pct_of_start}>{formatPercent(h.pct_of_start, { signed: true, decimals: 2 })}</Toned>}</td>
+                      {data.benchmark ? (
+                        <td className={TD}>
+                          {h.active === null || h.active === undefined ? (
+                            <span className="text-xs text-text-muted">{h.active_reason ?? "—"}</span>
+                          ) : (
+                            <Money value={h.active} currency={currency} signed decimals={2} />
+                          )}
+                        </td>
+                      ) : null}
                     </>
                   ) : (
-                    <td colSpan={6} className="px-3 py-1.5 text-right"><Absent reason="missing: units changed without a stored fill" /></td>
+                    <td colSpan={data.benchmark ? 7 : 6} className="px-3 py-1.5 text-right"><Absent reason="missing: units changed without a stored fill" /></td>
                   )}
                 </tr>
               ))}
             </tbody>
           </table>
         </div>
+        {data.benchmark ? (
+          <p className="mt-3 max-w-3xl text-xs text-text-muted">
+            “Against the benchmark” is a holding&apos;s total minus what its value at the start would have gained in {data.benchmark.label} ({formatPercent(data.benchmark.benchmark_return, { signed: true, decimals: 2 })} over the same dates). A holding bought during the window has no starting value to compare.
+            {data.benchmark.like_for_like ? "" : ` Not a like-for-like comparison: ${data.benchmark.notes.join("; ") || "the benchmark's currency or dividend basis is not the same as yours"}.`}
+          </p>
+        ) : null}
       </Blueprint>
 
       {groupNames.length > 0 ? (

@@ -189,6 +189,24 @@ export function buildProposal(rows: readonly EditRow[], additions: readonly AddR
   return { ok: true, request: { weights, additions: adds }, changed: weights.length + adds.length, invested };
 }
 
+/**
+ * Load a saved what-if back into the editor: the saved weights as typed percents over the
+ * current holdings (a holding the scenario does not mention keeps its current weight) and the
+ * added securities. A saved ticker you no longer hold is returned in `missing`, not dropped.
+ */
+export function applyScenario(
+  holdings: readonly { ticker: string; weight: number }[],
+  scenario: ProposedRequest,
+): { texts: Record<string, string>; added: AddRow[]; missing: string[] } {
+  const texts = Object.fromEntries(holdings.map((h) => [h.ticker, (h.weight * 100).toFixed(3)]));
+  const missing: string[] = [];
+  for (const w of scenario.weights ?? []) {
+    if (w.ticker in texts) texts[w.ticker] = (w.weight * 100).toFixed(3);
+    else missing.push(w.ticker);
+  }
+  return { texts, added: (scenario.additions ?? []).map((a) => ({ ticker: a.ticker, text: String(+(a.weight * 100).toFixed(3)) })), missing };
+}
+
 /** The share left as cash for the weights as typed (null when any entry is unreadable). */
 export function cashRemainder(rows: readonly EditRow[], additions: readonly AddRow[]): number | null {
   let invested = 0;

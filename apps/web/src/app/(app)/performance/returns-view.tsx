@@ -2,6 +2,7 @@
 
 import { CircleCheckIcon } from "lucide-react";
 import Link from "next/link";
+import { useState } from "react";
 
 import { AlertMessage } from "@/components/alert-message";
 import { Absent, ResourceGate } from "@/components/company/primitives";
@@ -12,6 +13,7 @@ import { formatDate, formatPercent } from "@/lib/format";
 import { useApiResource } from "@/lib/hooks/use-api-resource";
 import { figureReason, ledgerSentence, windowName, type PerformanceData, type WindowData } from "@/lib/performance/performance";
 
+import { SavedReports } from "./saved-reports";
 import { Formula, Money, PlainReturn, Points, ReturnCell, TD, TH, TH_LEFT } from "./shared";
 
 const fetchPerformance = () => getBrowserApiClient().GET("/portfolio/performance");
@@ -160,9 +162,33 @@ function Timeline({ data }: { data: PerformanceData }) {
 
 export function ReturnsView() {
   const { state } = useApiResource(fetchPerformance);
+  const [shown, setShown] = useState<{ data: PerformanceData; label: string } | null>(null);
   return (
-    <ResourceGate state={state} label="performance">
-      {(data: PerformanceData) =>
+    <div className="flex flex-col gap-5">
+      {shown ? (
+        <AlertMessage tone="info" title={`Showing the report you saved as "${shown.label}"`}>
+          These are the figures as they stood when it was saved, not today&apos;s.{" "}
+          <button type="button" onClick={() => setShown(null)} className="text-accent-ink underline underline-offset-2">
+            Back to today
+          </button>
+        </AlertMessage>
+      ) : null}
+      {shown ? (
+        <ReportBody data={shown.data} />
+      ) : (
+        <ResourceGate state={state} label="performance">
+          {(data: PerformanceData) => <ReportBody data={data} />}
+        </ResourceGate>
+      )}
+      <SavedReports onOpen={(data, label) => setShown({ data, label })} />
+    </div>
+  );
+}
+
+function ReportBody({ data }: { data: PerformanceData }) {
+  return (
+    <>
+      {
         data.status === "unavailable" && data.windows.length === 0 ? (
           <AlertMessage tone="info" title="Not enough history yet">
             {data.gap ?? "Returns need at least two daily snapshots."}
@@ -222,6 +248,6 @@ export function ReturnsView() {
           </div>
         )
       }
-    </ResourceGate>
+    </>
   );
 }

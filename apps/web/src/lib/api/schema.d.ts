@@ -4936,6 +4936,49 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/portfolio/performance/saved": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Saved Performance Reports
+         * @description Performance reports you kept, newest first.
+         */
+        get: operations["list_saved_performance_reports"];
+        put?: never;
+        /**
+         * Save Performance Report
+         * @description Keep today's report as it is now (the server builds it, so a saved figure is never one the
+         *     browser supplied). Open it later to see the figures as they stood.
+         */
+        post: operations["save_performance_report"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/portfolio/performance/saved/{report_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Open Saved Performance Report */
+        get: operations["open_saved_performance_report"];
+        put?: never;
+        post?: never;
+        /** Archive Saved Performance Report */
+        delete: operations["archive_saved_performance_report"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/portfolio/performance/settings": {
         parameters: {
             query?: never;
@@ -5101,6 +5144,49 @@ export interface paths {
         put?: never;
         post?: never;
         delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/portfolio/xray/scenarios": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Xray Scenarios
+         * @description Your saved what-if scenarios, newest first.
+         */
+        get: operations["list_xray_scenarios"];
+        put?: never;
+        /**
+         * Save Xray Scenario
+         * @description Keep a what-if. Only the proposed weights are stored; opening it runs them against the
+         *     holdings you have then.
+         */
+        post: operations["save_xray_scenario"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/portfolio/xray/scenarios/{scenario_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Open Xray Scenario */
+        get: operations["open_xray_scenario"];
+        put?: never;
+        post?: never;
+        /** Archive Xray Scenario */
+        delete: operations["archive_xray_scenario"];
         options?: never;
         head?: never;
         patch?: never;
@@ -6330,6 +6416,7 @@ export interface components {
                     [key: string]: number;
                 };
             };
+            benchmark?: components["schemas"]["BenchmarkRelativeOut"] | null;
             explain: components["schemas"]["PerformanceExplain"];
         };
         /** BacktestName */
@@ -6657,6 +6744,35 @@ export interface components {
              * @example S&P 500
              */
             label: string;
+        };
+        /** BenchmarkRelativeOut */
+        BenchmarkRelativeOut: {
+            /** Label */
+            label: string;
+            /**
+             * Benchmark Return
+             * @description Benchmark return over the same dates.
+             */
+            benchmark_return: number;
+            /**
+             * Basis
+             * @description total, price or unknown: whether dividends are included.
+             */
+            basis: string;
+            /** Currency */
+            currency: string | null;
+            /**
+             * Like For Like
+             * @description The benchmark is quoted in the base currency and includes dividends.
+             */
+            like_for_like: boolean;
+            /**
+             * Active Total
+             * @description Sum of the holdings' active contributions.
+             */
+            active_total: number;
+            /** Notes */
+            notes: string[];
         };
         /** BenchmarkSpec */
         BenchmarkSpec: {
@@ -8528,6 +8644,21 @@ export interface components {
             pct_of_start: number | null;
             /** Attributed */
             attributed: boolean;
+            /**
+             * Benchmark Equivalent
+             * @description What this holding's opening value would have gained in the benchmark.
+             */
+            benchmark_equivalent?: number | null;
+            /**
+             * Active
+             * @description Total contribution minus the benchmark equivalent.
+             */
+            active?: number | null;
+            /**
+             * Active Reason
+             * @description Why there is no active figure for this holding.
+             */
+            active_reason?: string | null;
         };
         /** ContributionReport */
         ContributionReport: {
@@ -17462,6 +17593,11 @@ export interface components {
             freshness_note: string | null;
             explain: components["schemas"]["PerformanceExplain"];
         };
+        /** PerformanceSavedReport */
+        PerformanceSavedReport: {
+            item: components["schemas"]["SavedAnalysisItem"];
+            report: components["schemas"]["PerformanceResponse"];
+        };
         /** PerformanceSeriesPoint */
         PerformanceSeriesPoint: {
             /**
@@ -20158,6 +20294,36 @@ export interface components {
             /** Name */
             name: string;
             request: components["schemas"]["ValuationRequest"];
+            /** Note */
+            note?: string | null;
+        };
+        /** SavedAnalysisItem */
+        SavedAnalysisItem: {
+            /** Id */
+            id: number;
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "xray_scenario" | "performance_report";
+            /** Name */
+            name: string;
+            /** Note */
+            note: string | null;
+            /** Method Version */
+            method_version: string | null;
+            /** As Of */
+            as_of: string | null;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+        };
+        /** SavedAnalysisRequest */
+        SavedAnalysisRequest: {
+            /** Name */
+            name: string;
             /** Note */
             note?: string | null;
         };
@@ -23526,6 +23692,19 @@ export interface components {
             method: string;
             /** Notes */
             notes: string[];
+        };
+        /** XraySaveScenarioRequest */
+        XraySaveScenarioRequest: {
+            /** Name */
+            name: string;
+            /** Note */
+            note?: string | null;
+            scenario: components["schemas"]["ProposedRequest"];
+        };
+        /** XraySavedScenario */
+        XraySavedScenario: {
+            item: components["schemas"]["SavedAnalysisItem"];
+            scenario: components["schemas"]["ProposedRequest"];
         };
         /** XraySide */
         XraySide: {
@@ -32328,6 +32507,119 @@ export interface operations {
             };
         };
     };
+    list_saved_performance_reports: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SavedAnalysisItem"][];
+                };
+            };
+        };
+    };
+    save_performance_report: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SavedAnalysisRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SavedAnalysisItem"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    open_saved_performance_report: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                report_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PerformanceSavedReport"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    archive_saved_performance_report: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                report_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     get_performance_settings: {
         parameters: {
             query?: never;
@@ -32531,6 +32823,119 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["XrayCandidates"];
                 };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_xray_scenarios: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SavedAnalysisItem"][];
+                };
+            };
+        };
+    };
+    save_xray_scenario: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["XraySaveScenarioRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SavedAnalysisItem"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    open_xray_scenario: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                scenario_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["XraySavedScenario"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    archive_xray_scenario: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                scenario_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
             /** @description Validation Error */
             422: {

@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   activeBar,
+  applyScenario,
   basisShares,
   buildProposal,
   cashRemainder,
@@ -140,6 +141,26 @@ describe("buildProposal", () => {
   it("refuses an addition with no weight", () => {
     const built = buildProposal(rows, [{ ticker: "NESN", text: "0" }]);
     expect(built.ok).toBe(false);
+  });
+});
+
+describe("applyScenario", () => {
+  const holdings = [
+    { ticker: "AAA", weight: 0.3 },
+    { ticker: "BBB", weight: 0.2 },
+  ];
+
+  it("puts saved weights over the current holdings and keeps the others as they are", () => {
+    const out = applyScenario(holdings, { weights: [{ ticker: "AAA", weight: 0.15 }], additions: [{ ticker: "NEW", weight: 0.05 }] });
+    expect(out.texts).toEqual({ AAA: "15.000", BBB: "20.000" });
+    expect(out.added).toEqual([{ ticker: "NEW", text: "5" }]);
+    expect(out.missing).toEqual([]);
+  });
+
+  it("names a saved holding that is no longer held instead of dropping it silently", () => {
+    const out = applyScenario(holdings, { weights: [{ ticker: "GONE", weight: 0.1 }], additions: [] });
+    expect(out.missing).toEqual(["GONE"]);
+    expect(out.texts).toEqual({ AAA: "30.000", BBB: "20.000" });
   });
 });
 

@@ -204,6 +204,26 @@ async def test_candidates_include_the_watchlist_and_search(api: httpx.AsyncClien
     )
 
 
+async def test_a_saved_scenario_is_listed_opened_and_archived(api: httpx.AsyncClient) -> None:
+    scenario = {"weights": [{"ticker": "AAPL_US_EQ", "weight": 0.2}], "additions": []}
+    made = await api.post(
+        "/portfolio/xray/scenarios", json={"name": "Trim Apple", "scenario": scenario}
+    )
+    assert made.status_code == 201
+    sid = made.json()["id"]
+    assert [x["name"] for x in (await api.get("/portfolio/xray/scenarios")).json()] == [
+        "Trim Apple"
+    ]
+    opened = (await api.get(f"/portfolio/xray/scenarios/{sid}")).json()
+    assert opened["scenario"]["weights"] == scenario["weights"]
+    assert (await api.delete(f"/portfolio/xray/scenarios/{sid}")).status_code == 204
+    assert (await api.get("/portfolio/xray/scenarios")).json() == []
+    assert (await api.get(f"/portfolio/xray/scenarios/{sid}")).status_code == 404
+    assert (
+        await api.post("/portfolio/xray/scenarios", json={"name": "", "scenario": scenario})
+    ).status_code == 422
+
+
 async def test_a_proposal_never_changes_saved_holdings(
     api: httpx.AsyncClient, backend_pool: asyncpg.Pool
 ) -> None:
@@ -272,8 +292,12 @@ async def test_stored_provider_profiles_fill_industry_domicile_and_listing(
     assert bucket(industry, "Consumer Electronics")["weight"] == pytest.approx(0.36)
     assert bucket(industry, "Consumer Electronics")["basis"] == {"reported": pytest.approx(0.36)}
     domicile = view(body, "domicile")
-    assert bucket(domicile, "US")["weight"] == pytest.approx(0.36 + 0.18)  # AAPL and MSFT by ISIN prefix
-    assert bucket(domicile, "CH")["basis"] == {"inferred": pytest.approx(0.30)}  # Nestle: ISIN prefix only
+    assert bucket(domicile, "US")["weight"] == pytest.approx(
+        0.36 + 0.18
+    )  # AAPL and MSFT by ISIN prefix
+    assert bucket(domicile, "CH")["basis"] == {
+        "inferred": pytest.approx(0.30)
+    }  # Nestle: ISIN prefix only
     listing = view(body, "listing")
     assert bucket(listing, "US")["weight"] == pytest.approx(0.36)
     assert bucket(listing, "US")["basis"] == {"inferred": pytest.approx(0.36)}

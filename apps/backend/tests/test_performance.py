@@ -165,6 +165,23 @@ def test_position_breaks_report_what_fills_cannot_explain():
     assert both["BBB"].ledger_quantity == 0 and "no fills" in both["BBB"].reason
 
 
+def test_benchmark_relative_contribution_is_the_gain_less_the_benchmark_on_opening_money():
+    from steward.performance.attribution import HoldingContribution, benchmark_relative
+
+    held = HoldingContribution("AAA", price=D("120"), income=D("5"), fees=D("-1"))  # total 124
+    bought_later = HoldingContribution("BBB", price=D("30"))
+    broken = HoldingContribution("CCC", attributed=False)
+    rel = {
+        x.ticker: x
+        for x in benchmark_relative(
+            [held, bought_later, broken], {"AAA": D("1000")}, D("0.10")
+        )
+    }
+    assert rel["AAA"].benchmark_equivalent == D("100.00") and rel["AAA"].active == D("24.00")
+    assert rel["BBB"].active is None and rel["BBB"].reason == "not held at the start"
+    assert rel["CCC"].active is None and rel["CCC"].reason == "not attributed"
+
+
 def test_an_entered_split_restates_earlier_fills_and_closes_the_position_break():
     entries = build_ledger(
         [

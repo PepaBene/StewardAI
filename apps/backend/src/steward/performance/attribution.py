@@ -102,6 +102,39 @@ class HoldingContribution:
         return self.price + self.fx + self.income + self.fees
 
 
+@dataclass(frozen=True)
+class RelativeContribution:
+    ticker: str
+    benchmark_equivalent: Decimal | None  # its opening value's gain, had it been in the benchmark
+    active: Decimal | None  # its contribution minus that
+    reason: str | None = None
+
+
+def benchmark_relative(
+    holdings: Iterable[HoldingContribution],
+    opening_values: Mapping[str, Decimal],
+    benchmark_return: Decimal,
+) -> list[RelativeContribution]:
+    """Each holding's contribution against the same opening money placed in the benchmark:
+    `active = total - opening value x benchmark return`. Both are money in the base currency, so
+    the actives add up to the portfolio's gain on its opening holdings less what the benchmark
+    would have made on them. A holding not held at the start has no opening money to compare
+    (its buys are a decision, not a position), and a holding the stored data cannot attribute is
+    left out; both say why."""
+    out: list[RelativeContribution] = []
+    for h in holdings:
+        if not h.attributed:
+            out.append(RelativeContribution(h.ticker, None, None, "not attributed"))
+            continue
+        opening = opening_values.get(h.ticker, ZERO)
+        if opening <= 0:
+            out.append(RelativeContribution(h.ticker, None, None, "not held at the start"))
+            continue
+        equivalent = opening * benchmark_return
+        out.append(RelativeContribution(h.ticker, equivalent, h.total - equivalent))
+    return out
+
+
 @dataclass
 class AttributionReport:
     start: dt.date

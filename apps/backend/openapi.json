@@ -16019,6 +16019,167 @@
         }
       }
     },
+    "/portfolio/performance/saved": {
+      "get": {
+        "tags": [
+          "portfolio"
+        ],
+        "summary": "List Saved Performance Reports",
+        "description": "Performance reports you kept, newest first.",
+        "operationId": "list_saved_performance_reports",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/SavedAnalysisItem"
+                  },
+                  "type": "array",
+                  "title": "Response List Saved Performance Reports"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      },
+      "post": {
+        "tags": [
+          "portfolio"
+        ],
+        "summary": "Save Performance Report",
+        "description": "Keep today's report as it is now (the server builds it, so a saved figure is never one the\nbrowser supplied). Open it later to see the figures as they stood.",
+        "operationId": "save_performance_report",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SavedAnalysisRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SavedAnalysisItem"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/portfolio/performance/saved/{report_id}": {
+      "get": {
+        "tags": [
+          "portfolio"
+        ],
+        "summary": "Open Saved Performance Report",
+        "operationId": "open_saved_performance_report",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "report_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Report Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PerformanceSavedReport"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "portfolio"
+        ],
+        "summary": "Archive Saved Performance Report",
+        "operationId": "archive_saved_performance_report",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "report_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Report Id"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/portfolio/performance/settings": {
       "get": {
         "tags": [
@@ -16323,6 +16484,167 @@
                 }
               }
             }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/portfolio/xray/scenarios": {
+      "get": {
+        "tags": [
+          "portfolio"
+        ],
+        "summary": "List Xray Scenarios",
+        "description": "Your saved what-if scenarios, newest first.",
+        "operationId": "list_xray_scenarios",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/SavedAnalysisItem"
+                  },
+                  "type": "array",
+                  "title": "Response List Xray Scenarios"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      },
+      "post": {
+        "tags": [
+          "portfolio"
+        ],
+        "summary": "Save Xray Scenario",
+        "description": "Keep a what-if. Only the proposed weights are stored; opening it runs them against the\nholdings you have then.",
+        "operationId": "save_xray_scenario",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/XraySaveScenarioRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SavedAnalysisItem"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/portfolio/xray/scenarios/{scenario_id}": {
+      "get": {
+        "tags": [
+          "portfolio"
+        ],
+        "summary": "Open Xray Scenario",
+        "operationId": "open_xray_scenario",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "scenario_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Scenario Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/XraySavedScenario"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "portfolio"
+        ],
+        "summary": "Archive Xray Scenario",
+        "operationId": "archive_xray_scenario",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "scenario_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Scenario Id"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
           },
           "422": {
             "description": "Validation Error",
@@ -20099,6 +20421,16 @@
             "type": "object",
             "title": "Groups"
           },
+          "benchmark": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/BenchmarkRelativeOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "explain": {
             "$ref": "#/components/schemas/PerformanceExplain"
           }
@@ -21149,6 +21481,63 @@
         ],
         "title": "BenchmarkProxy",
         "description": "Which fund's holdings stand in for a benchmark index's constituents."
+      },
+      "BenchmarkRelativeOut": {
+        "properties": {
+          "label": {
+            "type": "string",
+            "title": "Label"
+          },
+          "benchmark_return": {
+            "type": "number",
+            "title": "Benchmark Return",
+            "description": "Benchmark return over the same dates."
+          },
+          "basis": {
+            "type": "string",
+            "title": "Basis",
+            "description": "total, price or unknown: whether dividends are included."
+          },
+          "currency": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Currency"
+          },
+          "like_for_like": {
+            "type": "boolean",
+            "title": "Like For Like",
+            "description": "The benchmark is quoted in the base currency and includes dividends."
+          },
+          "active_total": {
+            "type": "number",
+            "title": "Active Total",
+            "description": "Sum of the holdings' active contributions."
+          },
+          "notes": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Notes"
+          }
+        },
+        "type": "object",
+        "required": [
+          "label",
+          "benchmark_return",
+          "basis",
+          "currency",
+          "like_for_like",
+          "active_total",
+          "notes"
+        ],
+        "title": "BenchmarkRelativeOut"
       },
       "BenchmarkSpec": {
         "properties": {
@@ -26674,6 +27063,42 @@
           "attributed": {
             "type": "boolean",
             "title": "Attributed"
+          },
+          "benchmark_equivalent": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Benchmark Equivalent",
+            "description": "What this holding's opening value would have gained in the benchmark."
+          },
+          "active": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Active",
+            "description": "Total contribution minus the benchmark equivalent."
+          },
+          "active_reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Active Reason",
+            "description": "Why there is no active figure for this holding."
           }
         },
         "type": "object",
@@ -52033,6 +52458,22 @@
         ],
         "title": "PerformanceResponse"
       },
+      "PerformanceSavedReport": {
+        "properties": {
+          "item": {
+            "$ref": "#/components/schemas/SavedAnalysisItem"
+          },
+          "report": {
+            "$ref": "#/components/schemas/PerformanceResponse"
+          }
+        },
+        "type": "object",
+        "required": [
+          "item",
+          "report"
+        ],
+        "title": "PerformanceSavedReport"
+      },
       "PerformanceSeriesPoint": {
         "properties": {
           "date": {
@@ -59768,6 +60209,103 @@
           "request"
         ],
         "title": "SaveScenarioIn"
+      },
+      "SavedAnalysisItem": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "xray_scenario",
+              "performance_report"
+            ],
+            "title": "Kind"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note"
+          },
+          "method_version": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Method Version"
+          },
+          "as_of": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "As Of"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "kind",
+          "name",
+          "note",
+          "method_version",
+          "as_of",
+          "created_at"
+        ],
+        "title": "SavedAnalysisItem"
+      },
+      "SavedAnalysisRequest": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "maxLength": 120,
+            "minLength": 1,
+            "title": "Name"
+          },
+          "note": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 500
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note"
+          }
+        },
+        "type": "object",
+        "required": [
+          "name"
+        ],
+        "title": "SavedAnalysisRequest"
       },
       "SavedComparison": {
         "properties": {
@@ -69463,6 +70001,53 @@
           "notes"
         ],
         "title": "XrayResponse"
+      },
+      "XraySaveScenarioRequest": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "maxLength": 120,
+            "minLength": 1,
+            "title": "Name"
+          },
+          "note": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 500
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note"
+          },
+          "scenario": {
+            "$ref": "#/components/schemas/ProposedRequest"
+          }
+        },
+        "type": "object",
+        "required": [
+          "name",
+          "scenario"
+        ],
+        "title": "XraySaveScenarioRequest"
+      },
+      "XraySavedScenario": {
+        "properties": {
+          "item": {
+            "$ref": "#/components/schemas/SavedAnalysisItem"
+          },
+          "scenario": {
+            "$ref": "#/components/schemas/ProposedRequest"
+          }
+        },
+        "type": "object",
+        "required": [
+          "item",
+          "scenario"
+        ],
+        "title": "XraySavedScenario"
       },
       "XraySide": {
         "properties": {

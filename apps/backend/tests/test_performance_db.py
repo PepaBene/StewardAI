@@ -30,11 +30,17 @@ def noon(day: dt.date) -> dt.datetime:
 async def seed(pool: asyncpg.Pool, admin_url: str) -> None:
     admin = await asyncpg.connect(admin_url)
     try:
-        await admin.execute("insert into auth.users (id, email) values ($1, 'o@example.com')", OWNER)
+        await admin.execute(
+            "insert into auth.users (id, email) values ($1, 'o@example.com')", OWNER
+        )
     finally:
         await admin.close()
-    job = await pool.fetchval("insert into public.job (job_type, trigger, status) values ('portfolio_sync', 'schedule', 'succeeded') returning id")
-    await pool.execute("insert into public.instrument (t212_ticker, name, currency, home_country) values ('AAA_US_EQ', 'Alpha Inc', 'EUR', 'DE')")
+    job = await pool.fetchval(
+        "insert into public.job (job_type, trigger, status) values ('portfolio_sync', 'schedule', 'succeeded') returning id"
+    )
+    await pool.execute(
+        "insert into public.instrument (t212_ticker, name, currency, home_country) values ('AAA_US_EQ', 'Alpha Inc', 'EUR', 'DE')"
+    )
     # (day, total, invested)
     for day, total, invested in ((D1, "1000", "0"), (D2, "1000", "500"), (D3, "1055", "550")):
         cash = Decimal(total) - Decimal(invested)
@@ -67,7 +73,9 @@ async def seed(pool: asyncpg.Pool, admin_url: str) -> None:
 
 
 @pytest.fixture
-async def api(migrated_db: MigratedDatabase, backend_pool: asyncpg.Pool) -> AsyncIterator[httpx.AsyncClient]:
+async def api(
+    migrated_db: MigratedDatabase, backend_pool: asyncpg.Pool
+) -> AsyncIterator[httpx.AsyncClient]:
     await seed(backend_pool, migrated_db.admin_url)
     app = create_app()
 
@@ -77,11 +85,15 @@ async def api(migrated_db: MigratedDatabase, backend_pool: asyncpg.Pool) -> Asyn
     app.dependency_overrides[get_pool] = pool_override
     app.dependency_overrides[get_pool_or_error] = pool_override
     app.dependency_overrides[require_owner] = lambda: AuthenticatedUser(OWNER, None, "aal2")
-    async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url="http://test") as client:
+    async with httpx.AsyncClient(
+        transport=httpx.ASGITransport(app=app), base_url="http://test"
+    ) as client:
         yield client
 
 
-async def test_performance_windows_ledger_health_and_unavailable_windows(api: httpx.AsyncClient) -> None:
+async def test_performance_windows_ledger_health_and_unavailable_windows(
+    api: httpx.AsyncClient,
+) -> None:
     body = (await api.get("/portfolio/performance")).json()
     assert body["base_currency"] == "EUR" and body["as_of"] == "2026-01-07"
     windows = {w["label"]: w for w in body["windows"]}
@@ -100,9 +112,14 @@ async def test_performance_windows_ledger_health_and_unavailable_windows(api: ht
     assert body["timeline"][0]["deposits"] == 1000 and body["timeline"][0]["dividends"] == 5
 
 
-async def test_unexplained_cash_withholds_a_precise_return(api: httpx.AsyncClient, backend_pool: asyncpg.Pool) -> None:
+async def test_unexplained_cash_withholds_a_precise_return(
+    api: httpx.AsyncClient, backend_pool: asyncpg.Pool
+) -> None:
     # An unrecorded 300 deposit shows up as cash the ledger cannot explain on day 3.
-    await backend_pool.execute("update public.account_snapshot set total_value = 1355, total_base = 1355, cash_available = 805, cash_base = 805 where snapshot_date = $1", D3)
+    await backend_pool.execute(
+        "update public.account_snapshot set total_value = 1355, total_base = 1355, cash_available = 805, cash_base = 805 where snapshot_date = $1",
+        D3,
+    )
     body = (await api.get("/portfolio/performance")).json()
     inception = next(w for w in body["windows"] if w["label"] == "inception")
     assert inception["twr"]["value"] is None
@@ -115,7 +132,9 @@ async def test_unexplained_cash_withholds_a_precise_return(api: httpx.AsyncClien
 async def test_lots_and_holding_period(api: httpx.AsyncClient) -> None:
     body = (await api.get("/portfolio/performance/lots")).json()
     (lot,) = body["lots"]
-    assert lot["ticker"] == "AAA_US_EQ" and lot["quantity"] == 10 and lot["cost"] == pytest.approx(500)
+    assert (
+        lot["ticker"] == "AAA_US_EQ" and lot["quantity"] == 10 and lot["cost"] == pytest.approx(500)
+    )
     assert lot["passes_on"] == "2029-01-07" and not lot["passed"]
     assert lot["target_reached"] is None and lot["forfeits_exemption_warning"] is False
     assert body["dividends"] == 5 and body["realized"] == [] and body["disclaimer"]
@@ -134,30 +153,84 @@ async def test_attribution_reconciles_to_the_gain(api: httpx.AsyncClient) -> Non
     assert body["groups"]["country"] == {"DE": pytest.approx(55)}
 
 
-async def test_settings_are_versioned_and_drive_the_sleeve_comparison(api: httpx.AsyncClient) -> None:
+async def test_settings_are_versioned_and_drive_the_sleeve_comparison(
+    api: httpx.AsyncClient,
+) -> None:
     empty = (await api.get("/portfolio/performance/sleeves")).json()
     assert empty["status"] == "unavailable" and "core ETFs" in empty["message"]
     first = (await api.get("/portfolio/performance/settings")).json()
     assert first["version"] is None and first["settings"]["time_test_years"] == 3
-    saved = await api.put("/portfolio/performance/settings", json={"core_tickers": ["AAA_US_EQ"], "time_test_years": 3})
+    saved = await api.put(
+        "/portfolio/performance/settings",
+        json={"core_tickers": ["AAA_US_EQ"], "time_test_years": 3},
+    )
     assert saved.status_code == 200 and isinstance(saved.json()["version"], int)
-    again = (await api.put("/portfolio/performance/settings", json={"core_tickers": ["AAA_US_EQ"], "time_test_years": 2})).json()
+    again = (
+        await api.put(
+            "/portfolio/performance/settings",
+            json={"core_tickers": ["AAA_US_EQ"], "time_test_years": 2},
+        )
+    ).json()
     assert again["version"] > saved.json()["version"]
     # The settings are a config domain now: history, diff and rollback come with it.
     versions = (await api.get("/config/performance/versions")).json()
     assert [v["id"] for v in versions] == [again["version"], saved.json()["version"]]
     assert versions[0]["active"] and not versions[1]["active"]
-    diff = (await api.get("/config/performance/diff", params={"from": saved.json()["version"], "to": again["version"]})).json()
+    diff = (
+        await api.get(
+            "/config/performance/diff",
+            params={"from": saved.json()["version"], "to": again["version"]},
+        )
+    ).json()
     assert [c["path"] for c in diff["changes"]] == ["/time_test_years"]
     back = await api.post(f"/config/performance/versions/{saved.json()['version']}/rollback")
     assert back.status_code == 200, back.text
-    assert (await api.get("/portfolio/performance/settings")).json()["settings"]["time_test_years"] == 3
-    assert (await api.put("/portfolio/performance/settings", json={"core_tickers": ["AAA_US_EQ"], "time_test_years": 2})).status_code == 200
-    assert (await api.get("/portfolio/performance/settings")).json()["settings"]["time_test_years"] == 2
+    assert (await api.get("/portfolio/performance/settings")).json()["settings"][
+        "time_test_years"
+    ] == 3
+    assert (
+        await api.put(
+            "/portfolio/performance/settings",
+            json={"core_tickers": ["AAA_US_EQ"], "time_test_years": 2},
+        )
+    ).status_code == 200
+    assert (await api.get("/portfolio/performance/settings")).json()["settings"][
+        "time_test_years"
+    ] == 2
     sleeves = (await api.get("/portfolio/performance/sleeves")).json()
     assert sleeves["too_early"] is True and sleeves["review_item"] is False
-    bad = await api.put("/portfolio/performance/settings", json={"benchmark": {"components": [{"symbol": "A", "weight": "0.6", "currency": "EUR"}]}})
+    bad = await api.put(
+        "/portfolio/performance/settings",
+        json={"benchmark": {"components": [{"symbol": "A", "weight": "0.6", "currency": "EUR"}]}},
+    )
     assert bad.status_code == 422
+
+
+async def test_a_saved_report_keeps_the_figures_as_they_stood(api: httpx.AsyncClient) -> None:
+    saved = await api.post("/portfolio/performance/saved", json={"name": "Before the move"})
+    assert saved.status_code == 201
+    item = saved.json()
+    assert item["kind"] == "performance_report" and item["method_version"]
+    listed = (await api.get("/portfolio/performance/saved")).json()
+    assert [x["id"] for x in listed] == [item["id"]]
+    opened = (await api.get(f"/portfolio/performance/saved/{item['id']}")).json()
+    live = (await api.get("/portfolio/performance")).json()
+    assert opened["report"]["windows"] == live["windows"]
+    assert (await api.delete(f"/portfolio/performance/saved/{item['id']}")).status_code == 204
+    assert (await api.get("/portfolio/performance/saved")).json() == []
+    assert (await api.get(f"/portfolio/performance/saved/{item['id']}")).status_code == 404
+
+
+async def test_an_entered_split_changes_the_lots_quantity(api: httpx.AsyncClient) -> None:
+    before = (await api.get("/portfolio/performance/lots")).json()
+    settings = (await api.get("/portfolio/performance/settings")).json()["settings"]
+    settings["splits"] = [{"ticker": "AAA_US_EQ", "day": "2030-01-01", "ratio": "4", "note": ""}]
+    assert (await api.put("/portfolio/performance/settings", json=settings)).status_code == 200
+    after = (await api.get("/portfolio/performance/lots")).json()
+    assert before["lots"] and len(after["lots"]) == len(before["lots"])
+    assert float(after["lots"][0]["quantity"]) == pytest.approx(
+        4 * float(before["lots"][0]["quantity"])
+    )
 
 
 async def test_csv_exports_match_the_pages(api: httpx.AsyncClient) -> None:
@@ -171,18 +244,26 @@ async def test_csv_exports_match_the_pages(api: httpx.AsyncClient) -> None:
     assert len(ledger.strip().split("\n")) == 1 + 3  # deposit, buy, dividend
     realized = (await api.get("/portfolio/performance/export", params={"kind": "realized"})).text
     assert len(realized.strip().split("\n")) == 1  # nothing sold yet: header only
-    attribution = (await api.get("/portfolio/performance/export", params={"kind": "attribution", "days": 30})).text
+    attribution = (
+        await api.get("/portfolio/performance/export", params={"kind": "attribution", "days": 30})
+    ).text
     assert "AAA_US_EQ" in attribution
-    assert (await api.get("/portfolio/performance/export", params={"kind": "nope"})).status_code == 422
+    assert (
+        await api.get("/portfolio/performance/export", params={"kind": "nope"})
+    ).status_code == 422
 
 
-async def test_build_review_adds_the_performance_rows_end_to_end(api: httpx.AsyncClient, backend_pool: asyncpg.Pool) -> None:
+async def test_build_review_adds_the_performance_rows_end_to_end(
+    api: httpx.AsyncClient, backend_pool: asyncpg.Pool
+) -> None:
     from steward.config.jobs import ReviewSettings
     from steward.config.thesis import ThesesConfig
     from steward.review.monthly import build_review
 
     now = dt.datetime(2026, 1, 8, 9, tzinfo=dt.UTC)
-    body, _ = await build_review(backend_pool, now, ReviewSettings(), None, None, None, ThesesConfig())
+    body, _ = await build_review(
+        backend_pool, now, ReviewSettings(), None, None, None, ThesesConfig()
+    )
     performance = [r for r in body.compliance if r.kind == "performance"]
     assert [r.id for r in performance] == ["sleeves:gap"]
     assert performance[0].status == "unknown"  # no core ETFs listed: never a pass
@@ -191,16 +272,26 @@ async def test_build_review_adds_the_performance_rows_end_to_end(api: httpx.Asyn
     assert "Performance checks" not in " ".join(body.notes if hasattr(body, "notes") else [])
 
 
-async def test_performance_alerts_are_raised_once_and_can_be_turned_off(api: httpx.AsyncClient, backend_pool: asyncpg.Pool) -> None:
+async def test_performance_alerts_are_raised_once_and_can_be_turned_off(
+    api: httpx.AsyncClient, backend_pool: asyncpg.Pool
+) -> None:
     from steward.performance.alerts import PerformanceBreach, alert_performance
 
-    job = await backend_pool.fetchval("insert into public.job (job_type, trigger, status) values ('monthly_review', 'schedule', 'running') returning id")
+    job = await backend_pool.fetchval(
+        "insert into public.job (job_type, trigger, status) values ('monthly_review', 'schedule', 'running') returning id"
+    )
     gap = PerformanceBreach("sleeves:gap", "Stocks trail the core", "3.1 points a year")
-    lot = PerformanceBreach("time_test:AAA_US_EQ:lot-1", "AAA lot passes the test", "sell target reached early")
+    lot = PerformanceBreach(
+        "time_test:AAA_US_EQ:lot-1", "AAA lot passes the test", "sell target reached early"
+    )
     now = dt.datetime(2026, 1, 8, 9, tzinfo=dt.UTC)
 
     async def count(key_like: str) -> int:
-        return int(await backend_pool.fetchval("select count(*) from public.alert where dedupe_key like $1", key_like))
+        return int(
+            await backend_pool.fetchval(
+                "select count(*) from public.alert where dedupe_key like $1", key_like
+            )
+        )
 
     assert await alert_performance(backend_pool, [gap, lot], severity=0, now=now, job_id=job) == []
     assert await count("performance:%") == 0  # severity 0 raises nothing
@@ -210,38 +301,69 @@ async def test_performance_alerts_are_raised_once_and_can_be_turned_off(api: htt
     created = await alert_performance(backend_pool, [gap, lot], severity=3, now=now, job_id=job)
     first = await count("performance:%")
     assert len(created) == 2 and first >= 2 and await count("performance:sleeves:gap:2026-01") >= 1
-    again = await alert_performance(backend_pool, [gap, lot], severity=3, now=now + dt.timedelta(days=1), job_id=job)
+    again = await alert_performance(
+        backend_pool, [gap, lot], severity=3, now=now + dt.timedelta(days=1), job_id=job
+    )
     assert again == [] and await count("performance:%") == first  # same month's gap, same lot: once
-    await alert_performance(backend_pool, [gap], severity=3, now=dt.datetime(2026, 2, 2, 9, tzinfo=dt.UTC), job_id=job)
-    assert await count("performance:sleeves:gap:2026-02") >= 1  # a gap that lasts alerts again next month
+    await alert_performance(
+        backend_pool, [gap], severity=3, now=dt.datetime(2026, 2, 2, 9, tzinfo=dt.UTC), job_id=job
+    )
+    assert (
+        await count("performance:sleeves:gap:2026-02") >= 1
+    )  # a gap that lasts alerts again next month
 
 
-async def test_the_performance_rollbacks_remove_what_their_migrations_added(api: httpx.AsyncClient, migrated_db: MigratedDatabase) -> None:
+async def test_the_performance_rollbacks_remove_what_their_migrations_added(
+    api: httpx.AsyncClient, migrated_db: MigratedDatabase
+) -> None:
     from pathlib import Path
 
     rollback_dir = Path(__file__).resolve().parents[3] / "supabase" / "rollback"
     await api.put("/portfolio/performance/settings", json={"core_tickers": ["AAA_US_EQ"]})
-    await api.put("/portfolio/performance/settings", json={"core_tickers": ["AAA_US_EQ"], "time_test_years": 2})
+    await api.put(
+        "/portfolio/performance/settings",
+        json={"core_tickers": ["AAA_US_EQ"], "time_test_years": 2},
+    )
     conn = await asyncpg.connect(migrated_db.admin_url)
     try:
-        assert await conn.fetchval("select count(*) from public.config_version where domain = 'performance'") == 2
+        assert (
+            await conn.fetchval(
+                "select count(*) from public.config_version where domain = 'performance'"
+            )
+            == 2
+        )
         async with conn.transaction():
-            await conn.execute((rollback_dir / "20261014100000_performance_config.down.sql").read_text())
-            assert await conn.fetchval("select count(*) from public.config_version where domain = 'performance'") == 0
+            await conn.execute(
+                (rollback_dir / "20261014100000_performance_config.down.sql").read_text()
+            )
+            assert (
+                await conn.fetchval(
+                    "select count(*) from public.config_version where domain = 'performance'"
+                )
+                == 0
+            )
             with pytest.raises(asyncpg.CheckViolationError):
                 async with conn.transaction():
-                    await conn.execute("insert into public.config_version (domain, body, schema_version, active) values ('performance', '{}'::jsonb, 1, true)")
+                    await conn.execute(
+                        "insert into public.config_version (domain, body, schema_version, active) values ('performance', '{}'::jsonb, 1, true)"
+                    )
             # the guard on config_version is back on after the rollback
             with pytest.raises(asyncpg.PostgresError, match="immutable"):
                 async with conn.transaction():
                     await conn.execute("delete from public.config_version")
-            await conn.execute((rollback_dir / "20261013100000_portfolio_performance.down.sql").read_text())
-            assert not await conn.fetchval("select to_regclass('public.performance_setting') is not null")
+            await conn.execute(
+                (rollback_dir / "20261013100000_portfolio_performance.down.sql").read_text()
+            )
+            assert not await conn.fetchval(
+                "select to_regclass('public.performance_setting') is not null"
+            )
     finally:
         await conn.close()
 
 
-async def test_monthly_review_rows_for_sleeves_and_holding_periods(api: httpx.AsyncClient, backend_pool: asyncpg.Pool) -> None:
+async def test_monthly_review_rows_for_sleeves_and_holding_periods(
+    api: httpx.AsyncClient, backend_pool: asyncpg.Pool
+) -> None:
     from steward.performance.review import performance_review
 
     findings, lots = await performance_review(backend_pool)
@@ -249,7 +371,11 @@ async def test_monthly_review_rows_for_sleeves_and_holding_periods(api: httpx.As
     # No core ETFs listed yet: the row is unknown and says what to do, never a pass.
     assert gap.status == "unknown" and "core ETFs" in gap.detail
     (lot,) = lots
-    assert lot.ticker == "AAA_US_EQ" and str(lot.bought_on) == "2026-01-06" and str(lot.passes_on) == "2029-01-07"
+    assert (
+        lot.ticker == "AAA_US_EQ"
+        and str(lot.bought_on) == "2026-01-06"
+        and str(lot.passes_on) == "2029-01-07"
+    )
     assert lot.forfeits_exemption_warning is False
     await api.put("/portfolio/performance/settings", json={"core_tickers": ["AAA_US_EQ"]})
     findings, _ = await performance_review(backend_pool)

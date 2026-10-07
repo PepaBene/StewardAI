@@ -8,6 +8,7 @@ from pydantic import BaseModel
 
 from api.auth import Owner
 from api.db import Pool
+from steward import saved
 from steward.lookthrough.read import PortfolioIn
 from steward.xray import service
 from steward.xray.benchmark import XrayBenchmark
@@ -96,6 +97,50 @@ async def get_candidates(
     held = {p.ticker for p in pf.positions} if pf else set()
     funds = {f.isin: f.isin in loaded.data.snapshots for f in loaded.settings.funds}
     return XrayCandidates(items=await service.candidates(pool, owner.user_id, q, held, funds))
+
+
+class XraySaveScenarioRequest(saved.SavedAnalysisRequest):
+    scenario: ProposedRequest
+
+
+class XraySavedScenario(BaseModel):
+    item: saved.SavedAnalysisItem
+    scenario: ProposedRequest
+
+
+@router.get("/scenarios")
+async def list_xray_scenarios(pool: Pool, owner: Owner) -> list[saved.SavedAnalysisItem]:
+    """Your saved what-if scenarios, newest first."""
+    return await saved.list_saved(pool, owner.user_id, "xray_scenario")
+
+
+@router.post("/scenarios", status_code=201)
+async def save_xray_scenario(
+    pool: Pool, owner: Owner, body: XraySaveScenarioRequest
+) -> saved.SavedAnalysisItem:
+    """Keep a what-if. Only the proposed weights are stored; opening it runs them against the
+    holdings you have then."""
+    return await saved.save(
+        pool,
+        owner.user_id,
+        "xray_scenario",
+        body,
+        body.scenario.model_dump(mode="json"),
+    )
+
+
+@router.get("/scenarios/{scenario_id}")
+async def open_xray_scenario(pool: Pool, owner: Owner, scenario_id: int) -> XraySavedScenario:
+    found = await saved.load_saved(pool, owner.user_id, "xray_scenario", scenario_id)
+    if found is None:
+        raise HTTPException(404, "No such saved scenario.")
+    return XraySavedScenario(item=found[0], scenario=ProposedRequest.model_validate(found[1]))
+
+
+@router.delete("/scenarios/{scenario_id}", status_code=204)
+async def archive_xray_scenario(pool: Pool, owner: Owner, scenario_id: int) -> None:
+    if not await saved.archive(pool, owner.user_id, "xray_scenario", scenario_id):
+        raise HTTPException(404, "No such saved scenario.")
 
 
 @router.post("/proposed")
